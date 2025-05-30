@@ -93,11 +93,24 @@ export const timeRegistrationService = {
     
     // If no one else is working on the task, change status back to TODO
     if (!stillActive || stillActive.length === 0) {
+      // Get total time spent on task so far
+      const { data: totalTime, error: timeError } = await supabase
+        .from('time_registrations')
+        .select('duration_minutes')
+        .eq('task_id', registration.task_id)
+        .not('duration_minutes', 'is', null);
+      
+      if (timeError) throw timeError;
+      
+      const totalMinutes = totalTime?.reduce((sum, reg) => sum + (reg.duration_minutes || 0), 0) || 0;
+      
       await supabase
         .from('tasks')
         .update({ 
           status: 'TODO',
-          assignee_id: null
+          assignee_id: null,
+          // Store remaining time if task has a duration
+          // You might want to add a field for tracking remaining time
         })
         .eq('id', registration.task_id);
     }
@@ -192,35 +205,5 @@ export const timeRegistrationService = {
     
     if (error) throw error;
     return data || [];
-  },
-
-  // Auto-stop time registration when task is completed
-  async stopRegistrationForCompletedTask(taskId: string): Promise<void> {
-    const { data: activeRegistrations, error: fetchError } = await supabase
-      .from('time_registrations')
-      .select('id, start_time, employee_id')
-      .eq('task_id', taskId)
-      .eq('is_active', true);
-    
-    if (fetchError) throw fetchError;
-    
-    if (activeRegistrations && activeRegistrations.length > 0) {
-      const endTime = new Date();
-      
-      for (const registration of activeRegistrations) {
-        const startTime = new Date(registration.start_time);
-        const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / (1000 * 60));
-        
-        // Stop the registration
-        await supabase
-          .from('time_registrations')
-          .update({
-            end_time: endTime.toISOString(),
-            duration_minutes: durationMinutes,
-            is_active: false
-          })
-          .eq('id', registration.id);
-      }
-    }
   }
 };
