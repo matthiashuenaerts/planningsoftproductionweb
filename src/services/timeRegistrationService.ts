@@ -18,6 +18,27 @@ export const timeRegistrationService = {
     // First, stop any active registrations for this employee
     await this.stopActiveRegistrations(employeeId);
     
+    // Check if the task is currently not being worked on by anyone
+    const { data: currentlyActive, error: activeError } = await supabase
+      .from('time_registrations')
+      .select('id')
+      .eq('task_id', taskId)
+      .eq('is_active', true);
+    
+    if (activeError) throw activeError;
+    
+    // If no one is currently working on the task, update task status to IN_PROGRESS
+    if (!currentlyActive || currentlyActive.length === 0) {
+      await supabase
+        .from('tasks')
+        .update({ 
+          status: 'IN_PROGRESS',
+          status_changed_at: new Date().toISOString(),
+          assignee_id: employeeId
+        })
+        .eq('id', taskId);
+    }
+    
     const { data, error } = await supabase
       .from('time_registrations')
       .insert([{
@@ -36,10 +57,10 @@ export const timeRegistrationService = {
   async stopTask(registrationId: string): Promise<TimeRegistration> {
     const endTime = new Date();
     
-    // Get the registration to calculate duration
+    // Get the registration to calculate duration and task info
     const { data: registration, error: fetchError } = await supabase
       .from('time_registrations')
-      .select('start_time')
+      .select('start_time, task_id')
       .eq('id', registrationId)
       .single();
     
@@ -60,13 +81,47 @@ export const timeRegistrationService = {
       .single();
     
     if (error) throw error;
+    
+    // Check if anyone else is still working on this task
+    const { data: stillActive, error: stillActiveError } = await supabase
+      .from('time_registrations')
+      .select('id')
+      .eq('task_id', registration.task_id)
+      .eq('is_active', true);
+    
+    if (stillActiveError) throw stillActiveError;
+    
+    // If no one else is working on the task, change status back to TODO
+    if (!stillActive || stillActive.length === 0) {
+      // Get total time spent on task so far
+      const { data: totalTime, error: timeError } = await supabase
+        .from('time_registrations')
+        .select('duration_minutes')
+        .eq('task_id', registration.task_id)
+        .not('duration_minutes', 'is', null);
+      
+      if (timeError) throw timeError;
+      
+      const totalMinutes = totalTime?.reduce((sum, reg) => sum + (reg.duration_minutes || 0), 0) || 0;
+      
+      await supabase
+        .from('tasks')
+        .update({ 
+          status: 'TODO',
+          assignee_id: null,
+          // Store remaining time if task has a duration
+          // You might want to add a field for tracking remaining time
+        })
+        .eq('id', registration.task_id);
+    }
+    
     return data as TimeRegistration;
   },
 
   async stopActiveRegistrations(employeeId: string): Promise<void> {
     const { data: activeRegistrations, error: fetchError } = await supabase
       .from('time_registrations')
-      .select('id, start_time')
+      .select('id, start_time, task_id')
       .eq('employee_id', employeeId)
       .eq('is_active', true);
     
@@ -79,6 +134,7 @@ export const timeRegistrationService = {
         const startTime = new Date(registration.start_time);
         const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / (1000 * 60));
         
+        // Stop the registration
         await supabase
           .from('time_registrations')
           .update({
@@ -87,6 +143,26 @@ export const timeRegistrationService = {
             is_active: false
           })
           .eq('id', registration.id);
+        
+        // Check if anyone else is still working on this task
+        const { data: stillActive, error: stillActiveError } = await supabase
+          .from('time_registrations')
+          .select('id')
+          .eq('task_id', registration.task_id)
+          .eq('is_active', true);
+        
+        if (stillActiveError) continue;
+        
+        // If no one else is working on the task, change status back to TODO
+        if (!stillActive || stillActive.length === 0) {
+          await supabase
+            .from('tasks')
+            .update({ 
+              status: 'TODO',
+              assignee_id: null
+            })
+            .eq('id', registration.task_id);
+        }
       }
     }
   },

@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlayCircle, Clock } from 'lucide-react';
+import { PlayCircle, Clock, Users } from 'lucide-react';
 
 interface WorkstationViewProps {
   workstationName?: string;
@@ -25,6 +25,7 @@ interface ExtendedTask extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
   assignee_name?: string;
+  active_workers?: number;
 }
 
 const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, workstationId, onBack }) => {
@@ -46,6 +47,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         title: 'Timer Started',
         description: 'Time tracking has begun for this task',
       });
+      loadTasks(); // Reload tasks to update the display
     },
     onError: (error) => {
       toast({
@@ -173,17 +175,33 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                 assigneeName = employeeData.name;
               }
             }
+
+            // Get count of active workers on this task
+            let activeWorkers = 0;
+            if (task.status === 'IN_PROGRESS') {
+              const { data: activeRegistrations, error: regError } = await supabase
+                .from('time_registrations')
+                .select('id')
+                .eq('task_id', task.id)
+                .eq('is_active', true);
+              
+              if (!regError && activeRegistrations) {
+                activeWorkers = activeRegistrations.length;
+              }
+            }
             
             return {
               ...task,
               project_name: projectData.name,
-              assignee_name: assigneeName
+              assignee_name: assigneeName,
+              active_workers: activeWorkers
             } as ExtendedTask;
           } catch (error) {
             console.error('Error fetching project info for task:', error);
             return {
               ...task,
-              project_name: 'Unknown Project'
+              project_name: 'Unknown Project',
+              active_workers: 0
             } as ExtendedTask;
           }
         })
@@ -254,7 +272,8 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                       is_rush_order: true,
                       rush_order_id: taskLink.rush_order_id,
                       title: task.title,
-                      project_name: rushOrderInfo.title
+                      project_name: rushOrderInfo.title,
+                      active_workers: 0
                     } as ExtendedTask;
                   } catch (error) {
                     console.error('Error processing rush order task:', error);
@@ -422,6 +441,19 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     }
   };
 
+  const handleJoinTask = async (taskId: string) => {
+    if (!currentEmployee) return;
+    
+    try {
+      await startTimerMutation.mutateAsync({
+        employeeId: currentEmployee.id,
+        taskId: taskId
+      });
+    } catch (error) {
+      console.error('Error joining task:', error);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -467,12 +499,46 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
           </CardHeader>
           <CardContent>
             {inProgressTasks.length > 0 ? (
-              <TaskList 
-                tasks={inProgressTasks} 
-                onTaskStatusChange={handleTaskUpdate}
-                showRushOrderBadge={true}
-                showCountdownTimer={true}
-              />
+              <div className="space-y-3">
+                {inProgressTasks.map((task) => (
+                  <div key={task.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h3 className="font-medium">{task.title}</h3>
+                        <p className="text-sm text-gray-600">{task.project_name}</p>
+                        {task.assignee_name && (
+                          <p className="text-sm text-blue-600">Assigned to: {task.assignee_name}</p>
+                        )}
+                        {task.timeRemaining && (
+                          <p className={`text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-green-600'}`}>
+                            Time: {task.timeRemaining}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {task.active_workers && task.active_workers > 0 && (
+                          <div className="flex items-center gap-1 text-sm text-blue-600">
+                            <Users className="h-4 w-4" />
+                            <span>{task.active_workers}</span>
+                          </div>
+                        )}
+                        <button
+                          onClick={() => handleJoinTask(task.id)}
+                          className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                        >
+                          Join Task
+                        </button>
+                        <button
+                          onClick={() => handleTaskUpdate(task.id, 'COMPLETED')}
+                          className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                        >
+                          Complete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <p className="text-gray-500 text-center py-4">No tasks in progress</p>
             )}

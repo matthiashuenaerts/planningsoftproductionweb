@@ -127,62 +127,60 @@ const TaskTimer = () => {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md border-b">
-      <div className="container mx-auto px-4 py-2">
-        <Card 
-          className={`cursor-pointer transition-colors ${
-            activeRegistration && activeRegistration.is_active 
-              ? 'border-green-500 bg-green-50 hover:bg-green-100' 
-              : 'border-red-500 bg-red-50 hover:bg-red-100'
-          }`}
-          onClick={handleTimerClick}
-        >
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className={`p-2 rounded-full ${
-                  activeRegistration && activeRegistration.is_active 
-                    ? 'bg-green-500 text-white' 
-                    : 'bg-red-500 text-white'
-                }`}>
-                  {activeRegistration && activeRegistration.is_active ? 
-                    <Pause className="h-4 w-4" /> : 
-                    <Play className="h-4 w-4" />
-                  }
-                </div>
-                
-                <div>
-                  {activeRegistration && taskDetails ? (
-                    <div>
-                      <p className="font-medium text-sm">
-                        {(taskDetails as any).phases?.projects?.name || 'Unknown Project'}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {taskDetails.title}
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="font-medium text-sm text-gray-500">No Active Task</p>
-                      <p className="text-sm text-gray-400">Click to start tracking</p>
-                    </div>
-                  )}
-                </div>
+    <div className="fixed top-4 right-4 z-50">
+      <Card 
+        className={`cursor-pointer transition-colors max-w-sm ${
+          activeRegistration && activeRegistration.is_active 
+            ? 'border-green-500 bg-green-50 hover:bg-green-100' 
+            : 'border-red-500 bg-red-50 hover:bg-red-100'
+        }`}
+        onClick={handleTimerClick}
+      >
+        <CardContent className="p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className={`p-1.5 rounded-full ${
+                activeRegistration && activeRegistration.is_active 
+                  ? 'bg-green-500 text-white' 
+                  : 'bg-red-500 text-white'
+              }`}>
+                {activeRegistration && activeRegistration.is_active ? 
+                  <Pause className="h-3 w-3" /> : 
+                  <Play className="h-3 w-3" />
+                }
               </div>
               
-              <div className="flex items-center space-x-2">
-                <Clock className="h-4 w-4 text-gray-500" />
-                <span className="font-mono text-lg font-medium">
-                  {activeRegistration && activeRegistration.is_active 
-                    ? formatDuration(activeRegistration.start_time)
-                    : '00:00:00'
-                  }
-                </span>
+              <div>
+                {activeRegistration && taskDetails ? (
+                  <div>
+                    <p className="font-medium text-xs">
+                      {(taskDetails as any).phases?.projects?.name || 'Unknown Project'}
+                    </p>
+                    <p className="text-xs text-gray-600 truncate max-w-32">
+                      {taskDetails.title}
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-medium text-xs text-gray-500">No Active Task</p>
+                    <p className="text-xs text-gray-400">Click to start</p>
+                  </div>
+                )}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            
+            <div className="flex items-center space-x-1">
+              <Clock className="h-3 w-3 text-gray-500" />
+              <span className="font-mono text-sm font-medium">
+                {activeRegistration && activeRegistration.is_active 
+                  ? formatDuration(activeRegistration.start_time)
+                  : '00:00:00'
+                }
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
