@@ -9,11 +9,55 @@ import { TodaysDeliveries } from '@/components/logistics/TodaysDeliveries';
 import { UpcomingDeliveries } from '@/components/logistics/UpcomingDeliveries';
 import { BackorderDeliveries } from '@/components/logistics/BackorderDeliveries';
 import { Truck, Calendar, AlertTriangle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const Logistics = () => {
-  const { data: orders = [], isLoading, refetch } = useQuery({
+  const { data: rawOrders = [], isLoading, refetch } = useQuery({
     queryKey: ['all-orders'],
     queryFn: () => orderService.getAllOrders(),
+  });
+
+  // Enhance orders with project names
+  const { data: orders = [] } = useQuery({
+    queryKey: ['all-orders-with-projects', rawOrders],
+    queryFn: async () => {
+      if (!rawOrders.length) return [];
+      
+      const ordersWithProjects = await Promise.all(
+        rawOrders.map(async (order) => {
+          try {
+            // Get project name from project_id
+            const { data: projectData, error } = await supabase
+              .from('projects')
+              .select('name')
+              .eq('id', order.project_id)
+              .single();
+            
+            if (error) {
+              console.error('Error fetching project for order:', order.id, error);
+              return {
+                ...order,
+                project_name: order.project_id // Fallback to showing the ID
+              };
+            }
+            
+            return {
+              ...order,
+              project_name: projectData?.name || order.project_id
+            };
+          } catch (error) {
+            console.error('Error processing order:', order.id, error);
+            return {
+              ...order,
+              project_name: order.project_id
+            };
+          }
+        })
+      );
+      
+      return ordersWithProjects;
+    },
+    enabled: rawOrders.length > 0,
   });
 
   const today = new Date();
@@ -119,7 +163,10 @@ const Logistics = () => {
           </TabsContent>
 
           <TabsContent value="upcoming" className="space-y-4">
-            <UpcomingDeliveries orders={upcomingDeliveries} />
+            <UpcomingDeliveries 
+              orders={upcomingDeliveries}
+              onDeliveryConfirmed={handleDeliveryConfirmed}
+            />
           </TabsContent>
 
           <TabsContent value="backorders" className="space-y-4">

@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import TaskList from '@/components/TaskList';
 import { useToast } from '@/hooks/use-toast';
 import { Task } from '@/services/dataService';
+import { standardTasksService } from '@/services/standardTasksService';
 import { supabase } from '@/integrations/supabase/client';
 import { workstationService } from '@/services/workstationService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -284,6 +285,67 @@ const PersonalTasks = () => {
     }
   }, [currentEmployee, userWorkstations, toast]);
 
+  const checkAndUpdateLimitPhases = async (completedTask: ExtendedTask) => {
+    try {
+      if (!completedTask.standard_task_id) return;
+
+      // Get the project ID from the completed task
+      const { data: phaseData, error: phaseError } = await supabase
+        .from('phases')
+        .select('project_id')
+        .eq('id', completedTask.phase_id)
+        .single();
+
+      if (phaseError || !phaseData) return;
+
+      const projectId = phaseData.project_id;
+
+      // Find all tasks in the project that are on HOLD and have limit phases
+      const { data: holdTasks, error: holdError } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          phases!inner(project_id)
+        `)
+        .eq('phases.project_id', projectId)
+        .eq('status', 'HOLD')
+        .not('standard_task_id', 'is', null);
+
+      if (holdError || !holdTasks) return;
+
+      // Check each HOLD task to see if its limit phases are now satisfied
+      for (const holdTask of holdTasks) {
+        if (holdTask.standard_task_id) {
+          const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(
+            holdTask.standard_task_id,
+            projectId
+          );
+
+          if (limitPhasesSatisfied) {
+            // Update the task status from HOLD to TODO
+            await supabase
+              .from('tasks')
+              .update({ 
+                status: 'TODO',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', holdTask.id);
+
+            console.log(`Task ${holdTask.id} updated from HOLD to TODO due to satisfied limit phases`);
+          }
+        }
+      }
+
+      // Refetch personal tasks to reflect changes
+      if (userWorkstations.length > 0) {
+        // Re-run the fetchPersonalTasks logic
+        window.location.reload(); // Simple way to refresh the data
+      }
+    } catch (error) {
+      console.error('Error checking limit phases:', error);
+    }
+  };
+
   const handleTaskStatusChange = async (taskId: string, status: Task['status']) => {
     if (!currentEmployee) {
       toast({
@@ -319,6 +381,9 @@ const PersonalTasks = () => {
         
       if (error) throw error;
       
+      // Find the completed task for limit phase checking
+      const completedTask = [...todoTasks, ...inProgressTasks].find(task => task.id === taskId);
+      
       // Move task between lists based on new status
       if (status === 'IN_PROGRESS') {
         const task = todoTasks.find(t => t.id === taskId);
@@ -336,6 +401,11 @@ const PersonalTasks = () => {
         // Remove from both lists since we don't show completed tasks
         setTodoTasks(prev => prev.filter(t => t.id !== taskId));
         setInProgressTasks(prev => prev.filter(t => t.id !== taskId));
+        
+        // Check limit phases if task was completed
+        if (completedTask) {
+          await checkAndUpdateLimitPhases(completedTask);
+        }
       }
       
       toast({

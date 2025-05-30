@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
@@ -5,6 +6,7 @@ import { Task } from '@/services/dataService';
 import { taskService } from '@/services/dataService';
 import { rushOrderService } from '@/services/rushOrderService';
 import { workstationService } from '@/services/workstationService';
+import { standardTasksService } from '@/services/standardTasksService';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -264,6 +266,64 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     }
   }, [actualWorkstationName]);
 
+  const checkAndUpdateLimitPhases = async (completedTask: ExtendedTask) => {
+    try {
+      if (!completedTask.standard_task_id) return;
+
+      // Get the project ID from the completed task
+      const { data: phaseData, error: phaseError } = await supabase
+        .from('phases')
+        .select('project_id')
+        .eq('id', completedTask.phase_id)
+        .single();
+
+      if (phaseError || !phaseData) return;
+
+      const projectId = phaseData.project_id;
+
+      // Find all tasks in the project that are on HOLD and have limit phases
+      const { data: holdTasks, error: holdError } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          phases!inner(project_id)
+        `)
+        .eq('phases.project_id', projectId)
+        .eq('status', 'HOLD')
+        .not('standard_task_id', 'is', null);
+
+      if (holdError || !holdTasks) return;
+
+      // Check each HOLD task to see if its limit phases are now satisfied
+      for (const holdTask of holdTasks) {
+        if (holdTask.standard_task_id) {
+          const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(
+            holdTask.standard_task_id,
+            projectId
+          );
+
+          if (limitPhasesSatisfied) {
+            // Update the task status from HOLD to TODO
+            await supabase
+              .from('tasks')
+              .update({ 
+                status: 'TODO',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', holdTask.id);
+
+            console.log(`Task ${holdTask.id} updated from HOLD to TODO due to satisfied limit phases`);
+          }
+        }
+      }
+
+      // Reload tasks to reflect changes
+      await loadTasks();
+    } catch (error) {
+      console.error('Error checking limit phases:', error);
+    }
+  };
+
   const handleTaskUpdate = async (taskId: string, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     try {
       const updateData: any = { 
@@ -288,6 +348,9 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         
       if (error) throw error;
       
+      // Find the completed task for limit phase checking
+      const completedTask = tasks.find(task => task.id === taskId);
+      
       // Update local state
       setTasks(prevTasks => {
         if (newStatus === 'COMPLETED') {
@@ -302,6 +365,11 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
           );
         }
       });
+      
+      // Check limit phases if task was completed
+      if (newStatus === 'COMPLETED' && completedTask) {
+        await checkAndUpdateLimitPhases(completedTask);
+      }
       
       toast({
         title: 'Success',
