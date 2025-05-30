@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
@@ -7,9 +6,12 @@ import { taskService } from '@/services/dataService';
 import { rushOrderService } from '@/services/rushOrderService';
 import { workstationService } from '@/services/workstationService';
 import { standardTasksService } from '@/services/standardTasksService';
+import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlayCircle, Clock } from 'lucide-react';
 
 interface WorkstationViewProps {
@@ -31,6 +33,29 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const [error, setError] = useState<string | null>(null);
   const [actualWorkstationName, setActualWorkstationName] = useState<string>('');
   const { toast } = useToast();
+  const { currentEmployee } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Start task timer mutation
+  const startTimerMutation = useMutation({
+    mutationFn: ({ employeeId, taskId }: { employeeId: string; taskId: string }) =>
+      timeRegistrationService.startTask(employeeId, taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+      toast({
+        title: 'Timer Started',
+        description: 'Time tracking has begun for this task',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: 'Failed to start timer',
+        variant: 'destructive'
+      });
+      console.error('Start timer error:', error);
+    }
+  });
 
   // Timer for updating countdown
   useEffect(() => {
@@ -331,14 +356,26 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         updated_at: new Date().toISOString()
       };
       
-      // Set status_changed_at when changing status
+      // Set status_changed_at and assignee when changing status to IN_PROGRESS
       if (newStatus === 'IN_PROGRESS') {
         updateData.status_changed_at = new Date().toISOString();
+        if (currentEmployee) {
+          updateData.assignee_id = currentEmployee.id;
+          
+          // Start time tracking for this task
+          startTimerMutation.mutate({
+            employeeId: currentEmployee.id,
+            taskId: taskId
+          });
+        }
       }
       
       // Add completion info if task is being marked as completed
       if (newStatus === 'COMPLETED') {
         updateData.completed_at = new Date().toISOString();
+        if (currentEmployee) {
+          updateData.completed_by = currentEmployee.id;
+        }
       }
       
       const { error } = await supabase

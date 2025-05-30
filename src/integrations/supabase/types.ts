@@ -973,6 +973,57 @@ export type Database = {
           },
         ]
       }
+      time_registrations: {
+        Row: {
+          created_at: string
+          duration_minutes: number | null
+          employee_id: string
+          end_time: string | null
+          id: string
+          is_active: boolean
+          start_time: string
+          task_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes?: number | null
+          employee_id: string
+          end_time?: string | null
+          id?: string
+          is_active?: boolean
+          start_time: string
+          task_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number | null
+          employee_id?: string
+          end_time?: string | null
+          id?: string
+          is_active?: boolean
+          start_time?: string
+          task_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_registrations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_registrations_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trucks: {
         Row: {
           created_at: string

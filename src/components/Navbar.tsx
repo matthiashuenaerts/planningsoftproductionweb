@@ -1,6 +1,7 @@
+
 import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu } from 'lucide-react';
+import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
@@ -8,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Drawer, DrawerClose, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
+
 const NavbarContent = ({
   onItemClick
 }: {
@@ -20,6 +22,9 @@ const NavbarContent = ({
 
   // Allow admin, manager, installation_team, and worker roles to see the Rush Orders menu
   const canSeeRushOrders = currentEmployee && ['admin', 'manager', 'installation_team', 'worker'].includes(currentEmployee.role);
+
+  // Allow admin and manager to see time registrations
+  const canSeeTimeRegistrations = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
 
   // Query rush orders to get counts for pending orders and unread messages
   const {
@@ -119,6 +124,12 @@ const NavbarContent = ({
                   </div>
                 </NavLink>
               </li>}
+            {canSeeTimeRegistrations && <li>
+                <NavLink to="/time-registrations" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                  <Clock className="w-5 h-5 text-white group-hover:text-white" />
+                  <span className="ml-3">Time Registrations</span>
+                </NavLink>
+              </li>}
             <li>
               <NavLink to="/settings" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <Settings className="w-5 h-5 text-white group-hover:text-white" />
@@ -145,6 +156,7 @@ const NavbarContent = ({
       </div>
     </div>;
 };
+
 const Navbar = () => {
   const isMobile = useIsMobile();
   if (isMobile) {
@@ -167,4 +179,5 @@ const Navbar = () => {
       <NavbarContent />
     </div>;
 };
+
 export default Navbar;
