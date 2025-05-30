@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu } from 'lucide-react';
@@ -8,44 +7,44 @@ import { rushOrderService } from '@/services/rushOrderService';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerTrigger,
-} from '@/components/ui/drawer';
+import { Drawer, DrawerClose, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
+const NavbarContent = ({
+  onItemClick
+}: {
+  onItemClick?: () => void;
+}) => {
+  const {
+    currentEmployee,
+    logout
+  } = useAuth();
 
-const NavbarContent = ({ onItemClick }: { onItemClick?: () => void }) => {
-  const { currentEmployee, logout } = useAuth();
-  
   // Allow admin, manager, installation_team, and worker roles to see the Rush Orders menu
-  const canSeeRushOrders = currentEmployee && 
-    ['admin', 'manager', 'installation_team', 'worker'].includes(currentEmployee.role);
-  
+  const canSeeRushOrders = currentEmployee && ['admin', 'manager', 'installation_team', 'worker'].includes(currentEmployee.role);
+
   // Query rush orders to get counts for pending orders and unread messages
-  const { data: rushOrders, isLoading } = useQuery({
+  const {
+    data: rushOrders,
+    isLoading
+  } = useQuery({
     queryKey: ['rushOrders', 'navbar'],
     queryFn: rushOrderService.getAllRushOrders,
     enabled: !!canSeeRushOrders,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 30000 // Refetch every 30 seconds
   });
-  
+
   // Calculate counts
   const pendingOrdersCount = rushOrders?.filter(order => order.status === 'pending').length || 0;
-  
+
   // Calculate total unread messages across all rush orders
   const totalUnreadMessages = rushOrders?.reduce((total, order) => {
     return total + (order.unread_messages_count || 0);
   }, 0) || 0;
-
   const handleItemClick = () => {
     if (onItemClick) {
       onItemClick();
     }
   };
-
-  return (
-    <div className="h-full px-3 py-4 overflow-y-auto bg-sky-800 text-white flex flex-col">
+  return <div className="h-full px-3 py-4 overflow-y-auto bg-sky-800 text-white flex flex-col">
       <div className="flex flex-col h-full justify-between">
         <div>
           <h2 className="px-2 py-3 text-lg font-semibold mb-2">Demo Account</h2>
@@ -83,55 +82,43 @@ const NavbarContent = ({ onItemClick }: { onItemClick?: () => void }) => {
             <li>
               <NavLink to="/daily-tasks" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <ListChecks className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">Daily Tasks</span>
+                <span className="ml-3">Installation planning</span>
               </NavLink>
             </li>
-            {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && (
-              <li>
+            {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
                 <NavLink to="/planning" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Users className="w-5 h-5 text-white group-hover:text-white" />
                   <span className="ml-3">Planning</span>
                 </NavLink>
-              </li>
-            )}
-            {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && (
-              <li>
+              </li>}
+            {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
                 <NavLink to="/orders" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <PackagePlus className="w-5 h-5 text-white group-hover:text-white" />
                   <span className="ml-3">Orders</span>
                 </NavLink>
-              </li>
-            )}
-            {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && (
-              <li>
+              </li>}
+            {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
                 <NavLink to="/logistics" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Truck className="w-5 h-5 text-white group-hover:text-white" />
                   <span className="ml-3">Logistics</span>
                 </NavLink>
-              </li>
-            )}
-            {canSeeRushOrders && (
-              <li>
+              </li>}
+            {canSeeRushOrders && <li>
                 <NavLink to="/rush-orders" className="flex items-center justify-between p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <div className="flex items-center">
                     <PackagePlus className="w-5 h-5 text-white group-hover:text-white" />
                     <span className="ml-3">Rush Orders</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {pendingOrdersCount > 0 && (
-                      <Badge variant="outline" className="bg-yellow-500 text-white border-0 font-medium">
+                    {pendingOrdersCount > 0 && <Badge variant="outline" className="bg-yellow-500 text-white border-0 font-medium">
                         {pendingOrdersCount}
-                      </Badge>
-                    )}
-                    {totalUnreadMessages > 0 && (
-                      <Badge variant="outline" className="bg-red-500 text-white border-0 font-medium">
+                      </Badge>}
+                    {totalUnreadMessages > 0 && <Badge variant="outline" className="bg-red-500 text-white border-0 font-medium">
                         {totalUnreadMessages}
-                      </Badge>
-                    )}
+                      </Badge>}
                   </div>
                 </NavLink>
-              </li>
-            )}
+              </li>}
             <li>
               <NavLink to="/settings" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <Settings className="w-5 h-5 text-white group-hover:text-white" />
@@ -143,40 +130,27 @@ const NavbarContent = ({ onItemClick }: { onItemClick?: () => void }) => {
         
         {/* User profile at bottom */}
         <div className="mt-auto border-t border-blue-600 pt-2">
-          {currentEmployee && (
-            <div className="flex items-center p-2 mb-2">
+          {currentEmployee && <div className="flex items-center p-2 mb-2">
               <User className="w-5 h-5 text-white" />
               <span className="ml-3 text-sm">{currentEmployee.name}</span>
-            </div>
-          )}
-          <button 
-            onClick={() => {
-              logout();
-              handleItemClick();
-            }}
-            className="flex w-full items-center p-2 rounded-lg hover:bg-sky-700 group text-white"
-          >
+            </div>}
+          <button onClick={() => {
+          logout();
+          handleItemClick();
+        }} className="flex w-full items-center p-2 rounded-lg hover:bg-sky-700 group text-white">
             <LogOut className="w-5 h-5 text-white" />
             <span className="ml-3">Logout</span>
           </button>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 const Navbar = () => {
   const isMobile = useIsMobile();
-
   if (isMobile) {
-    return (
-      <Drawer direction="left">
+    return <Drawer direction="left">
         <DrawerTrigger asChild>
-          <Button 
-            variant="outline" 
-            size="icon"
-            className="fixed top-4 left-4 z-50 bg-sky-800 border-sky-600 text-white hover:bg-sky-700"
-          >
+          <Button variant="outline" size="icon" className="fixed top-4 left-4 z-50 bg-sky-800 border-sky-600 text-white hover:bg-sky-700">
             <Menu className="h-4 w-4" />
           </Button>
         </DrawerTrigger>
@@ -187,15 +161,10 @@ const Navbar = () => {
             </div>
           </DrawerClose>
         </DrawerContent>
-      </Drawer>
-    );
+      </Drawer>;
   }
-
-  return (
-    <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+  return <div className="w-64 bg-sidebar fixed top-0 bottom-0">
       <NavbarContent />
-    </div>
-  );
+    </div>;
 };
-
 export default Navbar;
