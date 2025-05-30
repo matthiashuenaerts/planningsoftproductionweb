@@ -86,7 +86,7 @@ const Projects = () => {
         <Navbar />
       </div>
       
-      <div className="ml-64 flex-1 p-6 py-0">
+      <div className="ml-64 flex-1 p-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
             <div>
