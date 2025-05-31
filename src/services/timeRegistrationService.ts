@@ -75,7 +75,7 @@ export const timeRegistrationService = {
     const startTime = new Date(registration.start_time);
     const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / (1000 * 60));
     
-    // Get current task info and count active users
+    // Get current task info to calculate remaining duration
     const { data: taskData, error: taskError } = await supabase
       .from('tasks')
       .select('duration')
@@ -84,22 +84,9 @@ export const timeRegistrationService = {
     
     if (taskError) throw taskError;
     
-    // Count active users on this task
-    const { data: activeUsers, error: activeUsersError } = await supabase
-      .from('time_registrations')
-      .select('id')
-      .eq('task_id', registration.task_id)
-      .eq('is_active', true);
-    
-    if (activeUsersError) throw activeUsersError;
-    
-    const activeUserCount = activeUsers ? activeUsers.length : 0;
-    
     let remainingDuration: number | undefined;
     if (taskData.duration) {
-      // Apply acceleration factor based on active users
-      const acceleratedDuration = durationMinutes * activeUserCount;
-      remainingDuration = Math.max(0, taskData.duration - acceleratedDuration);
+      remainingDuration = Math.max(0, taskData.duration - durationMinutes);
     }
     
     const { data, error } = await supabase
@@ -203,25 +190,16 @@ export const timeRegistrationService = {
         const startTime = new Date(registration.start_time);
         const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / (1000 * 60));
         
-        // Get task duration and count active users to calculate remaining time
+        // Get task duration to calculate remaining time
         const { data: taskData } = await supabase
           .from('tasks')
           .select('duration')
           .eq('id', registration.task_id)
           .single();
         
-        const { data: activeUsers } = await supabase
-          .from('time_registrations')
-          .select('id')
-          .eq('task_id', registration.task_id)
-          .eq('is_active', true);
-        
-        const activeUserCount = activeUsers ? activeUsers.length : 1;
-        
         let remainingDuration: number | undefined;
         if (taskData?.duration) {
-          const acceleratedDuration = durationMinutes * activeUserCount;
-          remainingDuration = Math.max(0, taskData.duration - acceleratedDuration);
+          remainingDuration = Math.max(0, taskData.duration - durationMinutes);
         }
         
         // Stop the registration
@@ -273,17 +251,6 @@ export const timeRegistrationService = {
     
     if (error) throw error;
     return data as TimeRegistration | null;
-  },
-
-  async getTaskActiveUserCount(taskId: string): Promise<number> {
-    const { data, error } = await supabase
-      .from('time_registrations')
-      .select('id')
-      .eq('task_id', taskId)
-      .eq('is_active', true);
-    
-    if (error) throw error;
-    return data ? data.length : 0;
   },
 
   async getAllRegistrations(): Promise<any[]> {
