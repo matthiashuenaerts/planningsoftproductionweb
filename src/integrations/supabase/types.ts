@@ -368,6 +368,47 @@ export type Database = {
           },
         ]
       }
+      project_onedrive_configs: {
+        Row: {
+          access_token: string | null
+          created_at: string
+          folder_id: string
+          folder_name: string
+          folder_url: string
+          id: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          created_at?: string
+          folder_id: string
+          folder_name: string
+          folder_url: string
+          id?: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          created_at?: string
+          folder_id?: string
+          folder_name?: string
+          folder_url?: string
+          id?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_project_onedrive_configs_project_id"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_team_assignments: {
         Row: {
           created_at: string
