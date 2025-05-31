@@ -39,8 +39,8 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
 
   // Start task timer mutation
   const startTimerMutation = useMutation({
-    mutationFn: ({ employeeId, taskId }: { employeeId: string; taskId: string }) =>
-      timeRegistrationService.startTask(employeeId, taskId),
+    mutationFn: ({ employeeId, taskId, remainingDuration }: { employeeId: string; taskId: string; remainingDuration?: number }) =>
+      timeRegistrationService.startTask(employeeId, taskId, remainingDuration),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
       toast({
@@ -370,6 +370,28 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
 
   const handleTaskUpdate = async (taskId: string, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     try {
+      if (newStatus === 'COMPLETED') {
+        // Use the new completeTask method that stops time registration first
+        await timeRegistrationService.completeTask(taskId);
+        
+        // Find the completed task for limit phase checking
+        const completedTask = tasks.find(task => task.id === taskId);
+        
+        // Remove completed task from local state
+        setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+        
+        // Check limit phases if task was completed
+        if (completedTask) {
+          await checkAndUpdateLimitPhases(completedTask);
+        }
+        
+        toast({
+          title: 'Success',
+          description: 'Task completed successfully',
+        });
+        return;
+      }
+      
       const updateData: any = { 
         status: newStatus,
         updated_at: new Date().toISOString()
@@ -381,19 +403,16 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         if (currentEmployee) {
           updateData.assignee_id = currentEmployee.id;
           
+          // Get current task duration for the timer
+          const currentTask = tasks.find(task => task.id === taskId);
+          const remainingDuration = currentTask?.duration;
+          
           // Start time tracking for this task
           startTimerMutation.mutate({
             employeeId: currentEmployee.id,
-            taskId: taskId
+            taskId: taskId,
+            remainingDuration: remainingDuration
           });
-        }
-      }
-      
-      // Add completion info if task is being marked as completed
-      if (newStatus === 'COMPLETED') {
-        updateData.completed_at = new Date().toISOString();
-        if (currentEmployee) {
-          updateData.completed_by = currentEmployee.id;
         }
       }
       
@@ -404,28 +423,14 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         
       if (error) throw error;
       
-      // Find the completed task for limit phase checking
-      const completedTask = tasks.find(task => task.id === taskId);
-      
       // Update local state
-      setTasks(prevTasks => {
-        if (newStatus === 'COMPLETED') {
-          // Remove completed tasks from the list
-          return prevTasks.filter(task => task.id !== taskId);
-        } else {
-          // Update the task status
-          return prevTasks.map(task => 
-            task.id === taskId 
-              ? { ...task, status: newStatus, status_changed_at: updateData.status_changed_at || task.status_changed_at }
-              : task
-          );
-        }
-      });
-      
-      // Check limit phases if task was completed
-      if (newStatus === 'COMPLETED' && completedTask) {
-        await checkAndUpdateLimitPhases(completedTask);
-      }
+      setTasks(prevTasks => 
+        prevTasks.map(task => 
+          task.id === taskId 
+            ? { ...task, status: newStatus, status_changed_at: updateData.status_changed_at || task.status_changed_at }
+            : task
+        )
+      );
       
       toast({
         title: 'Success',
@@ -445,9 +450,14 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     if (!currentEmployee) return;
     
     try {
+      // Get current task to check remaining duration
+      const currentTask = tasks.find(task => task.id === taskId);
+      const remainingDuration = currentTask?.duration;
+      
       await startTimerMutation.mutateAsync({
         employeeId: currentEmployee.id,
-        taskId: taskId
+        taskId: taskId,
+        remainingDuration: remainingDuration
       });
     } catch (error) {
       console.error('Error joining task:', error);

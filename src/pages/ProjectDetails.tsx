@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -13,11 +12,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import TaskList from '@/components/TaskList';
 import ProjectFileManager from '@/components/ProjectFileManager';
+import OneDriveIntegration from '@/components/OneDriveIntegration';
 import { useAuth } from '@/context/AuthContext';
 
 const ProjectDetails = () => {
@@ -224,12 +224,20 @@ const ProjectDetails = () => {
                 >
                   <FileText className="mr-2 h-4 w-4" /> Files
                 </Button>
+                <Button 
+                  variant={activeTab === 'onedrive' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('onedrive')}
+                >
+                  <Folder className="mr-2 h-4 w-4" /> OneDrive
+                </Button>
               </div>
             </div>
           </div>
           
           {activeTab === 'files' ? (
             <ProjectFileManager projectId={projectId!} />
+          ) : activeTab === 'onedrive' ? (
+            <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Project Summary Card */}

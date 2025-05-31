@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface TimeRegistration {
@@ -14,7 +13,7 @@ export interface TimeRegistration {
 }
 
 export const timeRegistrationService = {
-  async startTask(employeeId: string, taskId: string): Promise<TimeRegistration> {
+  async startTask(employeeId: string, taskId: string, remainingDurationMinutes?: number): Promise<TimeRegistration> {
     // First, stop any active registrations for this employee
     await this.stopActiveRegistrations(employeeId);
     
@@ -29,13 +28,20 @@ export const timeRegistrationService = {
     
     // If no one is currently working on the task, update task status to IN_PROGRESS
     if (!currentlyActive || currentlyActive.length === 0) {
+      const updateData: any = { 
+        status: 'IN_PROGRESS',
+        status_changed_at: new Date().toISOString(),
+        assignee_id: employeeId
+      };
+      
+      // If we have remaining duration, update the task with it
+      if (remainingDurationMinutes !== undefined) {
+        updateData.duration = remainingDurationMinutes;
+      }
+      
       await supabase
         .from('tasks')
-        .update({ 
-          status: 'IN_PROGRESS',
-          status_changed_at: new Date().toISOString(),
-          assignee_id: employeeId
-        })
+        .update(updateData)
         .eq('id', taskId);
     }
     
@@ -54,7 +60,7 @@ export const timeRegistrationService = {
     return data as TimeRegistration;
   },
 
-  async stopTask(registrationId: string): Promise<TimeRegistration> {
+  async stopTask(registrationId: string): Promise<{ registration: TimeRegistration; remainingDuration?: number }> {
     const endTime = new Date();
     
     // Get the registration to calculate duration and task info
@@ -68,6 +74,20 @@ export const timeRegistrationService = {
     
     const startTime = new Date(registration.start_time);
     const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+    
+    // Get current task info to calculate remaining duration
+    const { data: taskData, error: taskError } = await supabase
+      .from('tasks')
+      .select('duration')
+      .eq('id', registration.task_id)
+      .single();
+    
+    if (taskError) throw taskError;
+    
+    let remainingDuration: number | undefined;
+    if (taskData.duration) {
+      remainingDuration = Math.max(0, taskData.duration - durationMinutes);
+    }
     
     const { data, error } = await supabase
       .from('time_registrations')
@@ -91,31 +111,67 @@ export const timeRegistrationService = {
     
     if (stillActiveError) throw stillActiveError;
     
-    // If no one else is working on the task, change status back to TODO
+    // If no one else is working on the task, change status back to TODO and save remaining duration
     if (!stillActive || stillActive.length === 0) {
-      // Get total time spent on task so far
-      const { data: totalTime, error: timeError } = await supabase
-        .from('time_registrations')
-        .select('duration_minutes')
-        .eq('task_id', registration.task_id)
-        .not('duration_minutes', 'is', null);
+      const updateData: any = { 
+        status: 'TODO',
+        assignee_id: null
+      };
       
-      if (timeError) throw timeError;
-      
-      const totalMinutes = totalTime?.reduce((sum, reg) => sum + (reg.duration_minutes || 0), 0) || 0;
+      // Save remaining duration if available
+      if (remainingDuration !== undefined) {
+        updateData.duration = remainingDuration;
+      }
       
       await supabase
         .from('tasks')
-        .update({ 
-          status: 'TODO',
-          assignee_id: null,
-          // Store remaining time if task has a duration
-          // You might want to add a field for tracking remaining time
-        })
+        .update(updateData)
         .eq('id', registration.task_id);
     }
     
-    return data as TimeRegistration;
+    return { 
+      registration: data as TimeRegistration, 
+      remainingDuration 
+    };
+  },
+
+  async completeTask(taskId: string): Promise<void> {
+    // First, stop all active time registrations for this task
+    const { data: activeRegistrations, error: fetchError } = await supabase
+      .from('time_registrations')
+      .select('id, start_time')
+      .eq('task_id', taskId)
+      .eq('is_active', true);
+    
+    if (fetchError) throw fetchError;
+    
+    if (activeRegistrations && activeRegistrations.length > 0) {
+      const endTime = new Date();
+      
+      for (const registration of activeRegistrations) {
+        const startTime = new Date(registration.start_time);
+        const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+        
+        await supabase
+          .from('time_registrations')
+          .update({
+            end_time: endTime.toISOString(),
+            duration_minutes: durationMinutes,
+            is_active: false
+          })
+          .eq('id', registration.id);
+      }
+    }
+    
+    // Now mark the task as completed
+    await supabase
+      .from('tasks')
+      .update({
+        status: 'COMPLETED',
+        completed_at: new Date().toISOString(),
+        assignee_id: null
+      })
+      .eq('id', taskId);
   },
 
   async stopActiveRegistrations(employeeId: string): Promise<void> {
@@ -133,6 +189,18 @@ export const timeRegistrationService = {
       for (const registration of activeRegistrations) {
         const startTime = new Date(registration.start_time);
         const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+        
+        // Get task duration to calculate remaining time
+        const { data: taskData } = await supabase
+          .from('tasks')
+          .select('duration')
+          .eq('id', registration.task_id)
+          .single();
+        
+        let remainingDuration: number | undefined;
+        if (taskData?.duration) {
+          remainingDuration = Math.max(0, taskData.duration - durationMinutes);
+        }
         
         // Stop the registration
         await supabase
@@ -155,12 +223,18 @@ export const timeRegistrationService = {
         
         // If no one else is working on the task, change status back to TODO
         if (!stillActive || stillActive.length === 0) {
+          const updateData: any = { 
+            status: 'TODO',
+            assignee_id: null
+          };
+          
+          if (remainingDuration !== undefined) {
+            updateData.duration = remainingDuration;
+          }
+          
           await supabase
             .from('tasks')
-            .update({ 
-              status: 'TODO',
-              assignee_id: null
-            })
+            .update(updateData)
             .eq('id', registration.task_id);
         }
       }
