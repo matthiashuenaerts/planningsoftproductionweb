@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -20,60 +19,48 @@ import TaskList from '@/components/TaskList';
 import ProjectFileManager from '@/components/ProjectFileManager';
 import OneDriveIntegration from '@/components/OneDriveIntegration';
 import { useAuth } from '@/context/AuthContext';
-import { timeRegistrationService } from '@/services/timeRegistrationService';
-
-interface ExtendedTask extends Task {
-  activeUserCount?: number;
-}
 
 const ProjectDetails = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [project, setProject] = useState<Project | null>(null);
-  const [tasks, setTasks] = useState<ExtendedTask[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('tasks');
   const { currentEmployee } = useAuth();
 
-  const fetchProjectData = async () => {
-    if (!projectId) return;
-    
-    try {
-      setLoading(true);
-      const projectData = await projectService.getById(projectId);
-      setProject(projectData);
-      
-      // Fetch phases for this project
-      const phaseData = await projectService.getProjectPhases(projectId);
-      
-      // Fetch tasks for all phases with active user counts
-      let allTasks: ExtendedTask[] = [];
-      for (const phase of phaseData) {
-        const phaseTasks = await taskService.getByPhase(phase.id);
-        
-        // Add active user count for each task
-        const tasksWithUserCount = await Promise.all(phaseTasks.map(async (task) => {
-          const activeUserCount = await timeRegistrationService.getTaskActiveUserCount(task.id);
-          return { ...task, activeUserCount };
-        }));
-        
-        allTasks = [...allTasks, ...tasksWithUserCount];
-      }
-      
-      setTasks(allTasks);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: `Failed to load project data: ${error.message}`,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchProjectData = async () => {
+      if (!projectId) return;
+      
+      try {
+        setLoading(true);
+        const projectData = await projectService.getById(projectId);
+        setProject(projectData);
+        
+        // Fetch phases for this project
+        const phaseData = await projectService.getProjectPhases(projectId);
+        
+        // Fetch tasks for all phases
+        let allTasks: Task[] = [];
+        for (const phase of phaseData) {
+          const phaseTasks = await taskService.getByPhase(phase.id);
+          allTasks = [...allTasks, ...phaseTasks];
+        }
+        
+        setTasks(allTasks);
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: `Failed to load project data: ${error.message}`,
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchProjectData();
   }, [projectId, toast]);
 
@@ -106,8 +93,23 @@ const ProjectDetails = () => {
       
       await taskService.update(taskId, updateData);
       
-      // Refresh project data to get updated task info
-      await fetchProjectData();
+      // Update local state
+      setTasks(prevTasks => 
+        prevTasks.map(task => 
+          task.id === taskId ? { 
+            ...task, 
+            status,
+            status_changed_at: updateData.status_changed_at,
+            ...(status === 'IN_PROGRESS' ? {
+              assignee_id: currentEmployee.id
+            } : {}),
+            ...(status === 'COMPLETED' ? {
+              completed_at: updateData.completed_at,
+              completed_by: currentEmployee.id
+            } : {})
+          } : task
+        )
+      );
       
       toast({
         title: "Task updated",
@@ -296,9 +298,6 @@ const ProjectDetails = () => {
                         tasks={todoTasks} 
                         title="To Do Tasks" 
                         onTaskStatusChange={handleTaskStatusChange}
-                        enableTimeRegistration={true}
-                        onRefresh={fetchProjectData}
-                        showCountdownTimer={true}
                       />
                     </TabsContent>
                     <TabsContent value="in_progress">
@@ -306,9 +305,6 @@ const ProjectDetails = () => {
                         tasks={inProgressTasks} 
                         title="In Progress Tasks" 
                         onTaskStatusChange={handleTaskStatusChange}
-                        enableTimeRegistration={true}
-                        onRefresh={fetchProjectData}
-                        showCountdownTimer={true}
                       />
                     </TabsContent>
                     <TabsContent value="completed">
@@ -316,8 +312,6 @@ const ProjectDetails = () => {
                         tasks={completedTasks} 
                         title="Completed Tasks" 
                         onTaskStatusChange={handleTaskStatusChange}
-                        enableTimeRegistration={true}
-                        onRefresh={fetchProjectData}
                       />
                     </TabsContent>
                   </Tabs>
