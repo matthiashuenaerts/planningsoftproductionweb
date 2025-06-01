@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,7 @@ import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer } fr
 interface ExtendedTask extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
-  assignee_name?: string; // Add assignee name for display
+  assignee_name?: string;
 }
 
 interface TaskListProps {
@@ -19,6 +20,7 @@ interface TaskListProps {
   compact?: boolean;
   showCountdownTimer?: boolean;
   onTaskStatusChange?: (taskId: string, status: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => Promise<void>;
+  showCompleteButton?: boolean;
 }
 
 const TaskList: React.FC<TaskListProps> = ({ 
@@ -28,7 +30,8 @@ const TaskList: React.FC<TaskListProps> = ({
   title, 
   compact = false,
   showCountdownTimer = false,
-  onTaskStatusChange 
+  onTaskStatusChange,
+  showCompleteButton = false
 }) => {
   const getPriorityColor = (priority: string) => {
     switch (priority.toLowerCase()) {
@@ -100,7 +103,6 @@ const TaskList: React.FC<TaskListProps> = ({
                   {task.title}
                 </h4>
                 
-                {/* Countdown Timer for IN_PROGRESS tasks */}
                 {task.status === 'IN_PROGRESS' && task.timeRemaining && task.duration && (
                   <div className={`mt-2 flex items-center gap-2 text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-blue-600'}`}>
                     <Timer className="h-4 w-4" />
@@ -170,12 +172,23 @@ const TaskList: React.FC<TaskListProps> = ({
             {(onTaskUpdate || onTaskStatusChange) && (
               <div className="flex gap-2">
                 {task.status === 'TODO' && (
-                  <Button 
-                    size="sm" 
-                    onClick={() => handleStatusChange(task, 'IN_PROGRESS')}
-                  >
-                    Start Task
-                  </Button>
+                  <>
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleStatusChange(task, 'IN_PROGRESS')}
+                    >
+                      Start Task
+                    </Button>
+                    {showCompleteButton && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleStatusChange(task, 'COMPLETED')}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        Complete
+                      </Button>
+                    )}
+                  </>
                 )}
                 {task.status === 'IN_PROGRESS' && (
                   <>

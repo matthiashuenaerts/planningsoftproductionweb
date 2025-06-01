@@ -64,6 +64,68 @@ export type Database = {
           },
         ]
       }
+      chat_messages: {
+        Row: {
+          chat_room_id: string
+          created_at: string
+          employee_id: string
+          id: string
+          message: string
+          updated_at: string
+        }
+        Insert: {
+          chat_room_id: string
+          created_at?: string
+          employee_id: string
+          id?: string
+          message: string
+          updated_at?: string
+        }
+        Update: {
+          chat_room_id?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+          message?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_chat_room_id_fkey"
+            columns: ["chat_room_id"]
+            isOneToOne: false
+            referencedRelation: "chat_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_rooms: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          role: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       employee_workstation_links: {
         Row: {
           created_at: string
@@ -361,6 +423,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "phases_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_onedrive_configs: {
+        Row: {
+          access_token: string | null
+          created_at: string
+          folder_id: string
+          folder_name: string
+          folder_url: string
+          id: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          created_at?: string
+          folder_id: string
+          folder_name: string
+          folder_url: string
+          id?: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          created_at?: string
+          folder_id?: string
+          folder_name?: string
+          folder_url?: string
+          id?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_project_onedrive_configs_project_id"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
