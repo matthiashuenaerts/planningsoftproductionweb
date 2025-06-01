@@ -42,7 +42,7 @@ export const chatService = {
       .from('chat_messages')
       .select(`
         *,
-        employees!inner(name)
+        employees (name)
       `)
       .eq('chat_room_id', chatRoomId)
       .order('created_at', { ascending: true });

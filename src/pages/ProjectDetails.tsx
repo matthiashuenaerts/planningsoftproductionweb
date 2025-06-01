@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { taskService } from '@/services/dataService';
+import { dataService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/Navbar';
@@ -27,13 +26,13 @@ const ProjectDetails = () => {
 
   const { data: project, isLoading: isProjectLoading, error: projectError } = useQuery({
     queryKey: ['project', projectId],
-    queryFn: () => taskService.getProject(projectId || ''),
+    queryFn: () => dataService.getProject(projectId || ''),
     enabled: !!projectId,
   });
 
   const { data: tasks, isLoading: isTasksLoading, error: tasksError } = useQuery({
     queryKey: ['projectTasks', projectId],
-    queryFn: () => taskService.getTasksForProject(projectId || ''),
+    queryFn: () => dataService.getTasksForProject(projectId || ''),
     enabled: !!projectId,
     refetchInterval: 30000,
   });
@@ -274,8 +273,8 @@ const ProjectDetails = () => {
             </TabsContent>
 
             <TabsContent value="files">
-              {project && <ProjectFileManager projectId={project.id} />}
-              {project && <OneDriveIntegration projectId={project.id} projectName={project.name} />}
+              {project && <ProjectFileManager project={project} />}
+              {project && <OneDriveIntegration projectId={project.id} />}
             </TabsContent>
           </Tabs>
         </div>

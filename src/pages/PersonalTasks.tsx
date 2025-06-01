@@ -1,6 +1,7 @@
+
 import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { taskService, Task } from '@/services/dataService';
+import { dataService, Task } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { useAuth } from '@/context/AuthContext';
 import TaskList from '@/components/TaskList';
@@ -21,7 +22,7 @@ const PersonalTasks = () => {
 
   const { data: tasks, isLoading, error } = useQuery({
     queryKey: ['personalTasks', currentEmployee?.id],
-    queryFn: () => taskService.getTasksForEmployee(currentEmployee?.id || ''),
+    queryFn: () => dataService.getTasksForEmployee(currentEmployee?.id || ''),
     enabled: !!currentEmployee?.id,
     refetchInterval: 30000,
   });
