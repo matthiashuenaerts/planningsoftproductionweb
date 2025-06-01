@@ -64,68 +64,6 @@ export type Database = {
           },
         ]
       }
-      chat_messages: {
-        Row: {
-          chat_room_id: string
-          created_at: string
-          employee_id: string
-          id: string
-          message: string
-          updated_at: string
-        }
-        Insert: {
-          chat_room_id: string
-          created_at?: string
-          employee_id: string
-          id?: string
-          message: string
-          updated_at?: string
-        }
-        Update: {
-          chat_room_id?: string
-          created_at?: string
-          employee_id?: string
-          id?: string
-          message?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "chat_messages_chat_room_id_fkey"
-            columns: ["chat_room_id"]
-            isOneToOne: false
-            referencedRelation: "chat_rooms"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      chat_rooms: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-          role: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name: string
-          role: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
-          role?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       employee_workstation_links: {
         Row: {
           created_at: string

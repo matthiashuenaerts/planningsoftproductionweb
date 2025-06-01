@@ -34,7 +34,7 @@ export const oneDriveService = {
       .single();
     
     if (error) throw error;
-    return data as ProjectOneDriveConfig;
+    return data;
   },
 
   async getProjectOneDriveConfig(projectId: string): Promise<ProjectOneDriveConfig | null> {
@@ -45,7 +45,7 @@ export const oneDriveService = {
       .maybeSingle();
     
     if (error) throw error;
-    return data as ProjectOneDriveConfig | null;
+    return data;
   },
 
   async updateProjectOneDriveConfig(projectId: string, updates: Partial<ProjectOneDriveConfig>): Promise<ProjectOneDriveConfig> {
@@ -60,7 +60,7 @@ export const oneDriveService = {
       .single();
     
     if (error) throw error;
-    return data as ProjectOneDriveConfig;
+    return data;
   },
 
   async disconnectProjectFromOneDrive(projectId: string): Promise<void> {
