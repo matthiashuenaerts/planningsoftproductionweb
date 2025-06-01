@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
@@ -8,51 +9,50 @@ import { useAuth } from '@/context/AuthContext';
 import { Clock, Users, Calendar, BarChart3 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
 const TimeRegistrations = () => {
-  const {
-    currentEmployee
-  } = useAuth();
+  const { currentEmployee } = useAuth();
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
 
   // Check if user is admin or manager
   const canViewAllRegistrations = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
-  const {
-    data: allRegistrations = [],
-    isLoading
-  } = useQuery({
+
+  const { data: allRegistrations = [], isLoading } = useQuery({
     queryKey: ['allTimeRegistrations'],
     queryFn: () => timeRegistrationService.getAllRegistrations(),
-    enabled: !!canViewAllRegistrations
+    enabled: !!canViewAllRegistrations,
   });
-  const {
-    data: myRegistrations = []
-  } = useQuery({
+
+  const { data: myRegistrations = [] } = useQuery({
     queryKey: ['myTimeRegistrations', currentEmployee?.id],
     queryFn: () => currentEmployee ? timeRegistrationService.getRegistrationsByEmployee(currentEmployee.id) : [],
-    enabled: !!currentEmployee
+    enabled: !!currentEmployee,
   });
+
   const formatDuration = (minutes: number | null) => {
     if (!minutes) return '0h 0m';
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return `${hours}h ${mins}m`;
   };
+
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString();
   };
+
   const getUniqueEmployees = () => {
     const employees = new Set();
     allRegistrations.forEach((reg: any) => {
       if (reg.employees) {
-        employees.add(JSON.stringify({
-          id: reg.employee_id,
-          name: reg.employees.name
-        }));
+        employees.add(JSON.stringify({ id: reg.employee_id, name: reg.employees.name }));
       }
     });
     return Array.from(employees).map((emp: any) => JSON.parse(emp));
   };
-  const filteredRegistrations = selectedEmployee === 'all' ? allRegistrations : allRegistrations.filter((reg: any) => reg.employee_id === selectedEmployee);
+
+  const filteredRegistrations = selectedEmployee === 'all' 
+    ? allRegistrations 
+    : allRegistrations.filter((reg: any) => reg.employee_id === selectedEmployee);
 
   // Calculate statistics
   const todayRegistrations = filteredRegistrations.filter((reg: any) => {
@@ -60,18 +60,26 @@ const TimeRegistrations = () => {
     const today = new Date().toDateString();
     return regDate === today;
   });
-  const totalMinutesToday = todayRegistrations.reduce((total: number, reg: any) => total + (reg.duration_minutes || 0), 0);
+
+  const totalMinutesToday = todayRegistrations.reduce((total: number, reg: any) => 
+    total + (reg.duration_minutes || 0), 0);
+
   const activeRegistrations = filteredRegistrations.filter((reg: any) => reg.is_active);
+
   if (isLoading) {
-    return <div className="min-h-screen bg-gray-50">
+    return (
+      <div className="min-h-screen bg-gray-50">
         <Navbar />
         <div className="ml-64 container mx-auto px-4 py-8">
           <div>Loading...</div>
         </div>
-      </div>;
+      </div>
+    );
   }
+
   if (!canViewAllRegistrations) {
-    return <div className="min-h-screen bg-gray-50">
+    return (
+      <div className="min-h-screen bg-gray-50">
         <Navbar />
         <div className="ml-64 container mx-auto px-4 py-8">
           <div className="mb-8">
@@ -97,7 +105,8 @@ const TimeRegistrations = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {formatDuration(myRegistrations.reduce((total: number, reg: any) => total + (reg.duration_minutes || 0), 0))}
+                  {formatDuration(myRegistrations.reduce((total: number, reg: any) => 
+                    total + (reg.duration_minutes || 0), 0))}
                 </div>
               </CardContent>
             </Card>
@@ -132,7 +141,8 @@ const TimeRegistrations = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {myRegistrations.map((registration: any) => <TableRow key={registration.id}>
+                  {myRegistrations.map((registration: any) => (
+                    <TableRow key={registration.id}>
                       <TableCell className="font-medium">
                         {registration.tasks?.phases?.projects?.name || 'Unknown Project'}
                       </TableCell>
@@ -147,17 +157,21 @@ const TimeRegistrations = () => {
                           {registration.is_active ? 'Active' : 'Completed'}
                         </Badge>
                       </TableCell>
-                    </TableRow>)}
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
         </div>
-      </div>;
+      </div>
+    );
   }
-  return <div className="min-h-screen bg-gray-50">
+
+  return (
+    <div className="min-h-screen bg-gray-50">
       <Navbar />
-      <div className="ml-64 w-full p-6">
+      <div className="ml-64 container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Time Registration Dashboard</h1>
           <p className="text-gray-600 mt-2">Monitor time tracking across all employees</p>
@@ -223,11 +237,17 @@ const TimeRegistrations = () => {
             <CardDescription>
               <div className="flex items-center space-x-4">
                 <span>Filter by employee:</span>
-                <select value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)} className="border rounded px-2 py-1">
+                <select 
+                  value={selectedEmployee}
+                  onChange={(e) => setSelectedEmployee(e.target.value)}
+                  className="border rounded px-2 py-1"
+                >
                   <option value="all">All Employees</option>
-                  {getUniqueEmployees().map((employee: any) => <option key={employee.id} value={employee.id}>
+                  {getUniqueEmployees().map((employee: any) => (
+                    <option key={employee.id} value={employee.id}>
                       {employee.name}
-                    </option>)}
+                    </option>
+                  ))}
                 </select>
               </div>
             </CardDescription>
@@ -246,7 +266,8 @@ const TimeRegistrations = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRegistrations.map((registration: any) => <TableRow key={registration.id}>
+                {filteredRegistrations.map((registration: any) => (
+                  <TableRow key={registration.id}>
                     <TableCell className="font-medium">
                       {registration.employees?.name || 'Unknown Employee'}
                     </TableCell>
@@ -264,12 +285,15 @@ const TimeRegistrations = () => {
                         {registration.is_active ? 'Active' : 'Completed'}
                       </Badge>
                     </TableCell>
-                  </TableRow>)}
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default TimeRegistrations;
