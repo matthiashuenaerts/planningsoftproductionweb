@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
+import { timeRegistrationService } from '@/services/timeRegistrationService';
 import TaskList from '@/components/TaskList';
 import ProjectFileManager from '@/components/ProjectFileManager';
 import OneDriveIntegration from '@/components/OneDriveIntegration';
@@ -75,6 +76,53 @@ const ProjectDetails = () => {
     }
     
     try {
+      // If starting a task, use time registration service
+      if (status === 'IN_PROGRESS') {
+        await timeRegistrationService.startTask(currentEmployee.id, taskId);
+        
+        // Update local state
+        setTasks(prevTasks => 
+          prevTasks.map(task => 
+            task.id === taskId ? { 
+              ...task, 
+              status: 'IN_PROGRESS',
+              status_changed_at: new Date().toISOString(),
+              assignee_id: currentEmployee.id
+            } : task
+          )
+        );
+        
+        toast({
+          title: "Task Started",
+          description: "Task has been started and time registration created.",
+        });
+        return;
+      }
+      
+      // If completing a task, use time registration service
+      if (status === 'COMPLETED') {
+        await timeRegistrationService.completeTask(taskId);
+        
+        // Update local state
+        setTasks(prevTasks => 
+          prevTasks.map(task => 
+            task.id === taskId ? { 
+              ...task, 
+              status: 'COMPLETED',
+              completed_at: new Date().toISOString(),
+              completed_by: currentEmployee.id
+            } : task
+          )
+        );
+        
+        toast({
+          title: "Task Completed",
+          description: "Task has been completed and time registration ended.",
+        });
+        return;
+      }
+      
+      // For other status changes, use regular task service
       const updateData: Partial<Task> = { 
         status, 
         status_changed_at: new Date().toISOString() 
@@ -298,6 +346,7 @@ const ProjectDetails = () => {
                         tasks={todoTasks} 
                         title="To Do Tasks" 
                         onTaskStatusChange={handleTaskStatusChange}
+                        showCompleteButton={true}
                       />
                     </TabsContent>
                     <TabsContent value="in_progress">

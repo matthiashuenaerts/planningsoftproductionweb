@@ -18,6 +18,7 @@ interface TaskListProps {
   title?: string;
   compact?: boolean;
   showCountdownTimer?: boolean;
+  showCompleteButton?: boolean;
   onTaskStatusChange?: (taskId: string, status: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => Promise<void>;
 }
 
@@ -28,6 +29,7 @@ const TaskList: React.FC<TaskListProps> = ({
   title, 
   compact = false,
   showCountdownTimer = false,
+  showCompleteButton = false,
   onTaskStatusChange 
 }) => {
   const getPriorityColor = (priority: string) => {
@@ -170,12 +172,23 @@ const TaskList: React.FC<TaskListProps> = ({
             {(onTaskUpdate || onTaskStatusChange) && (
               <div className="flex gap-2">
                 {task.status === 'TODO' && (
-                  <Button 
-                    size="sm" 
-                    onClick={() => handleStatusChange(task, 'IN_PROGRESS')}
-                  >
-                    Start Task
-                  </Button>
+                  <>
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleStatusChange(task, 'IN_PROGRESS')}
+                    >
+                      Start Task
+                    </Button>
+                    {showCompleteButton && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleStatusChange(task, 'COMPLETED')}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        Complete
+                      </Button>
+                    )}
+                  </>
                 )}
                 {task.status === 'IN_PROGRESS' && (
                   <>

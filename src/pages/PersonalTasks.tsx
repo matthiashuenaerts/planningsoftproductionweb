@@ -7,6 +7,7 @@ import { Task } from '@/services/dataService';
 import { standardTasksService } from '@/services/standardTasksService';
 import { supabase } from '@/integrations/supabase/client';
 import { workstationService } from '@/services/workstationService';
+import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Workstation } from '@/services/workstationService';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -357,6 +358,48 @@ const PersonalTasks = () => {
     }
     
     try {
+      // If starting a task, use time registration service
+      if (status === 'IN_PROGRESS') {
+        await timeRegistrationService.startTask(currentEmployee.id, taskId);
+        
+        // Move task between lists
+        const task = todoTasks.find(t => t.id === taskId);
+        if (task) {
+          setTodoTasks(prev => prev.filter(t => t.id !== taskId));
+          setInProgressTasks(prev => [...prev, { ...task, status: 'IN_PROGRESS', assignee_id: currentEmployee.id }]);
+        }
+        
+        toast({
+          title: "Task Started",
+          description: "Task has been started and time registration created.",
+        });
+        return;
+      }
+      
+      // If completing a task, use time registration service
+      if (status === 'COMPLETED') {
+        await timeRegistrationService.completeTask(taskId);
+        
+        // Find the completed task for limit phase checking
+        const completedTask = [...todoTasks, ...inProgressTasks].find(task => task.id === taskId);
+        
+        // Remove from both lists since we don't show completed tasks
+        setTodoTasks(prev => prev.filter(t => t.id !== taskId));
+        setInProgressTasks(prev => prev.filter(t => t.id !== taskId));
+        
+        // Check limit phases if task was completed
+        if (completedTask) {
+          await checkAndUpdateLimitPhases(completedTask);
+        }
+        
+        toast({
+          title: "Task Completed",
+          description: "Task has been completed and time registration ended.",
+        });
+        return;
+      }
+      
+      // For other status changes, use regular database update
       const updateData: Partial<Task> = { 
         status,
         updated_at: new Date().toISOString(),
@@ -368,12 +411,6 @@ const PersonalTasks = () => {
         updateData.assignee_id = currentEmployee?.id;
       }
       
-      // Add completion info if task is being marked as completed
-      if (status === 'COMPLETED') {
-        updateData.completed_at = new Date().toISOString();
-        updateData.completed_by = currentEmployee.id;
-      }
-      
       const { error } = await supabase
         .from('tasks')
         .update(updateData)
@@ -381,30 +418,12 @@ const PersonalTasks = () => {
         
       if (error) throw error;
       
-      // Find the completed task for limit phase checking
-      const completedTask = [...todoTasks, ...inProgressTasks].find(task => task.id === taskId);
-      
       // Move task between lists based on new status
-      if (status === 'IN_PROGRESS') {
-        const task = todoTasks.find(t => t.id === taskId);
-        if (task) {
-          setTodoTasks(prev => prev.filter(t => t.id !== taskId));
-          setInProgressTasks(prev => [...prev, { ...task, status: 'IN_PROGRESS', assignee_id: currentEmployee.id }]);
-        }
-      } else if (status === 'TODO') {
+      if (status === 'TODO') {
         const task = inProgressTasks.find(t => t.id === taskId);
         if (task) {
           setInProgressTasks(prev => prev.filter(t => t.id !== taskId));
           setTodoTasks(prev => [...prev, { ...task, status: 'TODO' }]);
-        }
-      } else if (status === 'COMPLETED') {
-        // Remove from both lists since we don't show completed tasks
-        setTodoTasks(prev => prev.filter(t => t.id !== taskId));
-        setInProgressTasks(prev => prev.filter(t => t.id !== taskId));
-        
-        // Check limit phases if task was completed
-        if (completedTask) {
-          await checkAndUpdateLimitPhases(completedTask);
         }
       }
       
