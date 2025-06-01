@@ -42,7 +42,7 @@ export const chatService = {
       .from('chat_messages')
       .select(`
         *,
-        employees (name)
+        employees!inner (name)
       `)
       .eq('chat_room_id', chatRoomId)
       .order('created_at', { ascending: true });
@@ -51,7 +51,7 @@ export const chatService = {
     
     return (data || []).map(msg => ({
       ...msg,
-      employee_name: msg.employees?.name || 'Unknown User'
+      employee_name: (msg.employees as any)?.name || 'Unknown User'
     }));
   },
 

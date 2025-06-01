@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { dataService, Task } from '@/services/dataService';
+import { taskService, Task } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { useAuth } from '@/context/AuthContext';
 import TaskList from '@/components/TaskList';
@@ -20,9 +20,15 @@ const PersonalTasks = () => {
   const queryClient = useQueryClient();
   const [activeTasks, setActiveTasks] = useState<ExtendedTask[]>([]);
 
+  // Get tasks assigned to the current employee
   const { data: tasks, isLoading, error } = useQuery({
     queryKey: ['personalTasks', currentEmployee?.id],
-    queryFn: () => dataService.getTasksForEmployee(currentEmployee?.id || ''),
+    queryFn: async () => {
+      if (!currentEmployee?.id) return [];
+      // Get all tasks and filter by assignee_id
+      const allTasks = await taskService.getAll();
+      return allTasks.filter(task => task.assignee_id === currentEmployee.id);
+    },
     enabled: !!currentEmployee?.id,
     refetchInterval: 30000,
   });

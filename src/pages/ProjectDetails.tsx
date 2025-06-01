@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { dataService } from '@/services/dataService';
+import { projectService, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/Navbar';
@@ -26,14 +26,29 @@ const ProjectDetails = () => {
 
   const { data: project, isLoading: isProjectLoading, error: projectError } = useQuery({
     queryKey: ['project', projectId],
-    queryFn: () => dataService.getProject(projectId || ''),
+    queryFn: () => projectService.getById(projectId || ''),
+    enabled: !!projectId,
+  });
+
+  // Get all phases for the project first, then get tasks for all phases
+  const { data: phases } = useQuery({
+    queryKey: ['projectPhases', projectId],
+    queryFn: () => projectService.getProjectPhases(projectId || ''),
     enabled: !!projectId,
   });
 
   const { data: tasks, isLoading: isTasksLoading, error: tasksError } = useQuery({
     queryKey: ['projectTasks', projectId],
-    queryFn: () => dataService.getTasksForProject(projectId || ''),
-    enabled: !!projectId,
+    queryFn: async () => {
+      if (!phases || phases.length === 0) return [];
+      const allTasks = [];
+      for (const phase of phases) {
+        const phaseTasks = await taskService.getByPhase(phase.id);
+        allTasks.push(...phaseTasks);
+      }
+      return allTasks;
+    },
+    enabled: !!projectId && !!phases,
     refetchInterval: 30000,
   });
 
@@ -139,21 +154,12 @@ const ProjectDetails = () => {
             <div className="mt-4 flex items-center space-x-6">
               <div className="flex items-center text-gray-500">
                 <Calendar className="h-4 w-4 mr-2" />
-                <span>Due Date: {new Date(project?.due_date).toLocaleDateString()}</span>
-              </div>
-              <div className="flex items-center text-gray-500">
-                <MapPin className="h-4 w-4 mr-2" />
-                <span>Location: {project?.location}</span>
+                <span>Due Date: {new Date(project?.installation_date).toLocaleDateString()}</span>
               </div>
               <div className="flex items-center text-gray-500">
                 <User className="h-4 w-4 mr-2" />
-                <span>Client: {project?.client_name}</span>
+                <span>Client: {project?.client}</span>
               </div>
-            </div>
-            <div className="mt-4">
-              {project?.is_rush_order && (
-                <Badge variant="destructive">Rush Order</Badge>
-              )}
             </div>
           </div>
           
@@ -185,18 +191,8 @@ const ProjectDetails = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-gray-500" />
-                        <span className="font-semibold">Due Date:</span>
-                        <span>{new Date(project?.due_date).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-gray-500" />
-                        <span className="font-semibold">Location:</span>
-                        <span>{project?.location}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Truck className="h-4 w-4 text-gray-500" />
-                        <span className="font-semibold">Logistics Contact:</span>
-                        <span>{project?.logistics_contact}</span>
+                        <span className="font-semibold">Installation Date:</span>
+                        <span>{new Date(project?.installation_date).toLocaleDateString()}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Cloud className="h-4 w-4 text-gray-500" />
@@ -216,17 +212,7 @@ const ProjectDetails = () => {
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4 text-gray-500" />
                         <span className="font-semibold">Client Name:</span>
-                        <span>{project?.client_name}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-gray-500" />
-                        <span className="font-semibold">Client Contact:</span>
-                        <span>{project?.client_contact}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-gray-500" />
-                        <span className="font-semibold">Client Email:</span>
-                        <span>{project?.client_email}</span>
+                        <span>{project?.client}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -274,7 +260,7 @@ const ProjectDetails = () => {
 
             <TabsContent value="files">
               {project && <ProjectFileManager project={project} />}
-              {project && <OneDriveIntegration projectId={project.id} />}
+              {project && <OneDriveIntegration projectId={project.id} projectName={project.name} />}
             </TabsContent>
           </Tabs>
         </div>
