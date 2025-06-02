@@ -1,182 +1,141 @@
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { timeRegistrationService } from '@/services/timeRegistrationService';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { Play, Pause, Clock } from 'lucide-react';
+import { Play, Pause, Square, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useAuth } from '@/context/AuthContext';
+import { timeRegistrationService } from '@/services/timeRegistrationService';
+import { useToast } from '@/hooks/use-toast';
+import NotificationBox from './NotificationBox';
 
 const TaskTimer = () => {
+  const [isRunning, setIsRunning] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [currentTaskTitle, setCurrentTaskTitle] = useState<string | null>(null);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Update time every second
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Get active registration
-  const { data: activeRegistration, isLoading } = useQuery({
-    queryKey: ['activeTimeRegistration', currentEmployee?.id],
-    queryFn: () => currentEmployee ? timeRegistrationService.getActiveRegistration(currentEmployee.id) : null,
-    enabled: !!currentEmployee,
-    refetchInterval: 5000 // Refetch every 5 seconds
-  });
-
-  // Get task details if there's an active registration
-  const { data: taskDetails } = useQuery({
-    queryKey: ['taskDetails', activeRegistration?.task_id],
-    queryFn: async () => {
-      if (!activeRegistration?.task_id) return null;
-      
-      const { data, error } = await supabase
-        .from('tasks')
-        .select(`
-          title,
-          phases (
-            name,
-            projects (name)
-          )
-        `)
-        .eq('id', activeRegistration.task_id)
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!activeRegistration?.task_id
-  });
-
-  // Start task mutation
-  const startTaskMutation = useMutation({
-    mutationFn: ({ employeeId, taskId }: { employeeId: string; taskId: string }) =>
-      timeRegistrationService.startTask(employeeId, taskId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
-      toast({
-        title: 'Task Started',
-        description: 'Time tracking has begun for this task',
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: 'Failed to start task timer',
-        variant: 'destructive'
-      });
-      console.error('Start task error:', error);
-    }
-  });
-
-  // Stop task mutation
-  const stopTaskMutation = useMutation({
-    mutationFn: (registrationId: string) =>
-      timeRegistrationService.stopTask(registrationId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
-      toast({
-        title: 'Task Paused',
-        description: 'Time tracking has been paused',
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: 'Failed to pause task timer',
-        variant: 'destructive'
-      });
-      console.error('Stop task error:', error);
-    }
-  });
-
-  const handleTimerClick = () => {
-    if (!currentEmployee) return;
-
-    if (activeRegistration && activeRegistration.is_active) {
-      // Stop the active task
-      stopTaskMutation.mutate(activeRegistration.id);
-    } else {
-      // Need to select a task to start - for now, show a message
-      toast({
-        title: 'No Active Task',
-        description: 'Start a task from the workstation or personal tasks page to begin time tracking',
-      });
-    }
-  };
-
-  const formatDuration = (startTime: string) => {
-    const start = new Date(startTime);
-    const now = currentTime;
-    const diffMs = now.getTime() - start.getTime();
-    const hours = Math.floor(diffMs / (1000 * 60 * 60));
-    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+    let interval: NodeJS.Timeout | null = null;
     
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    if (isRunning) {
+      interval = setInterval(() => {
+        setSeconds(seconds => seconds + 1);
+      }, 1000);
+    } else if (!isRunning && seconds !== 0) {
+      if (interval) clearInterval(interval);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRunning, seconds]);
+
+  // Check for active registrations on component mount
+  useEffect(() => {
+    const checkActiveRegistrations = async () => {
+      if (!currentEmployee) return;
+      
+      try {
+        const activeRegistrations = await timeRegistrationService.getActiveRegistrationsByEmployee(currentEmployee.id);
+        
+        if (activeRegistrations.length > 0) {
+          const activeReg = activeRegistrations[0];
+          setIsRunning(true);
+          
+          // Calculate elapsed seconds
+          const startTime = new Date(activeReg.start_time).getTime();
+          const now = new Date().getTime();
+          const elapsedSeconds = Math.floor((now - startTime) / 1000);
+          setSeconds(elapsedSeconds);
+          
+          // You might want to fetch task title here if available
+          setCurrentTaskTitle('Active Task');
+        }
+      } catch (error) {
+        console.error('Error checking active registrations:', error);
+      }
+    };
+    
+    checkActiveRegistrations();
+  }, [currentEmployee]);
+
+  const formatTime = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    
+    if (hours > 0) {
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  if (isLoading || !currentEmployee) {
-    return null;
-  }
+  const handleStart = () => {
+    setIsRunning(true);
+  };
+
+  const handlePause = () => {
+    setIsRunning(false);
+  };
+
+  const handleStop = async () => {
+    if (!currentEmployee) return;
+    
+    try {
+      // Stop any active registrations
+      await timeRegistrationService.stopActiveRegistrations(currentEmployee.id);
+      
+      setIsRunning(false);
+      setSeconds(0);
+      setCurrentTaskTitle(null);
+      
+      toast({
+        title: "Timer Stopped",
+        description: "Time registration has been stopped.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to stop timer: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
-    <div className="fixed top-4 right-4 z-50">
-      <Card 
-        className={`cursor-pointer transition-colors max-w-sm ${
-          activeRegistration && activeRegistration.is_active 
-            ? 'border-green-500 bg-green-50 hover:bg-green-100' 
-            : 'border-red-500 bg-red-50 hover:bg-red-100'
-        }`}
-        onClick={handleTimerClick}
-      >
+    <div className="fixed top-4 right-4 z-50 flex items-center gap-4">
+      <NotificationBox />
+      
+      <Card className="bg-white shadow-lg">
         <CardContent className="p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className={`p-1.5 rounded-full ${
-                activeRegistration && activeRegistration.is_active 
-                  ? 'bg-green-500 text-white' 
-                  : 'bg-red-500 text-white'
-              }`}>
-                {activeRegistration && activeRegistration.is_active ? 
-                  <Pause className="h-3 w-3" /> : 
-                  <Play className="h-3 w-3" />
-                }
+          <div className="flex items-center gap-3">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <div className="flex flex-col">
+              <div className="font-mono text-lg font-bold">
+                {formatTime(seconds)}
               </div>
-              
-              <div>
-                {activeRegistration && taskDetails ? (
-                  <div>
-                    <p className="font-medium text-xs">
-                      {(taskDetails as any).phases?.projects?.name || 'Unknown Project'}
-                    </p>
-                    <p className="text-xs text-gray-600 truncate max-w-32">
-                      {taskDetails.title}
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="font-medium text-xs text-gray-500">No Active Task</p>
-                    <p className="text-xs text-gray-400">Click to start</p>
-                  </div>
-                )}
-              </div>
+              {currentTaskTitle && (
+                <div className="text-xs text-muted-foreground truncate max-w-32">
+                  {currentTaskTitle}
+                </div>
+              )}
             </div>
-            
-            <div className="flex items-center space-x-1">
-              <Clock className="h-3 w-3 text-gray-500" />
-              <span className="font-mono text-sm font-medium">
-                {activeRegistration && activeRegistration.is_active 
-                  ? formatDuration(activeRegistration.start_time)
-                  : '00:00:00'
-                }
-              </span>
+            <div className="flex gap-1">
+              {!isRunning ? (
+                <Button size="sm" onClick={handleStart} variant="outline">
+                  <Play className="h-3 w-3" />
+                </Button>
+              ) : (
+                <Button size="sm" onClick={handlePause} variant="outline">
+                  <Pause className="h-3 w-3" />
+                </Button>
+              )}
+              {(isRunning || seconds > 0) && (
+                <Button size="sm" onClick={handleStop} variant="outline">
+                  <Square className="h-3 w-3" />
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>

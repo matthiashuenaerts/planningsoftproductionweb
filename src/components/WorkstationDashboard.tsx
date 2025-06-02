@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Task } from '@/services/dataService';
 import { useToast } from '@/hooks/use-toast';
-import { Package, Clock, Check, Calendar, ArrowUpRight, LayoutGrid, ListIcon } from 'lucide-react';
+import { Package, Check, Calendar, ArrowUpRight, LayoutGrid, ListIcon } from 'lucide-react';
 import TaskList from '@/components/TaskList';
 import { Workstation } from '@/services/workstationService';
 
@@ -45,7 +45,6 @@ const WorkstationDashboard = () => {
   const [workstationData, setWorkstationData] = useState<WorkstationData[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
   const { toast } = useToast();
   const [userWorkstations, setUserWorkstations] = useState<Workstation[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -796,7 +795,6 @@ const WorkstationDashboard = () => {
               
               <div className="fixed bottom-4 right-4 text-sm text-gray-500">
                 <div className="flex items-center justify-end">
-                  <Clock className="h-4 w-4 mr-1" />
                   Auto-refreshes every minute
                 </div>
               </div>
