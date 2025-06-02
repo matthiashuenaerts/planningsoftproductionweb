@@ -3,10 +3,12 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Order } from '@/types/order';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Order, OrderItem } from '@/types/order';
 import { DeliveryConfirmationModal } from './DeliveryConfirmationModal';
+import { orderService } from '@/services/orderService';
 import { format, differenceInDays } from 'date-fns';
-import { AlertTriangle, Package, Building2, Clock } from 'lucide-react';
+import { AlertTriangle, Package, Building2, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface BackorderDeliveriesProps {
   orders: Order[];
@@ -18,6 +20,8 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
   onDeliveryConfirmed 
 }) => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [orderItems, setOrderItems] = useState<Record<string, OrderItem[]>>({});
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -39,6 +43,29 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
     if (daysOverdue <= 3) return 'text-orange-600';
     if (daysOverdue <= 7) return 'text-red-600';
     return 'text-red-800';
+  };
+
+  const toggleOrderExpansion = async (orderId: string) => {
+    // Close if already open
+    if (expandedOrder === orderId) {
+      setExpandedOrder(null);
+      return;
+    }
+    
+    // Open and load order items if they haven't been loaded yet
+    setExpandedOrder(orderId);
+    
+    if (!orderItems[orderId]) {
+      try {
+        const items = await orderService.getOrderItems(orderId);
+        setOrderItems(prev => ({
+          ...prev,
+          [orderId]: items
+        }));
+      } catch (error: any) {
+        console.error("Failed to load order details:", error);
+      }
+    }
   };
 
   if (orders.length === 0) {
@@ -93,12 +120,12 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-gray-400" />
                         <div>
-                          <p className="text-sm text-gray-500">Project ID</p>
-                          <p className="font-medium">{order.project_id}</p>
+                          <p className="text-sm text-gray-500">Project</p>
+                          <p className="font-medium">{(order as any).project_name || order.project_id}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -114,7 +141,18 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
                           {format(new Date(order.expected_delivery), 'PPP')}
                         </p>
                       </div>
-                      <div className="flex items-center justify-end">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          onClick={() => toggleOrderExpansion(order.id)}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          {expandedOrder === order.id ? 
+                            <><ChevronUp className="h-4 w-4" /> Hide Items</> : 
+                            <><ChevronDown className="h-4 w-4" /> Show Items</>
+                          }
+                        </Button>
                         <Button 
                           onClick={() => setSelectedOrder(order)}
                           className="bg-green-600 hover:bg-green-700"
@@ -124,6 +162,42 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
                         </Button>
                       </div>
                     </div>
+
+                    {expandedOrder === order.id && (
+                      <div className="mt-4 p-4 bg-muted/30 rounded-lg">
+                        <h4 className="font-medium mb-3">Order Items</h4>
+                        {!orderItems[order.id] ? (
+                          <div className="flex justify-center p-4">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                          </div>
+                        ) : orderItems[order.id].length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No items in this order.</p>
+                        ) : (
+                          <div className="rounded-md border">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Description</TableHead>
+                                  <TableHead className="text-right">Quantity</TableHead>
+                                  <TableHead className="text-right">Unit Price</TableHead>
+                                  <TableHead className="text-right">Total Price</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {orderItems[order.id].map((item) => (
+                                  <TableRow key={item.id}>
+                                    <TableCell>{item.description}</TableCell>
+                                    <TableCell className="text-right">{item.quantity}</TableCell>
+                                    <TableCell className="text-right">${item.unit_price}</TableCell>
+                                    <TableCell className="text-right">${item.total_price}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );

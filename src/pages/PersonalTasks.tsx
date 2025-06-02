@@ -1,511 +1,535 @@
-import React, { useState, useEffect } from 'react';
-import Navbar from '@/components/Navbar';
-import { useAuth } from '@/context/AuthContext';
-import TaskList from '@/components/TaskList';
-import { useToast } from '@/hooks/use-toast';
-import { Task } from '@/services/dataService';
-import { standardTasksService } from '@/services/standardTasksService';
-import { supabase } from '@/integrations/supabase/client';
-import { workstationService } from '@/services/workstationService';
-import { timeRegistrationService } from '@/services/timeRegistrationService';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Workstation } from '@/services/workstationService';
-import { useIsMobile } from '@/hooks/use-mobile';
 
-interface ExtendedTask extends Task {
-  timeRemaining?: string;
-  isOvertime?: boolean;
-  assignee_name?: string;
+import React, { useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import Navbar from '@/components/Navbar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { timeRegistrationService } from '@/services/timeRegistrationService';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  Clock, 
+  Play, 
+  Pause, 
+  CheckCircle, 
+  Calendar,
+  User,
+  Building2,
+  AlertCircle,
+  FileText
+} from 'lucide-react';
+import { format, isToday, isTomorrow, parseISO } from 'date-fns';
+
+interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  status: string;
+  priority: string;
+  due_date: string;
+  workstation: string;
+  assignee_id?: string;
+  phase_id: string;
+  standard_task_id?: string;
+  phases: {
+    name: string;
+    projects: {
+      name: string;
+    };
+  };
+  employees?: {
+    name: string;
+  };
+}
+
+interface TimeRegistration {
+  id: string;
+  task_id: string;
+  employee_id: string;
+  start_time: string;
+  end_time?: string;
+  is_active: boolean;
 }
 
 const PersonalTasks = () => {
-  const [todoTasks, setTodoTasks] = useState<ExtendedTask[]>([]);
-  const [inProgressTasks, setInProgressTasks] = useState<ExtendedTask[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [userWorkstations, setUserWorkstations] = useState<Workstation[]>([]);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
-  const isMobile = useIsMobile();
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [statusUpdate, setStatusUpdate] = useState('');
+  const [activeTimers, setActiveTimers] = useState<Record<string, TimeRegistration>>({});
 
-  // Timer for updating countdown
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setInProgressTasks(prevTasks => prevTasks.map(task => {
-        if (task.status === 'IN_PROGRESS' && task.status_changed_at && task.duration) {
-          const startTime = new Date(task.status_changed_at);
-          const now = new Date();
-          const elapsedMs = now.getTime() - startTime.getTime();
-          const durationMs = task.duration * 60 * 1000; // Convert minutes to milliseconds
-          const remainingMs = durationMs - elapsedMs;
-          
-          if (remainingMs > 0) {
-            const hours = Math.floor(remainingMs / (1000 * 60 * 60));
-            const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
-            
-            return {
-              ...task,
-              timeRemaining: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
-              isOvertime: false
-            };
-          } else {
-            const overtimeMs = Math.abs(remainingMs);
-            const hours = Math.floor(overtimeMs / (1000 * 60 * 60));
-            const minutes = Math.floor((overtimeMs % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((overtimeMs % (1000 * 60)) / 1000);
-            
-            return {
-              ...task,
-              timeRemaining: `+${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
-              isOvertime: true
-            };
-          }
-        }
-        return task;
-      }));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const fetchUserWorkstations = async () => {
-      if (!currentEmployee) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        
-        // Get all workstations assigned to the employee
-        const workstations = await workstationService.getWorkstationsForEmployee(currentEmployee.id);
-        setUserWorkstations(workstations);
-        
-        if (workstations.length === 0) {
-          // If no linked workstations, check direct workstation assignment (legacy)
-          const { data: employeeData } = await supabase
-            .from('employees')
-            .select('workstation')
-            .eq('id', currentEmployee.id)
-            .single();
-            
-          if (employeeData?.workstation) {
-            // Try to find the workstation by name
-            const workstationByName = await workstationService.getByName(employeeData.workstation);
-            if (workstationByName) {
-              setUserWorkstations([workstationByName]);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching workstations:', error);
-      }
-    };
-
-    fetchUserWorkstations();
-  }, [currentEmployee]);
-
-  useEffect(() => {
-    const fetchPersonalTasks = async () => {
-      if (!currentEmployee || userWorkstations.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const allTasks: ExtendedTask[] = [];
-        
-        // For each workstation, get the tasks
-        for (const workstation of userWorkstations) {
-          // First try to get tasks via standard task links
-          const { data: standardTaskLinks, error: linksError } = await supabase
-            .from('standard_task_workstation_links')
-            .select('standard_task_id')
-            .eq('workstation_id', workstation.id);
-          
-          if (linksError) {
-            console.error('Error fetching standard task links:', linksError);
-            continue;
-          }
-          
-          if (standardTaskLinks && standardTaskLinks.length > 0) {
-            // Get all the standard tasks for this workstation
-            const standardTaskIds = standardTaskLinks.map(link => link.standard_task_id);
-            const standardTasks = await Promise.all(
-              standardTaskIds.map(id => supabase
-                .from('standard_tasks')
-                .select('*')
-                .eq('id', id)
-                .single()
-                .then(res => res.data)
-              )
-            );
-            
-            // For each standard task, find actual tasks that match
-            for (const standardTask of standardTasks) {
-              if (!standardTask) continue;
-              
-              const taskNumber = standardTask.task_number;
-              const taskName = standardTask.task_name;
-              
-              // Find tasks that match this standard task and are TODO or IN_PROGRESS
-              const { data: matchingTasks, error: tasksError } = await supabase
-                .from('tasks')
-                .select('*')
-                .in('status', ['TODO', 'IN_PROGRESS'])
-                .or(`title.ilike.%${taskNumber}%,title.ilike.%${taskName}%`);
-                
-              if (tasksError) {
-                console.error('Error fetching matching tasks:', tasksError);
-                continue;
-              }
-              
-              if (matchingTasks && matchingTasks.length > 0) {
-                // Filter for tasks assigned to current user or unassigned
-                const relevantTasks = matchingTasks.filter(task => 
-                  !task.assignee_id || task.assignee_id === currentEmployee.id
-                );
-                
-                // Get project info and assignee name for each task
-                const tasksWithProjectInfo = await Promise.all(
-                  relevantTasks.map(async (task) => {
-                    try {
-                      // Get phase data to get project id
-                      const { data: phaseData, error: phaseError } = await supabase
-                        .from('phases')
-                        .select('project_id, name')
-                        .eq('id', task.phase_id)
-                        .single();
-                      
-                      if (phaseError) throw phaseError;
-                      
-                      // Get project name
-                      const { data: projectData, error: projectError } = await supabase
-                        .from('projects')
-                        .select('name')
-                        .eq('id', phaseData.project_id)
-                        .single();
-                      
-                      if (projectError) throw projectError;
-
-                      // Get assignee name if task is IN_PROGRESS and has assignee_id
-                      let assigneeName = null;
-                      if (task.status === 'IN_PROGRESS' && task.assignee_id) {
-                        const { data: employeeData, error: employeeError } = await supabase
-                          .from('employees')
-                          .select('name')
-                          .eq('id', task.assignee_id)
-                          .single();
-                        
-                        if (!employeeError && employeeData) {
-                          assigneeName = employeeData.name;
-                        }
-                      }
-                      
-                      // Cast task to the required Task type
-                      return {
-                        ...task,
-                        project_name: projectData.name,
-                        assignee_name: assigneeName,
-                        priority: task.priority as "Low" | "Medium" | "High" | "Urgent",
-                        status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
-                      } as ExtendedTask;
-                    } catch (error) {
-                      console.error('Error fetching project info for task:', error);
-                      return {
-                        ...task,
-                        project_name: 'Unknown Project',
-                        priority: task.priority as "Low" | "Medium" | "High" | "Urgent",
-                        status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
-                      } as ExtendedTask;
-                    }
-                  })
-                );
-                
-                allTasks.push(...tasksWithProjectInfo);
-              }
-            }
-          } else {
-            // Fall back to traditional task-workstation links if no standard tasks are linked
-            const workstationTasks = await supabase
-              .from('task_workstation_links')
-              .select('tasks (*)')
-              .eq('workstation_id', workstation.id);
-              
-            if (workstationTasks.error) {
-              console.error('Error fetching workstation tasks:', workstationTasks.error);
-              continue;
-            }
-            
-            if (workstationTasks.data && workstationTasks.data.length > 0) {
-              const filteredTasks = workstationTasks.data
-                .filter(item => item.tasks && ['TODO', 'IN_PROGRESS'].includes(item.tasks.status))
-                .map(item => ({
-                  ...item.tasks,
-                  project_name: 'Unknown Project',
-                  priority: item.tasks.priority as "Low" | "Medium" | "High" | "Urgent",
-                  status: item.tasks.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
-                })) as Task[];
-                
-              // Filter for tasks assigned to current user or unassigned
-              const relevantTasks = filteredTasks.filter(task => 
-                !task.assignee_id || task.assignee_id === currentEmployee.id
-              );
-              
-              allTasks.push(...relevantTasks);
-            }
-          }
-        }
-
-        // Remove duplicates (a task might be linked to multiple workstations)
-        const uniqueTasks = Array.from(
-          new Map(allTasks.map(task => [task.id, task])).values()
-        );
-        
-        // Separate tasks by status
-        const todoTasksList = uniqueTasks.filter(task => task.status === 'TODO');
-        const inProgressTasksList = uniqueTasks.filter(task => task.status === 'IN_PROGRESS');
-        
-        setTodoTasks(todoTasksList);
-        setInProgressTasks(inProgressTasksList);
-      } catch (error: any) {
-        console.error('Error fetching personal tasks:', error);
-        toast({
-          title: "Error",
-          description: `Failed to load personal tasks: ${error.message}`,
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (userWorkstations.length > 0) {
-      fetchPersonalTasks();
-    }
-  }, [currentEmployee, userWorkstations, toast]);
-
-  const checkAndUpdateLimitPhases = async (completedTask: ExtendedTask) => {
-    try {
-      if (!completedTask.standard_task_id) return;
-
-      // Get the project ID from the completed task
-      const { data: phaseData, error: phaseError } = await supabase
-        .from('phases')
-        .select('project_id')
-        .eq('id', completedTask.phase_id)
-        .single();
-
-      if (phaseError || !phaseData) return;
-
-      const projectId = phaseData.project_id;
-
-      // Find all tasks in the project that are on HOLD and have limit phases
-      const { data: holdTasks, error: holdError } = await supabase
+  // Get tasks assigned to current employee
+  const { data: tasks = [], isLoading, refetch } = useQuery({
+    queryKey: ['personal-tasks', currentEmployee?.id],
+    queryFn: async () => {
+      if (!currentEmployee?.id) return [];
+      
+      const { data, error } = await supabase
         .from('tasks')
         .select(`
           *,
-          phases!inner(project_id)
+          phases (
+            name,
+            projects (name)
+          ),
+          employees (name)
         `)
-        .eq('phases.project_id', projectId)
-        .eq('status', 'HOLD')
-        .not('standard_task_id', 'is', null);
+        .eq('assignee_id', currentEmployee.id)
+        .order('due_date', { ascending: true });
+      
+      if (error) throw error;
+      return data as Task[];
+    },
+    enabled: !!currentEmployee?.id
+  });
 
-      if (holdError || !holdTasks) return;
+  // Get active time registrations
+  const { data: timeRegistrations = [] } = useQuery({
+    queryKey: ['time-registrations', currentEmployee?.id],
+    queryFn: async () => {
+      if (!currentEmployee?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('time_registrations')
+        .select('*')
+        .eq('employee_id', currentEmployee.id)
+        .eq('is_active', true);
+      
+      if (error) throw error;
+      return data as TimeRegistration[];
+    },
+    enabled: !!currentEmployee?.id,
+    refetchInterval: 5000
+  });
 
-      // Check each HOLD task to see if its limit phases are now satisfied
-      for (const holdTask of holdTasks) {
-        if (holdTask.standard_task_id) {
-          const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(
-            holdTask.standard_task_id,
-            projectId
-          );
+  // Update active timers state when data changes
+  React.useEffect(() => {
+    const timersMap: Record<string, TimeRegistration> = {};
+    timeRegistrations.forEach(reg => {
+      timersMap[reg.task_id] = reg;
+    });
+    setActiveTimers(timersMap);
+  }, [timeRegistrations]);
 
-          if (limitPhasesSatisfied) {
-            // Update the task status from HOLD to TODO
-            await supabase
-              .from('tasks')
-              .update({ 
-                status: 'TODO',
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', holdTask.id);
-
-            console.log(`Task ${holdTask.id} updated from HOLD to TODO due to satisfied limit phases`);
-          }
-        }
-      }
-
-      // Refetch personal tasks to reflect changes
-      if (userWorkstations.length > 0) {
-        // Re-run the fetchPersonalTasks logic
-        window.location.reload(); // Simple way to refresh the data
-      }
-    } catch (error) {
-      console.error('Error checking limit phases:', error);
-    }
-  };
-
-  const handleTaskStatusChange = async (taskId: string, status: Task['status']) => {
-    if (!currentEmployee) {
-      toast({
-        title: "Authentication Error",
-        description: "You must be logged in to update tasks.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
+  const updateTaskStatus = async (taskId: string, newStatus: string) => {
     try {
-      // If starting a task, use time registration service
-      if (status === 'IN_PROGRESS') {
-        await timeRegistrationService.startTask(currentEmployee.id, taskId);
-        
-        // Move task between lists
-        const task = todoTasks.find(t => t.id === taskId);
-        if (task) {
-          setTodoTasks(prev => prev.filter(t => t.id !== taskId));
-          setInProgressTasks(prev => [...prev, { ...task, status: 'IN_PROGRESS', assignee_id: currentEmployee.id }]);
-        }
-        
-        toast({
-          title: "Task Started",
-          description: "Task has been started and time registration created.",
-        });
-        return;
-      }
-      
-      // If completing a task, use time registration service
-      if (status === 'COMPLETED') {
-        await timeRegistrationService.completeTask(taskId);
-        
-        // Find the completed task for limit phase checking
-        const completedTask = [...todoTasks, ...inProgressTasks].find(task => task.id === taskId);
-        
-        // Remove from both lists since we don't show completed tasks
-        setTodoTasks(prev => prev.filter(t => t.id !== taskId));
-        setInProgressTasks(prev => prev.filter(t => t.id !== taskId));
-        
-        // Check limit phases if task was completed
-        if (completedTask) {
-          await checkAndUpdateLimitPhases(completedTask);
-        }
-        
-        toast({
-          title: "Task Completed",
-          description: "Task has been completed and time registration ended.",
-        });
-        return;
-      }
-      
-      // For other status changes, use regular database update
-      const updateData: Partial<Task> = { 
-        status,
-        updated_at: new Date().toISOString(),
-        status_changed_at: new Date().toISOString()
-      };
-      
-      // Set assignee when changing to IN_PROGRESS
-      if (status === 'IN_PROGRESS') {
-        updateData.assignee_id = currentEmployee?.id;
-      }
-      
       const { error } = await supabase
         .from('tasks')
-        .update(updateData)
+        .update({ 
+          status: newStatus,
+          status_changed_at: new Date().toISOString(),
+          ...(newStatus === 'COMPLETED' ? { 
+            completed_at: new Date().toISOString(),
+            completed_by: currentEmployee?.id 
+          } : {})
+        })
         .eq('id', taskId);
-        
+
       if (error) throw error;
-      
-      // Move task between lists based on new status
-      if (status === 'TODO') {
-        const task = inProgressTasks.find(t => t.id === taskId);
-        if (task) {
-          setInProgressTasks(prev => prev.filter(t => t.id !== taskId));
-          setTodoTasks(prev => [...prev, { ...task, status: 'TODO' }]);
-        }
-      }
-      
+
       toast({
-        title: "Task Updated",
-        description: `Task status changed to ${status}`,
+        title: 'Task Updated',
+        description: `Task status changed to ${newStatus.toLowerCase()}`,
       });
-    } catch (error: any) {
+
+      refetch();
+      setSelectedTask(null);
+    } catch (error) {
       console.error('Error updating task:', error);
       toast({
-        title: "Error",
-        description: `Failed to update task: ${error.message}`,
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to update task status',
+        variant: 'destructive'
       });
     }
   };
 
-  return (
-    <div className="flex min-h-screen">
-      {!isMobile && (
-        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-          <Navbar />
-        </div>
-      )}
-      {isMobile && <Navbar />}
-      <div className={`${isMobile ? 'pt-16' : 'ml-64'} w-full p-6`}>
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold">Personal Tasks</h1>
-            <p className="text-gray-500">
-              Tasks assigned to you at your workstations
-            </p>
-          </div>
-          
-          {loading ? (
-            <div className="flex justify-center p-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+  const toggleTimer = async (task: Task) => {
+    if (!currentEmployee?.id) return;
+
+    try {
+      const activeTimer = activeTimers[task.id];
+      
+      if (activeTimer) {
+        // Stop the timer
+        await timeRegistrationService.stopTask(activeTimer.id);
+        toast({
+          title: 'Timer Stopped',
+          description: `Stopped tracking time for "${task.title}"`,
+        });
+      } else {
+        // Start the timer
+        await timeRegistrationService.startTask(currentEmployee.id, task.id);
+        toast({
+          title: 'Timer Started',
+          description: `Started tracking time for "${task.title}"`,
+        });
+      }
+      
+      // Refetch to update the UI
+      refetch();
+    } catch (error) {
+      console.error('Timer toggle error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to toggle timer',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'TODO': return 'bg-blue-100 text-blue-800';
+      case 'IN_PROGRESS': return 'bg-yellow-100 text-yellow-800';
+      case 'COMPLETED': return 'bg-green-100 text-green-800';
+      case 'HOLD': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'text-red-600';
+      case 'medium': return 'text-yellow-600';
+      case 'low': return 'text-green-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  const getDateStatus = (dueDate: string) => {
+    const date = parseISO(dueDate);
+    if (isToday(date)) return { text: 'Due Today', color: 'text-red-600' };
+    if (isTomorrow(date)) return { text: 'Due Tomorrow', color: 'text-orange-600' };
+    return { text: format(date, 'MMM d, yyyy'), color: 'text-gray-600' };
+  };
+
+  const formatTimerDuration = (startTime: string) => {
+    const start = new Date(startTime);
+    const now = new Date();
+    const diffMs = now.getTime() - start.getTime();
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const filterTasks = (status: string) => {
+    return tasks.filter(task => {
+      if (status === 'active') {
+        return task.status === 'TODO' || task.status === 'IN_PROGRESS';
+      }
+      return task.status === status;
+    });
+  };
+
+  const renderTaskCard = (task: Task) => {
+    const dateStatus = getDateStatus(task.due_date);
+    const activeTimer = activeTimers[task.id];
+    const isTimerActive = !!activeTimer;
+
+    return (
+      <Card key={task.id} className="mb-4">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-gray-500" />
+                {task.phases?.projects?.name || 'Unknown Project'}
+              </CardTitle>
+              <p className="text-sm text-gray-500 mt-1">
+                Phase: {task.phases?.name || 'Unknown Phase'}
+              </p>
             </div>
-          ) : userWorkstations.length === 0 ? (
-            <Card>
+            <div className="flex items-center gap-2">
+              <Badge className={getStatusColor(task.status)}>
+                {task.status.replace('_', ' ')}
+              </Badge>
+              <Badge variant="outline" className={getPriorityColor(task.priority)}>
+                {task.priority}
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <h3 className="font-semibold text-gray-900 mb-2">{task.title}</h3>
+          {task.description && (
+            <p className="text-gray-600 text-sm mb-3">{task.description}</p>
+          )}
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-gray-400" />
+              <span className={`text-sm ${dateStatus.color}`}>
+                {dateStatus.text}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-gray-400" />
+              <span className="text-sm text-gray-600">{task.workstation}</span>
+            </div>
+            {isTimerActive && (
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-green-500" />
+                <span className="text-sm font-mono text-green-600">
+                  {formatTimerDuration(activeTimer.start_time)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => toggleTimer(task)}
+              size="sm"
+              variant={isTimerActive ? "destructive" : "default"}
+              className="flex items-center gap-2"
+            >
+              {isTimerActive ? (
+                <>
+                  <Pause className="h-4 w-4" />
+                  Stop Timer
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4" />
+                  Start Timer
+                </>
+              )}
+            </Button>
+
+            {task.status === 'TODO' && (
+              <Button
+                onClick={() => updateTaskStatus(task.id, 'IN_PROGRESS')}
+                size="sm"
+                variant="outline"
+              >
+                Start Task
+              </Button>
+            )}
+
+            {task.status === 'IN_PROGRESS' && (
+              <Button
+                onClick={() => updateTaskStatus(task.id, 'COMPLETED')}
+                size="sm"
+                variant="outline"
+                className="text-green-600 border-green-600"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Complete
+              </Button>
+            )}
+
+            <Button
+              onClick={() => setSelectedTask(task)}
+              size="sm"
+              variant="ghost"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Details
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="ml-64 container mx-auto px-4 py-8">
+          <div>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  const activeTasks = filterTasks('active');
+  const completedTasks = filterTasks('COMPLETED');
+  const holdTasks = filterTasks('HOLD');
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <div className="ml-64 container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">My Tasks</h1>
+          <p className="text-gray-600 mt-2">Manage your assigned tasks and time tracking</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Tasks</CardTitle>
+              <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{activeTasks.length}</div>
+              <p className="text-xs text-muted-foreground">
+                Tasks in progress
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Completed</CardTitle>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{completedTasks.length}</div>
+              <p className="text-xs text-muted-foreground">
+                Tasks completed
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">On Hold</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{holdTasks.length}</div>
+              <p className="text-xs text-muted-foreground">
+                Tasks on hold
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs defaultValue="active" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="active">Active Tasks ({activeTasks.length})</TabsTrigger>
+            <TabsTrigger value="completed">Completed ({completedTasks.length})</TabsTrigger>
+            <TabsTrigger value="hold">On Hold ({holdTasks.length})</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="active" className="space-y-4">
+            {activeTasks.length > 0 ? (
+              activeTasks.map(renderTaskCard)
+            ) : (
+              <Card>
+                <CardContent className="py-8">
+                  <div className="text-center text-gray-500">
+                    <AlertCircle className="mx-auto h-12 w-12 text-gray-400" />
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">No active tasks</h3>
+                    <p className="mt-1 text-sm text-gray-500">All your tasks are completed or on hold.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="completed" className="space-y-4">
+            {completedTasks.length > 0 ? (
+              completedTasks.map(renderTaskCard)
+            ) : (
+              <Card>
+                <CardContent className="py-8">
+                  <div className="text-center text-gray-500">
+                    <CheckCircle className="mx-auto h-12 w-12 text-gray-400" />
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">No completed tasks</h3>
+                    <p className="mt-1 text-sm text-gray-500">Complete some tasks to see them here.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="hold" className="space-y-4">
+            {holdTasks.length > 0 ? (
+              holdTasks.map(renderTaskCard)
+            ) : (
+              <Card>
+                <CardContent className="py-8">
+                  <div className="text-center text-gray-500">
+                    <Clock className="mx-auto h-12 w-12 text-gray-400" />
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">No tasks on hold</h3>
+                    <p className="mt-1 text-sm text-gray-500">Tasks that are paused will appear here.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {selectedTask && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <Card className="w-full max-w-md">
               <CardHeader>
-                <CardTitle>No Workstations Assigned</CardTitle>
+                <CardTitle>Task Details</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p>You don't have any workstations assigned. Please contact an administrator to assign you to workstations.</p>
+              <CardContent className="space-y-4">
+                <div>
+                  <h3 className="font-semibold">{selectedTask.title}</h3>
+                  <p className="text-sm text-gray-600">{selectedTask.description}</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Status:</span>
+                    <Badge className={getStatusColor(selectedTask.status)}>
+                      {selectedTask.status.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Priority:</span>
+                    <span className={`text-sm ${getPriorityColor(selectedTask.priority)}`}>
+                      {selectedTask.priority}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Due Date:</span>
+                    <span className="text-sm">{format(parseISO(selectedTask.due_date), 'PPP')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-500">Workstation:</span>
+                    <span className="text-sm">{selectedTask.workstation}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status Update
+                  </label>
+                  <Textarea
+                    placeholder="Add a status update or comment..."
+                    value={statusUpdate}
+                    onChange={(e) => setStatusUpdate(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedTask(null);
+                      setStatusUpdate('');
+                    }}
+                  >
+                    Close
+                  </Button>
+                  
+                  {selectedTask.status !== 'COMPLETED' && (
+                    <Button
+                      onClick={() => updateTaskStatus(selectedTask.id, 'COMPLETED')}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      Mark Complete
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
-          ) : (
-            <div className="space-y-8">
-              {/* In Progress Tasks - Show first */}
-              {inProgressTasks.length > 0 && (
-                <TaskList 
-                  tasks={inProgressTasks} 
-                  title="In Progress Tasks" 
-                  onTaskStatusChange={handleTaskStatusChange}
-                  showCountdownTimer={true}
-                />
-              )}
-              
-              {/* TODO Tasks - Show second */}
-              {todoTasks.length > 0 && (
-                <TaskList 
-                  tasks={todoTasks} 
-                  title="TODO Tasks" 
-                  onTaskStatusChange={handleTaskStatusChange}
-                />
-              )}
-              
-              {/* Show message if no tasks */}
-              {inProgressTasks.length === 0 && todoTasks.length === 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>No Tasks</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p>There are no pending tasks assigned to your workstations or to you directly.</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
