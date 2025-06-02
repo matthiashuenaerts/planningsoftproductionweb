@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
@@ -10,7 +9,6 @@ import { UpcomingDeliveries } from '@/components/logistics/UpcomingDeliveries';
 import { BackorderDeliveries } from '@/components/logistics/BackorderDeliveries';
 import { Truck, Calendar, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-
 const Logistics = () => {
   const {
     data: rawOrders = [],
@@ -58,7 +56,6 @@ const Logistics = () => {
     },
     enabled: rawOrders.length > 0
   });
-
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -78,11 +75,9 @@ const Logistics = () => {
     const deliveryDate = new Date(order.expected_delivery);
     return deliveryDate < today && order.status !== 'delivered';
   });
-
   const handleDeliveryConfirmed = () => {
     refetch();
   };
-
   if (isLoading) {
     return <div className="min-h-screen bg-gray-50">
         <Navbar />
@@ -91,7 +86,6 @@ const Logistics = () => {
         </div>
       </div>;
   }
-
   return <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="ml-64 w-full p-6">
@@ -163,5 +157,4 @@ const Logistics = () => {
       </div>
     </div>;
 };
-
 export default Logistics;
