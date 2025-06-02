@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -26,6 +25,7 @@ import BrokenPartsSummary from "./pages/BrokenPartsSummary";
 import NewBrokenPart from "./pages/NewBrokenPart";
 import Logistics from "./pages/Logistics";
 import TimeRegistrations from "./pages/TimeRegistrations";
+import Chat from "./pages/Chat";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -173,6 +173,14 @@ const App = () => (
                   <div className="pt-20">
                     <TaskTimer />
                     <TimeRegistrations />
+                  </div>
+                </ProtectedRoute>
+              } />
+              <Route path="/chat" element={
+                <ProtectedRoute>
+                  <div className="pt-20">
+                    <TaskTimer />
+                    <Chat />
                   </div>
                 </ProtectedRoute>
               } />
