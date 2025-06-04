@@ -1,147 +1,137 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 
-const Login: React.FC = () => {
-  const [name, setName] = useState('');
+const Login = () => {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { login, isAuthenticated } = useAuth();
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/');
-    }
-  }, [isAuthenticated, navigate]);
-
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!name || !password) {
-      toast({
-        title: "Error",
-        description: "Please enter both employee name and password",
-        variant: "destructive"
-      });
-      return;
-    }
+    setIsLoading(true);
 
     try {
-      setLoading(true);
-      
-      // Query the employees table by name
-      const { data: employees, error: queryError } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('name', name)
-        .limit(1);
-      
-      if (queryError) {
-        console.error('Database query error:', queryError);
-        throw new Error('Failed to connect to database');
-      }
-      
-      if (!employees || employees.length === 0) {
-        throw new Error('Employee not found');
-      }
-      
-      const employee = employees[0];
-      
-      // Simple password check (in a real app, you would use proper hashing)
-      if (employee.password !== password) {
-        throw new Error('Incorrect password');
-      }
-      
-      // Use the login function from AuthContext
-      login({
-        id: employee.id,
-        name: employee.name,
-        role: employee.role,
-        workstation: employee.workstation
-      });
-      
-      toast({
-        title: "Login successful",
-        description: `Welcome, ${employee.name}!`
-      });
-      
-      // Navigate based on role
-      if (employee.role === 'workstation') {
-        navigate('/');
-      } else {
-        navigate('/');
-      }
+      await login(email, password);
+      navigate('/');
     } catch (error: any) {
-      console.error('Login error:', error);
       toast({
-        title: "Login failed",
-        description: error.message || "An error occurred during login",
-        variant: "destructive"
+        title: 'Login Failed',
+        description: error.message || 'Invalid credentials',
+        variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
+    }
+  };
+
+  // Quick login buttons for demo purposes
+  const quickLogin = async (role: "admin" | "manager" | "worker" | "workstation" | "installation_team") => {
+    setIsLoading(true);
+    try {
+      let email = '';
+      let password = 'password123';
+      
+      switch (role) {
+        case 'admin':
+          email = 'admin@company.com';
+          break;
+        case 'manager':
+          email = 'manager@company.com';
+          break;
+        case 'worker':
+          email = 'worker@company.com';
+          break;
+        case 'workstation':
+          email = 'workstation@company.com';
+          break;
+        case 'installation_team':
+          email = 'installation@company.com';
+          break;
+      }
+      
+      await login(email, password);
+      navigate('/');
+    } catch (error: any) {
+      toast({
+        title: 'Login Failed',
+        description: error.message || 'Login failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-6 flex flex-col items-center space-y-4">
-        {/* Add the image here */}
-        <img 
-          src="https://static.wixstatic.com/media/99c033_7c36758b8bdb474990f30ed2fec2807f~mv2.png/v1/fill/w_954,h_660,al_c,q_90,usm_0.66_1.00_0.01,enc_avif,quality_auto/99c033_7c36758b8bdb474990f30ed2fec2807f~mv2.png" 
-          alt="Login visual"
-          className="w-full max-w-sm rounded shadow-md"
-        />
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
         <Card>
-          <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-3xl font-bold">PlanningSoftProduction</CardTitle>
-            <CardDescription>Planningssoftware voor productieomgeving</CardDescription>
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl text-center">Sign in</CardTitle>
+            <CardDescription className="text-center">
+              Enter your email and password to access your account
+            </CardDescription>
           </CardHeader>
-          <form onSubmit={handleLogin}>
-            <CardContent className="space-y-4">
+          <CardContent className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Gebruikersnaam</Label>
-                <Input 
-                  id="name" 
-                  type="text" 
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter your employee name"
-                  disabled={loading}
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Paswoord</Label>
-                <Input 
-                  id="password" 
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
                   type="password"
+                  placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  disabled={loading}
+                  required
                 />
               </div>
-            </CardContent>
-            <CardFooter>
-              <Button 
-                className="w-full" 
-                type="submit"
-                disabled={loading}
-              >
-                {loading ? "Signing in..." : "Sign in"}
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Signing in...' : 'Sign in'}
               </Button>
-            </CardFooter>
-          </form>
+            </form>
+            
+            <div className="space-y-2">
+              <p className="text-sm text-gray-600 text-center">Quick login for demo:</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" size="sm" onClick={() => quickLogin('admin')} disabled={isLoading}>
+                  Admin
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => quickLogin('manager')} disabled={isLoading}>
+                  Manager
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => quickLogin('worker')} disabled={isLoading}>
+                  Worker
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => quickLogin('workstation')} disabled={isLoading}>
+                  Workstation
+                </Button>
+              </div>
+              <Button variant="outline" size="sm" className="w-full" onClick={() => quickLogin('installation_team')} disabled={isLoading}>
+                Installation Team
+              </Button>
+            </div>
+          </CardContent>
         </Card>
       </div>
     </div>

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
@@ -9,6 +10,7 @@ import { UpcomingDeliveries } from '@/components/logistics/UpcomingDeliveries';
 import { BackorderDeliveries } from '@/components/logistics/BackorderDeliveries';
 import { Truck, Calendar, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+
 const Logistics = () => {
   const {
     data: rawOrders = [],
@@ -56,6 +58,7 @@ const Logistics = () => {
     },
     enabled: rawOrders.length > 0
   });
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -67,28 +70,36 @@ const Logistics = () => {
     deliveryDate.setHours(0, 0, 0, 0);
     return deliveryDate.getTime() === today.getTime() && order.status !== 'delivered';
   });
+  
   const upcomingDeliveries = orders.filter(order => {
     const deliveryDate = new Date(order.expected_delivery);
     return deliveryDate >= tomorrow && order.status !== 'delivered';
   });
+  
   const backorderDeliveries = orders.filter(order => {
     const deliveryDate = new Date(order.expected_delivery);
     return deliveryDate < today && order.status !== 'delivered';
   });
+
   const handleDeliveryConfirmed = () => {
     refetch();
   };
+
   if (isLoading) {
-    return <div className="min-h-screen bg-gray-50">
+    return (
+      <div className="min-h-screen bg-gray-50 flex">
         <Navbar />
-        <div className="ml-64 container mx-auto px-4 py-8">
+        <div className="flex-1 ml-64 p-6">
           <div>Loading...</div>
         </div>
-      </div>;
+      </div>
+    );
   }
-  return <div className="min-h-screen bg-gray-50">
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex">
       <Navbar />
-      <div className="ml-64 w-full p-6">
+      <div className="flex-1 ml-64 p-6 max-w-none">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Logistics</h1>
           <p className="text-gray-600 mt-2">Manage deliveries and order logistics</p>
@@ -155,6 +166,8 @@ const Logistics = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default Logistics;

@@ -1,50 +1,27 @@
 
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Order } from '@/types/order';
 import { DeliveryConfirmationModal } from './DeliveryConfirmationModal';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, startOfWeek, endOfWeek } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar, Package } from 'lucide-react';
+import { format } from 'date-fns';
+import { Calendar, Package, Building2, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { orderService } from '@/services/orderService';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface UpcomingDeliveriesProps {
   orders: Order[];
-  onDeliveryConfirmed?: () => void;
+  onDeliveryConfirmed: () => void;
 }
 
 export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({ 
   orders, 
   onDeliveryConfirmed 
 }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(currentDate);
-  const calendarStart = startOfWeek(monthStart);
-  const calendarEnd = endOfWeek(monthEnd);
-  
-  const calendarDays = eachDayOfInterval({
-    start: calendarStart,
-    end: calendarEnd
-  });
-
-  const getOrdersForDate = (date: Date) => {
-    return orders.filter(order => 
-      isSameDay(new Date(order.expected_delivery), date)
-    );
-  };
-
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    const newDate = new Date(currentDate);
-    if (direction === 'prev') {
-      newDate.setMonth(newDate.getMonth() - 1);
-    } else {
-      newDate.setMonth(newDate.getMonth() + 1);
-    }
-    setCurrentDate(newDate);
-  };
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -56,163 +33,182 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
     }
   };
 
-  const handleDeliveryConfirmed = () => {
-    setSelectedOrder(null);
-    if (onDeliveryConfirmed) {
-      onDeliveryConfirmed();
+  const toggleOrderExpansion = (orderId: string) => {
+    const newExpanded = new Set(expandedOrders);
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId);
+    } else {
+      newExpanded.add(orderId);
     }
+    setExpandedOrders(newExpanded);
   };
+
+  // Query for order items when order is expanded
+  const OrderItems = ({ orderId, isExpanded }: { orderId: string; isExpanded: boolean }) => {
+    const { data: orderItems = [], isLoading } = useQuery({
+      queryKey: ['order-items', orderId],
+      queryFn: () => orderService.getOrderItems(orderId),
+      enabled: isExpanded
+    });
+
+    if (!isExpanded) return null;
+
+    if (isLoading) {
+      return (
+        <div className="px-6 pb-4">
+          <div className="text-sm text-gray-500">Loading order items...</div>
+        </div>
+      );
+    }
+
+    if (orderItems.length === 0) {
+      return (
+        <div className="px-6 pb-4">
+          <div className="text-sm text-gray-500">No items found for this order.</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="px-6 pb-4">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Description</TableHead>
+              <TableHead className="text-right">Quantity</TableHead>
+              <TableHead className="text-right">Unit Price</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {orderItems.map((item) => (
+              <TableRow key={item.id}>
+                <TableCell>{item.description}</TableCell>
+                <TableCell className="text-right">{item.quantity}</TableCell>
+                <TableCell className="text-right">${item.unit_price.toFixed(2)}</TableCell>
+                <TableCell className="text-right">${item.total_price.toFixed(2)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  };
+
+  if (orders.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="text-center text-gray-500">
+            <Calendar className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No upcoming deliveries</h3>
+            <p className="mt-1 text-sm text-gray-500">No orders scheduled for future delivery.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Sort by delivery date
+  const sortedOrders = [...orders].sort((a, b) => 
+    new Date(a.expected_delivery).getTime() - new Date(b.expected_delivery).getTime()
+  );
 
   return (
     <>
-      <div className="space-y-6">
-        {/* Calendar Header */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Delivery Calendar
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigateMonth('prev')}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-lg font-semibold min-w-[200px] text-center">
-                  {format(currentDate, 'MMMM yyyy')}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigateMonth('next')}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-2">
-              {/* Day headers */}
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="p-2 text-center text-sm font-medium text-gray-500">
-                  {day}
-                </div>
-              ))}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-green-600">
+            <Calendar className="h-5 w-5" />
+            Upcoming Deliveries ({orders.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {sortedOrders.map((order) => {
+              const isExpanded = expandedOrders.has(order.id);
               
-              {/* Calendar days */}
-              {calendarDays.map((day, index) => {
-                const dayOrders = getOrdersForDate(day);
-                const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-                const isDayToday = isToday(day);
-                
-                return (
-                  <div
-                    key={index}
-                    className={`
-                      min-h-[100px] p-2 border rounded-lg
-                      ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'}
-                      ${isDayToday ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}
-                    `}
-                  >
-                    <div className={`
-                      text-sm font-medium mb-1
-                      ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
-                      ${isDayToday ? 'text-blue-600' : ''}
-                    `}>
-                      {format(day, 'd')}
-                    </div>
-                    
-                    {dayOrders.length > 0 && (
-                      <div className="space-y-1">
-                        {dayOrders.slice(0, 2).map((order) => (
-                          <div
-                            key={order.id}
-                            className="text-xs p-1 bg-blue-100 text-blue-800 rounded truncate"
-                            title={`${order.supplier} - ${(order as any).project_name || order.project_id}`}
-                          >
-                            {order.supplier}
-                          </div>
-                        ))}
-                        {dayOrders.length > 2 && (
-                          <div className="text-xs text-gray-500">
-                            +{dayOrders.length - 2} more
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Upcoming Orders List */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Upcoming Orders List
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {orders.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No upcoming deliveries scheduled
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {orders.slice(0, 10).map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium">{order.supplier}</h3>
+              return (
+                <Card key={order.id} className="border-l-4 border-l-green-500">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Package className="h-5 w-5" />
+                        Order from {order.supplier}
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
                         <Badge className={getStatusColor(order.status)}>
                           {order.status}
                         </Badge>
                       </div>
-                      <p className="text-sm text-gray-500">
-                        Project: {(order as any).project_name || order.project_id}
-                      </p>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="font-medium">{format(new Date(order.expected_delivery), 'PPP')}</p>
-                        <p className="text-sm text-gray-500">{format(new Date(order.expected_delivery), 'EEEE')}</p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Project</p>
+                          <p className="font-medium">
+                            {(order as any).project_name || order.project_id}
+                          </p>
+                        </div>
                       </div>
-                      <Button 
-                        onClick={() => setSelectedOrder(order)}
-                        className="bg-green-600 hover:bg-green-700"
-                        size="sm"
-                      >
-                        Mark as Delivered
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Order Date</p>
+                          <p className="font-medium">{format(new Date(order.order_date), 'PPP')}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Expected Delivery</p>
+                        <p className="font-medium">
+                          {format(new Date(order.expected_delivery), 'PPP')}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleOrderExpansion(order.id)}
+                        >
+                          {isExpanded ? (
+                            <>
+                              <ChevronUp className="h-4 w-4 mr-1" />
+                              Hide Items
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-4 w-4 mr-1" />
+                              Show Items
+                            </>
+                          )}
+                        </Button>
+                        <Button 
+                          onClick={() => setSelectedOrder(order)}
+                          className="bg-green-600 hover:bg-green-700"
+                          size="sm"
+                        >
+                          Confirm Delivery
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {orders.length > 10 && (
-                  <div className="text-center text-gray-500 text-sm">
-                    And {orders.length - 10} more orders...
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                  </CardContent>
+                  <OrderItems orderId={order.id} isExpanded={isExpanded} />
+                </Card>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {selectedOrder && (
         <DeliveryConfirmationModal
           order={selectedOrder}
           isOpen={!!selectedOrder}
           onClose={() => setSelectedOrder(null)}
-          onConfirmed={handleDeliveryConfirmed}
+          onConfirmed={onDeliveryConfirmed}
         />
       )}
     </>

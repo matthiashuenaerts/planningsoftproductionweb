@@ -1,12 +1,16 @@
 
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Order } from '@/types/order';
 import { DeliveryConfirmationModal } from './DeliveryConfirmationModal';
 import { format, differenceInDays } from 'date-fns';
-import { AlertTriangle, Package, Building2, Clock } from 'lucide-react';
+import { AlertTriangle, Package, Building2, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { orderService } from '@/services/orderService';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface BackorderDeliveriesProps {
   orders: Order[];
@@ -18,6 +22,7 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
   onDeliveryConfirmed 
 }) => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -39,6 +44,68 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
     if (daysOverdue <= 3) return 'text-orange-600';
     if (daysOverdue <= 7) return 'text-red-600';
     return 'text-red-800';
+  };
+
+  const toggleOrderExpansion = (orderId: string) => {
+    const newExpanded = new Set(expandedOrders);
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId);
+    } else {
+      newExpanded.add(orderId);
+    }
+    setExpandedOrders(newExpanded);
+  };
+
+  // Query for order items when order is expanded
+  const OrderItems = ({ orderId, isExpanded }: { orderId: string; isExpanded: boolean }) => {
+    const { data: orderItems = [], isLoading } = useQuery({
+      queryKey: ['order-items', orderId],
+      queryFn: () => orderService.getOrderItems(orderId),
+      enabled: isExpanded
+    });
+
+    if (!isExpanded) return null;
+
+    if (isLoading) {
+      return (
+        <div className="px-6 pb-4">
+          <div className="text-sm text-gray-500">Loading order items...</div>
+        </div>
+      );
+    }
+
+    if (orderItems.length === 0) {
+      return (
+        <div className="px-6 pb-4">
+          <div className="text-sm text-gray-500">No items found for this order.</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="px-6 pb-4">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Description</TableHead>
+              <TableHead className="text-right">Quantity</TableHead>
+              <TableHead className="text-right">Unit Price</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {orderItems.map((item) => (
+              <TableRow key={item.id}>
+                <TableCell>{item.description}</TableCell>
+                <TableCell className="text-right">{item.quantity}</TableCell>
+                <TableCell className="text-right">${item.unit_price.toFixed(2)}</TableCell>
+                <TableCell className="text-right">${item.total_price.toFixed(2)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
   };
 
   if (orders.length === 0) {
@@ -73,6 +140,7 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
           <div className="space-y-4">
             {sortedOrders.map((order) => {
               const daysOverdue = getDaysOverdue(order.expected_delivery);
+              const isExpanded = expandedOrders.has(order.id);
               
               return (
                 <Card key={order.id} className="border-l-4 border-l-red-500">
@@ -97,8 +165,10 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-gray-400" />
                         <div>
-                          <p className="text-sm text-gray-500">Project ID</p>
-                          <p className="font-medium">{order.project_id}</p>
+                          <p className="text-sm text-gray-500">Project</p>
+                          <p className="font-medium">
+                            {(order as any).project_name || order.project_id}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -114,7 +184,24 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
                           {format(new Date(order.expected_delivery), 'PPP')}
                         </p>
                       </div>
-                      <div className="flex items-center justify-end">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleOrderExpansion(order.id)}
+                        >
+                          {isExpanded ? (
+                            <>
+                              <ChevronUp className="h-4 w-4 mr-1" />
+                              Hide Items
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-4 w-4 mr-1" />
+                              Show Items
+                            </>
+                          )}
+                        </Button>
                         <Button 
                           onClick={() => setSelectedOrder(order)}
                           className="bg-green-600 hover:bg-green-700"
@@ -125,6 +212,7 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
                       </div>
                     </div>
                   </CardContent>
+                  <OrderItems orderId={order.id} isExpanded={isExpanded} />
                 </Card>
               );
             })}
