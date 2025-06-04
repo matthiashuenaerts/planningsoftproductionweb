@@ -31,7 +31,7 @@ const TaskTimer = () => {
     queryKey: ['activeTimeRegistration', currentEmployee?.id],
     queryFn: () => currentEmployee ? timeRegistrationService.getActiveRegistration(currentEmployee.id) : null,
     enabled: !!currentEmployee,
-    refetchInterval: 5000 // Refetch every 5 seconds
+    refetchInterval: 1000 // Refetch every 5 seconds
   });
 
   // Get task details if there's an active registration
