@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from '@/components/Navbar';
@@ -28,7 +27,7 @@ interface WorkstationWithIcon {
   icon: React.ReactNode;
 }
 
-const PersonalTasks: React.FC = () => {
+const Workstations: React.FC = () => {
   const [selectedWorkstation, setSelectedWorkstation] = useState<string | null>(null);
   const [workstations, setWorkstations] = useState<WorkstationWithIcon[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,4 +142,4 @@ const PersonalTasks: React.FC = () => {
   );
 };
 
-export default PersonalTasks;
+export default Workstations;
