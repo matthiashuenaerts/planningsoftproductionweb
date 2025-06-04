@@ -94,7 +94,7 @@ const Projects = () => {
               <p className="text-muted-foreground mt-1">Manage your projects from start to finish.</p>
             </div>
             
-            {isAdmin && <Button size="sm" onClick={() => setIsNewProjectModalOpen(true)}>
+            {isAdmin && <Button size="sm" onClick={() => setIsNewProjectModalOpen(true)} className="mx-[240px] px-[20px] rounded text-base">
                 <Plus className="mr-2 h-4 w-4" />
                 New Project
               </Button>}
