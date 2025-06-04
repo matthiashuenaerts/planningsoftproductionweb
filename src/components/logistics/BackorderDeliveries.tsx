@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +8,6 @@ import { DeliveryConfirmationModal } from './DeliveryConfirmationModal';
 import { format, differenceInDays } from 'date-fns';
 import { AlertTriangle, Package, Building2, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { orderService } from '@/services/orderService';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface BackorderDeliveriesProps {
@@ -89,8 +87,7 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
             <TableRow>
               <TableHead>Description</TableHead>
               <TableHead className="text-right">Quantity</TableHead>
-              <TableHead className="text-right">Unit Price</TableHead>
-              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Article Code</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -98,8 +95,7 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
               <TableRow key={item.id}>
                 <TableCell>{item.description}</TableCell>
                 <TableCell className="text-right">{item.quantity}</TableCell>
-                <TableCell className="text-right">${item.unit_price.toFixed(2)}</TableCell>
-                <TableCell className="text-right">${item.total_price.toFixed(2)}</TableCell>
+                <TableCell className="text-right">{item.article_code}</TableCell>
               </TableRow>
             ))}
           </TableBody>

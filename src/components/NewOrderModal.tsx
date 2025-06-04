@@ -4,8 +4,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
 import { X, Plus } from 'lucide-react';
@@ -28,11 +26,11 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({
   const [supplier, setSupplier] = useState('');
   const [expectedDelivery, setExpectedDelivery] = useState('');
   const [orderItems, setOrderItems] = useState([
-    { description: '', quantity: 1, unitPrice: 0 }
+    { description: '', quantity: 1, articleCode: '' }
   ]);
 
   const addItem = () => {
-    setOrderItems([...orderItems, { description: '', quantity: 1, unitPrice: 0 }]);
+    setOrderItems([...orderItems, { description: '', quantity: 1, articleCode: '' }]);
   };
 
   const removeItem = (index: number) => {
@@ -47,13 +45,6 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({
     setOrderItems(newItems);
   };
 
-  const calculateTotal = () => {
-    return orderItems.reduce((sum, item) => {
-      const itemTotal = item.quantity * item.unitPrice;
-      return sum + itemTotal;
-    }, 0);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -66,7 +57,7 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({
       return;
     }
     
-    if (orderItems.some(item => !item.description || item.quantity < 1 || item.unitPrice <= 0)) {
+    if (orderItems.some(item => !item.description || item.quantity < 1 || !item.articleCode)) {
       toast({
         title: "Error",
         description: "Please fill in all item details correctly",
@@ -92,8 +83,7 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({
         order_id: order.id,
         description: item.description,
         quantity: item.quantity,
-        unit_price: item.unitPrice,
-        total_price: item.quantity * item.unitPrice
+        article_code: item.articleCode
       }));
       
       await orderService.createOrderItems(orderItemsData);
@@ -107,7 +97,7 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({
       setSupplier('');
       setExpectedDelivery('');
       setOrderItems([
-        { description: '', quantity: 1, unitPrice: 0 }
+        { description: '', quantity: 1, articleCode: '' }
       ]);
       
       // Close the modal and refresh the parent component
@@ -173,7 +163,7 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({
             {orderItems.map((item, index) => (
               <div 
                 key={index} 
-                className="grid grid-cols-[1fr_80px_100px_30px] gap-2 items-start"
+                className="grid grid-cols-[1fr_80px_120px_30px] gap-2 items-start"
               >
                 <div>
                   <Input 
@@ -197,12 +187,9 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({
                 
                 <div>
                   <Input 
-                    type="number" 
-                    min="0.01" 
-                    step="0.01" 
-                    placeholder="Price"
-                    value={item.unitPrice} 
-                    onChange={(e) => updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)} 
+                    placeholder="Article code"
+                    value={item.articleCode} 
+                    onChange={(e) => updateItem(index, 'articleCode', e.target.value)} 
                     required
                   />
                 </div>
@@ -221,11 +208,6 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({
                 </div>
               </div>
             ))}
-          </div>
-          
-          <div className="flex justify-between items-center font-medium pt-2 border-t">
-            <span>Total Order Amount:</span>
-            <span>€{calculateTotal().toFixed(2)}</span>
           </div>
           
           <DialogFooter>

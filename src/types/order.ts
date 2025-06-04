@@ -15,8 +15,7 @@ export interface OrderItem {
   order_id: string;
   description: string;
   quantity: number;
-  unit_price: number;
-  total_price: number;
+  article_code: string;
   created_at: string;
   updated_at: string;
 }

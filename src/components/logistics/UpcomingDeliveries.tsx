@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -76,8 +75,7 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
             <TableRow>
               <TableHead>Description</TableHead>
               <TableHead className="text-right">Quantity</TableHead>
-              <TableHead className="text-right">Unit Price</TableHead>
-              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Article Code</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -85,8 +83,7 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
               <TableRow key={item.id}>
                 <TableCell>{item.description}</TableCell>
                 <TableCell className="text-right">{item.quantity}</TableCell>
-                <TableCell className="text-right">${item.unit_price.toFixed(2)}</TableCell>
-                <TableCell className="text-right">${item.total_price.toFixed(2)}</TableCell>
+                <TableCell className="text-right">{item.article_code}</TableCell>
               </TableRow>
             ))}
           </TableBody>
