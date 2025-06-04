@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Task } from '@/services/dataService';
 import { useToast } from '@/hooks/use-toast';
-import { Package, Clock, Check, Calendar, ArrowUpRight, LayoutGrid, ListIcon } from 'lucide-react';
+import { Package, Clock, Check, Calendar, ArrowUpRight, LayoutGrid, ListIcon, User } from 'lucide-react';
 import TaskList from '@/components/TaskList';
 import { Workstation } from '@/services/workstationService';
 
@@ -28,10 +28,16 @@ const validatePriority = (priority: string): "Low" | "Medium" | "High" | "Urgent
 
 const AUTO_REFRESH_INTERVAL = 60000; // Refresh every 60 seconds
 
+interface TaskWithEmployee extends Task {
+  assignee_name?: string;
+  timeRemaining?: string;
+  isOvertime?: boolean;
+}
+
 interface WorkstationData {
   workstation: Workstation;
-  tasks: Task[];
-  inProgressTasks: Task[]; // Separate property for in-progress tasks
+  tasks: TaskWithEmployee[];
+  inProgressTasks: TaskWithEmployee[];
   stats: {
     totalTasks: number;
     completedToday: number;
@@ -54,6 +60,46 @@ const WorkstationDashboard = () => {
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
+      
+      // Update countdown timers for in-progress tasks
+      setWorkstationData(prevData => 
+        prevData.map(workstationItem => ({
+          ...workstationItem,
+          inProgressTasks: workstationItem.inProgressTasks.map(task => {
+            if (task.status === 'IN_PROGRESS' && task.status_changed_at && task.duration) {
+              const startTime = new Date(task.status_changed_at);
+              const now = new Date();
+              const elapsedMs = now.getTime() - startTime.getTime();
+              const durationMs = task.duration * 60 * 1000; // Convert minutes to milliseconds
+              const remainingMs = durationMs - elapsedMs;
+              
+              if (remainingMs > 0) {
+                const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+                const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
+                
+                return {
+                  ...task,
+                  timeRemaining: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
+                  isOvertime: false
+                };
+              } else {
+                const overtimeMs = Math.abs(remainingMs);
+                const hours = Math.floor(overtimeMs / (1000 * 60 * 60));
+                const minutes = Math.floor((overtimeMs % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((overtimeMs % (1000 * 60)) / 1000);
+                
+                return {
+                  ...task,
+                  timeRemaining: `+${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
+                  isOvertime: true
+                };
+              }
+            }
+            return task;
+          })
+        }))
+      );
     }, 1000);
     
     return () => clearInterval(timer);
@@ -219,9 +265,9 @@ const WorkstationDashboard = () => {
     }
   };
 
-  const fetchTasksForWorkstation = async (workstation: Workstation): Promise<Task[]> => {
+  const fetchTasksForWorkstation = async (workstation: Workstation): Promise<TaskWithEmployee[]> => {
     try {
-      const allTasks: Task[] = [];
+      const allTasks: TaskWithEmployee[] = [];
       
       // First try to get tasks through standard task workstation links
       const { data: standardTaskLinks, error: standardLinksError } = await supabase
@@ -253,7 +299,7 @@ const WorkstationDashboard = () => {
           
           if (!standardTask) continue;
           
-          // IMPORTANT CHANGE: Fetch both TODO and IN_PROGRESS tasks
+          // Fetch both TODO and IN_PROGRESS tasks
           try {
             // Search for active tasks containing this standard task number or name
             const { data: matchingTasks, error: matchingTasksError } = await supabase
@@ -270,7 +316,7 @@ const WorkstationDashboard = () => {
             if (matchingTasks && matchingTasks.length > 0) {
               console.log(`Found ${matchingTasks.length} tasks matching standard task ${standardTask.task_number}`);
               
-              const validatedTasks: Task[] = matchingTasks.map(task => ({
+              const validatedTasks: TaskWithEmployee[] = matchingTasks.map(task => ({
                 ...task,
                 status: validateTaskStatus(task.status),
                 priority: validatePriority(task.priority)
@@ -296,7 +342,7 @@ const WorkstationDashboard = () => {
             }
             
             if (matchingNameTasks && matchingNameTasks.length > 0) {
-              const validatedTasks: Task[] = matchingNameTasks.map(task => ({
+              const validatedTasks: TaskWithEmployee[] = matchingNameTasks.map(task => ({
                 ...task,
                 status: validateTaskStatus(task.status),
                 priority: validatePriority(task.priority)
@@ -326,7 +372,7 @@ const WorkstationDashboard = () => {
         
         const taskIds = taskLinks.map(link => link.task_id);
         
-        // Get the actual tasks - IMPORTANT CHANGE: get both TODO and IN_PROGRESS
+        // Get the actual tasks - get both TODO and IN_PROGRESS
         const { data: linkedTasks, error: linkedTasksError } = await supabase
           .from('tasks')
           .select('*')
@@ -338,7 +384,7 @@ const WorkstationDashboard = () => {
         } else if (linkedTasks && linkedTasks.length > 0) {
           console.log("Found linked tasks:", linkedTasks.length);
           
-          const validatedTasks: Task[] = linkedTasks.map(task => ({
+          const validatedTasks: TaskWithEmployee[] = linkedTasks.map(task => ({
             ...task,
             status: validateTaskStatus(task.status),
             priority: validatePriority(task.priority)
@@ -351,7 +397,7 @@ const WorkstationDashboard = () => {
       // Final fallback: check if tasks have workstation name directly
       console.log("Checking for tasks with workstation name:", workstation.name);
       
-      // IMPORTANT CHANGE: get both TODO and IN_PROGRESS tasks
+      // get both TODO and IN_PROGRESS tasks
       const { data: directTasks, error: directTasksError } = await supabase
         .from('tasks')
         .select('*')
@@ -363,7 +409,7 @@ const WorkstationDashboard = () => {
       } else if (directTasks && directTasks.length > 0) {
         console.log("Found tasks with workstation directly:", directTasks.length);
         
-        const validatedTasks: Task[] = directTasks.map(task => ({
+        const validatedTasks: TaskWithEmployee[] = directTasks.map(task => ({
           ...task,
           status: validateTaskStatus(task.status),
           priority: validatePriority(task.priority)
@@ -379,7 +425,7 @@ const WorkstationDashboard = () => {
       
       console.log("Total unique tasks found for", workstation.name, ":", uniqueTasks.length);
       
-      // Get project and phase info for each task
+      // Get project and phase info for each task, and assignee names for in-progress tasks
       const tasksWithDetails = await enrichTasksWithProjectInfo(uniqueTasks);
       
       // Sort tasks by due date (earliest first)
@@ -396,8 +442,8 @@ const WorkstationDashboard = () => {
     }
   };
 
-  // Helper function to enrich tasks with project info
-  const enrichTasksWithProjectInfo = async (tasksData: Task[]): Promise<Task[]> => {
+  // Helper function to enrich tasks with project info and assignee names
+  const enrichTasksWithProjectInfo = async (tasksData: TaskWithEmployee[]): Promise<TaskWithEmployee[]> => {
     return await Promise.all(tasksData.map(async (task) => {
       try {
         // Get the phase to find the project
@@ -413,26 +459,39 @@ const WorkstationDashboard = () => {
           .select('name')
           .eq('id', phaseData.project_id)
           .single();
+
+        // Get assignee name if task is IN_PROGRESS and has assignee_id
+        let assigneeName = null;
+        if (task.status === 'IN_PROGRESS' && task.assignee_id) {
+          const { data: employeeData, error: employeeError } = await supabase
+            .from('employees')
+            .select('name')
+            .eq('id', task.assignee_id)
+            .single();
+          
+          if (!employeeError && employeeData) {
+            assigneeName = employeeData.name;
+          }
+        }
           
         // Form the task with additional info - status is already validated
         return {
           ...task,
           project_name: projectData?.name || 'Unknown Project',
-          phase_name: phaseData?.name || 'Unknown Phase'
-        } as Task;
+          assignee_name: assigneeName
+        } as TaskWithEmployee;
       } catch (error) {
         console.error('Error enriching task with project info:', error);
         return {
           ...task,
-          project_name: 'Unknown Project',
-          phase_name: 'Unknown Phase'
-        } as Task;
+          project_name: 'Unknown Project'
+        } as TaskWithEmployee;
       }
     }));
   };
 
   // Helper function to update task statistics
-  const calculateStats = async (tasksData: Task[], workstation: Workstation) => {
+  const calculateStats = async (tasksData: TaskWithEmployee[], workstation: Workstation) => {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -700,10 +759,26 @@ const WorkstationDashboard = () => {
                       <div className="mb-3">
                         <h3 className="text-sm font-medium text-amber-600 mb-1">In Progress</h3>
                         <div className="max-h-[calc(100vh-350px)] overflow-y-auto pr-1">
-                          <TaskList 
-                            tasks={data.inProgressTasks}
-                            compact={true}
-                          />
+                          {data.inProgressTasks.map((task) => (
+                            <div key={task.id} className="border rounded p-2 mb-2 bg-amber-50">
+                              <div className="flex justify-between items-start mb-1">
+                                <h4 className="font-medium text-sm truncate">{task.title}</h4>
+                                <span className="text-xs text-gray-500">{task.project_name}</span>
+                              </div>
+                              {task.assignee_name && (
+                                <div className="flex items-center text-xs text-gray-600 mb-1">
+                                  <User className="h-3 w-3 mr-1" />
+                                  Started by: {task.assignee_name}
+                                </div>
+                              )}
+                              {task.timeRemaining && (
+                                <div className={`text-xs font-mono ${task.isOvertime ? 'text-red-600' : 'text-green-600'}`}>
+                                  <Clock className="inline h-3 w-3 mr-1" />
+                                  {task.isOvertime ? 'Overtime: ' : 'Time left: '}{task.timeRemaining}
+                                </div>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}

@@ -263,8 +263,8 @@ const PersonalTasks = () => {
           new Map(allTasks.map(task => [task.id, task])).values()
         );
         
-        // Separate tasks by status
-        const todoTasksList = uniqueTasks.filter(task => task.status === 'TODO');
+        // Separate tasks by status - Fixed the status filtering
+        const todoTasksList = uniqueTasks.filter(task => task.status === 'TODO' || task.status === 'HOLD');
         const inProgressTasksList = uniqueTasks.filter(task => task.status === 'IN_PROGRESS');
         
         setTodoTasks(todoTasksList);

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -233,7 +234,7 @@ const ProjectDetails = () => {
     }
   };
 
-  // Group tasks by status
+  // Group tasks by status - Fixed the status filtering
   const todoTasks = tasks.filter(task => task.status === 'TODO' || task.status === 'HOLD');
   const inProgressTasks = tasks.filter(task => task.status === 'IN_PROGRESS');
   const completedTasks = tasks.filter(task => task.status === 'COMPLETED');

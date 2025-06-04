@@ -21,6 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   
   // Check for existing session on component mount and check for expiration
@@ -47,8 +48,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } catch (error) {
           console.error('Failed to parse stored session:', error);
           localStorage.removeItem('employeeSession');
+          setCurrentEmployee(null);
         }
       }
+      setIsLoading(false);
     };
     
     // Check session immediately
@@ -62,7 +65,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   const login = (employeeData: Employee) => {
     setCurrentEmployee(employeeData);
-    // Session storage is handled in the login component
+    // Calculate session expiration - end of today
+    const today = new Date();
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+    
+    const sessionData = {
+      ...employeeData,
+      expires: endOfDay.getTime()
+    };
+    
+    localStorage.setItem('employeeSession', JSON.stringify(sessionData));
   };
   
   const logout = () => {
@@ -70,6 +82,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('employeeSession');
     navigate('/login');
   };
+  
+  // Don't render children until we've checked for existing session
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
   
   return (
     <AuthContext.Provider

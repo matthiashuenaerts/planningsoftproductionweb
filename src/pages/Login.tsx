@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/context/AuthContext';
 
 const Login: React.FC = () => {
   const [name, setName] = useState('');
@@ -14,6 +15,14 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login, isAuthenticated } = useAuth();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +46,10 @@ const Login: React.FC = () => {
         .eq('name', name)
         .limit(1);
       
-      if (queryError) throw queryError;
+      if (queryError) {
+        console.error('Database query error:', queryError);
+        throw new Error('Failed to connect to database');
+      }
       
       if (!employees || employees.length === 0) {
         throw new Error('Employee not found');
@@ -50,26 +62,27 @@ const Login: React.FC = () => {
         throw new Error('Incorrect password');
       }
       
-      // Calculate session expiration - end of today
-      const today = new Date();
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
-      
-      // Create a session in localStorage with expiration
-      localStorage.setItem('employeeSession', JSON.stringify({
+      // Use the login function from AuthContext
+      login({
         id: employee.id,
         name: employee.name,
         role: employee.role,
-        workstation: employee.workstation,
-        expires: endOfDay.getTime()
-      }));
+        workstation: employee.workstation
+      });
       
       toast({
         title: "Login successful",
         description: `Welcome, ${employee.name}!`
       });
       
-      navigate('/');
+      // Navigate based on role
+      if (employee.role === 'workstation') {
+        navigate('/');
+      } else {
+        navigate('/');
+      }
     } catch (error: any) {
+      console.error('Login error:', error);
       toast({
         title: "Login failed",
         description: error.message || "An error occurred during login",
@@ -81,14 +94,14 @@ const Login: React.FC = () => {
   };
 
   return (
-  <div className="flex items-center justify-center min-h-screen bg-gray-100">
-    <div className="w-full max-w-md p-6 flex flex-col items-center space-y-4">
-      {/* Add the image here */}
-      <img 
-        src="https://static.wixstatic.com/media/99c033_7c36758b8bdb474990f30ed2fec2807f~mv2.png/v1/fill/w_954,h_660,al_c,q_90,usm_0.66_1.00_0.01,enc_avif,quality_auto/99c033_7c36758b8bdb474990f30ed2fec2807f~mv2.png" 
-        alt="Login visual"
-        className="w-full max-w-sm rounded shadow-md"
-      />
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <div className="w-full max-w-md p-6 flex flex-col items-center space-y-4">
+        {/* Add the image here */}
+        <img 
+          src="https://static.wixstatic.com/media/99c033_7c36758b8bdb474990f30ed2fec2807f~mv2.png/v1/fill/w_954,h_660,al_c,q_90,usm_0.66_1.00_0.01,enc_avif,quality_auto/99c033_7c36758b8bdb474990f30ed2fec2807f~mv2.png" 
+          alt="Login visual"
+          className="w-full max-w-sm rounded shadow-md"
+        />
         <Card>
           <CardHeader className="space-y-1 text-center">
             <CardTitle className="text-3xl font-bold">PlanningSoftProduction</CardTitle>
