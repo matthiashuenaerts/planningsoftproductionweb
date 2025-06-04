@@ -42,138 +42,104 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <Index />
-                  </div>
+                  <TaskTimer />
+                  <Index />
                 </ProtectedRoute>
               } />
               <Route path="/projects" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <Projects />
-                  </div>
+                  <TaskTimer />
+                  <Projects />
                 </ProtectedRoute>
               } />
               <Route path="/projects/:projectId" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <ProjectDetails />
-                  </div>
+                  <TaskTimer />
+                  <ProjectDetails />
                 </ProtectedRoute>
               } />
               <Route path="/workstations" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <Workstations />
-                  </div>
+                  <TaskTimer />
+                  <Workstations />
                 </ProtectedRoute>
               } />
               <Route path="/personal-tasks" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <PersonalTasks />
-                  </div>
+                  <TaskTimer />
+                  <PersonalTasks />
                 </ProtectedRoute>
               } />
               <Route path="/daily-tasks" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <DailyTasks />
-                  </div>
+                  <TaskTimer />
+                  <DailyTasks />
                 </ProtectedRoute>
               } />
               <Route path="/planning" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <Planning />
-                  </div>
+                  <TaskTimer />
+                  <Planning />
                 </ProtectedRoute>
               } />
               <Route path="/settings" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <Settings />
-                  </div>
+                  <TaskTimer />
+                  <Settings />
                 </ProtectedRoute>
               } />
               <Route path="/orders" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <Orders />
-                  </div>
+                  <TaskTimer />
+                  <Orders />
                 </ProtectedRoute>
               } />
               <Route path="/projects/:projectId/orders" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <ProjectOrders />
-                  </div>
+                  <TaskTimer />
+                  <ProjectOrders />
                 </ProtectedRoute>
               } />
               <Route path="/rush-orders" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <RushOrders />
-                  </div>
+                  <TaskTimer />
+                  <RushOrders />
                 </ProtectedRoute>
               } />
               <Route path="/rush-orders/:rushOrderId" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <RushOrderDetails />
-                  </div>
+                  <TaskTimer />
+                  <RushOrderDetails />
                 </ProtectedRoute>
               } />
               <Route path="/broken-parts" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <BrokenParts />
-                  </div>
+                  <TaskTimer />
+                  <BrokenParts />
                 </ProtectedRoute>
               } />
               <Route path="/broken-parts/summary" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <BrokenPartsSummary />
-                  </div>
+                  <TaskTimer />
+                  <BrokenPartsSummary />
                 </ProtectedRoute>
               } />
               <Route path="/broken-parts/new" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <NewBrokenPart />
-                  </div>
+                  <TaskTimer />
+                  <NewBrokenPart />
                 </ProtectedRoute>
               } />
               <Route path="/logistics" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <Logistics />
-                  </div>
+                  <TaskTimer />
+                  <Logistics />
                 </ProtectedRoute>
               } />
               <Route path="/time-registrations" element={
                 <ProtectedRoute>
-                  <div className="pt-20">
-                    <TaskTimer />
-                    <TimeRegistrations />
-                  </div>
+                  <TaskTimer />
+                  <TimeRegistrations />
                 </ProtectedRoute>
               } />
               <Route path="*" element={<NotFound />} />

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -13,6 +12,11 @@ const TaskTimer = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Don't render for workstation users
+  if (currentEmployee?.role === 'workstation') {
+    return null;
+  }
 
   // Update time every second
   useEffect(() => {
