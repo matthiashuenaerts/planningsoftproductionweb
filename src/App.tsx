@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -26,8 +27,11 @@ import NewBrokenPart from "./pages/NewBrokenPart";
 import Logistics from "./pages/Logistics";
 import TimeRegistrations from "./pages/TimeRegistrations";
 import NotFound from "./pages/NotFound";
+
 const queryClient = new QueryClient();
-const App = () => <QueryClientProvider client={queryClient}>
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
     <BrowserRouter>
       <AuthProvider>
         <AppProvider>
@@ -36,113 +40,149 @@ const App = () => <QueryClientProvider client={queryClient}>
             <Sonner />
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/" element={<ProtectedRoute>
-                  <div className="pt-20 py-0">
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <div className="pt-20">
                     <TaskTimer />
                     <Index />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/projects" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/projects" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <Projects />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/projects/:projectId" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/projects/:projectId" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <ProjectDetails />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/workstations" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/workstations" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <Workstations />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/personal-tasks" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/personal-tasks" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <PersonalTasks />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/daily-tasks" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/daily-tasks" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <DailyTasks />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/planning" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/planning" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <Planning />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/settings" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <Settings />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/orders" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/orders" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <Orders />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/projects/:projectId/orders" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/projects/:projectId/orders" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <ProjectOrders />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/rush-orders" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/rush-orders" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <RushOrders />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/rush-orders/:rushOrderId" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/rush-orders/:rushOrderId" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <RushOrderDetails />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/broken-parts" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/broken-parts" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <BrokenParts />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/broken-parts/summary" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/broken-parts/summary" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <BrokenPartsSummary />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/broken-parts/new" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/broken-parts/new" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <NewBrokenPart />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/logistics" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/logistics" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <Logistics />
                   </div>
-                </ProtectedRoute>} />
-              <Route path="/time-registrations" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/time-registrations" element={
+                <ProtectedRoute>
                   <div className="pt-20">
                     <TaskTimer />
                     <TimeRegistrations />
                   </div>
-                </ProtectedRoute>} />
+                </ProtectedRoute>
+              } />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </TooltipProvider>
         </AppProvider>
       </AuthProvider>
     </BrowserRouter>
-  </QueryClientProvider>;
+  </QueryClientProvider>
+);
+
 export default App;
