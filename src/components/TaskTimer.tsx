@@ -131,7 +131,7 @@ const TaskTimer = () => {
   }
 
   return (
-    <div className="fixed top-4 left-1/2 z-50">
+    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
       <Card 
         className={`cursor-pointer transition-colors max-w-sm ${
           activeRegistration && activeRegistration.is_active 
