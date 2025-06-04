@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Task } from '@/services/dataService';
 import { useToast } from '@/hooks/use-toast';
-import { Package, Clock, Check, Calendar, ArrowUpRight, LayoutGrid, ListIcon, User, Timer } from 'lucide-react';
+import { Package, Clock, Check, Calendar, ArrowUpRight, LayoutGrid, ListIcon } from 'lucide-react';
 import TaskList from '@/components/TaskList';
 import { Workstation } from '@/services/workstationService';
 
@@ -28,15 +28,10 @@ const validatePriority = (priority: string): "Low" | "Medium" | "High" | "Urgent
 
 const AUTO_REFRESH_INTERVAL = 60000; // Refresh every 60 seconds
 
-interface TaskWithEmployee extends Task {
-  assignee_name?: string;
-  start_time?: string;
-}
-
 interface WorkstationData {
   workstation: Workstation;
-  tasks: TaskWithEmployee[];
-  inProgressTasks: TaskWithEmployee[]; // Separate property for in-progress tasks
+  tasks: Task[];
+  inProgressTasks: Task[]; // Separate property for in-progress tasks
   stats: {
     totalTasks: number;
     completedToday: number;
@@ -224,9 +219,9 @@ const WorkstationDashboard = () => {
     }
   };
 
-  const fetchTasksForWorkstation = async (workstation: Workstation): Promise<TaskWithEmployee[]> => {
+  const fetchTasksForWorkstation = async (workstation: Workstation): Promise<Task[]> => {
     try {
-      const allTasks: TaskWithEmployee[] = [];
+      const allTasks: Task[] = [];
       
       // First try to get tasks through standard task workstation links
       const { data: standardTaskLinks, error: standardLinksError } = await supabase
@@ -384,8 +379,8 @@ const WorkstationDashboard = () => {
       
       console.log("Total unique tasks found for", workstation.name, ":", uniqueTasks.length);
       
-      // Get project and phase info for each task, plus assignee information
-      const tasksWithDetails = await enrichTasksWithProjectAndEmployeeInfo(uniqueTasks);
+      // Get project and phase info for each task
+      const tasksWithDetails = await enrichTasksWithProjectInfo(uniqueTasks);
       
       // Sort tasks by due date (earliest first)
       const sortedTasks = tasksWithDetails.sort((a, b) => {
@@ -401,8 +396,8 @@ const WorkstationDashboard = () => {
     }
   };
 
-  // Helper function to enrich tasks with project and employee info
-  const enrichTasksWithProjectAndEmployeeInfo = async (tasksData: Task[]): Promise<TaskWithEmployee[]> => {
+  // Helper function to enrich tasks with project info
+  const enrichTasksWithProjectInfo = async (tasksData: Task[]): Promise<Task[]> => {
     return await Promise.all(tasksData.map(async (task) => {
       try {
         // Get the phase to find the project
@@ -418,49 +413,20 @@ const WorkstationDashboard = () => {
           .select('name')
           .eq('id', phaseData.project_id)
           .single();
-
-        // Get assignee information if task is assigned
-        let assigneeName = '';
-        let startTime = '';
-        if (task.assignee_id) {
-          const { data: employeeData } = await supabase
-            .from('employees')
-            .select('name')
-            .eq('id', task.assignee_id)
-            .single();
-          
-          assigneeName = employeeData?.name || 'Unknown';
-
-          // Get the active time registration for this task to find start time
-          if (task.status === 'IN_PROGRESS') {
-            const { data: timeRegistration } = await supabase
-              .from('time_registrations')
-              .select('start_time')
-              .eq('task_id', task.id)
-              .eq('is_active', true)
-              .maybeSingle();
-            
-            if (timeRegistration) {
-              startTime = timeRegistration.start_time;
-            }
-          }
-        }
           
         // Form the task with additional info - status is already validated
         return {
           ...task,
           project_name: projectData?.name || 'Unknown Project',
-          phase_name: phaseData?.name || 'Unknown Phase',
-          assignee_name: assigneeName,
-          start_time: startTime
-        } as TaskWithEmployee;
+          phase_name: phaseData?.name || 'Unknown Phase'
+        } as Task;
       } catch (error) {
         console.error('Error enriching task with project info:', error);
         return {
           ...task,
           project_name: 'Unknown Project',
           phase_name: 'Unknown Phase'
-        } as TaskWithEmployee;
+        } as Task;
       }
     }));
   };
@@ -572,45 +538,83 @@ const WorkstationDashboard = () => {
     }, { totalTasks: 0, completedToday: 0, inProgress: 0, dueToday: 0 });
   };
 
-  // Format duration for countdown
-  const formatCountdown = (startTime: string) => {
-    if (!startTime) return '00:00:00';
-    
-    const start = new Date(startTime);
-    const now = currentTime;
-    const diffMs = now.getTime() - start.getTime();
-    const hours = Math.floor(diffMs / (1000 * 60 * 60));
-    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
-    
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  // Render in-progress task with employee info and countdown
-  const renderInProgressTask = (task: TaskWithEmployee) => {
+  // Render a single workstation section
+  const renderWorkstationSection = (data: WorkstationData) => {
     return (
-      <div key={task.id} className="border rounded-lg p-3 bg-amber-50 border-amber-200">
-        <div className="flex justify-between items-start mb-2">
-          <h4 className="font-medium text-sm">{task.title}</h4>
-          <div className="flex items-center text-xs text-amber-600">
-            <Timer className="h-3 w-3 mr-1" />
-            {formatCountdown(task.start_time || '')}
+      <div key={data.workstation.id} className="border rounded-lg p-4 bg-white shadow mb-4">
+        <h2 className="text-xl font-bold mb-4 text-primary">
+          {data.workstation.name}
+        </h2>
+        
+        <div className="grid grid-cols-4 gap-4">
+          {/* Tasks column - takes up 3/4 of the space */}
+          <div className="col-span-3">
+            {/* Display in-progress tasks first if there are any */}
+            {data.inProgressTasks && data.inProgressTasks.length > 0 && (
+              <div className="mb-4">
+                <TaskList 
+                  tasks={data.inProgressTasks} 
+                  title={`In Progress Tasks (${data.inProgressTasks.length})`}
+                />
+              </div>
+            )}
+            
+            {/* Display to-do tasks */}
+            {data.tasks.length === 0 && (!data.inProgressTasks || data.inProgressTasks.length === 0) ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>No Tasks</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p>There are no pending tasks assigned to this workstation.</p>
+                </CardContent>
+              </Card>
+            ) : data.tasks.length > 0 && (
+              <TaskList 
+                tasks={data.tasks} 
+                title={`To Do Tasks (${data.tasks.length})`}
+              />
+            )}
           </div>
-        </div>
-        
-        <div className="text-xs text-gray-600 mb-2">
-          {task.project_name} - {task.phase_name}
-        </div>
-        
-        {task.assignee_name && (
-          <div className="flex items-center text-xs text-amber-700">
-            <User className="h-3 w-3 mr-1" />
-            Started by: {task.assignee_name}
+          
+          {/* Stats column - takes up 1/4 of the space */}
+          <div className="space-y-4">
+            <Card>
+              <CardContent className="p-6 flex items-center">
+                <div className="bg-blue-100 p-3 rounded-full mr-4">
+                  <Package className="text-blue-700 h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">TODO Tasks</p>
+                  <h3 className="text-2xl font-bold">{data.stats.totalTasks}</h3>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-6 flex items-center">
+                <div className="bg-green-100 p-3 rounded-full mr-4">
+                  <Check className="text-green-700 h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Completed Today</p>
+                  <h3 className="text-2xl font-bold">{data.stats.completedToday}</h3>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-6 flex items-center">
+                <div className="bg-amber-100 p-3 rounded-full mr-4">
+                  <Calendar className="text-amber-700 h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Due Today</p>
+                  <h3 className="text-2xl font-bold">{data.stats.dueToday}</h3>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        )}
-        
-        <div className="text-xs text-gray-500 mt-1">
-          Due: {new Date(task.due_date).toLocaleDateString()}
         </div>
       </div>
     );
@@ -691,15 +695,15 @@ const WorkstationDashboard = () => {
                       {data.workstation.name}
                     </h2>
                     
-                    {/* In-progress tasks section - always show at the top with detailed info */}
+                    {/* In-progress tasks section - always show at the top */}
                     {data.inProgressTasks && data.inProgressTasks.length > 0 && (
                       <div className="mb-3">
-                        <h3 className="text-sm font-medium text-amber-600 mb-2 flex items-center">
-                          <Timer className="h-3 w-3 mr-1" />
-                          In Progress ({data.inProgressTasks.length})
-                        </h3>
-                        <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto pr-1">
-                          {data.inProgressTasks.map(renderInProgressTask)}
+                        <h3 className="text-sm font-medium text-amber-600 mb-1">In Progress</h3>
+                        <div className="max-h-[calc(100vh-350px)] overflow-y-auto pr-1">
+                          <TaskList 
+                            tasks={data.inProgressTasks}
+                            compact={true}
+                          />
                         </div>
                       </div>
                     )}
