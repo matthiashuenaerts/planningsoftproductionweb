@@ -1,16 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { projectService } from '@/services/projectService';
-import { taskService } from '@/services/taskService';
-import { phaseService } from '@/services/phaseService';
 import { useToast } from '@/hooks/use-toast';
 import { Task } from '@/services/dataService';
-import { Project, ProjectUpdate } from '@/services/projectService';
-import { Phase } from '@/services/phaseService';
+import { supabase } from '@/integrations/supabase/client';
 import Navbar from '@/components/Navbar';
 import TaskList from '@/components/TaskList';
-import TaskCard from '@/components/TaskCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,16 +39,68 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { projectSchema, projectUpdateSchema } from '@/lib/validators/project';
-import { taskSchema } from '@/lib/validators/task';
-import { phaseSchema } from '@/lib/validators/phase';
-import { confirm } from "@/components/ui/confirm"
 import { format } from 'date-fns';
+
+interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  status: string;
+  priority: string;
+  installation_date: string;
+  start_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ProjectUpdate {
+  name?: string;
+  description?: string;
+  status?: string;
+  priority?: string;
+  installation_date?: Date;
+  start_date?: Date;
+}
+
+interface Phase {
+  id: string;
+  name: string;
+  project_id: string;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+  updated_at: string;
+}
 
 interface TaskWithProjectAndPhase extends Task {
   project_name?: string;
   phase_name?: string;
 }
+
+// Basic validation schemas
+const projectUpdateSchema = z.object({
+  name: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  status: z.enum(['active', 'inactive']),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']),
+  installation_date: z.date(),
+  start_date: z.date()
+});
+
+const taskSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  status: z.enum(['TODO', 'IN_PROGRESS', 'COMPLETED', 'HOLD']),
+  priority: z.enum(['Low', 'Medium', 'High', 'Urgent']),
+  phase_id: z.string().min(1, "Phase is required"),
+  due_date: z.date(),
+  workstation: z.string().optional(),
+  duration: z.number().min(0).optional()
+});
+
+const phaseSchema = z.object({
+  name: z.string().min(1, "Name is required")
+});
 
 const ProjectDetails: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -71,11 +119,12 @@ const ProjectDetails: React.FC = () => {
   const projectForm = useForm<z.infer<typeof projectUpdateSchema>>({
     resolver: zodResolver(projectUpdateSchema),
     defaultValues: {
-      title: '',
+      name: '',
       description: '',
       status: 'active',
       priority: 'medium',
-      due_date: new Date(),
+      installation_date: new Date(),
+      start_date: new Date(),
     },
   })
 
@@ -107,9 +156,28 @@ const ProjectDetails: React.FC = () => {
     queryKey: ['project', projectId],
     queryFn: async () => {
       if (!projectId) return null;
-      const projectData = await projectService.getById(projectId);
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+      
+      if (error) throw error;
+      
+      const projectData = {
+        ...data,
+        name: data.name || data.title || '', // Handle both name and title fields
+      } as Project;
+      
       setProject(projectData);
-      projectForm.reset(projectData);
+      projectForm.reset({
+        name: projectData.name,
+        description: projectData.description || '',
+        status: projectData.status as any,
+        priority: projectData.priority as any,
+        installation_date: new Date(projectData.installation_date),
+        start_date: new Date(projectData.start_date)
+      });
       return projectData;
     },
     enabled: !!projectId,
@@ -120,9 +188,15 @@ const ProjectDetails: React.FC = () => {
     queryKey: ['phases', projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      const phasesData = await phaseService.getByProjectId(projectId);
-      setPhases(phasesData);
-      return phasesData;
+      const { data, error } = await supabase
+        .from('phases')
+        .select('*')
+        .eq('project_id', projectId);
+      
+      if (error) throw error;
+      
+      setPhases(data || []);
+      return data || [];
     },
     enabled: !!projectId,
   });
@@ -132,15 +206,22 @@ const ProjectDetails: React.FC = () => {
     queryKey: ['tasks', projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      const tasksData = await taskService.getByProjectId(projectId);
+      const { data, error } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          phases!inner(project_id, name)
+        `)
+        .eq('phases.project_id', projectId);
+      
+      if (error) throw error;
       
       // Enrich tasks with project and phase names
-      const enrichedTasks = tasksData.map(task => {
-        const phase = phases.find(p => p.id === task.phase_id);
+      const enrichedTasks = (data || []).map(task => {
         return {
           ...task,
-          project_name: project?.title,
-          phase_name: phase?.name,
+          project_name: project?.name,
+          phase_name: task.phases?.name,
         };
       });
       
@@ -151,10 +232,24 @@ const ProjectDetails: React.FC = () => {
   });
 
   // Project Mutations
-  const { mutate: updateProject, isLoading: isUpdateProjectLoading } = useMutation({
+  const { mutate: updateProject, isPending: isUpdateProjectLoading } = useMutation({
     mutationFn: async (data: ProjectUpdate) => {
       if (!projectId) throw new Error("Project ID is required to update project.");
-      return projectService.update(projectId, data);
+      const { error } = await supabase
+        .from('projects')
+        .update({
+          name: data.name,
+          description: data.description,
+          status: data.status,
+          priority: data.priority,
+          installation_date: data.installation_date?.toISOString().split('T')[0],
+          start_date: data.start_date?.toISOString().split('T')[0],
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', projectId);
+      
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       toast({
@@ -173,10 +268,15 @@ const ProjectDetails: React.FC = () => {
     },
   });
 
-  const { mutate: deleteProject, isLoading: isDeleteProjectLoading } = useMutation({
+  const { mutate: deleteProject, isPending: isDeleteProjectLoading } = useMutation({
     mutationFn: async (id: string) => {
-      if (!projectId) throw new Error("Project ID is required to delete project.");
-      return projectService.remove(id);
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      return id;
     },
     onSuccess: () => {
       toast({
@@ -195,10 +295,18 @@ const ProjectDetails: React.FC = () => {
   });
 
   // Task Mutations
-  const { mutate: createTask, isLoading: isCreateTaskLoading } = useMutation({
+  const { mutate: createTask, isPending: isCreateTaskLoading } = useMutation({
     mutationFn: async (data: z.infer<typeof taskSchema>) => {
       if (!projectId) throw new Error("Project ID is required to create task.");
-      return taskService.create({ ...data, project_id: projectId });
+      const { error } = await supabase
+        .from('tasks')
+        .insert({
+          ...data,
+          due_date: data.due_date.toISOString().split('T')[0]
+        });
+      
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       toast({
@@ -219,10 +327,20 @@ const ProjectDetails: React.FC = () => {
   });
 
   // Phase Mutations
-  const { mutate: createPhase, isLoading: isCreatePhaseLoading } = useMutation({
+  const { mutate: createPhase, isPending: isCreatePhaseLoading } = useMutation({
     mutationFn: async (data: z.infer<typeof phaseSchema>) => {
       if (!projectId) throw new Error("Project ID is required to create phase.");
-      return phaseService.create({ ...data, project_id: projectId });
+      const { error } = await supabase
+        .from('phases')
+        .insert({
+          ...data,
+          project_id: projectId,
+          start_date: new Date().toISOString().split('T')[0],
+          end_date: new Date().toISOString().split('T')[0]
+        });
+      
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       toast({
@@ -250,7 +368,7 @@ const ProjectDetails: React.FC = () => {
         const phase = phases.find(p => p.id === task.phase_id);
         return {
           ...task,
-          project_name: project?.title,
+          project_name: project?.name,
           phase_name: phase?.name,
         };
       });
@@ -280,7 +398,7 @@ const ProjectDetails: React.FC = () => {
   });
 
   const handleProjectDelete = async () => {
-    if (await confirm("Are you sure you want to delete this project?")) {
+    if (window.confirm("Are you sure you want to delete this project?")) {
       deleteProject(projectId || '');
     }
   };
@@ -298,6 +416,20 @@ const ProjectDetails: React.FC = () => {
     );
   }
 
+  // Filter tasks based on search term
+  const filteredTodoTasks = todoTasks.filter(task => 
+    task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    task.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const filteredInProgressTasks = inProgressTasks.filter(task => 
+    task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    task.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const filteredCompletedTasks = completedTasks.filter(task => 
+    task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    task.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="flex min-h-screen">
       <div className="w-64 bg-sidebar fixed top-0 bottom-0">
@@ -311,7 +443,7 @@ const ProjectDetails: React.FC = () => {
 
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-2xl font-bold">{project.title}</h1>
+              <h1 className="text-2xl font-bold">{project.name}</h1>
               <p className="text-gray-500">{project.description}</p>
             </div>
             <div className="space-x-2">
@@ -340,7 +472,7 @@ const ProjectDetails: React.FC = () => {
                 <CardTitle>To Do</CardTitle>
               </CardHeader>
               <CardContent>
-                <TaskList tasks={todoTasks} searchTerm={searchTerm} />
+                <TaskList tasks={filteredTodoTasks} />
               </CardContent>
             </Card>
 
@@ -349,7 +481,7 @@ const ProjectDetails: React.FC = () => {
                 <CardTitle>In Progress</CardTitle>
               </CardHeader>
               <CardContent>
-                <TaskList tasks={inProgressTasks} searchTerm={searchTerm} />
+                <TaskList tasks={filteredInProgressTasks} />
               </CardContent>
             </Card>
 
@@ -358,7 +490,7 @@ const ProjectDetails: React.FC = () => {
                 <CardTitle>Completed</CardTitle>
               </CardHeader>
               <CardContent>
-                <TaskList tasks={completedTasks} searchTerm={searchTerm} />
+                <TaskList tasks={filteredCompletedTasks} />
               </CardContent>
             </Card>
 
@@ -370,8 +502,11 @@ const ProjectDetails: React.FC = () => {
                 {upcomingDeadlines.length > 0 ? (
                   <ul>
                     {upcomingDeadlines.map((task) => (
-                      <li key={task.id} className="mb-2">
-                        <TaskCard task={task} />
+                      <li key={task.id} className="mb-2 p-2 border rounded">
+                        <div className="font-medium">{task.title}</div>
+                        <div className="text-sm text-gray-500">
+                          Due: {new Date(task.due_date).toLocaleDateString()}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -389,8 +524,11 @@ const ProjectDetails: React.FC = () => {
                 {overdueTasks.length > 0 ? (
                   <ul>
                     {overdueTasks.map((task) => (
-                      <li key={task.id} className="mb-2">
-                        <TaskCard task={task} />
+                      <li key={task.id} className="mb-2 p-2 border rounded bg-red-50">
+                        <div className="font-medium">{task.title}</div>
+                        <div className="text-sm text-red-600">
+                          Due: {new Date(task.due_date).toLocaleDateString()}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -578,7 +716,12 @@ const ProjectDetails: React.FC = () => {
                       <FormItem>
                         <FormLabel>Due Date</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} />
+                          <Input 
+                            type="date" 
+                            {...field} 
+                            value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : field.value}
+                            onChange={(e) => field.onChange(new Date(e.target.value))}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -604,7 +747,12 @@ const ProjectDetails: React.FC = () => {
                       <FormItem>
                         <FormLabel>Duration</FormLabel>
                         <FormControl>
-                          <Input type="number" placeholder="Duration" {...field} />
+                          <Input 
+                            type="number" 
+                            placeholder="Duration" 
+                            {...field} 
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -635,7 +783,7 @@ const ProjectDetails: React.FC = () => {
             })} className="space-y-4">
               <FormField
                 control={projectForm.control}
-                name="title"
+                name="name"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Title</FormLabel>
@@ -709,12 +857,17 @@ const ProjectDetails: React.FC = () => {
               />
               <FormField
                 control={projectForm.control}
-                name="due_date"
+                name="installation_date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Due Date</FormLabel>
+                    <FormLabel>Installation Date</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input 
+                        type="date" 
+                        {...field} 
+                        value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : field.value}
+                        onChange={(e) => field.onChange(new Date(e.target.value))}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

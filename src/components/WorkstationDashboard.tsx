@@ -31,6 +31,8 @@ const AUTO_REFRESH_INTERVAL = 60000; // Refresh every 60 seconds
 interface TaskWithEmployee extends Task {
   assignee_name?: string;
   start_time?: string;
+  project_name?: string;
+  phase_name?: string;
 }
 
 interface WorkstationData {
