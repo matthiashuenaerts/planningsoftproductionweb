@@ -13,7 +13,6 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import InstallationTeamCalendar from '@/components/InstallationTeamCalendar';
 import TruckLoadingCalendar from '@/components/TruckLoadingCalendar';
-
 interface Project {
   id: string;
   name: string;
@@ -23,7 +22,6 @@ interface Project {
   progress: number;
   [key: string]: any;
 }
-
 const DailyTasks: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [displayMode, setDisplayMode] = useState<'calendar' | 'teams' | 'trucks'>('calendar');
@@ -31,30 +29,29 @@ const DailyTasks: React.FC = () => {
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [weekStart, setWeekStart] = useState<Date>(new Date());
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
 
   // Format the selected date to match our date format in the database
-  const formattedSelectedDate = selectedDate 
-    ? selectedDate.toISOString().split('T')[0]
-    : new Date().toISOString().split('T')[0];
+  const formattedSelectedDate = selectedDate ? selectedDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
   // Fetch all projects with installation dates
   useEffect(() => {
     const fetchAllProjects = async () => {
       try {
         setLoading(true);
-        
+
         // Get all projects with installation dates
-        const { data, error } = await supabase
-          .from('projects')
-          .select('*')
-          .not('installation_date', 'is', null)
-          .order('installation_date', { ascending: true });
-        
+        const {
+          data,
+          error
+        } = await supabase.from('projects').select('*').not('installation_date', 'is', null).order('installation_date', {
+          ascending: true
+        });
         if (error) throw error;
-        
         setAllProjects(data || []);
-        
+
         // Filter projects for the selected date
         filterProjectsForSelectedDate(selectedDate, data || []);
       } catch (error: any) {
@@ -70,7 +67,6 @@ const DailyTasks: React.FC = () => {
         setLoading(false);
       }
     };
-
     fetchAllProjects();
   }, [toast]);
 
@@ -85,12 +81,10 @@ const DailyTasks: React.FC = () => {
       setProjects([]);
       return;
     }
-    
     const dateString = date.toISOString().split('T')[0];
     const filtered = allProjectsData.filter(project => {
       return project.installation_date === dateString;
     });
-    
     setProjects(filtered);
   };
 
@@ -102,7 +96,6 @@ const DailyTasks: React.FC = () => {
     }
     return dates;
   };
-
   const weekDates = getWeekDates();
 
   // Navigate to previous week
@@ -150,42 +143,30 @@ const DailyTasks: React.FC = () => {
         return 'bg-gray-100 text-gray-800 border-gray-300';
     }
   };
-
-  return (
-    <div className="flex min-h-screen">
+  return <div className="flex min-h-screen">
       <div className="w-64 bg-sidebar fixed top-0 bottom-0">
         <Navbar />
       </div>
-      <div className="ml-64 w-full p-6">
+      <div className="ml-64 w-full p-6 my-[70px]">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
             <h1 className="text-2xl font-bold">Installation Calendar</h1>
             
             <div className="flex mt-4 md:mt-0 space-x-2">
-              <Button 
-                variant={displayMode === 'calendar' ? 'default' : 'outline'}
-                onClick={() => setDisplayMode('calendar')}
-              >
+              <Button variant={displayMode === 'calendar' ? 'default' : 'outline'} onClick={() => setDisplayMode('calendar')}>
                 Calendar View
               </Button>
-              <Button 
-                variant={displayMode === 'teams' ? 'default' : 'outline'}
-                onClick={() => setDisplayMode('teams')}
-              >
+              <Button variant={displayMode === 'teams' ? 'default' : 'outline'} onClick={() => setDisplayMode('teams')}>
                 Team Planner
               </Button>
-              <Button 
-                variant={displayMode === 'trucks' ? 'default' : 'outline'}
-                onClick={() => setDisplayMode('trucks')}
-              >
+              <Button variant={displayMode === 'trucks' ? 'default' : 'outline'} onClick={() => setDisplayMode('trucks')}>
                 <Truck className="h-4 w-4 mr-2" />
                 Truck Loading
               </Button>
             </div>
           </div>
           
-          {displayMode === 'calendar' ? (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {displayMode === 'calendar' ? <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
@@ -197,18 +178,11 @@ const DailyTasks: React.FC = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    className="rounded-md border w-full"
-                    modifiers={{
-                      hasProjects: allProjects.map(p => new Date(p.installation_date))
-                    }}
-                    modifiersClassNames={{
-                      hasProjects: "relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:h-1 after:w-1 after:rounded-full after:bg-primary"
-                    }}
-                  />
+                  <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} className="rounded-md border w-full" modifiers={{
+                hasProjects: allProjects.map(p => new Date(p.installation_date))
+              }} modifiersClassNames={{
+                hasProjects: "relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:h-1 after:w-1 after:rounded-full after:bg-primary"
+              }} />
                 </CardContent>
               </Card>
               
@@ -226,18 +200,10 @@ const DailyTasks: React.FC = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {loading ? (
-                      <div className="flex justify-center p-8">
+                    {loading ? <div className="flex justify-center p-8">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                      </div>
-                    ) : projects.length > 0 ? (
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {projects.map(project => (
-                          <div 
-                            key={project.id} 
-                            className="rounded-lg border overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-                            onClick={() => handleProjectClick(project.id)}
-                          >
+                      </div> : projects.length > 0 ? <div className="grid gap-4 md:grid-cols-2">
+                        {projects.map(project => <div key={project.id} className="rounded-lg border overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleProjectClick(project.id)}>
                             <div className="bg-primary/5 p-4">
                               <div className="flex justify-between items-start">
                                 <h3 className="font-medium text-lg mb-1 truncate">{project.name}</h3>
@@ -261,46 +227,31 @@ const DailyTasks: React.FC = () => {
                                     <span>{project.progress || 0}%</span>
                                   </div>
                                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                                    <div 
-                                      className="h-full bg-primary rounded-full"
-                                      style={{ width: `${project.progress || 0}%` }}
-                                    ></div>
+                                    <div className="h-full bg-primary rounded-full" style={{
+                              width: `${project.progress || 0}%`
+                            }}></div>
                                   </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-12 px-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                          </div>)}
+                      </div> : <div className="text-center py-12 px-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
                         <CalendarDays className="mx-auto h-10 w-10 text-gray-400 mb-3" />
                         <p className="text-lg font-medium text-gray-600 mb-1">No installations scheduled</p>
                         <p className="text-muted-foreground max-w-sm mx-auto">
                           There are no projects scheduled for installation on this date.
                           Select a different date or create a new project.
                         </p>
-                        <Button 
-                          variant="outline" 
-                          className="mt-4"
-                          onClick={() => window.location.href = '/projects'}
-                        >
+                        <Button variant="outline" className="mt-4" onClick={() => window.location.href = '/projects'}>
                           View All Projects
                         </Button>
-                      </div>
-                    )}
+                      </div>}
                   </CardContent>
                 </Card>
               </div>
-            </div>
-          ) : displayMode === 'teams' ? (
-            <InstallationTeamCalendar projects={allProjects} />
-          ) : (
-            <TruckLoadingCalendar />
-          )}
+            </div> : displayMode === 'teams' ? <InstallationTeamCalendar projects={allProjects} /> : <TruckLoadingCalendar />}
           
-          {displayMode === 'calendar' && (
-            <div className="mt-6">
+          {displayMode === 'calendar' && <div className="mt-6">
               <Card>
                 <CardHeader>
                   <CardTitle>Upcoming Installations</CardTitle>
@@ -309,32 +260,17 @@ const DailyTasks: React.FC = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {loading ? (
-                    <div className="flex justify-center p-4">
+                  {loading ? <div className="flex justify-center p-4">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                    </div>
-                  ) : (
-                    <div className="relative">
+                    </div> : <div className="relative">
                       <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200" />
                       
-                      {allProjects.length > 0 ? (
-                        <div className="space-y-4">
-                          {allProjects
-                            .slice(0, 10)
-                            .map(project => {
-                            const installationDate = new Date(project.installation_date);
-                            const isUpcoming = installationDate >= new Date();
-                            
-                            return (
-                              <div 
-                                key={project.id}
-                                className="relative pl-10 cursor-pointer hover:bg-gray-50 p-2 rounded"
-                                onClick={() => handleProjectClick(project.id)}
-                              >
-                                <div className={cn(
-                                  "absolute left-3 top-2 w-3 h-3 rounded-full border-2 border-white",
-                                  isUpcoming ? "bg-primary" : "bg-gray-400"
-                                )} />
+                      {allProjects.length > 0 ? <div className="space-y-4">
+                          {allProjects.slice(0, 10).map(project => {
+                    const installationDate = new Date(project.installation_date);
+                    const isUpcoming = installationDate >= new Date();
+                    return <div key={project.id} className="relative pl-10 cursor-pointer hover:bg-gray-50 p-2 rounded" onClick={() => handleProjectClick(project.id)}>
+                                <div className={cn("absolute left-3 top-2 w-3 h-3 rounded-full border-2 border-white", isUpcoming ? "bg-primary" : "bg-gray-400")} />
                                 
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between">
                                   <div>
@@ -351,36 +287,23 @@ const DailyTasks: React.FC = () => {
                                     </Badge>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground">
+                              </div>;
+                  })}
+                        </div> : <div className="text-center py-8 text-muted-foreground">
                           No upcoming installations found.
-                        </div>
-                      )}
+                        </div>}
                       
-                      {allProjects.length > 10 && (
-                        <div className="text-center mt-4">
-                          <Button 
-                            variant="outline"
-                            onClick={() => window.location.href = '/projects'}
-                          >
+                      {allProjects.length > 10 && <div className="text-center mt-4">
+                          <Button variant="outline" onClick={() => window.location.href = '/projects'}>
                             View All Projects
                           </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        </div>}
+                    </div>}
                 </CardContent>
               </Card>
-            </div>
-          )}
+            </div>}
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default DailyTasks;
