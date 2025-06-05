@@ -20,11 +20,14 @@ import {
   Users,
   User,
   Wand2,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Navbar from '@/components/Navbar';
 import PlanningTimeline from '@/components/PlanningTimeline';
 import PlanningControls from '@/components/PlanningControls';
+import PersonalPlanningGenerator from '@/components/PersonalPlanningGenerator';
+import PlanningTaskManager from '@/components/PlanningTaskManager';
 import { employeeService } from '@/services/dataService';
 import { planningService } from '@/services/planningService';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -40,12 +43,13 @@ import {
 const Planning = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
-  const [isGeneratingPersonalPlan, setIsGeneratingPersonalPlan] = useState(false);
   const [employees, setEmployees] = useState<any[]>([]);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [generationSuccess, setGenerationSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showTaskManager, setShowTaskManager] = useState(false);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const isAdmin = currentEmployee?.role === 'admin';
@@ -94,6 +98,7 @@ const Planning = () => {
       await planningService.generateDailyPlan(selectedDate);
       
       setGenerationSuccess("Daily plan has been successfully generated for all employees");
+      setRefreshTrigger(prev => prev + 1);
       toast({
         title: "Success",
         description: "Daily plan has been generated",
@@ -111,44 +116,12 @@ const Planning = () => {
     }
   };
 
-  const handleGeneratePersonalPlan = async () => {
-    if (!selectedEmployee) {
-      toast({
-        title: "Employee Required",
-        description: "Please select an employee to create a plan",
-        variant: "destructive"
-      });
-      return;
-    }
+  const handlePlanGenerated = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
 
-    try {
-      setIsGeneratingPersonalPlan(true);
-      setGenerationError(null);
-      setGenerationSuccess(null);
-      
-      // Generate a plan based on personal tasks
-      await planningService.generatePlanFromPersonalTasks(selectedEmployee, selectedDate);
-      
-      // Get employee name
-      const employee = employees.find(emp => emp.id === selectedEmployee);
-      const employeeName = employee ? employee.name : "selected employee";
-      
-      setGenerationSuccess(`Daily plan has been generated for ${employeeName}`);
-      toast({
-        title: "Success",
-        description: `Plan created for ${employeeName}`,
-      });
-    } catch (error: any) {
-      console.error("Generate personal plan error:", error);
-      setGenerationError(error.message || "Failed to generate personal plan");
-      toast({
-        title: "Error",
-        description: `Failed to generate personal plan: ${error.message}`,
-        variant: "destructive"
-      });
-    } finally {
-      setIsGeneratingPersonalPlan(false);
-    }
+  const handleTaskManagerSave = () => {
+    setRefreshTrigger(prev => prev + 1);
   };
 
   // Clear messages when date changes
@@ -188,7 +161,7 @@ const Planning = () => {
             <div>
               <h1 className="text-3xl font-bold">Daily Planning</h1>
               <p className="text-slate-600 mt-1">
-                {isAdmin ? "Manage employee tasks and schedules" : "Your daily schedule"}
+                {isAdmin ? "Create and manage employee schedules with intelligent task allocation" : "Your daily schedule"}
               </p>
             </div>
             
@@ -228,21 +201,12 @@ const Planning = () => {
                 
                 <Button
                   variant="secondary"
-                  onClick={handleGeneratePersonalPlan}
-                  disabled={isGeneratingPersonalPlan}
+                  onClick={() => setShowTaskManager(true)}
+                  disabled={!selectedEmployee}
                   className="whitespace-nowrap"
                 >
-                  {isGeneratingPersonalPlan ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="mr-2 h-4 w-4" />
-                      Generate Tasks
-                    </>
-                  )}
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Task
                 </Button>
               </div>
             </div>
@@ -262,6 +226,16 @@ const Planning = () => {
               <AlertTitle>Success</AlertTitle>
               <AlertDescription>{generationSuccess}</AlertDescription>
             </Alert>
+          )}
+
+          {isAdmin && (
+            <PersonalPlanningGenerator
+              selectedDate={selectedDate}
+              employees={employees}
+              selectedEmployee={selectedEmployee}
+              onEmployeeChange={handleEmployeeChange}
+              onPlanGenerated={handlePlanGenerated}
+            />
           )}
           
           <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -308,6 +282,7 @@ const Planning = () => {
           </div>
 
           <PlanningTimeline 
+            key={refreshTrigger}
             selectedDate={selectedDate}
             employees={isAdmin ? getFilteredEmployees() : employees.filter(emp => emp.id === currentEmployee?.id)}
             isAdmin={isAdmin}
@@ -335,6 +310,14 @@ const Planning = () => {
               </div>
             </div>
           </div>
+
+          <PlanningTaskManager
+            isOpen={showTaskManager}
+            onClose={() => setShowTaskManager(false)}
+            selectedDate={selectedDate}
+            selectedEmployee={selectedEmployee || ''}
+            onSave={handleTaskManagerSave}
+          />
         </div>
       </div>
     </div>

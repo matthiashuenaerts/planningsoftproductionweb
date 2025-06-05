@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -234,6 +233,30 @@ const ProjectDetails = () => {
     }
   };
 
+  const getStatusColor = (status: string) => {
+    const validStatuses = ['TODO', 'IN_PROGRESS', 'COMPLETED', 'HOLD'];
+    if (!validStatuses.includes(status)) {
+      return 'bg-gray-100 text-gray-800';
+    }
+    
+    switch (status) {
+      case 'TODO':
+        return 'bg-blue-100 text-blue-800';
+      case 'IN_PROGRESS':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'COMPLETED':
+        return 'bg-green-100 text-green-800';
+      case 'HOLD':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getTaskCountByStatus = (status: string) => {
+    return tasks.filter(task => task.status === status).length;
+  };
+
   // Group tasks by status - Fixed the status filtering
   const todoTasks = tasks.filter(task => task.status === 'TODO' || task.status === 'HOLD');
   const inProgressTasks = tasks.filter(task => task.status === 'IN_PROGRESS');
@@ -283,6 +306,33 @@ const ProjectDetails = () => {
             </div>
           </div>
           
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{getTaskCountByStatus('TODO')}</div>
+                <p className="text-xs text-muted-foreground">Todo Tasks</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{getTaskCountByStatus('IN_PROGRESS')}</div>
+                <p className="text-xs text-muted-foreground">In Progress</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{getTaskCountByStatus('COMPLETED')}</div>
+                <p className="text-xs text-muted-foreground">Completed</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{tasks.length}</div>
+                <p className="text-xs text-muted-foreground">Total Tasks</p>
+              </CardContent>
+            </Card>
+          </div>
+
           {activeTab === 'files' ? (
             <ProjectFileManager projectId={projectId!} />
           ) : activeTab === 'onedrive' ? (

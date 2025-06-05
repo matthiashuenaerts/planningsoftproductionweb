@@ -9,6 +9,8 @@ import {
   Square,
   CheckSquare,
   MoreVertical,
+  Edit,
+  Trash2,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -21,6 +23,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import PlanningTaskManager from './PlanningTaskManager';
 
 interface PlanningTimelineProps {
   selectedDate: Date;
@@ -50,6 +53,7 @@ interface ScheduledTask {
     title: string;
     status: string;
     priority: string;
+    duration?: number;
   };
   phase?: {
     id: string;
@@ -69,6 +73,8 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
 }) => {
   const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingTask, setEditingTask] = useState<ScheduledTask | null>(null);
+  const [showTaskManager, setShowTaskManager] = useState(false);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   
@@ -83,65 +89,65 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
   ];
 
   useEffect(() => {
-    const fetchScheduledTasks = async () => {
-      try {
-        setLoading(true);
-        
-        // Create the start and end datetime for the selected date
-        const startDate = `${dateString}T00:00:00`;
-        const endDate = `${dateString}T23:59:59`;
-        
-        let query = supabase
-          .from('schedules')
-          .select(`
-            *,
-            employee:employees(id, name),
-            task:tasks(id, title, status, priority),
-            phase:phases(id, name, project_id)
-          `)
-          .gte('start_time', startDate)
-          .lte('start_time', endDate)
-          .order('start_time', { ascending: true });
-          
-        // If not admin, filter by employee ID
-        if (!isAdmin && currentEmployee) {
-          query = query.eq('employee_id', currentEmployee.id);
-        }
-        
-        const { data, error } = await query;
-        
-        if (error) throw error;
-        
-        // Get project info for tasks that have phases
-        const tasksWithProjects = await Promise.all((data || []).map(async (task) => {
-          if (task.phase && task.phase.project_id) {
-            const { data: projectData } = await supabase
-              .from('projects')
-              .select('id, name')
-              .eq('id', task.phase.project_id)
-              .single();
-            
-            return { ...task, project: projectData };
-          }
-          return task;
-        }));
-        
-        setScheduledTasks(tasksWithProjects);
-      } catch (error: any) {
-        console.error('Error fetching scheduled tasks:', error);
-        toast({
-          title: 'Error',
-          description: `Failed to load schedule: ${error.message}`,
-          variant: 'destructive'
-        });
-        setScheduledTasks([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchScheduledTasks();
-  }, [selectedDate, isAdmin, currentEmployee, dateString, toast]);
+  }, [selectedDate, employees, dateString]);
+
+  const fetchScheduledTasks = async () => {
+    try {
+      setLoading(true);
+      
+      // Create the start and end datetime for the selected date
+      const startDate = `${dateString}T00:00:00`;
+      const endDate = `${dateString}T23:59:59`;
+      
+      let query = supabase
+        .from('schedules')
+        .select(`
+          *,
+          employee:employees(id, name),
+          task:tasks(id, title, status, priority, duration),
+          phase:phases(id, name, project_id)
+        `)
+        .gte('start_time', startDate)
+        .lte('start_time', endDate)
+        .order('start_time', { ascending: true });
+        
+      // If not admin, filter by employee ID
+      if (!isAdmin && currentEmployee) {
+        query = query.eq('employee_id', currentEmployee.id);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      
+      // Get project info for tasks that have phases
+      const tasksWithProjects = await Promise.all((data || []).map(async (task) => {
+        if (task.phase && task.phase.project_id) {
+          const { data: projectData } = await supabase
+            .from('projects')
+            .select('id, name')
+            .eq('id', task.phase.project_id)
+            .single();
+          
+          return { ...task, project: projectData };
+        }
+        return task;
+      }));
+      
+      setScheduledTasks(tasksWithProjects);
+    } catch (error: any) {
+      console.error('Error fetching scheduled tasks:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to load schedule: ${error.message}`,
+        variant: 'destructive'
+      });
+      setScheduledTasks([]);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const markTaskCompleted = async (taskId: string) => {
     try {
@@ -212,6 +218,17 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
       });
     }
   };
+
+  const editTask = (task: ScheduledTask) => {
+    setEditingTask(task);
+    setShowTaskManager(true);
+  };
+
+  const handleTaskManagerSave = () => {
+    fetchScheduledTasks();
+    setShowTaskManager(false);
+    setEditingTask(null);
+  };
   
   // Helper to format time
   const formatTime = (timeString: string) => {
@@ -240,8 +257,10 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
   // Get priority color
   const getPriorityColor = (priority: string) => {
     switch (priority?.toLowerCase()) {
-      case 'high':
+      case 'urgent':
         return 'bg-red-100 text-red-800 border-red-300';
+      case 'high':
+        return 'bg-orange-100 text-orange-800 border-orange-300';
       case 'medium':
         return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       case 'low':
@@ -263,9 +282,16 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
             employees.map((employee) => (
               <Card key={employee.id} className="overflow-hidden">
                 <CardHeader className="bg-muted/50 pb-3">
-                  <CardTitle className="text-lg flex items-center">
-                    <User className="h-5 w-5 mr-2" />
-                    {employee.name}
+                  <CardTitle className="text-lg flex items-center justify-between">
+                    <div className="flex items-center">
+                      <User className="h-5 w-5 mr-2" />
+                      {employee.name}
+                      {employee.workstation && (
+                        <Badge variant="outline" className="ml-2">
+                          {employee.workstation}
+                        </Badge>
+                      )}
+                    </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4">
@@ -284,11 +310,12 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
                                   key={task.id} 
                                   className={cn(
                                     "rounded border p-3",
-                                    task.is_auto_generated ? "bg-gray-50" : "bg-white"
+                                    task.is_auto_generated ? "bg-gray-50" : "bg-white",
+                                    task.is_completed && "opacity-60"
                                   )}
                                 >
                                   <div className="flex items-start justify-between">
-                                    <div>
+                                    <div className="flex-1">
                                       <div className="font-medium">{task.title}</div>
                                       
                                       {task.project && (
@@ -300,6 +327,11 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
                                       <div className="flex items-center text-sm text-muted-foreground">
                                         <Clock className="h-3 w-3 mr-1" />
                                         {formatTime(task.start_time)} - {formatTime(task.end_time)}
+                                        {task.task?.duration && (
+                                          <span className="ml-2">
+                                            ({task.task.duration}m)
+                                          </span>
+                                        )}
                                       </div>
                                       
                                       {task.description && (
@@ -322,16 +354,23 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                           <DropdownMenuItem 
+                                            onClick={() => editTask(task)}
+                                          >
+                                            <Edit className="h-4 w-4 mr-2" />
+                                            Edit Task
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem 
                                             onClick={() => markTaskCompleted(task.id)}
-                                            disabled={task.task?.status === 'COMPLETED'}
+                                            disabled={task.task?.status === 'COMPLETED' || task.is_completed}
                                           >
                                             <CheckSquare className="h-4 w-4 mr-2" />
                                             Mark as Completed
                                           </DropdownMenuItem>
                                           <DropdownMenuItem
                                             onClick={() => removeFromSchedule(task.id)}
+                                            className="text-red-600"
                                           >
-                                            <Square className="h-4 w-4 mr-2" />
+                                            <Trash2 className="h-4 w-4 mr-2" />
                                             Remove from Schedule
                                           </DropdownMenuItem>
                                         </DropdownMenuContent>
@@ -364,6 +403,18 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
           )}
         </div>
       )}
+
+      <PlanningTaskManager
+        isOpen={showTaskManager}
+        onClose={() => {
+          setShowTaskManager(false);
+          setEditingTask(null);
+        }}
+        selectedDate={selectedDate}
+        selectedEmployee={editingTask?.employee_id || ''}
+        scheduleItem={editingTask}
+        onSave={handleTaskManagerSave}
+      />
     </div>
   );
 };
