@@ -277,33 +277,36 @@ export type Database = {
       }
       order_items: {
         Row: {
+          article_code: string | null
           created_at: string
           description: string
           id: string
           order_id: string
           quantity: number
-          total_price: number
-          unit_price: number
+          total_price: number | null
+          unit_price: number | null
           updated_at: string
         }
         Insert: {
+          article_code?: string | null
           created_at?: string
           description: string
           id?: string
           order_id: string
           quantity: number
-          total_price: number
-          unit_price: number
+          total_price?: number | null
+          unit_price?: number | null
           updated_at?: string
         }
         Update: {
+          article_code?: string | null
           created_at?: string
           description?: string
           id?: string
           order_id?: string
           quantity?: number
-          total_price?: number
-          unit_price?: number
+          total_price?: number | null
+          unit_price?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -930,6 +933,7 @@ export type Database = {
       standard_tasks: {
         Row: {
           created_at: string
+          day_counter: number
           id: string
           task_name: string
           task_number: string
@@ -938,6 +942,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          day_counter?: number
           id?: string
           task_name: string
           task_number: string
@@ -946,6 +951,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          day_counter?: number
           id?: string
           task_name?: string
           task_number?: string

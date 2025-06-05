@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface StandardTask {
@@ -6,6 +5,7 @@ export interface StandardTask {
   task_number: string;
   task_name: string;
   time_coefficient: number;
+  day_counter: number;
   created_at: string;
   updated_at: string;
 }
@@ -59,6 +59,18 @@ export const standardTasksService = {
     const { data, error } = await supabase
       .from('standard_tasks')
       .update({ time_coefficient: timeCoefficient })
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data as StandardTask;
+  },
+
+  async updateDayCounter(id: string, dayCounter: number): Promise<StandardTask | null> {
+    const { data, error } = await supabase
+      .from('standard_tasks')
+      .update({ day_counter: dayCounter })
       .eq('id', id)
       .select()
       .maybeSingle();
@@ -203,5 +215,12 @@ export const standardTasksService = {
   // Calculate task duration based on time coefficient and project value
   calculateTaskDuration(timeCoefficient: number, projectValue: number): number {
     return Math.round(timeCoefficient * projectValue);
+  },
+
+  // Calculate task due date based on installation date and day counter
+  calculateTaskDueDate(installationDate: Date, dayCounter: number): Date {
+    const dueDate = new Date(installationDate);
+    dueDate.setDate(dueDate.getDate() - dayCounter);
+    return dueDate;
   }
 };

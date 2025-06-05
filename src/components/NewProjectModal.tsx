@@ -72,6 +72,7 @@ interface TaskItem {
   standard_task_id?: string;
   time_coefficient?: number;
   duration?: number;
+  day_counter?: number;
 }
 
 const NewProjectModal: React.FC<NewProjectModalProps> = ({
@@ -118,7 +119,8 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
               task_number: task.task_number,
               standard_task_id: task.id,
               time_coefficient: task.time_coefficient,
-              duration: duration
+              duration: duration,
+              day_counter: task.day_counter || 0
             });
           } catch (error) {
             console.error(`Error fetching workstation for task ${task.task_name}:`, error);
@@ -185,7 +187,8 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         workstation: newTaskWorkstation.trim(),
         selected: true,
         time_coefficient: 1.0,
-        duration: projectValue
+        duration: projectValue,
+        day_counter: 0
       };
       
       setTasks([...tasks, newTask]);
@@ -244,21 +247,16 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         progress: 0
       });
       
-      // Calculate days between start and installation
-      const totalDays = Math.ceil(
-        (data.installation_date.getTime() - data.start_date.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      
-      // Calculate task distribution across the project timeline
+      // Get selected tasks
       const selectedTasks = tasks.filter(task => task.selected);
-      const daysPerTask = Math.max(1, Math.floor(totalDays / selectedTasks.length));
       
       // Create all tasks with proper timing and link to workstations
       const createdTasks: Task[] = [];
       for (let index = 0; index < selectedTasks.length; index++) {
         const task = selectedTasks[index];
-        const taskStartDate = new Date(data.start_date);
-        taskStartDate.setDate(data.start_date.getDate() + (index * daysPerTask));
+        
+        // Calculate due date based on installation date and day counter
+        const dueDate = standardTasksService.calculateTaskDueDate(data.installation_date, task.day_counter || 0);
         
         // Create a task name with the ID prefix and duration
         const durationText = task.duration ? ` (${task.duration} min)` : '';
@@ -294,7 +292,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
           }
         }
         
-        // Create the task with duration
+        // Create the task with duration and calculated due date
         const newTask = await taskService.create({
           phase_id: phase.id,
           assignee_id: null,
@@ -303,7 +301,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
           workstation: workstationType,
           status: initialStatus,
           priority: index < 5 ? 'High' : index < 15 ? 'Medium' : 'Low',
-          due_date: format(taskStartDate, 'yyyy-MM-dd'),
+          due_date: format(dueDate, 'yyyy-MM-dd'),
           standard_task_id: task.standard_task_id || null,
           duration: task.duration || 60 // Save the calculated duration
         });
@@ -522,8 +520,13 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                           <span className="mr-1">{task.id} - {task.name}</span>
                           {task.workstation && <span className="text-muted-foreground mr-2">({task.workstation})</span>}
                           {task.duration && (
-                            <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
+                            <span className="text-xs bg-muted px-2 py-0.5 rounded-full mr-2">
                               {task.duration} min
+                            </span>
+                          )}
+                          {task.day_counter !== undefined && (
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                              -{task.day_counter} days
                             </span>
                           )}
                         </label>

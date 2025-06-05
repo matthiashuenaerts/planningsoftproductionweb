@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -62,11 +61,15 @@ const Login: React.FC = () => {
         throw new Error('Incorrect password');
       }
       
+      // Ensure role is a valid type
+      const validRoles = ['workstation', 'admin', 'manager', 'worker', 'installation_team'] as const;
+      const employeeRole = validRoles.includes(employee.role as any) ? employee.role as typeof validRoles[number] : 'workstation';
+      
       // Use the login function from AuthContext
       login({
         id: employee.id,
         name: employee.name,
-        role: employee.role,
+        role: employeeRole,
         workstation: employee.workstation
       });
       
@@ -76,11 +79,7 @@ const Login: React.FC = () => {
       });
       
       // Navigate based on role
-      if (employee.role === 'workstation') {
-        navigate('/');
-      } else {
-        navigate('/');
-      }
+      navigate('/');
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
