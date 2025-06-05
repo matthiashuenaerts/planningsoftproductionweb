@@ -14,6 +14,16 @@ export const orderService = {
     return data as Order[] || [];
   },
 
+  async getAllOrders(): Promise<Order[]> {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .order('order_date', { ascending: false });
+    
+    if (error) throw error;
+    return data as Order[] || [];
+  },
+
   async getOrderItems(orderId: string): Promise<OrderItem[]> {
     const { data, error } = await supabase
       .from('order_items')
@@ -23,6 +33,16 @@ export const orderService = {
     
     if (error) throw error;
     return data as OrderItem[] || [];
+  },
+
+  async getOrderAttachments(orderId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('order_attachments')
+      .select('*')
+      .eq('order_id', orderId);
+    
+    if (error) throw error;
+    return data || [];
   },
 
   async createOrder(orderData: Omit<Order, 'id' | 'created_at' | 'updated_at'>): Promise<Order> {
@@ -58,6 +78,10 @@ export const orderService = {
     return data as Order;
   },
 
+  async updateOrderStatus(orderId: string, status: Order['status']): Promise<Order> {
+    return this.updateStatus(orderId, status);
+  },
+
   async deleteOrder(orderId: string): Promise<void> {
     // First delete order items
     await supabase
@@ -72,6 +96,12 @@ export const orderService = {
       .eq('id', orderId);
     
     if (error) throw error;
+  },
+
+  async uploadOrderAttachment(formData: FormData): Promise<any> {
+    // Mock implementation for now
+    console.log('Upload order attachment:', formData);
+    return Promise.resolve({ success: true });
   },
 
   async getDeliveriesToday(): Promise<(Order & { project_name: string })[]> {
@@ -91,7 +121,8 @@ export const orderService = {
     
     return (data || []).map(order => ({
       ...order,
-      project_name: (order.projects as any)?.name || 'Unknown Project'
+      project_name: (order.projects as any)?.name || 'Unknown Project',
+      status: order.status as Order['status']
     }));
   },
 
@@ -115,7 +146,8 @@ export const orderService = {
     
     return (data || []).map(order => ({
       ...order,
-      project_name: (order.projects as any)?.name || 'Unknown Project'
+      project_name: (order.projects as any)?.name || 'Unknown Project',
+      status: order.status as Order['status']
     }));
   },
 
@@ -137,7 +169,8 @@ export const orderService = {
     
     return (data || []).map(order => ({
       ...order,
-      project_name: (order.projects as any)?.name || 'Unknown Project'
+      project_name: (order.projects as any)?.name || 'Unknown Project',
+      status: order.status as Order['status']
     }));
   },
 

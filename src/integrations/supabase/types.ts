@@ -933,6 +933,7 @@ export type Database = {
       standard_tasks: {
         Row: {
           created_at: string
+          day_counter: number | null
           id: string
           task_name: string
           task_number: string
@@ -941,6 +942,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          day_counter?: number | null
           id?: string
           task_name: string
           task_number: string
@@ -949,6 +951,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          day_counter?: number | null
           id?: string
           task_name?: string
           task_number?: string
