@@ -80,16 +80,6 @@ const StandardTasksSettings: React.FC = () => {
     setStandardTasks(updatedTasks);
   };
 
-  const handleDayCounterChange = (taskId: string, value: string) => {
-    const updatedTasks = standardTasks.map(task => {
-      if (task.id === taskId) {
-        return { ...task, day_counter: parseInt(value) || 0 };
-      }
-      return task;
-    });
-    setStandardTasks(updatedTasks);
-  };
-
   const saveTimeCoefficient = async (task: StandardTask) => {
     setSaving(prev => ({ ...prev, [task.id]: true }));
     try {
@@ -107,26 +97,6 @@ const StandardTasksSettings: React.FC = () => {
       });
     } finally {
       setSaving(prev => ({ ...prev, [task.id]: false }));
-    }
-  };
-
-  const saveDayCounter = async (task: StandardTask) => {
-    setSaving(prev => ({ ...prev, [`${task.id}_day`]: true }));
-    try {
-      await standardTasksService.updateDayCounter(task.id, task.day_counter || 0);
-      toast({
-        title: 'Success',
-        description: `Day counter for ${task.task_number} updated successfully`,
-      });
-    } catch (error) {
-      console.error('Error updating day counter:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update day counter. Please try again.',
-        variant: 'destructive'
-      });
-    } finally {
-      setSaving(prev => ({ ...prev, [`${task.id}_day`]: false }));
     }
   };
 
@@ -214,8 +184,6 @@ const StandardTasksSettings: React.FC = () => {
                 <TableHead>Details</TableHead>
                 <TableHead className="w-32">Time Coefficient</TableHead>
                 <TableHead className="w-20">Actions</TableHead>
-                <TableHead className="w-32">Day Counter</TableHead>
-                <TableHead className="w-20">Actions</TableHead>
                 <TableHead className="w-96">Limit Phases (Standard Tasks)</TableHead>
               </TableRow>
             </TableHeader>
@@ -259,31 +227,6 @@ const StandardTasksSettings: React.FC = () => {
                         className="w-full"
                       >
                         {saving[task.id] ? (
-                          <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
-                        ) : (
-                          <Save className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <Input 
-                        type="number" 
-                        min="0"
-                        value={task.day_counter || 0} 
-                        onChange={(e) => handleDayCounterChange(task.id, e.target.value)}
-                        className="w-full"
-                        placeholder="Days"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => saveDayCounter(task)} 
-                        disabled={saving[`${task.id}_day`]}
-                        className="w-full"
-                      >
-                        {saving[`${task.id}_day`] ? (
                           <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
                         ) : (
                           <Save className="h-4 w-4" />
