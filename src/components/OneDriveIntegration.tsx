@@ -18,7 +18,7 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
   const { toast } = useToast();
 
   // OneDrive app configuration - these would typically come from environment variables
-  const ONEDRIVE_CLIENT_ID = '37c72a59-28d3-4861-8b06-b089e83db927'; // This should be configured in project settings
+  const ONEDRIVE_CLIENT_ID = '092681d3-68ad-4b6d-84f0-995b3525462a'; // This should be configured in project settings
   const REDIRECT_URI = `${window.location.origin}/onedrive-callback`;
 
   useEffect(() => {
