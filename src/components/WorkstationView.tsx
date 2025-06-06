@@ -9,10 +9,12 @@ import { standardTasksService } from '@/services/standardTasksService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlayCircle, Clock, Users } from 'lucide-react';
+import { PlayCircle, Clock, Users, FileText } from 'lucide-react';
+import ProjectFilesPopup from './ProjectFilesPopup';
 
 interface WorkstationViewProps {
   workstationName?: string;
@@ -26,6 +28,7 @@ interface ExtendedTask extends Task {
   isOvertime?: boolean;
   assignee_name?: string;
   active_workers?: number;
+  project_id?: string;
 }
 
 const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, workstationId, onBack }) => {
@@ -33,6 +36,9 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actualWorkstationName, setActualWorkstationName] = useState<string>('');
+  const [showProjectFiles, setShowProjectFiles] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [selectedProjectName, setSelectedProjectName] = useState<string>('');
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const queryClient = useQueryClient();
@@ -193,6 +199,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
             return {
               ...task,
               project_name: projectData.name,
+              project_id: phaseData.project_id,
               assignee_name: assigneeName,
               active_workers: activeWorkers
             } as ExtendedTask;
@@ -201,6 +208,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
             return {
               ...task,
               project_name: 'Unknown Project',
+              project_id: '',
               active_workers: 0
             } as ExtendedTask;
           }
@@ -464,6 +472,20 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     }
   };
 
+  const handleGoToFiles = (task: ExtendedTask) => {
+    if (task.project_id && task.project_name) {
+      setSelectedProjectId(task.project_id);
+      setSelectedProjectName(task.project_name);
+      setShowProjectFiles(true);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Project information not available for this task',
+        variant: 'destructive'
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -532,6 +554,15 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                             <span>{task.active_workers}</span>
                           </div>
                         )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGoToFiles(task)}
+                          title="Go to Files"
+                        >
+                          <FileText className="h-4 w-4" />
+                          Files
+                        </Button>
                         <button
                           onClick={() => handleJoinTask(task.id)}
                           className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
@@ -564,17 +595,49 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
           </CardHeader>
           <CardContent>
             {todoTasks.length > 0 ? (
-              <TaskList 
-                tasks={todoTasks} 
-                onTaskStatusChange={handleTaskUpdate}
-                showRushOrderBadge={true}
-              />
+              <div className="space-y-3">
+                {todoTasks.map((task) => (
+                  <div key={task.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h3 className="font-medium">{task.title}</h3>
+                        <p className="text-sm text-gray-600">{task.project_name}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGoToFiles(task)}
+                          title="Go to Files"
+                        >
+                          <FileText className="h-4 w-4" />
+                          Files
+                        </Button>
+                        <button
+                          onClick={() => handleTaskUpdate(task.id, 'IN_PROGRESS')}
+                          className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                        >
+                          Start
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <p className="text-gray-500 text-center py-4">No TODO tasks available</p>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Project Files Popup */}
+      <ProjectFilesPopup
+        isOpen={showProjectFiles}
+        onClose={() => setShowProjectFiles(false)}
+        projectId={selectedProjectId}
+        projectName={selectedProjectName}
+      />
     </div>
   );
 };
