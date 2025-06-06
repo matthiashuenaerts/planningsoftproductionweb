@@ -19,7 +19,7 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
 
   // OneDrive app configuration - these would typically come from environment variables
   const ONEDRIVE_CLIENT_ID = 'cd418fec-67b0-4627-acf9-1adae0a8b8e5'; // This should be configured in project settings
-  const REDIRECT_URI = `${window.location.origin}/onedrive-callback`;
+  const REDIRECT_URI = `https://id-preview--3f276e44-b7a1-4360-9d73-f35784886018.lovable.app/onedrive-callback`;
 
   useEffect(() => {
     loadConfig();
