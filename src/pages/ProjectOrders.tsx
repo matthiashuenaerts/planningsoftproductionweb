@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -32,7 +31,9 @@ interface OrderItem {
   order_id: string;
   description: string;
   quantity: number;
-  article_code: string;
+  article_code: string | null;
+  unit_price: number | null;
+  total_price: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -73,10 +74,18 @@ const ProjectOrders = () => {
             
             if (itemsError) {
               console.error('Error fetching order items:', itemsError);
-              return { ...order, orderItems: [] };
+              return { 
+                ...order, 
+                status: order.status as 'pending' | 'delivered' | 'canceled' | 'delayed',
+                orderItems: [] 
+              };
             }
             
-            return { ...order, orderItems: itemsData || [] };
+            return { 
+              ...order, 
+              status: order.status as 'pending' | 'delivered' | 'canceled' | 'delayed',
+              orderItems: itemsData || [] 
+            };
           })
         );
 

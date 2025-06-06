@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -12,13 +13,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import TaskList from '@/components/TaskList';
 import ProjectFileManager from '@/components/ProjectFileManager';
 import OneDriveIntegration from '@/components/OneDriveIntegration';
+import NewOrderModal from '@/components/NewOrderModal';
 import { useAuth } from '@/context/AuthContext';
 
 const ProjectDetails = () => {
@@ -29,6 +31,7 @@ const ProjectDetails = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('tasks');
+  const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const { currentEmployee } = useAuth();
 
   useEffect(() => {
@@ -172,6 +175,13 @@ const ProjectDetails = () => {
     }
   };
 
+  const handleNewOrderSuccess = () => {
+    toast({
+      title: "Success",
+      description: "Order created successfully",
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen">
@@ -293,6 +303,12 @@ const ProjectDetails = () => {
                   onClick={() => navigate(`/projects/${projectId}/orders`)}
                 >
                   <Package className="mr-2 h-4 w-4" /> Orders
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowNewOrderModal(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Add Order
                 </Button>
                 <Button 
                   variant={activeTab === 'files' ? 'default' : 'outline'}
@@ -425,6 +441,14 @@ const ProjectDetails = () => {
           )}
         </div>
       </div>
+
+      {/* New Order Modal */}
+      <NewOrderModal
+        open={showNewOrderModal}
+        onOpenChange={setShowNewOrderModal}
+        projectId={projectId!}
+        onSuccess={handleNewOrderSuccess}
+      />
     </div>
   );
 };

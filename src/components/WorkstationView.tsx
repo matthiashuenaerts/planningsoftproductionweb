@@ -16,6 +16,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink } from 'lucide-react';
 import ProjectFilesPopup from './ProjectFilesPopup';
 import { format, differenceInDays, isAfter, isBefore } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 interface WorkstationViewProps {
   workstationName?: string;
@@ -43,6 +44,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Function to get urgency class based on due date
   const getUrgencyClass = (dueDate: string) => {
@@ -602,7 +604,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => window.open(`/projects/${task.project_id}`, '_blank')}
+                              onClick={() => navigate(`/projects/${task.project_id}`)}
                               title="Go to Project Details"
                             >
                               <ExternalLink className="h-4 w-4" />
@@ -679,7 +681,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => window.open(`/projects/${task.project_id}`, '_blank')}
+                              onClick={() => navigate(`/projects/${task.project_id}`)}
                               title="Go to Project Details"
                             >
                               <ExternalLink className="h-4 w-4" />
