@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,10 +31,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Clock, User, Calendar, MoreVertical, Play, Pause, Square, CheckSquare } from 'lucide-react';
+import { 
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Clock, User, Calendar as CalendarIcon, MoreVertical, Play, Pause, Square, CheckSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { cn } from "@/lib/utils";
 import TaskTimer from '@/components/TaskTimer';
 import Navbar from '@/components/Navbar';
 
@@ -46,6 +54,8 @@ interface Task {
   due_date?: string;
   created_at: string;
   updated_at: string;
+  phase_id: string;
+  workstation: string;
 }
 
 const PersonalTasks = () => {
@@ -75,7 +85,12 @@ const PersonalTasks = () => {
         if (error) {
           setError(error.message);
         } else {
-          setTasks(data || []);
+          // Ensure status is properly typed
+          const typedTasks = (data || []).map(task => ({
+            ...task,
+            status: task.status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD'
+          }));
+          setTasks(typedTasks);
         }
       } catch (err: any) {
         setError(err.message);
@@ -101,7 +116,12 @@ const PersonalTasks = () => {
     try {
       const { data, error } = await supabase
         .from('tasks')
-        .insert([newTask])
+        .insert([{
+          ...newTask,
+          due_date: newTask.due_date || new Date().toISOString().split('T')[0],
+          phase_id: newTask.phase_id || '00000000-0000-0000-0000-000000000000',
+          workstation: newTask.workstation || 'default'
+        }])
         .select('*');
 
       if (error) {
@@ -112,7 +132,11 @@ const PersonalTasks = () => {
         });
         console.error("Error creating task:", error);
       } else {
-        setTasks([...tasks, data[0]]);
+        const typedTask = {
+          ...data[0],
+          status: data[0].status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD'
+        };
+        setTasks([...tasks, typedTask]);
         toast({
           title: "Success",
           description: "Task created successfully",
@@ -134,7 +158,14 @@ const PersonalTasks = () => {
     try {
       const { data, error } = await supabase
         .from('tasks')
-        .update(updatedTask)
+        .update({
+          title: updatedTask.title,
+          description: updatedTask.description,
+          status: updatedTask.status,
+          priority: updatedTask.priority,
+          due_date: updatedTask.due_date,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', updatedTask.id)
         .select('*');
 
@@ -146,7 +177,11 @@ const PersonalTasks = () => {
         });
         console.error("Error updating task:", error);
       } else {
-        setTasks(tasks.map(task => task.id === updatedTask.id ? data[0] : task));
+        const typedTask = {
+          ...data[0],
+          status: data[0].status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD'
+        };
+        setTasks(tasks.map(task => task.id === updatedTask.id ? typedTask : task));
         toast({
           title: "Success",
           description: "Task updated successfully",
@@ -211,7 +246,11 @@ const PersonalTasks = () => {
         });
         console.error("Error starting task:", error);
       } else {
-        setTasks(tasks.map(t => t.id === task.id ? data[0] : t));
+        const typedTask = {
+          ...data[0],
+          status: data[0].status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD'
+        };
+        setTasks(tasks.map(t => t.id === task.id ? typedTask : t));
         setIsTimerRunning(true);
         toast({
           title: "Success",
@@ -244,7 +283,11 @@ const PersonalTasks = () => {
         });
         console.error("Error pausing task:", error);
       } else {
-        setTasks(tasks.map(t => t.id === task.id ? data[0] : t));
+        const typedTask = {
+          ...data[0],
+          status: data[0].status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD'
+        };
+        setTasks(tasks.map(t => t.id === task.id ? typedTask : t));
         setIsTimerRunning(false);
         toast({
           title: "Success",
@@ -281,7 +324,11 @@ const PersonalTasks = () => {
         });
         console.error("Error completing task:", error);
       } else {
-        setTasks(tasks.map(t => t.id === task.id ? data[0] : t));
+        const typedTask = {
+          ...data[0],
+          status: data[0].status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD'
+        };
+        setTasks(tasks.map(t => t.id === task.id ? typedTask : t));
         setIsTimerRunning(false);
         toast({
           title: "Success",
@@ -349,7 +396,7 @@ const PersonalTasks = () => {
                 <SelectItem value="HOLD">Hold</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={priorityFilter} onValueChange={priorityFilter}>
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Filter by priority" />
               </SelectTrigger>
@@ -431,7 +478,7 @@ const PersonalTasks = () => {
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDeleteTask(task.id)}>
-                            <Calendar className="h-4 w-4 mr-2" />
+                            <CalendarIcon className="h-4 w-4 mr-2" />
                             Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -471,7 +518,7 @@ const PersonalTasks = () => {
 };
 
 interface TaskFormProps {
-  task?: Task;
+  task?: Task | null;
   onSubmit: (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => void;
   onCancel: () => void;
 }
@@ -479,8 +526,8 @@ interface TaskFormProps {
 const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
   const [title, setTitle] = useState(task?.title || '');
   const [description, setDescription] = useState(task?.description || '');
-  const [status, setStatus] = useState(task?.status || 'TODO');
-  const [priority, setPriority] = useState(task?.priority || 'Medium');
+  const [status, setStatus] = useState<'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD'>(task?.status || 'TODO');
+  const [priority, setPriority] = useState<'Urgent' | 'High' | 'Medium' | 'Low'>(task?.priority || 'Medium');
   const [dueDate, setDueDate] = useState<Date | undefined>(task?.due_date ? new Date(task.due_date) : undefined);
 
   const handleSubmit = () => {
@@ -495,6 +542,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
       status,
       priority,
       due_date: dueDate ? format(dueDate, 'yyyy-MM-dd') : undefined,
+      phase_id: task?.phase_id || '00000000-0000-0000-0000-000000000000',
+      workstation: task?.workstation || 'default'
     };
     onSubmit(taskData);
   };
@@ -528,7 +577,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
         <Label htmlFor="status" className="text-right">
           Status
         </Label>
-        <Select value={status} onValueChange={setStatus} >
+        <Select value={status} onValueChange={(value: 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD') => setStatus(value)}>
           <SelectTrigger className="col-span-3">
             <SelectValue placeholder="Select a status" />
           </SelectTrigger>
@@ -544,7 +593,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
         <Label htmlFor="priority" className="text-right">
           Priority
         </Label>
-        <Select value={priority} onValueChange={setPriority}>
+        <Select value={priority} onValueChange={(value: 'Urgent' | 'High' | 'Medium' | 'Low') => setPriority(value)}>
           <SelectTrigger className="col-span-3">
             <SelectValue placeholder="Select a priority" />
           </SelectTrigger>
@@ -565,15 +614,15 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, onSubmit, onCancel }) => {
             <Button
               variant={"outline"}
               className={cn(
-                "w-[240px] justify-start text-left font-normal",
+                "w-[240px] justify-start text-left font-normal col-span-3",
                 !dueDate && "text-muted-foreground"
               )}
             >
-              <Calendar className="mr-2 h-4 w-4" />
+              <CalendarIcon className="mr-2 h-4 w-4" />
               {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
+          <PopoverContent className="w-auto p-0" align="start">
             <Calendar
               mode="single"
               selected={dueDate}

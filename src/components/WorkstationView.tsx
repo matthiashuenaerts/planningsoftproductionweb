@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
@@ -13,8 +14,9 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlayCircle, Clock, Users, FileText } from 'lucide-react';
+import { PlayCircle, Clock, Users, FileText, AlertTriangle } from 'lucide-react';
 import ProjectFilesPopup from './ProjectFilesPopup';
+import { format, differenceInDays, isAfter, isBefore } from 'date-fns';
 
 interface WorkstationViewProps {
   workstationName?: string;
@@ -42,6 +44,25 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const queryClient = useQueryClient();
+
+  // Function to get urgency class based on due date
+  const getUrgencyClass = (dueDate: string) => {
+    const today = new Date();
+    const due = new Date(dueDate);
+    const daysUntilDue = differenceInDays(due, today);
+
+    if (isBefore(due, today)) {
+      return { class: 'overdue', label: 'Overdue', variant: 'destructive' as const };
+    } else if (daysUntilDue <= 1) {
+      return { class: 'critical', label: 'Critical', variant: 'destructive' as const };
+    } else if (daysUntilDue <= 3) {
+      return { class: 'urgent', label: 'Urgent', variant: 'default' as const };
+    } else if (daysUntilDue <= 7) {
+      return { class: 'high', label: 'High', variant: 'secondary' as const };
+    } else {
+      return { class: 'normal', label: 'Normal', variant: 'outline' as const };
+    }
+  };
 
   // Start task timer mutation
   const startTimerMutation = useMutation({
@@ -532,53 +553,69 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
           <CardContent>
             {inProgressTasks.length > 0 ? (
               <div className="space-y-3">
-                {inProgressTasks.map((task) => (
-                  <div key={task.id} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h3 className="font-medium">{task.title}</h3>
-                        <p className="text-sm text-gray-600">{task.project_name}</p>
-                        {task.assignee_name && (
-                          <p className="text-sm text-blue-600">Assigned to: {task.assignee_name}</p>
-                        )}
-                        {task.timeRemaining && (
-                          <p className={`text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-green-600'}`}>
-                            Time: {task.timeRemaining}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {task.active_workers && task.active_workers > 0 && (
-                          <div className="flex items-center gap-1 text-sm text-blue-600">
-                            <Users className="h-4 w-4" />
-                            <span>{task.active_workers}</span>
-                          </div>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleGoToFiles(task)}
-                          title="Go to Files"
-                        >
-                          <FileText className="h-4 w-4" />
-                          Files
-                        </Button>
-                        <button
-                          onClick={() => handleJoinTask(task.id)}
-                          className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-                        >
-                          Join Task
-                        </button>
-                        <button
-                          onClick={() => handleTaskUpdate(task.id, 'COMPLETED')}
-                          className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
-                        >
-                          Complete
-                        </button>
+                {inProgressTasks.map((task) => {
+                  const urgency = task.due_date ? getUrgencyClass(task.due_date) : null;
+                  return (
+                    <div key={task.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h3 className="font-medium">{task.title}</h3>
+                          <p className="text-sm text-gray-600">{task.project_name}</p>
+                          {task.assignee_name && (
+                            <p className="text-sm text-blue-600">Assigned to: {task.assignee_name}</p>
+                          )}
+                          {task.due_date && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-sm text-gray-500">
+                                Due: {format(new Date(task.due_date), 'MMM dd, yyyy')}
+                              </p>
+                              {urgency && (
+                                <Badge variant={urgency.variant} className="text-xs">
+                                  {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-1" />}
+                                  {urgency.label}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                          {task.timeRemaining && (
+                            <p className={`text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-green-600'}`}>
+                              Time: {task.timeRemaining}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {task.active_workers && task.active_workers > 0 && (
+                            <div className="flex items-center gap-1 text-sm text-blue-600">
+                              <Users className="h-4 w-4" />
+                              <span>{task.active_workers}</span>
+                            </div>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleGoToFiles(task)}
+                            title="Go to Files"
+                          >
+                            <FileText className="h-4 w-4" />
+                            Files
+                          </Button>
+                          <button
+                            onClick={() => handleJoinTask(task.id)}
+                            className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                          >
+                            Join Task
+                          </button>
+                          <button
+                            onClick={() => handleTaskUpdate(task.id, 'COMPLETED')}
+                            className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                          >
+                            Complete
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-gray-500 text-center py-4">No tasks in progress</p>
@@ -596,33 +633,49 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
           <CardContent>
             {todoTasks.length > 0 ? (
               <div className="space-y-3">
-                {todoTasks.map((task) => (
-                  <div key={task.id} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h3 className="font-medium">{task.title}</h3>
-                        <p className="text-sm text-gray-600">{task.project_name}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleGoToFiles(task)}
-                          title="Go to Files"
-                        >
-                          <FileText className="h-4 w-4" />
-                          Files
-                        </Button>
-                        <button
-                          onClick={() => handleTaskUpdate(task.id, 'IN_PROGRESS')}
-                          className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-                        >
-                          Start
-                        </button>
+                {todoTasks.map((task) => {
+                  const urgency = task.due_date ? getUrgencyClass(task.due_date) : null;
+                  return (
+                    <div key={task.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h3 className="font-medium">{task.title}</h3>
+                          <p className="text-sm text-gray-600">{task.project_name}</p>
+                          {task.due_date && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-sm text-gray-500">
+                                Due: {format(new Date(task.due_date), 'MMM dd, yyyy')}
+                              </p>
+                              {urgency && (
+                                <Badge variant={urgency.variant} className="text-xs">
+                                  {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-1" />}
+                                  {urgency.label}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleGoToFiles(task)}
+                            title="Go to Files"
+                          >
+                            <FileText className="h-4 w-4" />
+                            Files
+                          </Button>
+                          <button
+                            onClick={() => handleTaskUpdate(task.id, 'IN_PROGRESS')}
+                            className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                          >
+                            Start
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-gray-500 text-center py-4">No TODO tasks available</p>
