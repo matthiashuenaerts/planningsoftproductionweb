@@ -257,10 +257,14 @@ const ProjectDetails = () => {
     return tasks.filter(task => task.status === status).length;
   };
 
-  // Group tasks by status - Fixed the status filtering
-  const todoTasks = tasks.filter(task => task.status === 'TODO' || task.status === 'HOLD');
+  // Group tasks by status - Fix the filtering logic
+  const todoTasks = tasks.filter(task => task.status === 'TODO');
+  const holdTasks = tasks.filter(task => task.status === 'HOLD');
   const inProgressTasks = tasks.filter(task => task.status === 'IN_PROGRESS');
   const completedTasks = tasks.filter(task => task.status === 'COMPLETED');
+
+  // Combine TODO and HOLD tasks for the "Open tasks" tab
+  const openTasks = [...todoTasks, ...holdTasks];
 
   return (
     <div className="flex min-h-screen">
@@ -309,8 +313,8 @@ const ProjectDetails = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Card>
               <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{getTaskCountByStatus('TODO')}</div>
-                <p className="text-xs text-muted-foreground">Todo Tasks</p>
+                <div className="text-2xl font-bold">{openTasks.length}</div>
+                <p className="text-xs text-muted-foreground">Open Tasks</p>
               </CardContent>
             </Card>
             <Card>
@@ -388,14 +392,14 @@ const ProjectDetails = () => {
                 <CardContent>
                   <Tabs defaultValue="todo">
                     <TabsList className="mb-4">
-                      <TabsTrigger value="todo">Open tasks ({todoTasks.length})</TabsTrigger>
+                      <TabsTrigger value="todo">Open tasks ({openTasks.length})</TabsTrigger>
                       <TabsTrigger value="in_progress">In Progress ({inProgressTasks.length})</TabsTrigger>
                       <TabsTrigger value="completed">Completed ({completedTasks.length})</TabsTrigger>
                     </TabsList>
                     <TabsContent value="todo">
                       <TaskList 
-                        tasks={todoTasks} 
-                        title="To Do Tasks" 
+                        tasks={openTasks} 
+                        title="Open Tasks" 
                         onTaskStatusChange={handleTaskStatusChange}
                         showCompleteButton={true}
                       />

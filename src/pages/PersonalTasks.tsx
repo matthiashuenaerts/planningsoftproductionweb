@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -85,11 +84,21 @@ const PersonalTasks = () => {
         if (error) {
           setError(error.message);
         } else {
-          // Ensure status is properly typed
-          const typedTasks = (data || []).map(task => ({
-            ...task,
-            status: task.status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD'
-          }));
+          // Ensure status and priority are properly typed
+          const typedTasks = (data || []).map(task => {
+            // Validate priority
+            const validPriorities = ['Urgent', 'High', 'Medium', 'Low'];
+            let priority: 'Urgent' | 'High' | 'Medium' | 'Low' = 'Medium';
+            if (validPriorities.includes(task.priority)) {
+              priority = task.priority as 'Urgent' | 'High' | 'Medium' | 'Low';
+            }
+
+            return {
+              ...task,
+              status: task.status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD',
+              priority
+            };
+          });
           setTasks(typedTasks);
         }
       } catch (err: any) {
@@ -132,9 +141,18 @@ const PersonalTasks = () => {
         });
         console.error("Error creating task:", error);
       } else {
-        const typedTask = {
-          ...data[0],
-          status: data[0].status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD'
+        const rawTask = data[0];
+        // Validate priority
+        const validPriorities = ['Urgent', 'High', 'Medium', 'Low'];
+        let priority: 'Urgent' | 'High' | 'Medium' | 'Low' = 'Medium';
+        if (validPriorities.includes(rawTask.priority)) {
+          priority = rawTask.priority as 'Urgent' | 'High' | 'Medium' | 'Low';
+        }
+
+        const typedTask: Task = {
+          ...rawTask,
+          status: rawTask.status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD',
+          priority
         };
         setTasks([...tasks, typedTask]);
         toast({
@@ -177,9 +195,18 @@ const PersonalTasks = () => {
         });
         console.error("Error updating task:", error);
       } else {
-        const typedTask = {
-          ...data[0],
-          status: data[0].status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD'
+        const rawTask = data[0];
+        // Validate priority
+        const validPriorities = ['Urgent', 'High', 'Medium', 'Low'];
+        let priority: 'Urgent' | 'High' | 'Medium' | 'Low' = 'Medium';
+        if (validPriorities.includes(rawTask.priority)) {
+          priority = rawTask.priority as 'Urgent' | 'High' | 'Medium' | 'Low';
+        }
+
+        const typedTask: Task = {
+          ...rawTask,
+          status: rawTask.status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD',
+          priority
         };
         setTasks(tasks.map(task => task.id === updatedTask.id ? typedTask : task));
         toast({
@@ -246,9 +273,18 @@ const PersonalTasks = () => {
         });
         console.error("Error starting task:", error);
       } else {
-        const typedTask = {
-          ...data[0],
-          status: data[0].status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD'
+        const rawTask = data[0];
+        // Validate priority
+        const validPriorities = ['Urgent', 'High', 'Medium', 'Low'];
+        let priority: 'Urgent' | 'High' | 'Medium' | 'Low' = 'Medium';
+        if (validPriorities.includes(rawTask.priority)) {
+          priority = rawTask.priority as 'Urgent' | 'High' | 'Medium' | 'Low';
+        }
+
+        const typedTask: Task = {
+          ...rawTask,
+          status: rawTask.status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD',
+          priority
         };
         setTasks(tasks.map(t => t.id === task.id ? typedTask : t));
         setIsTimerRunning(true);
@@ -283,9 +319,18 @@ const PersonalTasks = () => {
         });
         console.error("Error pausing task:", error);
       } else {
-        const typedTask = {
-          ...data[0],
-          status: data[0].status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD'
+        const rawTask = data[0];
+        // Validate priority
+        const validPriorities = ['Urgent', 'High', 'Medium', 'Low'];
+        let priority: 'Urgent' | 'High' | 'Medium' | 'Low' = 'Medium';
+        if (validPriorities.includes(rawTask.priority)) {
+          priority = rawTask.priority as 'Urgent' | 'High' | 'Medium' | 'Low';
+        }
+
+        const typedTask: Task = {
+          ...rawTask,
+          status: rawTask.status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD',
+          priority
         };
         setTasks(tasks.map(t => t.id === task.id ? typedTask : t));
         setIsTimerRunning(false);
@@ -324,9 +369,18 @@ const PersonalTasks = () => {
         });
         console.error("Error completing task:", error);
       } else {
-        const typedTask = {
-          ...data[0],
-          status: data[0].status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD'
+        const rawTask = data[0];
+        // Validate priority
+        const validPriorities = ['Urgent', 'High', 'Medium', 'Low'];
+        let priority: 'Urgent' | 'High' | 'Medium' | 'Low' = 'Medium';
+        if (validPriorities.includes(rawTask.priority)) {
+          priority = rawTask.priority as 'Urgent' | 'High' | 'Medium' | 'Low';
+        }
+
+        const typedTask: Task = {
+          ...rawTask,
+          status: rawTask.status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD',
+          priority
         };
         setTasks(tasks.map(t => t.id === task.id ? typedTask : t));
         setIsTimerRunning(false);

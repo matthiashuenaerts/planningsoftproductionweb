@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
@@ -14,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlayCircle, Clock, Users, FileText, AlertTriangle } from 'lucide-react';
+import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink } from 'lucide-react';
 import ProjectFilesPopup from './ProjectFilesPopup';
 import { format, differenceInDays, isAfter, isBefore } from 'date-fns';
 
@@ -599,6 +598,17 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                             <FileText className="h-4 w-4" />
                             Files
                           </Button>
+                          {task.project_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(`/projects/${task.project_id}`, '_blank')}
+                              title="Go to Project Details"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              Project
+                            </Button>
+                          )}
                           <button
                             onClick={() => handleJoinTask(task.id)}
                             className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
@@ -665,6 +675,17 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                             <FileText className="h-4 w-4" />
                             Files
                           </Button>
+                          {task.project_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(`/projects/${task.project_id}`, '_blank')}
+                              title="Go to Project Details"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              Project
+                            </Button>
+                          )}
                           <button
                             onClick={() => handleTaskUpdate(task.id, 'IN_PROGRESS')}
                             className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"

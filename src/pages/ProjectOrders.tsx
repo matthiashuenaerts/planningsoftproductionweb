@@ -1,48 +1,27 @@
+
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Clock, User, Calendar, MoreVertical, Play, Pause, Square, CheckSquare } from 'lucide-react';
+import { Clock, ArrowLeft, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import TaskTimer from '@/components/TaskTimer';
 import Navbar from '@/components/Navbar';
-import { Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useNavigate } from 'react-router-dom';
 
-interface ProjectOrder {
+interface Order {
   id: string;
   project_id: string;
-  order_number: string;
-  description: string;
+  supplier: string;
+  order_date: string;
+  expected_delivery: string;
+  status: 'pending' | 'delivered' | 'canceled' | 'delayed';
   created_at: string;
   updated_at: string;
   orderItems?: OrderItem[];
@@ -50,16 +29,18 @@ interface ProjectOrder {
 
 interface OrderItem {
   id: string;
-  project_order_id: string;
-  article_code: string;
+  order_id: string;
   description: string;
   quantity: number;
+  article_code: string;
   created_at: string;
   updated_at: string;
 }
 
 const ProjectOrders = () => {
-  const [orders, setOrders] = useState<ProjectOrder[]>([]);
+  const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
@@ -68,16 +49,38 @@ const ProjectOrders = () => {
     const fetchProjectOrders = async () => {
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from('project_orders')
-          .select(`
-            *,
-            orderItems:project_order_items(*)
-          `)
+        
+        if (!projectId) {
+          throw new Error('Project ID is required');
+        }
+
+        // Fetch orders for the specific project
+        const { data: ordersData, error: ordersError } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('project_id', projectId)
           .order('created_at', { ascending: false });
         
-        if (error) throw error;
-        setOrders(data || []);
+        if (ordersError) throw ordersError;
+
+        // Fetch order items for each order
+        const ordersWithItems = await Promise.all(
+          (ordersData || []).map(async (order) => {
+            const { data: itemsData, error: itemsError } = await supabase
+              .from('order_items')
+              .select('*')
+              .eq('order_id', order.id);
+            
+            if (itemsError) {
+              console.error('Error fetching order items:', itemsError);
+              return { ...order, orderItems: [] };
+            }
+            
+            return { ...order, orderItems: itemsData || [] };
+          })
+        );
+
+        setOrders(ordersWithItems);
       } catch (error: any) {
         console.error('Error fetching project orders:', error);
         toast({
@@ -91,7 +94,22 @@ const ProjectOrders = () => {
     };
 
     fetchProjectOrders();
-  }, [toast, currentEmployee]);
+  }, [projectId, toast, currentEmployee]);
+
+  const getStatusBadge = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Pending</Badge>;
+      case 'delivered':
+        return <Badge className="bg-green-100 text-green-800 border-green-300">Delivered</Badge>;
+      case 'canceled':
+        return <Badge className="bg-red-100 text-red-800 border-red-300">Canceled</Badge>;
+      case 'delayed':
+        return <Badge className="bg-orange-100 text-orange-800 border-orange-300">Delayed</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
 
   return (
     <div className="flex min-h-screen">
@@ -100,34 +118,55 @@ const ProjectOrders = () => {
       </div>
       <div className="ml-64 w-full p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold">Project Orders</h1>
-            <p className="text-slate-600 mt-1">Manage project-specific orders and track order items</p>
+          <div className="mb-6">
+            <Button 
+              variant="outline" 
+              onClick={() => navigate(`/projects/${projectId}`)}
+              className="mb-4"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Project
+            </Button>
+            
+            <div className="flex items-center gap-2 mb-2">
+              <Package className="h-6 w-6" />
+              <h1 className="text-3xl font-bold">Project Orders</h1>
+            </div>
+            <p className="text-slate-600">Orders for this project</p>
           </div>
 
           <div className="space-y-6">
-            {orders.map((order) => (
-              <Card key={order.id}>
-                <CardHeader>
-                  <CardTitle>Order Number: {order.order_number}</CardTitle>
-                  <CardDescription>
-                    {order.description || 'No description provided'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {loading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              </div>
+            ) : orders.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6 text-center">
+                  <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-500">No orders found for this project.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              orders.map((order) => (
+                <Card key={order.id}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
                       <div>
-                        <Label>Project ID</Label>
-                        <Input type="text" value={order.project_id} readOnly />
+                        <CardTitle>Order from {order.supplier}</CardTitle>
+                        <CardDescription>
+                          Ordered on {format(new Date(order.order_date), 'MMM dd, yyyy')}
+                        </CardDescription>
                       </div>
-                      <div>
-                        <Label>Created At</Label>
-                        <Input type="text" value={format(new Date(order.created_at), 'MMM dd, yyyy - HH:mm')} readOnly />
+                      <div className="flex flex-col items-end gap-2">
+                        {getStatusBadge(order.status)}
+                        <div className="text-sm text-muted-foreground">
+                          Expected: {format(new Date(order.expected_delivery), 'MMM dd, yyyy')}
+                        </div>
                       </div>
                     </div>
-                    
-                    {order.orderItems && order.orderItems.length > 0 && (
+                  </CardHeader>
+                  <CardContent>
+                    {order.orderItems && order.orderItems.length > 0 ? (
                       <div>
                         <h4 className="text-md font-semibold mb-2">Order Items</h4>
                         <div className="border rounded-lg overflow-hidden">
@@ -153,16 +192,13 @@ const ProjectOrders = () => {
                           </Table>
                         </div>
                       </div>
+                    ) : (
+                      <p className="text-muted-foreground">No items found for this order.</p>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <div className="mt-8 text-center text-muted-foreground">
-            {orders.length === 0 && !loading ? 'No project orders found.' : null}
-            {loading ? 'Loading project orders...' : null}
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </div>
       </div>
