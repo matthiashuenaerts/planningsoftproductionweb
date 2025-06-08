@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import WorkstationSettings from '@/components/settings/WorkstationSettings';
 import EmployeeSettings from '@/components/settings/EmployeeSettings';
 import StandardTasksSettings from '@/components/settings/StandardTasksSettings';
+import UserRolesSettings from '@/components/settings/UserRolesSettings';
 import { Button } from '@/components/ui/button';
 import { Settings as SettingsIcon } from 'lucide-react';
 
@@ -80,6 +81,7 @@ const Settings: React.FC = () => {
               <TabsTrigger value="workstations">Workstations</TabsTrigger>
               <TabsTrigger value="employees">Employees</TabsTrigger>
               <TabsTrigger value="standard-tasks">Standard Tasks</TabsTrigger>
+              <TabsTrigger value="user-roles">User Roles</TabsTrigger>
             </TabsList>
             
             <TabsContent value="workstations">
@@ -92,6 +94,10 @@ const Settings: React.FC = () => {
 
             <TabsContent value="standard-tasks">
               <StandardTasksSettings />
+            </TabsContent>
+
+            <TabsContent value="user-roles">
+              <UserRolesSettings />
             </TabsContent>
           </Tabs>
         </div>
