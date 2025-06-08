@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,9 +12,11 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Trash2, Plus, Settings, Shield } from 'lucide-react';
 
+type AppRole = 'admin' | 'manager' | 'worker' | 'workstation' | 'installation_team';
+
 interface RolePermission {
   id: string;
-  role: string;
+  role: AppRole;
   navbar_item: string;
   can_access: boolean;
 }
@@ -33,12 +36,12 @@ const NAVBAR_ITEMS = [
   { key: 'settings', label: 'Settings' }
 ];
 
-const AVAILABLE_ROLES = ['admin', 'manager', 'worker', 'workstation', 'installation_team'];
+const AVAILABLE_ROLES: AppRole[] = ['admin', 'manager', 'worker', 'workstation', 'installation_team'];
 
 const UserRolesSettings = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedRoleForPermissions, setSelectedRoleForPermissions] = useState<string>('admin');
+  const [selectedRoleForPermissions, setSelectedRoleForPermissions] = useState<AppRole>('admin');
   const [newRoleName, setNewRoleName] = useState<string>('');
 
   // Fetch role permissions
@@ -61,9 +64,16 @@ const UserRolesSettings = () => {
   // Add new role mutation
   const addRoleMutation = useMutation({
     mutationFn: async (newRole: string) => {
+      // Validate that the role is one of the allowed enum values
+      if (!AVAILABLE_ROLES.includes(newRole.toLowerCase() as AppRole)) {
+        throw new Error(`Role "${newRole}" is not a valid role. Must be one of: ${AVAILABLE_ROLES.join(', ')}`);
+      }
+
+      const roleEnum = newRole.toLowerCase() as AppRole;
+      
       // First add default permissions for the new role
       const defaultPermissions = NAVBAR_ITEMS.map(item => ({
-        role: newRole,
+        role: roleEnum,
         navbar_item: item.key,
         can_access: false // Default to no access
       }));
@@ -82,10 +92,10 @@ const UserRolesSettings = () => {
         description: 'New role added successfully',
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: 'Error',
-        description: 'Failed to add new role',
+        description: error.message || 'Failed to add new role',
         variant: 'destructive'
       });
       console.error('Add role error:', error);
@@ -94,7 +104,7 @@ const UserRolesSettings = () => {
 
   // Remove role mutation
   const removeRoleMutation = useMutation({
-    mutationFn: async (role: string) => {
+    mutationFn: async (role: AppRole) => {
       const { error } = await supabase
         .from('role_permissions')
         .delete()
@@ -121,7 +131,7 @@ const UserRolesSettings = () => {
 
   // Update role permission mutation
   const updateRolePermissionMutation = useMutation({
-    mutationFn: async ({ role, navbarItem, canAccess }: { role: string; navbarItem: string; canAccess: boolean }) => {
+    mutationFn: async ({ role, navbarItem, canAccess }: { role: AppRole; navbarItem: string; canAccess: boolean }) => {
       const { error } = await supabase
         .from('role_permissions')
         .upsert({ 
@@ -161,7 +171,7 @@ const UserRolesSettings = () => {
       return;
     }
 
-    if (existingRoles.includes(newRoleName.toLowerCase())) {
+    if (existingRoles.includes(newRoleName.toLowerCase() as AppRole)) {
       toast({
         title: 'Error',
         description: 'Role already exists',
@@ -173,7 +183,7 @@ const UserRolesSettings = () => {
     addRoleMutation.mutate(newRoleName.toLowerCase());
   };
 
-  const handleRemoveRole = (role: string) => {
+  const handleRemoveRole = (role: AppRole) => {
     // Prevent removing default roles
     if (AVAILABLE_ROLES.includes(role)) {
       toast({
@@ -195,7 +205,7 @@ const UserRolesSettings = () => {
     });
   };
 
-  const getPermissionForRole = (role: string, navbarItem: string): boolean => {
+  const getPermissionForRole = (role: AppRole, navbarItem: string): boolean => {
     const permission = rolePermissions?.find(p => p.role === role && p.navbar_item === navbarItem);
     return permission?.can_access ?? false;
   };
@@ -211,6 +221,9 @@ const UserRolesSettings = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-4">
+            <p className="text-sm text-gray-600">Available roles: {AVAILABLE_ROLES.join(', ')}</p>
+          </div>
           <div className="flex items-center space-x-4">
             <div className="flex-1">
               <Label htmlFor="new-role">Role Name</Label>
@@ -218,7 +231,7 @@ const UserRolesSettings = () => {
                 id="new-role"
                 value={newRoleName}
                 onChange={(e) => setNewRoleName(e.target.value)}
-                placeholder="Enter new role name"
+                placeholder="Enter role name (e.g., admin, manager, worker)"
               />
             </div>
             <Button 
@@ -282,7 +295,7 @@ const UserRolesSettings = () => {
           <div className="space-y-4">
             <div>
               <Label htmlFor="permissions-role-select">Select Role to Configure</Label>
-              <Select value={selectedRoleForPermissions} onValueChange={setSelectedRoleForPermissions}>
+              <Select value={selectedRoleForPermissions} onValueChange={(value: AppRole) => setSelectedRoleForPermissions(value)}>
                 <SelectTrigger className="w-full md:w-64">
                   <SelectValue />
                 </SelectTrigger>

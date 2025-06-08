@@ -385,7 +385,7 @@ const ProjectDetails = () => {
           {/* New Task Modal */}
           {showNewTaskModal && selectedPhaseId && (
             <NewTaskModal
-              phaseId={selectedPhaseId}
+              phase_id={selectedPhaseId}
               onClose={() => {
                 setShowNewTaskModal(false);
                 setSelectedPhaseId(null);
@@ -394,6 +394,7 @@ const ProjectDetails = () => {
                 setShowNewTaskModal(false);
                 setSelectedPhaseId(null);
                 queryClient.invalidateQueries({ queryKey: ['project', id] });
+                queryClient.invalidateQueries({ queryKey: ['projectPhases', id] });
               }}
             />
           )}
