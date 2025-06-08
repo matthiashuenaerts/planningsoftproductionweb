@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -195,7 +194,7 @@ const PersonalTasks = () => {
   };
 
   const canCompleteTask = (taskStatus: string) => {
-    return taskStatus === 'TODO' || taskStatus === 'HOLD';
+    return taskStatus === 'TODO' || taskStatus === 'IN_PROGRESS' || taskStatus === 'HOLD';
   };
 
   const groupedTasks = tasks.reduce((acc: any, task: any) => {

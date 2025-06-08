@@ -23,7 +23,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/Navbar';
 import NewTaskModal from '@/components/NewTaskModal';
-import { ProjectFileManager } from '@/components/ProjectFileManager';
+import ProjectFileManager from '@/components/ProjectFileManager';
 
 const ProjectDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -177,6 +177,14 @@ const ProjectDetails = () => {
     });
 
     return counts;
+  };
+
+  const canCompleteTask = (taskStatus: string) => {
+    return taskStatus === 'TODO' || taskStatus === 'IN_PROGRESS' || taskStatus === 'HOLD';
+  };
+
+  const canStartTask = (taskStatus: string) => {
+    return taskStatus === 'TODO' || taskStatus === 'HOLD';
   };
 
   const allTasks = project?.phases?.flatMap((phase: any) => phase.tasks || []) || [];
@@ -468,7 +476,7 @@ const ProjectDetails = () => {
                           </div>
                           
                           <div className="flex items-center space-x-2">
-                            {task.status !== 'COMPLETED' && (
+                            {canCompleteTask(task.status) && (
                               <Button
                                 size="sm"
                                 onClick={() => completeTaskMutation.mutate({ 
