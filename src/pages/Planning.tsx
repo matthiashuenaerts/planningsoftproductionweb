@@ -134,8 +134,9 @@ const Planning = () => {
         let assignedWorkstationNames = workerWorkstations?.map(link => link.workstations?.name).filter(Boolean) || [];
         
         // If no workstations assigned via links, check legacy workstation field
-        if (assignedWorkstationNames.length === 0 && worker.workstation) {
-          assignedWorkstationNames.push(worker.workstation);
+        const legacyWorkstation = (worker as any).workstation;
+        if (assignedWorkstationNames.length === 0 && legacyWorkstation) {
+          assignedWorkstationNames.push(legacyWorkstation);
         }
 
         console.log(`${worker.name} assigned workstations:`, assignedWorkstationNames);
@@ -595,9 +596,9 @@ const Planning = () => {
                         <SelectItem key={worker.id} value={worker.id}>
                           <div className="flex items-center justify-between w-full">
                             <span>{worker.name}</span>
-                            {worker.workstation && (
+                            {(worker as any).workstation && (
                               <Badge variant="outline" className="ml-2">
-                                {worker.workstation}
+                                {(worker as any).workstation}
                               </Badge>
                             )}
                           </div>
