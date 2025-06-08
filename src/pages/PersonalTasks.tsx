@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/context/AuthContext';
@@ -264,8 +265,12 @@ const PersonalTasks = () => {
         );
         
         // Separate tasks by status - Fixed the status filtering
-        const allTodoAndHoldTasks = uniqueTasks.filter(task => task.status === 'TODO' || task.status === 'HOLD');
-        const allInProgressTasks = uniqueTasks.filter(task => task.status === 'IN_PROGRESS');
+        const allTodoAndHoldTasks = uniqueTasks.filter(task => 
+          task.status === 'TODO' || task.status === 'HOLD'
+        );
+        const allInProgressTasks = uniqueTasks.filter(task => 
+          task.status === 'IN_PROGRESS'
+        );
         
         setTodoTasks(allTodoAndHoldTasks);
         setInProgressTasks(allInProgressTasks);
