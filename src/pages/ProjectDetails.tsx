@@ -78,8 +78,11 @@ const ProjectDetails = () => {
     }
     
     try {
+      // Use explicit status checks without type narrowing
+      const statusValue = newStatus as string;
+      
       // If starting a task, use time registration service
-      if (newStatus === 'IN_PROGRESS') {
+      if (statusValue === 'IN_PROGRESS') {
         await timeRegistrationService.startTask(currentEmployee.id, taskId);
         
         // Update local state
@@ -102,7 +105,7 @@ const ProjectDetails = () => {
       }
       
       // If completing a task, use time registration service
-      if (newStatus === 'COMPLETED') {
+      if (statusValue === 'COMPLETED') {
         await timeRegistrationService.completeTask(taskId);
         
         // Update local state
@@ -131,12 +134,12 @@ const ProjectDetails = () => {
       };
       
       // Set assignee when changing to IN_PROGRESS
-      if (newStatus === 'IN_PROGRESS') {
+      if (statusValue === 'IN_PROGRESS') {
         updateData.assignee_id = currentEmployee.id;
       }
       
       // Add completion info if task is being marked as completed
-      if (newStatus === 'COMPLETED') {
+      if (statusValue === 'COMPLETED') {
         updateData.completed_at = new Date().toISOString();
         updateData.completed_by = currentEmployee.id;
       }
@@ -150,10 +153,10 @@ const ProjectDetails = () => {
             ...task, 
             status: newStatus,
             status_changed_at: updateData.status_changed_at,
-            ...(newStatus === 'IN_PROGRESS' ? {
+            ...(statusValue === 'IN_PROGRESS' ? {
               assignee_id: currentEmployee.id
             } : {}),
-            ...(newStatus === 'COMPLETED' ? {
+            ...(statusValue === 'COMPLETED' ? {
               completed_at: updateData.completed_at,
               completed_by: currentEmployee.id
             } : {})

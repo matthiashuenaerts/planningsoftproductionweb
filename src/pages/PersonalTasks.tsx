@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/context/AuthContext';
@@ -362,8 +363,11 @@ const PersonalTasks = () => {
     }
     
     try {
+      // Use explicit status checks without type narrowing
+      const statusValue = newStatus as string;
+      
       // If starting a task, use time registration service
-      if (newStatus === 'IN_PROGRESS') {
+      if (statusValue === 'IN_PROGRESS') {
         await timeRegistrationService.startTask(currentEmployee.id, taskId);
         
         // Move task between lists
@@ -381,7 +385,7 @@ const PersonalTasks = () => {
       }
       
       // If completing a task, use time registration service
-      if (newStatus === 'COMPLETED') {
+      if (statusValue === 'COMPLETED') {
         await timeRegistrationService.completeTask(taskId);
         
         // Find the completed task for limit phase checking
@@ -411,7 +415,7 @@ const PersonalTasks = () => {
       };
       
       // Set assignee when changing to IN_PROGRESS
-      if (newStatus === 'IN_PROGRESS') {
+      if (statusValue === 'IN_PROGRESS') {
         updateData.assignee_id = currentEmployee?.id;
       }
       
@@ -423,7 +427,7 @@ const PersonalTasks = () => {
       if (error) throw error;
       
       // Move task between lists based on new status
-      if (newStatus === 'TODO') {
+      if (statusValue === 'TODO') {
         const task = inProgressTasks.find(t => t.id === taskId);
         if (task) {
           setInProgressTasks(prev => prev.filter(t => t.id !== taskId));
