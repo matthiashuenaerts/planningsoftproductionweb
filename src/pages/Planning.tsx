@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { format, startOfDay, addDays, isSameDay } from 'date-fns';
+import { format, startOfDay } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from "@/components/ui/button";
@@ -12,26 +12,22 @@ import {
 } from "@/components/ui/popover";
 import { 
   Calendar as CalendarIcon, 
-  AlertCircle, 
-  CheckCircle, 
-  ListTodo,
-  Loader2,
-  Clock,
   Users,
-  User,
-  Wand2,
+  Clock,
+  AlertCircle,
+  CheckCircle,
   Plus,
+  Edit,
+  Trash2,
+  Move,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Navbar from '@/components/Navbar';
-import PlanningTimeline from '@/components/PlanningTimeline';
-import PlanningControls from '@/components/PlanningControls';
-import PersonalPlanningGenerator from '@/components/PersonalPlanningGenerator';
-import PlanningTaskManager from '@/components/PlanningTaskManager';
 import { employeeService } from '@/services/dataService';
 import { planningService } from '@/services/planningService';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { 
   Select,
   SelectContent,
@@ -39,116 +35,318 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import PlanningTaskManager from '@/components/PlanningTaskManager';
+import { supabase } from '@/integrations/supabase/client';
+
+interface WorkerTask {
+  id: string;
+  title: string;
+  description?: string;
+  duration: number;
+  priority: string;
+  status: string;
+  due_date: string;
+  assignee_id?: string;
+  phase_id: string;
+  phases?: {
+    name: string;
+    projects: {
+      name: string;
+    };
+  };
+}
+
+interface ScheduleItem {
+  id: string;
+  employee_id: string;
+  task_id?: string;
+  title: string;
+  description?: string;
+  start_time: string;
+  end_time: string;
+  is_auto_generated: boolean;
+  task?: WorkerTask;
+}
+
+interface WorkerSchedule {
+  employee: any;
+  tasks: WorkerTask[];
+  schedule: ScheduleItem[];
+  totalDuration: number;
+}
 
 const Planning = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
-  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [generationError, setGenerationError] = useState<string | null>(null);
-  const [generationSuccess, setGenerationSuccess] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("all");
-  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [workers, setWorkers] = useState<any[]>([]);
+  const [workerSchedules, setWorkerSchedules] = useState<WorkerSchedule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [generatingSchedule, setGeneratingSchedule] = useState(false);
+  const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
   const [showTaskManager, setShowTaskManager] = useState(false);
+  const [editingScheduleItem, setEditingScheduleItem] = useState<ScheduleItem | null>(null);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const isAdmin = currentEmployee?.role === 'admin';
 
+  // Working hours configuration
+  const workingHours = [
+    { name: 'Morning', start: '07:00', end: '10:00', duration: 180 },
+    { name: 'Mid-day', start: '10:15', end: '12:30', duration: 135 },
+    { name: 'Afternoon', start: '13:00', end: '16:00', duration: 180 },
+  ];
+
+  const totalWorkingMinutes = workingHours.reduce((sum, period) => sum + period.duration, 0);
+
   useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        const employeeData = await employeeService.getAll();
-        setEmployees(employeeData);
-        
-        // If admin, preselect the first employee, otherwise select current user
-        if (isAdmin && employeeData.length > 0) {
-          setSelectedEmployee(employeeData[0].id);
-        } else if (currentEmployee) {
-          setSelectedEmployee(currentEmployee.id);
-        }
-      } catch (error) {
-        console.error('Error fetching employees:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load employee data",
-          variant: "destructive"
-        });
-      }
-    };
+    fetchWorkersAndSchedules();
+  }, [selectedDate]);
 
-    fetchEmployees();
-  }, [toast, currentEmployee, isAdmin]);
-
-  const handleGeneratePlan = async () => {
-    if (!isAdmin) {
-      toast({
-        title: "Permission Denied",
-        description: "Only administrators can generate plans",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const fetchWorkersAndSchedules = async () => {
     try {
-      setIsGeneratingPlan(true);
-      setGenerationError(null);
-      setGenerationSuccess(null);
+      setLoading(true);
       
-      // Generate a plan based on open tasks and employee availability
-      await planningService.generateDailyPlan(selectedDate);
-      
-      setGenerationSuccess("Daily plan has been successfully generated for all employees");
-      setRefreshTrigger(prev => prev + 1);
-      toast({
-        title: "Success",
-        description: "Daily plan has been generated",
+      // Fetch all workers
+      const employeeData = await employeeService.getAll();
+      const workerEmployees = employeeData.filter(emp => emp.role === 'worker');
+      setWorkers(workerEmployees);
+
+      // Fetch schedules and tasks for each worker
+      const schedulePromises = workerEmployees.map(async (worker) => {
+        // Get worker's tasks
+        const { data: tasks, error: tasksError } = await supabase
+          .from('tasks')
+          .select(`
+            *,
+            phases (
+              name,
+              projects (name)
+            )
+          `)
+          .or(`assignee_id.eq.${worker.id},assignee_id.is.null`)
+          .neq('status', 'COMPLETED')
+          .order('priority', { ascending: false })
+          .order('due_date', { ascending: true });
+
+        if (tasksError) {
+          console.error('Error fetching tasks for worker:', worker.id, tasksError);
+        }
+
+        // Get worker's schedule for the selected date
+        const schedule = await planningService.getSchedulesByEmployeeAndDate(worker.id, selectedDate);
+
+        const workerTasks = tasks || [];
+        const totalDuration = workerTasks.reduce((sum, task) => sum + (task.duration || 60), 0);
+
+        return {
+          employee: worker,
+          tasks: workerTasks,
+          schedule: schedule,
+          totalDuration
+        };
       });
-    } catch (error: any) {
-      console.error("Generate plan error:", error);
-      setGenerationError(error.message || "Failed to generate plan");
+
+      const schedules = await Promise.all(schedulePromises);
+      setWorkerSchedules(schedules);
+      
+      if (schedules.length > 0 && !selectedWorker) {
+        setSelectedWorker(schedules[0].employee.id);
+      }
+    } catch (error) {
+      console.error('Error fetching workers and schedules:', error);
       toast({
         title: "Error",
-        description: `Failed to generate plan: ${error.message}`,
+        description: "Failed to load worker schedules",
         variant: "destructive"
       });
     } finally {
-      setIsGeneratingPlan(false);
+      setLoading(false);
     }
   };
 
-  const handlePlanGenerated = () => {
-    setRefreshTrigger(prev => prev + 1);
-  };
+  const generateDailySchedule = async (workerId: string) => {
+    try {
+      setGeneratingSchedule(true);
+      
+      const worker = workerSchedules.find(w => w.employee.id === workerId);
+      if (!worker) {
+        throw new Error('Worker not found');
+      }
 
-  const handleTaskManagerSave = () => {
-    setRefreshTrigger(prev => prev + 1);
-  };
+      // Clear existing auto-generated schedules for this worker and date
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      await supabase
+        .from('schedules')
+        .delete()
+        .eq('employee_id', workerId)
+        .gte('start_time', `${dateStr}T00:00:00`)
+        .lte('start_time', `${dateStr}T23:59:59`)
+        .eq('is_auto_generated', true);
 
-  // Clear messages when date changes
-  useEffect(() => {
-    setGenerationError(null);
-    setGenerationSuccess(null);
-  }, [selectedDate]);
+      // Get available tasks sorted by priority and due date
+      const availableTasks = worker.tasks.filter(task => 
+        task.status === 'TODO' || task.status === 'IN_PROGRESS'
+      );
 
-  const handleEmployeeChange = (employeeId: string) => {
-    setSelectedEmployee(employeeId);
-    
-    // If admin viewing personal tab, update the tab to show the selected employee
-    if (isAdmin && activeTab === "me") {
-      setActiveTab("selected");
+      if (availableTasks.length === 0) {
+        toast({
+          title: "No Tasks Available",
+          description: "No tasks available to schedule for this worker",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Create schedule items for each working period
+      const schedulesToInsert = [];
+      let taskIndex = 0;
+      let remainingTaskDuration = availableTasks[taskIndex]?.duration || 60;
+      let currentTask = availableTasks[taskIndex];
+
+      for (const period of workingHours) {
+        if (!currentTask) break;
+
+        const startTime = new Date(`${dateStr}T${period.start}:00`);
+        const endTime = new Date(`${dateStr}T${period.end}:00`);
+
+        // If current task fits in this period
+        if (remainingTaskDuration <= period.duration) {
+          schedulesToInsert.push({
+            employee_id: workerId,
+            task_id: currentTask.id,
+            title: currentTask.title,
+            description: currentTask.description || '',
+            start_time: startTime.toISOString(),
+            end_time: new Date(startTime.getTime() + (remainingTaskDuration * 60000)).toISOString(),
+            is_auto_generated: true
+          });
+
+          // Move to next task
+          taskIndex++;
+          currentTask = availableTasks[taskIndex];
+          remainingTaskDuration = currentTask?.duration || 60;
+        } else {
+          // Task spans multiple periods, schedule for this entire period
+          schedulesToInsert.push({
+            employee_id: workerId,
+            task_id: currentTask.id,
+            title: `${currentTask.title} (Part ${schedulesToInsert.filter(s => s.task_id === currentTask.id).length + 1})`,
+            description: currentTask.description || '',
+            start_time: startTime.toISOString(),
+            end_time: endTime.toISOString(),
+            is_auto_generated: true
+          });
+
+          remainingTaskDuration -= period.duration;
+        }
+      }
+
+      // Insert schedules
+      if (schedulesToInsert.length > 0) {
+        const { error } = await supabase
+          .from('schedules')
+          .insert(schedulesToInsert);
+
+        if (error) throw error;
+      }
+
+      await fetchWorkersAndSchedules();
+      
+      toast({
+        title: "Schedule Generated",
+        description: `Daily schedule generated for ${worker.employee.name}`,
+      });
+    } catch (error: any) {
+      console.error('Error generating schedule:', error);
+      toast({
+        title: "Error",
+        description: `Failed to generate schedule: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setGeneratingSchedule(false);
     }
   };
 
-  const getFilteredEmployees = () => {
-    if (activeTab === "all") {
-      return employees;
-    } else if (activeTab === "me") {
-      return employees.filter(emp => emp.id === currentEmployee?.id);
-    } else if (activeTab === "selected" && selectedEmployee) {
-      return employees.filter(emp => emp.id === selectedEmployee);
+  const generateAllSchedules = async () => {
+    try {
+      setGeneratingSchedule(true);
+      
+      for (const workerSchedule of workerSchedules) {
+        await generateDailySchedule(workerSchedule.employee.id);
+      }
+      
+      toast({
+        title: "All Schedules Generated",
+        description: "Daily schedules generated for all workers",
+      });
+    } catch (error: any) {
+      console.error('Error generating all schedules:', error);
+      toast({
+        title: "Error",
+        description: `Failed to generate schedules: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setGeneratingSchedule(false);
     }
-    return [];
   };
+
+  const deleteScheduleItem = async (scheduleId: string) => {
+    try {
+      await supabase
+        .from('schedules')
+        .delete()
+        .eq('id', scheduleId);
+
+      await fetchWorkersAndSchedules();
+      
+      toast({
+        title: "Schedule Item Deleted",
+        description: "Schedule item has been removed",
+      });
+    } catch (error: any) {
+      console.error('Error deleting schedule item:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete schedule item",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority?.toLowerCase()) {
+      case 'urgent':
+        return 'bg-red-100 text-red-800 border-red-300';
+      case 'high':
+        return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'low':
+        return 'bg-green-100 text-green-800 border-green-300';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const formatTime = (timeStr: string) => {
+    return format(new Date(timeStr), 'HH:mm');
+  };
+
+  const selectedWorkerSchedule = workerSchedules.find(w => w.employee.id === selectedWorker);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen">
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+        <div className="ml-64 w-full p-6 flex justify-center items-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -159,9 +357,9 @@ const Planning = () => {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
             <div>
-              <h1 className="text-3xl font-bold">Daily Planning</h1>
+              <h1 className="text-3xl font-bold">Worker Daily Planning</h1>
               <p className="text-slate-600 mt-1">
-                {isAdmin ? "Create and manage employee schedules with intelligent task allocation" : "Your daily schedule"}
+                Create and manage daily schedules for workers based on their assigned tasks
               </p>
             </div>
             
@@ -185,138 +383,256 @@ const Planning = () => {
                     selected={selectedDate}
                     onSelect={(date) => setSelectedDate(date || new Date())}
                     initialFocus
-                    className={cn("p-3 pointer-events-auto")}
                   />
                 </PopoverContent>
               </Popover>
               
-              <div className="flex space-x-2">
-                {isAdmin && (
-                  <PlanningControls 
-                    selectedDate={selectedDate}
-                    onGeneratePlan={handleGeneratePlan}
-                    isGenerating={isGeneratingPlan}
-                  />
-                )}
-                
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowTaskManager(true)}
-                  disabled={!selectedEmployee}
-                  className="whitespace-nowrap"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Task
-                </Button>
-              </div>
+              {isAdmin && (
+                <div className="flex space-x-2">
+                  <Button
+                    onClick={generateAllSchedules}
+                    disabled={generatingSchedule}
+                    className="whitespace-nowrap"
+                  >
+                    {generatingSchedule ? 'Generating...' : 'Generate All Schedules'}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
-          {generationError && (
-            <Alert variant="destructive" className="mb-4">
+          {workers.length === 0 ? (
+            <Alert>
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{generationError}</AlertDescription>
+              <AlertTitle>No Workers Found</AlertTitle>
+              <AlertDescription>
+                No employees with the 'worker' role were found. Please ensure workers are properly configured in the system.
+              </AlertDescription>
             </Alert>
-          )}
-          
-          {generationSuccess && (
-            <Alert variant="default" className="mb-4 bg-green-50 text-green-800 border-green-200">
-              <CheckCircle className="h-4 w-4" />
-              <AlertTitle>Success</AlertTitle>
-              <AlertDescription>{generationSuccess}</AlertDescription>
-            </Alert>
-          )}
+          ) : (
+            <div className="space-y-6">
+              {/* Worker Selection */}
+              <div className="flex items-center justify-between">
+                <div className="w-64">
+                  <Select value={selectedWorker || ''} onValueChange={setSelectedWorker}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a worker" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workers.map((worker) => (
+                        <SelectItem key={worker.id} value={worker.id}>
+                          {worker.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-          {isAdmin && (
-            <PersonalPlanningGenerator
-              selectedDate={selectedDate}
-              employees={employees}
-              selectedEmployee={selectedEmployee}
-              onEmployeeChange={handleEmployeeChange}
-              onPlanGenerated={handlePlanGenerated}
-            />
-          )}
-          
-          <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="w-full max-w-xs">
-              <Select
-                value={selectedEmployee || ""}
-                onValueChange={handleEmployeeChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select employee" />
-                </SelectTrigger>
-                <SelectContent>
-                  {employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
-                      {employee.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {isAdmin && (
-              <Tabs 
-                value={activeTab} 
-                onValueChange={setActiveTab}
-                className="w-full max-w-md"
-              >
-                <TabsList className="grid grid-cols-3">
-                  <TabsTrigger value="all" className="flex items-center justify-center">
-                    <Users className="h-4 w-4 mr-2" />
-                    All Employees
-                  </TabsTrigger>
-                  <TabsTrigger value="selected" className="flex items-center justify-center">
-                    <User className="h-4 w-4 mr-2" />
-                    Selected
-                  </TabsTrigger>
-                  <TabsTrigger value="me" className="flex items-center justify-center">
-                    <User className="h-4 w-4 mr-2" />
-                    My Schedule
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            )}
-          </div>
-
-          <PlanningTimeline 
-            key={refreshTrigger}
-            selectedDate={selectedDate}
-            employees={isAdmin ? getFilteredEmployees() : employees.filter(emp => emp.id === currentEmployee?.id)}
-            isAdmin={isAdmin}
-          />
-          
-          <div className="mt-6">
-            <div className="bg-muted rounded-lg p-4">
-              <h3 className="text-lg font-medium mb-2 flex items-center">
-                <Clock className="h-5 w-5 mr-2" />
-                Standard Working Hours
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="font-medium">Morning</div>
-                  <div className="text-sm text-muted-foreground">7:00 AM - 10:00 AM</div>
-                </div>
-                <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                  <div className="font-medium">Mid-day</div>
-                  <div className="text-sm text-muted-foreground">10:15 AM - 12:30 PM</div>
-                </div>
-                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                  <div className="font-medium">Afternoon</div>
-                  <div className="text-sm text-muted-foreground">1:00 PM - 4:00 PM</div>
-                </div>
+                {isAdmin && selectedWorker && (
+                  <div className="flex space-x-2">
+                    <Button
+                      onClick={() => generateDailySchedule(selectedWorker)}
+                      disabled={generatingSchedule}
+                      variant="outline"
+                    >
+                      Generate Schedule
+                    </Button>
+                    <Button
+                      onClick={() => setShowTaskManager(true)}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Manual Task
+                    </Button>
+                  </div>
+                )}
               </div>
+
+              {/* Worker Overview */}
+              {selectedWorkerSchedule && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Available Tasks</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{selectedWorkerSchedule.tasks.length}</div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Total Duration</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{Math.round(selectedWorkerSchedule.totalDuration / 60)}h</div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Working Hours</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{Math.round(totalWorkingMinutes / 60)}h</div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Scheduled Items</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{selectedWorkerSchedule.schedule.length}</div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* Worker Schedule */}
+              {selectedWorkerSchedule && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Users className="h-5 w-5 mr-2" />
+                      {selectedWorkerSchedule.employee.name} - Daily Schedule
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {workingHours.map((period) => {
+                        const periodSchedules = selectedWorkerSchedule.schedule.filter(item => {
+                          const startTime = format(new Date(item.start_time), 'HH:mm');
+                          const endTime = format(new Date(item.end_time), 'HH:mm');
+                          return startTime >= period.start && startTime < period.end;
+                        });
+
+                        return (
+                          <div key={period.name} className="border rounded-lg overflow-hidden">
+                            <div className="bg-blue-50 px-4 py-2 border-b">
+                              <h4 className="font-medium">{period.name}</h4>
+                              <p className="text-sm text-gray-600">{period.start} - {period.end} ({period.duration} min)</p>
+                            </div>
+                            
+                            <div className="p-4">
+                              {periodSchedules.length > 0 ? (
+                                <div className="space-y-2">
+                                  {periodSchedules.map((item) => (
+                                    <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                                      <div className="flex-1">
+                                        <h5 className="font-medium">{item.title}</h5>
+                                        {item.description && (
+                                          <p className="text-sm text-gray-600">{item.description}</p>
+                                        )}
+                                        <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                                          <span className="flex items-center">
+                                            <Clock className="h-3 w-3 mr-1" />
+                                            {formatTime(item.start_time)} - {formatTime(item.end_time)}
+                                          </span>
+                                          {item.task && (
+                                            <Badge className={getPriorityColor(item.task.priority)}>
+                                              {item.task.priority}
+                                            </Badge>
+                                          )}
+                                          {item.is_auto_generated && (
+                                            <Badge variant="outline">Auto-generated</Badge>
+                                          )}
+                                        </div>
+                                      </div>
+                                      
+                                      {isAdmin && (
+                                        <div className="flex items-center space-x-2">
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                              setEditingScheduleItem(item);
+                                              setShowTaskManager(true);
+                                            }}
+                                          >
+                                            <Edit className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => deleteScheduleItem(item.id)}
+                                            className="text-red-600 hover:bg-red-50"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-center text-gray-500 py-4">
+                                  No tasks scheduled for this period
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Available Tasks */}
+              {selectedWorkerSchedule && selectedWorkerSchedule.tasks.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Available Tasks for {selectedWorkerSchedule.employee.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {selectedWorkerSchedule.tasks.map((task) => (
+                        <div key={task.id} className="flex items-center justify-between p-3 border rounded">
+                          <div className="flex-1">
+                            <h5 className="font-medium">{task.title}</h5>
+                            {task.description && (
+                              <p className="text-sm text-gray-600">{task.description}</p>
+                            )}
+                            <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                              <span>Duration: {task.duration || 60} min</span>
+                              <span>Due: {format(new Date(task.due_date), 'MMM dd')}</span>
+                              {task.phases && (
+                                <span>Project: {task.phases.projects.name}</span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            <Badge className={getPriorityColor(task.priority)}>
+                              {task.priority}
+                            </Badge>
+                            <Badge variant="outline">
+                              {task.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
-          </div>
+          )}
 
           <PlanningTaskManager
             isOpen={showTaskManager}
-            onClose={() => setShowTaskManager(false)}
+            onClose={() => {
+              setShowTaskManager(false);
+              setEditingScheduleItem(null);
+            }}
             selectedDate={selectedDate}
-            selectedEmployee={selectedEmployee || ''}
-            onSave={handleTaskManagerSave}
+            selectedEmployee={selectedWorker || ''}
+            scheduleItem={editingScheduleItem}
+            onSave={() => {
+              fetchWorkersAndSchedules();
+              setShowTaskManager(false);
+              setEditingScheduleItem(null);
+            }}
           />
         </div>
       </div>
