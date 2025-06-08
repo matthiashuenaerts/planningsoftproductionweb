@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
@@ -11,12 +10,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { Camera, Check, X, RotateCcw, Image } from 'lucide-react';
 
 const BrokenPartForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cameraMode, setCameraMode] = useState<'none' | 'camera' | 'preview'>('none');
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [formData, setFormData] = useState({
     project_id: '',
     workstation_id: '',
@@ -58,6 +66,114 @@ const BrokenPartForm = () => {
       const file = e.target.files[0];
       setSelectedImage(file);
       setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const startCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: facingMode,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      });
+      
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+      setCameraMode('camera');
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      toast({
+        title: "Camera Error",
+        description: "Unable to access camera. Please check permissions.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const stopCamera = useCallback(() => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+  }, [stream]);
+
+  const captureImage = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+
+    if (!context) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+    setCapturedImage(imageDataUrl);
+    
+    // Convert to file for upload
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], `broken-part-${Date.now()}.jpg`, {
+          type: 'image/jpeg'
+        });
+        setSelectedImage(file);
+        setImagePreview(imageDataUrl);
+      }
+    }, 'image/jpeg', 0.8);
+    
+    stopCamera();
+    setCameraMode('preview');
+  };
+
+  const retakePhoto = () => {
+    setCapturedImage(null);
+    setSelectedImage(null);
+    setImagePreview(null);
+    startCamera();
+  };
+
+  const switchCamera = async () => {
+    stopCamera();
+    setFacingMode(facingMode === 'user' ? 'environment' : 'user');
+    setTimeout(() => {
+      startCamera();
+    }, 100);
+  };
+
+  const cancelCamera = () => {
+    stopCamera();
+    setCameraMode('none');
+    setCapturedImage(null);
+  };
+
+  const confirmPhoto = () => {
+    setCameraMode('none');
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedImage(file);
+      setImagePreview(URL.createObjectURL(file));
+      setCapturedImage(null);
+      setCameraMode('none');
+    }
+  };
+
+  const clearImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    setCapturedImage(null);
+    setCameraMode('none');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -121,6 +237,95 @@ const BrokenPartForm = () => {
     }
   };
 
+  if (cameraMode === 'camera') {
+    return (
+      <Card className="w-full">
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium">Take Photo</h3>
+              <Button variant="ghost" size="icon" onClick={cancelCamera}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-4">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={switchCamera}
+                  className="bg-white/20 border-white/30 text-white hover:bg-white/30"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="lg"
+                  onClick={captureImage}
+                  className="bg-white text-black hover:bg-gray-100 rounded-full w-16 h-16"
+                >
+                  <Camera className="h-6 w-6" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={cancelCamera}
+                  className="bg-white/20 border-white/30 text-white hover:bg-white/30"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <canvas ref={canvasRef} className="hidden" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (cameraMode === 'preview' && capturedImage) {
+    return (
+      <Card className="w-full">
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium">Photo Preview</h3>
+            </div>
+            
+            <div className="relative">
+              <img
+                src={capturedImage}
+                alt="Captured broken part"
+                className="w-full rounded-lg max-h-96 object-contain bg-gray-100"
+              />
+            </div>
+            
+            <p className="text-sm text-gray-600">
+              Photo captured successfully. Confirm to use this image or retake.
+            </p>
+            
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={retakePhoto}>
+                Retake Photo
+              </Button>
+              <Button onClick={confirmPhoto} className="flex items-center gap-2 bg-green-600 hover:bg-green-700">
+                <Check className="h-4 w-4" />
+                Use Photo
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-full">
       <CardContent className="pt-6">
@@ -176,14 +381,47 @@ const BrokenPartForm = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="image">Image</Label>
+            <Label>Image</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={startCamera}
+                className="flex items-center gap-2"
+              >
+                <Camera className="h-4 w-4" />
+                Take Photo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2"
+              >
+                <Image className="h-4 w-4" />
+                Choose File
+              </Button>
+              {(imagePreview || selectedImage) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={clearImage}
+                  className="flex items-center gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Clear
+                </Button>
+              )}
+            </div>
+            
             <Input
-              id="image"
+              ref={fileInputRef}
               type="file"
               accept="image/*"
-              onChange={handleImageChange}
-              className="cursor-pointer"
+              onChange={handleFileChange}
+              className="hidden"
             />
+            
             {imagePreview && (
               <div className="mt-2">
                 <img
