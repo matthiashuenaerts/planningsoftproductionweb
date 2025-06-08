@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format, startOfDay } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
@@ -115,6 +114,8 @@ const Planning = () => {
 
       // Fetch schedules and tasks for each worker
       const schedulePromises = workerEmployees.map(async (worker) => {
+        console.log(`Fetching data for worker: ${worker.name} (${worker.id})`);
+        
         // Get worker's assigned workstations
         const { data: workerWorkstations, error: workstationsError } = await supabase
           .from('employee_workstation_links')
@@ -137,32 +138,61 @@ const Planning = () => {
           assignedWorkstationNames.push(worker.workstation);
         }
 
-        // Get worker's tasks based on assigned workstations
-        let tasksQuery = supabase
-          .from('tasks')
-          .select(`
-            *,
-            phases (
-              name,
-              projects (name)
-            )
-          `)
-          .neq('status', 'COMPLETED')
-          .order('priority', { ascending: false })
-          .order('due_date', { ascending: true });
+        console.log(`${worker.name} assigned workstations:`, assignedWorkstationNames);
 
-        // Filter by assignee or workstation
+        // Get worker's tasks based on assigned workstations - improved query
+        let workerTasks: WorkerTask[] = [];
+        
         if (assignedWorkstationNames.length > 0) {
-          tasksQuery = tasksQuery.or(`assignee_id.eq.${worker.id},workstation.in.(${assignedWorkstationNames.map(w => `"${w}"`).join(',')})`);
+          // Query tasks that are either assigned to this worker OR match their workstations
+          const { data: tasks, error: tasksError } = await supabase
+            .from('tasks')
+            .select(`
+              *,
+              phases (
+                name,
+                projects (name)
+              )
+            `)
+            .in('status', ['TODO', 'IN_PROGRESS']) // Include both TODO and IN_PROGRESS
+            .order('priority', { ascending: false })
+            .order('due_date', { ascending: true });
+
+          if (tasksError) {
+            console.error('Error fetching tasks for worker:', worker.id, tasksError);
+          } else if (tasks) {
+            // Filter tasks based on workstation or assignee
+            workerTasks = tasks.filter(task => {
+              const isAssignedToWorker = task.assignee_id === worker.id;
+              const isWorkstationMatch = assignedWorkstationNames.includes(task.workstation);
+              console.log(`Task "${task.title}": assignee=${task.assignee_id}, workstation=${task.workstation}, matches=${isAssignedToWorker || isWorkstationMatch}`);
+              return isAssignedToWorker || isWorkstationMatch;
+            });
+          }
         } else {
-          tasksQuery = tasksQuery.eq('assignee_id', worker.id);
+          // If no workstations, only get tasks directly assigned to worker
+          const { data: tasks, error: tasksError } = await supabase
+            .from('tasks')
+            .select(`
+              *,
+              phases (
+                name,
+                projects (name)
+              )
+            `)
+            .eq('assignee_id', worker.id)
+            .in('status', ['TODO', 'IN_PROGRESS']) // Include both TODO and IN_PROGRESS
+            .order('priority', { ascending: false })
+            .order('due_date', { ascending: true });
+
+          if (tasksError) {
+            console.error('Error fetching assigned tasks for worker:', worker.id, tasksError);
+          } else {
+            workerTasks = tasks || [];
+          }
         }
 
-        const { data: tasks, error: tasksError } = await tasksQuery;
-
-        if (tasksError) {
-          console.error('Error fetching tasks for worker:', worker.id, tasksError);
-        }
+        console.log(`${worker.name} available tasks:`, workerTasks.length);
 
         // Get worker's schedule for the selected date
         const schedule = await planningService.getSchedulesByEmployeeAndDate(worker.id, selectedDate);
@@ -170,13 +200,12 @@ const Planning = () => {
         // Enhance schedule items with task data
         const enhancedSchedule = await Promise.all(schedule.map(async (scheduleItem) => {
           if (scheduleItem.task_id) {
-            const taskData = tasks?.find(t => t.id === scheduleItem.task_id);
+            const taskData = workerTasks.find(t => t.id === scheduleItem.task_id);
             return { ...scheduleItem, task: taskData };
           }
           return scheduleItem;
         }));
 
-        const workerTasks = tasks || [];
         const totalDuration = workerTasks.reduce((sum, task) => sum + (task.duration || 60), 0);
 
         return {
@@ -215,6 +244,10 @@ const Planning = () => {
         throw new Error('Worker not found');
       }
 
+      console.log(`Generating schedule for ${worker.employee.name}`);
+      console.log(`Available tasks: ${worker.tasks.length}`);
+      console.log(`Assigned workstations: ${worker.assignedWorkstations.join(', ')}`);
+
       if (worker.assignedWorkstations.length === 0) {
         toast({
           title: "No Workstations Assigned",
@@ -234,18 +267,19 @@ const Planning = () => {
         .lte('start_time', `${dateStr}T23:59:59`)
         .eq('is_auto_generated', true);
 
-      // Get available tasks that match the worker's workstations
+      // Filter available tasks - only TODO and IN_PROGRESS tasks
       const availableTasks = worker.tasks.filter(task => {
-        if (task.status === 'COMPLETED') return false;
-        
-        // Check if task workstation matches any of the worker's assigned workstations
-        return worker.assignedWorkstations.includes(task.workstation) || task.assignee_id === workerId;
+        const isAvailable = ['TODO', 'IN_PROGRESS'].includes(task.status);
+        console.log(`Task "${task.title}" status: ${task.status}, available: ${isAvailable}`);
+        return isAvailable;
       });
+
+      console.log(`Filtered available tasks: ${availableTasks.length}`);
 
       if (availableTasks.length === 0) {
         toast({
           title: "No Tasks Available",
-          description: `No tasks available for ${worker.employee.name}'s workstations: ${worker.assignedWorkstations.join(', ')}`,
+          description: `No TODO or IN_PROGRESS tasks available for ${worker.employee.name}'s workstations: ${worker.assignedWorkstations.join(', ')}. Available statuses in total tasks: ${[...new Set(worker.tasks.map(t => t.status))].join(', ')}`,
           variant: "destructive"
         });
         return;
@@ -316,6 +350,8 @@ const Planning = () => {
           }
         }
       }
+
+      console.log(`Schedules to insert: ${schedulesToInsert.length}`);
 
       // Insert schedules
       if (schedulesToInsert.length > 0) {
@@ -599,8 +635,9 @@ const Planning = () => {
                       <CardTitle className="text-sm font-medium">Available Tasks</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{selectedWorkerSchedule.tasks.length}</div>
+                      <div className="text-2xl font-bold">{selectedWorkerSchedule.tasks.filter(t => ['TODO', 'IN_PROGRESS'].includes(t.status)).length}</div>
                       <p className="text-xs text-muted-foreground">Ready to schedule</p>
+                      <p className="text-xs text-muted-foreground">Total: {selectedWorkerSchedule.tasks.length}</p>
                     </CardContent>
                   </Card>
                   
