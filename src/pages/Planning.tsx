@@ -48,6 +48,7 @@ interface WorkerTask {
   due_date: string;
   assignee_id?: string;
   phase_id: string;
+  workstation: string;
   phases?: {
     name: string;
     projects: {
