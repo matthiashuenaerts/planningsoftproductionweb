@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/context/AuthContext';
@@ -352,7 +351,7 @@ const PersonalTasks = () => {
     }
   };
 
-  const handleTaskStatusChange = async (taskId: string, status: Task['status']) => {
+  const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
     if (!currentEmployee) {
       toast({
         title: "Authentication Error",
@@ -364,7 +363,7 @@ const PersonalTasks = () => {
     
     try {
       // If starting a task, use time registration service
-      if (status === 'IN_PROGRESS') {
+      if (newStatus === 'IN_PROGRESS') {
         await timeRegistrationService.startTask(currentEmployee.id, taskId);
         
         // Move task between lists
@@ -382,7 +381,7 @@ const PersonalTasks = () => {
       }
       
       // If completing a task, use time registration service
-      if (status === 'COMPLETED') {
+      if (newStatus === 'COMPLETED') {
         await timeRegistrationService.completeTask(taskId);
         
         // Find the completed task for limit phase checking
@@ -406,13 +405,13 @@ const PersonalTasks = () => {
       
       // For other status changes, use regular database update
       const updateData: Partial<Task> = { 
-        status,
+        status: newStatus,
         updated_at: new Date().toISOString(),
         status_changed_at: new Date().toISOString()
       };
       
       // Set assignee when changing to IN_PROGRESS
-      if (status === 'IN_PROGRESS') {
+      if (newStatus === 'IN_PROGRESS') {
         updateData.assignee_id = currentEmployee?.id;
       }
       
@@ -424,7 +423,7 @@ const PersonalTasks = () => {
       if (error) throw error;
       
       // Move task between lists based on new status
-      if (status === 'TODO') {
+      if (newStatus === 'TODO') {
         const task = inProgressTasks.find(t => t.id === taskId);
         if (task) {
           setInProgressTasks(prev => prev.filter(t => t.id !== taskId));
@@ -434,7 +433,7 @@ const PersonalTasks = () => {
       
       toast({
         title: "Task Updated",
-        description: `Task status changed to ${status}`,
+        description: `Task status changed to ${newStatus}`,
       });
     } catch (error: any) {
       console.error('Error updating task:', error);

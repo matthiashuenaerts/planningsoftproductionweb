@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -68,7 +67,7 @@ const ProjectDetails = () => {
     fetchProjectData();
   }, [projectId, toast]);
 
-  const handleTaskStatusChange = async (taskId: string, status: Task['status']) => {
+  const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
     if (!currentEmployee) {
       toast({
         title: "Authentication Error",
@@ -80,7 +79,7 @@ const ProjectDetails = () => {
     
     try {
       // If starting a task, use time registration service
-      if (status === 'IN_PROGRESS') {
+      if (newStatus === 'IN_PROGRESS') {
         await timeRegistrationService.startTask(currentEmployee.id, taskId);
         
         // Update local state
@@ -103,7 +102,7 @@ const ProjectDetails = () => {
       }
       
       // If completing a task, use time registration service
-      if (status === 'COMPLETED') {
+      if (newStatus === 'COMPLETED') {
         await timeRegistrationService.completeTask(taskId);
         
         // Update local state
@@ -127,17 +126,17 @@ const ProjectDetails = () => {
       
       // For other status changes, use regular task service
       const updateData: Partial<Task> = { 
-        status, 
+        status: newStatus, 
         status_changed_at: new Date().toISOString() 
       };
       
       // Set assignee when changing to IN_PROGRESS
-      if (status === 'IN_PROGRESS') {
+      if (newStatus === 'IN_PROGRESS') {
         updateData.assignee_id = currentEmployee.id;
       }
       
       // Add completion info if task is being marked as completed
-      if (status === 'COMPLETED') {
+      if (newStatus === 'COMPLETED') {
         updateData.completed_at = new Date().toISOString();
         updateData.completed_by = currentEmployee.id;
       }
@@ -149,12 +148,12 @@ const ProjectDetails = () => {
         prevTasks.map(task => 
           task.id === taskId ? { 
             ...task, 
-            status,
+            status: newStatus,
             status_changed_at: updateData.status_changed_at,
-            ...(status === 'IN_PROGRESS' ? {
+            ...(newStatus === 'IN_PROGRESS' ? {
               assignee_id: currentEmployee.id
             } : {}),
-            ...(status === 'COMPLETED' ? {
+            ...(newStatus === 'COMPLETED' ? {
               completed_at: updateData.completed_at,
               completed_by: currentEmployee.id
             } : {})
@@ -164,7 +163,7 @@ const ProjectDetails = () => {
       
       toast({
         title: "Task updated",
-        description: `Task status has been updated to ${status}.`,
+        description: `Task status has been updated to ${newStatus}.`,
       });
     } catch (error: any) {
       toast({
