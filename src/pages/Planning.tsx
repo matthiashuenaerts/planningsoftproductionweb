@@ -174,6 +174,38 @@ const Planning = () => {
         throw new Error('Worker not found');
       }
 
+      // Get worker's assigned workstations
+      const { data: workerWorkstations, error: workstationsError } = await supabase
+        .from('employee_workstation_links')
+        .select(`
+          workstations (
+            id,
+            name
+          )
+        `)
+        .eq('employee_id', workerId);
+
+      if (workstationsError) {
+        console.error('Error fetching worker workstations:', workstationsError);
+        throw workstationsError;
+      }
+
+      const assignedWorkstationNames = workerWorkstations?.map(link => link.workstations?.name).filter(Boolean) || [];
+      
+      // If no workstations assigned via links, check legacy workstation field
+      if (assignedWorkstationNames.length === 0 && worker.employee.workstation) {
+        assignedWorkstationNames.push(worker.employee.workstation);
+      }
+
+      if (assignedWorkstationNames.length === 0) {
+        toast({
+          title: "No Workstations Assigned",
+          description: "This worker has no workstations assigned. Please assign workstations first.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Clear existing auto-generated schedules for this worker and date
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       await supabase
@@ -184,15 +216,20 @@ const Planning = () => {
         .lte('start_time', `${dateStr}T23:59:59`)
         .eq('is_auto_generated', true);
 
-      // Get available tasks sorted by priority and due date
-      const availableTasks = worker.tasks.filter(task => 
-        task.status === 'TODO' || task.status === 'IN_PROGRESS'
-      );
+      // Get available tasks that are assigned to the worker's workstations
+      const availableTasks = worker.tasks.filter(task => {
+        if (task.status !== 'TODO' && task.status !== 'IN_PROGRESS') {
+          return false;
+        }
+        
+        // Check if task workstation matches any of the worker's assigned workstations
+        return assignedWorkstationNames.includes(task.workstation);
+      });
 
       if (availableTasks.length === 0) {
         toast({
           title: "No Tasks Available",
-          description: "No tasks available to schedule for this worker",
+          description: `No tasks available for ${worker.employee.name}'s assigned workstations: ${assignedWorkstationNames.join(', ')}`,
           variant: "destructive"
         });
         return;
@@ -265,7 +302,7 @@ const Planning = () => {
       
       toast({
         title: "Schedule Generated",
-        description: `Continuous daily schedule generated for ${worker.employee.name}`,
+        description: `Continuous daily schedule generated for ${worker.employee.name} using tasks from workstations: ${assignedWorkstationNames.join(', ')}`,
       });
     } catch (error: any) {
       console.error('Error generating schedule:', error);
