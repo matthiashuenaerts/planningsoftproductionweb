@@ -1,11 +1,10 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Play, Pause, Clock, GripVertical } from 'lucide-react';
+import { Play, Pause, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 const TaskTimer = () => {
@@ -13,10 +12,6 @@ const TaskTimer = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [position, setPosition] = useState({ x: 50, y: 50 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const timerRef = useRef<HTMLDivElement>(null);
 
   // Don't render for workstation users
   if (currentEmployee?.role === 'workstation') {
@@ -31,51 +26,12 @@ const TaskTimer = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Dragging functionality
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      
-      setPosition({
-        x: e.clientX - dragOffset.x,
-        y: e.clientY - dragOffset.y
-      });
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.userSelect = 'none';
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.userSelect = '';
-    };
-  }, [isDragging, dragOffset]);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!timerRef.current) return;
-    
-    const rect = timerRef.current.getBoundingClientRect();
-    setDragOffset({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    });
-    setIsDragging(true);
-  };
-
   // Get active registration
   const { data: activeRegistration, isLoading } = useQuery({
     queryKey: ['activeTimeRegistration', currentEmployee?.id],
     queryFn: () => currentEmployee ? timeRegistrationService.getActiveRegistration(currentEmployee.id) : null,
     enabled: !!currentEmployee,
-    refetchInterval: 1000
+    refetchInterval: 1000 // Refetch every 5 seconds
   });
 
   // Get task details if there's an active registration
@@ -175,41 +131,18 @@ const TaskTimer = () => {
   }
 
   return (
-    <div 
-      ref={timerRef}
-      className="fixed z-[9999] cursor-move select-none"
-      style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        zIndex: 2147483647, // Maximum z-index value
-        pointerEvents: 'auto'
-      }}
-      onMouseDown={handleMouseDown}
-    >
+    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 ml-[50px]">
       <Card 
-        className={`transition-colors max-w-sm shadow-2xl border-2 ${
+        className={`cursor-pointer transition-colors max-w-sm ${
           activeRegistration && activeRegistration.is_active 
             ? 'border-green-500 bg-green-50 hover:bg-green-100' 
             : 'border-red-500 bg-red-50 hover:bg-red-100'
         }`}
-        onClick={(e) => {
-          e.stopPropagation();
-          handleTimerClick();
-        }}
+        onClick={handleTimerClick}
       >
         <CardContent className="p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <div 
-                className="cursor-grab active:cursor-grabbing p-1"
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  handleMouseDown(e);
-                }}
-              >
-                <GripVertical className="h-4 w-4 text-gray-400" />
-              </div>
-              
               <div className={`p-1.5 rounded-full ${
                 activeRegistration && activeRegistration.is_active 
                   ? 'bg-green-500 text-white' 
