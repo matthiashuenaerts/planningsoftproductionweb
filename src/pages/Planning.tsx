@@ -66,6 +66,8 @@ interface ScheduleItem {
   end_time: string;
   is_auto_generated: boolean;
   task?: WorkerTask;
+  task_part?: number;
+  total_parts?: number;
 }
 
 interface WorkerSchedule {
@@ -196,47 +198,57 @@ const Planning = () => {
         return;
       }
 
-      // Create schedule items for each working period
+      // Create continuous schedule that fills the entire day
       const schedulesToInsert = [];
-      let taskIndex = 0;
-      let remainingTaskDuration = availableTasks[taskIndex]?.duration || 60;
-      let currentTask = availableTasks[taskIndex];
+      let currentTaskIndex = 0;
+      let remainingTaskDuration = availableTasks[currentTaskIndex]?.duration || 60;
+      let currentTask = availableTasks[currentTaskIndex];
+      let taskPartCounter = 1;
 
       for (const period of workingHours) {
         if (!currentTask) break;
 
-        const startTime = new Date(`${dateStr}T${period.start}:00`);
-        const endTime = new Date(`${dateStr}T${period.end}:00`);
+        const periodStartTime = new Date(`${dateStr}T${period.start}:00`);
+        let periodRemainingMinutes = period.duration;
+        let periodCurrentTime = new Date(periodStartTime);
 
-        // If current task fits in this period
-        if (remainingTaskDuration <= period.duration) {
+        while (periodRemainingMinutes > 0 && currentTask) {
+          const timeToAllocate = Math.min(remainingTaskDuration, periodRemainingMinutes);
+          const endTime = new Date(periodCurrentTime.getTime() + (timeToAllocate * 60000));
+
+          // Determine if this is a partial task
+          const isPartialTask = timeToAllocate < remainingTaskDuration;
+          const totalParts = Math.ceil((availableTasks[currentTaskIndex]?.duration || 60) / period.duration);
+          
+          let taskTitle = currentTask.title;
+          if (totalParts > 1) {
+            taskTitle = `${currentTask.title} (Part ${taskPartCounter})`;
+          }
+
           schedulesToInsert.push({
             employee_id: workerId,
             task_id: currentTask.id,
-            title: currentTask.title,
+            title: taskTitle,
             description: currentTask.description || '',
-            start_time: startTime.toISOString(),
-            end_time: new Date(startTime.getTime() + (remainingTaskDuration * 60000)).toISOString(),
-            is_auto_generated: true
-          });
-
-          // Move to next task
-          taskIndex++;
-          currentTask = availableTasks[taskIndex];
-          remainingTaskDuration = currentTask?.duration || 60;
-        } else {
-          // Task spans multiple periods, schedule for this entire period
-          schedulesToInsert.push({
-            employee_id: workerId,
-            task_id: currentTask.id,
-            title: `${currentTask.title} (Part ${schedulesToInsert.filter(s => s.task_id === currentTask.id).length + 1})`,
-            description: currentTask.description || '',
-            start_time: startTime.toISOString(),
+            start_time: periodCurrentTime.toISOString(),
             end_time: endTime.toISOString(),
             is_auto_generated: true
           });
 
-          remainingTaskDuration -= period.duration;
+          // Update counters
+          remainingTaskDuration -= timeToAllocate;
+          periodRemainingMinutes -= timeToAllocate;
+          periodCurrentTime = new Date(endTime);
+
+          // If task is completed, move to next task
+          if (remainingTaskDuration <= 0) {
+            currentTaskIndex++;
+            currentTask = availableTasks[currentTaskIndex];
+            remainingTaskDuration = currentTask?.duration || 60;
+            taskPartCounter = 1;
+          } else {
+            taskPartCounter++;
+          }
         }
       }
 
@@ -253,7 +265,7 @@ const Planning = () => {
       
       toast({
         title: "Schedule Generated",
-        description: `Daily schedule generated for ${worker.employee.name}`,
+        description: `Continuous daily schedule generated for ${worker.employee.name}`,
       });
     } catch (error: any) {
       console.error('Error generating schedule:', error);
@@ -277,7 +289,7 @@ const Planning = () => {
       
       toast({
         title: "All Schedules Generated",
-        description: "Daily schedules generated for all workers",
+        description: "Continuous daily schedules generated for all workers",
       });
     } catch (error: any) {
       console.error('Error generating all schedules:', error);
@@ -333,6 +345,19 @@ const Planning = () => {
     return format(new Date(timeStr), 'HH:mm');
   };
 
+  const calculateScheduleEfficiency = (schedule: ScheduleItem[]) => {
+    if (schedule.length === 0) return 0;
+    
+    let totalScheduledMinutes = 0;
+    schedule.forEach(item => {
+      const start = new Date(item.start_time);
+      const end = new Date(item.end_time);
+      totalScheduledMinutes += (end.getTime() - start.getTime()) / (1000 * 60);
+    });
+    
+    return Math.round((totalScheduledMinutes / totalWorkingMinutes) * 100);
+  };
+
   const selectedWorkerSchedule = workerSchedules.find(w => w.employee.id === selectedWorker);
 
   if (loading) {
@@ -359,7 +384,7 @@ const Planning = () => {
             <div>
               <h1 className="text-3xl font-bold">Worker Daily Planning</h1>
               <p className="text-slate-600 mt-1">
-                Create and manage daily schedules for workers based on their assigned tasks
+                Create and manage continuous daily schedules for workers based on their assigned tasks
               </p>
             </div>
             
@@ -435,7 +460,7 @@ const Planning = () => {
                       disabled={generatingSchedule}
                       variant="outline"
                     >
-                      Generate Schedule
+                      Generate Continuous Schedule
                     </Button>
                     <Button
                       onClick={() => setShowTaskManager(true)}
@@ -449,7 +474,7 @@ const Planning = () => {
 
               {/* Worker Overview */}
               {selectedWorkerSchedule && (
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium">Available Tasks</CardTitle>
@@ -485,6 +510,16 @@ const Planning = () => {
                       <div className="text-2xl font-bold">{selectedWorkerSchedule.schedule.length}</div>
                     </CardContent>
                   </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Schedule Efficiency</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{calculateScheduleEfficiency(selectedWorkerSchedule.schedule)}%</div>
+                      <div className="text-xs text-muted-foreground">Time utilization</div>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
 
@@ -494,7 +529,7 @@ const Planning = () => {
                   <CardHeader>
                     <CardTitle className="flex items-center">
                       <Users className="h-5 w-5 mr-2" />
-                      {selectedWorkerSchedule.employee.name} - Daily Schedule
+                      {selectedWorkerSchedule.employee.name} - Continuous Daily Schedule
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -502,7 +537,6 @@ const Planning = () => {
                       {workingHours.map((period) => {
                         const periodSchedules = selectedWorkerSchedule.schedule.filter(item => {
                           const startTime = format(new Date(item.start_time), 'HH:mm');
-                          const endTime = format(new Date(item.end_time), 'HH:mm');
                           return startTime >= period.start && startTime < period.end;
                         });
 
@@ -516,53 +550,56 @@ const Planning = () => {
                             <div className="p-4">
                               {periodSchedules.length > 0 ? (
                                 <div className="space-y-2">
-                                  {periodSchedules.map((item) => (
-                                    <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                                      <div className="flex-1">
-                                        <h5 className="font-medium">{item.title}</h5>
-                                        {item.description && (
-                                          <p className="text-sm text-gray-600">{item.description}</p>
+                                  {periodSchedules.map((item) => {
+                                    const itemDuration = Math.round((new Date(item.end_time).getTime() - new Date(item.start_time).getTime()) / (1000 * 60));
+                                    return (
+                                      <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                                        <div className="flex-1">
+                                          <h5 className="font-medium">{item.title}</h5>
+                                          {item.description && (
+                                            <p className="text-sm text-gray-600">{item.description}</p>
+                                          )}
+                                          <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                                            <span className="flex items-center">
+                                              <Clock className="h-3 w-3 mr-1" />
+                                              {formatTime(item.start_time)} - {formatTime(item.end_time)} ({itemDuration}m)
+                                            </span>
+                                            {item.task && (
+                                              <Badge className={getPriorityColor(item.task.priority)}>
+                                                {item.task.priority}
+                                              </Badge>
+                                            )}
+                                            {item.is_auto_generated && (
+                                              <Badge variant="outline">Auto-generated</Badge>
+                                            )}
+                                          </div>
+                                        </div>
+                                        
+                                        {isAdmin && (
+                                          <div className="flex items-center space-x-2">
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => {
+                                                setEditingScheduleItem(item);
+                                                setShowTaskManager(true);
+                                              }}
+                                            >
+                                              <Edit className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => deleteScheduleItem(item.id)}
+                                              className="text-red-600 hover:bg-red-50"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </div>
                                         )}
-                                        <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
-                                          <span className="flex items-center">
-                                            <Clock className="h-3 w-3 mr-1" />
-                                            {formatTime(item.start_time)} - {formatTime(item.end_time)}
-                                          </span>
-                                          {item.task && (
-                                            <Badge className={getPriorityColor(item.task.priority)}>
-                                              {item.task.priority}
-                                            </Badge>
-                                          )}
-                                          {item.is_auto_generated && (
-                                            <Badge variant="outline">Auto-generated</Badge>
-                                          )}
-                                        </div>
                                       </div>
-                                      
-                                      {isAdmin && (
-                                        <div className="flex items-center space-x-2">
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => {
-                                              setEditingScheduleItem(item);
-                                              setShowTaskManager(true);
-                                            }}
-                                          >
-                                            <Edit className="h-4 w-4" />
-                                          </Button>
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => deleteScheduleItem(item.id)}
-                                            className="text-red-600 hover:bg-red-50"
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               ) : (
                                 <div className="text-center text-gray-500 py-4">
