@@ -264,11 +264,11 @@ const PersonalTasks = () => {
         );
         
         // Separate tasks by status - Fixed the status filtering
-        const todoTasksList = uniqueTasks.filter(task => task.status === 'TODO' || task.status === 'HOLD');
-        const inProgressTasksList = uniqueTasks.filter(task => task.status === 'IN_PROGRESS');
+        const allTodoAndHoldTasks = uniqueTasks.filter(task => task.status === 'TODO' || task.status === 'HOLD');
+        const allInProgressTasks = uniqueTasks.filter(task => task.status === 'IN_PROGRESS');
         
-        setTodoTasks(todoTasksList);
-        setInProgressTasks(inProgressTasksList);
+        setTodoTasks(allTodoAndHoldTasks);
+        setInProgressTasks(allInProgressTasks);
       } catch (error: any) {
         console.error('Error fetching personal tasks:', error);
         toast({
