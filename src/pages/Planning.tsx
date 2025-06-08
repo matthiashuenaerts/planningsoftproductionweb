@@ -48,13 +48,16 @@ interface WorkerTask {
   due_date: string;
   assignee_id?: string;
   phase_id: string;
-  workstation: string;
   phases?: {
     name: string;
     projects: {
       name: string;
     };
   };
+  workstations?: Array<{
+    id: string;
+    name: string;
+  }>;
 }
 
 interface ScheduleItem {
@@ -81,7 +84,6 @@ const Planning = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [workers, setWorkers] = useState<any[]>([]);
   const [workerSchedules, setWorkerSchedules] = useState<WorkerSchedule[]>([]);
-  const [allTodoTasks, setAllTodoTasks] = useState<WorkerTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingSchedule, setGeneratingSchedule] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
@@ -106,7 +108,7 @@ const Planning = () => {
 
   const fetchAllTodoTasks = async () => {
     try {
-      // Get all TODO tasks with project information
+      // Get all TODO tasks with project information and linked workstations
       const { data: tasks, error } = await supabase
         .from('tasks')
         .select(`
@@ -114,6 +116,12 @@ const Planning = () => {
           phases (
             name,
             projects (
+              name
+            )
+          ),
+          task_workstation_links (
+            workstations (
+              id,
               name
             )
           )
@@ -132,7 +140,8 @@ const Planning = () => {
       return tasks?.map(task => ({
         ...task,
         priority: task.priority as "Low" | "Medium" | "High" | "Urgent",
-        status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
+        status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD",
+        workstations: task.task_workstation_links?.map((link: any) => link.workstations).filter(Boolean) || []
       })) || [];
     } catch (error) {
       console.error('Error in fetchAllTodoTasks:', error);
@@ -149,9 +158,8 @@ const Planning = () => {
       const workerEmployees = employeeData.filter(emp => emp.role === 'worker');
       setWorkers(workerEmployees);
 
-      // Fetch all TODO tasks
+      // Fetch all TODO tasks with workstation links
       const todoTasks = await fetchAllTodoTasks();
-      setAllTodoTasks(todoTasks);
 
       // Fetch schedules and tasks for each worker
       const schedulePromises = workerEmployees.map(async (worker) => {
@@ -182,13 +190,16 @@ const Planning = () => {
 
         console.log(`${worker.name} assigned workstations:`, assignedWorkstationNames);
 
-        // Filter TODO tasks for this worker
+        // Filter TODO tasks for this worker based on workstation links and direct assignment
         const workerTasks = todoTasks.filter(task => {
           const isAssignedToWorker = task.assignee_id === worker.id;
-          const isWorkstationMatch = assignedWorkstationNames.includes(task.workstation);
-          const isUnassignedWorkstationTask = !task.assignee_id && assignedWorkstationNames.includes(task.workstation);
           
-          return isAssignedToWorker || isWorkstationMatch || isUnassignedWorkstationTask;
+          // Check if any of the task's linked workstations match worker's workstations
+          const hasMatchingWorkstation = task.workstations && task.workstations.some((taskWorkstation: any) => 
+            assignedWorkstationNames.includes(taskWorkstation.name)
+          );
+          
+          return isAssignedToWorker || hasMatchingWorkstation;
         });
 
         console.log(`${worker.name} has ${workerTasks.length} TODO tasks`);
@@ -567,95 +578,6 @@ const Planning = () => {
             </div>
           </div>
 
-          {/* Global TODO Tasks Overview */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>All TODO Tasks Overview</span>
-                <Badge variant="outline">{allTodoTasks.length} tasks</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Urgent</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-red-600">
-                      {allTodoTasks.filter(t => t.priority === 'Urgent').length}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">High</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-orange-600">
-                      {allTodoTasks.filter(t => t.priority === 'High').length}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Medium</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-yellow-600">
-                      {allTodoTasks.filter(t => t.priority === 'Medium').length}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Low</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">
-                      {allTodoTasks.filter(t => t.priority === 'Low').length}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {allTodoTasks.length === 0 ? (
-                <div className="text-center py-8">
-                  <AlertCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p className="text-gray-600">No TODO tasks found in the system</p>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {allTodoTasks.slice(0, 20).map((task) => (
-                    <div key={task.id} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
-                      <div className="flex-1">
-                        <h5 className="font-medium text-sm">{task.title}</h5>
-                        {task.phases && (
-                          <p className="text-xs text-blue-600">
-                            Project: {task.phases.projects.name}
-                          </p>
-                        )}
-                        <div className="flex items-center space-x-2 text-xs text-gray-500">
-                          <span>Duration: {task.duration || 60} min</span>
-                          <span>Due: {format(new Date(task.due_date), 'MMM dd')}</span>
-                          <span>Workstation: {task.workstation}</span>
-                        </div>
-                      </div>
-                      <Badge className={getPriorityColor(task.priority)} variant="outline">
-                        {task.priority}
-                      </Badge>
-                    </div>
-                  ))}
-                  {allTodoTasks.length > 20 && (
-                    <div className="text-center py-2 text-sm text-gray-500">
-                      ... and {allTodoTasks.length - 20} more tasks
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {workers.length === 0 ? (
             <Alert>
               <AlertCircle className="h-4 w-4" />
@@ -923,7 +845,7 @@ const Planning = () => {
                             <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
                               <span>Duration: {task.duration || 60} min</span>
                               <span>Due: {format(new Date(task.due_date), 'MMM dd')}</span>
-                              <span>Workstation: {task.workstation}</span>
+                              <span>Workstations: {task.workstations?.map(ws => ws.name).join(', ') || 'None'}</span>
                               {task.assignee_id === selectedWorkerSchedule.employee.id && (
                                 <Badge variant="secondary">Directly Assigned</Badge>
                               )}
