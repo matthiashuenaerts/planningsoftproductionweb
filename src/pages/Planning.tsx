@@ -141,11 +141,11 @@ const Planning = () => {
 
         console.log(`${worker.name} assigned workstations:`, assignedWorkstationNames);
 
-        // Get worker's tasks based on assigned workstations - improved query
+        // Get worker's tasks - improved query to properly filter by workstation and status
         let workerTasks: WorkerTask[] = [];
         
         if (assignedWorkstationNames.length > 0) {
-          // Query tasks that are either assigned to this worker OR match their workstations
+          // Query all TODO tasks that match the worker's workstations or are directly assigned
           const { data: tasks, error: tasksError } = await supabase
             .from('tasks')
             .select(`
@@ -155,19 +155,30 @@ const Planning = () => {
                 projects (name)
               )
             `)
-            .in('status', ['TODO', 'IN_PROGRESS']) // Include both TODO and IN_PROGRESS
+            .eq('status', 'TODO') // Only get TODO tasks
             .order('priority', { ascending: false })
             .order('due_date', { ascending: true });
 
           if (tasksError) {
             console.error('Error fetching tasks for worker:', worker.id, tasksError);
           } else if (tasks) {
-            // Filter tasks based on workstation or assignee
+            // Filter tasks to only include those for assigned workstations or directly assigned to worker
             workerTasks = tasks.filter(task => {
               const isAssignedToWorker = task.assignee_id === worker.id;
               const isWorkstationMatch = assignedWorkstationNames.includes(task.workstation);
-              console.log(`Task "${task.title}": assignee=${task.assignee_id}, workstation=${task.workstation}, matches=${isAssignedToWorker || isWorkstationMatch}`);
-              return isAssignedToWorker || isWorkstationMatch;
+              const isUnassignedWorkstationTask = !task.assignee_id && assignedWorkstationNames.includes(task.workstation);
+              
+              console.log(`Task "${task.title}": 
+                - Status: ${task.status}
+                - Assignee: ${task.assignee_id} 
+                - Workstation: ${task.workstation}
+                - Worker workstations: ${assignedWorkstationNames.join(', ')}
+                - Directly assigned: ${isAssignedToWorker}
+                - Workstation match: ${isWorkstationMatch}
+                - Unassigned for workstation: ${isUnassignedWorkstationTask}
+                - Should include: ${isAssignedToWorker || isWorkstationMatch || isUnassignedWorkstationTask}`);
+              
+              return isAssignedToWorker || isWorkstationMatch || isUnassignedWorkstationTask;
             });
           }
         } else {
@@ -182,7 +193,7 @@ const Planning = () => {
               )
             `)
             .eq('assignee_id', worker.id)
-            .in('status', ['TODO', 'IN_PROGRESS']) // Include both TODO and IN_PROGRESS
+            .eq('status', 'TODO') // Only get TODO tasks
             .order('priority', { ascending: false })
             .order('due_date', { ascending: true });
 
@@ -193,7 +204,10 @@ const Planning = () => {
           }
         }
 
-        console.log(`${worker.name} available tasks:`, workerTasks.length);
+        console.log(`${worker.name} TODO tasks found:`, workerTasks.length);
+        workerTasks.forEach(task => {
+          console.log(`- ${task.title} (${task.workstation}) - Priority: ${task.priority}`);
+        });
 
         // Get worker's schedule for the selected date
         const schedule = await planningService.getSchedulesByEmployeeAndDate(worker.id, selectedDate);
@@ -246,7 +260,7 @@ const Planning = () => {
       }
 
       console.log(`Generating schedule for ${worker.employee.name}`);
-      console.log(`Available tasks: ${worker.tasks.length}`);
+      console.log(`Available TODO tasks: ${worker.tasks.length}`);
       console.log(`Assigned workstations: ${worker.assignedWorkstations.join(', ')}`);
 
       if (worker.assignedWorkstations.length === 0) {
@@ -268,19 +282,15 @@ const Planning = () => {
         .lte('start_time', `${dateStr}T23:59:59`)
         .eq('is_auto_generated', true);
 
-      // Filter available tasks - only TODO and IN_PROGRESS tasks
-      const availableTasks = worker.tasks.filter(task => {
-        const isAvailable = ['TODO', 'IN_PROGRESS'].includes(task.status);
-        console.log(`Task "${task.title}" status: ${task.status}, available: ${isAvailable}`);
-        return isAvailable;
-      });
+      // All tasks are already filtered to TODO status in fetchWorkersAndSchedules
+      const availableTasks = worker.tasks;
 
-      console.log(`Filtered available tasks: ${availableTasks.length}`);
+      console.log(`TODO tasks ready for scheduling: ${availableTasks.length}`);
 
       if (availableTasks.length === 0) {
         toast({
-          title: "No Tasks Available",
-          description: `No TODO or IN_PROGRESS tasks available for ${worker.employee.name}'s workstations: ${worker.assignedWorkstations.join(', ')}. Available statuses in total tasks: ${[...new Set(worker.tasks.map(t => t.status))].join(', ')}`,
+          title: "No TODO Tasks Available",
+          description: `No TODO tasks available for ${worker.employee.name}'s workstations: ${worker.assignedWorkstations.join(', ')}.`,
           variant: "destructive"
         });
         return;
@@ -633,12 +643,11 @@ const Planning = () => {
                 <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Available Tasks</CardTitle>
+                      <CardTitle className="text-sm font-medium">TODO Tasks</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{selectedWorkerSchedule.tasks.filter(t => ['TODO', 'IN_PROGRESS'].includes(t.status)).length}</div>
+                      <div className="text-2xl font-bold">{selectedWorkerSchedule.tasks.length}</div>
                       <p className="text-xs text-muted-foreground">Ready to schedule</p>
-                      <p className="text-xs text-muted-foreground">Total: {selectedWorkerSchedule.tasks.length}</p>
                     </CardContent>
                   </Card>
                   
@@ -658,7 +667,7 @@ const Planning = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{Math.round(selectedWorkerSchedule.totalDuration / 60)}h</div>
-                      <p className="text-xs text-muted-foreground">Of available tasks</p>
+                      <p className="text-xs text-muted-foreground">Of TODO tasks</p>
                     </CardContent>
                   </Card>
                   
@@ -822,7 +831,10 @@ const Planning = () => {
               {selectedWorkerSchedule && selectedWorkerSchedule.tasks.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Available Tasks for {selectedWorkerSchedule.employee.name}</CardTitle>
+                    <CardTitle>Available TODO Tasks for {selectedWorkerSchedule.employee.name}</CardTitle>
+                    <p className="text-sm text-gray-600">
+                      Tasks from assigned workstations: {selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None'}
+                    </p>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -840,6 +852,9 @@ const Planning = () => {
                               <span>Duration: {task.duration || 60} min</span>
                               <span>Due: {format(new Date(task.due_date), 'MMM dd')}</span>
                               <span>Workstation: {task.workstation}</span>
+                              {task.assignee_id === selectedWorkerSchedule.employee.id && (
+                                <Badge variant="secondary">Directly Assigned</Badge>
+                              )}
                             </div>
                           </div>
                           
@@ -856,8 +871,37 @@ const Planning = () => {
                       
                       {selectedWorkerSchedule.tasks.length > 10 && (
                         <div className="text-center py-4 text-sm text-gray-500">
-                          ... and {selectedWorkerSchedule.tasks.length - 10} more tasks
+                          ... and {selectedWorkerSchedule.tasks.length - 10} more TODO tasks
                         </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Show message when no TODO tasks available */}
+              {selectedWorkerSchedule && selectedWorkerSchedule.tasks.length === 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>No TODO Tasks Available</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-8">
+                      <AlertCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p className="text-gray-600 mb-2">
+                        No TODO tasks found for {selectedWorkerSchedule.employee.name}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Assigned workstations: {selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None assigned'}
+                      </p>
+                      {isAdmin && (
+                        <Button
+                          onClick={() => setShowTaskManager(true)}
+                          className="mt-4"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add New Task
+                        </Button>
                       )}
                     </div>
                   </CardContent>
