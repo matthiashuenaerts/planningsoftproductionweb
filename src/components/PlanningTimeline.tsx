@@ -11,6 +11,8 @@ import {
   MoreVertical,
   Edit,
   Trash2,
+  Zap,
+  RefreshCw,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -54,6 +56,7 @@ interface ScheduledTask {
     status: string;
     priority: string;
     duration?: number;
+    workstation?: string;
   };
   phase?: {
     id: string;
@@ -75,6 +78,7 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState<ScheduledTask | null>(null);
   const [showTaskManager, setShowTaskManager] = useState(false);
+  const [generatingSchedule, setGeneratingSchedule] = useState(false);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   
@@ -105,7 +109,7 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
         .select(`
           *,
           employee:employees(id, name),
-          task:tasks(id, title, status, priority, duration),
+          task:tasks(id, title, status, priority, duration, workstation),
           phase:phases(id, name, project_id)
         `)
         .gte('start_time', startDate)
@@ -146,6 +150,153 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
       setScheduledTasks([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateScheduleForEmployee = async (employeeId: string) => {
+    try {
+      setGeneratingSchedule(true);
+      
+      const employee = employees.find(emp => emp.id === employeeId);
+      if (!employee) {
+        throw new Error('Employee not found');
+      }
+
+      // Get employee's workstations
+      const { data: workerWorkstations, error: workstationsError } = await supabase
+        .from('employee_workstation_links')
+        .select(`
+          workstations (
+            id,
+            name
+          )
+        `)
+        .eq('employee_id', employeeId);
+
+      if (workstationsError) {
+        console.error('Error fetching worker workstations:', workstationsError);
+        throw workstationsError;
+      }
+
+      let assignedWorkstationNames = workerWorkstations?.map(link => link.workstations?.name).filter(Boolean) || [];
+      
+      // If no workstations assigned via links, check legacy workstation field
+      if (assignedWorkstationNames.length === 0 && employee.workstation) {
+        assignedWorkstationNames.push(employee.workstation);
+      }
+
+      if (assignedWorkstationNames.length === 0) {
+        toast({
+          title: "No Workstations Assigned",
+          description: `${employee.name} has no workstations assigned. Please assign workstations first.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Clear existing auto-generated schedules for this employee and date
+      await supabase
+        .from('schedules')
+        .delete()
+        .eq('employee_id', employeeId)
+        .gte('start_time', `${dateString}T00:00:00`)
+        .lte('start_time', `${dateString}T23:59:59`)
+        .eq('is_auto_generated', true);
+
+      // Get available tasks for the employee's workstations
+      let tasksQuery = supabase
+        .from('tasks')
+        .select(`
+          *,
+          phases (
+            name,
+            projects (name)
+          )
+        `)
+        .neq('status', 'COMPLETED')
+        .order('priority', { ascending: false })
+        .order('due_date', { ascending: true });
+
+      // Filter by assignee or workstation
+      tasksQuery = tasksQuery.or(`assignee_id.eq.${employeeId},workstation.in.(${assignedWorkstationNames.map(w => `"${w}"`).join(',')})`);
+
+      const { data: tasks, error: tasksError } = await tasksQuery;
+
+      if (tasksError) {
+        console.error('Error fetching tasks:', tasksError);
+        throw tasksError;
+      }
+
+      if (!tasks || tasks.length === 0) {
+        toast({
+          title: "No Tasks Available",
+          description: `No tasks available for ${employee.name}'s workstations: ${assignedWorkstationNames.join(', ')}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Sort tasks by priority and due date
+      const priorityOrder = { 'Urgent': 0, 'High': 1, 'Medium': 2, 'Low': 3 };
+      tasks.sort((a, b) => {
+        const priorityA = priorityOrder[a.priority as keyof typeof priorityOrder] || 4;
+        const priorityB = priorityOrder[b.priority as keyof typeof priorityOrder] || 4;
+        
+        if (priorityA !== priorityB) return priorityA - priorityB;
+        
+        const dateA = new Date(a.due_date);
+        const dateB = new Date(b.due_date);
+        return dateA.getTime() - dateB.getTime();
+      });
+
+      // Create schedule items for each time segment
+      const schedulesToInsert = [];
+      let taskIndex = 0;
+
+      for (const segment of timeSegments) {
+        if (taskIndex >= tasks.length) break;
+
+        const task = tasks[taskIndex];
+        const startTime = new Date(`${dateString}T${segment.startTime}:00`);
+        const endTime = new Date(`${dateString}T${segment.endTime}:00`);
+
+        schedulesToInsert.push({
+          employee_id: employeeId,
+          task_id: task.id,
+          title: task.title,
+          description: task.description || '',
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          is_auto_generated: true
+        });
+
+        taskIndex++;
+      }
+
+      // Insert schedules
+      if (schedulesToInsert.length > 0) {
+        const { error } = await supabase
+          .from('schedules')
+          .insert(schedulesToInsert);
+
+        if (error) throw error;
+      }
+
+      await fetchScheduledTasks();
+      
+      toast({
+        title: "Schedule Generated",
+        description: `Generated ${schedulesToInsert.length} schedule items for ${employee.name}`,
+      });
+    } catch (error: any) {
+      console.error('Error generating schedule:', error);
+      toast({
+        title: "Error",
+        description: `Failed to generate schedule: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setGeneratingSchedule(false);
     }
   };
   
@@ -292,6 +443,25 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
                         </Badge>
                       )}
                     </div>
+                    {isAdmin && (
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => fetchScheduledTasks()}
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => generateScheduleForEmployee(employee.id)}
+                          disabled={generatingSchedule}
+                        >
+                          <Zap className="h-4 w-4 mr-1" />
+                          {generatingSchedule ? 'Generating...' : 'Generate'}
+                        </Button>
+                      </div>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4">
@@ -310,7 +480,7 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
                                   key={task.id} 
                                   className={cn(
                                     "rounded border p-3",
-                                    task.is_auto_generated ? "bg-gray-50" : "bg-white",
+                                    task.is_auto_generated ? "bg-gray-50 border-gray-200" : "bg-white border-blue-200",
                                     task.is_completed && "opacity-60"
                                   )}
                                 >
@@ -319,8 +489,14 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
                                       <div className="font-medium">{task.title}</div>
                                       
                                       {task.project && (
-                                        <div className="text-sm text-muted-foreground mb-1">
+                                        <div className="text-sm text-blue-600 mb-1">
                                           Project: {task.project.name}
+                                        </div>
+                                      )}
+                                      
+                                      {task.task?.workstation && (
+                                        <div className="text-sm text-purple-600 mb-1">
+                                          Workstation: {task.task.workstation}
                                         </div>
                                       )}
                                       
@@ -335,7 +511,7 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
                                       </div>
                                       
                                       {task.description && (
-                                        <p className="text-sm mt-2">{task.description}</p>
+                                        <p className="text-sm mt-2 text-gray-600">{task.description}</p>
                                       )}
                                     </div>
                                     
@@ -346,43 +522,63 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
                                         </Badge>
                                       )}
                                       
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                                            <MoreVertical className="h-4 w-4" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                          <DropdownMenuItem 
-                                            onClick={() => editTask(task)}
-                                          >
-                                            <Edit className="h-4 w-4 mr-2" />
-                                            Edit Task
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem 
-                                            onClick={() => markTaskCompleted(task.id)}
-                                            disabled={task.task?.status === 'COMPLETED' || task.is_completed}
-                                          >
-                                            <CheckSquare className="h-4 w-4 mr-2" />
-                                            Mark as Completed
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem
-                                            onClick={() => removeFromSchedule(task.id)}
-                                            className="text-red-600"
-                                          >
-                                            <Trash2 className="h-4 w-4 mr-2" />
-                                            Remove from Schedule
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
+                                      {task.is_auto_generated && (
+                                        <Badge variant="outline" className="text-xs">
+                                          Auto
+                                        </Badge>
+                                      )}
+                                      
+                                      {isAdmin && (
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                              <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                            <DropdownMenuItem 
+                                              onClick={() => editTask(task)}
+                                            >
+                                              <Edit className="h-4 w-4 mr-2" />
+                                              Edit Task
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem 
+                                              onClick={() => markTaskCompleted(task.id)}
+                                              disabled={task.task?.status === 'COMPLETED' || task.is_completed}
+                                            >
+                                              <CheckSquare className="h-4 w-4 mr-2" />
+                                              Mark as Completed
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                              onClick={() => removeFromSchedule(task.id)}
+                                              className="text-red-600"
+                                            >
+                                              <Trash2 className="h-4 w-4 mr-2" />
+                                              Remove from Schedule
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            <div className="py-6 text-center text-muted-foreground">
-                              No tasks scheduled for this time segment
+                            <div className="py-6 text-center text-muted-foreground border-2 border-dashed border-gray-200 rounded">
+                              <Square className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                              <p>No tasks scheduled for this time segment</p>
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setShowTaskManager(true)}
+                                  className="mt-2"
+                                >
+                                  <Square className="h-4 w-4 mr-1" />
+                                  Add Task
+                                </Button>
+                              )}
                             </div>
                           )}
                         </div>

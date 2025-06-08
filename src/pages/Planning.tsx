@@ -19,7 +19,8 @@ import {
   Plus,
   Edit,
   Trash2,
-  Move,
+  RefreshCw,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Navbar from '@/components/Navbar';
@@ -67,8 +68,6 @@ interface ScheduleItem {
   end_time: string;
   is_auto_generated: boolean;
   task?: WorkerTask;
-  task_part?: number;
-  total_parts?: number;
 }
 
 interface WorkerSchedule {
@@ -76,6 +75,7 @@ interface WorkerSchedule {
   tasks: WorkerTask[];
   schedule: ScheduleItem[];
   totalDuration: number;
+  assignedWorkstations: string[];
 }
 
 const Planning = () => {
@@ -115,8 +115,30 @@ const Planning = () => {
 
       // Fetch schedules and tasks for each worker
       const schedulePromises = workerEmployees.map(async (worker) => {
-        // Get worker's tasks
-        const { data: tasks, error: tasksError } = await supabase
+        // Get worker's assigned workstations
+        const { data: workerWorkstations, error: workstationsError } = await supabase
+          .from('employee_workstation_links')
+          .select(`
+            workstations (
+              id,
+              name
+            )
+          `)
+          .eq('employee_id', worker.id);
+
+        if (workstationsError) {
+          console.error('Error fetching worker workstations:', workstationsError);
+        }
+
+        let assignedWorkstationNames = workerWorkstations?.map(link => link.workstations?.name).filter(Boolean) || [];
+        
+        // If no workstations assigned via links, check legacy workstation field
+        if (assignedWorkstationNames.length === 0 && worker.workstation) {
+          assignedWorkstationNames.push(worker.workstation);
+        }
+
+        // Get worker's tasks based on assigned workstations
+        let tasksQuery = supabase
           .from('tasks')
           .select(`
             *,
@@ -125,10 +147,18 @@ const Planning = () => {
               projects (name)
             )
           `)
-          .or(`assignee_id.eq.${worker.id},assignee_id.is.null`)
           .neq('status', 'COMPLETED')
           .order('priority', { ascending: false })
           .order('due_date', { ascending: true });
+
+        // Filter by assignee or workstation
+        if (assignedWorkstationNames.length > 0) {
+          tasksQuery = tasksQuery.or(`assignee_id.eq.${worker.id},workstation.in.(${assignedWorkstationNames.map(w => `"${w}"`).join(',')})`);
+        } else {
+          tasksQuery = tasksQuery.eq('assignee_id', worker.id);
+        }
+
+        const { data: tasks, error: tasksError } = await tasksQuery;
 
         if (tasksError) {
           console.error('Error fetching tasks for worker:', worker.id, tasksError);
@@ -137,14 +167,24 @@ const Planning = () => {
         // Get worker's schedule for the selected date
         const schedule = await planningService.getSchedulesByEmployeeAndDate(worker.id, selectedDate);
 
+        // Enhance schedule items with task data
+        const enhancedSchedule = await Promise.all(schedule.map(async (scheduleItem) => {
+          if (scheduleItem.task_id) {
+            const taskData = tasks?.find(t => t.id === scheduleItem.task_id);
+            return { ...scheduleItem, task: taskData };
+          }
+          return scheduleItem;
+        }));
+
         const workerTasks = tasks || [];
         const totalDuration = workerTasks.reduce((sum, task) => sum + (task.duration || 60), 0);
 
         return {
           employee: worker,
           tasks: workerTasks,
-          schedule: schedule,
-          totalDuration
+          schedule: enhancedSchedule,
+          totalDuration,
+          assignedWorkstations: assignedWorkstationNames
         };
       });
 
@@ -175,30 +215,7 @@ const Planning = () => {
         throw new Error('Worker not found');
       }
 
-      // Get worker's assigned workstations
-      const { data: workerWorkstations, error: workstationsError } = await supabase
-        .from('employee_workstation_links')
-        .select(`
-          workstations (
-            id,
-            name
-          )
-        `)
-        .eq('employee_id', workerId);
-
-      if (workstationsError) {
-        console.error('Error fetching worker workstations:', workstationsError);
-        throw workstationsError;
-      }
-
-      const assignedWorkstationNames = workerWorkstations?.map(link => link.workstations?.name).filter(Boolean) || [];
-      
-      // If no workstations assigned via links, check legacy workstation field
-      if (assignedWorkstationNames.length === 0 && worker.employee.workstation) {
-        assignedWorkstationNames.push(worker.employee.workstation);
-      }
-
-      if (assignedWorkstationNames.length === 0) {
+      if (worker.assignedWorkstations.length === 0) {
         toast({
           title: "No Workstations Assigned",
           description: "This worker has no workstations assigned. Please assign workstations first.",
@@ -217,24 +234,35 @@ const Planning = () => {
         .lte('start_time', `${dateStr}T23:59:59`)
         .eq('is_auto_generated', true);
 
-      // Get available tasks that are assigned to the worker's workstations
+      // Get available tasks that match the worker's workstations
       const availableTasks = worker.tasks.filter(task => {
-        if (task.status !== 'TODO' && task.status !== 'IN_PROGRESS') {
-          return false;
-        }
+        if (task.status === 'COMPLETED') return false;
         
         // Check if task workstation matches any of the worker's assigned workstations
-        return assignedWorkstationNames.includes(task.workstation);
+        return worker.assignedWorkstations.includes(task.workstation) || task.assignee_id === workerId;
       });
 
       if (availableTasks.length === 0) {
         toast({
           title: "No Tasks Available",
-          description: `No tasks available for ${worker.employee.name}'s assigned workstations: ${assignedWorkstationNames.join(', ')}`,
+          description: `No tasks available for ${worker.employee.name}'s workstations: ${worker.assignedWorkstations.join(', ')}`,
           variant: "destructive"
         });
         return;
       }
+
+      // Sort tasks by priority and due date
+      const priorityOrder = { 'Urgent': 0, 'High': 1, 'Medium': 2, 'Low': 3 };
+      availableTasks.sort((a, b) => {
+        const priorityA = priorityOrder[a.priority as keyof typeof priorityOrder] || 4;
+        const priorityB = priorityOrder[b.priority as keyof typeof priorityOrder] || 4;
+        
+        if (priorityA !== priorityB) return priorityA - priorityB;
+        
+        const dateA = new Date(a.due_date);
+        const dateB = new Date(b.due_date);
+        return dateA.getTime() - dateB.getTime();
+      });
 
       // Create continuous schedule that fills the entire day
       const schedulesToInsert = [];
@@ -255,7 +283,6 @@ const Planning = () => {
           const endTime = new Date(periodCurrentTime.getTime() + (timeToAllocate * 60000));
 
           // Determine if this is a partial task
-          const isPartialTask = timeToAllocate < remainingTaskDuration;
           const totalParts = Math.ceil((availableTasks[currentTaskIndex]?.duration || 60) / period.duration);
           
           let taskTitle = currentTask.title;
@@ -303,7 +330,7 @@ const Planning = () => {
       
       toast({
         title: "Schedule Generated",
-        description: `Continuous daily schedule generated for ${worker.employee.name} using tasks from workstations: ${assignedWorkstationNames.join(', ')}`,
+        description: `Generated ${schedulesToInsert.length} schedule items for ${worker.employee.name}`,
       });
     } catch (error: any) {
       console.error('Error generating schedule:', error);
@@ -327,7 +354,7 @@ const Planning = () => {
       
       toast({
         title: "All Schedules Generated",
-        description: "Continuous daily schedules generated for all workers",
+        description: "Generated schedules for all workers",
       });
     } catch (error: any) {
       console.error('Error generating all schedules:', error);
@@ -359,6 +386,42 @@ const Planning = () => {
       toast({
         title: "Error",
         description: "Failed to delete schedule item",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const markTaskCompleted = async (scheduleItem: ScheduleItem) => {
+    try {
+      // If linked to a task, update the task status
+      if (scheduleItem.task_id) {
+        await supabase
+          .from('tasks')
+          .update({ 
+            status: 'COMPLETED',
+            completed_at: new Date().toISOString(),
+            completed_by: currentEmployee?.id
+          })
+          .eq('id', scheduleItem.task_id);
+      }
+
+      // Remove the schedule item
+      await supabase
+        .from('schedules')
+        .delete()
+        .eq('id', scheduleItem.id);
+
+      await fetchWorkersAndSchedules();
+      
+      toast({
+        title: "Task Completed",
+        description: "Task marked as completed and removed from schedule",
+      });
+    } catch (error: any) {
+      console.error('Error completing task:', error);
+      toast({
+        title: "Error",
+        description: "Failed to complete task",
         variant: "destructive"
       });
     }
@@ -450,6 +513,15 @@ const Planning = () => {
                 </PopoverContent>
               </Popover>
               
+              <Button
+                onClick={fetchWorkersAndSchedules}
+                variant="outline"
+                size="sm"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh
+              </Button>
+              
               {isAdmin && (
                 <div className="flex space-x-2">
                   <Button
@@ -457,6 +529,7 @@ const Planning = () => {
                     disabled={generatingSchedule}
                     className="whitespace-nowrap"
                   >
+                    <Zap className="mr-2 h-4 w-4" />
                     {generatingSchedule ? 'Generating...' : 'Generate All Schedules'}
                   </Button>
                 </div>
@@ -484,7 +557,14 @@ const Planning = () => {
                     <SelectContent>
                       {workers.map((worker) => (
                         <SelectItem key={worker.id} value={worker.id}>
-                          {worker.name}
+                          <div className="flex items-center justify-between w-full">
+                            <span>{worker.name}</span>
+                            {worker.workstation && (
+                              <Badge variant="outline" className="ml-2">
+                                {worker.workstation}
+                              </Badge>
+                            )}
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -498,13 +578,14 @@ const Planning = () => {
                       disabled={generatingSchedule}
                       variant="outline"
                     >
-                      Generate Continuous Schedule
+                      <Zap className="mr-2 h-4 w-4" />
+                      Generate Schedule
                     </Button>
                     <Button
                       onClick={() => setShowTaskManager(true)}
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Add Manual Task
+                      Add Task
                     </Button>
                   </div>
                 )}
@@ -512,13 +593,24 @@ const Planning = () => {
 
               {/* Worker Overview */}
               {selectedWorkerSchedule && (
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium">Available Tasks</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{selectedWorkerSchedule.tasks.length}</div>
+                      <p className="text-xs text-muted-foreground">Ready to schedule</p>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Workstations</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{selectedWorkerSchedule.assignedWorkstations.length}</div>
+                      <p className="text-xs text-muted-foreground">{selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None assigned'}</p>
                     </CardContent>
                   </Card>
                   
@@ -528,6 +620,7 @@ const Planning = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{Math.round(selectedWorkerSchedule.totalDuration / 60)}h</div>
+                      <p className="text-xs text-muted-foreground">Of available tasks</p>
                     </CardContent>
                   </Card>
                   
@@ -537,6 +630,7 @@ const Planning = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{Math.round(totalWorkingMinutes / 60)}h</div>
+                      <p className="text-xs text-muted-foreground">Daily capacity</p>
                     </CardContent>
                   </Card>
                   
@@ -546,16 +640,17 @@ const Planning = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{selectedWorkerSchedule.schedule.length}</div>
+                      <p className="text-xs text-muted-foreground">Today's schedule</p>
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Schedule Efficiency</CardTitle>
+                      <CardTitle className="text-sm font-medium">Efficiency</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{calculateScheduleEfficiency(selectedWorkerSchedule.schedule)}%</div>
-                      <div className="text-xs text-muted-foreground">Time utilization</div>
+                      <p className="text-xs text-muted-foreground">Time utilization</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -565,9 +660,16 @@ const Planning = () => {
               {selectedWorkerSchedule && (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Users className="h-5 w-5 mr-2" />
-                      {selectedWorkerSchedule.employee.name} - Continuous Daily Schedule
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <Users className="h-5 w-5 mr-2" />
+                        {selectedWorkerSchedule.employee.name} - Daily Schedule
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {selectedWorkerSchedule.assignedWorkstations.map(ws => (
+                          <Badge key={ws} variant="outline">{ws}</Badge>
+                        ))}
+                      </div>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -591,9 +693,14 @@ const Planning = () => {
                                   {periodSchedules.map((item) => {
                                     const itemDuration = Math.round((new Date(item.end_time).getTime() - new Date(item.start_time).getTime()) / (1000 * 60));
                                     return (
-                                      <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                                      <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
                                         <div className="flex-1">
                                           <h5 className="font-medium">{item.title}</h5>
+                                          {item.task && item.task.phases && (
+                                            <p className="text-sm text-blue-600">
+                                              Project: {item.task.phases.projects?.name}
+                                            </p>
+                                          )}
                                           {item.description && (
                                             <p className="text-sm text-gray-600">{item.description}</p>
                                           )}
@@ -608,13 +715,21 @@ const Planning = () => {
                                               </Badge>
                                             )}
                                             {item.is_auto_generated && (
-                                              <Badge variant="outline">Auto-generated</Badge>
+                                              <Badge variant="outline">Auto</Badge>
                                             )}
                                           </div>
                                         </div>
                                         
                                         {isAdmin && (
                                           <div className="flex items-center space-x-2">
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => markTaskCompleted(item)}
+                                              className="text-green-600 hover:bg-green-50"
+                                            >
+                                              <CheckCircle className="h-4 w-4" />
+                                            </Button>
                                             <Button
                                               size="sm"
                                               variant="outline"
@@ -640,8 +755,20 @@ const Planning = () => {
                                   })}
                                 </div>
                               ) : (
-                                <div className="text-center text-gray-500 py-4">
-                                  No tasks scheduled for this period
+                                <div className="text-center text-gray-500 py-8 border-2 border-dashed border-gray-200 rounded">
+                                  <Clock className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                  <p>No tasks scheduled for this period</p>
+                                  {isAdmin && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setShowTaskManager(true)}
+                                      className="mt-2"
+                                    >
+                                      <Plus className="h-4 w-4 mr-1" />
+                                      Add Task
+                                    </Button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -661,19 +788,20 @@ const Planning = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {selectedWorkerSchedule.tasks.map((task) => (
+                      {selectedWorkerSchedule.tasks.slice(0, 10).map((task) => (
                         <div key={task.id} className="flex items-center justify-between p-3 border rounded">
                           <div className="flex-1">
                             <h5 className="font-medium">{task.title}</h5>
+                            {task.phases && (
+                              <p className="text-sm text-blue-600">Project: {task.phases.projects.name}</p>
+                            )}
                             {task.description && (
                               <p className="text-sm text-gray-600">{task.description}</p>
                             )}
                             <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
                               <span>Duration: {task.duration || 60} min</span>
                               <span>Due: {format(new Date(task.due_date), 'MMM dd')}</span>
-                              {task.phases && (
-                                <span>Project: {task.phases.projects.name}</span>
-                              )}
+                              <span>Workstation: {task.workstation}</span>
                             </div>
                           </div>
                           
@@ -687,6 +815,12 @@ const Planning = () => {
                           </div>
                         </div>
                       ))}
+                      
+                      {selectedWorkerSchedule.tasks.length > 10 && (
+                        <div className="text-center py-4 text-sm text-gray-500">
+                          ... and {selectedWorkerSchedule.tasks.length - 10} more tasks
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
