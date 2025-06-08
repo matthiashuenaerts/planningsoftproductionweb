@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/context/AuthContext';
@@ -10,8 +9,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { workstationService } from '@/services/workstationService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Workstation } from '@/services/workstationService';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { format, parseISO, isToday } from 'date-fns';
+import { 
+  Clock,
+  Play,
+  ExternalLink,
+  FileText,
+  Calendar,
+  User
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 interface ExtendedTask extends Task {
   timeRemaining?: string;
@@ -19,14 +31,55 @@ interface ExtendedTask extends Task {
   assignee_name?: string;
 }
 
+interface ScheduledTask {
+  id: string;
+  employee_id: string;
+  title: string;
+  description: string | null;
+  start_time: string;
+  end_time: string;
+  task_id: string | null;
+  phase_id: string | null;
+  is_auto_generated: boolean;
+  is_completed?: boolean;
+  task?: {
+    id: string;
+    title: string;
+    status: string;
+    priority: string;
+    duration?: number;
+    workstation?: string;
+  };
+  phase?: {
+    id: string;
+    name: string;
+    project_id: string;
+  };
+  project?: {
+    id: string;
+    name: string;
+  };
+}
+
 const PersonalTasks = () => {
   const [todoTasks, setTodoTasks] = useState<ExtendedTask[]>([]);
   const [inProgressTasks, setInProgressTasks] = useState<ExtendedTask[]>([]);
+  const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [userWorkstations, setUserWorkstations] = useState<Workstation[]>([]);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+
+  // Update current time every minute
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Timer for updating countdown
   useEffect(() => {
@@ -105,6 +158,52 @@ const PersonalTasks = () => {
     };
 
     fetchUserWorkstations();
+  }, [currentEmployee]);
+
+  useEffect(() => {
+    const fetchScheduledTasks = async () => {
+      if (!currentEmployee) return;
+
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const startDate = `${today}T00:00:00`;
+        const endDate = `${today}T23:59:59`;
+
+        const { data, error } = await supabase
+          .from('schedules')
+          .select(`
+            *,
+            task:tasks(id, title, status, priority, duration, workstation),
+            phase:phases(id, name, project_id)
+          `)
+          .eq('employee_id', currentEmployee.id)
+          .gte('start_time', startDate)
+          .lte('start_time', endDate)
+          .order('start_time', { ascending: true });
+
+        if (error) throw error;
+
+        // Get project info for tasks that have phases
+        const tasksWithProjects = await Promise.all((data || []).map(async (task) => {
+          if (task.phase && task.phase.project_id) {
+            const { data: projectData } = await supabase
+              .from('projects')
+              .select('id, name')
+              .eq('id', task.phase.project_id)
+              .single();
+            
+            return { ...task, project: projectData };
+          }
+          return task;
+        }));
+
+        setScheduledTasks(tasksWithProjects);
+      } catch (error: any) {
+        console.error('Error fetching scheduled tasks:', error);
+      }
+    };
+
+    fetchScheduledTasks();
   }, [currentEmployee]);
 
   useEffect(() => {
@@ -449,6 +548,75 @@ const PersonalTasks = () => {
     }
   };
 
+  const formatTime = (timeString: string) => {
+    try {
+      return format(parseISO(timeString), 'HH:mm');
+    } catch (error) {
+      return 'Invalid time';
+    }
+  };
+
+  const getCurrentTimePosition = () => {
+    const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setHours(7, 0, 0, 0); // Start at 7 AM
+    const endOfDay = new Date(now);
+    endOfDay.setHours(16, 0, 0, 0); // End at 4 PM
+
+    if (now < startOfDay || now > endOfDay) return null;
+
+    const totalMinutes = (endOfDay.getTime() - startOfDay.getTime()) / (1000 * 60);
+    const currentMinutes = (now.getTime() - startOfDay.getTime()) / (1000 * 60);
+    
+    return (currentMinutes / totalMinutes) * 100;
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority?.toLowerCase()) {
+      case 'urgent':
+        return 'bg-red-100 text-red-800 border-red-300';
+      case 'high':
+        return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'low':
+        return 'bg-green-100 text-green-800 border-green-300';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const handleStartTask = async (taskId: string) => {
+    if (!currentEmployee) return;
+    
+    try {
+      await timeRegistrationService.startTask(currentEmployee.id, taskId);
+      toast({
+        title: "Task Started",
+        description: "Task has been started and time registration created.",
+      });
+      // Refresh data
+      window.location.reload();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to start task: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleProjectDetails = (projectId: string) => {
+    navigate(`/projects/${projectId}`);
+  };
+
+  const handleViewFiles = (projectId: string) => {
+    // This would open a file viewer or navigate to project files
+    navigate(`/projects/${projectId}/files`);
+  };
+
+  const timelinePosition = getCurrentTimePosition();
+
   return (
     <div className="flex min-h-screen">
       {!isMobile && (
@@ -462,7 +630,7 @@ const PersonalTasks = () => {
           <div className="mb-6">
             <h1 className="text-2xl font-bold">Personal Tasks</h1>
             <p className="text-gray-500">
-              Tasks assigned to you at your workstations
+              Your daily schedule and assigned tasks
             </p>
           </div>
           
@@ -470,46 +638,179 @@ const PersonalTasks = () => {
             <div className="flex justify-center p-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
             </div>
-          ) : userWorkstations.length === 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>No Workstations Assigned</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p>You don't have any workstations assigned. Please contact an administrator to assign you to workstations.</p>
-              </CardContent>
-            </Card>
           ) : (
             <div className="space-y-8">
-              {/* In Progress Tasks - Show first */}
-              {inProgressTasks.length > 0 && (
-                <TaskList 
-                  tasks={inProgressTasks} 
-                  title="In Progress Tasks" 
-                  onTaskStatusChange={handleTaskStatusChange}
-                  showCountdownTimer={true}
-                />
-              )}
-              
-              {/* TODO Tasks - Show second */}
-              {todoTasks.length > 0 && (
-                <TaskList 
-                  tasks={todoTasks} 
-                  title="TODO Tasks" 
-                  onTaskStatusChange={handleTaskStatusChange}
-                />
-              )}
-              
-              {/* Show message if no tasks */}
-              {inProgressTasks.length === 0 && todoTasks.length === 0 && (
+              {/* Daily Planning Timeline */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Calendar className="h-5 w-5 mr-2" />
+                    Today's Schedule
+                    <span className="ml-2 text-sm font-normal text-gray-500">
+                      {format(new Date(), 'EEEE, MMMM d, yyyy')}
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {scheduledTasks.length > 0 ? (
+                    <div className="relative">
+                      {/* Timeline */}
+                      <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+                      
+                      {/* Current time indicator */}
+                      {timelinePosition !== null && (
+                        <div 
+                          className="absolute left-0 w-full z-10"
+                          style={{ top: `${timelinePosition}%` }}
+                        >
+                          <div className="flex items-center">
+                            <div className="w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow-lg"></div>
+                            <div className="flex-1 h-0.5 bg-red-500 ml-2"></div>
+                            <span className="ml-2 text-xs text-red-500 font-medium">
+                              {format(currentTime, 'HH:mm')}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {scheduledTasks.map((scheduledTask, index) => (
+                        <div key={scheduledTask.id} className="relative pl-12 pb-6 last:pb-0">
+                          {/* Timeline node */}
+                          <div className="absolute left-4 w-4 h-4 bg-blue-500 rounded-full -translate-x-1/2 border-2 border-white shadow"></div>
+                          
+                          <div className="bg-white border rounded-lg p-4 shadow-sm">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="flex items-center mb-1">
+                                  <Clock className="h-4 w-4 text-gray-500 mr-1" />
+                                  <span className="text-sm font-medium">
+                                    {formatTime(scheduledTask.start_time)} - {formatTime(scheduledTask.end_time)}
+                                  </span>
+                                  {scheduledTask.is_auto_generated && (
+                                    <Badge variant="outline" className="ml-2 text-xs">
+                                      Auto
+                                    </Badge>
+                                  )}
+                                </div>
+                                
+                                <h4 className="font-medium text-lg">{scheduledTask.title}</h4>
+                                
+                                {scheduledTask.project && (
+                                  <p className="text-sm text-blue-600 mb-1">
+                                    Project: {scheduledTask.project.name}
+                                  </p>
+                                )}
+                                
+                                {scheduledTask.task?.workstation && (
+                                  <p className="text-sm text-purple-600 mb-1">
+                                    Workstation: {scheduledTask.task.workstation}
+                                  </p>
+                                )}
+                                
+                                {scheduledTask.description && (
+                                  <p className="text-sm text-gray-600 mt-2">{scheduledTask.description}</p>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center space-x-2 ml-4">
+                                {scheduledTask.task?.priority && (
+                                  <Badge className={cn("text-xs", getPriorityColor(scheduledTask.task.priority))}>
+                                    {scheduledTask.task.priority}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2 mt-3">
+                              {scheduledTask.task_id && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleStartTask(scheduledTask.task_id!)}
+                                  disabled={scheduledTask.task?.status === 'COMPLETED' || scheduledTask.is_completed}
+                                >
+                                  <Play className="h-4 w-4 mr-1" />
+                                  Start
+                                </Button>
+                              )}
+                              
+                              {scheduledTask.project && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleProjectDetails(scheduledTask.project!.id)}
+                                >
+                                  <ExternalLink className="h-4 w-4 mr-1" />
+                                  Project Details
+                                </Button>
+                              )}
+                              
+                              {scheduledTask.project && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleViewFiles(scheduledTask.project!.id)}
+                                >
+                                  <FileText className="h-4 w-4 mr-1" />
+                                  Files
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">No scheduled tasks for today</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Existing Task Lists */}
+              {userWorkstations.length === 0 ? (
                 <Card>
                   <CardHeader>
-                    <CardTitle>No Tasks</CardTitle>
+                    <CardTitle>No Workstations Assigned</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p>There are no pending tasks assigned to your workstations or to you directly.</p>
+                    <p>You don't have any workstations assigned. Please contact an administrator to assign you to workstations.</p>
                   </CardContent>
                 </Card>
+              ) : (
+                <div className="space-y-8">
+                  {/* In Progress Tasks - Show first */}
+                  {inProgressTasks.length > 0 && (
+                    <TaskList 
+                      tasks={inProgressTasks} 
+                      title="In Progress Tasks" 
+                      onTaskStatusChange={handleTaskStatusChange}
+                      showCountdownTimer={true}
+                    />
+                  )}
+                  
+                  {/* TODO Tasks - Show second */}
+                  {todoTasks.length > 0 && (
+                    <TaskList 
+                      tasks={todoTasks} 
+                      title="TODO Tasks" 
+                      onTaskStatusChange={handleTaskStatusChange}
+                    />
+                  )}
+                  
+                  {/* Show message if no tasks */}
+                  {inProgressTasks.length === 0 && todoTasks.length === 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>No Tasks</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p>There are no pending tasks assigned to your workstations or to you directly.</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
               )}
             </div>
           )}
