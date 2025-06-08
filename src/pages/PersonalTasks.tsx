@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
@@ -31,7 +32,7 @@ const PersonalTasks = () => {
             projects (name)
           )
         `)
-        .eq('assignee', currentEmployee.id)
+        .eq('assignee_id', currentEmployee.id)
         .order('due_date', { ascending: true });
 
       if (error) {
@@ -161,7 +162,7 @@ const PersonalTasks = () => {
     completeTaskMutation.mutate(taskId);
   };
 
-  const loading = tasksLoading || startTaskMutation.isLoading || pauseTaskMutation.isLoading || completeTaskMutation.isLoading;
+  const loading = tasksLoading || startTaskMutation.isPending || pauseTaskMutation.isPending || completeTaskMutation.isPending;
 
   const getStatusIcon = (status: string) => {
     switch (status) {

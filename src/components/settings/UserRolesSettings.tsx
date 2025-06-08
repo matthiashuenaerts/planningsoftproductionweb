@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,21 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Trash2, User, Settings, Shield } from 'lucide-react';
-
-interface Employee {
-  id: string;
-  name: string;
-  role: string;
-  email?: string;
-}
-
-interface UserRole {
-  id: string;
-  user_id: string;
-  role: string;
-  employee: Employee;
-}
+import { Trash2, Plus, Settings, Shield } from 'lucide-react';
 
 interface RolePermission {
   id: string;
@@ -53,40 +38,8 @@ const AVAILABLE_ROLES = ['admin', 'manager', 'worker', 'workstation', 'installat
 const UserRolesSettings = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('');
-  const [selectedRole, setSelectedRole] = useState<string>('');
   const [selectedRoleForPermissions, setSelectedRoleForPermissions] = useState<string>('admin');
-
-  // Fetch all employees
-  const { data: employees } = useQuery({
-    queryKey: ['employees'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .order('name');
-      
-      if (error) throw error;
-      return data as Employee[];
-    }
-  });
-
-  // Fetch user roles
-  const { data: userRoles } = useQuery({
-    queryKey: ['userRoles'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select(`
-          *,
-          employee:employees(*)
-        `)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data as UserRole[];
-    }
-  });
+  const [newRoleName, setNewRoleName] = useState<string>('');
 
   // Fetch role permissions
   const { data: rolePermissions } = useQuery({
@@ -102,61 +55,67 @@ const UserRolesSettings = () => {
     }
   });
 
-  // Add user role mutation
-  const addUserRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .insert({ user_id: userId, role })
-        .select()
-        .single();
+  // Get unique roles from permissions
+  const existingRoles = Array.from(new Set(rolePermissions?.map(p => p.role) || []));
+
+  // Add new role mutation
+  const addRoleMutation = useMutation({
+    mutationFn: async (newRole: string) => {
+      // First add default permissions for the new role
+      const defaultPermissions = NAVBAR_ITEMS.map(item => ({
+        role: newRole,
+        navbar_item: item.key,
+        can_access: false // Default to no access
+      }));
+
+      const { error } = await supabase
+        .from('role_permissions')
+        .insert(defaultPermissions);
       
       if (error) throw error;
-      return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['userRoles'] });
-      setSelectedEmployee('');
-      setSelectedRole('');
+      queryClient.invalidateQueries({ queryKey: ['rolePermissions'] });
+      setNewRoleName('');
       toast({
         title: 'Success',
-        description: 'User role added successfully',
+        description: 'New role added successfully',
       });
     },
     onError: (error) => {
       toast({
         title: 'Error',
-        description: 'Failed to add user role',
+        description: 'Failed to add new role',
         variant: 'destructive'
       });
-      console.error('Add user role error:', error);
+      console.error('Add role error:', error);
     }
   });
 
-  // Remove user role mutation
-  const removeUserRoleMutation = useMutation({
-    mutationFn: async (roleId: string) => {
+  // Remove role mutation
+  const removeRoleMutation = useMutation({
+    mutationFn: async (role: string) => {
       const { error } = await supabase
-        .from('user_roles')
+        .from('role_permissions')
         .delete()
-        .eq('id', roleId);
+        .eq('role', role);
       
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['userRoles'] });
+      queryClient.invalidateQueries({ queryKey: ['rolePermissions'] });
       toast({
         title: 'Success',
-        description: 'User role removed successfully',
+        description: 'Role removed successfully',
       });
     },
     onError: (error) => {
       toast({
         title: 'Error',
-        description: 'Failed to remove user role',
+        description: 'Failed to remove role',
         variant: 'destructive'
       });
-      console.error('Remove user role error:', error);
+      console.error('Remove role error:', error);
     }
   });
 
@@ -192,21 +151,40 @@ const UserRolesSettings = () => {
     }
   });
 
-  const handleAddUserRole = () => {
-    if (!selectedEmployee || !selectedRole) {
+  const handleAddRole = () => {
+    if (!newRoleName.trim()) {
       toast({
         title: 'Error',
-        description: 'Please select both an employee and a role',
+        description: 'Please enter a role name',
         variant: 'destructive'
       });
       return;
     }
 
-    addUserRoleMutation.mutate({ userId: selectedEmployee, role: selectedRole });
+    if (existingRoles.includes(newRoleName.toLowerCase())) {
+      toast({
+        title: 'Error',
+        description: 'Role already exists',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    addRoleMutation.mutate(newRoleName.toLowerCase());
   };
 
-  const handleRemoveUserRole = (roleId: string) => {
-    removeUserRoleMutation.mutate(roleId);
+  const handleRemoveRole = (role: string) => {
+    // Prevent removing default roles
+    if (AVAILABLE_ROLES.includes(role)) {
+      toast({
+        title: 'Error',
+        description: 'Cannot remove default system roles',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    removeRoleMutation.mutate(role);
   };
 
   const handlePermissionChange = (navbarItem: string, canAccess: boolean) => {
@@ -224,97 +202,70 @@ const UserRolesSettings = () => {
 
   return (
     <div className="space-y-6">
-      {/* Add User Role */}
+      {/* Add New Role */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <User className="h-5 w-5" />
-            <span>Assign User Roles</span>
+            <Plus className="h-5 w-5" />
+            <span>Add New Role</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="employee-select">Select Employee</Label>
-              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose an employee" />
-                </SelectTrigger>
-                <SelectContent>
-                  {employees?.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
-                      {employee.name} ({employee.role})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="flex items-center space-x-4">
+            <div className="flex-1">
+              <Label htmlFor="new-role">Role Name</Label>
+              <Input
+                id="new-role"
+                value={newRoleName}
+                onChange={(e) => setNewRoleName(e.target.value)}
+                placeholder="Enter new role name"
+              />
             </div>
-
-            <div>
-              <Label htmlFor="role-select">Select Role</Label>
-              <Select value={selectedRole} onValueChange={setSelectedRole}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {AVAILABLE_ROLES.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {role.replace('_', ' ')}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-end">
-              <Button 
-                onClick={handleAddUserRole}
-                disabled={!selectedEmployee || !selectedRole || addUserRoleMutation.isPending}
-                className="w-full"
-              >
-                {addUserRoleMutation.isPending ? 'Adding...' : 'Add Role'}
-              </Button>
-            </div>
+            <Button 
+              onClick={handleAddRole}
+              disabled={addRoleMutation.isPending}
+              className="mt-6"
+            >
+              {addRoleMutation.isPending ? 'Adding...' : 'Add Role'}
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Current User Roles */}
+      {/* Existing Roles */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Shield className="h-5 w-5" />
-            <span>Current User Roles</span>
+            <span>Existing Roles</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {userRoles && userRoles.length > 0 ? (
+          {existingRoles.length > 0 ? (
             <div className="space-y-3">
-              {userRoles.map((userRole) => (
-                <div key={userRole.id} className="flex items-center justify-between p-3 border rounded-lg">
+              {existingRoles.map((role) => (
+                <div key={role} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center space-x-3">
-                    <User className="h-4 w-4 text-gray-500" />
-                    <div>
-                      <p className="font-medium">{userRole.employee.name}</p>
-                      <p className="text-sm text-gray-600">{userRole.employee.email}</p>
-                    </div>
+                    <Shield className="h-4 w-4 text-gray-500" />
                     <Badge variant="outline">
-                      {userRole.role.replace('_', ' ')}
+                      {role.replace('_', ' ')}
                     </Badge>
                   </div>
-                  <Button
-                    onClick={() => handleRemoveUserRole(userRole.id)}
-                    variant="outline"
-                    size="sm"
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {!AVAILABLE_ROLES.includes(role) && (
+                    <Button
+                      onClick={() => handleRemoveRole(role)}
+                      variant="outline"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-gray-600 text-center py-4">No user roles assigned yet.</p>
+            <p className="text-gray-600 text-center py-4">No roles found.</p>
           )}
         </CardContent>
       </Card>
@@ -336,7 +287,7 @@ const UserRolesSettings = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {AVAILABLE_ROLES.map((role) => (
+                  {existingRoles.map((role) => (
                     <SelectItem key={role} value={role}>
                       {role.replace('_', ' ')}
                     </SelectItem>
