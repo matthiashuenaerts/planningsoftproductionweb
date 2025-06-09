@@ -480,3 +480,4 @@ ${data.brokenParts.map(part => `
 ${part.image_path ? `- **Image:** Attached (${part.image_path})` : '- **Image:** No image provided'}
 `).join('')}
 `;
+};
