@@ -24,7 +24,7 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
   onImportComplete
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedTaskId, setSelectedTaskId] = useState<string>('');
+  const [selectedTaskId, setSelectedTaskId] = useState<string>('none');
   const [isImporting, setIsImporting] = useState(false);
   const [previewData, setPreviewData] = useState<string[][]>([]);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -99,7 +99,7 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
       
       await partsListService.importPartsFromCSV(
         projectId,
-        selectedTaskId || null,
+        selectedTaskId === 'none' ? null : selectedTaskId,
         csvContent,
         selectedFile.name,
         currentEmployee?.id
@@ -112,7 +112,7 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
 
       // Reset form
       setSelectedFile(null);
-      setSelectedTaskId('');
+      setSelectedTaskId('none');
       setPreviewData([]);
       setValidationErrors([]);
       
@@ -171,7 +171,7 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
                 <SelectValue placeholder="Select a task (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No specific task</SelectItem>
+                <SelectItem value="none">No specific task</SelectItem>
                 {tasks.map(task => (
                   <SelectItem key={task.id} value={task.id}>
                     {task.title}
