@@ -70,7 +70,7 @@ const ProjectDetails: React.FC = () => {
         const typedTasks = (tasksData || []).map(task => ({
           ...task,
           status: task.status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD',
-          priority: task.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+          priority: task.priority as 'Low' | 'Medium' | 'High' | 'Urgent'
         })) as Task[];
         setTasks(typedTasks);
       }
