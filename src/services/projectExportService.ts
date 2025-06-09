@@ -1,11 +1,8 @@
 
 import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
 import { supabase } from '@/integrations/supabase/client';
 import { Project } from '@/services/dataService';
 import { orderService } from '@/services/orderService';
-import { timeRegistrationService } from '@/services/timeRegistrationService';
-import { brokenPartsService } from '@/services/brokenPartsService';
 
 interface ExportData {
   project: Project;
@@ -18,6 +15,18 @@ interface ExportData {
   employees: any[];
   workstations: any[];
 }
+
+// Custom file download function to replace file-saver
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
 export const exportProjectData = async (project: Project): Promise<void> => {
   try {
@@ -57,7 +66,7 @@ export const exportProjectData = async (project: Project): Promise<void> => {
     // Generate and download ZIP
     const blob = await zip.generateAsync({ type: 'blob' });
     const fileName = `${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_Export_${new Date().toISOString().split('T')[0]}.zip`;
-    saveAs(blob, fileName);
+    downloadBlob(blob, fileName);
     
   } catch (error) {
     console.error('Error exporting project data:', error);
@@ -148,7 +157,7 @@ const collectProjectData = async (projectId: string): Promise<ExportData> => {
     .order('name');
   
   return {
-    project: project || {},
+    project: project as Project,
     phases: phases || [],
     tasks: tasks || [],
     orders: orders || [],
@@ -180,7 +189,7 @@ const generateProjectDocumentation = (data: ExportData): string => {
 ## Project Statistics
 - **Total Phases:** ${data.phases.length}
 - **Total Tasks:** ${totalTasks}
-- **Completed Tasks:** ${completedTasks} (${Math.round((completedTasks/totalTasks) * 100)}%)
+- **Completed Tasks:** ${completedTasks} (${totalTasks > 0 ? Math.round((completedTasks/totalTasks) * 100) : 0}%)
 - **Total Orders:** ${totalOrders}
 - **Total Time Spent:** ${Math.round(totalTimeSpent / 60)} hours
 - **Broken Parts Reported:** ${data.brokenParts.length}
