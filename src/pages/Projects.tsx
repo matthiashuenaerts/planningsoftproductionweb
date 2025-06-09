@@ -39,7 +39,10 @@ const Projects = () => {
       setFilteredProjects(projects);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = projects.filter(project => project.name.toLowerCase().includes(query) || project.client.toLowerCase().includes(query));
+      const filtered = projects.filter(project => 
+        project.name.toLowerCase().includes(query) || 
+        project.client.toLowerCase().includes(query)
+      );
       setFilteredProjects(filtered);
     }
   }, [searchQuery, projects]);
@@ -117,16 +120,23 @@ const Projects = () => {
               <p className="text-muted-foreground mt-1">Manage your projects from start to finish.</p>
             </div>
             
-            {isAdmin && <Button size="sm" onClick={() => setIsNewProjectModalOpen(true)} className="mx-0">
+            {isAdmin && (
+              <Button size="sm" onClick={() => setIsNewProjectModalOpen(true)} className="mx-0">
                 <Plus className="mr-2 h-4 w-4" />
                 New Project
-              </Button>}
+              </Button>
+            )}
           </div>
           
           <div className="mb-8 flex gap-4 flex-col sm:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search projects by name or client..." className="pl-8" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              <Input 
+                placeholder="Search projects by name or client..." 
+                className="pl-8" 
+                value={searchQuery} 
+                onChange={e => setSearchQuery(e.target.value)} 
+              />
             </div>
           </div>
           
@@ -142,16 +152,6 @@ const Projects = () => {
                           <CardDescription>{project.client}</CardDescription>
                         </div>
                         <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => handleExportProject(project, e)}
-                            disabled={exportingProject === project.id}
-                            className="h-8 w-8 p-0"
-                            title="Export project data"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
                           {isAdmin && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
@@ -161,6 +161,16 @@ const Projects = () => {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem 
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    handleExportProject(project, e);
+                                  }}
+                                  disabled={exportingProject === project.id}
+                                >
+                                  <Download className="mr-2 h-4 w-4" />
+                                  {exportingProject === project.id ? 'Exporting...' : 'Export Project'}
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={e => {
                                   e.stopPropagation();
                                   navigate(`/projects/${project.id}/edit`);
@@ -175,10 +185,13 @@ const Projects = () => {
                                   <Package className="mr-2 h-4 w-4" />
                                   Orders
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={e => {
-                                  e.stopPropagation();
-                                  setProjectToDelete(project.id);
-                                }}>
+                                <DropdownMenuItem 
+                                  className="text-red-600 focus:text-red-600" 
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setProjectToDelete(project.id);
+                                  }}
+                                >
                                   <Trash2 className="mr-2 h-4 w-4" />
                                   Delete Project
                                 </DropdownMenuItem>

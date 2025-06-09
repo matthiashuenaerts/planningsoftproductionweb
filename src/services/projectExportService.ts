@@ -1,5 +1,5 @@
-
 import JSZip from 'jszip';
+import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
 import { Project } from '@/services/dataService';
 import { orderService } from '@/services/orderService';
@@ -14,6 +14,7 @@ interface ExportData {
   brokenParts: any[];
   employees: any[];
   workstations: any[];
+  documents: any[];
 }
 
 // Custom file download function to replace file-saver
@@ -52,6 +53,35 @@ export const exportProjectData = async (project: Project): Promise<void> => {
     
     const brokenPartsReport = generateBrokenPartsReport(exportData);
     zip.file('Broken_Parts_Report.md', brokenPartsReport);
+    
+    // Add Excel files
+    const excelFolder = zip.folder('excel_files');
+    
+    // Tasks Excel
+    const tasksWorkbook = generateTasksExcel(exportData);
+    const tasksBuffer = XLSX.write(tasksWorkbook, { type: 'array', bookType: 'xlsx' });
+    excelFolder?.file('Tasks.xlsx', tasksBuffer);
+    
+    // Orders Excel
+    const ordersWorkbook = generateOrdersExcel(exportData);
+    const ordersBuffer = XLSX.write(ordersWorkbook, { type: 'array', bookType: 'xlsx' });
+    excelFolder?.file('Orders.xlsx', ordersBuffer);
+    
+    // Time Registration Excel
+    const timeWorkbook = generateTimeRegistrationExcel(exportData);
+    const timeBuffer = XLSX.write(timeWorkbook, { type: 'array', bookType: 'xlsx' });
+    excelFolder?.file('Time_Registrations.xlsx', timeBuffer);
+    
+    // Project Overview Excel
+    const overviewWorkbook = generateProjectOverviewExcel(exportData);
+    const overviewBuffer = XLSX.write(overviewWorkbook, { type: 'array', bookType: 'xlsx' });
+    excelFolder?.file('Project_Overview.xlsx', overviewBuffer);
+    
+    // Add project documents if any exist
+    if (exportData.documents.length > 0) {
+      const documentsFolder = zip.folder('project_documents');
+      await addProjectDocuments(documentsFolder, exportData.documents);
+    }
     
     // Add raw data as JSON
     const dataFolder = zip.folder('raw_data');
@@ -156,6 +186,24 @@ const collectProjectData = async (projectId: string): Promise<ExportData> => {
     .select('*')
     .order('name');
   
+  // Get project documents from OneDrive config
+  const { data: oneDriveConfig } = await supabase
+    .from('project_onedrive_configs')
+    .select('*')
+    .eq('project_id', projectId)
+    .single();
+  
+  let documents: any[] = [];
+  if (oneDriveConfig) {
+    // For now, we'll create a placeholder for documents
+    // In a real implementation, you would fetch actual files from OneDrive
+    documents = [{
+      name: 'OneDrive Folder',
+      url: oneDriveConfig.folder_url,
+      type: 'folder'
+    }];
+  }
+  
   return {
     project: project as Project,
     phases: phases || [],
@@ -165,8 +213,137 @@ const collectProjectData = async (projectId: string): Promise<ExportData> => {
     timeRegistrations: timeRegistrations || [],
     brokenParts: brokenParts || [],
     employees: employees || [],
-    workstations: workstations || []
+    workstations: workstations || [],
+    documents: documents || []
   };
+};
+
+const generateTasksExcel = (data: ExportData): XLSX.WorkBook => {
+  const workbook = XLSX.utils.book_new();
+  
+  // Tasks summary sheet
+  const summaryData = [
+    ['Total Tasks', data.tasks.length],
+    ['Completed Tasks', data.tasks.filter(t => t.status === 'COMPLETED').length],
+    ['In Progress Tasks', data.tasks.filter(t => t.status === 'IN_PROGRESS').length],
+    ['Todo Tasks', data.tasks.filter(t => t.status === 'TODO').length],
+    ['On Hold Tasks', data.tasks.filter(t => t.status === 'HOLD').length]
+  ];
+  
+  const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+  XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+  
+  // Detailed tasks sheet
+  const tasksData = data.tasks.map(task => ({
+    'Task Title': task.title,
+    'Phase': task.phases?.name || 'N/A',
+    'Status': task.status,
+    'Priority': task.priority,
+    'Due Date': new Date(task.due_date).toLocaleDateString(),
+    'Assignee': task.assignee?.name || 'Unassigned',
+    'Workstation': task.workstation,
+    'Description': task.description || 'No description',
+    'Completed At': task.completed_at ? new Date(task.completed_at).toLocaleString() : '',
+    'Completed By': task.completed_by_employee?.name || '',
+    'Duration (minutes)': task.duration || ''
+  }));
+  
+  const tasksSheet = XLSX.utils.json_to_sheet(tasksData);
+  XLSX.utils.book_append_sheet(workbook, tasksSheet, 'Tasks');
+  
+  return workbook;
+};
+
+const generateOrdersExcel = (data: ExportData): XLSX.WorkBook => {
+  const workbook = XLSX.utils.book_new();
+  
+  // Orders sheet
+  const ordersData = data.orders.map(order => ({
+    'Order ID': order.id,
+    'Supplier': order.supplier,
+    'Order Date': new Date(order.order_date).toLocaleDateString(),
+    'Expected Delivery': new Date(order.expected_delivery).toLocaleDateString(),
+    'Status': order.status
+  }));
+  
+  const ordersSheet = XLSX.utils.json_to_sheet(ordersData);
+  XLSX.utils.book_append_sheet(workbook, ordersSheet, 'Orders');
+  
+  // Order items sheet
+  const itemsData = data.orderItems.map(item => ({
+    'Order ID': item.order_id,
+    'Description': item.description,
+    'Article Code': item.article_code || 'N/A',
+    'Quantity': item.quantity,
+    'Unit Price': item.unit_price || 'N/A',
+    'Total Price': item.total_price || 'N/A'
+  }));
+  
+  const itemsSheet = XLSX.utils.json_to_sheet(itemsData);
+  XLSX.utils.book_append_sheet(workbook, itemsSheet, 'Order Items');
+  
+  return workbook;
+};
+
+const generateTimeRegistrationExcel = (data: ExportData): XLSX.WorkBook => {
+  const workbook = XLSX.utils.book_new();
+  
+  const timeData = data.timeRegistrations.map(reg => ({
+    'Employee': reg.employees?.name || 'Unknown',
+    'Task': reg.tasks?.title || 'Unknown',
+    'Phase': reg.tasks?.phases?.name || 'Unknown',
+    'Start Time': new Date(reg.start_time).toLocaleString(),
+    'End Time': reg.end_time ? new Date(reg.end_time).toLocaleString() : 'Still active',
+    'Duration (hours)': reg.duration_minutes ? Math.round(reg.duration_minutes / 60 * 100) / 100 : 'N/A'
+  }));
+  
+  const timeSheet = XLSX.utils.json_to_sheet(timeData);
+  XLSX.utils.book_append_sheet(workbook, timeSheet, 'Time Registrations');
+  
+  return workbook;
+};
+
+const generateProjectOverviewExcel = (data: ExportData): XLSX.WorkBook => {
+  const workbook = XLSX.utils.book_new();
+  
+  // Project info
+  const projectInfo = [
+    ['Project Name', data.project.name],
+    ['Client', data.project.client],
+    ['Description', data.project.description || 'No description'],
+    ['Start Date', new Date(data.project.start_date).toLocaleDateString()],
+    ['Installation Date', new Date(data.project.installation_date).toLocaleDateString()],
+    ['Status', data.project.status],
+    ['Progress', `${data.project.progress}%`]
+  ];
+  
+  const projectSheet = XLSX.utils.aoa_to_sheet(projectInfo);
+  XLSX.utils.book_append_sheet(workbook, projectSheet, 'Project Info');
+  
+  // Phases
+  const phasesData = data.phases.map(phase => ({
+    'Phase Name': phase.name,
+    'Start Date': new Date(phase.start_date).toLocaleDateString(),
+    'End Date': new Date(phase.end_date).toLocaleDateString(),
+    'Progress': `${phase.progress}%`
+  }));
+  
+  const phasesSheet = XLSX.utils.json_to_sheet(phasesData);
+  XLSX.utils.book_append_sheet(workbook, phasesSheet, 'Phases');
+  
+  return workbook;
+};
+
+const addProjectDocuments = async (documentsFolder: any, documents: any[]) => {
+  // Add document references
+  const documentsList = documents.map(doc => 
+    `${doc.name}: ${doc.url || 'No URL available'}`
+  ).join('\n');
+  
+  documentsFolder?.file('documents_list.txt', documentsList);
+  
+  // Note: In a real implementation, you would download actual files from OneDrive
+  // For now, we're just creating a reference file
 };
 
 const generateProjectDocumentation = (data: ExportData): string => {
@@ -193,6 +370,7 @@ const generateProjectDocumentation = (data: ExportData): string => {
 - **Total Orders:** ${totalOrders}
 - **Total Time Spent:** ${Math.round(totalTimeSpent / 60)} hours
 - **Broken Parts Reported:** ${data.brokenParts.length}
+- **Project Documents:** ${data.documents.length}
 
 ## Phases
 ${data.phases.map(phase => `
@@ -204,7 +382,7 @@ ${data.phases.map(phase => `
 
 ## Export Information
 - **Exported on:** ${new Date().toLocaleString()}
-- **Export includes:** Tasks, Orders, Time Registrations, Broken Parts, and detailed reports
+- **Export includes:** Tasks, Orders, Time Registrations, Broken Parts, Excel files, and detailed reports
 `;
 };
 
@@ -302,4 +480,3 @@ ${data.brokenParts.map(part => `
 ${part.image_path ? `- **Image:** Attached (${part.image_path})` : '- **Image:** No image provided'}
 `).join('')}
 `;
-};
