@@ -157,7 +157,14 @@ export class PartsListService {
       .order('created_at');
 
     if (error) throw error;
-    return data || [];
+    
+    // Cast the color_status to the correct type
+    const typedParts = (data || []).map(part => ({
+      ...part,
+      color_status: part.color_status as 'none' | 'green' | 'orange' | 'red'
+    })) as Part[];
+    
+    return typedParts;
   }
 
   async updatePartColor(partId: string, colorStatus: 'none' | 'green' | 'orange' | 'red'): Promise<void> {

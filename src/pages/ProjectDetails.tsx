@@ -66,7 +66,13 @@ const ProjectDetails: React.FC = () => {
           .order('due_date');
 
         if (tasksError) throw tasksError;
-        setTasks(tasksData || []);
+        // Cast the tasks data to match our Task interface
+        const typedTasks = (tasksData || []).map(task => ({
+          ...task,
+          status: task.status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD',
+          priority: task.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+        })) as Task[];
+        setTasks(typedTasks);
       }
 
     } catch (err: any) {
