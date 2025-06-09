@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -20,6 +20,7 @@ import TaskList from '@/components/TaskList';
 import ProjectFileManager from '@/components/ProjectFileManager';
 import OneDriveIntegration from '@/components/OneDriveIntegration';
 import NewOrderModal from '@/components/NewOrderModal';
+import { PartsListDialog } from '@/components/PartsListDialog';
 import { useAuth } from '@/context/AuthContext';
 
 const ProjectDetails = () => {
@@ -31,6 +32,7 @@ const ProjectDetails = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('tasks');
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
+  const [showPartsListDialog, setShowPartsListDialog] = useState(false);
   const { currentEmployee } = useAuth();
 
   useEffect(() => {
@@ -313,6 +315,12 @@ const ProjectDetails = () => {
                   <Plus className="mr-2 h-4 w-4" /> Add Order
                 </Button>
                 <Button 
+                  variant="outline"
+                  onClick={() => setShowPartsListDialog(true)}
+                >
+                  <List className="mr-2 h-4 w-4" /> Parts List
+                </Button>
+                <Button 
                   variant={activeTab === 'files' ? 'default' : 'outline'}
                   onClick={() => setActiveTab('files')}
                 >
@@ -450,6 +458,20 @@ const ProjectDetails = () => {
         onOpenChange={setShowNewOrderModal}
         projectId={projectId!}
         onSuccess={handleNewOrderSuccess}
+      />
+
+      {/* Parts List Dialog */}
+      <PartsListDialog
+        isOpen={showPartsListDialog}
+        onClose={() => setShowPartsListDialog(false)}
+        projectId={projectId!}
+        tasks={tasks}
+        onImportComplete={() => {
+          toast({
+            title: "Success",
+            description: "Parts list imported successfully",
+          });
+        }}
       />
     </div>
   );
