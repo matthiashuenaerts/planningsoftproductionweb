@@ -14,7 +14,12 @@ export class ProjectService {
       if (error.code === 'PGRST116') return null;
       throw error;
     }
-    return data;
+    
+    // Cast the status to the correct union type
+    return {
+      ...data,
+      status: data.status as "planned" | "in_progress" | "completed" | "on_hold"
+    };
   }
 }
 

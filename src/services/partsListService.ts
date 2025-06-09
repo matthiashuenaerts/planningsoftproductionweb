@@ -115,7 +115,7 @@ export class PartsListService {
       parts.push(part);
     }
 
-    // Insert parts
+    // Insert parts with proper type casting
     if (parts.length > 0) {
       const { error: partsError } = await supabase
         .from('parts')
@@ -157,7 +157,12 @@ export class PartsListService {
       .order('created_at');
 
     if (error) throw error;
-    return data || [];
+    
+    // Cast the data to ensure proper typing
+    return (data || []).map(part => ({
+      ...part,
+      color_status: part.color_status as 'none' | 'green' | 'orange' | 'red'
+    }));
   }
 
   async updatePartColor(partId: string, colorStatus: 'none' | 'green' | 'orange' | 'red'): Promise<void> {
