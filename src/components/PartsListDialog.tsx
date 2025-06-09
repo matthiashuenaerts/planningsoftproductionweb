@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PartsListImporter } from '@/components/PartsListImporter';
 import { PartsListViewer } from '@/components/PartsListViewer';
+import { PartsListManager } from '@/components/PartsListManager';
 
 interface PartsListDialogProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export const PartsListDialog: React.FC<PartsListDialogProps> = ({
 }) => {
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
   const [selectedTaskTitle, setSelectedTaskTitle] = useState<string>('');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleTaskSelect = (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -29,51 +31,43 @@ export const PartsListDialog: React.FC<PartsListDialogProps> = ({
     setSelectedTaskTitle(task?.title || '');
   };
 
+  const handleImportComplete = () => {
+    setRefreshKey(prev => prev + 1);
+    onImportComplete?.();
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Parts Lists</DialogTitle>
+          <DialogTitle>Parts Lists Management</DialogTitle>
         </DialogHeader>
         
-        <Tabs defaultValue="import" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="import">Import Parts List</TabsTrigger>
-            <TabsTrigger value="view" disabled={!selectedTaskId}>View Parts Lists</TabsTrigger>
+        <Tabs defaultValue="manage" className="w-full h-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="manage">Manage Parts Lists</TabsTrigger>
+            <TabsTrigger value="import">Import CSV</TabsTrigger>
+            <TabsTrigger value="view" disabled={!selectedTaskId}>View Task Parts</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="import" className="space-y-4">
+          <TabsContent value="manage" className="space-y-4 h-full overflow-auto">
+            <PartsListManager
+              projectId={projectId}
+              tasks={tasks}
+              onTaskSelect={handleTaskSelect}
+              refreshKey={refreshKey}
+            />
+          </TabsContent>
+          
+          <TabsContent value="import" className="space-y-4 h-full overflow-auto">
             <PartsListImporter
               projectId={projectId}
               tasks={tasks}
-              onImportComplete={() => {
-                onImportComplete?.();
-              }}
+              onImportComplete={handleImportComplete}
             />
-            
-            {tasks.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="font-medium">Select a task to view its parts lists:</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {tasks.map(task => (
-                    <button
-                      key={task.id}
-                      onClick={() => handleTaskSelect(task.id)}
-                      className={`p-2 text-left border rounded ${
-                        selectedTaskId === task.id 
-                          ? 'bg-primary text-primary-foreground' 
-                          : 'bg-background hover:bg-muted'
-                      }`}
-                    >
-                      {task.title}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </TabsContent>
           
-          <TabsContent value="view">
+          <TabsContent value="view" className="h-full overflow-auto">
             {selectedTaskId && (
               <PartsListViewer
                 isOpen={true}
