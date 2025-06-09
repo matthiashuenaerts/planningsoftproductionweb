@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock } from 'lucide-react';
+import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project } from '@/services/dataService';
 import { useAuth } from '@/context/AuthContext';
 import NewProjectModal from '@/components/NewProjectModal';
+import { exportProjectData } from '@/services/projectExportService';
+
 const Projects = () => {
   const navigate = useNavigate();
   const {
@@ -25,6 +27,7 @@ const Projects = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [exportingProject, setExportingProject] = useState<string | null>(null);
   const isAdmin = currentEmployee?.role === 'admin';
   useEffect(() => {
     loadProjects();
@@ -54,6 +57,26 @@ const Projects = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+  const handleExportProject = async (project: Project, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExportingProject(project.id);
+    
+    try {
+      await exportProjectData(project);
+      toast({
+        title: "Success",
+        description: `Project "${project.name}" has been exported successfully`
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to export project: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setExportingProject(null);
     }
   };
   const handleDeleteProject = async () => {
@@ -118,37 +141,51 @@ const Projects = () => {
                           <CardTitle className="text-xl mb-1">{project.name}</CardTitle>
                           <CardDescription>{project.client}</CardDescription>
                         </div>
-                        {isAdmin && <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                <span className="sr-only">Open menu</span>
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={e => {
-                        e.stopPropagation();
-                        navigate(`/projects/${project.id}/edit`);
-                      }}>
-                                <Settings className="mr-2 h-4 w-4" />
-                                Edit Project
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={e => {
-                        e.stopPropagation();
-                        navigate(`/projects/${project.id}/orders`);
-                      }}>
-                                <Package className="mr-2 h-4 w-4" />
-                                Orders
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={e => {
-                        e.stopPropagation();
-                        setProjectToDelete(project.id);
-                      }}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete Project
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>}
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => handleExportProject(project, e)}
+                            disabled={exportingProject === project.id}
+                            className="h-8 w-8 p-0"
+                            title="Export project data"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          {isAdmin && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={e => {
+                                  e.stopPropagation();
+                                  navigate(`/projects/${project.id}/edit`);
+                                }}>
+                                  <Settings className="mr-2 h-4 w-4" />
+                                  Edit Project
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={e => {
+                                  e.stopPropagation();
+                                  navigate(`/projects/${project.id}/orders`);
+                                }}>
+                                  <Package className="mr-2 h-4 w-4" />
+                                  Orders
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={e => {
+                                  e.stopPropagation();
+                                  setProjectToDelete(project.id);
+                                }}>
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete Project
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent>
