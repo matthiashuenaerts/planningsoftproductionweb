@@ -1,35 +1,17 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar } from "@/components/ui/calendar"
-import { CalendarIcon, ArrowLeft, PlusCircle, Truck, Users, ListChecks } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+import { ArrowLeft, PlusCircle, ListChecks } from "lucide-react";
 import { format } from 'date-fns';
 import { cn } from "@/lib/utils"
 import { Project, Phase, Task } from '@/services/dataService';
-import { projectService } from '@/services/projectService';
-import { phaseService } from '@/services/phaseService';
 import { taskService } from '@/services/dataService';
-import { ProjectTeamAssignment } from '@/services/projectTeamAssignmentService';
-import { projectTeamAssignmentService } from '@/services/projectTeamAssignmentService';
-import { ProjectTruckAssignment } from '@/services/projectTruckAssignmentService';
-import { projectTruckAssignmentService } from '@/services/projectTruckAssignmentService';
-import { Order } from '@/services/orderService';
-import { orderService } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
-import { ProjectTeamAssignmentsPopup } from '@/components/ProjectTeamAssignmentsPopup';
-import { ProjectTruckAssignmentPopup } from '@/components/ProjectTruckAssignmentPopup';
-import { OrderPopup } from '@/components/OrderPopup';
-import { TaskPopup } from '@/components/TaskPopup';
 import { PartsListImporter } from '@/components/PartsListImporter';
+import { supabase } from '@/integrations/supabase/client';
 
 const ProjectDetails: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -39,20 +21,9 @@ const ProjectDetails: React.FC = () => {
   const [project, setProject] = useState<Project | null>(null);
   const [phases, setPhases] = useState<Phase[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [teamAssignments, setTeamAssignments] = useState<ProjectTeamAssignment[]>([]);
-  const [truckAssignments, setTruckAssignments] = useState<ProjectTruckAssignment[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [showTeamPopup, setShowTeamPopup] = useState(false);
-  const [showTruckPopup, setShowTruckPopup] = useState(false);
-  const [showOrderPopup, setShowOrderPopup] = useState(false);
-  const [showTaskPopup, setShowTaskPopup] = useState(false);
-  const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
-
-  const [date, setDate] = React.useState<Date | undefined>(new Date())
 
   const loadProjectData = async () => {
     if (!projectId) {
@@ -66,32 +37,37 @@ const ProjectDetails: React.FC = () => {
       setError(null);
 
       // Load project details
-      const projectData = await projectService.getById(projectId);
-      if (projectData) {
-        setProject(projectData);
-      } else {
-        setError('Project not found.');
-      }
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+
+      if (projectError) throw projectError;
+      setProject(projectData as Project);
 
       // Load phases for the project
-      const phasesData = await phaseService.getByProject(projectId);
-      setPhases(phasesData);
+      const { data: phasesData, error: phasesError } = await supabase
+        .from('phases')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('start_date');
 
-      // Load tasks for the project
-      const tasksData = await taskService.getByProject(projectId);
-      setTasks(tasksData);
+      if (phasesError) throw phasesError;
+      setPhases(phasesData || []);
 
-      // Load team assignments for the project
-      const teamAssignmentsData = await projectTeamAssignmentService.getByProject(projectId);
-      setTeamAssignments(teamAssignmentsData);
+      // Load tasks for the project phases
+      if (phasesData && phasesData.length > 0) {
+        const phaseIds = phasesData.map(p => p.id);
+        const { data: tasksData, error: tasksError } = await supabase
+          .from('tasks')
+          .select('*')
+          .in('phase_id', phaseIds)
+          .order('due_date');
 
-      // Load truck assignments for the project
-      const truckAssignmentsData = await projectTruckAssignmentService.getByProject(projectId);
-      setTruckAssignments(truckAssignmentsData);
-
-      // Load orders for the project
-      const ordersData = await orderService.getByProject(projectId);
-      setOrders(ordersData);
+        if (tasksError) throw tasksError;
+        setTasks(tasksData || []);
+      }
 
     } catch (err: any) {
       console.error('Error loading project details:', err);
@@ -171,10 +147,6 @@ const ProjectDetails: React.FC = () => {
             <Card>
               <CardHeader className="flex justify-between">
                 <CardTitle>Phases</CardTitle>
-                <Button size="sm" onClick={() => setShowTaskPopup(true)}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Task
-                </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 {phases.length > 0 ? (
@@ -188,13 +160,6 @@ const ProjectDetails: React.FC = () => {
                           <p className="text-xs">Start Date: {format(new Date(phase.start_date), 'PPP')}</p>
                           <p className="text-xs">End Date: {format(new Date(phase.end_date), 'PPP')}</p>
                           <Badge variant="outline">Progress: {phase.progress}%</Badge>
-                          <Button size="sm" variant="secondary" onClick={() => {
-                            setShowTaskPopup(true);
-                            setSelectedPhaseId(phase.id);
-                          }}>
-                            <ListChecks className="mr-2 h-4 w-4" />
-                            Add Task
-                          </Button>
                         </CardContent>
                       </Card>
                     ))}
@@ -235,135 +200,15 @@ const ProjectDetails: React.FC = () => {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Project Team */}
-            <Card>
-              <CardHeader className="flex justify-between">
-                <CardTitle>Project Team</CardTitle>
-                <Button size="sm" onClick={() => setShowTeamPopup(true)}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Assign Team
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {teamAssignments.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-4">
-                    {teamAssignments.map((assignment) => (
-                      <Card key={assignment.id} className="shadow-sm">
-                        <CardHeader>
-                          <CardTitle className="text-sm font-medium">{assignment.team}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-1">
-                          <p className="text-xs">Start Date: {format(new Date(assignment.start_date), 'PPP')}</p>
-                          <p className="text-xs">Duration: {assignment.duration} days</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-gray-500">No team members assigned to this project.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Truck Assignment */}
-            <Card>
-              <CardHeader className="flex justify-between">
-                <CardTitle>Truck Assignment</CardTitle>
-                <Button size="sm" onClick={() => setShowTruckPopup(true)}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Assign Truck
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {truckAssignments.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-4">
-                    {truckAssignments.map((assignment) => (
-                      <Card key={assignment.id} className="shadow-sm">
-                        <CardHeader>
-                          <CardTitle className="text-sm font-medium">Truck {assignment.truck_id}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-1">
-                          <p className="text-xs">Loading Date: {format(new Date(assignment.loading_date), 'PPP')}</p>
-                          <p className="text-xs">Installation Date: {format(new Date(assignment.installation_date), 'PPP')}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-gray-500">No trucks assigned to this project.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Orders */}
-            <Card>
-              <CardHeader className="flex justify-between">
-                <CardTitle>Orders</CardTitle>
-                <Button size="sm" onClick={() => setShowOrderPopup(true)}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Add Order
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {orders.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-4">
-                    {orders.map((order) => (
-                      <Card key={order.id} className="shadow-sm">
-                        <CardHeader>
-                          <CardTitle className="text-sm font-medium">Order {format(new Date(order.order_date), 'PPP')}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-1">
-                          <p className="text-xs">Supplier: {order.supplier}</p>
-                          <p className="text-xs">Expected Delivery: {format(new Date(order.expected_delivery), 'PPP')}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-gray-500">No orders placed for this project.</p>
-                )}
-              </CardContent>
-            </Card>
-            
             {/* Parts List Import */}
             <PartsListImporter
-              projectId={projectId}
+              projectId={projectId!}
               tasks={tasks}
               onImportComplete={loadProjectData}
             />
           </div>
         </div>
       )}
-
-      {/* Popups */}
-      <ProjectTeamAssignmentsPopup
-        isOpen={showTeamPopup}
-        onClose={() => setShowTeamPopup(false)}
-        projectId={projectId}
-        onTeamAssigned={loadProjectData}
-      />
-
-      <ProjectTruckAssignmentPopup
-        isOpen={showTruckPopup}
-        onClose={() => setShowTruckPopup(false)}
-        projectId={projectId}
-        onTruckAssigned={loadProjectData}
-      />
-
-      <OrderPopup
-        isOpen={showOrderPopup}
-        onClose={() => setShowOrderPopup(false)}
-        projectId={projectId}
-        onOrderCreated={loadProjectData}
-      />
-
-      <TaskPopup
-        isOpen={showTaskPopup}
-        onClose={() => setShowTaskPopup(false)}
-        projectId={projectId}
-        phaseId={selectedPhaseId}
-        onTaskCreated={loadProjectData}
-      />
     </div>
   );
 };
