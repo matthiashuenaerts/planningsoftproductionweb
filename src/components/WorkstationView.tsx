@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
@@ -16,7 +15,6 @@ import { useAuth } from '@/context/AuthContext';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package } from 'lucide-react';
 import ProjectFilesPopup from './ProjectFilesPopup';
-import { PartsListViewer } from './PartsListViewer';
 import { format, differenceInDays, isAfter, isBefore } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
@@ -717,24 +715,20 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
       </div>
 
       {/* Project Files Popup */}
-      {showProjectFiles && (
-        <ProjectFilesPopup
-          isOpen={showProjectFiles}
-          onClose={() => setShowProjectFiles(false)}
-          projectId={selectedProjectId}
-          projectName={selectedProjectName}
-        />
-      )}
+      <ProjectFilesPopup
+        isOpen={showProjectFiles}
+        onClose={() => setShowProjectFiles(false)}
+        projectId={selectedProjectId}
+        projectName={selectedProjectName}
+      />
 
       {/* Parts List Viewer */}
-      {showPartsListViewer && selectedTaskForParts && (
-        <PartsListViewer
-          isOpen={showPartsListViewer}
-          onClose={() => setShowPartsListViewer(false)}
-          taskId={selectedTaskForParts.id}
-          taskTitle={selectedTaskForParts.title}
-        />
-      )}
+      <PartsListViewer
+        isOpen={showPartsListViewer}
+        onClose={() => setShowPartsListViewer(false)}
+        taskId={selectedTaskForParts?.id || ''}
+        taskTitle={selectedTaskForParts?.title || ''}
+      />
     </div>
   );
 };
