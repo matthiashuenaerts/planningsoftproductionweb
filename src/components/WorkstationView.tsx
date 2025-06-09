@@ -715,20 +715,24 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
       </div>
 
       {/* Project Files Popup */}
-      <ProjectFilesPopup
-        isOpen={showProjectFiles}
-        onClose={() => setShowProjectFiles(false)}
-        projectId={selectedProjectId}
-        projectName={selectedProjectName}
-      />
+      {showProjectFiles && (
+        <ProjectFilesPopup
+          isOpen={showProjectFiles}
+          onClose={() => setShowProjectFiles(false)}
+          projectId={selectedProjectId}
+          projectName={selectedProjectName}
+        />
+      )}
 
       {/* Parts List Viewer */}
-      <PartsListViewer
-        isOpen={showPartsListViewer}
-        onClose={() => setShowPartsListViewer(false)}
-        taskId={selectedTaskForParts?.id || ''}
-        taskTitle={selectedTaskForParts?.title || ''}
-      />
+      {showPartsListViewer && selectedTaskForParts && (
+        <PartsListViewer
+          isOpen={showPartsListViewer}
+          onClose={() => setShowPartsListViewer(false)}
+          taskId={selectedTaskForParts.id}
+          taskTitle={selectedTaskForParts.title}
+        />
+      )}
     </div>
   );
 };

@@ -97,7 +97,7 @@ export class PartsListService {
       const values = line.split('\t');
       const part: any = {
         parts_list_id: partsList.id,
-        color_status: 'none'
+        color_status: 'none' as const
       };
 
       headers.forEach((header, index) => {

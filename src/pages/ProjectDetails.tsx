@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from "@/components/ui/calendar"
-import { CalendarIcon, ArrowLeft, PlusCircle, Truck, Users, ListChecks } from "lucide-react"
+import { CalendarIcon, ArrowLeft, PlusCircle, Truck, Users, ListChecks, Package } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -18,18 +18,26 @@ import { Project, Phase, Task } from '@/services/dataService';
 import { projectService } from '@/services/projectService';
 import { phaseService } from '@/services/phaseService';
 import { taskService } from '@/services/dataService';
-import { ProjectTeamAssignment } from '@/services/projectTeamAssignmentService';
-import { projectTeamAssignmentService } from '@/services/projectTeamAssignmentService';
-import { ProjectTruckAssignment } from '@/services/projectTruckAssignmentService';
-import { projectTruckAssignmentService } from '@/services/projectTruckAssignmentService';
-import { Order } from '@/services/orderService';
+import { ProjectTeamAssignment, projectTeamAssignmentService } from '@/services/projectTeamAssignmentService';
+import { ProjectTruckAssignment, projectTruckAssignmentService } from '@/services/projectTruckAssignmentService';
 import { orderService } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
 import { ProjectTeamAssignmentsPopup } from '@/components/ProjectTeamAssignmentsPopup';
 import { ProjectTruckAssignmentPopup } from '@/components/ProjectTruckAssignmentPopup';
 import { OrderPopup } from '@/components/OrderPopup';
 import { TaskPopup } from '@/components/TaskPopup';
-import { PartsListImporter } from '@/components/PartsListImporter';
+import { PartsListDialog } from '@/components/PartsListDialog';
+
+interface Order {
+  id: string;
+  project_id: string;
+  supplier: string;
+  order_date: string;
+  expected_delivery: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
 
 const ProjectDetails: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -50,6 +58,7 @@ const ProjectDetails: React.FC = () => {
   const [showTruckPopup, setShowTruckPopup] = useState(false);
   const [showOrderPopup, setShowOrderPopup] = useState(false);
   const [showTaskPopup, setShowTaskPopup] = useState(false);
+  const [showPartsListDialog, setShowPartsListDialog] = useState(false);
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
 
   const [date, setDate] = React.useState<Date | undefined>(new Date())
@@ -77,9 +86,10 @@ const ProjectDetails: React.FC = () => {
       const phasesData = await phaseService.getByProject(projectId);
       setPhases(phasesData);
 
-      // Load tasks for the project
-      const tasksData = await taskService.getByProject(projectId);
-      setTasks(tasksData);
+      // Load tasks for the project - use existing method from dataService
+      const tasksData = await taskService.getAll();
+      const projectTasks = tasksData.filter(task => task.phase_id && phasesData.some(phase => phase.id === task.phase_id));
+      setTasks(projectTasks as Task[]);
 
       // Load team assignments for the project
       const teamAssignmentsData = await projectTeamAssignmentService.getByProject(projectId);
@@ -91,7 +101,7 @@ const ProjectDetails: React.FC = () => {
 
       // Load orders for the project
       const ordersData = await orderService.getByProject(projectId);
-      setOrders(ordersData);
+      setOrders(ordersData as Order[]);
 
     } catch (err: any) {
       console.error('Error loading project details:', err);
@@ -325,12 +335,22 @@ const ProjectDetails: React.FC = () => {
               </CardContent>
             </Card>
             
-            {/* Parts List Import */}
-            <PartsListImporter
-              projectId={projectId}
-              tasks={tasks}
-              onImportComplete={loadProjectData}
-            />
+            {/* Files and Parts Lists Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Files & Parts Lists</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => setShowPartsListDialog(true)}
+                >
+                  <Package className="mr-2 h-4 w-4" />
+                  Manage Parts Lists
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </div>
       )}
@@ -339,30 +359,38 @@ const ProjectDetails: React.FC = () => {
       <ProjectTeamAssignmentsPopup
         isOpen={showTeamPopup}
         onClose={() => setShowTeamPopup(false)}
-        projectId={projectId}
+        projectId={projectId!}
         onTeamAssigned={loadProjectData}
       />
 
       <ProjectTruckAssignmentPopup
         isOpen={showTruckPopup}
         onClose={() => setShowTruckPopup(false)}
-        projectId={projectId}
+        projectId={projectId!}
         onTruckAssigned={loadProjectData}
       />
 
       <OrderPopup
         isOpen={showOrderPopup}
         onClose={() => setShowOrderPopup(false)}
-        projectId={projectId}
+        projectId={projectId!}
         onOrderCreated={loadProjectData}
       />
 
       <TaskPopup
         isOpen={showTaskPopup}
         onClose={() => setShowTaskPopup(false)}
-        projectId={projectId}
+        projectId={projectId!}
         phaseId={selectedPhaseId}
         onTaskCreated={loadProjectData}
+      />
+
+      <PartsListDialog
+        isOpen={showPartsListDialog}
+        onClose={() => setShowPartsListDialog(false)}
+        projectId={projectId!}
+        tasks={tasks}
+        onImportComplete={loadProjectData}
       />
     </div>
   );
