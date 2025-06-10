@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
@@ -17,6 +16,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package } from 'lucide-react';
 import ProjectFilesPopup from './ProjectFilesPopup';
 import { PartsListViewer } from './PartsListViewer';
+import { PartsListDialog } from './PartsListDialog';
 import { format, differenceInDays, isAfter, isBefore } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
@@ -45,6 +45,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const [selectedProjectName, setSelectedProjectName] = useState<string>('');
   const [showPartsListViewer, setShowPartsListViewer] = useState(false);
   const [selectedTaskForParts, setSelectedTaskForParts] = useState<ExtendedTask | null>(null);
+  const [showPartsListDialog, setShowPartsListDialog] = useState(false);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const queryClient = useQueryClient();
@@ -517,6 +518,20 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     setShowPartsListViewer(true);
   };
 
+  const handleShowProjectParts = (task: ExtendedTask) => {
+    if (task.project_id) {
+      setSelectedProjectId(task.project_id);
+      setSelectedProjectName(task.project_name || 'Unknown Project');
+      setShowPartsListDialog(true);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Project information not available for this task',
+        variant: 'destructive'
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -604,11 +619,31 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                             variant="outline"
                             size="sm"
                             onClick={() => handleShowPartsList(task)}
-                            title="View Parts List"
+                            title="View Task Parts List"
+                          >
+                            <Package className="h-4 w-4" />
+                            Task Parts
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleShowProjectParts(task)}
+                            title="View Project Parts List"
                           >
                             <Package className="h-4 w-4" />
                             Parts
                           </Button>
+                          {task.project_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGoToFiles(task)}
+                              title="View Project Files"
+                            >
+                              <FileText className="h-4 w-4" />
+                              Files
+                            </Button>
+                          )}
                           {task.project_id && (
                             <Button
                               variant="outline"
@@ -681,11 +716,31 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                             variant="outline"
                             size="sm"
                             onClick={() => handleShowPartsList(task)}
-                            title="View Parts List"
+                            title="View Task Parts List"
+                          >
+                            <Package className="h-4 w-4" />
+                            Task Parts
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleShowProjectParts(task)}
+                            title="View Project Parts List"
                           >
                             <Package className="h-4 w-4" />
                             Parts
                           </Button>
+                          {task.project_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGoToFiles(task)}
+                              title="View Project Files"
+                            >
+                              <FileText className="h-4 w-4" />
+                              Files
+                            </Button>
+                          )}
                           {task.project_id && (
                             <Button
                               variant="outline"
@@ -726,13 +781,22 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         />
       )}
 
-      {/* Parts List Viewer */}
+      {/* Task Parts List Viewer */}
       {showPartsListViewer && selectedTaskForParts && (
         <PartsListViewer
           isOpen={showPartsListViewer}
           onClose={() => setShowPartsListViewer(false)}
           taskId={selectedTaskForParts.id}
           taskTitle={selectedTaskForParts.title}
+        />
+      )}
+
+      {/* Project Parts List Dialog */}
+      {showPartsListDialog && (
+        <PartsListDialog
+          isOpen={showPartsListDialog}
+          onClose={() => setShowPartsListDialog(false)}
+          projectId={selectedProjectId}
         />
       )}
     </div>

@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -14,17 +13,14 @@ import { useAuth } from '@/context/AuthContext';
 
 interface PartsListImporterProps {
   projectId: string;
-  tasks: any[];
   onImportComplete?: () => void;
 }
 
 export const PartsListImporter: React.FC<PartsListImporterProps> = ({
   projectId,
-  tasks,
   onImportComplete
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedTaskId, setSelectedTaskId] = useState<string>('none');
   const [isImporting, setIsImporting] = useState(false);
   const [previewData, setPreviewData] = useState<string[][]>([]);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -55,8 +51,9 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
   const previewCSV = async (file: File) => {
     try {
       const text = await file.text();
+      // Use semicolon as delimiter
       const lines = text.split('\n').slice(0, 6); // First 6 lines for preview
-      const rows = lines.map(line => line.split('\t').map(cell => cell.trim()));
+      const rows = lines.map(line => line.split(';').map(cell => cell.trim()));
       
       setPreviewData(rows);
       
@@ -97,9 +94,10 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
     try {
       const csvContent = await selectedFile.text();
       
+      // Import as project-wide parts list (no specific task)
       await partsListService.importPartsFromCSV(
         projectId,
-        selectedTaskId === 'none' ? null : selectedTaskId,
+        null, // No specific task - project-wide
         csvContent,
         selectedFile.name,
         currentEmployee?.id
@@ -112,7 +110,6 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
 
       // Reset form
       setSelectedFile(null);
-      setSelectedTaskId('none');
       setPreviewData([]);
       setValidationErrors([]);
       
@@ -146,7 +143,7 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Import Parts List from CSV
+            Import Parts List from CSV (Project-wide)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -160,25 +157,8 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
               disabled={isImporting}
             />
             <p className="text-sm text-muted-foreground">
-              Maximum file size: 5MB. Tab-separated values preferred.
+              Maximum file size: 5MB. Semicolon-separated values (;) required.
             </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="task-select">Associate with Task (Optional)</Label>
-            <Select value={selectedTaskId} onValueChange={setSelectedTaskId} disabled={isImporting}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a task (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No specific task</SelectItem>
-                {tasks.map(task => (
-                  <SelectItem key={task.id} value={task.id}>
-                    {task.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           {validationErrors.length > 0 && (
@@ -269,7 +249,7 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
         <CardContent>
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              Your CSV should include these headers (tab-separated):
+              Your CSV should include these headers (semicolon-separated):
             </p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-1 text-xs">
               {expectedHeaders.map(header => (
@@ -283,7 +263,7 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
             </p>
           </div>
         </CardContent>
-      </Card>
+      )}
     </div>
   );
 };

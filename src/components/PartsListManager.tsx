@@ -2,24 +2,19 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { partsListService, PartsList } from '@/services/partsListService';
 import { Loader2, Package, FileText, Trash2, Eye } from 'lucide-react';
-import { PartsListViewer } from '@/components/PartsListViewer';
+import { ProjectPartsViewer } from '@/components/ProjectPartsViewer';
 
 interface PartsListManagerProps {
   projectId: string;
-  tasks: any[];
-  onTaskSelect: (taskId: string) => void;
   refreshKey: number;
 }
 
 export const PartsListManager: React.FC<PartsListManagerProps> = ({
   projectId,
-  tasks,
-  onTaskSelect,
   refreshKey
 }) => {
   const [partsLists, setPartsLists] = useState<PartsList[]>([]);
@@ -70,22 +65,8 @@ export const PartsListManager: React.FC<PartsListManagerProps> = ({
   };
 
   const handleView = (partsList: PartsList) => {
-    if (partsList.task_id) {
-      setSelectedPartsList(partsList);
-      setViewerOpen(true);
-    } else {
-      toast({
-        title: 'No Task Associated',
-        description: 'This parts list is not associated with a specific task',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const getTaskTitle = (taskId: string | null) => {
-    if (!taskId) return 'General Project';
-    const task = tasks.find(t => t.id === taskId);
-    return task?.title || 'Unknown Task';
+    setSelectedPartsList(partsList);
+    setViewerOpen(true);
   };
 
   const formatDate = (dateString: string) => {
@@ -127,7 +108,6 @@ export const PartsListManager: React.FC<PartsListManagerProps> = ({
               <TableHeader>
                 <TableRow>
                   <TableHead>File Name</TableHead>
-                  <TableHead>Associated Task</TableHead>
                   <TableHead>Imported</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -141,11 +121,6 @@ export const PartsListManager: React.FC<PartsListManagerProps> = ({
                         {partsList.file_name}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant={partsList.task_id ? "default" : "secondary"}>
-                        {getTaskTitle(partsList.task_id)}
-                      </Badge>
-                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {formatDate(partsList.imported_at)}
                     </TableCell>
@@ -155,9 +130,9 @@ export const PartsListManager: React.FC<PartsListManagerProps> = ({
                           variant="outline"
                           size="sm"
                           onClick={() => handleView(partsList)}
-                          disabled={!partsList.task_id}
                         >
                           <Eye className="h-4 w-4" />
+                          View
                         </Button>
                         <Button
                           variant="outline"
@@ -176,50 +151,16 @@ export const PartsListManager: React.FC<PartsListManagerProps> = ({
         </CardContent>
       </Card>
 
-      {/* Task Selection for Viewing */}
-      {partsLists.some(pl => pl.task_id) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>View Parts by Task</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-              {tasks.map(task => {
-                const taskPartsLists = partsLists.filter(pl => pl.task_id === task.id);
-                if (taskPartsLists.length === 0) return null;
-                
-                return (
-                  <Button
-                    key={task.id}
-                    variant="outline"
-                    onClick={() => onTaskSelect(task.id)}
-                    className="justify-between h-auto p-4"
-                  >
-                    <div className="text-left">
-                      <div className="font-medium">{task.title}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {taskPartsLists.length} parts list{taskPartsLists.length !== 1 ? 's' : ''}
-                      </div>
-                    </div>
-                    <Badge>{taskPartsLists.length}</Badge>
-                  </Button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Parts List Viewer Modal */}
       {selectedPartsList && (
-        <PartsListViewer
+        <ProjectPartsViewer
           isOpen={viewerOpen}
           onClose={() => {
             setViewerOpen(false);
             setSelectedPartsList(null);
           }}
-          taskId={selectedPartsList.task_id!}
-          taskTitle={getTaskTitle(selectedPartsList.task_id)}
+          partsListId={selectedPartsList.id}
+          fileName={selectedPartsList.file_name}
         />
       )}
     </>

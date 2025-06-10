@@ -61,9 +61,9 @@ export class PartsListService {
 
     if (partsListError) throw partsListError;
 
-    // Parse CSV content
+    // Parse CSV content using semicolon delimiter
     const lines = csvContent.split('\n');
-    const headers = lines[0].split('\t').map(h => h.trim());
+    const headers = lines[0].split(';').map(h => h.trim());
     
     // Expected headers mapping
     const headerMap = {
@@ -73,7 +73,8 @@ export class PartsListService {
       'Lengte': 'lengte',
       'Breedte': 'breedte',
       'Aantal': 'aantal',
-      'CNC  pos': 'cnc_pos',
+      'CNC pos': 'cnc_pos',
+      'CNC  pos': 'cnc_pos', // Handle extra space variation
       'Wand Naam': 'wand_naam',
       'Afplak Boven': 'afplak_boven',
       'Afplak Onder': 'afplak_onder',
@@ -94,7 +95,7 @@ export class PartsListService {
       const line = lines[i].trim();
       if (!line) continue;
 
-      const values = line.split('\t');
+      const values = line.split(';');
       const part: any = {
         parts_list_id: partsList.id,
         color_status: 'none' as const
