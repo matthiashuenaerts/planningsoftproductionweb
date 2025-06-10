@@ -7,10 +7,12 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { supabase } from '@/integrations/supabase/client';
-import { AlertCircle, File, FileText, Image, FileImage, FileVideo, Video, FileAudio, AudioLines } from 'lucide-react';
+import { AlertCircle, File, FileText, Image, FileImage, FileVideo, Video, FileAudio, AudioLines, Edit } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import PDFEditor from '@/components/PDFEditor';
 
 interface FilePreviewProps {
   isOpen: boolean;
@@ -30,6 +32,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState(false);
 
   // Load the file when the dialog opens
   React.useEffect(() => {
@@ -43,8 +46,22 @@ const FilePreview: React.FC<FilePreviewProps> = ({
         URL.revokeObjectURL(previewUrl);
         setPreviewUrl(null);
       }
+      setEditMode(false);
     };
   }, [isOpen, projectId, fileName]);
+
+  // Re-render when currentPage changes in PDF editor
+  React.useEffect(() => {
+    if (editMode && previewUrl) {
+      renderPage();
+    }
+  }, [editMode]);
+
+  const renderPage = () => {
+    // This will trigger a re-render of the PDF editor
+    setEditMode(false);
+    setTimeout(() => setEditMode(true), 100);
+  };
 
   const loadFile = async () => {
     setLoading(true);
@@ -119,6 +136,10 @@ const FilePreview: React.FC<FilePreviewProps> = ({
     }
   };
 
+  const isPDF = () => {
+    return getMimeType() === 'application/pdf';
+  };
+
   // Render the preview based on file type
   const renderPreview = () => {
     if (loading) {
@@ -150,6 +171,41 @@ const FilePreview: React.FC<FilePreviewProps> = ({
     }
     
     const mimeType = getMimeType();
+    
+    // PDF preview with edit mode
+    if (mimeType === 'application/pdf') {
+      if (editMode) {
+        return (
+          <PDFEditor
+            pdfUrl={previewUrl}
+            projectId={projectId}
+            fileName={fileName}
+            onSave={() => {
+              // Optionally show a success message
+            }}
+          />
+        );
+      } else {
+        return (
+          <div className="space-y-4">
+            <div className="flex justify-center">
+              <Button
+                onClick={() => setEditMode(true)}
+                className="mb-4"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit PDF
+              </Button>
+            </div>
+            <iframe 
+              src={previewUrl} 
+              className="w-full h-[70vh]" 
+              title={fileName}
+            />
+          </div>
+        );
+      }
+    }
     
     // Image preview
     if (mimeType.startsWith('image/')) {
@@ -190,17 +246,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({
       );
     }
     
-    // PDF preview
-    if (mimeType === 'application/pdf') {
-      return (
-        <iframe 
-          src={previewUrl} 
-          className="w-full h-[70vh]" 
-          title={fileName}
-        />
-      );
-    }
-    
     // Text preview (including JSON, HTML, etc.)
     if (mimeType.startsWith('text/') || mimeType === 'application/json') {
       return (
@@ -231,16 +276,37 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl w-[95vw]">
+      <DialogContent className="max-w-7xl w-[95vw] max-h-[95vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {getFileIcon()} {fileName}
+            {isPDF() && !editMode && (
+              <Button
+                onClick={() => setEditMode(true)}
+                size="sm"
+                variant="outline"
+                className="ml-auto"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+            )}
+            {editMode && (
+              <Button
+                onClick={() => setEditMode(false)}
+                size="sm"
+                variant="outline"
+                className="ml-auto"
+              >
+                View Only
+              </Button>
+            )}
           </DialogTitle>
           <DialogDescription>
-            File Preview
+            {editMode ? 'PDF Editor - Click to add text annotations' : 'File Preview'}
           </DialogDescription>
         </DialogHeader>
-        <div className="mt-2">
+        <div className="mt-2 overflow-auto">
           {renderPreview()}
         </div>
       </DialogContent>

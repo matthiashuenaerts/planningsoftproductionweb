@@ -1,0 +1,144 @@
+
+/* PDF Editor Styles */
+.pdf-editor-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.pdf-canvas {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: crosshair;
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.pdf-canvas:hover {
+  border-color: #3b82f6;
+}
+
+.annotation-overlay {
+  position: absolute;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.annotation-text {
+  position: absolute;
+  cursor: pointer;
+  pointer-events: all;
+  user-select: none;
+  padding: 2px 4px;
+  border-radius: 3px;
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
+.annotation-text:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  outline: 1px solid #3b82f6;
+}
+
+.annotation-text.selected {
+  background-color: rgba(59, 130, 246, 0.2);
+  outline: 2px solid #3b82f6;
+}
+
+.pdf-page-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.pdf-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 16px;
+}
+
+.annotation-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.annotation-item {
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  transition: all 0.2s ease;
+}
+
+.annotation-item:hover {
+  border-color: #3b82f6;
+  background-color: #f8fafc;
+}
+
+.annotation-item.selected {
+  border-color: #3b82f6;
+  background-color: #eff6ff;
+}
+
+.saving-indicator {
+  color: #10b981;
+  font-size: 14px;
+  margin-left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.editor-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.editor-panel h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.color-input {
+  width: 60px;
+  height: 32px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.text-size-input {
+  width: 80px;
+}
+
+@media (max-width: 768px) {
+  .pdf-page-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .pdf-zoom-controls {
+    margin-left: 0;
+    margin-top: 8px;
+  }
+}
