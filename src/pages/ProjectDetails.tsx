@@ -465,7 +465,6 @@ const ProjectDetails = () => {
         isOpen={showPartsListDialog}
         onClose={() => setShowPartsListDialog(false)}
         projectId={projectId!}
-        tasks={tasks}
         onImportComplete={() => {
           toast({
             title: "Success",
