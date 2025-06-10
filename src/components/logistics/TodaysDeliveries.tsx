@@ -159,7 +159,7 @@ export const TodaysDeliveries: React.FC<TodaysDeliveriesProps> = ({
         order={selectedOrder}
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
-        onConfirm={onDeliveryConfirmed}
+        onConfirmed={onDeliveryConfirmed}
       />
     </div>
   );

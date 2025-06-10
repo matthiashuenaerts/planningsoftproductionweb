@@ -161,7 +161,7 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
         order={selectedOrder}
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
-        onConfirm={onDeliveryConfirmed}
+        onConfirmed={onDeliveryConfirmed}
       />
     </div>
   );

@@ -103,7 +103,13 @@ const PersonalTasks = () => {
 
       if (schedulesError) throw schedulesError;
 
-      setTasks(tasksData || []);
+      // Type cast the tasks data to ensure proper typing
+      const typedTasks: Task[] = (tasksData || []).map(task => ({
+        ...task,
+        status: task.status as 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD'
+      }));
+
+      setTasks(typedTasks);
       setSchedules(schedulesData || []);
     } catch (error: any) {
       toast({
@@ -120,8 +126,8 @@ const PersonalTasks = () => {
     if (!currentEmployee) return;
     
     try {
-      const registrations = await timeRegistrationService.getActiveRegistrations(currentEmployee.id);
-      setActiveTimeRegistrations(registrations);
+      const registrations = await timeRegistrationService.getActiveRegistration(currentEmployee.id);
+      setActiveTimeRegistrations(registrations ? [registrations] : []);
     } catch (error) {
       console.error('Error fetching active time registrations:', error);
     }
@@ -302,7 +308,7 @@ const PersonalTasks = () => {
                     <div className="flex justify-between items-start mb-2">
                       <CardTitle className="text-lg">{task.title}</CardTitle>
                       {isTaskActive(task.id) && (
-                        <TaskTimer taskId={task.id} />
+                        <TaskTimer />
                       )}
                     </div>
                     <CardDescription className="text-sm">
@@ -437,6 +443,8 @@ const PersonalTasks = () => {
         {showFilesPopup && (
           <ProjectFilesPopup
             projectId={showFilesPopup}
+            projectName={tasks.find(task => task.phases.projects.id === showFilesPopup)?.phases.projects.name || "Unknown Project"}
+            isOpen={true}
             onClose={() => setShowFilesPopup(null)}
           />
         )}
@@ -460,6 +468,7 @@ const PersonalTasks = () => {
             isOpen={true}
             onClose={() => setShowBarcodeDialog(null)}
             projectId={showBarcodeDialog}
+            projectName={tasks.find(task => task.phases.projects.id === showBarcodeDialog)?.phases.projects.name || "Unknown Project"}
           />
         )}
       </div>
