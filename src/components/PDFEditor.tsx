@@ -39,9 +39,12 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
   const [scale, setScale] = useState(1.5);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
-  // Load PDF.js library and initialize
+  // Load PDF.js library and initialize - only once
   useEffect(() => {
+    if (initialized) return;
+    
     const loadPdfJs = async () => {
       try {
         setLoading(true);
@@ -49,6 +52,7 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
         // Check if PDF.js is already loaded
         if (window.pdfjsLib) {
           await loadPDF();
+          setInitialized(true);
           return;
         }
 
@@ -58,6 +62,7 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
         script.onload = async () => {
           window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
           await loadPDF();
+          setInitialized(true);
         };
         script.onerror = () => {
           toast({
@@ -76,33 +81,22 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
 
     loadPdfJs();
     loadAnnotations();
-
-    return () => {
-      // Cleanup if needed
-    };
-  }, [pdfUrl]);
+  }, [pdfUrl]); // Only depend on pdfUrl
 
   // Re-render page when page or scale changes
   useEffect(() => {
-    if (pdfDoc && !loading) {
+    if (pdfDoc && !loading && initialized) {
       renderPage(currentPage);
     }
-  }, [currentPage, scale, pdfDoc]);
-
-  // Re-render annotations when annotations change
-  useEffect(() => {
-    if (!loading) {
-      renderAnnotations();
-    }
-  }, [annotations, selectedAnnotation, currentPage]);
+  }, [currentPage, scale, pdfDoc, initialized]);
 
   const loadPDF = async () => {
     try {
       const pdf = await window.pdfjsLib.getDocument(pdfUrl).promise;
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
-      await renderPage(1);
       setLoading(false);
+      // Don't call renderPage here to avoid double rendering
     } catch (error) {
       console.error('Error loading PDF:', error);
       toast({
@@ -137,7 +131,9 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
       };
 
       await page.render(renderContext).promise;
-      renderAnnotations();
+      
+      // Render annotations after a small delay to ensure canvas is ready
+      setTimeout(() => renderAnnotations(), 50);
     } catch (error) {
       console.error('Error rendering page:', error);
       toast({
@@ -149,7 +145,7 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
   };
 
   const renderAnnotations = () => {
-    if (!canvasRef.current || loading) return;
+    if (!canvasRef.current || loading || !pdfDoc) return;
 
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
@@ -238,6 +234,9 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
     setIsAddingText(false);
     autoSave(newAnnotations);
     
+    // Re-render annotations
+    setTimeout(() => renderAnnotations(), 50);
+    
     toast({
       title: "Success",
       description: "Text annotation added",
@@ -263,11 +262,13 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
         y <= annotation.y + textHeight + 4
       ) {
         setSelectedAnnotation(annotation.id);
+        setTimeout(() => renderAnnotations(), 50);
         return;
       }
     }
     
     setSelectedAnnotation(null);
+    setTimeout(() => renderAnnotations(), 50);
   };
 
   const updateAnnotation = (id: string, updates: Partial<TextAnnotation>) => {
@@ -277,6 +278,9 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
     setAnnotations(newAnnotations);
     onAnnotationChange?.(newAnnotations);
     autoSave(newAnnotations);
+    
+    // Re-render annotations
+    setTimeout(() => renderAnnotations(), 50);
   };
 
   const deleteAnnotation = (id: string) => {
@@ -285,6 +289,9 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
     onAnnotationChange?.(newAnnotations);
     setSelectedAnnotation(null);
     autoSave(newAnnotations);
+    
+    // Re-render annotations
+    setTimeout(() => renderAnnotations(), 50);
     
     toast({
       title: "Success",

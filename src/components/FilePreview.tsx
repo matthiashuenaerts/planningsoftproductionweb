@@ -50,19 +50,6 @@ const FilePreview: React.FC<FilePreviewProps> = ({
     };
   }, [isOpen, projectId, fileName]);
 
-  // Re-render when currentPage changes in PDF editor
-  React.useEffect(() => {
-    if (editMode && previewUrl) {
-      renderPage();
-    }
-  }, [editMode]);
-
-  const renderPage = () => {
-    // This will trigger a re-render of the PDF editor
-    setEditMode(false);
-    setTimeout(() => setEditMode(true), 100);
-  };
-
   const loadFile = async () => {
     setLoading(true);
     setError(null);
