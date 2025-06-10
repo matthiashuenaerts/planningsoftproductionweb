@@ -16,12 +16,14 @@ import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Pl
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
+import { standardTasksService } from '@/services/standardTasksService';
 import TaskList from '@/components/TaskList';
 import ProjectFileManager from '@/components/ProjectFileManager';
 import OneDriveIntegration from '@/components/OneDriveIntegration';
 import NewOrderModal from '@/components/NewOrderModal';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const ProjectDetails = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -69,6 +71,107 @@ const ProjectDetails = () => {
     fetchProjectData();
   }, [projectId, toast]);
 
+  const checkAndUpdateLimitPhases = async (completedTaskId?: string) => {
+    if (!projectId) return;
+    
+    try {
+      // Get all tasks in the project that are on HOLD and have standard_task_id
+      const { data: holdTasks, error: holdError } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          phases!inner(project_id)
+        `)
+        .eq('phases.project_id', projectId)
+        .eq('status', 'HOLD')
+        .not('standard_task_id', 'is', null);
+
+      if (holdError) {
+        console.error('Error fetching HOLD tasks:', holdError);
+        return;
+      }
+
+      if (!holdTasks || holdTasks.length === 0) {
+        console.log('No HOLD tasks found with standard_task_id');
+        return;
+      }
+
+      // Check each HOLD task to see if its limit phases are now satisfied
+      const tasksToUpdate = [];
+      for (const holdTask of holdTasks) {
+        if (holdTask.standard_task_id) {
+          try {
+            const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(
+              holdTask.standard_task_id,
+              projectId
+            );
+
+            if (limitPhasesSatisfied) {
+              tasksToUpdate.push(holdTask);
+            }
+          } catch (error) {
+            console.error(`Error checking limit phases for task ${holdTask.id}:`, error);
+          }
+        }
+      }
+
+      // Update all eligible tasks from HOLD to TODO
+      if (tasksToUpdate.length > 0) {
+        console.log(`Updating ${tasksToUpdate.length} tasks from HOLD to TODO`);
+        
+        for (const task of tasksToUpdate) {
+          await supabase
+            .from('tasks')
+            .update({ 
+              status: 'TODO',
+              status_changed_at: new Date().toISOString()
+            })
+            .eq('id', task.id);
+        }
+
+        // Refresh the tasks list to show the updated statuses
+        const phaseData = await projectService.getProjectPhases(projectId);
+        let allTasks: Task[] = [];
+        for (const phase of phaseData) {
+          const phaseTasks = await taskService.getByPhase(phase.id);
+          allTasks = [...allTasks, ...phaseTasks];
+        }
+        setTasks(allTasks);
+
+        toast({
+          title: "Tasks Updated",
+          description: `${tasksToUpdate.length} task(s) moved from HOLD to TODO due to satisfied dependencies.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error in checkAndUpdateLimitPhases:', error);
+    }
+  };
+
+  const checkLimitPhasesBeforeStart = async (taskId: string, standardTaskId?: string): Promise<boolean> => {
+    if (!projectId || !standardTaskId) return true;
+    
+    try {
+      const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(
+        standardTaskId,
+        projectId
+      );
+
+      if (!limitPhasesSatisfied) {
+        toast({
+          title: "Cannot Start Task",
+          description: "This task cannot be started because its dependencies are not yet completed.",
+          variant: "destructive"
+        });
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error checking limit phases before start:', error);
+      return true; // Allow start if we can't check (fail open)
+    }
+  };
+
   const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
     if (!currentEmployee) {
       toast({
@@ -82,9 +185,15 @@ const ProjectDetails = () => {
     try {
       // Use explicit status checks without type narrowing
       const statusValue = newStatus as string;
+      const currentTask = tasks.find(task => task.id === taskId);
       
-      // If starting a task, use time registration service
+      // If starting a task, check limit phases first
       if (statusValue === 'IN_PROGRESS') {
+        const canStart = await checkLimitPhasesBeforeStart(taskId, currentTask?.standard_task_id);
+        if (!canStart) {
+          return; // Don't proceed if limit phases aren't satisfied
+        }
+
         await timeRegistrationService.startTask(currentEmployee.id, taskId);
         
         // Update local state
@@ -121,6 +230,9 @@ const ProjectDetails = () => {
             } : task
           )
         );
+        
+        // Check and update limit phases after completing a task
+        await checkAndUpdateLimitPhases(taskId);
         
         toast({
           title: "Task Completed",
@@ -165,6 +277,11 @@ const ProjectDetails = () => {
           } : task
         )
       );
+
+      // Check limit phases after any status change to COMPLETED
+      if (statusValue === 'COMPLETED') {
+        await checkAndUpdateLimitPhases(taskId);
+      }
       
       toast({
         title: "Task updated",

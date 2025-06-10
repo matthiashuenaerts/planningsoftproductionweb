@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface StandardTask {
@@ -192,9 +193,21 @@ export const standardTasksService = {
       
       if (error) throw error;
       
-      // If no tasks exist for this standard task, or not all are completed, limit phases are not satisfied
+      // If no tasks exist for this standard task, it means it was either:
+      // 1. Not included in the project (unchecked during creation), OR
+      // 2. Actually missing
+      // We need to check if this standard task was intentionally excluded
       if (!projectTasks || projectTasks.length === 0) {
-        return false;
+        // Check if this standard task was intentionally excluded from the project
+        const wasExcluded = await this.wasStandardTaskExcludedFromProject(limitPhase.standard_task_id, projectId);
+        
+        if (wasExcluded) {
+          // If it was excluded, we consider it as "satisfied" for limit phase purposes
+          continue;
+        } else {
+          // If it wasn't excluded but doesn't exist, limit phases are not satisfied
+          return false;
+        }
       }
       
       // Check if all instances of this standard task in the project are completed
@@ -204,7 +217,61 @@ export const standardTasksService = {
       }
     }
     
-    return true; // All limit phases are completed
+    return true; // All limit phases are completed or excluded
+  },
+
+  async wasStandardTaskExcludedFromProject(standardTaskId: string, projectId: string): Promise<boolean> {
+    try {
+      // Check if there are any phases in this project that should have this standard task
+      // but it was intentionally excluded
+      
+      // First, get all phases for this project
+      const { data: phases, error: phasesError } = await supabase
+        .from('phases')
+        .select('id, name')
+        .eq('project_id', projectId);
+      
+      if (phasesError || !phases) {
+        console.error('Error fetching phases:', phasesError);
+        return false;
+      }
+      
+      // For each phase, check if this standard task should exist but doesn't
+      // This is a heuristic - if other similar tasks exist in the project but this one doesn't,
+      // it was likely excluded during creation
+      
+      // Get the standard task details
+      const standardTask = await this.getById(standardTaskId);
+      if (!standardTask) return false;
+      
+      // Check if there are any tasks at all in this project with standard_task_id
+      const { data: anyStandardTasks, error: anyError } = await supabase
+        .from('tasks')
+        .select(`
+          id,
+          phases!inner(project_id)
+        `)
+        .eq('phases.project_id', projectId)
+        .not('standard_task_id', 'is', null)
+        .limit(1);
+      
+      if (anyError) {
+        console.error('Error checking for standard tasks:', anyError);
+        return false;
+      }
+      
+      // If there are other standard tasks in the project but this specific one is missing,
+      // it was likely excluded
+      if (anyStandardTasks && anyStandardTasks.length > 0) {
+        console.log(`Standard task ${standardTaskId} was excluded from project ${projectId}`);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error checking if standard task was excluded:', error);
+      return false; // Fail safe - assume it wasn't excluded
+    }
   },
 
   // Get task name parts by splitting the task name at underscores
