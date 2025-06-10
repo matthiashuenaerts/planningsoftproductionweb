@@ -16,6 +16,19 @@ interface ProjectPartsViewerProps {
   fileName: string;
 }
 
+const getBackgroundColor = (color: string) => {
+  switch (color) {
+    case 'green':
+      return 'bg-green-100 border-green-300';
+    case 'orange':
+      return 'bg-orange-100 border-orange-300';
+    case 'red':
+      return 'bg-red-100 border-red-300';
+    default:
+      return 'bg-gray-50 border-gray-200';
+  }
+};
+
 const getColorClass = (color: string) => {
   switch (color) {
     case 'green':
@@ -149,19 +162,19 @@ export const ProjectPartsViewer: React.FC<ProjectPartsViewerProps> = ({
               <CardContent>
                 <div className="flex gap-4 text-sm">
                   <div className="flex items-center gap-2">
-                    <Circle className="h-4 w-4 text-gray-400" />
+                    <div className="w-4 h-4 bg-gray-50 border border-gray-200 rounded"></div>
                     <span>Unprocessed: {statusCounts.none}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Circle className="h-4 w-4 text-green-600 fill-green-600" />
+                    <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
                     <span>Complete: {statusCounts.green}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Circle className="h-4 w-4 text-orange-600 fill-orange-600" />
+                    <div className="w-4 h-4 bg-orange-100 border border-orange-300 rounded"></div>
                     <span>In Progress: {statusCounts.orange}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Circle className="h-4 w-4 text-red-600 fill-red-600" />
+                    <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
                     <span>Issues: {statusCounts.red}</span>
                   </div>
                 </div>
@@ -184,7 +197,7 @@ export const ProjectPartsViewer: React.FC<ProjectPartsViewerProps> = ({
                 </TableHeader>
                 <TableBody>
                   {parts.map(part => (
-                    <TableRow key={part.id}>
+                    <TableRow key={part.id} className={`border ${getBackgroundColor(part.color_status)}`}>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Circle className={`h-4 w-4 ${getColorClass(part.color_status)}`} />

@@ -13,10 +13,11 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package } from 'lucide-react';
-import ProjectFilesPopup from './ProjectFilesPopup';
+import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package, Barcode } from 'lucide-react';
+import { ProjectFilesPopup } from './ProjectFilesPopup';
 import { PartsListViewer } from './PartsListViewer';
 import { PartsListDialog } from './PartsListDialog';
+import { ProjectBarcodeDialog } from './ProjectBarcodeDialog';
 import { format, differenceInDays, isAfter, isBefore } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
@@ -46,6 +47,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const [showPartsListViewer, setShowPartsListViewer] = useState(false);
   const [selectedTaskForParts, setSelectedTaskForParts] = useState<ExtendedTask | null>(null);
   const [showPartsListDialog, setShowPartsListDialog] = useState(false);
+  const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const queryClient = useQueryClient();
@@ -513,11 +515,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     }
   };
 
-  const handleShowPartsList = (task: ExtendedTask) => {
-    setSelectedTaskForParts(task);
-    setShowPartsListViewer(true);
-  };
-
   const handleShowProjectParts = (task: ExtendedTask) => {
     if (task.project_id) {
       setSelectedProjectId(task.project_id);
@@ -530,6 +527,25 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         variant: 'destructive'
       });
     }
+  };
+
+  const handleShowBarcode = (task: ExtendedTask) => {
+    if (task.project_id) {
+      setSelectedProjectId(task.project_id);
+      setSelectedProjectName(task.project_name || 'Unknown Project');
+      setShowBarcodeDialog(true);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Project information not available for this task',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleShowPartsList = (task: ExtendedTask) => {
+    setSelectedTaskForParts(task);
+    setShowPartsListViewer(true);
   };
 
   if (loading) {
@@ -797,6 +813,16 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
           isOpen={showPartsListDialog}
           onClose={() => setShowPartsListDialog(false)}
           projectId={selectedProjectId}
+        />
+      )}
+
+      {/* Project Barcode Dialog */}
+      {showBarcodeDialog && (
+        <ProjectBarcodeDialog
+          isOpen={showBarcodeDialog}
+          onClose={() => setShowBarcodeDialog(false)}
+          projectId={selectedProjectId}
+          projectName={selectedProjectName}
         />
       )}
     </div>
