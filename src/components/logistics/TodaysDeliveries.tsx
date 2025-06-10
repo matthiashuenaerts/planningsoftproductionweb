@@ -1,17 +1,17 @@
-
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
-import { Package, Truck, FileText, Paperclip } from 'lucide-react';
+import { Order } from '@/types/order';
 import { DeliveryConfirmationModal } from './DeliveryConfirmationModal';
+import { format } from 'date-fns';
+import { Truck, Package, Building2, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { orderService } from '@/services/orderService';
-import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
-import { useToast } from '@/hooks/use-toast';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface TodaysDeliveriesProps {
-  orders: any[];
+  orders: Order[];
   onDeliveryConfirmed: () => void;
 }
 
@@ -19,148 +19,190 @@ export const TodaysDeliveries: React.FC<TodaysDeliveriesProps> = ({
   orders, 
   onDeliveryConfirmed 
 }) => {
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [orderAttachments, setOrderAttachments] = useState<{ [key: string]: any[] }>({});
-  const { toast } = useToast();
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
-  // Load attachments for an order
-  const loadOrderAttachments = async (orderId: string) => {
-    try {
-      const attachments = await orderService.getOrderAttachments(orderId);
-      setOrderAttachments(prev => ({ ...prev, [orderId]: attachments }));
-    } catch (error) {
-      console.error('Error loading attachments:', error);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'delivered': return 'bg-green-100 text-green-800';
+      case 'canceled': return 'bg-red-100 text-red-800';
+      case 'delayed': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  React.useEffect(() => {
-    // Load attachments for all orders
-    orders.forEach(order => {
-      loadOrderAttachments(order.id);
-    });
-  }, [orders]);
-
-  const handleConfirmDelivery = (order: any) => {
-    setSelectedOrder(order);
-    setShowConfirmModal(true);
-  };
-
-  const handleAttachmentUpload = (orderId: string) => {
-    loadOrderAttachments(orderId);
-    toast({
-      title: "Success",
-      description: "File uploaded successfully",
-    });
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
-      case 'delivered':
-        return <Badge className="bg-green-100 text-green-800">Delivered</Badge>;
-      case 'delayed':
-        return <Badge className="bg-red-100 text-red-800">Delayed</Badge>;
-      default:
-        return <Badge>{status}</Badge>;
+  const toggleOrderExpansion = (orderId: string) => {
+    const newExpanded = new Set(expandedOrders);
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId);
+    } else {
+      newExpanded.add(orderId);
     }
+    setExpandedOrders(newExpanded);
+  };
+
+  // Query for order items when order is expanded
+  const OrderItems = ({ orderId, isExpanded }: { orderId: string; isExpanded: boolean }) => {
+    const { data: orderItems = [], isLoading } = useQuery({
+      queryKey: ['order-items', orderId],
+      queryFn: () => orderService.getOrderItems(orderId),
+      enabled: isExpanded
+    });
+
+    if (!isExpanded) return null;
+
+    if (isLoading) {
+      return (
+        <div className="px-6 pb-4">
+          <div className="text-sm text-gray-500">Loading order items...</div>
+        </div>
+      );
+    }
+
+    if (orderItems.length === 0) {
+      return (
+        <div className="px-6 pb-4">
+          <div className="text-sm text-gray-500">No items found for this order.</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="px-6 pb-4">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Description</TableHead>
+              <TableHead className="text-right">Quantity</TableHead>
+              <TableHead className="text-right">Article Code</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {orderItems.map((item) => (
+              <TableRow key={item.id}>
+                <TableCell>{item.description}</TableCell>
+                <TableCell className="text-right">{item.quantity}</TableCell>
+                <TableCell className="text-right">{item.article_code}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
   };
 
   if (orders.length === 0) {
     return (
       <Card>
-        <CardContent className="pt-6 text-center">
-          <Truck className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">No deliveries scheduled for today.</p>
+        <CardContent className="py-8">
+          <div className="text-center text-gray-500">
+            <Truck className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No deliveries today</h3>
+            <p className="mt-1 text-sm text-gray-500">No orders expected for delivery today.</p>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {orders.map((order) => (
-        <Card key={order.id}>
-          <CardHeader>
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  {order.supplier}
-                </CardTitle>
-                <CardDescription>
-                  Project: {order.project_name}
-                </CardDescription>
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                {getStatusBadge(order.status)}
-                <Button 
-                  onClick={() => handleConfirmDelivery(order)}
-                  size="sm"
-                  disabled={order.status === 'delivered'}
-                >
-                  {order.status === 'delivered' ? 'Delivered' : 'Confirm Delivery'}
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                Expected: {format(new Date(order.expected_delivery), 'MMM dd, yyyy')}
-              </div>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-blue-600">
+            <Truck className="h-5 w-5" />
+            Today's Deliveries ({orders.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {orders.map((order) => {
+              const isExpanded = expandedOrders.has(order.id);
               
-              {/* Order Attachments Section */}
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <h4 className="text-sm font-medium flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Delivery Documents
-                  </h4>
-                  <OrderAttachmentUploader 
-                    orderId={order.id} 
-                    onUploadSuccess={() => handleAttachmentUpload(order.id)}
-                    compact={true}
-                  />
-                </div>
-                
-                {orderAttachments[order.id] && orderAttachments[order.id].length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {orderAttachments[order.id].map((attachment: any) => (
-                      <div 
-                        key={attachment.id} 
-                        className="border rounded p-2 flex items-center justify-between bg-gray-50"
-                      >
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <Paperclip className="h-4 w-4 text-gray-500" />
-                          <span className="text-sm truncate">{attachment.file_name}</span>
+              return (
+                <Card key={order.id} className="border-l-4 border-l-blue-500">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Package className="h-5 w-5" />
+                        Order from {order.supplier}
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Badge className={getStatusColor(order.status)}>
+                          {order.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Project</p>
+                          <p className="font-medium">
+                            {(order as any).project_name || order.project_id}
+                          </p>
                         </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => window.open(attachment.file_path, '_blank')}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <p className="text-sm text-gray-500">Order Date</p>
+                          <p className="font-medium">{format(new Date(order.order_date), 'PPP')}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Expected Delivery</p>
+                        <p className="font-medium">
+                          {format(new Date(order.expected_delivery), 'PPP')}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleOrderExpansion(order.id)}
                         >
-                          View
+                          {isExpanded ? (
+                            <>
+                              <ChevronUp className="h-4 w-4 mr-1" />
+                              Hide Items
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-4 w-4 mr-1" />
+                              Show Items
+                            </>
+                          )}
+                        </Button>
+                        <Button 
+                          onClick={() => setSelectedOrder(order)}
+                          className="bg-green-600 hover:bg-green-700"
+                          size="sm"
+                        >
+                          Confirm Delivery
                         </Button>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No documents attached</p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+                    </div>
+                  </CardContent>
+                  <OrderItems orderId={order.id} isExpanded={isExpanded} />
+                </Card>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
-      <DeliveryConfirmationModal
-        order={selectedOrder}
-        isOpen={showConfirmModal}
-        onClose={() => setShowConfirmModal(false)}
-        onConfirmed={onDeliveryConfirmed}
-      />
-    </div>
+      {selectedOrder && (
+        <DeliveryConfirmationModal
+          order={selectedOrder}
+          isOpen={!!selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          onConfirmed={onDeliveryConfirmed}
+        />
+      )}
+    </>
   );
 };
