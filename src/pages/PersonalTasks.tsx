@@ -13,22 +13,33 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Workstation } from '@/services/workstationService';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { format, parseISO, isToday } from 'date-fns';
+import { format, parseISO, isToday, differenceInDays, isBefore } from 'date-fns';
 import { 
   Clock,
   Play,
   ExternalLink,
   FileText,
   Calendar,
-  User
+  User,
+  PlayCircle,
+  Users,
+  AlertTriangle,
+  Package,
+  Barcode
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import ProjectFilesPopup from '@/components/ProjectFilesPopup';
+import { PartsListDialog } from '@/components/PartsListDialog';
+import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface ExtendedTask extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
   assignee_name?: string;
+  active_workers?: number;
+  project_id?: string;
 }
 
 interface ScheduledTask {
@@ -68,10 +79,56 @@ const PersonalTasks = () => {
   const [loading, setLoading] = useState(true);
   const [userWorkstations, setUserWorkstations] = useState<Workstation[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showProjectFiles, setShowProjectFiles] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [selectedProjectName, setSelectedProjectName] = useState<string>('');
+  const [showPartsListDialog, setShowPartsListDialog] = useState(false);
+  const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  // Function to get urgency class based on due date
+  const getUrgencyClass = (dueDate: string) => {
+    const today = new Date();
+    const due = new Date(dueDate);
+    const daysUntilDue = differenceInDays(due, today);
+
+    if (isBefore(due, today)) {
+      return { class: 'overdue', label: 'Overdue', variant: 'destructive' as const };
+    } else if (daysUntilDue <= 1) {
+      return { class: 'critical', label: 'Critical', variant: 'destructive' as const };
+    } else if (daysUntilDue <= 3) {
+      return { class: 'urgent', label: 'Urgent', variant: 'default' as const };
+    } else if (daysUntilDue <= 7) {
+      return { class: 'high', label: 'High', variant: 'secondary' as const };
+    } else {
+      return { class: 'normal', label: 'Normal', variant: 'outline' as const };
+    }
+  };
+
+  // Start task timer mutation
+  const startTimerMutation = useMutation({
+    mutationFn: ({ employeeId, taskId, remainingDuration }: { employeeId: string; taskId: string; remainingDuration?: number }) =>
+      timeRegistrationService.startTask(employeeId, taskId, remainingDuration),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+      toast({
+        title: 'Timer Started',
+        description: 'Time tracking has begun for this task',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: 'Failed to start timer',
+        variant: 'destructive'
+      });
+      console.error('Start timer error:', error);
+    }
+  });
 
   // Update current time every minute
   useEffect(() => {
@@ -302,12 +359,28 @@ const PersonalTasks = () => {
                           assigneeName = employeeData.name;
                         }
                       }
+
+                      // Get count of active workers on this task
+                      let activeWorkers = 0;
+                      if (task.status === 'IN_PROGRESS') {
+                        const { data: activeRegistrations, error: regError } = await supabase
+                          .from('time_registrations')
+                          .select('id')
+                          .eq('task_id', task.id)
+                          .eq('is_active', true);
+                        
+                        if (!regError && activeRegistrations) {
+                          activeWorkers = activeRegistrations.length;
+                        }
+                      }
                       
                       // Cast task to the required Task type
                       return {
                         ...task,
                         project_name: projectData.name,
+                        project_id: phaseData.project_id,
                         assignee_name: assigneeName,
+                        active_workers: activeWorkers,
                         priority: task.priority as "Low" | "Medium" | "High" | "Urgent",
                         status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
                       } as ExtendedTask;
@@ -316,6 +389,8 @@ const PersonalTasks = () => {
                       return {
                         ...task,
                         project_name: 'Unknown Project',
+                        project_id: '',
+                        active_workers: 0,
                         priority: task.priority as "Low" | "Medium" | "High" | "Urgent",
                         status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
                       } as ExtendedTask;
@@ -344,9 +419,11 @@ const PersonalTasks = () => {
                 .map(item => ({
                   ...item.tasks,
                   project_name: 'Unknown Project',
+                  project_id: '',
+                  active_workers: 0,
                   priority: item.tasks.priority as "Low" | "Medium" | "High" | "Urgent",
                   status: item.tasks.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
-                })) as Task[];
+                })) as ExtendedTask[];
                 
               // Filter for tasks assigned to current user or unassigned
               const relevantTasks = filteredTasks.filter(task => 
@@ -544,6 +621,66 @@ const PersonalTasks = () => {
         title: "Error",
         description: `Failed to update task: ${error.message}`,
         variant: "destructive"
+      });
+    }
+  };
+
+  const handleJoinTask = async (taskId: string) => {
+    if (!currentEmployee) return;
+    
+    try {
+      // Get current task to check remaining duration
+      const currentTask = [...todoTasks, ...inProgressTasks].find(task => task.id === taskId);
+      const remainingDuration = currentTask?.duration;
+      
+      await startTimerMutation.mutateAsync({
+        employeeId: currentEmployee.id,
+        taskId: taskId,
+        remainingDuration: remainingDuration
+      });
+    } catch (error) {
+      console.error('Error joining task:', error);
+    }
+  };
+
+  const handleGoToFiles = (task: ExtendedTask) => {
+    if (task.project_id && task.project_name) {
+      setSelectedProjectId(task.project_id);
+      setSelectedProjectName(task.project_name);
+      setShowProjectFiles(true);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Project information not available for this task',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleShowProjectParts = (task: ExtendedTask) => {
+    if (task.project_id) {
+      setSelectedProjectId(task.project_id);
+      setSelectedProjectName(task.project_name || 'Unknown Project');
+      setShowPartsListDialog(true);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Project information not available for this task',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleShowBarcode = (task: ExtendedTask) => {
+    if (task.project_id) {
+      setSelectedProjectId(task.project_id);
+      setSelectedProjectName(task.project_name || 'Unknown Project');
+      setShowBarcodeDialog(true);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Project information not available for this task',
+        variant: 'destructive'
       });
     }
   };
@@ -768,7 +905,7 @@ const PersonalTasks = () => {
                 </CardContent>
               </Card>
 
-              {/* Existing Task Lists */}
+              {/* Enhanced Task Lists with Workstation-style cards */}
               {userWorkstations.length === 0 ? (
                 <Card>
                   <CardHeader>
@@ -782,21 +919,206 @@ const PersonalTasks = () => {
                 <div className="space-y-8">
                   {/* In Progress Tasks - Show first */}
                   {inProgressTasks.length > 0 && (
-                    <TaskList 
-                      tasks={inProgressTasks} 
-                      title="In Progress Tasks" 
-                      onTaskStatusChange={handleTaskStatusChange}
-                      showCountdownTimer={true}
-                    />
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <PlayCircle className="h-5 w-5" />
+                          In Progress Tasks ({inProgressTasks.length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {inProgressTasks.map((task) => {
+                            const urgency = task.due_date ? getUrgencyClass(task.due_date) : null;
+                            return (
+                              <div key={task.id} className="border rounded-lg p-4">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <h3 className="font-medium">{task.title}</h3>
+                                    <p className="text-sm text-gray-600">{task.project_name}</p>
+                                    {task.assignee_name && (
+                                      <p className="text-sm text-blue-600">Assigned to: {task.assignee_name}</p>
+                                    )}
+                                    {task.due_date && (
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <p className="text-sm text-gray-500">
+                                          Due: {format(new Date(task.due_date), 'MMM dd, yyyy')}
+                                        </p>
+                                        {urgency && (
+                                          <Badge variant={urgency.variant} className="text-xs">
+                                            {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-1" />}
+                                            {urgency.label}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    )}
+                                    {task.timeRemaining && (
+                                      <p className={`text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-green-600'}`}>
+                                        Time: {task.timeRemaining}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {task.active_workers && task.active_workers > 0 && (
+                                      <div className="flex items-center gap-1 text-sm text-blue-600">
+                                        <Users className="h-4 w-4" />
+                                        <span>{task.active_workers}</span>
+                                      </div>
+                                    )}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleShowProjectParts(task)}
+                                      title="View Project Parts List"
+                                    >
+                                      <Package className="h-4 w-4" />
+                                      Parts
+                                    </Button>
+                                    {task.project_id && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleGoToFiles(task)}
+                                        title="View Project Files"
+                                      >
+                                        <FileText className="h-4 w-4" />
+                                        Files
+                                      </Button>
+                                    )}
+                                    {task.project_id && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleShowBarcode(task)}
+                                        title="Show Project Barcode"
+                                      >
+                                        <Barcode className="h-4 w-4" />
+                                        Barcode
+                                      </Button>
+                                    )}
+                                    {task.project_id && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => navigate(`/projects/${task.project_id}`)}
+                                        title="Go to Project Details"
+                                      >
+                                        <ExternalLink className="h-4 w-4" />
+                                        Project
+                                      </Button>
+                                    )}
+                                    <button
+                                      onClick={() => handleJoinTask(task.id)}
+                                      className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                                    >
+                                      Join Task
+                                    </button>
+                                    <button
+                                      onClick={() => handleTaskStatusChange(task.id, 'COMPLETED')}
+                                      className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                                    >
+                                      Complete
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
                   )}
                   
                   {/* TODO Tasks - Show second */}
                   {todoTasks.length > 0 && (
-                    <TaskList 
-                      tasks={todoTasks} 
-                      title="TODO Tasks" 
-                      onTaskStatusChange={handleTaskStatusChange}
-                    />
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Clock className="h-5 w-5" />
+                          TODO Tasks ({todoTasks.length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {todoTasks.map((task) => {
+                            const urgency = task.due_date ? getUrgencyClass(task.due_date) : null;
+                            return (
+                              <div key={task.id} className="border rounded-lg p-4">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <h3 className="font-medium">{task.title}</h3>
+                                    <p className="text-sm text-gray-600">{task.project_name}</p>
+                                    {task.due_date && (
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <p className="text-sm text-gray-500">
+                                          Due: {format(new Date(task.due_date), 'MMM dd, yyyy')}
+                                        </p>
+                                        {urgency && (
+                                          <Badge variant={urgency.variant} className="text-xs">
+                                            {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-1" />}
+                                            {urgency.label}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleShowProjectParts(task)}
+                                      title="View Project Parts List"
+                                    >
+                                      <Package className="h-4 w-4" />
+                                      Parts
+                                    </Button>
+                                    {task.project_id && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleGoToFiles(task)}
+                                        title="View Project Files"
+                                      >
+                                        <FileText className="h-4 w-4" />
+                                        Files
+                                      </Button>
+                                    )}
+                                    {task.project_id && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleShowBarcode(task)}
+                                        title="Show Project Barcode"
+                                      >
+                                        <Barcode className="h-4 w-4" />
+                                        Barcode
+                                      </Button>
+                                    )}
+                                    {task.project_id && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => navigate(`/projects/${task.project_id}`)}
+                                        title="Go to Project Details"
+                                      >
+                                        <ExternalLink className="h-4 w-4" />
+                                        Project
+                                      </Button>
+                                    )}
+                                    <button
+                                      onClick={() => handleTaskStatusChange(task.id, 'IN_PROGRESS')}
+                                      className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                                    >
+                                      Start
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
                   )}
                   
                   {/* Show message if no tasks */}
@@ -816,6 +1138,35 @@ const PersonalTasks = () => {
           )}
         </div>
       </div>
+
+      {/* Project Files Popup */}
+      {showProjectFiles && (
+        <ProjectFilesPopup
+          isOpen={showProjectFiles}
+          onClose={() => setShowProjectFiles(false)}
+          projectId={selectedProjectId}
+          projectName={selectedProjectName}
+        />
+      )}
+
+      {/* Project Parts List Dialog */}
+      {showPartsListDialog && (
+        <PartsListDialog
+          isOpen={showPartsListDialog}
+          onClose={() => setShowPartsListDialog(false)}
+          projectId={selectedProjectId}
+        />
+      )}
+
+      {/* Project Barcode Dialog */}
+      {showBarcodeDialog && (
+        <ProjectBarcodeDialog
+          isOpen={showBarcodeDialog}
+          onClose={() => setShowBarcodeDialog(false)}
+          projectId={selectedProjectId}
+          projectName={selectedProjectName}
+        />
+      )}
     </div>
   );
 };

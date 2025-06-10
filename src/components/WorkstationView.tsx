@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
@@ -635,15 +634,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleShowPartsList(task)}
-                            title="View Task Parts List"
-                          >
-                            <Package className="h-4 w-4" />
-                            Task Parts
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
                             onClick={() => handleShowProjectParts(task)}
                             title="View Project Parts List"
                           >
@@ -659,6 +649,17 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                             >
                               <FileText className="h-4 w-4" />
                               Files
+                            </Button>
+                          )}
+                          {task.project_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleShowBarcode(task)}
+                              title="Show Project Barcode"
+                            >
+                              <Barcode className="h-4 w-4" />
+                              Barcode
                             </Button>
                           )}
                           {task.project_id && (
@@ -732,15 +733,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleShowPartsList(task)}
-                            title="View Task Parts List"
-                          >
-                            <Package className="h-4 w-4" />
-                            Task Parts
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
                             onClick={() => handleShowProjectParts(task)}
                             title="View Project Parts List"
                           >
@@ -756,6 +748,17 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                             >
                               <FileText className="h-4 w-4" />
                               Files
+                            </Button>
+                          )}
+                          {task.project_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleShowBarcode(task)}
+                              title="Show Project Barcode"
+                            >
+                              <Barcode className="h-4 w-4" />
+                              Barcode
                             </Button>
                           )}
                           {task.project_id && (
