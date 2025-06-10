@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
@@ -14,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package, Barcode } from 'lucide-react';
-import { ProjectFilesPopup } from './ProjectFilesPopup';
+import ProjectFilesPopup from './ProjectFilesPopup';
 import { PartsListViewer } from './PartsListViewer';
 import { PartsListDialog } from './PartsListDialog';
 import { ProjectBarcodeDialog } from './ProjectBarcodeDialog';
