@@ -263,7 +263,7 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
             </p>
           </div>
         </CardContent>
-      )}
+      </Card>
     </div>
   );
 };
