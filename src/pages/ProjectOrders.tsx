@@ -1,18 +1,19 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Clock, ArrowLeft, Package } from 'lucide-react';
+import { Clock, ArrowLeft, Package, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import Navbar from '@/components/Navbar';
-import { Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useNavigate } from 'react-router-dom';
+import { orderService } from '@/services/orderService';
+import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
 
 interface Order {
   id: string;
@@ -24,6 +25,7 @@ interface Order {
   created_at: string;
   updated_at: string;
   orderItems?: OrderItem[];
+  attachments?: OrderAttachment[];
 }
 
 interface OrderItem {
@@ -34,6 +36,17 @@ interface OrderItem {
   article_code: string | null;
   unit_price: number | null;
   total_price: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface OrderAttachment {
+  id: string;
+  order_id: string;
+  file_name: string;
+  file_path: string;
+  file_type: string;
+  file_size: number;
   created_at: string;
   updated_at: string;
 }
@@ -64,8 +77,8 @@ const ProjectOrders = () => {
         
         if (ordersError) throw ordersError;
 
-        // Fetch order items for each order
-        const ordersWithItems = await Promise.all(
+        // Fetch order items and attachments for each order
+        const ordersWithItemsAndAttachments = await Promise.all(
           (ordersData || []).map(async (order) => {
             const { data: itemsData, error: itemsError } = await supabase
               .from('order_items')
@@ -74,22 +87,21 @@ const ProjectOrders = () => {
             
             if (itemsError) {
               console.error('Error fetching order items:', itemsError);
-              return { 
-                ...order, 
-                status: order.status as 'pending' | 'delivered' | 'canceled' | 'delayed',
-                orderItems: [] 
-              };
             }
+
+            // Fetch attachments
+            const attachments = await orderService.getOrderAttachments(order.id);
             
             return { 
               ...order, 
               status: order.status as 'pending' | 'delivered' | 'canceled' | 'delayed',
-              orderItems: itemsData || [] 
+              orderItems: itemsData || [],
+              attachments: attachments || []
             };
           })
         );
 
-        setOrders(ordersWithItems);
+        setOrders(ordersWithItemsAndAttachments);
       } catch (error: any) {
         console.error('Error fetching project orders:', error);
         toast({
@@ -104,6 +116,43 @@ const ProjectOrders = () => {
 
     fetchProjectOrders();
   }, [projectId, toast, currentEmployee]);
+
+  const handleAttachmentUpload = async () => {
+    // Refresh orders to show new attachments
+    const updatedOrders = await Promise.all(
+      orders.map(async (order) => {
+        const attachments = await orderService.getOrderAttachments(order.id);
+        return { ...order, attachments: attachments || [] };
+      })
+    );
+    setOrders(updatedOrders);
+  };
+
+  const handleDeleteAttachment = async (attachmentId: string, orderId: string) => {
+    try {
+      await orderService.deleteOrderAttachment(attachmentId);
+      
+      // Update the order's attachments in state
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, attachments: (order.attachments || []).filter(att => att.id !== attachmentId) }
+            : order
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: "Attachment deleted successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to delete attachment: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
@@ -174,7 +223,8 @@ const ProjectOrders = () => {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-6">
+                    {/* Order Items */}
                     {order.orderItems && order.orderItems.length > 0 ? (
                       <div>
                         <h4 className="text-md font-semibold mb-2">Order Items</h4>
@@ -204,6 +254,54 @@ const ProjectOrders = () => {
                     ) : (
                       <p className="text-muted-foreground">No items found for this order.</p>
                     )}
+
+                    {/* Order Attachments */}
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <h4 className="text-md font-semibold">Order Files</h4>
+                        <OrderAttachmentUploader 
+                          orderId={order.id} 
+                          onUploadSuccess={handleAttachmentUpload}
+                          compact={true}
+                        />
+                      </div>
+                      
+                      {order.attachments && order.attachments.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {order.attachments.map((attachment) => (
+                            <div 
+                              key={attachment.id} 
+                              className="border rounded-lg p-3 flex items-center justify-between bg-gray-50"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{attachment.file_name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {(attachment.file_size / 1024).toFixed(1)} KB
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 ml-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => window.open(attachment.file_path, '_blank')}
+                                >
+                                  View
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => handleDeleteAttachment(attachment.id, order.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No files attached to this order.</p>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))
