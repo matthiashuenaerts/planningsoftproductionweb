@@ -2,13 +2,13 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { Order } from '@/types/order';
 import { orderService } from '@/services/orderService';
 import { Camera, Check, X, RotateCcw } from 'lucide-react';
 
 interface DeliveryConfirmationModalProps {
-  order: Order | null;
+  order: Order;
   isOpen: boolean;
   onClose: () => void;
   onConfirmed: () => void;
@@ -27,11 +27,6 @@ export const DeliveryConfirmationModal: React.FC<DeliveryConfirmationModalProps>
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
-
-  // Don't render if order is null
-  if (!order) {
-    return null;
-  }
 
   const startCamera = async () => {
     try {
