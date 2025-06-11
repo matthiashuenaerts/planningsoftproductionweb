@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
@@ -554,9 +553,8 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     if (!currentEmployee) return;
     
     try {
-      // Start time tracking for workstation task - we'll create a dummy task ID for workstation tasks
-      // You might want to modify this to handle workstation tasks differently
-      await timeRegistrationService.startTask(currentEmployee.id, workstationTask.id);
+      // Use the new startWorkstationTask method instead of regular startTask
+      await timeRegistrationService.startWorkstationTask(currentEmployee.id, workstationTask.id);
       
       toast({
         title: 'Workstation Task Started',
