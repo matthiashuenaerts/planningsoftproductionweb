@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Card,
@@ -40,6 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 import { workstationService, Workstation } from '@/services/workstationService';
 import { useForm } from 'react-hook-form';
 import { TaskWorkstationsManager } from './TaskWorkstationsManager';
+import { WorkstationTasksManager } from './WorkstationTasksManager';
 
 const WorkstationSettings: React.FC = () => {
   const [workstations, setWorkstations] = useState<Workstation[]>([]);
@@ -48,6 +48,7 @@ const WorkstationSettings: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showTaskMapping, setShowTaskMapping] = useState(false);
+  const [showTasksManager, setShowTasksManager] = useState(false);
   const { toast } = useToast();
 
   const form = useForm({
@@ -273,6 +274,16 @@ const WorkstationSettings: React.FC = () => {
                           >
                             Tasks
                           </Button>
+                          <Button
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedWorkstation(workstation);
+                              setShowTasksManager(true);
+                            }}
+                          >
+                            Workstation Tasks
+                          </Button>
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button
@@ -314,6 +325,30 @@ const WorkstationSettings: React.FC = () => {
             </DialogHeader>
             
             <TaskWorkstationsManager 
+              workstationId={selectedWorkstation.id} 
+              workstationName={selectedWorkstation.name} 
+            />
+            
+            <div className="flex justify-end">
+              <DialogClose asChild>
+                <Button type="button" variant="outline">Close</Button>
+              </DialogClose>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {selectedWorkstation && (
+        <Dialog open={showTasksManager} onOpenChange={setShowTasksManager}>
+          <DialogContent className="max-w-6xl">
+            <DialogHeader>
+              <DialogTitle>Manage Workstation Tasks</DialogTitle>
+              <DialogDescription>
+                Create and manage tasks specific to {selectedWorkstation.name}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <WorkstationTasksManager 
               workstationId={selectedWorkstation.id} 
               workstationName={selectedWorkstation.name} 
             />

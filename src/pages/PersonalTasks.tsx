@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import Navbar from '@/components/Navbar';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import TaskTimer from '@/components/TaskTimer';
-import DailyTimeline from '@/components/DailyTimeline';
+import EnhancedDailyTimeline from '@/components/EnhancedDailyTimeline';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
@@ -435,7 +434,13 @@ const PersonalTasks = () => {
           </TabsContent>
 
           <TabsContent value="timeline" className="space-y-4">
-            <DailyTimeline tasks={timelineTasks} />
+            <EnhancedDailyTimeline 
+              tasks={timelineTasks} 
+              onTaskAction={handleTaskStatusChange}
+              onShowFiles={setShowFilesPopup}
+              onShowParts={setShowPartsDialog}
+              onShowBarcode={setShowBarcodeDialog}
+            />
           </TabsContent>
         </Tabs>
 
@@ -477,3 +482,5 @@ const PersonalTasks = () => {
 };
 
 export default PersonalTasks;
+
+}
