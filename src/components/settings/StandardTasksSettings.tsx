@@ -24,6 +24,22 @@ const StandardTasksSettings: React.FC = () => {
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
+  // Predefined color options
+  const colorOptions = [
+    '#3B82F6', // Blue
+    '#10B981', // Emerald
+    '#F59E0B', // Amber
+    '#EF4444', // Red
+    '#8B5CF6', // Purple
+    '#EC4899', // Pink
+    '#06B6D4', // Cyan
+    '#84CC16', // Lime
+    '#F97316', // Orange
+    '#6366F1', // Indigo
+    '#14B8A6', // Teal
+    '#F43F5E', // Rose
+  ];
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -89,6 +105,16 @@ const StandardTasksSettings: React.FC = () => {
     setStandardTasks(updatedTasks);
   };
 
+  const handleColorChange = (taskId: string, color: string) => {
+    const updatedTasks = standardTasks.map(task => {
+      if (task.id === taskId) {
+        return { ...task, color: color };
+      }
+      return task;
+    });
+    setStandardTasks(updatedTasks);
+  };
+
   const saveTimeCoefficient = async (task: StandardTask) => {
     setSaving(prev => ({ ...prev, [task.id]: true }));
     try {
@@ -126,6 +152,26 @@ const StandardTasksSettings: React.FC = () => {
       });
     } finally {
       setSaving(prev => ({ ...prev, [`${task.id}_day`]: false }));
+    }
+  };
+
+  const saveColor = async (task: StandardTask) => {
+    setSaving(prev => ({ ...prev, [`${task.id}_color`]: true }));
+    try {
+      await standardTasksService.updateColor(task.id, task.color || '#3B82F6');
+      toast({
+        title: 'Success',
+        description: `Color for ${task.task_number} updated successfully`,
+      });
+    } catch (error) {
+      console.error('Error updating color:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update color. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setSaving(prev => ({ ...prev, [`${task.id}_color`]: false }));
     }
   };
 
@@ -215,6 +261,8 @@ const StandardTasksSettings: React.FC = () => {
                 <TableHead className="w-20">Actions</TableHead>
                 <TableHead className="w-32">Day Counter</TableHead>
                 <TableHead className="w-20">Actions</TableHead>
+                <TableHead className="w-32">Color</TableHead>
+                <TableHead className="w-20">Actions</TableHead>
                 <TableHead className="w-96">Limit Phases (Standard Tasks)</TableHead>
               </TableRow>
             </TableHeader>
@@ -283,6 +331,35 @@ const StandardTasksSettings: React.FC = () => {
                         className="w-full"
                       >
                         {saving[`${task.id}_day`] ? (
+                          <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {colorOptions.map((color) => (
+                          <button
+                            key={color}
+                            className={`w-6 h-6 rounded border-2 ${
+                              task.color === color ? 'border-gray-900' : 'border-gray-300'
+                            }`}
+                            style={{ backgroundColor: color }}
+                            onClick={() => handleColorChange(task.id, color)}
+                          />
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => saveColor(task)} 
+                        disabled={saving[`${task.id}_color`]}
+                        className="w-full"
+                      >
+                        {saving[`${task.id}_color`] ? (
                           <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
                         ) : (
                           <Save className="h-4 w-4" />
