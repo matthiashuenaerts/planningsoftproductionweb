@@ -1,433 +1,600 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from "@/integrations/supabase/client";
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import TaskList from './TaskList';
+import { Task } from '@/services/dataService';
+import { taskService } from '@/services/dataService';
+import { rushOrderService } from '@/services/rushOrderService';
+import { workstationService } from '@/services/workstationService';
+import { standardTasksService } from '@/services/standardTasksService';
+import { timeRegistrationService } from '@/services/timeRegistrationService';
+import { workstationTasksService } from '@/services/workstationTasksService';
+import { supabase } from '@/integrations/supabase/client';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Clock, 
-  User, 
-  Calendar, 
-  Play, 
-  Square, 
-  CheckCircle, 
-  Filter,
-  ArrowUpDown,
-  Plus
-} from 'lucide-react';
-import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { standardTasksService } from '@/services/standardTasksService';
-
-interface ExtendedTask {
-  id: string;
-  title: string;
-  description: string;
-  status: 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD';
-  priority: string;
-  due_date: string;
-  assignee_id: string;
-  workstation: string;
-  phase_id: string;
-  duration: number;
-  standard_task_id?: string;
-  project_name: string;
-  project_id: string;
-  active_workers: number;
-  is_workstation_task: boolean;
-  created_at: string;
-  updated_at: string;
-}
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package, Barcode, Play } from 'lucide-react';
+import ProjectFilesPopup from './ProjectFilesPopup';
+import { PartsListViewer } from './PartsListViewer';
+import { PartsListDialog } from './PartsListDialog';
+import { ProjectBarcodeDialog } from './ProjectBarcodeDialog';
+import { format, differenceInDays, isAfter, isBefore } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 interface WorkstationViewProps {
-  workstationId: string;
-  onBack: () => void;
+  workstationName?: string;
+  workstationId?: string;
+  onBack?: () => void;
 }
 
-const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationId, onBack }) => {
+// Custom Task interface that includes countdown timer properties
+interface ExtendedTask extends Task {
+  timeRemaining?: string;
+  isOvertime?: boolean;
+  assignee_name?: string;
+  active_workers?: number;
+  project_id?: string;
+  is_workstation_task?: boolean;
+}
+
+const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, workstationId, onBack }) => {
   const [tasks, setTasks] = useState<ExtendedTask[]>([]);
-  const [workstationName, setWorkstationName] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [priorityFilter, setPriorityFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>('due_date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [showTaskForm, setShowTaskForm] = useState(false);
-  const [editingTask, setEditingTask] = useState<ExtendedTask | null>(null);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    priority: 'medium',
-    due_date: '',
-    duration: ''
-  });
-  const [taskStandardTasks, setTaskStandardTasks] = useState<Record<string, any>>({});
-  
+  const [error, setError] = useState<string | null>(null);
+  const [actualWorkstationName, setActualWorkstationName] = useState<string>('');
+  const [showProjectFiles, setShowProjectFiles] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [selectedProjectName, setSelectedProjectName] = useState<string>('');
+  const [showPartsListViewer, setShowPartsListViewer] = useState(false);
+  const [selectedTaskForParts, setSelectedTaskForParts] = useState<ExtendedTask | null>(null);
+  const [showPartsListDialog, setShowPartsListDialog] = useState(false);
+  const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    loadWorkstationData();
-    loadTaskStandardTasks();
-  }, [workstationId]);
+  // Function to get urgency class based on due date
+  const getUrgencyClass = (dueDate: string) => {
+    const today = new Date();
+    const due = new Date(dueDate);
+    const daysUntilDue = differenceInDays(due, today);
 
-  const loadTaskStandardTasks = async () => {
-    try {
-      const standardTasks = await standardTasksService.getAll();
-      const standardTasksMap: Record<string, any> = {};
-      standardTasks.forEach(task => {
-        standardTasksMap[task.id] = task;
-      });
-      setTaskStandardTasks(standardTasksMap);
-    } catch (error) {
-      console.error('Error loading standard tasks:', error);
+    if (isBefore(due, today)) {
+      return { class: 'overdue', label: 'Overdue', variant: 'destructive' as const };
+    } else if (daysUntilDue <= 1) {
+      return { class: 'critical', label: 'Critical', variant: 'destructive' as const };
+    } else if (daysUntilDue <= 3) {
+      return { class: 'urgent', label: 'Urgent', variant: 'default' as const };
+    } else if (daysUntilDue <= 7) {
+      return { class: 'high', label: 'High', variant: 'secondary' as const };
+    } else {
+      return { class: 'normal', label: 'Normal', variant: 'outline' as const };
     }
   };
 
-  const loadWorkstationData = async () => {
+  // Start task timer mutation
+  const startTimerMutation = useMutation({
+    mutationFn: ({ employeeId, taskId, remainingDuration }: { employeeId: string; taskId: string; remainingDuration?: number }) =>
+      timeRegistrationService.startTask(employeeId, taskId, remainingDuration),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+      toast({
+        title: 'Timer Started',
+        description: 'Time tracking has begun for this task',
+      });
+      loadTasks(); // Reload tasks to update the display
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: 'Failed to start timer',
+        variant: 'destructive'
+      });
+      console.error('Start timer error:', error);
+    }
+  });
+
+  // Timer for updating countdown
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTasks(prevTasks => prevTasks.map(task => {
+        if (task.status === 'IN_PROGRESS' && task.status_changed_at && task.duration) {
+          const startTime = new Date(task.status_changed_at);
+          const now = new Date();
+          const elapsedMs = now.getTime() - startTime.getTime();
+          const durationMs = task.duration * 60 * 1000; // Convert minutes to milliseconds
+          const remainingMs = durationMs - elapsedMs;
+          
+          if (remainingMs > 0) {
+            const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+            const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
+            
+            return {
+              ...task,
+              timeRemaining: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
+              isOvertime: false
+            };
+          } else {
+            const overtimeMs = Math.abs(remainingMs);
+            const hours = Math.floor(overtimeMs / (1000 * 60 * 60));
+            const minutes = Math.floor((overtimeMs % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((overtimeMs % (1000 * 60)) / 1000);
+            
+            return {
+              ...task,
+              timeRemaining: `+${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
+              isOvertime: true
+            };
+          }
+        }
+        return task;
+      }));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // First, resolve the workstation name if we only have the ID
+  useEffect(() => {
+    const resolveWorkstationName = async () => {
+      if (workstationName) {
+        setActualWorkstationName(workstationName);
+        return;
+      }
+      
+      if (workstationId) {
+        try {
+          const workstation = await workstationService.getById(workstationId);
+          if (workstation) {
+            setActualWorkstationName(workstation.name);
+          } else {
+            setError('Workstation not found');
+          }
+        } catch (error) {
+          console.error('Error fetching workstation:', error);
+          setError('Failed to load workstation details');
+        }
+      }
+    };
+    
+    resolveWorkstationName();
+  }, [workstationName, workstationId]);
+
+  const loadTasks = async () => {
+    if (!actualWorkstationName) return;
+    
     try {
       setLoading(true);
+      setError(null);
       
-      // Get workstation info
-      const { data: workstation, error: workstationError } = await supabase
-        .from('workstations')
-        .select('name')
-        .eq('id', workstationId)
-        .single();
+      console.log(`Loading tasks for workstation: ${actualWorkstationName}`);
+      
+      // Load regular tasks using the name - only TODO and IN_PROGRESS tasks
+      const regularTasks = await taskService.getByWorkstation(actualWorkstationName);
+      const activeTasks = regularTasks.filter(task => task.status === 'TODO' || task.status === 'IN_PROGRESS');
+      console.log(`Found ${activeTasks.length} active regular tasks`);
+      
+      // Get project info and assignee name for each regular task
+      const tasksWithProjectInfo = await Promise.all(
+        activeTasks.map(async (task) => {
+          try {
+            // Get phase data to get project id
+            const { data: phaseData, error: phaseError } = await supabase
+              .from('phases')
+              .select('project_id, name')
+              .eq('id', task.phase_id)
+              .single();
+            
+            if (phaseError) throw phaseError;
+            
+            // Get project name
+            const { data: projectData, error: projectError } = await supabase
+              .from('projects')
+              .select('name')
+              .eq('id', phaseData.project_id)
+              .single();
+            
+            if (projectError) throw projectError;
 
-      if (workstationError) throw workstationError;
-      setWorkstationName(workstation.name);
+            // Get assignee name if task is IN_PROGRESS and has assignee_id
+            let assigneeName = null;
+            if (task.status === 'IN_PROGRESS' && task.assignee_id) {
+              const { data: employeeData, error: employeeError } = await supabase
+                .from('employees')
+                .select('name')
+                .eq('id', task.assignee_id)
+                .single();
+              
+              if (!employeeError && employeeData) {
+                assigneeName = employeeData.name;
+              }
+            }
 
-      // Get regular tasks for this workstation
-      const { data: regularTasks, error: tasksError } = await supabase
-        .from('tasks')
-        .select(`
-          *,
-          phases!inner(
-            name,
-            projects!inner(
-              id,
-              name
-            )
-          )
-        `)
-        .eq('workstation', workstation.name)
-        .order('due_date', { ascending: true });
+            // Get count of active workers on this task
+            let activeWorkers = 0;
+            if (task.status === 'IN_PROGRESS') {
+              const { data: activeRegistrations, error: regError } = await supabase
+                .from('time_registrations')
+                .select('id')
+                .eq('task_id', task.id)
+                .eq('is_active', true);
+              
+              if (!regError && activeRegistrations) {
+                activeWorkers = activeRegistrations.length;
+              }
+            }
+            
+            return {
+              ...task,
+              project_name: projectData.name,
+              project_id: phaseData.project_id,
+              assignee_name: assigneeName,
+              active_workers: activeWorkers,
+              is_workstation_task: false
+            } as ExtendedTask;
+          } catch (error) {
+            console.error('Error fetching project info for task:', error);
+            return {
+              ...task,
+              project_name: 'Unknown Project',
+              project_id: '',
+              active_workers: 0,
+              is_workstation_task: false
+            } as ExtendedTask;
+          }
+        })
+      );
+      
+      // Load rush order tasks
+      let workstationDbId = workstationId;
+      if (!workstationDbId && actualWorkstationName) {
+        const { data: workstationData, error: workstationError } = await supabase
+          .from('workstations')
+          .select('id')
+          .eq('name', actualWorkstationName)
+          .single();
+        
+        if (workstationError) throw workstationError;
+        workstationDbId = workstationData.id;
+      }
+      
+      let allTasks = [...tasksWithProjectInfo];
+      
+      if (workstationDbId) {
+        const rushOrders = await rushOrderService.getRushOrdersForWorkstation(workstationDbId);
+        console.log(`Found ${rushOrders.length} rush orders for workstation`);
+        
+        // Process rush order tasks
+        if (rushOrders.length > 0) {
+          for (const rushOrder of rushOrders) {
+            if (rushOrder.tasks && rushOrder.tasks.length > 0) {
+              const tasksWithRushOrderInfo = await Promise.all(
+                rushOrder.tasks.map(async (taskLink: any) => {
+                  try {
+                    const { data: task, error: taskError } = await supabase
+                      .from('tasks')
+                      .select('*')
+                      .eq('id', taskLink.standard_task_id)
+                      .single();
+                    
+                    if (taskError) throw taskError;
+                    
+                    const { data: rushOrderInfo, error: rushOrderError } = await supabase
+                      .from('rush_orders')
+                      .select('title')
+                      .eq('id', taskLink.rush_order_id)
+                      .neq('status', 'completed')
+                      .single();
+                    
+                    if (rushOrderError) {
+                      return null;
+                    }
+                    
+                    const validateTaskStatus = (status: string): "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD" => {
+                      if (['TODO', 'IN_PROGRESS', 'COMPLETED', 'HOLD'].includes(status)) {
+                        return status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD";
+                      }
+                      return 'TODO';
+                    };
+                    
+                    const status = validateTaskStatus(task.status);
+                    
+                    // Only include TODO and IN_PROGRESS tasks from rush orders
+                    if (status !== 'TODO' && status !== 'IN_PROGRESS') {
+                      return null;
+                    }
+                    
+                    return {
+                      ...task,
+                      status,
+                      is_rush_order: true,
+                      rush_order_id: taskLink.rush_order_id,
+                      title: task.title,
+                      project_name: rushOrderInfo.title,
+                      active_workers: 0,
+                      is_workstation_task: false
+                    } as ExtendedTask;
+                  } catch (error) {
+                    console.error('Error processing rush order task:', error);
+                    return null;
+                  }
+                })
+              );
+              
+              const validRushOrderTasks = tasksWithRushOrderInfo.filter(task => task !== null) as ExtendedTask[];
+              allTasks = [...allTasks, ...validRushOrderTasks];
+            }
+          }
+        }
 
-      if (tasksError) throw tasksError;
-
-      // Get workstation tasks
-      const { data: workstationTasks, error: workstationTasksError } = await supabase
-        .from('workstation_tasks')
-        .select('*')
-        .eq('workstation_id', workstationId);
-
-      if (workstationTasksError) throw workstationTasksError;
-
-      // Transform regular tasks
-      const transformedRegularTasks: ExtendedTask[] = (regularTasks || []).map(task => ({
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        priority: task.priority,
-        due_date: task.due_date,
-        assignee_id: task.assignee_id,
-        workstation: task.workstation,
-        phase_id: task.phase_id,
-        duration: task.duration,
-        standard_task_id: task.standard_task_id,
-        project_name: task.phases.projects.name,
-        project_id: task.phases.projects.id,
-        active_workers: 0,
-        is_workstation_task: false,
-        created_at: task.created_at,
-        updated_at: task.updated_at
-      }));
-
-      // Transform workstation tasks to match ExtendedTask interface
-      const transformedWorkstationTasks: ExtendedTask[] = (workstationTasks || []).map(task => ({
-        id: task.id,
-        title: task.task_name,
-        description: task.description || '',
-        status: 'TODO' as const,
-        priority: task.priority,
-        due_date: new Date().toISOString().split('T')[0],
-        assignee_id: currentEmployee?.id || '',
-        workstation: workstation.name,
-        phase_id: '',
-        duration: task.duration || 0,
-        standard_task_id: null,
-        project_name: 'Workstation Task',
-        project_id: '',
-        active_workers: 0,
-        is_workstation_task: true,
-        created_at: task.created_at,
-        updated_at: task.updated_at
-      }));
-
-      // Combine and set all tasks
-      const allTasks = [...transformedRegularTasks, ...transformedWorkstationTasks];
+        // Note: Workstation tasks are NOT loaded here anymore - they're only accessible via the 3-dot menu
+      }
+      
+      console.log(`Total active tasks found: ${allTasks.length}`);
       setTasks(allTasks);
-
-    } catch (error: any) {
-      console.error('Error loading workstation data:', error);
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+      setError('Failed to load tasks');
       toast({
-        title: "Error",
-        description: `Failed to load workstation data: ${error.message}`,
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to load tasks for this workstation',
+        variant: 'destructive'
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleTaskStatusChange = async (taskId: string, newStatus: ExtendedTask['status']) => {
-    try {
-      const task = tasks.find(t => t.id === taskId);
-      if (!task) return;
-
-      if (task.is_workstation_task) {
-        // Handle workstation task status change if needed
-        // For now, workstation tasks don't change status in the database
-        setTasks(tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
-      } else {
-        // Handle regular task status change
-        const { error } = await supabase
-          .from('tasks')
-          .update({ 
-            status: newStatus,
-            completed_at: newStatus === 'COMPLETED' ? new Date().toISOString() : null,
-            completed_by: newStatus === 'COMPLETED' ? currentEmployee?.id : null
-          })
-          .eq('id', taskId);
-
-        if (error) throw error;
-
-        setTasks(tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
-        
-        toast({
-          title: "Success",
-          description: `Task status updated to ${newStatus.toLowerCase().replace('_', ' ')}`
-        });
-      }
-    } catch (error: any) {
-      console.error('Error updating task status:', error);
-      toast({
-        title: "Error",
-        description: `Failed to update task status: ${error.message}`,
-        variant: "destructive"
-      });
+  useEffect(() => {
+    if (actualWorkstationName) {
+      loadTasks();
     }
-  };
+  }, [actualWorkstationName]);
 
-  const handleCreateTask = async () => {
+  const checkAndUpdateLimitPhases = async (completedTask: ExtendedTask) => {
     try {
-      const { data, error } = await supabase
-        .from('workstation_tasks')
-        .insert([{
-          workstation_id: workstationId,
-          task_name: formData.title,
-          description: formData.description,
-          priority: formData.priority,
-          duration: formData.duration ? parseInt(formData.duration) : null
-        }])
-        .select()
+      if (!completedTask.standard_task_id) return;
+
+      // Get the project ID from the completed task
+      const { data: phaseData, error: phaseError } = await supabase
+        .from('phases')
+        .select('project_id')
+        .eq('id', completedTask.phase_id)
         .single();
 
-      if (error) throw error;
+      if (phaseError || !phaseData) return;
 
-      // Add the new task to the local state
-      const newTask: ExtendedTask = {
-        id: data.id,
-        title: data.task_name,
-        description: data.description || '',
-        status: 'TODO',
-        priority: data.priority,
-        due_date: new Date().toISOString().split('T')[0],
-        assignee_id: currentEmployee?.id || '',
-        workstation: workstationName,
-        phase_id: '',
-        duration: data.duration || 0,
-        standard_task_id: null,
-        project_name: 'Workstation Task',
-        project_id: '',
-        active_workers: 0,
-        is_workstation_task: true,
-        created_at: data.created_at,
-        updated_at: data.updated_at
-      };
+      const projectId = phaseData.project_id;
 
-      setTasks([...tasks, newTask]);
-      setShowTaskForm(false);
-      setFormData({
-        title: '',
-        description: '',
-        priority: 'medium',
-        due_date: '',
-        duration: ''
-      });
+      // Find all tasks in the project that are on HOLD and have limit phases
+      const { data: holdTasks, error: holdError } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          phases!inner(project_id)
+        `)
+        .eq('phases.project_id', projectId)
+        .eq('status', 'HOLD')
+        .not('standard_task_id', 'is', null);
 
-      toast({
-        title: "Success",
-        description: "Workstation task created successfully"
-      });
-    } catch (error: any) {
-      console.error('Error creating workstation task:', error);
-      toast({
-        title: "Error",
-        description: `Failed to create task: ${error.message}`,
-        variant: "destructive"
-      });
+      if (holdError || !holdTasks) return;
+
+      // Check each HOLD task to see if its limit phases are now satisfied
+      for (const holdTask of holdTasks) {
+        if (holdTask.standard_task_id) {
+          const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(
+            holdTask.standard_task_id,
+            projectId
+          );
+
+          if (limitPhasesSatisfied) {
+            // Update the task status from HOLD to TODO
+            await supabase
+              .from('tasks')
+              .update({ 
+                status: 'TODO',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', holdTask.id);
+
+            console.log(`Task ${holdTask.id} updated from HOLD to TODO due to satisfied limit phases`);
+          }
+        }
+      }
+
+      // Reload tasks to reflect changes
+      await loadTasks();
+    } catch (error) {
+      console.error('Error checking limit phases:', error);
     }
   };
 
-  const handleUpdateTask = async () => {
-    if (!editingTask) return;
-
+  const handleTaskUpdate = async (taskId: string, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     try {
-      if (editingTask.is_workstation_task) {
-        const { error } = await supabase
-          .from('workstation_tasks')
-          .update({
-            task_name: formData.title,
-            description: formData.description,
-            priority: formData.priority,
-            duration: formData.duration ? parseInt(formData.duration) : null
-          })
-          .eq('id', editingTask.id);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('tasks')
-          .update({
-            title: formData.title,
-            description: formData.description,
-            priority: formData.priority,
-            due_date: formData.due_date,
-            duration: formData.duration ? parseInt(formData.duration) : null
-          })
-          .eq('id', editingTask.id);
-
-        if (error) throw error;
+      if (newStatus === 'COMPLETED') {
+        // Use the new completeTask method that stops time registration first
+        await timeRegistrationService.completeTask(taskId);
+        
+        // Find the completed task for limit phase checking
+        const completedTask = tasks.find(task => task.id === taskId);
+        
+        // Remove completed task from local state
+        setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+        
+        // Check limit phases if task was completed
+        if (completedTask) {
+          await checkAndUpdateLimitPhases(completedTask);
+        }
+        
+        toast({
+          title: 'Success',
+          description: 'Task completed successfully',
+        });
+        return;
       }
-
+      
+      const updateData: any = { 
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Set status_changed_at and assignee when changing status to IN_PROGRESS
+      if (newStatus === 'IN_PROGRESS') {
+        updateData.status_changed_at = new Date().toISOString();
+        if (currentEmployee) {
+          updateData.assignee_id = currentEmployee.id;
+          
+          // Get current task duration for the timer
+          const currentTask = tasks.find(task => task.id === taskId);
+          const remainingDuration = currentTask?.duration;
+          
+          // Start time tracking for this task
+          startTimerMutation.mutate({
+            employeeId: currentEmployee.id,
+            taskId: taskId,
+            remainingDuration: remainingDuration
+          });
+        }
+      }
+      
+      const { error } = await supabase
+        .from('tasks')
+        .update(updateData)
+        .eq('id', taskId);
+        
+      if (error) throw error;
+      
       // Update local state
-      setTasks(tasks.map(t => t.id === editingTask.id ? {
-        ...t,
-        title: formData.title,
-        description: formData.description,
-        priority: formData.priority,
-        due_date: formData.due_date || t.due_date,
-        duration: formData.duration ? parseInt(formData.duration) : t.duration
-      } : t));
-
-      setEditingTask(null);
-      setShowTaskForm(false);
-      setFormData({
-        title: '',
-        description: '',
-        priority: 'medium',
-        due_date: '',
-        duration: ''
-      });
-
+      setTasks(prevTasks => 
+        prevTasks.map(task => 
+          task.id === taskId 
+            ? { ...task, status: newStatus, status_changed_at: updateData.status_changed_at || task.status_changed_at }
+            : task
+        )
+      );
+      
       toast({
-        title: "Success",
-        description: "Task updated successfully"
+        title: 'Success',
+        description: 'Task updated successfully',
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating task:', error);
       toast({
-        title: "Error",
-        description: `Failed to update task: ${error.message}`,
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to update task',
+        variant: 'destructive'
       });
     }
   };
 
-  const handleDeleteTask = async (taskId: string) => {
-    try {
-      const task = tasks.find(t => t.id === taskId);
-      if (!task) return;
-
-      if (task.is_workstation_task) {
-        const { error } = await supabase
-          .from('workstation_tasks')
-          .delete()
-          .eq('id', taskId);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('tasks')
-          .delete()
-          .eq('id', taskId);
-
-        if (error) throw error;
-      }
-
-      setTasks(tasks.filter(t => t.id !== taskId));
-      
-      toast({
-        title: "Success",
-        description: "Task deleted successfully"
-      });
-    } catch (error: any) {
-      console.error('Error deleting task:', error);
-      toast({
-        title: "Error",
-        description: `Failed to delete task: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Filter tasks to exclude workstation tasks from main lists
-  const filteredAndSortedTasks = tasks
-    .filter(task => !task.is_workstation_task) // Exclude workstation tasks from main view
-    .filter(task => {
-      const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          task.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          task.project_name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
-      const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
-      
-      return matchesSearch && matchesStatus && matchesPriority;
-    })
-    .sort((a, b) => {
-      let aValue: any = a[sortBy as keyof ExtendedTask];
-      let bValue: any = b[sortBy as keyof ExtendedTask];
-      
-      if (sortBy === 'due_date') {
-        aValue = new Date(aValue);
-        bValue = new Date(bValue);
-      }
-      
-      if (sortOrder === 'asc') {
-        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-      } else {
-        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-      }
-    });
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      'TODO': { color: 'bg-blue-100 text-blue-800 border-blue-300', label: 'To Do' },
-      'IN_PROGRESS': { color: 'bg-amber-100 text-amber-800 border-amber-300', label: 'In Progress' },
-      'COMPLETED': { color: 'bg-green-100 text-green-800 border-green-300', label: 'Completed' },
-      'HOLD': { color: 'bg-red-100 text-red-800 border-red-300', label: 'On Hold' }
-    };
+  const handleJoinTask = async (taskId: string) => {
+    if (!currentEmployee) return;
     
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig['TODO'];
-    return <Badge className={config.color}>{config.label}</Badge>;
+    try {
+      // Get current task to check if it's a workstation task
+      const currentTask = tasks.find(task => task.id === taskId);
+      
+      if (currentTask?.is_workstation_task) {
+        // Use the workstation task method
+        await timeRegistrationService.startWorkstationTask(currentEmployee.id, taskId);
+        toast({
+          title: 'Workstation Task Started',
+          description: 'Time tracking has begun for this workstation task',
+        });
+      } else {
+        // Use the regular task method
+        const remainingDuration = currentTask?.duration;
+        await startTimerMutation.mutateAsync({
+          employeeId: currentEmployee.id,
+          taskId: taskId,
+          remainingDuration: remainingDuration
+        });
+      }
+      
+      // Reload tasks to update the display
+      loadTasks();
+    } catch (error) {
+      console.error('Error joining task:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to start task timer',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleGoToFiles = (task: ExtendedTask) => {
+    if (task.project_id && task.project_name) {
+      setSelectedProjectId(task.project_id);
+      setSelectedProjectName(task.project_name);
+      setShowProjectFiles(true);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Project information not available for this task',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleShowProjectParts = (task: ExtendedTask) => {
+    if (task.project_id) {
+      setSelectedProjectId(task.project_id);
+      setSelectedProjectName(task.project_name || 'Unknown Project');
+      setShowPartsListDialog(true);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Project information not available for this task',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleShowBarcode = (task: ExtendedTask) => {
+    if (task.project_id) {
+      setSelectedProjectId(task.project_id);
+      setSelectedProjectName(task.project_name || 'Unknown Project');
+      setShowBarcodeDialog(true);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Project information not available for this task',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleShowPartsList = (task: ExtendedTask) => {
+    setSelectedTaskForParts(task);
+    setShowPartsListViewer(true);
+  };
+
+  const handleStartWorkstationTask = async (workstationTask: any) => {
+    if (!currentEmployee) return;
+    
+    try {
+      // Use the new startWorkstationTask method instead of regular startTask
+      await timeRegistrationService.startWorkstationTask(currentEmployee.id, workstationTask.id);
+      
+      // Invalidate queries to refresh the TaskTimer
+      queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+      
+      toast({
+        title: 'Workstation Task Started',
+        description: `Started working on ${workstationTask.task_name}`,
+      });
+    } catch (error) {
+      console.error('Error starting workstation task:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to start workstation task',
+        variant: 'destructive'
+      });
+    }
   };
 
   const getPriorityBadge = (priority: string) => {
@@ -443,379 +610,288 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationId, onBack
     }
   };
 
-  const getTaskColor = (task: ExtendedTask): string => {
-    if (task.standard_task_id && taskStandardTasks[task.standard_task_id]) {
-      return taskStandardTasks[task.standard_task_id].color || '#3B82F6';
-    }
-    return '#3B82F6'; // Default blue color
-  };
-
-  const openEditForm = (task: ExtendedTask) => {
-    setEditingTask(task);
-    setFormData({
-      title: task.title,
-      description: task.description,
-      priority: task.priority,
-      due_date: task.due_date,
-      duration: task.duration.toString()
-    });
-    setShowTaskForm(true);
-  };
-
   if (loading) {
     return (
-      <div className="flex justify-center items-center p-8">
+      <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
       </div>
     );
   }
 
-  const todoTasks = filteredAndSortedTasks.filter(task => task.status === 'TODO');
-  const inProgressTasks = filteredAndSortedTasks.filter(task => task.status === 'IN_PROGRESS');
-  const completedTasks = filteredAndSortedTasks.filter(task => task.status === 'COMPLETED');
+  if (error) {
+    return (
+      <div className="text-center text-red-500 p-4">
+        <p>{error}</p>
+      </div>
+    );
+  }
+
+  // Filter out workstation tasks from the main task lists
+  const inProgressTasks = tasks.filter(task => task.status === 'IN_PROGRESS' && !task.is_workstation_task);
+  const todoTasks = tasks.filter(task => task.status === 'TODO' && !task.is_workstation_task);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">{workstationName} Workstation</h2>
-        <Button onClick={() => setShowTaskForm(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Workstation Task
-        </Button>
-      </div>
-
-      {/* Search and Filter Controls */}
-      <div className="flex flex-wrap gap-4 bg-white p-4 rounded-lg border">
-        <div className="flex-1 min-w-64">
-          <Input
-            placeholder="Search tasks..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
-            <Filter className="h-4 w-4 mr-2" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="TODO">To Do</SelectItem>
-            <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-            <SelectItem value="COMPLETED">Completed</SelectItem>
-            <SelectItem value="HOLD">On Hold</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-          <SelectTrigger className="w-40">
-            <Filter className="h-4 w-4 mr-2" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Priority</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Button
-          variant="outline"
-          onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-        >
-          <ArrowUpDown className="h-4 w-4 mr-2" />
-          {sortBy} ({sortOrder})
-        </Button>
-      </div>
-
-      {/* Task Columns */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* TODO Column */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-blue-700">To Do</h3>
-            <Badge variant="secondary">{todoTasks.length}</Badge>
-          </div>
-          <div className="space-y-3">
-            {todoTasks.map((task) => (
-              <Card 
-                key={task.id} 
-                className="h-fit transition-all duration-200 hover:shadow-md"
-                style={{ borderLeftWidth: '4px', borderLeftColor: getTaskColor(task) }}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-sm font-medium text-gray-900 line-clamp-2">
-                      {task.title}
-                    </CardTitle>
-                  </div>
-                  <p className="text-xs text-gray-600 truncate">
-                    {task.project_name}
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex flex-wrap gap-1">
-                    {getStatusBadge(task.status)}
-                    {getPriorityBadge(task.priority)}
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <User className="h-3 w-3" />
-                      <span className="truncate">Workstation: {task.workstation}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <Calendar className="h-3 w-3" />
-                      <span>Due: {format(new Date(task.due_date), 'MMM dd, yyyy')}</span>
-                    </div>
-                    {task.duration && (
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <Clock className="h-3 w-3" />
-                        <span>Duration: {task.duration}h</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {task.description && (
-                    <p className="text-xs text-gray-600 line-clamp-2">
-                      {task.description}
-                    </p>
-                  )}
-
-                  <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      onClick={() => handleTaskStatusChange(task.id, 'IN_PROGRESS')}
-                      className="flex-1 h-7 text-xs"
-                    >
-                      <Play className="h-3 w-3 mr-1" />
-                      Start
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* IN PROGRESS Column */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-amber-700">In Progress</h3>
-            <Badge variant="secondary">{inProgressTasks.length}</Badge>
-          </div>
-          <div className="space-y-3">
-            {inProgressTasks.map((task) => (
-              <Card 
-                key={task.id} 
-                className="h-fit transition-all duration-200 hover:shadow-md ring-2 ring-amber-200"
-                style={{ borderLeftWidth: '4px', borderLeftColor: getTaskColor(task) }}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-sm font-medium text-gray-900 line-clamp-2">
-                      {task.title}
-                    </CardTitle>
-                  </div>
-                  <p className="text-xs text-gray-600 truncate">
-                    {task.project_name}
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex flex-wrap gap-1">
-                    {getStatusBadge(task.status)}
-                    {getPriorityBadge(task.priority)}
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <User className="h-3 w-3" />
-                      <span className="truncate">Workstation: {task.workstation}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <Calendar className="h-3 w-3" />
-                      <span>Due: {format(new Date(task.due_date), 'MMM dd, yyyy')}</span>
-                    </div>
-                    {task.duration && (
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <Clock className="h-3 w-3" />
-                        <span>Duration: {task.duration}h</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {task.description && (
-                    <p className="text-xs text-gray-600 line-clamp-2">
-                      {task.description}
-                    </p>
-                  )}
-
-                  <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleTaskStatusChange(task.id, 'TODO')}
-                      className="flex-1 h-7 text-xs"
-                    >
-                      <Square className="h-3 w-3 mr-1" />
-                      Pause
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleTaskStatusChange(task.id, 'COMPLETED')}
-                      className="flex-1 h-7 text-xs"
-                    >
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Complete
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* COMPLETED Column */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-green-700">Completed</h3>
-            <Badge variant="secondary">{completedTasks.length}</Badge>
-          </div>
-          <div className="space-y-3">
-            {completedTasks.map((task) => (
-              <Card 
-                key={task.id} 
-                className="h-fit transition-all duration-200 hover:shadow-md opacity-75"
-                style={{ borderLeftWidth: '4px', borderLeftColor: getTaskColor(task) }}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-sm font-medium text-gray-900 line-clamp-2">
-                      {task.title}
-                    </CardTitle>
-                  </div>
-                  <p className="text-xs text-gray-600 truncate">
-                    {task.project_name}
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex flex-wrap gap-1">
-                    {getStatusBadge(task.status)}
-                    {getPriorityBadge(task.priority)}
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <User className="h-3 w-3" />
-                      <span className="truncate">Workstation: {task.workstation}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <Calendar className="h-3 w-3" />
-                      <span>Due: {format(new Date(task.due_date), 'MMM dd, yyyy')}</span>
-                    </div>
-                    {task.duration && (
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <Clock className="h-3 w-3" />
-                        <span>Duration: {task.duration}h</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {task.description && (
-                    <p className="text-xs text-gray-600 line-clamp-2">
-                      {task.description}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">{actualWorkstationName} Workstation</h1>
+        <div className="flex gap-2">
+          {onBack && (
+            <button onClick={onBack} className="text-blue-600 hover:underline">
+              ← Back
+            </button>
+          )}
+          <Badge variant="outline" className="text-lg px-3 py-1">
+            {tasks.length} Active Tasks
+          </Badge>
         </div>
       </div>
 
-      {/* Task Form Dialog */}
-      <Dialog open={showTaskForm} onOpenChange={setShowTaskForm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingTask ? 'Edit Task' : 'Create New Workstation Task'}
-            </DialogTitle>
-            <DialogDescription>
-              {editingTask ? 'Update the task details below.' : 'Fill in the details for the new workstation task.'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="title">Task Name</Label>
-              <Input
-                id="title"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Enter task name"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Enter task description"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="priority">Priority</Label>
-              <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {!editingTask?.is_workstation_task && (
-              <div>
-                <Label htmlFor="due_date">Due Date</Label>
-                <Input
-                  id="due_date"
-                  type="date"
-                  value={formData.due_date}
-                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                />
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PlayCircle className="h-5 w-5" />
+              In Progress Tasks ({inProgressTasks.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {inProgressTasks.length > 0 ? (
+              <div className="space-y-3">
+                {inProgressTasks.map((task) => {
+                  const urgency = task.due_date ? getUrgencyClass(task.due_date) : null;
+                  return (
+                    <div key={task.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h3 className="font-medium">{task.project_name}</h3>
+                          <p className="text-sm text-gray-600">{task.title}</p>
+                          {task.assignee_name && (
+                            <p className="text-sm text-blue-600">Assigned to: {task.assignee_name}</p>
+                          )}
+                          {task.due_date && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-sm text-gray-500">
+                                Due: {format(new Date(task.due_date), 'MMM dd, yyyy')}
+                              </p>
+                              {urgency && (
+                                <Badge variant={urgency.variant} className="text-xs">
+                                  {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-1" />}
+                                  {urgency.label}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                          {task.timeRemaining && (
+                            <p className={`text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-green-600'}`}>
+                              Time: {task.timeRemaining}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {task.active_workers && task.active_workers > 0 && (
+                            <div className="flex items-center gap-1 text-sm text-blue-600">
+                              <Users className="h-4 w-4" />
+                              <span>{task.active_workers}</span>
+                            </div>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleShowProjectParts(task)}
+                            title="View Project Parts List"
+                          >
+                            <Package className="h-4 w-4" />
+                            Parts
+                          </Button>
+                          {task.project_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGoToFiles(task)}
+                              title="View Project Files"
+                            >
+                              <FileText className="h-4 w-4" />
+                              Files
+                            </Button>
+                          )}
+                          {task.project_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleShowBarcode(task)}
+                              title="Show Project Barcode"
+                            >
+                              <Barcode className="h-4 w-4" />
+                              Barcode
+                            </Button>
+                          )}
+                          {task.project_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => navigate(`/projects/${task.project_id}`)}
+                              title="Go to Project Details"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              Project
+                            </Button>
+                          )}
+                          <button
+                            onClick={() => handleJoinTask(task.id)}
+                            className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                          >
+                            Join Task
+                          </button>
+                          <button
+                            onClick={() => handleTaskUpdate(task.id, 'COMPLETED')}
+                            className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                          >
+                            Complete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+            ) : (
+              <p className="text-gray-500 text-center py-4">No tasks in progress</p>
             )}
-            
-            <div>
-              <Label htmlFor="duration">Duration (hours)</Label>
-              <Input
-                id="duration"
-                type="number"
-                value={formData.duration}
-                onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                placeholder="Estimated duration in hours"
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTaskForm(false)}>
-              Cancel
-            </Button>
-            <Button onClick={editingTask ? handleUpdateTask : handleCreateTask}>
-              {editingTask ? 'Update Task' : 'Create Task'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              TODO Tasks ({todoTasks.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {todoTasks.length > 0 ? (
+              <div className="space-y-3">
+                {todoTasks.map((task) => {
+                  const urgency = task.due_date ? getUrgencyClass(task.due_date) : null;
+                  return (
+                    <div key={task.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h3 className="font-medium">{task.project_name}</h3>
+                          <p className="text-sm text-gray-600">{task.title}</p>
+                          {task.due_date && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-sm text-gray-500">
+                                Due: {format(new Date(task.due_date), 'MMM dd, yyyy')}
+                              </p>
+                              {urgency && (
+                                <Badge variant={urgency.variant} className="text-xs">
+                                  {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-1" />}
+                                  {urgency.label}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleShowProjectParts(task)}
+                            title="View Project Parts List"
+                          >
+                            <Package className="h-4 w-4" />
+                            Parts
+                          </Button>
+                          {task.project_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGoToFiles(task)}
+                              title="View Project Files"
+                            >
+                              <FileText className="h-4 w-4" />
+                              Files
+                            </Button>
+                          )}
+                          {task.project_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleShowBarcode(task)}
+                              title="Show Project Barcode"
+                            >
+                              <Barcode className="h-4 w-4" />
+                              Barcode
+                            </Button>
+                          )}
+                          {task.project_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => navigate(`/projects/${task.project_id}`)}
+                              title="Go to Project Details"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              Project
+                            </Button>
+                          )}
+                          <button
+                            onClick={() => handleTaskUpdate(task.id, 'IN_PROGRESS')}
+                            className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                          >
+                            Start
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-center py-4">No TODO tasks available</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Project Files Popup */}
+      {showProjectFiles && (
+        <ProjectFilesPopup
+          isOpen={showProjectFiles}
+          onClose={() => setShowProjectFiles(false)}
+          projectId={selectedProjectId}
+          projectName={selectedProjectName}
+        />
+      )}
+
+      {/* Task Parts List Viewer */}
+      {showPartsListViewer && selectedTaskForParts && (
+        <PartsListViewer
+          isOpen={showPartsListViewer}
+          onClose={() => setShowPartsListViewer(false)}
+          taskId={selectedTaskForParts.id}
+          taskTitle={selectedTaskForParts.title}
+        />
+      )}
+
+      {/* Project Parts List Dialog */}
+      {showPartsListDialog && (
+        <PartsListDialog
+          isOpen={showPartsListDialog}
+          onClose={() => setShowPartsListDialog(false)}
+          projectId={selectedProjectId}
+        />
+      )}
+
+      {/* Project Barcode Dialog */}
+      {showBarcodeDialog && (
+        <ProjectBarcodeDialog
+          isOpen={showBarcodeDialog}
+          onClose={() => setShowBarcodeDialog(false)}
+          projectId={selectedProjectId}
+          projectName={selectedProjectName}
+        />
+      )}
     </div>
   );
 };
