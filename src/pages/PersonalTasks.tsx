@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import Navbar from '@/components/Navbar';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import TaskTimer from '@/components/TaskTimer';
-import EnhancedDailyTimeline from '@/components/EnhancedDailyTimeline';
+import DailyTimeline from '@/components/DailyTimeline';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
@@ -213,14 +214,20 @@ const PersonalTasks = () => {
     return (task.status === 'IN_PROGRESS' || isTaskActive(task.id)) && task.status !== 'COMPLETED';
   };
 
-  // Convert schedules to timeline format
+  // Convert schedules to timeline format for DailyTimeline component
   const timelineTasks = schedules.map(schedule => ({
     id: schedule.id,
     title: schedule.title,
     start_time: schedule.start_time,
     end_time: schedule.end_time,
     description: schedule.description,
-    status: 'scheduled'
+    status: 'scheduled',
+    project_name: schedule.title, // Use title as project name for schedules
+    workstation: '',
+    priority: 'medium',
+    canStart: false,
+    canComplete: false,
+    isActive: false
   }));
 
   // Stats calculations
@@ -436,8 +443,8 @@ const PersonalTasks = () => {
           </TabsContent>
 
           <TabsContent value="timeline" className="space-y-4">
-            <EnhancedDailyTimeline 
-              tasks={timelineTasks} 
+            <DailyTimeline 
+              tasks={timelineTasks}
               onTaskAction={handleTaskStatusChange}
               onShowFiles={setShowFilesPopup}
               onShowParts={setShowPartsDialog}

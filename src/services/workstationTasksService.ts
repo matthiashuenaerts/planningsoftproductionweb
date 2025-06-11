@@ -30,7 +30,7 @@ export interface UpdateWorkstationTaskData {
 export const workstationTasksService = {
   async getAll(): Promise<WorkstationTask[]> {
     const { data, error } = await supabase
-      .from('workstation_tasks')
+      .from('workstation_tasks' as any)
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -43,7 +43,7 @@ export const workstationTasksService = {
 
   async getByWorkstation(workstationId: string): Promise<WorkstationTask[]> {
     const { data, error } = await supabase
-      .from('workstation_tasks')
+      .from('workstation_tasks' as any)
       .select('*')
       .eq('workstation_id', workstationId)
       .order('created_at', { ascending: false });
@@ -57,7 +57,7 @@ export const workstationTasksService = {
 
   async getById(id: string): Promise<WorkstationTask | null> {
     const { data, error } = await supabase
-      .from('workstation_tasks')
+      .from('workstation_tasks' as any)
       .select('*')
       .eq('id', id)
       .single();
@@ -74,7 +74,7 @@ export const workstationTasksService = {
 
   async create(taskData: CreateWorkstationTaskData): Promise<WorkstationTask> {
     const { data, error } = await supabase
-      .from('workstation_tasks')
+      .from('workstation_tasks' as any)
       .insert([{
         ...taskData,
         created_at: new Date().toISOString(),
@@ -92,7 +92,7 @@ export const workstationTasksService = {
 
   async update(id: string, taskData: UpdateWorkstationTaskData): Promise<WorkstationTask> {
     const { data, error } = await supabase
-      .from('workstation_tasks')
+      .from('workstation_tasks' as any)
       .update({
         ...taskData,
         updated_at: new Date().toISOString()
@@ -110,7 +110,7 @@ export const workstationTasksService = {
 
   async delete(id: string): Promise<void> {
     const { error } = await supabase
-      .from('workstation_tasks')
+      .from('workstation_tasks' as any)
       .delete()
       .eq('id', id);
 

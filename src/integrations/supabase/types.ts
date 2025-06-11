@@ -1414,6 +1414,47 @@ export type Database = {
         }
         Relationships: []
       }
+      workstation_tasks: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration: number | null
+          id: string
+          priority: string
+          task_name: string
+          updated_at: string
+          workstation_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration?: number | null
+          id?: string
+          priority?: string
+          task_name: string
+          updated_at?: string
+          workstation_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration?: number | null
+          id?: string
+          priority?: string
+          task_name?: string
+          updated_at?: string
+          workstation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workstation_tasks_workstation_id_fkey"
+            columns: ["workstation_id"]
+            isOneToOne: false
+            referencedRelation: "workstations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workstations: {
         Row: {
           created_at: string
