@@ -484,5 +484,3 @@ const PersonalTasks = () => {
 };
 
 export default PersonalTasks;
-
-}
