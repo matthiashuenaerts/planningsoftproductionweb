@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
@@ -50,10 +51,37 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const [selectedTaskForParts, setSelectedTaskForParts] = useState<ExtendedTask | null>(null);
   const [showPartsListDialog, setShowPartsListDialog] = useState(false);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
+  const [standardTasks, setStandardTasks] = useState<Record<string, any>>({});
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  // Load standard tasks for color mapping
+  useEffect(() => {
+    loadStandardTasks();
+  }, []);
+
+  const loadStandardTasks = async () => {
+    try {
+      const allStandardTasks = await standardTasksService.getAll();
+      const standardTasksMap: Record<string, any> = {};
+      allStandardTasks.forEach(task => {
+        standardTasksMap[task.id] = task;
+      });
+      setStandardTasks(standardTasksMap);
+    } catch (error) {
+      console.error('Error loading standard tasks:', error);
+    }
+  };
+
+  // Function to get task color from standard task
+  const getTaskColor = (task: ExtendedTask): string | null => {
+    if (task.standard_task_id && standardTasks[task.standard_task_id]) {
+      return standardTasks[task.standard_task_id].color || null;
+    }
+    return null;
+  };
 
   // Function to get urgency class based on due date
   const getUrgencyClass = (dueDate: string) => {
@@ -610,6 +638,23 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     }
   };
 
+  // Sort tasks by due date ascending, then by project name
+  const sortTasks = (tasksToSort: ExtendedTask[]) => {
+    return tasksToSort.sort((a, b) => {
+      // First sort by due date (ascending)
+      const dateA = new Date(a.due_date);
+      const dateB = new Date(b.due_date);
+      const dateComparison = dateA.getTime() - dateB.getTime();
+      
+      if (dateComparison !== 0) {
+        return dateComparison;
+      }
+      
+      // If dates are equal, sort by project name (ascending)
+      return (a.project_name || '').localeCompare(b.project_name || '');
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -626,9 +671,9 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     );
   }
 
-  // Filter out workstation tasks from the main task lists
-  const inProgressTasks = tasks.filter(task => task.status === 'IN_PROGRESS' && !task.is_workstation_task);
-  const todoTasks = tasks.filter(task => task.status === 'TODO' && !task.is_workstation_task);
+  // Filter out workstation tasks from the main task lists and sort them
+  const inProgressTasks = sortTasks(tasks.filter(task => task.status === 'IN_PROGRESS' && !task.is_workstation_task));
+  const todoTasks = sortTasks(tasks.filter(task => task.status === 'TODO' && !task.is_workstation_task));
 
   return (
     <div className="space-y-6">
@@ -659,8 +704,17 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
               <div className="space-y-3">
                 {inProgressTasks.map((task) => {
                   const urgency = task.due_date ? getUrgencyClass(task.due_date) : null;
+                  const taskColor = getTaskColor(task);
                   return (
-                    <div key={task.id} className="border rounded-lg p-4">
+                    <div 
+                      key={task.id} 
+                      className="border rounded-lg p-4 relative"
+                      style={{
+                        borderLeftWidth: '4px',
+                        borderLeftColor: taskColor || '#e5e7eb',
+                        borderLeftStyle: 'solid'
+                      }}
+                    >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <h3 className="font-medium">{task.project_name}</h3>
@@ -772,8 +826,17 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
               <div className="space-y-3">
                 {todoTasks.map((task) => {
                   const urgency = task.due_date ? getUrgencyClass(task.due_date) : null;
+                  const taskColor = getTaskColor(task);
                   return (
-                    <div key={task.id} className="border rounded-lg p-4">
+                    <div 
+                      key={task.id} 
+                      className="border rounded-lg p-4 relative"
+                      style={{
+                        borderLeftWidth: '4px',
+                        borderLeftColor: taskColor || '#e5e7eb',
+                        borderLeftStyle: 'solid'
+                      }}
+                    >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <h3 className="font-medium">{task.project_name}</h3>
