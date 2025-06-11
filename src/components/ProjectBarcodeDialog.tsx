@@ -26,7 +26,7 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
   const generateBarcodeData = () => {
     const digits = projectName.replace(/\D/g, ''); // Extract only digits
     const first7Digits = digits.substring(0, 7);
-    return `*/${first7Digits}*`;
+    return `/${first7Digits}`;
   };
 
   const barcodeData = generateBarcodeData();
