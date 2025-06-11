@@ -1,9 +1,10 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface TimeRegistration {
   id: string;
   employee_id: string;
-  task_id: string;
+  task_id?: string;
   workstation_task_id?: string;
   start_time: string;
   end_time?: string;
@@ -80,10 +81,6 @@ export const timeRegistrationService = {
     
     if (isWorkstationTask) {
       insertData.workstation_task_id = taskId;
-      // For workstation tasks, we'll use a placeholder task_id or handle it differently
-      // Since we need a task_id for the foreign key, we'll need to modify the approach
-      // This will need to be handled at the database level
-      insertData.task_id = null; // This will need to be handled at the database level
     } else {
       insertData.task_id = taskId;
     }
@@ -102,13 +99,12 @@ export const timeRegistrationService = {
     // First, stop any active registrations for this employee
     await this.stopActiveRegistrations(employeeId);
     
-    // Create time registration for workstation task
-    // We'll create a special entry that doesn't reference the tasks table
+    // Create time registration for workstation task using the new column
     const { data, error } = await supabase
       .from('time_registrations')
       .insert([{
         employee_id: employeeId,
-        task_id: workstationTaskId, // We'll use the workstation task ID directly
+        workstation_task_id: workstationTaskId,
         start_time: new Date().toISOString(),
         is_active: true
       }])
@@ -116,10 +112,8 @@ export const timeRegistrationService = {
       .single();
     
     if (error) {
-      // If foreign key constraint fails, it means this is a workstation task
-      // Let's handle it by creating a dummy task entry or modifying our approach
       console.error('Error creating time registration for workstation task:', error);
-      throw new Error('Unable to start workstation task timer. This feature needs database schema updates.');
+      throw error;
     }
     
     return data as TimeRegistration;
@@ -131,7 +125,7 @@ export const timeRegistrationService = {
     // Get the registration to calculate duration and task info
     const { data: registration, error: fetchError } = await supabase
       .from('time_registrations')
-      .select('start_time, task_id')
+      .select('start_time, task_id, workstation_task_id')
       .eq('id', registrationId)
       .single();
     
@@ -140,16 +134,20 @@ export const timeRegistrationService = {
     const startTime = new Date(registration.start_time);
     const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / (1000 * 60));
     
-    // Get current task info to calculate remaining duration (only for regular tasks)
-    const { data: taskData, error: taskError } = await supabase
-      .from('tasks')
-      .select('duration')
-      .eq('id', registration.task_id)
-      .maybeSingle();
-    
     let remainingDuration: number | undefined;
-    if (taskData && taskData.duration) {
-      remainingDuration = Math.max(0, taskData.duration - durationMinutes);
+    
+    // Only handle task status updates for regular tasks (not workstation tasks)
+    if (registration.task_id) {
+      // Get current task info to calculate remaining duration
+      const { data: taskData, error: taskError } = await supabase
+        .from('tasks')
+        .select('duration')
+        .eq('id', registration.task_id)
+        .maybeSingle();
+      
+      if (taskData && taskData.duration) {
+        remainingDuration = Math.max(0, taskData.duration - durationMinutes);
+      }
     }
     
     const { data, error } = await supabase
@@ -166,7 +164,7 @@ export const timeRegistrationService = {
     if (error) throw error;
     
     // Only update task status for regular tasks (not workstation tasks)
-    if (taskData) {
+    if (registration.task_id) {
       // Check if anyone else is still working on this task
       const { data: stillActive, error: stillActiveError } = await supabase
         .from('time_registrations')
@@ -202,11 +200,11 @@ export const timeRegistrationService = {
   },
 
   async completeTask(taskId: string): Promise<void> {
-    // First, stop all active time registrations for this task
+    // First, stop all active time registrations for this task (both regular and workstation tasks)
     const { data: activeRegistrations, error: fetchError } = await supabase
       .from('time_registrations')
-      .select('id, start_time')
-      .eq('task_id', taskId)
+      .select('id, start_time, task_id, workstation_task_id')
+      .or(`task_id.eq.${taskId},workstation_task_id.eq.${taskId}`)
       .eq('is_active', true);
     
     if (fetchError) throw fetchError;
@@ -229,7 +227,7 @@ export const timeRegistrationService = {
       }
     }
     
-    // Now mark the task as completed (only for regular tasks)
+    // Now mark the task as completed (only for regular tasks, not workstation tasks)
     const { data: taskExists } = await supabase
       .from('tasks')
       .select('id')
@@ -251,7 +249,7 @@ export const timeRegistrationService = {
   async stopActiveRegistrations(employeeId: string): Promise<void> {
     const { data: activeRegistrations, error: fetchError } = await supabase
       .from('time_registrations')
-      .select('id, start_time, task_id')
+      .select('id, start_time, task_id, workstation_task_id')
       .eq('employee_id', employeeId)
       .eq('is_active', true);
     
@@ -264,16 +262,20 @@ export const timeRegistrationService = {
         const startTime = new Date(registration.start_time);
         const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / (1000 * 60));
         
-        // Get task duration to calculate remaining time (only for regular tasks)
-        const { data: taskData } = await supabase
-          .from('tasks')
-          .select('duration')
-          .eq('id', registration.task_id)
-          .maybeSingle();
-        
         let remainingDuration: number | undefined;
-        if (taskData?.duration) {
-          remainingDuration = Math.max(0, taskData.duration - durationMinutes);
+        
+        // Only handle task status updates for regular tasks
+        if (registration.task_id) {
+          // Get task duration to calculate remaining time
+          const { data: taskData } = await supabase
+            .from('tasks')
+            .select('duration')
+            .eq('id', registration.task_id)
+            .maybeSingle();
+          
+          if (taskData?.duration) {
+            remainingDuration = Math.max(0, taskData.duration - durationMinutes);
+          }
         }
         
         // Stop the registration
@@ -287,7 +289,7 @@ export const timeRegistrationService = {
           .eq('id', registration.id);
         
         // Only update task status for regular tasks
-        if (taskData) {
+        if (registration.task_id) {
           // Check if anyone else is still working on this task
           const { data: stillActive, error: stillActiveError } = await supabase
             .from('time_registrations')
@@ -336,7 +338,8 @@ export const timeRegistrationService = {
       .select(`
         *,
         employees (name),
-        tasks (title, phases (name, projects (name)))
+        tasks (title, phases (name, projects (name))),
+        workstation_tasks (task_name, workstations (name))
       `)
       .order('start_time', { ascending: false });
     
@@ -349,7 +352,8 @@ export const timeRegistrationService = {
       .from('time_registrations')
       .select(`
         *,
-        tasks (title, phases (name, projects (name)))
+        tasks (title, phases (name, projects (name))),
+        workstation_tasks (task_name, workstations (name))
       `)
       .eq('employee_id', employeeId)
       .order('start_time', { ascending: false });

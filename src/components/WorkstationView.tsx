@@ -325,6 +325,43 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
             }
           }
         }
+
+        // Load workstation-specific tasks
+        try {
+          const { data: workstationTasks, error: workstationTasksError } = await supabase
+            .from('workstation_tasks')
+            .select('*')
+            .eq('workstation_id', workstationDbId);
+          
+          if (workstationTasksError) throw workstationTasksError;
+          
+          if (workstationTasks && workstationTasks.length > 0) {
+            console.log(`Found ${workstationTasks.length} workstation tasks`);
+            
+            // Convert workstation tasks to the same format as regular tasks
+            const workstationTasksFormatted = workstationTasks.map(wTask => ({
+              id: wTask.id,
+              title: wTask.task_name,
+              description: wTask.description || '',
+              status: 'TODO' as const,
+              priority: wTask.priority,
+              due_date: new Date().toISOString(), // Default to today
+              assignee_id: null,
+              workstation: actualWorkstationName,
+              phase_id: '',
+              duration: wTask.duration || 60, // Default 1 hour in minutes
+              standard_task_id: null,
+              project_name: `Workstation Task - ${actualWorkstationName}`,
+              project_id: null,
+              active_workers: 0,
+              is_workstation_task: true
+            })) as ExtendedTask[];
+            
+            allTasks = [...allTasks, ...workstationTasksFormatted];
+          }
+        } catch (error) {
+          console.error('Error loading workstation tasks:', error);
+        }
       }
       
       console.log(`Total active tasks found: ${allTasks.length}`);
@@ -488,17 +525,35 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     if (!currentEmployee) return;
     
     try {
-      // Get current task to check remaining duration
+      // Get current task to check if it's a workstation task
       const currentTask = tasks.find(task => task.id === taskId);
-      const remainingDuration = currentTask?.duration;
       
-      await startTimerMutation.mutateAsync({
-        employeeId: currentEmployee.id,
-        taskId: taskId,
-        remainingDuration: remainingDuration
-      });
+      if (currentTask?.is_workstation_task) {
+        // Use the workstation task method
+        await timeRegistrationService.startWorkstationTask(currentEmployee.id, taskId);
+        toast({
+          title: 'Workstation Task Started',
+          description: 'Time tracking has begun for this workstation task',
+        });
+      } else {
+        // Use the regular task method
+        const remainingDuration = currentTask?.duration;
+        await startTimerMutation.mutateAsync({
+          employeeId: currentEmployee.id,
+          taskId: taskId,
+          remainingDuration: remainingDuration
+        });
+      }
+      
+      // Reload tasks to update the display
+      loadTasks();
     } catch (error) {
       console.error('Error joining task:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to start task timer',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -658,6 +713,11 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                               Time: {task.timeRemaining}
                             </p>
                           )}
+                          {task.is_workstation_task && (
+                            <Badge variant="secondary" className="text-xs mt-1">
+                              Workstation Task
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           {task.active_workers && task.active_workers > 0 && (
@@ -666,47 +726,51 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                               <span>{task.active_workers}</span>
                             </div>
                           )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleShowProjectParts(task)}
-                            title="View Project Parts List"
-                          >
-                            <Package className="h-4 w-4" />
-                            Parts
-                          </Button>
-                          {task.project_id && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleGoToFiles(task)}
-                              title="View Project Files"
-                            >
-                              <FileText className="h-4 w-4" />
-                              Files
-                            </Button>
-                          )}
-                          {task.project_id && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleShowBarcode(task)}
-                              title="Show Project Barcode"
-                            >
-                              <Barcode className="h-4 w-4" />
-                              Barcode
-                            </Button>
-                          )}
-                          {task.project_id && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate(`/projects/${task.project_id}`)}
-                              title="Go to Project Details"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                              Project
-                            </Button>
+                          {!task.is_workstation_task && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleShowProjectParts(task)}
+                                title="View Project Parts List"
+                              >
+                                <Package className="h-4 w-4" />
+                                Parts
+                              </Button>
+                              {task.project_id && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleGoToFiles(task)}
+                                  title="View Project Files"
+                                >
+                                  <FileText className="h-4 w-4" />
+                                  Files
+                                </Button>
+                              )}
+                              {task.project_id && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleShowBarcode(task)}
+                                  title="Show Project Barcode"
+                                >
+                                  <Barcode className="h-4 w-4" />
+                                  Barcode
+                                </Button>
+                              )}
+                              {task.project_id && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => navigate(`/projects/${task.project_id}`)}
+                                  title="Go to Project Details"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                  Project
+                                </Button>
+                              )}
+                            </>
                           )}
                           <button
                             onClick={() => handleJoinTask(task.id)}
@@ -763,52 +827,61 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                               )}
                             </div>
                           )}
+                          {task.is_workstation_task && (
+                            <Badge variant="secondary" className="text-xs mt-1">
+                              Workstation Task
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleShowProjectParts(task)}
-                            title="View Project Parts List"
-                          >
-                            <Package className="h-4 w-4" />
-                            Parts
-                          </Button>
-                          {task.project_id && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleGoToFiles(task)}
-                              title="View Project Files"
-                            >
-                              <FileText className="h-4 w-4" />
-                              Files
-                            </Button>
-                          )}
-                          {task.project_id && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleShowBarcode(task)}
-                              title="Show Project Barcode"
-                            >
-                              <Barcode className="h-4 w-4" />
-                              Barcode
-                            </Button>
-                          )}
-                          {task.project_id && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate(`/projects/${task.project_id}`)}
-                              title="Go to Project Details"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                              Project
-                            </Button>
+                          {!task.is_workstation_task && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleShowProjectParts(task)}
+                                title="View Project Parts List"
+                              >
+                                <Package className="h-4 w-4" />
+                                Parts
+                              </Button>
+                              {task.project_id && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleGoToFiles(task)}
+                                  title="View Project Files"
+                                >
+                                  <FileText className="h-4 w-4" />
+                                  Files
+                                </Button>
+                              )}
+                              {task.project_id && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleShowBarcode(task)}
+                                  title="Show Project Barcode"
+                                >
+                                  <Barcode className="h-4 w-4" />
+                                  Barcode
+                                </Button>
+                              )}
+                              {task.project_id && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => navigate(`/projects/${task.project_id}`)}
+                                  title="Go to Project Details"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                  Project
+                                </Button>
+                              )}
+                            </>
                           )}
                           <button
-                            onClick={() => handleTaskUpdate(task.id, 'IN_PROGRESS')}
+                            onClick={() => task.is_workstation_task ? handleJoinTask(task.id) : handleTaskUpdate(task.id, 'IN_PROGRESS')}
                             className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
                           >
                             Start

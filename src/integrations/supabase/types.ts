@@ -1262,8 +1262,9 @@ export type Database = {
           id: string
           is_active: boolean
           start_time: string
-          task_id: string
+          task_id: string | null
           updated_at: string
+          workstation_task_id: string | null
         }
         Insert: {
           created_at?: string
@@ -1273,8 +1274,9 @@ export type Database = {
           id?: string
           is_active?: boolean
           start_time: string
-          task_id: string
+          task_id?: string | null
           updated_at?: string
+          workstation_task_id?: string | null
         }
         Update: {
           created_at?: string
@@ -1284,8 +1286,9 @@ export type Database = {
           id?: string
           is_active?: boolean
           start_time?: string
-          task_id?: string
+          task_id?: string | null
           updated_at?: string
+          workstation_task_id?: string | null
         }
         Relationships: [
           {
@@ -1300,6 +1303,13 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_registrations_workstation_task_id_fkey"
+            columns: ["workstation_task_id"]
+            isOneToOne: false
+            referencedRelation: "workstation_tasks"
             referencedColumns: ["id"]
           },
         ]
