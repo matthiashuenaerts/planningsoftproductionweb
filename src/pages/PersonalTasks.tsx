@@ -305,14 +305,16 @@ const PersonalTasks = () => {
                 <Card key={task.id} className="h-fit">
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start mb-2">
-                      <CardTitle className="text-lg">{task.title}</CardTitle>
+                      <div className="flex-1">
+                        <CardTitle className="text-lg mb-1">{task.phases.projects.name}</CardTitle>
+                        <CardDescription className="text-base font-medium">
+                          {task.title}
+                        </CardDescription>
+                      </div>
                       {isTaskActive(task.id) && (
                         <TaskTimer />
                       )}
                     </div>
-                    <CardDescription className="text-sm">
-                      {task.phases.projects.name} - {task.phases.name}
-                    </CardDescription>
                   </CardHeader>
                   
                   <CardContent className="space-y-4">
