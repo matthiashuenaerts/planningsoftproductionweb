@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -230,6 +229,39 @@ const PersonalTasks = () => {
     isActive: false
   }));
 
+  // Add actual tasks to timeline with proper project information
+  const taskTimelineItems = tasks.map(task => ({
+    id: task.id,
+    title: task.title,
+    start_time: new Date().toISOString(), // Default to current time, should be from actual schedule
+    end_time: new Date(Date.now() + (task.duration || 1) * 60 * 60 * 1000).toISOString(),
+    description: task.description || '',
+    status: task.status.toLowerCase(),
+    project_name: task.phases.projects.name,
+    workstation: task.workstation,
+    priority: task.priority,
+    canStart: canStartTask(task),
+    canComplete: canCompleteTask(task),
+    isActive: isTaskActive(task.id)
+  }));
+
+  // Combine schedules and tasks for timeline
+  const allTimelineTasks = [...timelineTasks, ...taskTimelineItems];
+
+  const handleTimelineStartTask = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      handleTaskStatusChange(taskId, 'IN_PROGRESS');
+    }
+  };
+
+  const handleTimelineCompleteTask = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      handleTaskStatusChange(taskId, 'COMPLETED');
+    }
+  };
+
   // Stats calculations
   const todoTasks = tasks.filter(task => task.status === 'TODO');
   const inProgressTasks = tasks.filter(task => task.status === 'IN_PROGRESS');
@@ -444,10 +476,12 @@ const PersonalTasks = () => {
 
           <TabsContent value="timeline" className="space-y-4">
             <DailyTimeline 
-              tasks={timelineTasks}
+              tasks={allTimelineTasks}
               onShowFiles={setShowFilesPopup}
               onShowParts={setShowPartsDialog}
               onShowBarcode={setShowBarcodeDialog}
+              onStartTask={handleTimelineStartTask}
+              onCompleteTask={handleTimelineCompleteTask}
             />
           </TabsContent>
         </Tabs>

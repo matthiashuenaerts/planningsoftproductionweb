@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Clock, Calendar, ChevronLeft, ChevronRight, FileText, Package2, QrCode, ExternalLink, Play, CheckCircle } from 'lucide-react';
 import { format, addDays, subDays, startOfDay, endOfDay, isToday, isSameDay } from 'date-fns';
 
 interface TimelineTask {
@@ -14,13 +13,30 @@ interface TimelineTask {
   description?: string;
   project_name?: string;
   status?: string;
+  workstation?: string;
+  priority?: string;
+  canStart?: boolean;
+  canComplete?: boolean;
+  isActive?: boolean;
 }
 
 interface DailyTimelineProps {
   tasks: TimelineTask[];
+  onShowFiles?: (projectId: string) => void;
+  onShowParts?: (projectId: string) => void;
+  onShowBarcode?: (projectId: string) => void;
+  onStartTask?: (taskId: string) => void;
+  onCompleteTask?: (taskId: string) => void;
 }
 
-const DailyTimeline: React.FC<DailyTimelineProps> = ({ tasks }) => {
+const DailyTimeline: React.FC<DailyTimelineProps> = ({ 
+  tasks, 
+  onShowFiles, 
+  onShowParts, 
+  onShowBarcode, 
+  onStartTask, 
+  onCompleteTask 
+}) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -104,6 +120,20 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({ tasks }) => {
         return 'bg-gray-100 text-gray-800 border-gray-300';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const getPriorityBadge = (priority?: string) => {
+    if (!priority) return null;
+    switch (priority.toLowerCase()) {
+      case 'high':
+        return <Badge className="bg-red-100 text-red-800 border-red-300">High</Badge>;
+      case 'medium':
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Medium</Badge>;
+      case 'low':
+        return <Badge className="bg-green-100 text-green-800 border-green-300">Low</Badge>;
+      default:
+        return <Badge>{priority}</Badge>;
     }
   };
 
@@ -192,9 +222,16 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({ tasks }) => {
                     <Card className="h-full shadow-sm border-l-4 border-l-blue-500">
                       <CardContent className="p-3 h-full flex flex-col">
                         <div className="flex justify-between items-start mb-1">
-                          <h4 className="font-medium text-sm truncate flex-1">
-                            {task.title}
-                          </h4>
+                          <div className="flex-1">
+                            {task.project_name && (
+                              <h3 className="font-medium text-sm truncate">
+                                {task.project_name}
+                              </h3>
+                            )}
+                            <h4 className="font-medium text-xs truncate text-muted-foreground">
+                              {task.title}
+                            </h4>
+                          </div>
                           {task.status && (
                             <Badge className={`text-xs ${getStatusColor(task.status)}`}>
                               {task.status}
@@ -208,17 +245,98 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({ tasks }) => {
                           {format(new Date(task.end_time), 'HH:mm')}
                         </div>
                         
-                        {task.project_name && (
+                        {task.workstation && (
                           <div className="text-xs text-muted-foreground mb-1">
-                            Project: {task.project_name}
+                            Workstation: {task.workstation}
+                          </div>
+                        )}
+
+                        {task.priority && (
+                          <div className="mb-1">
+                            {getPriorityBadge(task.priority)}
                           </div>
                         )}
                         
                         {task.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-2 flex-1">
+                          <p className="text-xs text-muted-foreground line-clamp-2 flex-1 mb-2">
                             {task.description}
                           </p>
                         )}
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {onShowFiles && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onShowFiles(task.id)}
+                              className="text-xs px-2 py-1 h-6"
+                            >
+                              <FileText className="h-3 w-3 mr-1" />
+                              Files
+                            </Button>
+                          )}
+                          
+                          {onShowParts && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onShowParts(task.id)}
+                              className="text-xs px-2 py-1 h-6"
+                            >
+                              <Package2 className="h-3 w-3 mr-1" />
+                              Parts
+                            </Button>
+                          )}
+                          
+                          {onShowBarcode && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onShowBarcode(task.id)}
+                              className="text-xs px-2 py-1 h-6"
+                            >
+                              <QrCode className="h-3 w-3 mr-1" />
+                              Barcode
+                            </Button>
+                          )}
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(`/projects/${task.id}`, '_blank')}
+                            className="text-xs px-2 py-1 h-6"
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Project
+                          </Button>
+                        </div>
+
+                        {/* Task Control Buttons */}
+                        <div className="flex gap-1 pt-1 border-t">
+                          {task.canStart && onStartTask && (
+                            <Button
+                              size="sm"
+                              onClick={() => onStartTask(task.id)}
+                              className="flex-1 text-xs px-2 py-1 h-6"
+                            >
+                              <Play className="h-3 w-3 mr-1" />
+                              Start
+                            </Button>
+                          )}
+                          
+                          {task.canComplete && onCompleteTask && (
+                            <Button
+                              size="sm"
+                              onClick={() => onCompleteTask(task.id)}
+                              className="flex-1 text-xs px-2 py-1 h-6"
+                              variant="default"
+                            >
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Complete
+                            </Button>
+                          )}
+                        </div>
                       </CardContent>
                     </Card>
                   </div>
