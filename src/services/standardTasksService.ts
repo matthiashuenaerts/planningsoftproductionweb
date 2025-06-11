@@ -83,7 +83,7 @@ export const standardTasksService = {
   async updateColor(id: string, color: string): Promise<StandardTask | null> {
     const { data, error } = await supabase
       .from('standard_tasks')
-      .update({ color: color })
+      .update({ color: color } as any)
       .eq('id', id)
       .select()
       .maybeSingle();
