@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import DailyTimeline from '@/components/DailyTimeline';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
+import EnhancedTaskCard from '@/components/EnhancedTaskCard';
 
 interface Task {
   id: string;
@@ -176,31 +178,6 @@ const PersonalTasks = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      'TODO': { color: 'bg-blue-100 text-blue-800 border-blue-300', label: 'To Do' },
-      'IN_PROGRESS': { color: 'bg-amber-100 text-amber-800 border-amber-300', label: 'In Progress' },
-      'COMPLETED': { color: 'bg-green-100 text-green-800 border-green-300', label: 'Completed' },
-      'HOLD': { color: 'bg-red-100 text-red-800 border-red-300', label: 'On Hold' }
-    };
-    
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig['TODO'];
-    return <Badge className={config.color}>{config.label}</Badge>;
-  };
-
-  const getPriorityBadge = (priority: string) => {
-    switch (priority.toLowerCase()) {
-      case 'high':
-        return <Badge className="bg-red-100 text-red-800 border-red-300">High</Badge>;
-      case 'medium':
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Medium</Badge>;
-      case 'low':
-        return <Badge className="bg-green-100 text-green-800 border-green-300">Low</Badge>;
-      default:
-        return <Badge>{priority}</Badge>;
-    }
-  };
-
   const isTaskActive = (taskId: string) => {
     return activeTimeRegistrations.some(reg => reg.task_id === taskId);
   };
@@ -221,7 +198,7 @@ const PersonalTasks = () => {
     end_time: schedule.end_time,
     description: schedule.description,
     status: 'scheduled',
-    project_name: schedule.title, // Use title as project name for schedules
+    project_name: schedule.title,
     workstation: '',
     priority: 'medium',
     canStart: false,
@@ -233,7 +210,7 @@ const PersonalTasks = () => {
   const taskTimelineItems = tasks.map(task => ({
     id: task.id,
     title: task.title,
-    start_time: new Date().toISOString(), // Default to current time, should be from actual schedule
+    start_time: new Date().toISOString(),
     end_time: new Date(Date.now() + (task.duration || 1) * 60 * 60 * 1000).toISOString(),
     description: task.description || '',
     status: task.status.toLowerCase(),
@@ -339,128 +316,19 @@ const PersonalTasks = () => {
           </TabsList>
 
           <TabsContent value="tasks" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
               {tasks.map((task) => (
-                <Card key={task.id} className="h-fit">
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg mb-1">{task.phases.projects.name}</CardTitle>
-                        <CardDescription className="text-base font-medium">
-                          {task.title}
-                        </CardDescription>
-                      </div>
-                      {isTaskActive(task.id) && (
-                        <TaskTimer />
-                      )}
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      {getStatusBadge(task.status)}
-                      {getPriorityBadge(task.priority)}
-                    </div>
-
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        <span>Workstation: {task.workstation}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        <span>Due: {new Date(task.due_date).toLocaleDateString()}</span>
-                      </div>
-                      {task.duration && (
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          <span>Duration: {task.duration} hours</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {task.description && (
-                      <p className="text-sm text-muted-foreground">{task.description}</p>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowFilesPopup(task.phases.projects.id)}
-                      >
-                        <FileText className="h-4 w-4 mr-1" />
-                        Files
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowPartsDialog(task.phases.projects.id)}
-                      >
-                        <Package2 className="h-4 w-4 mr-1" />
-                        Parts
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowBarcodeDialog(task.phases.projects.id)}
-                      >
-                        <QrCode className="h-4 w-4 mr-1" />
-                        Barcode
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(`/projects/${task.phases.projects.id}`, '_blank')}
-                      >
-                        <ExternalLink className="h-4 w-4 mr-1" />
-                        Project
-                      </Button>
-                    </div>
-
-                    {/* Task Control Buttons */}
-                    <div className="flex gap-2 pt-2 border-t">
-                      {canStartTask(task) && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleTaskStatusChange(task.id, 'IN_PROGRESS')}
-                          className="flex-1"
-                        >
-                          <Play className="h-4 w-4 mr-1" />
-                          Start
-                        </Button>
-                      )}
-                      
-                      {isTaskActive(task.id) && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleTaskStatusChange(task.id, 'TODO')}
-                          className="flex-1"
-                        >
-                          <Square className="h-4 w-4 mr-1" />
-                          Pause
-                        </Button>
-                      )}
-                      
-                      {canCompleteTask(task) && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleTaskStatusChange(task.id, 'COMPLETED')}
-                          className="flex-1"
-                          variant="default"
-                        >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Complete
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                <EnhancedTaskCard
+                  key={task.id}
+                  task={task}
+                  isActive={isTaskActive(task.id)}
+                  canStart={canStartTask(task)}
+                  canComplete={canCompleteTask(task)}
+                  onStatusChange={handleTaskStatusChange}
+                  onShowFiles={setShowFilesPopup}
+                  onShowParts={setShowPartsDialog}
+                  onShowBarcode={setShowBarcodeDialog}
+                />
               ))}
             </div>
 

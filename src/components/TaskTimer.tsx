@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -31,31 +32,60 @@ const TaskTimer = () => {
     queryKey: ['activeTimeRegistration', currentEmployee?.id],
     queryFn: () => currentEmployee ? timeRegistrationService.getActiveRegistration(currentEmployee.id) : null,
     enabled: !!currentEmployee,
-    refetchInterval: 1000 // Refetch every 5 seconds
+    refetchInterval: 1000 // Refetch every second for real-time updates
   });
 
   // Get task details if there's an active registration
   const { data: taskDetails } = useQuery({
-    queryKey: ['taskDetails', activeRegistration?.task_id],
+    queryKey: ['taskDetails', activeRegistration?.task_id, activeRegistration?.workstation_task_id],
     queryFn: async () => {
-      if (!activeRegistration?.task_id) return null;
+      if (!activeRegistration) return null;
       
-      const { data, error } = await supabase
-        .from('tasks')
-        .select(`
-          title,
-          phases (
-            name,
-            projects (name)
-          )
-        `)
-        .eq('id', activeRegistration.task_id)
-        .single();
+      // Handle regular tasks
+      if (activeRegistration.task_id) {
+        const { data, error } = await supabase
+          .from('tasks')
+          .select(`
+            title,
+            phases (
+              name,
+              projects (name)
+            )
+          `)
+          .eq('id', activeRegistration.task_id)
+          .single();
+        
+        if (error) throw error;
+        return {
+          title: data.title,
+          project_name: data.phases?.projects?.name || 'Unknown Project',
+          is_workstation_task: false
+        };
+      }
       
-      if (error) throw error;
-      return data;
+      // Handle workstation tasks
+      if (activeRegistration.workstation_task_id) {
+        const { data: workstationTask, error: workstationError } = await supabase
+          .from('workstation_tasks')
+          .select(`
+            task_name,
+            workstations (name)
+          `)
+          .eq('id', activeRegistration.workstation_task_id)
+          .single();
+        
+        if (workstationError) throw workstationError;
+        
+        return {
+          title: workstationTask.task_name,
+          project_name: `Workstation: ${workstationTask.workstations?.name || 'Unknown'}`,
+          is_workstation_task: true
+        };
+      }
+      
+      return null;
     },
-    enabled: !!activeRegistration?.task_id
+    enabled: !!activeRegistration && (!!activeRegistration.task_id || !!activeRegistration.workstation_task_id)
   });
 
   // Start task mutation
@@ -154,15 +184,18 @@ const TaskTimer = () => {
                 }
               </div>
               
-              <div>
+              <div className="min-w-0 flex-1">
                 {activeRegistration && taskDetails ? (
                   <div>
-                    <p className="font-medium text-xs">
-                      {(taskDetails as any).phases?.projects?.name || 'Unknown Project'}
+                    <p className="font-medium text-xs truncate">
+                      {taskDetails.project_name}
                     </p>
-                    <p className="text-xs text-gray-600 truncate max-w-32">
+                    <p className="text-xs text-gray-600 truncate">
                       {taskDetails.title}
                     </p>
+                    {taskDetails.is_workstation_task && (
+                      <p className="text-xs text-blue-600">Workstation Task</p>
+                    )}
                   </div>
                 ) : (
                   <div>
@@ -173,7 +206,7 @@ const TaskTimer = () => {
               </div>
             </div>
             
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-1 ml-2">
               <Clock className="h-3 w-3 text-gray-500" />
               <span className="font-mono text-sm font-medium">
                 {activeRegistration && activeRegistration.is_active 

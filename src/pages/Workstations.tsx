@@ -38,6 +38,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Define workstation with appropriate icon mapping
 interface WorkstationWithIcon {
@@ -56,6 +57,7 @@ const Workstations: React.FC = () => {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const loadWorkstations = async () => {
@@ -127,11 +129,14 @@ const Workstations: React.FC = () => {
     if (!currentEmployee) return;
     
     try {
-      // Start time registration for workstation task
-      await timeRegistrationService.startTask(currentEmployee.id, task.id);
+      // Start time registration for workstation task using the new method
+      await timeRegistrationService.startWorkstationTask(currentEmployee.id, task.id);
+      
+      // Invalidate queries to refresh the TaskTimer
+      queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
       
       toast({
-        title: "Task Started",
+        title: "Workstation Task Started",
         description: `Started working on ${task.task_name}`,
       });
       
