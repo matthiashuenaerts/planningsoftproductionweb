@@ -35,6 +35,7 @@ interface ExtendedTask extends Task {
   assignee_name?: string;
   active_workers?: number;
   project_id?: string;
+  is_workstation_task?: boolean;
 }
 
 const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, workstationId, onBack }) => {
@@ -354,7 +355,9 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
               project_name: `Workstation Task - ${actualWorkstationName}`,
               project_id: null,
               active_workers: 0,
-              is_workstation_task: true
+              is_workstation_task: true,
+              created_at: wTask.created_at,
+              updated_at: wTask.updated_at
             })) as ExtendedTask[];
             
             allTasks = [...allTasks, ...workstationTasksFormatted];
