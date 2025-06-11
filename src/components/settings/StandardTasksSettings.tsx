@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { StandardTask, standardTasksService } from '@/services/standardTasksService';
 import { Card, CardContent } from '@/components/ui/card';
@@ -158,7 +159,14 @@ const StandardTasksSettings: React.FC = () => {
   const saveColor = async (task: StandardTask) => {
     setSaving(prev => ({ ...prev, [`${task.id}_color`]: true }));
     try {
+      console.log('Saving color for task:', task.id, 'Color:', task.color);
       await standardTasksService.updateColor(task.id, task.color || '#3B82F6');
+      
+      // Update the local state to reflect the saved color
+      setStandardTasks(prev => prev.map(t => 
+        t.id === task.id ? { ...t, color: task.color || '#3B82F6' } : t
+      ));
+      
       toast({
         title: 'Success',
         description: `Color for ${task.task_number} updated successfully`,
@@ -167,9 +175,17 @@ const StandardTasksSettings: React.FC = () => {
       console.error('Error updating color:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update color. Please try again.',
+        description: `Failed to update color: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: 'destructive'
       });
+      
+      // Revert the local state change on error
+      const originalTask = standardTasks.find(t => t.id === task.id);
+      if (originalTask) {
+        setStandardTasks(prev => prev.map(t => 
+          t.id === task.id ? originalTask : t
+        ));
+      }
     } finally {
       setSaving(prev => ({ ...prev, [`${task.id}_color`]: false }));
     }
@@ -342,13 +358,24 @@ const StandardTasksSettings: React.FC = () => {
                         {colorOptions.map((color) => (
                           <button
                             key={color}
-                            className={`w-6 h-6 rounded border-2 ${
-                              task.color === color ? 'border-gray-900' : 'border-gray-300'
+                            className={`w-6 h-6 rounded border-2 hover:scale-110 transition-transform ${
+                              task.color === color ? 'border-gray-900 shadow-md' : 'border-gray-300'
                             }`}
                             style={{ backgroundColor: color }}
                             onClick={() => handleColorChange(task.id, color)}
+                            title={`Set color to ${color}`}
                           />
                         ))}
+                        {/* No color option */}
+                        <button
+                          className={`w-6 h-6 rounded border-2 bg-white hover:scale-110 transition-transform ${
+                            !task.color || task.color === '' ? 'border-gray-900 shadow-md' : 'border-gray-300'
+                          }`}
+                          onClick={() => handleColorChange(task.id, '')}
+                          title="No color"
+                        >
+                          <X className="h-3 w-3 text-gray-400 mx-auto" />
+                        </button>
                       </div>
                     </TableCell>
                     <TableCell>

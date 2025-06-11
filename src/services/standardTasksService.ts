@@ -81,14 +81,19 @@ export const standardTasksService = {
   },
 
   async updateColor(id: string, color: string): Promise<StandardTask | null> {
+    console.log(`Updating color for task ${id} to ${color}`);
     const { data, error } = await supabase
       .from('standard_tasks')
-      .update({ color: color } as any)
+      .update({ color: color })
       .eq('id', id)
       .select()
       .maybeSingle();
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error updating color:', error);
+      throw error;
+    }
+    console.log('Color updated successfully:', data);
     return data as StandardTask;
   },
 
