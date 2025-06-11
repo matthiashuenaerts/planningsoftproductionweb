@@ -215,7 +215,7 @@ const Workstations: React.FC = () => {
                       <div className="space-y-3">
                         <div>
                           <h3 className="font-medium text-lg">{selectedWorkstationForTasks?.name}</h3>
-                          <p className="text-muted-foreground text-xl font-bold">{task.task_name}</p>
+                          <p className="text-slate-950 text-xl font-bold">{task.task_name}</p>
                         </div>
                         
                         <div className="flex flex-wrap gap-2">
