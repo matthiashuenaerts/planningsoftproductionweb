@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from '@/components/Navbar';
@@ -19,6 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import { workstationService } from '@/services/workstationService';
 import { workstationTasksService, WorkstationTask } from '@/services/workstationTasksService';
+import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { 
   ArrowLeft, 
   Package, 
@@ -31,10 +33,10 @@ import {
   ListOrdered,
   CalendarArrowDown,
   MoreVertical,
-  Play,
-  CheckCircle
+  Play
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
 
 // Define workstation with appropriate icon mapping
@@ -53,6 +55,7 @@ const Workstations: React.FC = () => {
   const [workstationTasks, setWorkstationTasks] = useState<WorkstationTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const { toast } = useToast();
+  const { currentEmployee } = useAuth();
 
   useEffect(() => {
     const loadWorkstations = async () => {
@@ -120,14 +123,20 @@ const Workstations: React.FC = () => {
     loadWorkstationTasks(workstationId);
   };
 
-  const handleStartWorkstationTask = async (taskId: string) => {
+  const handleStartWorkstationTask = async (task: WorkstationTask) => {
+    if (!currentEmployee) return;
+    
     try {
-      // Here you would implement the logic to start a workstation task
-      // This could create a time registration or update task status
+      // Start time registration for workstation task
+      await timeRegistrationService.startTask(currentEmployee.id, task.id);
+      
       toast({
         title: "Task Started",
-        description: "Workstation task has been started successfully",
+        description: `Started working on ${task.task_name}`,
       });
+      
+      // Close the dialog after starting the task
+      setShowWorkstationTasks(null);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -288,7 +297,7 @@ const Workstations: React.FC = () => {
                         <div className="flex gap-2 pt-2 border-t">
                           <Button
                             size="sm"
-                            onClick={() => handleStartWorkstationTask(task.id)}
+                            onClick={() => handleStartWorkstationTask(task)}
                             className="flex-1"
                           >
                             <Play className="h-4 w-4 mr-1" />

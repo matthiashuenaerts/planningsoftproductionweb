@@ -445,7 +445,6 @@ const PersonalTasks = () => {
           <TabsContent value="timeline" className="space-y-4">
             <DailyTimeline 
               tasks={timelineTasks}
-              onTaskAction={handleTaskStatusChange}
               onShowFiles={setShowFilesPopup}
               onShowParts={setShowPartsDialog}
               onShowBarcode={setShowBarcodeDialog}

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
@@ -39,7 +40,6 @@ interface ExtendedTask extends Task {
 
 const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, workstationId, onBack }) => {
   const [tasks, setTasks] = useState<ExtendedTask[]>([]);
-  const [workstationTasks, setWorkstationTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actualWorkstationName, setActualWorkstationName] = useState<string>('');
@@ -262,15 +262,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
       let allTasks = [...tasksWithProjectInfo];
       
       if (workstationDbId) {
-        // Load workstation specific tasks
-        try {
-          const workstationSpecificTasks = await workstationTasksService.getByWorkstation(workstationDbId);
-          setWorkstationTasks(workstationSpecificTasks);
-        } catch (error) {
-          console.error('Error loading workstation tasks:', error);
-          setWorkstationTasks([]);
-        }
-
         const rushOrders = await rushOrderService.getRushOrdersForWorkstation(workstationDbId);
         console.log(`Found ${rushOrders.length} rush orders for workstation`);
         
@@ -563,7 +554,10 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     if (!currentEmployee) return;
     
     try {
-      // Start time tracking for workstation task (this might need a different implementation)
+      // Start time tracking for workstation task - we'll create a dummy task ID for workstation tasks
+      // You might want to modify this to handle workstation tasks differently
+      await timeRegistrationService.startTask(currentEmployee.id, workstationTask.id);
+      
       toast({
         title: 'Workstation Task Started',
         description: `Started working on ${workstationTask.task_name}`,
@@ -627,50 +621,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
       </div>
 
       <div className="space-y-6">
-        {/* Workstation Specific Tasks */}
-        {workstationTasks.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <PlayCircle className="h-5 w-5" />
-                Workstation Tasks ({workstationTasks.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {workstationTasks.map((task) => (
-                  <div key={task.id} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h3 className="font-medium">{actualWorkstationName}</h3>
-                        <p className="text-sm text-gray-600">{task.task_name}</p>
-                        {task.description && (
-                          <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-2">
-                          {getPriorityBadge(task.priority)}
-                          {task.duration && (
-                            <Badge variant="outline">{task.duration}h</Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleStartWorkstationTask(task)}
-                          className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-                        >
-                          <Play className="h-4 w-4 mr-1 inline" />
-                          Start
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
