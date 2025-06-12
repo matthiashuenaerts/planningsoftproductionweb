@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, startOfWeek, endOfWeek } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -386,7 +387,7 @@ const DayCell = ({
     </div>;
 };
 
-// Enhanced team calendar component with bigger view and better month handling
+// Enhanced team calendar component with improved scroll position preservation
 const TeamCalendar = ({
   team,
   currentMonth,
@@ -397,7 +398,9 @@ const TeamCalendar = ({
   handleExtendProject,
   handleDurationChange,
   onTruckAssign,
-  onRefreshData
+  onRefreshData,
+  scrollPositions,
+  setScrollPositions
 }) => {
   const teamColor = teamColors[team];
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -416,13 +419,42 @@ const TeamCalendar = ({
 
   // Auto-scroll to current month on initial load
   useEffect(() => {
-    if (scrollAreaRef.current) {
+    if (scrollAreaRef.current && !scrollPositions[team]) {
       const currentMonthElement = scrollAreaRef.current.querySelector('[data-current-month="true"]');
       if (currentMonthElement) {
         currentMonthElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }
-  }, []);
+  }, [team, scrollPositions]);
+
+  // Restore scroll position when it exists
+  useEffect(() => {
+    if (scrollAreaRef.current && scrollPositions[team] !== undefined) {
+      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (viewport) {
+        viewport.scrollTop = scrollPositions[team];
+      }
+    }
+  }, [scrollPositions, team]);
+
+  // Save scroll position on scroll
+  const handleScroll = (e: Event) => {
+    const target = e.target as HTMLElement;
+    if (target) {
+      setScrollPositions(prev => ({
+        ...prev,
+        [team]: target.scrollTop
+      }));
+    }
+  };
+
+  useEffect(() => {
+    const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (viewport) {
+      viewport.addEventListener('scroll', handleScroll);
+      return () => viewport.removeEventListener('scroll', handleScroll);
+    }
+  }, [team, setScrollPositions]);
 
   // Generate calendar days for a specific month, starting on Monday
   const generateMonthDays = (month: Date) => {
@@ -567,7 +599,7 @@ const UnassignedProjects = ({
     </div>;
 };
 
-// Main installation team calendar component with scrollable view and current month focus
+// Main installation team calendar component with scroll position preservation
 const InstallationTeamCalendar = ({
   projects
 }: {
@@ -577,6 +609,7 @@ const InstallationTeamCalendar = ({
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [truckAssignments, setTruckAssignments] = useState<TruckAssignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scrollPositions, setScrollPositions] = useState<Record<string, number>>({});
   const {
     toast
   } = useToast();
@@ -625,11 +658,12 @@ const InstallationTeamCalendar = ({
     fetchAssignments();
   }, [toast]);
 
-  // Enhanced project drop handling with proper reset and scroll preservation
+  // Enhanced project drop handling with proper scroll position preservation
   const handleDropProject = async (projectId: string, team: string | null, newStartDate?: string) => {
     try {
-      // Store current scroll position
-      const currentScroll = window.pageYOffset;
+      // Store current page scroll position
+      const currentPageScroll = window.pageYOffset;
+      
       console.log(`Handling drop for project ${projectId} to team ${team} on date ${newStartDate}`);
       const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
       if (team === null) {
@@ -671,10 +705,10 @@ const InstallationTeamCalendar = ({
             description: "Project has been moved to unassigned and reset"
           });
 
-          // Preserve scroll position
+          // Preserve both page and calendar scroll positions
           setTimeout(() => {
             window.scrollTo({
-              top: currentScroll,
+              top: currentPageScroll,
               behavior: 'instant'
             });
           }, 50);
@@ -720,10 +754,10 @@ const InstallationTeamCalendar = ({
             description: `Project has been assigned to ${team} team${newStartDate ? ` starting ${format(new Date(newStartDate), 'MMM d')}` : ''}`
           });
 
-          // Preserve scroll position
+          // Preserve both page and calendar scroll positions
           setTimeout(() => {
             window.scrollTo({
-              top: currentScroll,
+              top: currentPageScroll,
               behavior: 'instant'
             });
           }, 50);
@@ -758,10 +792,10 @@ const InstallationTeamCalendar = ({
             description: `Project has been assigned to ${team} team`
           });
 
-          // Preserve scroll position
+          // Preserve both page and calendar scroll positions
           setTimeout(() => {
             window.scrollTo({
-              top: currentScroll,
+              top: currentPageScroll,
               behavior: 'instant'
             });
           }, 50);
@@ -986,7 +1020,7 @@ const InstallationTeamCalendar = ({
     }
   };
 
-  // Refresh data while maintaining scroll position
+  // Refresh data while maintaining scroll positions
   const refreshDataWithScrollPreservation = async () => {
     await fetchAssignments();
   };
@@ -1012,9 +1046,9 @@ const InstallationTeamCalendar = ({
         </CardHeader>
         <CardContent>
           <UnassignedProjects projects={projects} assignments={assignments} truckAssignments={truckAssignments} onTruckAssign={handleTruckAssign} onDropProject={handleDropProject} />
-          <TeamCalendar team="green" currentMonth={currentMonth} projects={projects} assignments={assignments} truckAssignments={truckAssignments} onDropProject={handleDropProject} handleExtendProject={handleExtendProject} handleDurationChange={handleDurationChange} onTruckAssign={handleTruckAssign} onRefreshData={refreshDataWithScrollPreservation} />
-          <TeamCalendar team="blue" currentMonth={currentMonth} projects={projects} assignments={assignments} truckAssignments={truckAssignments} onDropProject={handleDropProject} handleExtendProject={handleExtendProject} handleDurationChange={handleDurationChange} onTruckAssign={handleTruckAssign} onRefreshData={refreshDataWithScrollPreservation} />
-          <TeamCalendar team="orange" currentMonth={currentMonth} projects={projects} assignments={assignments} truckAssignments={truckAssignments} onDropProject={handleDropProject} handleExtendProject={handleExtendProject} handleDurationChange={handleDurationChange} onTruckAssign={handleTruckAssign} onRefreshData={refreshDataWithScrollPreservation} />
+          <TeamCalendar team="green" currentMonth={currentMonth} projects={projects} assignments={assignments} truckAssignments={truckAssignments} onDropProject={handleDropProject} handleExtendProject={handleExtendProject} handleDurationChange={handleDurationChange} onTruckAssign={handleTruckAssign} onRefreshData={refreshDataWithScrollPreservation} scrollPositions={scrollPositions} setScrollPositions={setScrollPositions} />
+          <TeamCalendar team="blue" currentMonth={currentMonth} projects={projects} assignments={assignments} truckAssignments={truckAssignments} onDropProject={handleDropProject} handleExtendProject={handleExtendProject} handleDurationChange={handleDurationChange} onTruckAssign={handleTruckAssign} onRefreshData={refreshDataWithScrollPreservation} scrollPositions={scrollPositions} setScrollPositions={setScrollPositions} />
+          <TeamCalendar team="orange" currentMonth={currentMonth} projects={projects} assignments={assignments} truckAssignments={truckAssignments} onDropProject={handleDropProject} handleExtendProject={handleExtendProject} handleDurationChange={handleDurationChange} onTruckAssign={handleTruckAssign} onRefreshData={refreshDataWithScrollPreservation} scrollPositions={scrollPositions} setScrollPositions={setScrollPositions} />
         </CardContent>
       </Card>
     </DndProvider>;
