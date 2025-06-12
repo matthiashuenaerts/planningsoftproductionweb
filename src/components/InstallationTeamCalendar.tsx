@@ -396,7 +396,7 @@ const DayCell = ({
     </div>;
 };
 
-// Enhanced team calendar component with collapsible functionality
+// Enhanced team calendar component with collapsible functionality - starts collapsed
 const TeamCalendar = ({
   team,
   currentMonth,
@@ -409,11 +409,12 @@ const TeamCalendar = ({
   onTruckAssign,
   onRefreshData,
   scrollPositions,
-  setScrollPositions
+  setScrollPositions,
+  isCollapsed,
+  setIsCollapsed
 }) => {
   const teamColor = teamColors[team];
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const [isCollapsed, setIsCollapsed] = useState(true);
 
   // Generate multiple months for scrolling (current month in the middle)
   const generateCalendarMonths = () => {
@@ -616,7 +617,7 @@ const UnassignedProjects = ({
     </div>;
 };
 
-// Main installation team calendar component with enhanced scroll preservation
+// Main installation team calendar component with enhanced scroll preservation and default collapsed state
 const InstallationTeamCalendar = ({
   projects
 }: {
@@ -628,6 +629,12 @@ const InstallationTeamCalendar = ({
   const [loading, setLoading] = useState(true);
   const [scrollPositions, setScrollPositions] = useState<Record<string, number>>({});
   const [pageScrollPosition, setPageScrollPosition] = useState(0);
+  // Start with all calendars collapsed
+  const [teamCollapsedStates, setTeamCollapsedStates] = useState({
+    green: true,
+    blue: true,
+    orange: true
+  });
   const {
     toast
   } = useToast();
@@ -1098,9 +1105,54 @@ const InstallationTeamCalendar = ({
         </CardHeader>
         <CardContent>
           <UnassignedProjects projects={projects} assignments={assignments} truckAssignments={truckAssignments} onTruckAssign={handleTruckAssign} onDropProject={handleDropProject} />
-          <TeamCalendar team="green" currentMonth={currentMonth} projects={projects} assignments={assignments} truckAssignments={truckAssignments} onDropProject={handleDropProject} handleExtendProject={handleExtendProject} handleDurationChange={handleDurationChange} onTruckAssign={handleTruckAssign} onRefreshData={refreshDataWithScrollPreservation} scrollPositions={scrollPositions} setScrollPositions={setScrollPositions} />
-          <TeamCalendar team="blue" currentMonth={currentMonth} projects={projects} assignments={assignments} truckAssignments={truckAssignments} onDropProject={handleDropProject} handleExtendProject={handleExtendProject} handleDurationChange={handleDurationChange} onTruckAssign={handleTruckAssign} onRefreshData={refreshDataWithScrollPreservation} scrollPositions={scrollPositions} setScrollPositions={setScrollPositions} />
-          <TeamCalendar team="orange" currentMonth={currentMonth} projects={projects} assignments={assignments} truckAssignments={truckAssignments} onDropProject={handleDropProject} handleExtendProject={handleExtendProject} handleDurationChange={handleDurationChange} onTruckAssign={handleTruckAssign} onRefreshData={refreshDataWithScrollPreservation} scrollPositions={scrollPositions} setScrollPositions={setScrollPositions} />
+          <TeamCalendar 
+            team="green" 
+            currentMonth={currentMonth} 
+            projects={projects} 
+            assignments={assignments} 
+            truckAssignments={truckAssignments} 
+            onDropProject={handleDropProject} 
+            handleExtendProject={handleExtendProject} 
+            handleDurationChange={handleDurationChange} 
+            onTruckAssign={handleTruckAssign} 
+            onRefreshData={refreshDataWithScrollPreservation} 
+            scrollPositions={scrollPositions} 
+            setScrollPositions={setScrollPositions}
+            isCollapsed={teamCollapsedStates.green}
+            setIsCollapsed={(collapsed) => setTeamCollapsed('green', collapsed)}
+          />
+          <TeamCalendar 
+            team="blue" 
+            currentMonth={currentMonth} 
+            projects={projects} 
+            assignments={assignments} 
+            truckAssignments={truckAssignments} 
+            onDropProject={handleDropProject} 
+            handleExtendProject={handleExtendProject} 
+            handleDurationChange={handleDurationChange} 
+            onTruckAssign={handleTruckAssign} 
+            onRefreshData={refreshDataWithScrollPreservation} 
+            scrollPositions={scrollPositions} 
+            setScrollPositions={setScrollPositions}
+            isCollapsed={teamCollapsedStates.blue}
+            setIsCollapsed={(collapsed) => setTeamCollapsed('blue', collapsed)}
+          />
+          <TeamCalendar 
+            team="orange" 
+            currentMonth={currentMonth} 
+            projects={projects} 
+            assignments={assignments} 
+            truckAssignments={truckAssignments} 
+            onDropProject={handleDropProject} 
+            handleExtendProject={handleExtendProject} 
+            handleDurationChange={handleDurationChange} 
+            onTruckAssign={handleTruckAssign} 
+            onRefreshData={refreshDataWithScrollPreservation} 
+            scrollPositions={scrollPositions} 
+            setScrollPositions={setScrollPositions}
+            isCollapsed={teamCollapsedStates.orange}
+            setIsCollapsed={(collapsed) => setTeamCollapsed('orange', collapsed)}
+          />
         </CardContent>
       </Card>
     </DndProvider>;
