@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format, startOfDay } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
@@ -550,6 +551,7 @@ const Planning = () => {
                     selected={selectedDate}
                     onSelect={(date) => setSelectedDate(date || new Date())}
                     initialFocus
+                    weekStartsOn={1}
                   />
                 </PopoverContent>
               </Popover>

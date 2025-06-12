@@ -6,11 +6,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, ChevronRight, CalendarDays, Truck, GripHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, Truck, GripHorizontal, ExternalLink } from 'lucide-react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 // Define project type
 interface Project {
@@ -155,7 +156,7 @@ const DurationSelector = ({ value, onChange, disabled = false }) => {
   );
 };
 
-// Enhanced project item component with better visual spanning
+// Enhanced project item component with navigation button
 const ProjectItem = ({ 
   project, 
   team, 
@@ -169,6 +170,7 @@ const ProjectItem = ({
   dayPosition = 0,
   totalDays = 1
 }) => {
+  const navigate = useNavigate();
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'PROJECT',
     item: { 
@@ -191,6 +193,11 @@ const ProjectItem = ({
 
   const handleTruckChange = async (truckId: string) => {
     await onTruckAssign(project.id, truckId);
+  };
+
+  const handleNavigateToProject = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/projects/${project.id}`);
   };
 
   // Show full content only on the start day
@@ -219,9 +226,19 @@ const ProjectItem = ({
                 </div>
                 <div className="text-xs text-gray-600 truncate">{project.client}</div>
               </div>
-              <Badge className={getStatusColor(project.status)} variant="outline">
-                {project.status}
-              </Badge>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleNavigateToProject}
+                  className="h-6 w-6 p-0 hover:bg-white/50"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </Button>
+                <Badge className={getStatusColor(project.status)} variant="outline">
+                  {project.status}
+                </Badge>
+              </div>
             </div>
             
             {/* Duration Selector */}
@@ -275,7 +292,7 @@ const ProjectItem = ({
 // Truck selector component
 const TruckSelector = ({ value, onValueChange, truckNumber }) => {
   const [trucks, setTrucks] = useState<Truck[]>([]);
-
+  
   useEffect(() => {
     const fetchTrucks = async () => {
       const { data } = await supabase.from('trucks').select('*').order('truck_number');
@@ -283,7 +300,7 @@ const TruckSelector = ({ value, onValueChange, truckNumber }) => {
     };
     fetchTrucks();
   }, []);
-
+  
   return (
     <div className="flex items-center gap-2">
       <Truck className="h-3 w-3" />
@@ -347,7 +364,7 @@ const DayCell = ({
       isOver: !!monitor.isOver()
     })
   }));
-
+  
   const handleDateChange = async (assignmentId: string, newStartDate: string) => {
     try {
       const { error } = await supabase
@@ -365,7 +382,7 @@ const DayCell = ({
       console.error('Error updating assignment date:', error);
     }
   };
-
+  
   const dateStr = format(date, 'yyyy-MM-dd');
   const isCurrentMonthDay = isSameMonth(date, currentMonth);
   
@@ -399,7 +416,7 @@ const DayCell = ({
       };
     })
     .filter(Boolean);
-
+  
   return (
     <div 
       ref={drop}
@@ -444,7 +461,7 @@ const DayCell = ({
   );
 };
 
-// Enhanced team calendar component with monthly view starting on Monday
+// Enhanced team calendar component with proper Monday start
 const TeamCalendar = ({ 
   team, 
   currentMonth, 
@@ -459,11 +476,11 @@ const TeamCalendar = ({
 }) => {
   const teamColor = teamColors[team];
   
-  // Get calendar days for one full month with padding
+  // Get calendar days for one full month with proper Monday start
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   
-  // Start calendar on Monday and show exactly 6 weeks (42 days)
+  // Start calendar on Monday (weekStartsOn: 1 means Monday)
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const calendarEnd = addDays(calendarStart, 41); // 6 weeks = 42 days - 1
   
@@ -548,7 +565,7 @@ const UnassignedProjects = ({ projects, assignments, truckAssignments, onTruckAs
       isOver: !!monitor.isOver()
     })
   }));
-
+  
   const unassignedProjects = projects.filter(project => 
     !assignments.some(a => a.project_id === project.id)
   );
@@ -592,7 +609,7 @@ const UnassignedProjects = ({ projects, assignments, truckAssignments, onTruckAs
   );
 };
 
-// Main installation team calendar component with scroll position preservation
+// Main installation team calendar component with enhanced scroll position preservation
 const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -601,7 +618,7 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
   const [scrollPosition, setScrollPosition] = useState(0);
   const { toast } = useToast();
 
-  // Preserve scroll position
+  // Enhanced scroll position preservation
   useEffect(() => {
     const handleScroll = () => {
       setScrollPosition(window.pageYOffset);
@@ -613,9 +630,12 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
 
   // Restore scroll position after data refresh
   const restoreScrollPosition = () => {
-    setTimeout(() => {
-      window.scrollTo(0, scrollPosition);
-    }, 100);
+    requestAnimationFrame(() => {
+      window.scrollTo({
+        top: scrollPosition,
+        behavior: 'instant'
+      });
+    });
   };
 
   // Fetch team assignments and truck assignments
@@ -674,9 +694,12 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
     setCurrentMonth(addMonths(currentMonth, 1));
   };
 
-  // Handle project drop on a team or unassigned with proper reset
+  // Enhanced project drop handling with proper reset and scroll preservation
   const handleDropProject = async (projectId: string, team: string | null, newStartDate?: string) => {
     try {
+      // Store current scroll position
+      const currentScroll = window.pageYOffset;
+      
       const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
       
       if (team === null) {
@@ -725,7 +748,13 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
             description: "Project has been moved to unassigned and reset"
           });
           
-          restoreScrollPosition();
+          // Preserve scroll position
+          setTimeout(() => {
+            window.scrollTo({
+              top: currentScroll,
+              behavior: 'instant'
+            });
+          }, 50);
         }
       } else {
         // Assign to team
@@ -772,7 +801,13 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
             description: `Project has been assigned to ${team} team${newStartDate ? ` starting ${format(new Date(newStartDate), 'MMM d')}` : ''}`
           });
           
-          restoreScrollPosition();
+          // Preserve scroll position
+          setTimeout(() => {
+            window.scrollTo({
+              top: currentScroll,
+              behavior: 'instant'
+            });
+          }, 50);
         } else {
           const newAssignment = {
             project_id: projectId,
@@ -808,7 +843,13 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
             description: `Project has been assigned to ${team} team`
           });
           
-          restoreScrollPosition();
+          // Preserve scroll position
+          setTimeout(() => {
+            window.scrollTo({
+              top: currentScroll,
+              behavior: 'instant'
+            });
+          }, 50);
         }
       }
     } catch (error) {
@@ -1057,8 +1098,14 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
 
   // Refresh data without losing scroll position
   const refreshDataWithScrollPreservation = async () => {
+    const currentScroll = window.pageYOffset;
     await fetchAssignments();
-    restoreScrollPosition();
+    setTimeout(() => {
+      window.scrollTo({
+        top: currentScroll,
+        behavior: 'instant'
+      });
+    }, 100);
   };
 
   if (loading) {
