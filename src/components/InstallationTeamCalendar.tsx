@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format, addDays, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, subMonths, startOfWeek, getDay } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -150,7 +151,7 @@ const DurationSelector = ({
     </div>;
 };
 
-// Enhanced project item component with navigation button
+// Enhanced project item component with navigation button and no planned badge
 const ProjectItem = ({
   project,
   team,
@@ -201,18 +202,17 @@ const ProjectItem = ({
         {showFullContent ? <>
             <div className="flex flex-col mb-2">
               <div className="flex justify-between items-start mb-1">
-                <div className={cn("font-medium text-sm truncate flex-1", teamColor.text)}>
+                <div className={cn("font-medium text-sm flex-1", teamColor.text)}>
                   {project.name}
                 </div>
-                
               </div>
               
-              <div className="text-xs text-gray-600 truncate mb-1">{project.client}</div>
-              
-              <Button size="sm" variant="ghost" onClick={handleNavigateToProject} className="h-6 w-full justify-start p-1 text-xs hover:bg-white/50">
+              <Button size="sm" variant="ghost" onClick={handleNavigateToProject} className="h-6 w-full justify-start p-1 text-xs hover:bg-white/50 mb-1">
                 <ExternalLink className="h-3 w-3 mr-1" />
                 View Details
               </Button>
+              
+              <div className="text-xs text-gray-600 truncate mb-1">{project.client}</div>
             </div>
             
             {/* Duration Selector */}
@@ -284,7 +284,7 @@ const TruckSelector = ({
     </div>;
 };
 
-// Enhanced day cell component with better drop zones and cross-month support
+// Enhanced day cell component with proper cross-month handling
 const DayCell = ({
   date,
   team,
@@ -317,6 +317,7 @@ const DayCell = ({
       isOver: !!monitor.isOver()
     })
   }));
+  
   const handleDateChange = async (assignmentId: string, newStartDate: string) => {
     try {
       console.log(`Updating assignment ${assignmentId} to start date: ${newStartDate}`);
@@ -335,6 +336,7 @@ const DayCell = ({
       console.error('Error updating assignment date:', error);
     }
   };
+  
   const dateStr = format(date, 'yyyy-MM-dd');
   const isCurrentMonthDay = isSameMonth(date, currentMonth);
 
@@ -359,6 +361,7 @@ const DayCell = ({
       totalDays: assignment.duration
     };
   }).filter(Boolean);
+  
   return <div ref={drop} className={cn("min-h-[120px] border border-gray-200 p-1", !isCurrentMonthDay && "bg-gray-50 text-gray-400", isOver ? "bg-blue-50 border-blue-300" : "", isCurrentMonthDay ? "bg-white" : "")}>
       <div className={cn("text-center text-sm font-medium mb-1", !isCurrentMonthDay && "text-gray-400")}>
         <div>{format(date, 'EEE')}</div>
@@ -381,7 +384,7 @@ const DayCell = ({
     </div>;
 };
 
-// Enhanced team calendar component with proper Monday start and single month view
+// Enhanced team calendar component starting on Monday
 const TeamCalendar = ({
   team,
   currentMonth,
@@ -418,6 +421,7 @@ const TeamCalendar = ({
   for (let i = 0; i < calendarDays.length; i += 7) {
     weeks.push(calendarDays.slice(i, i + 7));
   }
+  
   return <div className="mb-6">
       <div className={cn("p-3 rounded-t-lg", teamColor.header)}>
         <h3 className="text-lg font-medium capitalize">{team} Team</h3>
@@ -426,7 +430,7 @@ const TeamCalendar = ({
       <div className={cn("rounded-b-lg border-b border-x", teamColor.border)}>
         {/* Day headers - starting with Monday */}
         <div className="grid grid-cols-7 border-b">
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => <div key={day} className="p-2 text-center font-medium text-sm bg-gray-50">
+          {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => <div key={day} className="p-2 text-center font-medium text-sm bg-gray-50">
               {day}
             </div>)}
         </div>
@@ -494,7 +498,7 @@ const UnassignedProjects = ({
     </div>;
 };
 
-// Main installation team calendar component with enhanced scroll position preservation
+// Main installation team calendar component with enhanced cross-month handling
 const InstallationTeamCalendar = ({
   projects
 }: {
@@ -582,13 +586,14 @@ const InstallationTeamCalendar = ({
     setCurrentMonth(addMonths(currentMonth, 1));
   };
 
-  // Enhanced project drop handling with proper reset and scroll preservation
+  // Enhanced project drop handling with proper cross-month date handling
   const handleDropProject = async (projectId: string, team: string | null, newStartDate?: string) => {
     try {
       // Store current scroll position
       const currentScroll = window.pageYOffset;
       console.log(`Handling drop for project ${projectId} to team ${team} on date ${newStartDate}`);
       const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
+      
       if (team === null) {
         // Reset project completely - remove team assignment and truck assignment
         if (existingAssignmentIndex >= 0) {
@@ -954,11 +959,13 @@ const InstallationTeamCalendar = ({
       });
     }, 100);
   };
+  
   if (loading) {
     return <div className="flex justify-center p-8">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
     </div>;
   }
+  
   return <DndProvider backend={HTML5Backend}>
       <Card>
         <CardHeader className="pb-2">
@@ -989,4 +996,5 @@ const InstallationTeamCalendar = ({
       </Card>
     </DndProvider>;
 };
+
 export default InstallationTeamCalendar;

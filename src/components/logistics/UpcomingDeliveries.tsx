@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +31,18 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
       case 'delayed': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  // Function to determine if project is planned (assigned to an installation team)
+  const getInstallationStatus = (order: Order) => {
+    // Check if the order has any project with team assignment
+    // This would typically come from the project_team_assignments table
+    // For now, we'll check if installation_date is set and if there's team assignment data
+    const projectOrder = order as any;
+    if (projectOrder.project_team_assignment || projectOrder.team_assigned) {
+      return { status: 'planned', color: 'bg-green-100 text-green-800' };
+    }
+    return { status: 'to plan', color: 'bg-yellow-100 text-yellow-800' };
   };
 
   const toggleOrderExpansion = (orderId: string) => {
@@ -124,6 +137,7 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
           <div className="space-y-4">
             {sortedOrders.map((order) => {
               const isExpanded = expandedOrders.has(order.id);
+              const installationStatus = getInstallationStatus(order);
               
               return (
                 <Card key={order.id} className="border-l-4 border-l-green-500">
@@ -134,6 +148,9 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
                         Order from {order.supplier}
                       </CardTitle>
                       <div className="flex items-center gap-2">
+                        <Badge className={installationStatus.color}>
+                          {installationStatus.status}
+                        </Badge>
                         <Badge className={getStatusColor(order.status)}>
                           {order.status}
                         </Badge>
@@ -211,3 +228,5 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
     </>
   );
 };
+
+export default UpcomingDeliveries;
