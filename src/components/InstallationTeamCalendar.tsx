@@ -459,12 +459,13 @@ const TeamCalendar = ({
 }) => {
   const teamColor = teamColors[team];
   
-  // Get all days in the month including padding days from previous/next month
-  // Start weeks on Monday (weekStartsOn: 1)
+  // Get calendar days for one full month with padding
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
+  
+  // Start calendar on Monday and show exactly 6 weeks (42 days)
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-  const calendarEnd = endOfDay(addDays(startOfWeek(monthEnd, { weekStartsOn: 1 }), 41));
+  const calendarEnd = addDays(calendarStart, 41); // 6 weeks = 42 days - 1
   
   const calendarDays = eachDayOfInterval({
     start: calendarStart,
@@ -535,7 +536,7 @@ const getStatusColor = (status) => {
   }
 };
 
-// Enhanced unassigned projects component
+// Enhanced unassigned projects component with proper reset handling
 const UnassignedProjects = ({ projects, assignments, truckAssignments, onTruckAssign, onDropProject }) => {
   const [{ isOver }, drop] = useDrop(() => ({
     accept: 'PROJECT',
@@ -591,13 +592,31 @@ const UnassignedProjects = ({ projects, assignments, truckAssignments, onTruckAs
   );
 };
 
-// Main installation team calendar component
+// Main installation team calendar component with scroll position preservation
 const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [truckAssignments, setTruckAssignments] = useState<TruckAssignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scrollPosition, setScrollPosition] = useState(0);
   const { toast } = useToast();
+
+  // Preserve scroll position
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollPosition(window.pageYOffset);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Restore scroll position after data refresh
+  const restoreScrollPosition = () => {
+    setTimeout(() => {
+      window.scrollTo(0, scrollPosition);
+    }, 100);
+  };
 
   // Fetch team assignments and truck assignments
   const fetchAssignments = async () => {
@@ -655,16 +674,17 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
     setCurrentMonth(addMonths(currentMonth, 1));
   };
 
-  // Handle project drop on a team or unassigned
+  // Handle project drop on a team or unassigned with proper reset
   const handleDropProject = async (projectId: string, team: string | null, newStartDate?: string) => {
     try {
       const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
       
       if (team === null) {
-        // Remove team assignment (move to unassigned)
+        // Reset project completely - remove team assignment and truck assignment
         if (existingAssignmentIndex >= 0) {
           const existingAssignment = assignments[existingAssignmentIndex];
           
+          // Remove team assignment
           const { error } = await supabase
             .from('project_team_assignments')
             .delete()
@@ -676,7 +696,7 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
           const updatedAssignments = assignments.filter(a => a.project_id !== projectId);
           setAssignments(updatedAssignments);
           
-          // Update project installation_date to null
+          // Reset project installation_date to null
           const { error: projectError } = await supabase
             .from('projects')
             .update({ installation_date: null })
@@ -701,9 +721,11 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
           }
           
           toast({
-            title: "Project Unassigned",
-            description: "Project has been moved to unassigned"
+            title: "Project Reset",
+            description: "Project has been moved to unassigned and reset"
           });
+          
+          restoreScrollPosition();
         }
       } else {
         // Assign to team
@@ -749,6 +771,8 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
             title: "Team Updated",
             description: `Project has been assigned to ${team} team${newStartDate ? ` starting ${format(new Date(newStartDate), 'MMM d')}` : ''}`
           });
+          
+          restoreScrollPosition();
         } else {
           const newAssignment = {
             project_id: projectId,
@@ -783,6 +807,8 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
             title: "Team Assigned",
             description: `Project has been assigned to ${team} team`
           });
+          
+          restoreScrollPosition();
         }
       }
     } catch (error) {
@@ -1029,6 +1055,12 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
     }
   };
 
+  // Refresh data without losing scroll position
+  const refreshDataWithScrollPreservation = async () => {
+    await fetchAssignments();
+    restoreScrollPosition();
+  };
+
   if (loading) {
     return <div className="flex justify-center p-8">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -1075,7 +1107,7 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
             handleExtendProject={handleExtendProject}
             handleDurationChange={handleDurationChange}
             onTruckAssign={handleTruckAssign}
-            onRefreshData={fetchAssignments}
+            onRefreshData={refreshDataWithScrollPreservation}
           />
           <TeamCalendar 
             team="blue" 
@@ -1087,7 +1119,7 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
             handleExtendProject={handleExtendProject}
             handleDurationChange={handleDurationChange}
             onTruckAssign={handleTruckAssign}
-            onRefreshData={fetchAssignments}
+            onRefreshData={refreshDataWithScrollPreservation}
           />
           <TeamCalendar 
             team="orange" 
@@ -1099,7 +1131,7 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
             handleExtendProject={handleExtendProject}
             handleDurationChange={handleDurationChange}
             onTruckAssign={handleTruckAssign}
-            onRefreshData={fetchAssignments}
+            onRefreshData={refreshDataWithScrollPreservation}
           />
         </CardContent>
       </Card>

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +10,7 @@ import { format } from 'date-fns';
 import { Calendar, Package, Building2, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { orderService } from '@/services/orderService';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UpcomingDeliveriesProps {
   orders: Order[];
@@ -22,12 +24,38 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
+  // Query for team assignments to determine installation status
+  const { data: teamAssignments = [] } = useQuery({
+    queryKey: ['team-assignments'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('project_team_assignments')
+        .select('project_id, team');
+      
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'canceled': return 'bg-red-100 text-red-800';
       case 'delayed': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getInstallationStatus = (projectId: string) => {
+    const hasTeamAssignment = teamAssignments.some(assignment => assignment.project_id === projectId);
+    return hasTeamAssignment ? 'planned' : 'to plan';
+  };
+
+  const getInstallationStatusColor = (status: string) => {
+    switch (status) {
+      case 'planned': return 'bg-blue-100 text-blue-800';
+      case 'to plan': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -124,6 +152,7 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
           <div className="space-y-4">
             {sortedOrders.map((order) => {
               const isExpanded = expandedOrders.has(order.id);
+              const installationStatus = getInstallationStatus(order.project_id);
               
               return (
                 <Card key={order.id} className="border-l-4 border-l-green-500">
@@ -136,6 +165,9 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
                       <div className="flex items-center gap-2">
                         <Badge className={getStatusColor(order.status)}>
                           {order.status}
+                        </Badge>
+                        <Badge className={getInstallationStatusColor(installationStatus)}>
+                          {installationStatus}
                         </Badge>
                       </div>
                     </div>
