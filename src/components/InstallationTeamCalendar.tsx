@@ -413,7 +413,7 @@ const TeamCalendar = ({
 }) => {
   const teamColor = teamColors[team];
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(True);
 
   // Generate multiple months for scrolling (current month in the middle)
   const generateCalendarMonths = () => {
