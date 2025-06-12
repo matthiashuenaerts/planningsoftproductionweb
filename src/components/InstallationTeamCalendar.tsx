@@ -691,7 +691,56 @@ const InstallationTeamCalendar = ({
     fetchAssignments();
   }, [toast]);
 
-  // Enhanced project drop handling with enhanced scroll position preservation
+  // Helper function to update truck loading date - enhanced version
+  const updateTruckLoadingDate = async (projectId: string, installationDateStr: string) => {
+    const truckAssignmentIndex = truckAssignments.findIndex(ta => ta.project_id === projectId);
+    if (truckAssignmentIndex >= 0) {
+      const truckAssignment = truckAssignments[truckAssignmentIndex];
+
+      // Calculate new loading date (one business day before installation)
+      const installationDate = new Date(installationDateStr);
+      const loadingDate = new Date(installationDate);
+      
+      // Move back one day initially
+      loadingDate.setDate(loadingDate.getDate() - 1);
+
+      // Weekend adjustment - if loading falls on weekend, move to Friday
+      if (loadingDate.getDay() === 0) {
+        // Sunday - move to Friday
+        loadingDate.setDate(loadingDate.getDate() - 2);
+      } else if (loadingDate.getDay() === 6) {
+        // Saturday - move to Friday
+        loadingDate.setDate(loadingDate.getDate() - 1);
+      }
+      
+      const loadingDateStr = format(loadingDate, 'yyyy-MM-dd');
+      
+      console.log(`Updating truck loading date for project ${projectId}: installation=${installationDateStr}, loading=${loadingDateStr}`);
+      
+      const { error } = await supabase
+        .from('project_truck_assignments')
+        .update({
+          installation_date: installationDateStr,
+          loading_date: loadingDateStr
+        })
+        .eq('id', truckAssignment.id);
+        
+      if (error) throw error;
+
+      // Update local state
+      const updatedTruckAssignments = [...truckAssignments];
+      updatedTruckAssignments[truckAssignmentIndex] = {
+        ...truckAssignment,
+        installation_date: installationDateStr,
+        loading_date: loadingDateStr
+      };
+      setTruckAssignments(updatedTruckAssignments);
+      
+      console.log(`Successfully updated truck loading date: ${loadingDateStr}`);
+    }
+  };
+
+  // Enhanced project drop handling with truck loading date calculation
   const handleDropProject = async (projectId: string, team: string | null, newStartDate?: string) => {
     try {
       // Store current page scroll position
@@ -699,15 +748,17 @@ const InstallationTeamCalendar = ({
       
       console.log(`Handling drop for project ${projectId} to team ${team} on date ${newStartDate}`);
       const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
+      
       if (team === null) {
         // Reset project completely - remove team assignment and truck assignment
         if (existingAssignmentIndex >= 0) {
           const existingAssignment = assignments[existingAssignmentIndex];
 
           // Remove team assignment
-          const {
-            error
-          } = await supabase.from('project_team_assignments').delete().eq('id', existingAssignment.id);
+          const { error } = await supabase
+            .from('project_team_assignments')
+            .delete()
+            .eq('id', existingAssignment.id);
           if (error) throw error;
 
           // Remove from assignments array
@@ -715,24 +766,26 @@ const InstallationTeamCalendar = ({
           setAssignments(updatedAssignments);
 
           // Reset project installation_date to null
-          const {
-            error: projectError
-          } = await supabase.from('projects').update({
-            installation_date: null
-          }).eq('id', projectId);
+          const { error: projectError } = await supabase
+            .from('projects')
+            .update({ installation_date: null })
+            .eq('id', projectId);
           if (projectError) throw projectError;
 
           // Remove truck assignment if exists
           const truckAssignmentIndex = truckAssignments.findIndex(ta => ta.project_id === projectId);
           if (truckAssignmentIndex >= 0) {
             const truckAssignment = truckAssignments[truckAssignmentIndex];
-            const {
-              error: truckError
-            } = await supabase.from('project_truck_assignments').delete().eq('id', truckAssignment.id);
+            const { error: truckError } = await supabase
+              .from('project_truck_assignments')
+              .delete()
+              .eq('id', truckAssignment.id);
             if (truckError) throw truckError;
+            
             const updatedTruckAssignments = truckAssignments.filter(ta => ta.project_id !== projectId);
             setTruckAssignments(updatedTruckAssignments);
           }
+          
           toast({
             title: "Project Reset",
             description: "Project has been moved to unassigned and reset"
@@ -745,16 +798,17 @@ const InstallationTeamCalendar = ({
         // Assign to team
         if (existingAssignmentIndex >= 0) {
           const existingAssignment = assignments[existingAssignmentIndex];
-          const updateData: Partial<Assignment> = {
-            team
-          };
+          const updateData: Partial<Assignment> = { team };
           if (newStartDate) {
             updateData.start_date = newStartDate;
           }
-          const {
-            error
-          } = await supabase.from('project_team_assignments').update(updateData).eq('id', existingAssignment.id);
+          
+          const { error } = await supabase
+            .from('project_team_assignments')
+            .update(updateData)
+            .eq('id', existingAssignment.id);
           if (error) throw error;
+          
           const updatedAssignments = [...assignments];
           updatedAssignments[existingAssignmentIndex] = {
             ...existingAssignment,
@@ -768,15 +822,15 @@ const InstallationTeamCalendar = ({
           const installationDateStr = format(installationDate, 'yyyy-MM-dd');
 
           // Update project installation_date
-          const {
-            error: projectError
-          } = await supabase.from('projects').update({
-            installation_date: installationDateStr
-          }).eq('id', projectId);
+          const { error: projectError } = await supabase
+            .from('projects')
+            .update({ installation_date: installationDateStr })
+            .eq('id', projectId);
           if (projectError) throw projectError;
 
           // Update truck assignment loading date if exists
           await updateTruckLoadingDate(projectId, installationDateStr);
+          
           toast({
             title: "Team Updated",
             description: `Project has been assigned to ${team} team${newStartDate ? ` starting ${format(new Date(newStartDate), 'MMM d')}` : ''}`
@@ -791,11 +845,13 @@ const InstallationTeamCalendar = ({
             start_date: newStartDate || format(new Date(), 'yyyy-MM-dd'),
             duration: 1
           };
-          const {
-            data,
-            error
-          } = await supabase.from('project_team_assignments').insert([newAssignment]).select();
+          
+          const { data, error } = await supabase
+            .from('project_team_assignments')
+            .insert([newAssignment])
+            .select();
           if (error) throw error;
+          
           setAssignments([...assignments, data[0]]);
 
           // Calculate and update installation date using business days
@@ -804,12 +860,15 @@ const InstallationTeamCalendar = ({
           const installationDateStr = format(installationDate, 'yyyy-MM-dd');
 
           // Update project installation_date
-          const {
-            error: projectError
-          } = await supabase.from('projects').update({
-            installation_date: installationDateStr
-          }).eq('id', projectId);
+          const { error: projectError } = await supabase
+            .from('projects')
+            .update({ installation_date: installationDateStr })
+            .eq('id', projectId);
           if (projectError) throw projectError;
+
+          // Update truck assignment loading date if exists (for newly assigned projects)
+          await updateTruckLoadingDate(projectId, installationDateStr);
+          
           toast({
             title: "Team Assigned",
             description: `Project has been assigned to ${team} team`
@@ -829,20 +888,21 @@ const InstallationTeamCalendar = ({
     }
   };
 
-  // Handle duration change
+  // Handle duration change with truck loading date update
   const handleDurationChange = async (assignmentId: string, newDuration: number) => {
     try {
       storePageScrollPosition();
       
       const assignmentIndex = assignments.findIndex(a => a.id === assignmentId);
       if (assignmentIndex < 0) return;
+      
       const assignment = assignments[assignmentIndex];
-      const {
-        error
-      } = await supabase.from('project_team_assignments').update({
-        duration: newDuration
-      }).eq('id', assignmentId);
+      const { error } = await supabase
+        .from('project_team_assignments')
+        .update({ duration: newDuration })
+        .eq('id', assignmentId);
       if (error) throw error;
+      
       const updatedAssignments = [...assignments];
       updatedAssignments[assignmentIndex] = {
         ...assignment,
@@ -856,15 +916,15 @@ const InstallationTeamCalendar = ({
       const installationDateStr = format(installationDate, 'yyyy-MM-dd');
 
       // Update project installation_date
-      const {
-        error: projectError
-      } = await supabase.from('projects').update({
-        installation_date: installationDateStr
-      }).eq('id', assignment.project_id);
+      const { error: projectError } = await supabase
+        .from('projects')
+        .update({ installation_date: installationDateStr })
+        .eq('id', assignment.project_id);
       if (projectError) throw projectError;
 
       // Update truck assignment loading date if exists
       await updateTruckLoadingDate(assignment.project_id, installationDateStr);
+      
       toast({
         title: "Duration Updated",
         description: `Project duration is now ${newDuration} day${newDuration > 1 ? 's' : ''}`
@@ -878,45 +938,6 @@ const InstallationTeamCalendar = ({
         description: "Failed to update project duration",
         variant: "destructive"
       });
-    }
-  };
-
-  // Helper function to update truck loading date
-  const updateTruckLoadingDate = async (projectId: string, installationDateStr: string) => {
-    const truckAssignmentIndex = truckAssignments.findIndex(ta => ta.project_id === projectId);
-    if (truckAssignmentIndex >= 0) {
-      const truckAssignment = truckAssignments[truckAssignmentIndex];
-
-      // Calculate new loading date (one business day before installation)
-      const installationDate = new Date(installationDateStr);
-      const loadingDate = new Date(installationDate);
-      loadingDate.setDate(loadingDate.getDate() - 1);
-
-      // Weekend adjustment - if loading falls on weekend, move to Friday
-      if (loadingDate.getDay() === 0) {
-        // Sunday
-        loadingDate.setDate(loadingDate.getDate() - 2); // Friday
-      } else if (loadingDate.getDay() === 6) {
-        // Saturday
-        loadingDate.setDate(loadingDate.getDate() - 1); // Friday
-      }
-      const loadingDateStr = format(loadingDate, 'yyyy-MM-dd');
-      const {
-        error
-      } = await supabase.from('project_truck_assignments').update({
-        installation_date: installationDateStr,
-        loading_date: loadingDateStr
-      }).eq('id', truckAssignment.id);
-      if (error) throw error;
-
-      // Update local state
-      const updatedTruckAssignments = [...truckAssignments];
-      updatedTruckAssignments[truckAssignmentIndex] = {
-        ...truckAssignment,
-        installation_date: installationDateStr,
-        loading_date: loadingDateStr
-      };
-      setTruckAssignments(updatedTruckAssignments);
     }
   };
 
@@ -951,9 +972,10 @@ const InstallationTeamCalendar = ({
         // Remove truck assignment
         if (existingTruckAssignmentIndex >= 0) {
           const existingAssignment = truckAssignments[existingTruckAssignmentIndex];
-          const {
-            error
-          } = await supabase.from('project_truck_assignments').delete().eq('id', existingAssignment.id);
+          const { error } = await supabase
+            .from('project_truck_assignments')
+            .delete()
+            .eq('id', existingAssignment.id);
           if (error) throw error;
           const updatedTruckAssignments = truckAssignments.filter(ta => ta.project_id !== projectId);
           setTruckAssignments(updatedTruckAssignments);
@@ -979,23 +1001,25 @@ const InstallationTeamCalendar = ({
         if (existingTruckAssignmentIndex >= 0) {
           // Update existing truck assignment
           const existingAssignment = truckAssignments[existingTruckAssignmentIndex];
-          const {
-            error
-          } = await supabase.from('project_truck_assignments').update({
-            truck_id: truckId,
-            installation_date: installationDateStr,
-            loading_date: loadingDateStr
-          }).eq('id', existingAssignment.id);
+          const { error } = await supabase
+            .from('project_truck_assignments')
+            .update({
+              truck_id: truckId,
+              installation_date: installationDateStr,
+              loading_date: loadingDateStr
+            })
+            .eq('id', existingAssignment.id);
           if (error) throw error;
 
           // Fetch updated assignment with truck info
-          const {
-            data: updatedData,
-            error: fetchError
-          } = await supabase.from('project_truck_assignments').select(`
-              *,
-              trucks!fk_project_truck_assignments_truck(truck_number)
-            `).eq('id', existingAssignment.id).single();
+          const { data: updatedData, error: fetchError } = await supabase
+            .from('project_truck_assignments')
+            .select(`
+                *,
+                trucks!fk_project_truck_assignments_truck(truck_number)
+              `)
+            .eq('id', existingAssignment.id)
+            .single();
           if (fetchError) throw fetchError;
           const updatedTruckAssignments = [...truckAssignments];
           updatedTruckAssignments[existingTruckAssignmentIndex] = {
@@ -1015,13 +1039,13 @@ const InstallationTeamCalendar = ({
             installation_date: installationDateStr,
             loading_date: loadingDateStr
           };
-          const {
-            data,
-            error
-          } = await supabase.from('project_truck_assignments').insert([newTruckAssignment]).select(`
-              *,
-              trucks!fk_project_truck_assignments_truck(truck_number)
-            `);
+          const { data, error } = await supabase
+            .from('project_truck_assignments')
+            .insert([newTruckAssignment])
+            .select(`
+                *,
+                trucks!fk_project_truck_assignments_truck(truck_number)
+              `);
           if (error) throw error;
           const formattedAssignment = {
             ...data[0],
