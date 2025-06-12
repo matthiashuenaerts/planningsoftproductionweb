@@ -639,6 +639,14 @@ const InstallationTeamCalendar = ({
     toast
   } = useToast();
 
+  // Helper function to update individual team collapsed state
+  const setTeamCollapsed = (team: string, collapsed: boolean) => {
+    setTeamCollapsedStates(prev => ({
+      ...prev,
+      [team]: collapsed
+    }));
+  };
+
   // Store page scroll position before operations
   const storePageScrollPosition = () => {
     setPageScrollPosition(window.pageYOffset);
