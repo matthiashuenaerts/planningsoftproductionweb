@@ -1,19 +1,19 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, startOfWeek, endOfWeek } from 'date-fns';
+import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, startOfWeek, endOfWeek, isSameDay } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { CalendarDays, Truck, ExternalLink } from 'lucide-react';
+import { CalendarDays, Truck, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 // Define project type
 interface Project {
@@ -285,7 +285,7 @@ const TruckSelector = ({
     </div>;
 };
 
-// Enhanced day cell component - ensuring Monday start and correct project display
+// Enhanced day cell component with current day highlighting
 const DayCell = ({
   date,
   team,
@@ -342,6 +342,7 @@ const DayCell = ({
   const dateStr = format(date, 'yyyy-MM-dd');
   const isCurrentMonthDay = isSameMonth(date, currentMonth);
   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+  const isToday = isSameDay(date, new Date());
 
   // Get projects that should be displayed on this day
   const projectsForDay = assignments.filter(assignment => assignment.team === team).map(assignment => {
@@ -365,10 +366,18 @@ const DayCell = ({
     };
   }).filter(Boolean);
   
-  return <div ref={drop} className={cn("min-h-[120px] border border-gray-200 p-1", !isCurrentMonthDay && "bg-gray-50 text-gray-400", isWeekend && isCurrentMonthDay && "bg-blue-50", isOver && isCurrentMonthDay ? "bg-green-50 border-green-300" : "", isCurrentMonthDay ? "bg-white" : "")}>
-      <div className={cn("text-center text-sm font-medium mb-1", !isCurrentMonthDay && "text-gray-400")}>
+  return <div ref={drop} className={cn(
+      "min-h-[120px] border border-gray-200 p-1",
+      !isCurrentMonthDay && "bg-gray-50 text-gray-400",
+      isWeekend && isCurrentMonthDay && "bg-blue-50",
+      isToday && isCurrentMonthDay && "bg-yellow-100 border-yellow-400 border-2",
+      isOver && isCurrentMonthDay ? "bg-green-50 border-green-300" : "",
+      isCurrentMonthDay ? "bg-white" : ""
+    )}>
+      <div className={cn("text-center text-sm font-medium mb-1", !isCurrentMonthDay && "text-gray-400", isToday && "text-yellow-800 font-bold")}>
         <div className="text-xs">{format(date, 'EEE')}</div>
         <div className="text-lg">{format(date, 'd')}</div>
+        {isToday && <div className="text-xs font-bold">Today</div>}
       </div>
       
       <div className="space-y-1">
@@ -387,7 +396,7 @@ const DayCell = ({
     </div>;
 };
 
-// Enhanced team calendar component with improved scroll position preservation
+// Enhanced team calendar component with collapsible functionality
 const TeamCalendar = ({
   team,
   currentMonth,
@@ -404,6 +413,7 @@ const TeamCalendar = ({
 }) => {
   const teamColor = teamColors[team];
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Generate multiple months for scrolling (current month in the middle)
   const generateCalendarMonths = () => {
@@ -469,66 +479,73 @@ const TeamCalendar = ({
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   };
 
-  return <div className="mb-6">
-      <div className={cn("p-3 rounded-t-lg", teamColor.header)}>
-        <h3 className="text-lg font-medium capitalize">{team} Team</h3>
-      </div>
-      
-      <div className={cn("rounded-b-lg border-b border-x", teamColor.border)}>
-        <ScrollArea className="h-[800px]" ref={scrollAreaRef}>
-          {calendarMonths.map((month, monthIndex) => {
-            const monthDays = generateMonthDays(month);
-            const weeks = [];
-            for (let i = 0; i < monthDays.length; i += 7) {
-              weeks.push(monthDays.slice(i, i + 7));
-            }
+  return <Collapsible open={!isCollapsed} onOpenChange={setIsCollapsed} className="mb-6">
+      <div className={cn("rounded-lg border", teamColor.border)}>
+        <CollapsibleTrigger asChild>
+          <div className={cn("p-3 rounded-t-lg cursor-pointer flex items-center justify-between", teamColor.header)}>
+            <h3 className="text-lg font-medium capitalize">{team} Team</h3>
+            {isCollapsed ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
+          </div>
+        </CollapsibleTrigger>
+        
+        <CollapsibleContent>
+          <div className={cn("rounded-b-lg border-b border-x", teamColor.border)}>
+            <ScrollArea className="h-[800px]" ref={scrollAreaRef}>
+              {calendarMonths.map((month, monthIndex) => {
+                const monthDays = generateMonthDays(month);
+                const weeks = [];
+                for (let i = 0; i < monthDays.length; i += 7) {
+                  weeks.push(monthDays.slice(i, i + 7));
+                }
 
-            const isCurrentMonth = isSameMonth(month, new Date());
+                const isCurrentMonth = isSameMonth(month, new Date());
 
-            return (
-              <div key={monthIndex} className="mb-4" data-current-month={isCurrentMonth}>
-                {/* Month header */}
-                <div className="sticky top-0 bg-gray-100 p-2 text-center font-medium border-b z-10">
-                  {format(month, 'MMMM yyyy')}
-                  {isCurrentMonth && <span className="ml-2 text-xs bg-blue-500 text-white px-2 py-1 rounded">Current</span>}
-                </div>
-                
-                {/* Day headers - starting with Monday */}
-                <div className="grid grid-cols-7 border-b">
-                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                    <div key={day} className="p-2 text-center font-medium text-sm bg-gray-50">
-                      {day}
+                return (
+                  <div key={monthIndex} className="mb-4" data-current-month={isCurrentMonth}>
+                    {/* Month header */}
+                    <div className="sticky top-0 bg-gray-100 p-2 text-center font-medium border-b z-10">
+                      {format(month, 'MMMM yyyy')}
+                      {isCurrentMonth && <span className="ml-2 text-xs bg-blue-500 text-white px-2 py-1 rounded">Current</span>}
                     </div>
-                  ))}
-                </div>
-                
-                {/* Calendar grid */}
-                {weeks.map((week, weekIndex) => (
-                  <div key={weekIndex} className="grid grid-cols-7">
-                    {week.map((date, dayIndex) => (
-                      <DayCell 
-                        key={dayIndex} 
-                        date={date} 
-                        team={team} 
-                        projects={projects} 
-                        assignments={assignments} 
-                        truckAssignments={truckAssignments} 
-                        onDropProject={onDropProject} 
-                        handleExtendProject={handleExtendProject} 
-                        handleDurationChange={handleDurationChange} 
-                        onTruckAssign={onTruckAssign} 
-                        currentMonth={month} 
-                        onRefreshData={onRefreshData} 
-                      />
+                    
+                    {/* Day headers - starting with Monday */}
+                    <div className="grid grid-cols-7 border-b">
+                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                        <div key={day} className="p-2 text-center font-medium text-sm bg-gray-50">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Calendar grid */}
+                    {weeks.map((week, weekIndex) => (
+                      <div key={weekIndex} className="grid grid-cols-7">
+                        {week.map((date, dayIndex) => (
+                          <DayCell 
+                            key={dayIndex} 
+                            date={date} 
+                            team={team} 
+                            projects={projects} 
+                            assignments={assignments} 
+                            truckAssignments={truckAssignments} 
+                            onDropProject={onDropProject} 
+                            handleExtendProject={handleExtendProject} 
+                            handleDurationChange={handleDurationChange} 
+                            onTruckAssign={onTruckAssign} 
+                            currentMonth={month} 
+                            onRefreshData={onRefreshData} 
+                          />
+                        ))}
+                      </div>
                     ))}
                   </div>
-                ))}
-              </div>
-            );
-          })}
-        </ScrollArea>
+                );
+              })}
+            </ScrollArea>
+          </div>
+        </CollapsibleContent>
       </div>
-    </div>;
+    </Collapsible>;
 };
 
 // Function to get status badge color
@@ -599,7 +616,7 @@ const UnassignedProjects = ({
     </div>;
 };
 
-// Main installation team calendar component with scroll position preservation
+// Main installation team calendar component with enhanced scroll preservation
 const InstallationTeamCalendar = ({
   projects
 }: {
@@ -610,9 +627,25 @@ const InstallationTeamCalendar = ({
   const [truckAssignments, setTruckAssignments] = useState<TruckAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [scrollPositions, setScrollPositions] = useState<Record<string, number>>({});
+  const [pageScrollPosition, setPageScrollPosition] = useState(0);
   const {
     toast
   } = useToast();
+
+  // Store page scroll position before operations
+  const storePageScrollPosition = () => {
+    setPageScrollPosition(window.pageYOffset);
+  };
+
+  // Restore page scroll position after operations
+  const restorePageScrollPosition = () => {
+    setTimeout(() => {
+      window.scrollTo({
+        top: pageScrollPosition,
+        behavior: 'instant'
+      });
+    }, 50);
+  };
 
   // Fetch team assignments and truck assignments
   const fetchAssignments = async () => {
@@ -658,11 +691,11 @@ const InstallationTeamCalendar = ({
     fetchAssignments();
   }, [toast]);
 
-  // Enhanced project drop handling with proper scroll position preservation
+  // Enhanced project drop handling with enhanced scroll position preservation
   const handleDropProject = async (projectId: string, team: string | null, newStartDate?: string) => {
     try {
       // Store current page scroll position
-      const currentPageScroll = window.pageYOffset;
+      storePageScrollPosition();
       
       console.log(`Handling drop for project ${projectId} to team ${team} on date ${newStartDate}`);
       const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
@@ -706,12 +739,7 @@ const InstallationTeamCalendar = ({
           });
 
           // Preserve both page and calendar scroll positions
-          setTimeout(() => {
-            window.scrollTo({
-              top: currentPageScroll,
-              behavior: 'instant'
-            });
-          }, 50);
+          restorePageScrollPosition();
         }
       } else {
         // Assign to team
@@ -755,12 +783,7 @@ const InstallationTeamCalendar = ({
           });
 
           // Preserve both page and calendar scroll positions
-          setTimeout(() => {
-            window.scrollTo({
-              top: currentPageScroll,
-              behavior: 'instant'
-            });
-          }, 50);
+          restorePageScrollPosition();
         } else {
           const newAssignment = {
             project_id: projectId,
@@ -793,12 +816,7 @@ const InstallationTeamCalendar = ({
           });
 
           // Preserve both page and calendar scroll positions
-          setTimeout(() => {
-            window.scrollTo({
-              top: currentPageScroll,
-              behavior: 'instant'
-            });
-          }, 50);
+          restorePageScrollPosition();
         }
       }
     } catch (error) {
@@ -814,6 +832,8 @@ const InstallationTeamCalendar = ({
   // Handle duration change
   const handleDurationChange = async (assignmentId: string, newDuration: number) => {
     try {
+      storePageScrollPosition();
+      
       const assignmentIndex = assignments.findIndex(a => a.id === assignmentId);
       if (assignmentIndex < 0) return;
       const assignment = assignments[assignmentIndex];
@@ -849,6 +869,8 @@ const InstallationTeamCalendar = ({
         title: "Duration Updated",
         description: `Project duration is now ${newDuration} day${newDuration > 1 ? 's' : ''}`
       });
+
+      restorePageScrollPosition();
     } catch (error) {
       console.error('Error updating project duration:', error);
       toast({
@@ -907,6 +929,8 @@ const InstallationTeamCalendar = ({
   // Handle truck assignment
   const handleTruckAssign = async (projectId: string, truckId: string) => {
     try {
+      storePageScrollPosition();
+      
       // Find the team assignment to get installation date
       const assignment = assignments.find(a => a.project_id === projectId);
       if (!assignment) {
@@ -1010,6 +1034,8 @@ const InstallationTeamCalendar = ({
           });
         }
       }
+
+      restorePageScrollPosition();
     } catch (error) {
       console.error('Error assigning truck:', error);
       toast({
@@ -1022,7 +1048,9 @@ const InstallationTeamCalendar = ({
 
   // Refresh data while maintaining scroll positions
   const refreshDataWithScrollPreservation = async () => {
+    storePageScrollPosition();
     await fetchAssignments();
+    restorePageScrollPosition();
   };
   
   if (loading) {
@@ -1040,7 +1068,7 @@ const InstallationTeamCalendar = ({
               Installation Team Calendar - Enhanced View
             </CardTitle>
             <div className="text-sm text-gray-600">
-              Calendars show ~1.5 months. Scroll to navigate through time.
+              Calendars show ~1.5 months. Scroll to navigate through time. Click team headers to collapse/expand.
             </div>
           </div>
         </CardHeader>
