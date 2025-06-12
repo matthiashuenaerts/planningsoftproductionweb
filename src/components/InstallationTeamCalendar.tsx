@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
+import React, { useState, useEffect, useRef } from 'react';
+import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, startOfWeek, endOfWeek } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -284,7 +284,7 @@ const TruckSelector = ({
     </div>;
 };
 
-// Enhanced day cell component - fixed to start on Monday and show projects correctly
+// Enhanced day cell component - ensuring Monday start and correct project display
 const DayCell = ({
   date,
   team,
@@ -304,14 +304,8 @@ const DayCell = ({
     accept: 'PROJECT',
     drop: (item: DragItem) => {
       const dropDate = format(date, 'yyyy-MM-dd');
-      console.log(`Dropping project ${item.id} on date: ${dropDate} in month ${format(currentMonth, 'yyyy-MM')}`);
+      console.log(`Dropping project ${item.id} on date: ${dropDate}`);
       
-      // Ensure we're dropping within the current visible month
-      if (!isSameMonth(date, currentMonth)) {
-        console.log('Drop ignored - target date is not in current month');
-        return;
-      }
-
       if (item.team === team && item.assignment) {
         // Moving within same team - just update start date
         handleDateChange(item.assignment.id, dropDate);
@@ -335,7 +329,7 @@ const DayCell = ({
       }).eq('id', assignmentId);
       if (error) throw error;
 
-      // Refresh data instead of reloading page
+      // Refresh data while maintaining scroll position
       if (onRefreshData) {
         onRefreshData();
       }
@@ -346,6 +340,7 @@ const DayCell = ({
   
   const dateStr = format(date, 'yyyy-MM-dd');
   const isCurrentMonthDay = isSameMonth(date, currentMonth);
+  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
 
   // Get projects that should be displayed on this day
   const projectsForDay = assignments.filter(assignment => assignment.team === team).map(assignment => {
@@ -369,9 +364,9 @@ const DayCell = ({
     };
   }).filter(Boolean);
   
-  return <div ref={drop} className={cn("min-h-[120px] border border-gray-200 p-1", !isCurrentMonthDay && "bg-gray-50 text-gray-400", isOver && isCurrentMonthDay ? "bg-blue-50 border-blue-300" : "", isCurrentMonthDay ? "bg-white" : "")}>
+  return <div ref={drop} className={cn("min-h-[120px] border border-gray-200 p-1", !isCurrentMonthDay && "bg-gray-50 text-gray-400", isWeekend && isCurrentMonthDay && "bg-blue-50", isOver && isCurrentMonthDay ? "bg-green-50 border-green-300" : "", isCurrentMonthDay ? "bg-white" : "")}>
       <div className={cn("text-center text-sm font-medium mb-1", !isCurrentMonthDay && "text-gray-400")}>
-        <div>{format(date, 'EEE')}</div>
+        <div className="text-xs">{format(date, 'EEE')}</div>
         <div className="text-lg">{format(date, 'd')}</div>
       </div>
       
@@ -391,7 +386,7 @@ const DayCell = ({
     </div>;
 };
 
-// Enhanced team calendar component with scrollable months
+// Enhanced team calendar component with bigger view and better month handling
 const TeamCalendar = ({
   team,
   currentMonth,
@@ -405,11 +400,12 @@ const TeamCalendar = ({
   onRefreshData
 }) => {
   const teamColor = teamColors[team];
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // Generate multiple months for scrolling (3 months before to 3 months after)
+  // Generate multiple months for scrolling (current month in the middle)
   const generateCalendarMonths = () => {
     const months = [];
-    for (let i = -3; i <= 3; i++) {
+    for (let i = -2; i <= 2; i++) {
       const month = addMonths(currentMonth, i);
       months.push(month);
     }
@@ -417,6 +413,16 @@ const TeamCalendar = ({
   };
 
   const calendarMonths = generateCalendarMonths();
+
+  // Auto-scroll to current month on initial load
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const currentMonthElement = scrollAreaRef.current.querySelector('[data-current-month="true"]');
+      if (currentMonthElement) {
+        currentMonthElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  }, []);
 
   // Generate calendar days for a specific month, starting on Monday
   const generateMonthDays = (month: Date) => {
@@ -437,7 +443,7 @@ const TeamCalendar = ({
       </div>
       
       <div className={cn("rounded-b-lg border-b border-x", teamColor.border)}>
-        <ScrollArea className="h-[600px]">
+        <ScrollArea className="h-[800px]" ref={scrollAreaRef}>
           {calendarMonths.map((month, monthIndex) => {
             const monthDays = generateMonthDays(month);
             const weeks = [];
@@ -445,11 +451,14 @@ const TeamCalendar = ({
               weeks.push(monthDays.slice(i, i + 7));
             }
 
+            const isCurrentMonth = isSameMonth(month, new Date());
+
             return (
-              <div key={monthIndex} className="mb-4">
+              <div key={monthIndex} className="mb-4" data-current-month={isCurrentMonth}>
                 {/* Month header */}
                 <div className="sticky top-0 bg-gray-100 p-2 text-center font-medium border-b z-10">
                   {format(month, 'MMMM yyyy')}
+                  {isCurrentMonth && <span className="ml-2 text-xs bg-blue-500 text-white px-2 py-1 rounded">Current</span>}
                 </div>
                 
                 {/* Day headers - starting with Monday */}
@@ -506,7 +515,7 @@ const getStatusColor = status => {
   }
 };
 
-// Enhanced unassigned projects component with proper reset handling and badge logic
+// Enhanced unassigned projects component with proper badge logic
 const UnassignedProjects = ({
   projects,
   assignments,
@@ -558,7 +567,7 @@ const UnassignedProjects = ({
     </div>;
 };
 
-// Main installation team calendar component with scrollable view (no navigation arrows)
+// Main installation team calendar component with scrollable view and current month focus
 const InstallationTeamCalendar = ({
   projects
 }: {
@@ -568,29 +577,9 @@ const InstallationTeamCalendar = ({
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [truckAssignments, setTruckAssignments] = useState<TruckAssignment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [scrollPosition, setScrollPosition] = useState(0);
   const {
     toast
   } = useToast();
-
-  // Enhanced scroll position preservation
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrollPosition(window.pageYOffset);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Restore scroll position after data refresh
-  const restoreScrollPosition = () => {
-    requestAnimationFrame(() => {
-      window.scrollTo({
-        top: scrollPosition,
-        behavior: 'instant'
-      });
-    });
-  };
 
   // Fetch team assignments and truck assignments
   const fetchAssignments = async () => {
@@ -997,16 +986,9 @@ const InstallationTeamCalendar = ({
     }
   };
 
-  // Refresh data without losing scroll position
+  // Refresh data while maintaining scroll position
   const refreshDataWithScrollPreservation = async () => {
-    const currentScroll = window.pageYOffset;
     await fetchAssignments();
-    setTimeout(() => {
-      window.scrollTo({
-        top: currentScroll,
-        behavior: 'instant'
-      });
-    }, 100);
   };
   
   if (loading) {
@@ -1021,10 +1003,10 @@ const InstallationTeamCalendar = ({
           <div className="flex justify-between items-center">
             <CardTitle className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5" />
-              Installation Team Calendar - Scrollable View
+              Installation Team Calendar - Enhanced View
             </CardTitle>
             <div className="text-sm text-gray-600">
-              Scroll within each team calendar to navigate through months
+              Calendars show ~1.5 months. Scroll to navigate through time.
             </div>
           </div>
         </CardHeader>
