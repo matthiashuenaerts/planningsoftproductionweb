@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { format, addDays, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, subMonths } from 'date-fns';
+import { format, addDays, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, subMonths, startOfWeek, getDay } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -60,6 +60,40 @@ interface DragItem {
   team: string;
   assignment?: Assignment;
 }
+
+// Helper function to skip weekends
+const addBusinessDays = (date: Date, days: number): Date => {
+  let result = new Date(date);
+  let addedDays = 0;
+  
+  while (addedDays < days) {
+    result = addDays(result, 1);
+    // Skip weekends (Saturday = 6, Sunday = 0)
+    if (result.getDay() !== 0 && result.getDay() !== 6) {
+      addedDays++;
+    }
+  }
+  
+  return result;
+};
+
+// Helper function to calculate business days between dates
+const getBusinessDaysArray = (startDate: Date, duration: number): Date[] => {
+  const days: Date[] = [];
+  let currentDate = new Date(startDate);
+  let addedDays = 0;
+  
+  while (addedDays < duration) {
+    // Skip weekends
+    if (currentDate.getDay() !== 0 && currentDate.getDay() !== 6) {
+      days.push(new Date(currentDate));
+      addedDays++;
+    }
+    currentDate = addDays(currentDate, 1);
+  }
+  
+  return days;
+};
 
 // Define team colors
 const teamColors = {
@@ -159,8 +193,8 @@ const ProjectItem = ({
     await onTruckAssign(project.id, truckId);
   };
 
-  // Only show full content on the start day or single day projects
-  const showFullContent = isStart || totalDays === 1;
+  // Show full content only on the start day
+  const showFullContent = isStart;
 
   return (
     <div
@@ -215,7 +249,7 @@ const ProjectItem = ({
               <div className="text-xs text-gray-600 mt-1">
                 {format(new Date(assignment.start_date), 'MMM d')}
                 {assignment.duration > 1 && (
-                  <span> - {format(addDays(new Date(assignment.start_date), assignment.duration - 1), 'MMM d')}</span>
+                  <span> - {format(addBusinessDays(new Date(assignment.start_date), assignment.duration - 1), 'MMM d')}</span>
                 )}
                 {truckAssignment && (
                   <div className="text-xs text-blue-600">
@@ -226,9 +260,11 @@ const ProjectItem = ({
             )}
           </>
         ) : (
-          // Continuation indicator
+          // Continuation indicator - show only project name
           <div className="h-8 flex items-center justify-center">
-            <GripHorizontal className="h-4 w-4 text-gray-400" />
+            <div className={cn("text-xs font-medium truncate", teamColor.text)}>
+              {project.name}
+            </div>
           </div>
         )}
       </div>
@@ -292,7 +328,8 @@ const DayCell = ({
   handleExtendProject,
   handleDurationChange,
   onTruckAssign,
-  currentMonth 
+  currentMonth,
+  onRefreshData
 }) => {
   const [{ isOver }, drop] = useDrop(() => ({
     accept: 'PROJECT',
@@ -320,8 +357,10 @@ const DayCell = ({
         
       if (error) throw error;
       
-      // The parent component should refetch data
-      window.location.reload();
+      // Refresh data instead of reloading page
+      if (onRefreshData) {
+        onRefreshData();
+      }
     } catch (error) {
       console.error('Error updating assignment date:', error);
     }
@@ -338,27 +377,24 @@ const DayCell = ({
       if (!project) return null;
       
       const startDate = new Date(assignment.start_date);
-      const endDate = addDays(startDate, assignment.duration - 1);
+      const businessDays = getBusinessDaysArray(startDate, assignment.duration);
       
-      // Check if this date falls within the project duration
-      const isWithinProject = isWithinInterval(date, {
-        start: startOfDay(startDate),
-        end: endOfDay(endDate)
-      });
+      // Check if this date is one of the business days for this project
+      const dayIndex = businessDays.findIndex(businessDay => 
+        format(businessDay, 'yyyy-MM-dd') === dateStr
+      );
       
-      if (!isWithinProject) return null;
+      if (dayIndex === -1) return null;
       
-      // Calculate position within the project duration
-      const daysDiff = Math.floor((date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const isStart = daysDiff === 0;
-      const isContinuation = daysDiff > 0;
+      const isStart = dayIndex === 0;
+      const isContinuation = dayIndex > 0;
       
       return {
         project,
         assignment,
         isStart,
         isContinuation,
-        dayPosition: daysDiff,
+        dayPosition: dayIndex,
         totalDays: assignment.duration
       };
     })
@@ -408,7 +444,7 @@ const DayCell = ({
   );
 };
 
-// Enhanced team calendar component with monthly view
+// Enhanced team calendar component with monthly view starting on Monday
 const TeamCalendar = ({ 
   team, 
   currentMonth, 
@@ -418,15 +454,17 @@ const TeamCalendar = ({
   onDropProject, 
   handleExtendProject,
   handleDurationChange,
-  onTruckAssign 
+  onTruckAssign,
+  onRefreshData
 }) => {
   const teamColor = teamColors[team];
   
   // Get all days in the month including padding days from previous/next month
+  // Start weeks on Monday (weekStartsOn: 1)
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
-  const calendarStart = startOfDay(addDays(monthStart, -monthStart.getDay()));
-  const calendarEnd = endOfDay(addDays(monthEnd, 6 - monthEnd.getDay()));
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const calendarEnd = endOfDay(addDays(startOfWeek(monthEnd, { weekStartsOn: 1 }), 41));
   
   const calendarDays = eachDayOfInterval({
     start: calendarStart,
@@ -446,9 +484,9 @@ const TeamCalendar = ({
       </div>
       
       <div className={cn("rounded-b-lg border-b border-x", teamColor.border)}>
-        {/* Day headers */}
+        {/* Day headers - starting with Monday */}
         <div className="grid grid-cols-7 border-b">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
             <div key={day} className="p-2 text-center font-medium text-sm bg-gray-50">
               {day}
             </div>
@@ -471,6 +509,7 @@ const TeamCalendar = ({
                 handleDurationChange={handleDurationChange}
                 onTruckAssign={onTruckAssign}
                 currentMonth={currentMonth}
+                onRefreshData={onRefreshData}
               />
             ))}
           </div>
@@ -561,48 +600,48 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
   const { toast } = useToast();
 
   // Fetch team assignments and truck assignments
+  const fetchAssignments = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch team assignments
+      const { data: teamData, error: teamError } = await supabase
+        .from('project_team_assignments')
+        .select('*')
+        .order('start_date', { ascending: true });
+        
+      if (teamError) throw teamError;
+      setAssignments(teamData || []);
+      
+      // Fetch truck assignments
+      const { data: truckData, error: truckError } = await supabase
+        .from('project_truck_assignments')
+        .select(`
+          *,
+          trucks!fk_project_truck_assignments_truck(truck_number)
+        `);
+        
+      if (truckError) throw truckError;
+      
+      const formattedTruckAssignments = truckData?.map(assignment => ({
+        ...assignment,
+        truck: assignment.trucks
+      })) || [];
+      
+      setTruckAssignments(formattedTruckAssignments);
+    } catch (error) {
+      console.error('Error fetching assignments:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load assignments",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchAssignments = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch team assignments
-        const { data: teamData, error: teamError } = await supabase
-          .from('project_team_assignments')
-          .select('*')
-          .order('start_date', { ascending: true });
-          
-        if (teamError) throw teamError;
-        setAssignments(teamData || []);
-        
-        // Fetch truck assignments
-        const { data: truckData, error: truckError } = await supabase
-          .from('project_truck_assignments')
-          .select(`
-            *,
-            trucks!fk_project_truck_assignments_truck(truck_number)
-          `);
-          
-        if (truckError) throw truckError;
-        
-        const formattedTruckAssignments = truckData?.map(assignment => ({
-          ...assignment,
-          truck: assignment.trucks
-        })) || [];
-        
-        setTruckAssignments(formattedTruckAssignments);
-      } catch (error) {
-        console.error('Error fetching assignments:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load assignments",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchAssignments();
   }, [toast]);
 
@@ -690,9 +729,9 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
           };
           setAssignments(updatedAssignments);
           
-          // Calculate and update installation date
-          const installationDate = new Date(updateData.start_date || existingAssignment.start_date);
-          installationDate.setDate(installationDate.getDate() + (existingAssignment.duration - 1));
+          // Calculate and update installation date using business days
+          const startDate = new Date(updateData.start_date || existingAssignment.start_date);
+          const installationDate = addBusinessDays(startDate, existingAssignment.duration - 1);
           const installationDateStr = format(installationDate, 'yyyy-MM-dd');
           
           // Update project installation_date
@@ -727,9 +766,9 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
           
           setAssignments([...assignments, data[0]]);
           
-          // Calculate and update installation date
-          const installationDate = new Date(newAssignment.start_date);
-          installationDate.setDate(installationDate.getDate() + (newAssignment.duration - 1));
+          // Calculate and update installation date using business days
+          const startDate = new Date(newAssignment.start_date);
+          const installationDate = addBusinessDays(startDate, newAssignment.duration - 1);
           const installationDateStr = format(installationDate, 'yyyy-MM-dd');
           
           // Update project installation_date
@@ -778,9 +817,9 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
       };
       setAssignments(updatedAssignments);
       
-      // Calculate and update installation date
-      const installationDate = new Date(assignment.start_date);
-      installationDate.setDate(installationDate.getDate() + (newDuration - 1));
+      // Calculate and update installation date using business days
+      const startDate = new Date(assignment.start_date);
+      const installationDate = addBusinessDays(startDate, newDuration - 1);
       const installationDateStr = format(installationDate, 'yyyy-MM-dd');
       
       // Update project installation_date
@@ -814,12 +853,12 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
     if (truckAssignmentIndex >= 0) {
       const truckAssignment = truckAssignments[truckAssignmentIndex];
       
-      // Calculate new loading date
+      // Calculate new loading date (one business day before installation)
       const installationDate = new Date(installationDateStr);
       const loadingDate = new Date(installationDate);
       loadingDate.setDate(loadingDate.getDate() - 1);
       
-      // Weekend adjustment
+      // Weekend adjustment - if loading falls on weekend, move to Friday
       if (loadingDate.getDay() === 0) { // Sunday
         loadingDate.setDate(loadingDate.getDate() - 2); // Friday
       } else if (loadingDate.getDay() === 6) { // Saturday
@@ -869,10 +908,9 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
         return;
       }
       
-      // Calculate installation date from team assignment
+      // Calculate installation date from team assignment using business days
       const startDate = new Date(assignment.start_date);
-      const installationDate = new Date(startDate);
-      installationDate.setDate(installationDate.getDate() + (assignment.duration - 1));
+      const installationDate = addBusinessDays(startDate, assignment.duration - 1);
       const installationDateStr = format(installationDate, 'yyyy-MM-dd');
       
       const existingTruckAssignmentIndex = truckAssignments.findIndex(ta => ta.project_id === projectId);
@@ -898,11 +936,11 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
           });
         }
       } else {
-        // Calculate loading date (one workday before installation)
+        // Calculate loading date (one business day before installation)
         const loadingDate = new Date(installationDate);
         loadingDate.setDate(loadingDate.getDate() - 1);
         
-        // If installation is on Monday, loading should be on Friday
+        // Weekend adjustment
         if (loadingDate.getDay() === 0) { // Sunday
           loadingDate.setDate(loadingDate.getDate() - 2); // Friday
         } else if (loadingDate.getDay() === 6) { // Saturday
@@ -1037,6 +1075,7 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
             handleExtendProject={handleExtendProject}
             handleDurationChange={handleDurationChange}
             onTruckAssign={handleTruckAssign}
+            onRefreshData={fetchAssignments}
           />
           <TeamCalendar 
             team="blue" 
@@ -1048,6 +1087,7 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
             handleExtendProject={handleExtendProject}
             handleDurationChange={handleDurationChange}
             onTruckAssign={handleTruckAssign}
+            onRefreshData={fetchAssignments}
           />
           <TeamCalendar 
             team="orange" 
@@ -1059,6 +1099,7 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
             handleExtendProject={handleExtendProject}
             handleDurationChange={handleDurationChange}
             onTruckAssign={handleTruckAssign}
+            onRefreshData={fetchAssignments}
           />
         </CardContent>
       </Card>
