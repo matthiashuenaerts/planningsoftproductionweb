@@ -66,7 +66,6 @@ interface DragItem {
 const addBusinessDays = (date: Date, days: number): Date => {
   let result = new Date(date);
   let addedDays = 0;
-  
   while (addedDays < days) {
     result = addDays(result, 1);
     // Skip weekends (Saturday = 6, Sunday = 0)
@@ -74,7 +73,6 @@ const addBusinessDays = (date: Date, days: number): Date => {
       addedDays++;
     }
   }
-  
   return result;
 };
 
@@ -83,7 +81,6 @@ const getBusinessDaysArray = (startDate: Date, duration: number): Date[] => {
   const days: Date[] = [];
   let currentDate = new Date(startDate);
   let addedDays = 0;
-  
   while (addedDays < duration) {
     // Skip weekends
     if (currentDate.getDay() !== 0 && currentDate.getDay() !== 6) {
@@ -92,7 +89,6 @@ const getBusinessDaysArray = (startDate: Date, duration: number): Date[] => {
     }
     currentDate = addDays(currentDate, 1);
   }
-  
   return days;
 };
 
@@ -131,39 +127,37 @@ const teamColors = {
 // Get truck color for visual distinction
 const getTruckColor = (truckNumber: string) => {
   switch (truckNumber) {
-    case '01': return 'bg-blue-500 text-white';
-    case '02': return 'bg-green-500 text-white';
-    case '03': return 'bg-orange-500 text-white';
-    default: return 'bg-gray-500 text-white';
+    case '01':
+      return 'bg-blue-500 text-white';
+    case '02':
+      return 'bg-green-500 text-white';
+    case '03':
+      return 'bg-orange-500 text-white';
+    default:
+      return 'bg-gray-500 text-white';
   }
 };
 
 // Duration selector component
-const DurationSelector = ({ value, onChange, disabled = false }) => {
-  return (
-    <div className="flex items-center gap-1">
+const DurationSelector = ({
+  value,
+  onChange,
+  disabled = false
+}) => {
+  return <div className="flex items-center gap-1">
       <span className="text-xs">Days:</span>
-      <Input
-        type="number"
-        min="1"
-        max="30"
-        value={value}
-        onChange={(e) => onChange(parseInt(e.target.value) || 1)}
-        disabled={disabled}
-        className="h-6 w-16 text-xs"
-      />
-    </div>
-  );
+      <Input type="number" min="1" max="30" value={value} onChange={e => onChange(parseInt(e.target.value) || 1)} disabled={disabled} className="h-6 w-16 text-xs" />
+    </div>;
 };
 
 // Enhanced project item component with navigation button
-const ProjectItem = ({ 
-  project, 
-  team, 
-  assignment, 
-  onExtendProject, 
+const ProjectItem = ({
+  project,
+  team,
+  assignment,
+  onExtendProject,
   onDurationChange,
-  truckAssignment, 
+  truckAssignment,
   onTruckAssign,
   isStart = true,
   isContinuation = false,
@@ -171,30 +165,28 @@ const ProjectItem = ({
   totalDays = 1
 }) => {
   const navigate = useNavigate();
-  const [{ isDragging }, drag] = useDrag(() => ({
+  const [{
+    isDragging
+  }, drag] = useDrag(() => ({
     type: 'PROJECT',
-    item: { 
-      id: project.id, 
+    item: {
+      id: project.id,
       team: team,
       assignment: assignment
     },
-    collect: (monitor) => ({
+    collect: monitor => ({
       isDragging: !!monitor.isDragging()
     })
   }));
-
   const teamColor = team ? teamColors[team] : teamColors.unassigned;
-  
   const handleDurationChange = (newDuration: number) => {
     if (assignment && onDurationChange) {
       onDurationChange(assignment.id, newDuration);
     }
   };
-
   const handleTruckChange = async (truckId: string) => {
     await onTruckAssign(project.id, truckId);
   };
-
   const handleNavigateToProject = (e: React.MouseEvent) => {
     e.stopPropagation();
     navigate(`/projects/${project.id}`);
@@ -202,159 +194,117 @@ const ProjectItem = ({
 
   // Show full content only on the start day
   const showFullContent = isStart;
-
-  return (
-    <div
-      ref={drag}
-      className={cn(
-        "relative cursor-move border-2 rounded-lg mb-1",
-        teamColor.project,
-        isDragging ? "opacity-50 z-50" : "opacity-100",
-        isContinuation ? "border-l-0 rounded-l-none" : "",
-        dayPosition === totalDays - 1 && totalDays > 1 ? "border-r-0 rounded-r-none" : "",
-        totalDays > 1 && dayPosition > 0 && dayPosition < totalDays - 1 ? "border-x-0 rounded-none" : ""
-      )}
-      style={{ opacity: isDragging ? 0.5 : 1 }}
-    >
+  return <div ref={drag} className={cn("relative cursor-move border-2 rounded-lg mb-1", teamColor.project, isDragging ? "opacity-50 z-50" : "opacity-100", isContinuation ? "border-l-0 rounded-l-none" : "", dayPosition === totalDays - 1 && totalDays > 1 ? "border-r-0 rounded-r-none" : "", totalDays > 1 && dayPosition > 0 && dayPosition < totalDays - 1 ? "border-x-0 rounded-none" : "")} style={{
+    opacity: isDragging ? 0.5 : 1
+  }}>
       <div className="p-2">
-        {showFullContent ? (
-          <>
+        {showFullContent ? <>
             <div className="flex flex-col mb-2">
               <div className="flex justify-between items-start mb-1">
                 <div className={cn("font-medium text-sm truncate flex-1", teamColor.text)}>
                   {project.name}
                 </div>
-                <Badge className={getStatusColor(project.status)} variant="outline">
-                  {project.status}
-                </Badge>
+                
               </div>
               
               <div className="text-xs text-gray-600 truncate mb-1">{project.client}</div>
               
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleNavigateToProject}
-                className="h-6 w-full justify-start p-1 text-xs hover:bg-white/50"
-              >
+              <Button size="sm" variant="ghost" onClick={handleNavigateToProject} className="h-6 w-full justify-start p-1 text-xs hover:bg-white/50">
                 <ExternalLink className="h-3 w-3 mr-1" />
                 View Details
               </Button>
             </div>
             
             {/* Duration Selector */}
-            {team && assignment && (
-              <div className="mb-2">
-                <DurationSelector
-                  value={assignment.duration}
-                  onChange={handleDurationChange}
-                />
-              </div>
-            )}
+            {team && assignment && <div className="mb-2">
+                <DurationSelector value={assignment.duration} onChange={handleDurationChange} />
+              </div>}
             
             {/* Truck Assignment */}
-            {team && (
-              <div className="mb-2">
-                <TruckSelector
-                  value={truckAssignment?.truck_id || ''}
-                  onValueChange={handleTruckChange}
-                  truckNumber={truckAssignment?.truck?.truck_number}
-                />
-              </div>
-            )}
+            {team && <div className="mb-2">
+                <TruckSelector value={truckAssignment?.truck_id || ''} onValueChange={handleTruckChange} truckNumber={truckAssignment?.truck?.truck_number} />
+              </div>}
             
-            {assignment && (
-              <div className="text-xs text-gray-600 mt-1">
+            {assignment && <div className="text-xs text-gray-600 mt-1">
                 {format(new Date(assignment.start_date), 'MMM d')}
-                {assignment.duration > 1 && (
-                  <span> - {format(addBusinessDays(new Date(assignment.start_date), assignment.duration - 1), 'MMM d')}</span>
-                )}
-                {truckAssignment && (
-                  <div className="text-xs text-blue-600">
+                {assignment.duration > 1 && <span> - {format(addBusinessDays(new Date(assignment.start_date), assignment.duration - 1), 'MMM d')}</span>}
+                {truckAssignment && <div className="text-xs text-blue-600">
                     Load: {format(new Date(truckAssignment.loading_date), 'MMM d')}
-                  </div>
-                )}
-              </div>
-            )}
-          </>
-        ) : (
-          // Continuation indicator - show only project name
-          <div className="h-8 flex items-center justify-center">
+                  </div>}
+              </div>}
+          </> :
+      // Continuation indicator - show only project name
+      <div className="h-8 flex items-center justify-center">
             <div className={cn("text-xs font-medium truncate", teamColor.text)}>
               {project.name}
             </div>
-          </div>
-        )}
+          </div>}
       </div>
-    </div>
-  );
+    </div>;
 };
 
 // Truck selector component
-const TruckSelector = ({ value, onValueChange, truckNumber }) => {
+const TruckSelector = ({
+  value,
+  onValueChange,
+  truckNumber
+}) => {
   const [trucks, setTrucks] = useState<Truck[]>([]);
-  
   useEffect(() => {
     const fetchTrucks = async () => {
-      const { data } = await supabase.from('trucks').select('*').order('truck_number');
+      const {
+        data
+      } = await supabase.from('trucks').select('*').order('truck_number');
       setTrucks(data || []);
     };
     fetchTrucks();
   }, []);
-  
-  return (
-    <div className="flex items-center gap-2">
+  return <div className="flex items-center gap-2">
       <Truck className="h-3 w-3" />
       <Select value={value} onValueChange={onValueChange}>
         <SelectTrigger className="h-6 text-xs flex-1">
           <SelectValue placeholder="Assign truck">
-            {truckNumber ? (
-              <Badge className={getTruckColor(truckNumber)}>
+            {truckNumber ? <Badge className={getTruckColor(truckNumber)}>
                 T{truckNumber}
-              </Badge>
-            ) : (
-              "No truck"
-            )}
+              </Badge> : "No truck"}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="none">No truck assigned</SelectItem>
-          {trucks.map(truck => (
-            <SelectItem key={truck.id} value={truck.id}>
+          {trucks.map(truck => <SelectItem key={truck.id} value={truck.id}>
               <div className="flex items-center gap-2">
                 <Badge className={getTruckColor(truck.truck_number)}>
                   {truck.truck_number}
                 </Badge>
                 <span>{truck.description}</span>
               </div>
-            </SelectItem>
-          ))}
+            </SelectItem>)}
         </SelectContent>
       </Select>
-    </div>
-  );
+    </div>;
 };
 
 // Enhanced day cell component with better drop zones and cross-month support
-const DayCell = ({ 
-  date, 
-  team, 
-  projects, 
-  assignments, 
-  truckAssignments, 
-  onDropProject, 
+const DayCell = ({
+  date,
+  team,
+  projects,
+  assignments,
+  truckAssignments,
+  onDropProject,
   handleExtendProject,
   handleDurationChange,
   onTruckAssign,
   currentMonth,
   onRefreshData
 }) => {
-  const [{ isOver }, drop] = useDrop(() => ({
+  const [{
+    isOver
+  }, drop] = useDrop(() => ({
     accept: 'PROJECT',
     drop: (item: DragItem) => {
       const dropDate = format(date, 'yyyy-MM-dd');
       console.log(`Dropping project ${item.id} on date: ${dropDate}`);
-      
       if (item.team === team && item.assignment) {
         // Moving within same team - just update start date
         handleDateChange(item.assignment.id, dropDate);
@@ -363,22 +313,20 @@ const DayCell = ({
         onDropProject(item.id, team, dropDate);
       }
     },
-    collect: (monitor) => ({
+    collect: monitor => ({
       isOver: !!monitor.isOver()
     })
   }));
-  
   const handleDateChange = async (assignmentId: string, newStartDate: string) => {
     try {
       console.log(`Updating assignment ${assignmentId} to start date: ${newStartDate}`);
-      
-      const { error } = await supabase
-        .from('project_team_assignments')
-        .update({ start_date: newStartDate })
-        .eq('id', assignmentId);
-        
+      const {
+        error
+      } = await supabase.from('project_team_assignments').update({
+        start_date: newStartDate
+      }).eq('id', assignmentId);
       if (error) throw error;
-      
+
       // Refresh data instead of reloading page
       if (onRefreshData) {
         onRefreshData();
@@ -387,109 +335,79 @@ const DayCell = ({
       console.error('Error updating assignment date:', error);
     }
   };
-  
   const dateStr = format(date, 'yyyy-MM-dd');
   const isCurrentMonthDay = isSameMonth(date, currentMonth);
-  
+
   // Get projects that should be displayed on this day
-  const projectsForDay = assignments
-    .filter(assignment => assignment.team === team)
-    .map(assignment => {
-      const project = projects.find(p => p.id === assignment.project_id);
-      if (!project) return null;
-      
-      const startDate = new Date(assignment.start_date);
-      const businessDays = getBusinessDaysArray(startDate, assignment.duration);
-      
-      // Check if this date is one of the business days for this project
-      const dayIndex = businessDays.findIndex(businessDay => 
-        format(businessDay, 'yyyy-MM-dd') === dateStr
-      );
-      
-      if (dayIndex === -1) return null;
-      
-      const isStart = dayIndex === 0;
-      const isContinuation = dayIndex > 0;
-      
-      return {
-        project,
-        assignment,
-        isStart,
-        isContinuation,
-        dayPosition: dayIndex,
-        totalDays: assignment.duration
-      };
-    })
-    .filter(Boolean);
-  
-  return (
-    <div 
-      ref={drop}
-      className={cn(
-        "min-h-[120px] border border-gray-200 p-1",
-        !isCurrentMonthDay && "bg-gray-50 text-gray-400",
-        isOver ? "bg-blue-50 border-blue-300" : "",
-        isCurrentMonthDay ? "bg-white" : ""
-      )}
-    >
-      <div className={cn(
-        "text-center text-sm font-medium mb-1",
-        !isCurrentMonthDay && "text-gray-400"
-      )}>
+  const projectsForDay = assignments.filter(assignment => assignment.team === team).map(assignment => {
+    const project = projects.find(p => p.id === assignment.project_id);
+    if (!project) return null;
+    const startDate = new Date(assignment.start_date);
+    const businessDays = getBusinessDaysArray(startDate, assignment.duration);
+
+    // Check if this date is one of the business days for this project
+    const dayIndex = businessDays.findIndex(businessDay => format(businessDay, 'yyyy-MM-dd') === dateStr);
+    if (dayIndex === -1) return null;
+    const isStart = dayIndex === 0;
+    const isContinuation = dayIndex > 0;
+    return {
+      project,
+      assignment,
+      isStart,
+      isContinuation,
+      dayPosition: dayIndex,
+      totalDays: assignment.duration
+    };
+  }).filter(Boolean);
+  return <div ref={drop} className={cn("min-h-[120px] border border-gray-200 p-1", !isCurrentMonthDay && "bg-gray-50 text-gray-400", isOver ? "bg-blue-50 border-blue-300" : "", isCurrentMonthDay ? "bg-white" : "")}>
+      <div className={cn("text-center text-sm font-medium mb-1", !isCurrentMonthDay && "text-gray-400")}>
         <div>{format(date, 'EEE')}</div>
         <div className="text-lg">{format(date, 'd')}</div>
       </div>
       
       <div className="space-y-1">
-        {projectsForDay.map(({ project, assignment, isStart, isContinuation, dayPosition, totalDays }) => {
-          const truckAssignment = truckAssignments.find(ta => ta.project_id === project.id);
-          
-          return (
-            <ProjectItem 
-              key={`${project.id}-${dayPosition}`}
-              project={project} 
-              team={team}
-              assignment={assignment}
-              truckAssignment={truckAssignment}
-              onExtendProject={handleExtendProject}
-              onDurationChange={handleDurationChange}
-              onTruckAssign={onTruckAssign}
-              isStart={isStart}
-              isContinuation={isContinuation}
-              dayPosition={dayPosition}
-              totalDays={totalDays}
-            />
-          );
-        })}
+        {projectsForDay.map(({
+        project,
+        assignment,
+        isStart,
+        isContinuation,
+        dayPosition,
+        totalDays
+      }) => {
+        const truckAssignment = truckAssignments.find(ta => ta.project_id === project.id);
+        return <ProjectItem key={`${project.id}-${dayPosition}`} project={project} team={team} assignment={assignment} truckAssignment={truckAssignment} onExtendProject={handleExtendProject} onDurationChange={handleDurationChange} onTruckAssign={onTruckAssign} isStart={isStart} isContinuation={isContinuation} dayPosition={dayPosition} totalDays={totalDays} />;
+      })}
       </div>
-    </div>
-  );
+    </div>;
 };
 
 // Enhanced team calendar component with proper Monday start and single month view
-const TeamCalendar = ({ 
-  team, 
-  currentMonth, 
-  projects, 
-  assignments, 
-  truckAssignments, 
-  onDropProject, 
+const TeamCalendar = ({
+  team,
+  currentMonth,
+  projects,
+  assignments,
+  truckAssignments,
+  onDropProject,
   handleExtendProject,
   handleDurationChange,
   onTruckAssign,
   onRefreshData
 }) => {
   const teamColor = teamColors[team];
-  
+
   // Get calendar days for one full month starting Monday
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
-  
+
   // Start calendar on the Monday of the week containing the first day of the month
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const calendarStart = startOfWeek(monthStart, {
+    weekStartsOn: 1
+  });
   // End calendar on the Sunday of the week containing the last day of the month
-  const calendarEnd = addDays(startOfWeek(monthEnd, { weekStartsOn: 1 }), 6);
-  
+  const calendarEnd = addDays(startOfWeek(monthEnd, {
+    weekStartsOn: 1
+  }), 6);
   const calendarDays = eachDayOfInterval({
     start: calendarStart,
     end: calendarEnd
@@ -500,9 +418,7 @@ const TeamCalendar = ({
   for (let i = 0; i < calendarDays.length; i += 7) {
     weeks.push(calendarDays.slice(i, i + 7));
   }
-
-  return (
-    <div className="mb-6">
+  return <div className="mb-6">
       <div className={cn("p-3 rounded-t-lg", teamColor.header)}>
         <h3 className="text-lg font-medium capitalize">{team} Team</h3>
       </div>
@@ -510,41 +426,21 @@ const TeamCalendar = ({
       <div className={cn("rounded-b-lg border-b border-x", teamColor.border)}>
         {/* Day headers - starting with Monday */}
         <div className="grid grid-cols-7 border-b">
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-            <div key={day} className="p-2 text-center font-medium text-sm bg-gray-50">
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => <div key={day} className="p-2 text-center font-medium text-sm bg-gray-50">
               {day}
-            </div>
-          ))}
+            </div>)}
         </div>
         
         {/* Calendar grid */}
-        {weeks.map((week, weekIndex) => (
-          <div key={weekIndex} className="grid grid-cols-7">
-            {week.map((date, dayIndex) => (
-              <DayCell 
-                key={dayIndex}
-                date={date} 
-                team={team} 
-                projects={projects} 
-                assignments={assignments}
-                truckAssignments={truckAssignments}
-                onDropProject={onDropProject}
-                handleExtendProject={handleExtendProject}
-                handleDurationChange={handleDurationChange}
-                onTruckAssign={onTruckAssign}
-                currentMonth={currentMonth}
-                onRefreshData={onRefreshData}
-              />
-            ))}
-          </div>
-        ))}
+        {weeks.map((week, weekIndex) => <div key={weekIndex} className="grid grid-cols-7">
+            {week.map((date, dayIndex) => <DayCell key={dayIndex} date={date} team={team} projects={projects} assignments={assignments} truckAssignments={truckAssignments} onDropProject={onDropProject} handleExtendProject={handleExtendProject} handleDurationChange={handleDurationChange} onTruckAssign={onTruckAssign} currentMonth={currentMonth} onRefreshData={onRefreshData} />)}
+          </div>)}
       </div>
-    </div>
-  );
+    </div>;
 };
 
 // Function to get status badge color
-const getStatusColor = (status) => {
+const getStatusColor = status => {
   switch (status?.toLowerCase()) {
     case 'active':
       return 'bg-green-100 text-green-800 border-green-300';
@@ -560,78 +456,64 @@ const getStatusColor = (status) => {
 };
 
 // Enhanced unassigned projects component with proper reset handling
-const UnassignedProjects = ({ projects, assignments, truckAssignments, onTruckAssign, onDropProject }) => {
+const UnassignedProjects = ({
+  projects,
+  assignments,
+  truckAssignments,
+  onTruckAssign,
+  onDropProject
+}) => {
   const navigate = useNavigate();
-  const [{ isOver }, drop] = useDrop(() => ({
+  const [{
+    isOver
+  }, drop] = useDrop(() => ({
     accept: 'PROJECT',
     drop: (item: DragItem) => {
       console.log('Dropping project to unassigned:', item);
       // Move project back to unassigned by removing its team assignment
       onDropProject(item.id, null, null);
     },
-    collect: (monitor) => ({
+    collect: monitor => ({
       isOver: !!monitor.isOver()
     })
   }));
-  
-  const unassignedProjects = projects.filter(project => 
-    !assignments.some(a => a.project_id === project.id)
-  );
-  
-  return (
-    <div className="mb-6">
+  const unassignedProjects = projects.filter(project => !assignments.some(a => a.project_id === project.id));
+  return <div className="mb-6">
       <div className={cn("p-3 rounded-t-lg", teamColors.unassigned.header)}>
         <h3 className="text-lg font-medium">Unassigned Projects ({unassignedProjects.length})</h3>
       </div>
       
-      <div 
-        ref={drop}
-        className={cn(
-          "p-2 rounded-b-lg border-b border-x border-gray-300 bg-white min-h-[100px]",
-          isOver ? "bg-gray-100" : ""
-        )}
-      >
-        {unassignedProjects.length === 0 ? (
-          <p className="text-center text-gray-500 p-4">No unassigned projects</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+      <div ref={drop} className={cn("p-2 rounded-b-lg border-b border-x border-gray-300 bg-white min-h-[100px]", isOver ? "bg-gray-100" : "")}>
+        {unassignedProjects.length === 0 ? <p className="text-center text-gray-500 p-4">No unassigned projects</p> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
             {unassignedProjects.map(project => {
-              const truckAssignment = truckAssignments.find(ta => ta.project_id === project.id);
-              return (
-                <ProjectItem 
-                  key={project.id} 
-                  project={project} 
-                  team={null}
-                  assignment={null}
-                  truckAssignment={truckAssignment}
-                  onExtendProject={() => {}}
-                  onDurationChange={() => {}}
-                  onTruckAssign={onTruckAssign}
-                />
-              );
-            })}
-          </div>
-        )}
+          const truckAssignment = truckAssignments.find(ta => ta.project_id === project.id);
+          return <ProjectItem key={project.id} project={project} team={null} assignment={null} truckAssignment={truckAssignment} onExtendProject={() => {}} onDurationChange={() => {}} onTruckAssign={onTruckAssign} />;
+        })}
+          </div>}
       </div>
-    </div>
-  );
+    </div>;
 };
 
 // Main installation team calendar component with enhanced scroll position preservation
-const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
+const InstallationTeamCalendar = ({
+  projects
+}: {
+  projects: Project[];
+}) => {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [truckAssignments, setTruckAssignments] = useState<TruckAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [scrollPosition, setScrollPosition] = useState(0);
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
 
   // Enhanced scroll position preservation
   useEffect(() => {
     const handleScroll = () => {
       setScrollPosition(window.pageYOffset);
     };
-
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -650,31 +532,30 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
   const fetchAssignments = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch team assignments
-      const { data: teamData, error: teamError } = await supabase
-        .from('project_team_assignments')
-        .select('*')
-        .order('start_date', { ascending: true });
-        
+      const {
+        data: teamData,
+        error: teamError
+      } = await supabase.from('project_team_assignments').select('*').order('start_date', {
+        ascending: true
+      });
       if (teamError) throw teamError;
       setAssignments(teamData || []);
-      
+
       // Fetch truck assignments
-      const { data: truckData, error: truckError } = await supabase
-        .from('project_truck_assignments')
-        .select(`
+      const {
+        data: truckData,
+        error: truckError
+      } = await supabase.from('project_truck_assignments').select(`
           *,
           trucks!fk_project_truck_assignments_truck(truck_number)
         `);
-        
       if (truckError) throw truckError;
-      
       const formattedTruckAssignments = truckData?.map(assignment => ({
         ...assignment,
         truck: assignment.trucks
       })) || [];
-      
       setTruckAssignments(formattedTruckAssignments);
     } catch (error) {
       console.error('Error fetching assignments:', error);
@@ -687,7 +568,6 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     fetchAssignments();
   }, [toast]);
@@ -707,57 +587,47 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
     try {
       // Store current scroll position
       const currentScroll = window.pageYOffset;
-      
       console.log(`Handling drop for project ${projectId} to team ${team} on date ${newStartDate}`);
-      
       const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
-      
       if (team === null) {
         // Reset project completely - remove team assignment and truck assignment
         if (existingAssignmentIndex >= 0) {
           const existingAssignment = assignments[existingAssignmentIndex];
-          
+
           // Remove team assignment
-          const { error } = await supabase
-            .from('project_team_assignments')
-            .delete()
-            .eq('id', existingAssignment.id);
-            
+          const {
+            error
+          } = await supabase.from('project_team_assignments').delete().eq('id', existingAssignment.id);
           if (error) throw error;
-          
+
           // Remove from assignments array
           const updatedAssignments = assignments.filter(a => a.project_id !== projectId);
           setAssignments(updatedAssignments);
-          
+
           // Reset project installation_date to null
-          const { error: projectError } = await supabase
-            .from('projects')
-            .update({ installation_date: null })
-            .eq('id', projectId);
-            
+          const {
+            error: projectError
+          } = await supabase.from('projects').update({
+            installation_date: null
+          }).eq('id', projectId);
           if (projectError) throw projectError;
-          
+
           // Remove truck assignment if exists
           const truckAssignmentIndex = truckAssignments.findIndex(ta => ta.project_id === projectId);
           if (truckAssignmentIndex >= 0) {
             const truckAssignment = truckAssignments[truckAssignmentIndex];
-            
-            const { error: truckError } = await supabase
-              .from('project_truck_assignments')
-              .delete()
-              .eq('id', truckAssignment.id);
-              
+            const {
+              error: truckError
+            } = await supabase.from('project_truck_assignments').delete().eq('id', truckAssignment.id);
             if (truckError) throw truckError;
-            
             const updatedTruckAssignments = truckAssignments.filter(ta => ta.project_id !== projectId);
             setTruckAssignments(updatedTruckAssignments);
           }
-          
           toast({
             title: "Project Reset",
             description: "Project has been moved to unassigned and reset"
           });
-          
+
           // Preserve scroll position
           setTimeout(() => {
             window.scrollTo({
@@ -770,47 +640,43 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
         // Assign to team
         if (existingAssignmentIndex >= 0) {
           const existingAssignment = assignments[existingAssignmentIndex];
-          const updateData: Partial<Assignment> = { team };
-          
+          const updateData: Partial<Assignment> = {
+            team
+          };
           if (newStartDate) {
             updateData.start_date = newStartDate;
           }
-          
-          const { error } = await supabase
-            .from('project_team_assignments')
-            .update(updateData)
-            .eq('id', existingAssignment.id);
-            
+          const {
+            error
+          } = await supabase.from('project_team_assignments').update(updateData).eq('id', existingAssignment.id);
           if (error) throw error;
-          
           const updatedAssignments = [...assignments];
           updatedAssignments[existingAssignmentIndex] = {
             ...existingAssignment,
             ...updateData
           };
           setAssignments(updatedAssignments);
-          
+
           // Calculate and update installation date using business days
           const startDate = new Date(updateData.start_date || existingAssignment.start_date);
           const installationDate = addBusinessDays(startDate, existingAssignment.duration - 1);
           const installationDateStr = format(installationDate, 'yyyy-MM-dd');
-          
+
           // Update project installation_date
-          const { error: projectError } = await supabase
-            .from('projects')
-            .update({ installation_date: installationDateStr })
-            .eq('id', projectId);
-            
+          const {
+            error: projectError
+          } = await supabase.from('projects').update({
+            installation_date: installationDateStr
+          }).eq('id', projectId);
           if (projectError) throw projectError;
-          
+
           // Update truck assignment loading date if exists
           await updateTruckLoadingDate(projectId, installationDateStr);
-          
           toast({
             title: "Team Updated",
             description: `Project has been assigned to ${team} team${newStartDate ? ` starting ${format(new Date(newStartDate), 'MMM d')}` : ''}`
           });
-          
+
           // Preserve scroll position
           setTimeout(() => {
             window.scrollTo({
@@ -825,34 +691,30 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
             start_date: newStartDate || format(new Date(), 'yyyy-MM-dd'),
             duration: 1
           };
-          
-          const { data, error } = await supabase
-            .from('project_team_assignments')
-            .insert([newAssignment])
-            .select();
-            
+          const {
+            data,
+            error
+          } = await supabase.from('project_team_assignments').insert([newAssignment]).select();
           if (error) throw error;
-          
           setAssignments([...assignments, data[0]]);
-          
+
           // Calculate and update installation date using business days
           const startDate = new Date(newAssignment.start_date);
           const installationDate = addBusinessDays(startDate, newAssignment.duration - 1);
           const installationDateStr = format(installationDate, 'yyyy-MM-dd');
-          
+
           // Update project installation_date
-          const { error: projectError } = await supabase
-            .from('projects')
-            .update({ installation_date: installationDateStr })
-            .eq('id', projectId);
-            
+          const {
+            error: projectError
+          } = await supabase.from('projects').update({
+            installation_date: installationDateStr
+          }).eq('id', projectId);
           if (projectError) throw projectError;
-          
           toast({
             title: "Team Assigned",
             description: `Project has been assigned to ${team} team`
           });
-          
+
           // Preserve scroll position
           setTimeout(() => {
             window.scrollTo({
@@ -877,39 +739,35 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
     try {
       const assignmentIndex = assignments.findIndex(a => a.id === assignmentId);
       if (assignmentIndex < 0) return;
-      
       const assignment = assignments[assignmentIndex];
-      
-      const { error } = await supabase
-        .from('project_team_assignments')
-        .update({ duration: newDuration })
-        .eq('id', assignmentId);
-        
+      const {
+        error
+      } = await supabase.from('project_team_assignments').update({
+        duration: newDuration
+      }).eq('id', assignmentId);
       if (error) throw error;
-      
       const updatedAssignments = [...assignments];
       updatedAssignments[assignmentIndex] = {
         ...assignment,
         duration: newDuration
       };
       setAssignments(updatedAssignments);
-      
+
       // Calculate and update installation date using business days
       const startDate = new Date(assignment.start_date);
       const installationDate = addBusinessDays(startDate, newDuration - 1);
       const installationDateStr = format(installationDate, 'yyyy-MM-dd');
-      
+
       // Update project installation_date
-      const { error: projectError } = await supabase
-        .from('projects')
-        .update({ installation_date: installationDateStr })
-        .eq('id', assignment.project_id);
-        
+      const {
+        error: projectError
+      } = await supabase.from('projects').update({
+        installation_date: installationDateStr
+      }).eq('id', assignment.project_id);
       if (projectError) throw projectError;
-      
+
       // Update truck assignment loading date if exists
       await updateTruckLoadingDate(assignment.project_id, installationDateStr);
-      
       toast({
         title: "Duration Updated",
         description: `Project duration is now ${newDuration} day${newDuration > 1 ? 's' : ''}`
@@ -929,31 +787,29 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
     const truckAssignmentIndex = truckAssignments.findIndex(ta => ta.project_id === projectId);
     if (truckAssignmentIndex >= 0) {
       const truckAssignment = truckAssignments[truckAssignmentIndex];
-      
+
       // Calculate new loading date (one business day before installation)
       const installationDate = new Date(installationDateStr);
       const loadingDate = new Date(installationDate);
       loadingDate.setDate(loadingDate.getDate() - 1);
-      
+
       // Weekend adjustment - if loading falls on weekend, move to Friday
-      if (loadingDate.getDay() === 0) { // Sunday
+      if (loadingDate.getDay() === 0) {
+        // Sunday
         loadingDate.setDate(loadingDate.getDate() - 2); // Friday
-      } else if (loadingDate.getDay() === 6) { // Saturday
+      } else if (loadingDate.getDay() === 6) {
+        // Saturday
         loadingDate.setDate(loadingDate.getDate() - 1); // Friday
       }
-      
       const loadingDateStr = format(loadingDate, 'yyyy-MM-dd');
-      
-      const { error } = await supabase
-        .from('project_truck_assignments')
-        .update({ 
-          installation_date: installationDateStr,
-          loading_date: loadingDateStr
-        })
-        .eq('id', truckAssignment.id);
-        
+      const {
+        error
+      } = await supabase.from('project_truck_assignments').update({
+        installation_date: installationDateStr,
+        loading_date: loadingDateStr
+      }).eq('id', truckAssignment.id);
       if (error) throw error;
-      
+
       // Update local state
       const updatedTruckAssignments = [...truckAssignments];
       updatedTruckAssignments[truckAssignmentIndex] = {
@@ -984,29 +840,22 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
         });
         return;
       }
-      
+
       // Calculate installation date from team assignment using business days
       const startDate = new Date(assignment.start_date);
       const installationDate = addBusinessDays(startDate, assignment.duration - 1);
       const installationDateStr = format(installationDate, 'yyyy-MM-dd');
-      
       const existingTruckAssignmentIndex = truckAssignments.findIndex(ta => ta.project_id === projectId);
-      
       if (truckId === 'none' || truckId === '') {
         // Remove truck assignment
         if (existingTruckAssignmentIndex >= 0) {
           const existingAssignment = truckAssignments[existingTruckAssignmentIndex];
-          
-          const { error } = await supabase
-            .from('project_truck_assignments')
-            .delete()
-            .eq('id', existingAssignment.id);
-            
+          const {
+            error
+          } = await supabase.from('project_truck_assignments').delete().eq('id', existingAssignment.id);
           if (error) throw error;
-          
           const updatedTruckAssignments = truckAssignments.filter(ta => ta.project_id !== projectId);
           setTruckAssignments(updatedTruckAssignments);
-          
           toast({
             title: "Truck Unassigned",
             description: "Truck has been removed from project"
@@ -1016,50 +865,43 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
         // Calculate loading date (one business day before installation)
         const loadingDate = new Date(installationDate);
         loadingDate.setDate(loadingDate.getDate() - 1);
-        
+
         // Weekend adjustment
-        if (loadingDate.getDay() === 0) { // Sunday
+        if (loadingDate.getDay() === 0) {
+          // Sunday
           loadingDate.setDate(loadingDate.getDate() - 2); // Friday
-        } else if (loadingDate.getDay() === 6) { // Saturday
+        } else if (loadingDate.getDay() === 6) {
+          // Saturday
           loadingDate.setDate(loadingDate.getDate() - 1); // Friday
         }
-        
         const loadingDateStr = format(loadingDate, 'yyyy-MM-dd');
-        
         if (existingTruckAssignmentIndex >= 0) {
           // Update existing truck assignment
           const existingAssignment = truckAssignments[existingTruckAssignmentIndex];
-          
-          const { error } = await supabase
-            .from('project_truck_assignments')
-            .update({ 
-              truck_id: truckId,
-              installation_date: installationDateStr,
-              loading_date: loadingDateStr
-            })
-            .eq('id', existingAssignment.id);
-            
+          const {
+            error
+          } = await supabase.from('project_truck_assignments').update({
+            truck_id: truckId,
+            installation_date: installationDateStr,
+            loading_date: loadingDateStr
+          }).eq('id', existingAssignment.id);
           if (error) throw error;
-          
+
           // Fetch updated assignment with truck info
-          const { data: updatedData, error: fetchError } = await supabase
-            .from('project_truck_assignments')
-            .select(`
+          const {
+            data: updatedData,
+            error: fetchError
+          } = await supabase.from('project_truck_assignments').select(`
               *,
               trucks!fk_project_truck_assignments_truck(truck_number)
-            `)
-            .eq('id', existingAssignment.id)
-            .single();
-            
+            `).eq('id', existingAssignment.id).single();
           if (fetchError) throw fetchError;
-          
           const updatedTruckAssignments = [...truckAssignments];
           updatedTruckAssignments[existingTruckAssignmentIndex] = {
             ...updatedData,
             truck: updatedData.trucks
           };
           setTruckAssignments(updatedTruckAssignments);
-          
           toast({
             title: "Truck Updated",
             description: `Project assigned to truck ${updatedData.trucks.truck_number}`
@@ -1072,24 +914,19 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
             installation_date: installationDateStr,
             loading_date: loadingDateStr
           };
-          
-          const { data, error } = await supabase
-            .from('project_truck_assignments')
-            .insert([newTruckAssignment])
-            .select(`
+          const {
+            data,
+            error
+          } = await supabase.from('project_truck_assignments').insert([newTruckAssignment]).select(`
               *,
               trucks!fk_project_truck_assignments_truck(truck_number)
             `);
-            
           if (error) throw error;
-          
           const formattedAssignment = {
             ...data[0],
             truck: data[0].trucks
           };
-          
           setTruckAssignments([...truckAssignments, formattedAssignment]);
-          
           toast({
             title: "Truck Assigned",
             description: `Project assigned to truck ${data[0].trucks.truck_number}`
@@ -1117,15 +954,12 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
       });
     }, 100);
   };
-
   if (loading) {
     return <div className="flex justify-center p-8">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
     </div>;
   }
-
-  return (
-    <DndProvider backend={HTML5Backend}>
+  return <DndProvider backend={HTML5Backend}>
       <Card>
         <CardHeader className="pb-2">
           <div className="flex justify-between items-center">
@@ -1147,53 +981,12 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
           </div>
         </CardHeader>
         <CardContent>
-          <UnassignedProjects 
-            projects={projects} 
-            assignments={assignments} 
-            truckAssignments={truckAssignments}
-            onTruckAssign={handleTruckAssign}
-            onDropProject={handleDropProject}
-          />
-          <TeamCalendar 
-            team="green" 
-            currentMonth={currentMonth}
-            projects={projects} 
-            assignments={assignments} 
-            truckAssignments={truckAssignments}
-            onDropProject={handleDropProject} 
-            handleExtendProject={handleExtendProject}
-            handleDurationChange={handleDurationChange}
-            onTruckAssign={handleTruckAssign}
-            onRefreshData={refreshDataWithScrollPreservation}
-          />
-          <TeamCalendar 
-            team="blue" 
-            currentMonth={currentMonth}
-            projects={projects} 
-            assignments={assignments} 
-            truckAssignments={truckAssignments}
-            onDropProject={handleDropProject} 
-            handleExtendProject={handleExtendProject}
-            handleDurationChange={handleDurationChange}
-            onTruckAssign={handleTruckAssign}
-            onRefreshData={refreshDataWithScrollPreservation}
-          />
-          <TeamCalendar 
-            team="orange" 
-            currentMonth={currentMonth}
-            projects={projects} 
-            assignments={assignments} 
-            truckAssignments={truckAssignments}
-            onDropProject={handleDropProject} 
-            handleExtendProject={handleExtendProject}
-            handleDurationChange={handleDurationChange}
-            onTruckAssign={handleTruckAssign}
-            onRefreshData={refreshDataWithScrollPreservation}
-          />
+          <UnassignedProjects projects={projects} assignments={assignments} truckAssignments={truckAssignments} onTruckAssign={handleTruckAssign} onDropProject={handleDropProject} />
+          <TeamCalendar team="green" currentMonth={currentMonth} projects={projects} assignments={assignments} truckAssignments={truckAssignments} onDropProject={handleDropProject} handleExtendProject={handleExtendProject} handleDurationChange={handleDurationChange} onTruckAssign={handleTruckAssign} onRefreshData={refreshDataWithScrollPreservation} />
+          <TeamCalendar team="blue" currentMonth={currentMonth} projects={projects} assignments={assignments} truckAssignments={truckAssignments} onDropProject={handleDropProject} handleExtendProject={handleExtendProject} handleDurationChange={handleDurationChange} onTruckAssign={handleTruckAssign} onRefreshData={refreshDataWithScrollPreservation} />
+          <TeamCalendar team="orange" currentMonth={currentMonth} projects={projects} assignments={assignments} truckAssignments={truckAssignments} onDropProject={handleDropProject} handleExtendProject={handleExtendProject} handleDurationChange={handleDurationChange} onTruckAssign={handleTruckAssign} onRefreshData={refreshDataWithScrollPreservation} />
         </CardContent>
       </Card>
-    </DndProvider>
-  );
+    </DndProvider>;
 };
-
 export default InstallationTeamCalendar;
