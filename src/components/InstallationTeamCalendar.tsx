@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { format, addDays, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, subMonths, startOfWeek, getDay } from 'date-fns';
+import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, ChevronRight, CalendarDays, Truck, GripHorizontal, ExternalLink } from 'lucide-react';
+import { CalendarDays, Truck, ExternalLink } from 'lucide-react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Define project type
 interface Project {
@@ -204,7 +205,6 @@ const ProjectItem = ({
                 <div className={cn("font-medium text-sm truncate flex-1", teamColor.text)}>
                   {project.name}
                 </div>
-                
               </div>
               
               <div className="text-xs text-gray-600 truncate mb-1">{project.client}</div>
@@ -284,7 +284,7 @@ const TruckSelector = ({
     </div>;
 };
 
-// Enhanced day cell component with better drop zones and cross-month support
+// Enhanced day cell component - fixed to start on Monday and show projects correctly
 const DayCell = ({
   date,
   team,
@@ -304,7 +304,14 @@ const DayCell = ({
     accept: 'PROJECT',
     drop: (item: DragItem) => {
       const dropDate = format(date, 'yyyy-MM-dd');
-      console.log(`Dropping project ${item.id} on date: ${dropDate}`);
+      console.log(`Dropping project ${item.id} on date: ${dropDate} in month ${format(currentMonth, 'yyyy-MM')}`);
+      
+      // Ensure we're dropping within the current visible month
+      if (!isSameMonth(date, currentMonth)) {
+        console.log('Drop ignored - target date is not in current month');
+        return;
+      }
+
       if (item.team === team && item.assignment) {
         // Moving within same team - just update start date
         handleDateChange(item.assignment.id, dropDate);
@@ -317,6 +324,7 @@ const DayCell = ({
       isOver: !!monitor.isOver()
     })
   }));
+  
   const handleDateChange = async (assignmentId: string, newStartDate: string) => {
     try {
       console.log(`Updating assignment ${assignmentId} to start date: ${newStartDate}`);
@@ -335,6 +343,7 @@ const DayCell = ({
       console.error('Error updating assignment date:', error);
     }
   };
+  
   const dateStr = format(date, 'yyyy-MM-dd');
   const isCurrentMonthDay = isSameMonth(date, currentMonth);
 
@@ -359,7 +368,8 @@ const DayCell = ({
       totalDays: assignment.duration
     };
   }).filter(Boolean);
-  return <div ref={drop} className={cn("min-h-[120px] border border-gray-200 p-1", !isCurrentMonthDay && "bg-gray-50 text-gray-400", isOver ? "bg-blue-50 border-blue-300" : "", isCurrentMonthDay ? "bg-white" : "")}>
+  
+  return <div ref={drop} className={cn("min-h-[120px] border border-gray-200 p-1", !isCurrentMonthDay && "bg-gray-50 text-gray-400", isOver && isCurrentMonthDay ? "bg-blue-50 border-blue-300" : "", isCurrentMonthDay ? "bg-white" : "")}>
       <div className={cn("text-center text-sm font-medium mb-1", !isCurrentMonthDay && "text-gray-400")}>
         <div>{format(date, 'EEE')}</div>
         <div className="text-lg">{format(date, 'd')}</div>
@@ -381,7 +391,7 @@ const DayCell = ({
     </div>;
 };
 
-// Enhanced team calendar component with proper Monday start and single month view
+// Enhanced team calendar component with scrollable months
 const TeamCalendar = ({
   team,
   currentMonth,
@@ -396,45 +406,86 @@ const TeamCalendar = ({
 }) => {
   const teamColor = teamColors[team];
 
-  // Get calendar days for one full month starting Monday
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
+  // Generate multiple months for scrolling (3 months before to 3 months after)
+  const generateCalendarMonths = () => {
+    const months = [];
+    for (let i = -3; i <= 3; i++) {
+      const month = addMonths(currentMonth, i);
+      months.push(month);
+    }
+    return months;
+  };
 
-  // Start calendar on the Monday of the week containing the first day of the month
-  const calendarStart = startOfWeek(monthStart, {
-    weekStartsOn: 1
-  });
-  // End calendar on the Sunday of the week containing the last day of the month
-  const calendarEnd = addDays(startOfWeek(monthEnd, {
-    weekStartsOn: 1
-  }), 6);
-  const calendarDays = eachDayOfInterval({
-    start: calendarStart,
-    end: calendarEnd
-  });
+  const calendarMonths = generateCalendarMonths();
 
-  // Group days into weeks
-  const weeks = [];
-  for (let i = 0; i < calendarDays.length; i += 7) {
-    weeks.push(calendarDays.slice(i, i + 7));
-  }
+  // Generate calendar days for a specific month, starting on Monday
+  const generateMonthDays = (month: Date) => {
+    const monthStart = startOfMonth(month);
+    const monthEnd = endOfMonth(month);
+    
+    // Start calendar on the Monday of the week containing the first day of the month
+    const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+    // End calendar on the Sunday of the week containing the last day of the month
+    const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+    
+    return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+  };
+
   return <div className="mb-6">
       <div className={cn("p-3 rounded-t-lg", teamColor.header)}>
         <h3 className="text-lg font-medium capitalize">{team} Team</h3>
       </div>
       
       <div className={cn("rounded-b-lg border-b border-x", teamColor.border)}>
-        {/* Day headers - starting with Monday */}
-        <div className="grid grid-cols-7 border-b">
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => <div key={day} className="p-2 text-center font-medium text-sm bg-gray-50">
-              {day}
-            </div>)}
-        </div>
-        
-        {/* Calendar grid */}
-        {weeks.map((week, weekIndex) => <div key={weekIndex} className="grid grid-cols-7">
-            {week.map((date, dayIndex) => <DayCell key={dayIndex} date={date} team={team} projects={projects} assignments={assignments} truckAssignments={truckAssignments} onDropProject={onDropProject} handleExtendProject={handleExtendProject} handleDurationChange={handleDurationChange} onTruckAssign={onTruckAssign} currentMonth={currentMonth} onRefreshData={onRefreshData} />)}
-          </div>)}
+        <ScrollArea className="h-[600px]">
+          {calendarMonths.map((month, monthIndex) => {
+            const monthDays = generateMonthDays(month);
+            const weeks = [];
+            for (let i = 0; i < monthDays.length; i += 7) {
+              weeks.push(monthDays.slice(i, i + 7));
+            }
+
+            return (
+              <div key={monthIndex} className="mb-4">
+                {/* Month header */}
+                <div className="sticky top-0 bg-gray-100 p-2 text-center font-medium border-b z-10">
+                  {format(month, 'MMMM yyyy')}
+                </div>
+                
+                {/* Day headers - starting with Monday */}
+                <div className="grid grid-cols-7 border-b">
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                    <div key={day} className="p-2 text-center font-medium text-sm bg-gray-50">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Calendar grid */}
+                {weeks.map((week, weekIndex) => (
+                  <div key={weekIndex} className="grid grid-cols-7">
+                    {week.map((date, dayIndex) => (
+                      <DayCell 
+                        key={dayIndex} 
+                        date={date} 
+                        team={team} 
+                        projects={projects} 
+                        assignments={assignments} 
+                        truckAssignments={truckAssignments} 
+                        onDropProject={onDropProject} 
+                        handleExtendProject={handleExtendProject} 
+                        handleDurationChange={handleDurationChange} 
+                        onTruckAssign={onTruckAssign} 
+                        currentMonth={month} 
+                        onRefreshData={onRefreshData} 
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </ScrollArea>
       </div>
     </div>;
 };
@@ -455,7 +506,7 @@ const getStatusColor = status => {
   }
 };
 
-// Enhanced unassigned projects component with proper reset handling
+// Enhanced unassigned projects component with proper reset handling and badge logic
 const UnassignedProjects = ({
   projects,
   assignments,
@@ -477,7 +528,9 @@ const UnassignedProjects = ({
       isOver: !!monitor.isOver()
     })
   }));
+  
   const unassignedProjects = projects.filter(project => !assignments.some(a => a.project_id === project.id));
+  
   return <div className="mb-6">
       <div className={cn("p-3 rounded-t-lg", teamColors.unassigned.header)}>
         <h3 className="text-lg font-medium">Unassigned Projects ({unassignedProjects.length})</h3>
@@ -487,14 +540,25 @@ const UnassignedProjects = ({
         {unassignedProjects.length === 0 ? <p className="text-center text-gray-500 p-4">No unassigned projects</p> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
             {unassignedProjects.map(project => {
           const truckAssignment = truckAssignments.find(ta => ta.project_id === project.id);
-          return <ProjectItem key={project.id} project={project} team={null} assignment={null} truckAssignment={truckAssignment} onExtendProject={() => {}} onDurationChange={() => {}} onTruckAssign={onTruckAssign} />;
+          const hasTeamAssignment = assignments.some(a => a.project_id === project.id);
+          
+          return <div key={project.id} className="border rounded-lg p-3">
+              <ProjectItem project={project} team={null} assignment={null} truckAssignment={truckAssignment} onExtendProject={() => {}} onDurationChange={() => {}} onTruckAssign={onTruckAssign} />
+              
+              {/* Show planned vs to plan badge */}
+              <div className="mt-2 flex justify-center">
+                <Badge variant={hasTeamAssignment ? "default" : "outline"}>
+                  {hasTeamAssignment ? "Planned" : "To Plan"}
+                </Badge>
+              </div>
+            </div>;
         })}
           </div>}
       </div>
     </div>;
 };
 
-// Main installation team calendar component with enhanced scroll position preservation
+// Main installation team calendar component with scrollable view (no navigation arrows)
 const InstallationTeamCalendar = ({
   projects
 }: {
@@ -571,16 +635,6 @@ const InstallationTeamCalendar = ({
   useEffect(() => {
     fetchAssignments();
   }, [toast]);
-
-  // Navigate to previous month
-  const prevMonth = () => {
-    setCurrentMonth(subMonths(currentMonth, 1));
-  };
-
-  // Navigate to next month
-  const nextMonth = () => {
-    setCurrentMonth(addMonths(currentMonth, 1));
-  };
 
   // Enhanced project drop handling with proper reset and scroll preservation
   const handleDropProject = async (projectId: string, team: string | null, newStartDate?: string) => {
@@ -954,29 +1008,23 @@ const InstallationTeamCalendar = ({
       });
     }, 100);
   };
+  
   if (loading) {
     return <div className="flex justify-center p-8">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
     </div>;
   }
+  
   return <DndProvider backend={HTML5Backend}>
       <Card>
         <CardHeader className="pb-2">
           <div className="flex justify-between items-center">
             <CardTitle className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5" />
-              Installation Team Calendar
+              Installation Team Calendar - Scrollable View
             </CardTitle>
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="icon" onClick={prevMonth}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm font-medium min-w-[150px] text-center">
-                {format(currentMonth, 'MMMM yyyy')}
-              </span>
-              <Button variant="outline" size="icon" onClick={nextMonth}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+            <div className="text-sm text-gray-600">
+              Scroll within each team calendar to navigate through months
             </div>
           </div>
         </CardHeader>
@@ -989,4 +1037,5 @@ const InstallationTeamCalendar = ({
       </Card>
     </DndProvider>;
 };
+
 export default InstallationTeamCalendar;

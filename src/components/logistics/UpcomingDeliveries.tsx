@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,14 +23,30 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string, hasTeamAssignment: boolean) => {
+    // Check if project is assigned to installation team to determine badge
+    if (status === 'pending') {
+      if (hasTeamAssignment) {
+        return 'bg-green-100 text-green-800'; // Planned
+      } else {
+        return 'bg-yellow-100 text-yellow-800'; // To Plan
+      }
+    }
+    
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'canceled': return 'bg-red-100 text-red-800';
       case 'delayed': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const getStatusText = (status: string, hasTeamAssignment: boolean) => {
+    // Check if project is assigned to installation team to determine text
+    if (status === 'pending') {
+      return hasTeamAssignment ? 'Planned' : 'To Plan';
+    }
+    return status;
   };
 
   const toggleOrderExpansion = (orderId: string) => {
@@ -124,6 +141,9 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
           <div className="space-y-4">
             {sortedOrders.map((order) => {
               const isExpanded = expandedOrders.has(order.id);
+              // Check if the project has a team assignment to determine badge
+              const hasTeamAssignment = (order as any).project_team_assignments && 
+                                      (order as any).project_team_assignments.length > 0;
               
               return (
                 <Card key={order.id} className="border-l-4 border-l-green-500">
@@ -134,8 +154,8 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
                         Order from {order.supplier}
                       </CardTitle>
                       <div className="flex items-center gap-2">
-                        <Badge className={getStatusColor(order.status)}>
-                          {order.status}
+                        <Badge className={getStatusColor(order.status, hasTeamAssignment)}>
+                          {getStatusText(order.status, hasTeamAssignment)}
                         </Badge>
                       </div>
                     </div>
