@@ -219,26 +219,27 @@ const ProjectItem = ({
       <div className="p-2">
         {showFullContent ? (
           <>
-            <div className="flex justify-between items-start mb-1">
-              <div className="flex-1 min-w-0">
-                <div className={cn("font-medium text-sm truncate", teamColor.text)}>
+            <div className="flex flex-col mb-2">
+              <div className="flex justify-between items-start mb-1">
+                <div className={cn("font-medium text-sm truncate flex-1", teamColor.text)}>
                   {project.name}
                 </div>
-                <div className="text-xs text-gray-600 truncate">{project.client}</div>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleNavigateToProject}
-                  className="h-6 w-6 p-0 hover:bg-white/50"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                </Button>
                 <Badge className={getStatusColor(project.status)} variant="outline">
                   {project.status}
                 </Badge>
               </div>
+              
+              <div className="text-xs text-gray-600 truncate mb-1">{project.client}</div>
+              
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleNavigateToProject}
+                className="h-6 w-full justify-start p-1 text-xs hover:bg-white/50"
+              >
+                <ExternalLink className="h-3 w-3 mr-1" />
+                View Details
+              </Button>
             </div>
             
             {/* Duration Selector */}
@@ -334,7 +335,7 @@ const TruckSelector = ({ value, onValueChange, truckNumber }) => {
   );
 };
 
-// Enhanced day cell component with better drop zones
+// Enhanced day cell component with better drop zones and cross-month support
 const DayCell = ({ 
   date, 
   team, 
@@ -352,6 +353,8 @@ const DayCell = ({
     accept: 'PROJECT',
     drop: (item: DragItem) => {
       const dropDate = format(date, 'yyyy-MM-dd');
+      console.log(`Dropping project ${item.id} on date: ${dropDate}`);
+      
       if (item.team === team && item.assignment) {
         // Moving within same team - just update start date
         handleDateChange(item.assignment.id, dropDate);
@@ -367,6 +370,8 @@ const DayCell = ({
   
   const handleDateChange = async (assignmentId: string, newStartDate: string) => {
     try {
+      console.log(`Updating assignment ${assignmentId} to start date: ${newStartDate}`);
+      
       const { error } = await supabase
         .from('project_team_assignments')
         .update({ start_date: newStartDate })
@@ -461,7 +466,7 @@ const DayCell = ({
   );
 };
 
-// Enhanced team calendar component with proper Monday start
+// Enhanced team calendar component with proper Monday start and single month view
 const TeamCalendar = ({ 
   team, 
   currentMonth, 
@@ -476,13 +481,14 @@ const TeamCalendar = ({
 }) => {
   const teamColor = teamColors[team];
   
-  // Get calendar days for one full month with proper Monday start
+  // Get calendar days for one full month starting Monday
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   
-  // Start calendar on Monday (weekStartsOn: 1 means Monday)
+  // Start calendar on the Monday of the week containing the first day of the month
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-  const calendarEnd = addDays(calendarStart, 41); // 6 weeks = 42 days - 1
+  // End calendar on the Sunday of the week containing the last day of the month
+  const calendarEnd = addDays(startOfWeek(monthEnd, { weekStartsOn: 1 }), 6);
   
   const calendarDays = eachDayOfInterval({
     start: calendarStart,
@@ -555,9 +561,11 @@ const getStatusColor = (status) => {
 
 // Enhanced unassigned projects component with proper reset handling
 const UnassignedProjects = ({ projects, assignments, truckAssignments, onTruckAssign, onDropProject }) => {
+  const navigate = useNavigate();
   const [{ isOver }, drop] = useDrop(() => ({
     accept: 'PROJECT',
     drop: (item: DragItem) => {
+      console.log('Dropping project to unassigned:', item);
       // Move project back to unassigned by removing its team assignment
       onDropProject(item.id, null, null);
     },
@@ -699,6 +707,8 @@ const InstallationTeamCalendar = ({ projects }: { projects: Project[] }) => {
     try {
       // Store current scroll position
       const currentScroll = window.pageYOffset;
+      
+      console.log(`Handling drop for project ${projectId} to team ${team} on date ${newStartDate}`);
       
       const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
       
