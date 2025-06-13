@@ -10,7 +10,14 @@ export const orderService = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []).map(order => ({
+      ...order,
+      status: order.status as Order['status']
+    }));
+  },
+
+  async getAllOrders(): Promise<Order[]> {
+    return this.getAll();
   },
 
   async getById(id: string): Promise<Order> {
@@ -21,7 +28,10 @@ export const orderService = {
       .single();
 
     if (error) throw error;
-    return data;
+    return {
+      ...data,
+      status: data.status as Order['status']
+    };
   },
 
   async getByProject(projectId: string): Promise<Order[]> {
@@ -32,7 +42,10 @@ export const orderService = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []).map(order => ({
+      ...order,
+      status: order.status as Order['status']
+    }));
   },
 
   async create(order: Omit<Order, 'id' | 'created_at' | 'updated_at'>): Promise<Order> {
@@ -43,7 +56,10 @@ export const orderService = {
       .single();
 
     if (error) throw error;
-    return data;
+    return {
+      ...data,
+      status: data.status as Order['status']
+    };
   },
 
   async update(id: string, updates: Partial<Order>): Promise<Order> {
@@ -55,7 +71,14 @@ export const orderService = {
       .single();
 
     if (error) throw error;
-    return data;
+    return {
+      ...data,
+      status: data.status as Order['status']
+    };
+  },
+
+  async updateOrderStatus(id: string, status: Order['status']): Promise<Order> {
+    return this.update(id, { status });
   },
 
   async delete(id: string): Promise<void> {
@@ -150,6 +173,30 @@ export const orderService = {
 
     if (error) throw error;
     return data;
+  },
+
+  async uploadOrderAttachment(orderId: string, file: File): Promise<OrderAttachment> {
+    // Upload file to Supabase storage
+    const fileName = `${Date.now()}-${file.name}`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('order-attachments')
+      .upload(fileName, file);
+
+    if (uploadError) throw uploadError;
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('order-attachments')
+      .getPublicUrl(fileName);
+
+    // Create attachment record
+    return this.createOrderAttachment({
+      order_id: orderId,
+      file_name: file.name,
+      file_path: publicUrl,
+      file_type: file.type,
+      file_size: file.size
+    });
   },
 
   async deleteOrderAttachment(id: string): Promise<void> {

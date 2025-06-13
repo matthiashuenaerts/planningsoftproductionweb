@@ -21,6 +21,7 @@ import {
 import { Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
+import { Order } from '@/types/order';
 
 interface NewOrderModalProps {
   open: boolean;
@@ -36,7 +37,7 @@ const NewOrderModal = ({ open, onOpenChange, projectId, onSuccess, showAddOrderB
   const [formData, setFormData] = useState({
     supplier: '',
     expected_delivery: '',
-    status: 'pending'
+    status: 'pending' as Order['status']
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -111,7 +112,7 @@ const NewOrderModal = ({ open, onOpenChange, projectId, onSuccess, showAddOrderB
           <Label htmlFor="status">Status</Label>
           <Select
             value={formData.status}
-            onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
+            onValueChange={(value: Order['status']) => setFormData(prev => ({ ...prev, status: value }))}
           >
             <SelectTrigger>
               <SelectValue />

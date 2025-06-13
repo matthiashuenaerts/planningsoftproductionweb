@@ -24,7 +24,10 @@ export const accessoriesService = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []).map(accessory => ({
+      ...accessory,
+      status: accessory.status as Accessory['status']
+    }));
   },
 
   async create(accessory: Omit<Accessory, 'id' | 'created_at' | 'updated_at'>): Promise<Accessory> {
@@ -35,7 +38,10 @@ export const accessoriesService = {
       .single();
 
     if (error) throw error;
-    return data;
+    return {
+      ...data,
+      status: data.status as Accessory['status']
+    };
   },
 
   async update(id: string, updates: Partial<Accessory>): Promise<Accessory> {
@@ -47,7 +53,10 @@ export const accessoriesService = {
       .single();
 
     if (error) throw error;
-    return data;
+    return {
+      ...data,
+      status: data.status as Accessory['status']
+    };
   },
 
   async delete(id: string): Promise<void> {
