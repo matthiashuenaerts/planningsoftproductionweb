@@ -28,12 +28,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Trash2, ExternalLink, Edit } from 'lucide-react';
+import { Plus, Trash2, ExternalLink, Edit, ShoppingCart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { accessoriesService, Accessory } from '@/services/accessoriesService';
 import { orderService } from '@/services/orderService';
 import { useNavigate } from 'react-router-dom';
 import OrderEditModal from './OrderEditModal';
+import NewOrderModal from './NewOrderModal';
 
 interface AccessoriesDialogProps {
   open: boolean;
@@ -50,6 +51,7 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showOrderEditModal, setShowOrderEditModal] = useState(false);
+  const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     article_name: '',
@@ -176,6 +178,86 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
     setSelectedOrderId(null);
   };
 
+  const handleAccessorySelection = (accessoryId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedAccessories(prev => [...prev, accessoryId]);
+    } else {
+      setSelectedAccessories(prev => prev.filter(id => id !== accessoryId));
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedAccessories(accessories.map(acc => acc.id));
+    } else {
+      setSelectedAccessories([]);
+    }
+  };
+
+  const handleCreateOrderFromAccessories = () => {
+    if (selectedAccessories.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select at least one accessory to create an order",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const selectedAccessoryObjects = accessories.filter(acc => 
+      selectedAccessories.includes(acc.id)
+    );
+
+    // Check if all selected accessories have the same supplier
+    const suppliers = selectedAccessoryObjects.map(acc => acc.supplier).filter(Boolean);
+    const uniqueSuppliers = [...new Set(suppliers)];
+    const commonSupplier = uniqueSuppliers.length === 1 ? uniqueSuppliers[0] : '';
+
+    // Create order items from selected accessories
+    const orderItems = selectedAccessoryObjects.map(accessory => ({
+      description: accessory.article_description || accessory.article_name,
+      quantity: accessory.quantity,
+      article_code: accessory.article_code || '',
+      article_name: accessory.article_name
+    }));
+
+    // Generate supplier name
+    let supplierName = '';
+    if (commonSupplier) {
+      supplierName = commonSupplier;
+    } else if (selectedAccessoryObjects.length > 0) {
+      const articleNames = selectedAccessoryObjects.map(a => a.article_name).join(', ');
+      supplierName = `Mixed Accessories - ${articleNames.substring(0, 50)}${articleNames.length > 50 ? '...' : ''}`;
+    } else {
+      supplierName = 'Accessories Order';
+    }
+
+    setShowNewOrderModal(true);
+  };
+
+  const handleOrderCreated = async (orderId: string) => {
+    // Link selected accessories to the new order and update their status
+    try {
+      await accessoriesService.linkToOrder(selectedAccessories, orderId);
+      
+      toast({
+        title: "Success",
+        description: "Order created and accessories linked successfully"
+      });
+      
+      setSelectedAccessories([]);
+      setShowNewOrderModal(false);
+      loadAccessories();
+      loadOrders();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to link accessories to order: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
   const getRowClassName = (status: string) => {
     switch (status) {
       case 'in_stock':
@@ -210,6 +292,31 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
     }
   };
 
+  const getPrefilledOrderData = () => {
+    const selectedAccessoryObjects = accessories.filter(acc => 
+      selectedAccessories.includes(acc.id)
+    );
+
+    // Check if all selected accessories have the same supplier
+    const suppliers = selectedAccessoryObjects.map(acc => acc.supplier).filter(Boolean);
+    const uniqueSuppliers = [...new Set(suppliers)];
+    const commonSupplier = uniqueSuppliers.length === 1 ? uniqueSuppliers[0] : '';
+
+    // Create order items from selected accessories
+    const orderItems = selectedAccessoryObjects.map(accessory => ({
+      description: accessory.article_description || accessory.article_name,
+      quantity: accessory.quantity,
+      article_code: accessory.article_code || '',
+      article_name: accessory.article_name
+    }));
+
+    return {
+      accessories: selectedAccessoryObjects,
+      orderItems,
+      supplier: commonSupplier
+    };
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -217,16 +324,24 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
           <DialogHeader>
             <DialogTitle>Project Accessories</DialogTitle>
             <DialogDescription>
-              Manage accessories for this project. Orders can be created from the project orders page.
+              Manage accessories for this project. Select accessories to create orders.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <Button onClick={() => setShowForm(!showForm)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Accessory
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={() => setShowForm(!showForm)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Accessory
+                </Button>
+                {selectedAccessories.length > 0 && (
+                  <Button onClick={handleCreateOrderFromAccessories} variant="outline">
+                    <ShoppingCart className="mr-2 h-4 w-4" />
+                    Create Order ({selectedAccessories.length})
+                  </Button>
+                )}
+              </div>
             </div>
 
             {showForm && (
@@ -328,6 +443,12 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectedAccessories.length === accessories.length && accessories.length > 0}
+                        onCheckedChange={handleSelectAll}
+                      />
+                    </TableHead>
                     <TableHead>Article Name</TableHead>
                     <TableHead>Article Code</TableHead>
                     <TableHead>Description</TableHead>
@@ -343,13 +464,13 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8">
+                      <TableCell colSpan={11} className="text-center py-8">
                         Loading accessories...
                       </TableCell>
                     </TableRow>
                   ) : accessories.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                         No accessories found. Add your first accessory above.
                       </TableCell>
                     </TableRow>
@@ -358,6 +479,12 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
                       const orderInfo = getOrderInfo(accessory.order_id);
                       return (
                         <TableRow key={accessory.id} className={getRowClassName(accessory.status)}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedAccessories.includes(accessory.id)}
+                              onCheckedChange={(checked) => handleAccessorySelection(accessory.id, !!checked)}
+                            />
+                          </TableCell>
                           <TableCell className="font-medium">{accessory.article_name}</TableCell>
                           <TableCell>{accessory.article_code || '-'}</TableCell>
                           <TableCell className="max-w-xs truncate" title={accessory.article_description || ''}>
@@ -442,6 +569,14 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
           onSuccess={handleOrderEditSuccess}
         />
       )}
+
+      <NewOrderModal
+        open={showNewOrderModal}
+        onOpenChange={setShowNewOrderModal}
+        projectId={projectId}
+        onSuccess={handleOrderCreated}
+        prefilledData={selectedAccessories.length > 0 ? getPrefilledOrderData() : null}
+      />
     </>
   );
 };

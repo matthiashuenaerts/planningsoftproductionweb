@@ -49,6 +49,7 @@ interface NewOrderModalProps {
   prefilledData?: {
     accessories: any[];
     orderItems: OrderItem[];
+    supplier?: string;
   } | null;
 }
 
@@ -76,17 +77,15 @@ const NewOrderModal = ({
       // Set order items from prefilled data
       setOrderItems(prefilledData.orderItems);
       
-      // Generate supplier name based on accessories
-      let supplierName = '';
-      if (prefilledData.accessories.length > 0) {
-        // Use supplier from first accessory if available, otherwise use article names
-        const firstAccessorySupplier = prefilledData.accessories[0].supplier;
-        if (firstAccessorySupplier) {
-          supplierName = firstAccessorySupplier;
-        } else {
-          supplierName = `Accessories Order - ${prefilledData.accessories.map(a => a.article_name).join(', ').substring(0, 50)}${prefilledData.accessories.length > 1 ? '...' : ''}`;
-        }
-      } else {
+      // Use the supplier from prefilled data if available
+      let supplierName = prefilledData.supplier || '';
+      
+      if (!supplierName && prefilledData.accessories.length > 0) {
+        // Generate supplier name based on accessories if no common supplier
+        supplierName = `Accessories Order - ${prefilledData.accessories.map(a => a.article_name).join(', ').substring(0, 50)}${prefilledData.accessories.length > 1 ? '...' : ''}`;
+      }
+      
+      if (!supplierName) {
         supplierName = 'Accessories Order';
       }
       
