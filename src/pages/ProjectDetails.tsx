@@ -12,16 +12,19 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { standardTasksService } from '@/services/standardTasksService';
+import { accessoriesService, Accessory } from '@/services/accessoriesService';
+import { orderService } from '@/services/orderService';
 import TaskList from '@/components/TaskList';
 import ProjectFileManager from '@/components/ProjectFileManager';
 import OneDriveIntegration from '@/components/OneDriveIntegration';
 import NewOrderModal from '@/components/NewOrderModal';
 import { PartsListDialog } from '@/components/PartsListDialog';
+import { AccessoriesDialog } from '@/components/AccessoriesDialog';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -31,10 +34,13 @@ const ProjectDetails = () => {
   const { toast } = useToast();
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [accessories, setAccessories] = useState<Accessory[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('tasks');
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [showPartsListDialog, setShowPartsListDialog] = useState(false);
+  const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
   const { currentEmployee } = useAuth();
 
   useEffect(() => {
@@ -57,6 +63,13 @@ const ProjectDetails = () => {
         }
         
         setTasks(allTasks);
+
+        // Fetch accessories and orders
+        const accessoriesData = await accessoriesService.getByProject(projectId);
+        setAccessories(accessoriesData);
+
+        const ordersData = await orderService.getByProject(projectId);
+        setOrders(ordersData);
       } catch (error: any) {
         toast({
           title: "Error",
@@ -301,6 +314,10 @@ const ProjectDetails = () => {
       title: "Success",
       description: "Order created successfully",
     });
+    // Refresh orders data
+    if (projectId) {
+      orderService.getByProject(projectId).then(setOrders);
+    }
   };
 
   if (loading) {
@@ -397,6 +414,14 @@ const ProjectDetails = () => {
   // Combine TODO and HOLD tasks for the "Open tasks" tab
   const openTasks = [...todoTasks, ...holdTasks];
 
+  // Calculate summary stats
+  const openOrdersCount = orders.filter(order => order.status === 'pending').length;
+  const unavailableAccessoriesCount = accessories.filter(acc => 
+    acc.status === 'to_order' || acc.status === 'ordered'
+  ).length;
+  const inStockAccessoriesCount = accessories.filter(acc => acc.status === 'in_stock').length;
+  const deliveredAccessoriesCount = accessories.filter(acc => acc.status === 'delivered').length;
+
   return (
     <div className="flex min-h-screen">
       <div className="w-64 bg-sidebar fixed top-0 bottom-0">
@@ -427,15 +452,15 @@ const ProjectDetails = () => {
                 </Button>
                 <Button 
                   variant="outline"
-                  onClick={() => setShowNewOrderModal(true)}
-                >
-                  <Plus className="mr-2 h-4 w-4" /> Add Order
-                </Button>
-                <Button 
-                  variant="outline"
                   onClick={() => setShowPartsListDialog(true)}
                 >
                   <List className="mr-2 h-4 w-4" /> Parts List
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowAccessoriesDialog(true)}
+                >
+                  <Settings className="mr-2 h-4 w-4" /> Accessories
                 </Button>
                 <Button 
                   variant={activeTab === 'files' ? 'default' : 'outline'}
@@ -511,6 +536,29 @@ const ProjectDetails = () => {
                       </div>
                     </div>
                   </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Orders & Accessories</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="bg-orange-50 p-2 rounded">
+                        <div className="font-medium text-orange-800">{openOrdersCount}</div>
+                        <div className="text-orange-600 text-xs">Open Orders</div>
+                      </div>
+                      <div className="bg-red-50 p-2 rounded">
+                        <div className="font-medium text-red-800">{unavailableAccessoriesCount}</div>
+                        <div className="text-red-600 text-xs">To Order</div>
+                      </div>
+                      <div className="bg-green-50 p-2 rounded">
+                        <div className="font-medium text-green-800">{inStockAccessoriesCount}</div>
+                        <div className="text-green-600 text-xs">In Stock</div>
+                      </div>
+                      <div className="bg-blue-50 p-2 rounded">
+                        <div className="font-medium text-blue-800">{deliveredAccessoriesCount}</div>
+                        <div className="text-blue-600 text-xs">Delivered</div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <h4 className="text-sm font-medium">Important Dates</h4>
                     <div className="flex items-center gap-2 text-sm">
@@ -569,12 +617,13 @@ const ProjectDetails = () => {
         </div>
       </div>
 
-      {/* New Order Modal */}
+      {/* New Order Modal with Add Order button moved here */}
       <NewOrderModal
         open={showNewOrderModal}
         onOpenChange={setShowNewOrderModal}
         projectId={projectId!}
         onSuccess={handleNewOrderSuccess}
+        showAddOrderButton={true}
       />
 
       {/* Parts List Dialog */}
@@ -588,6 +637,13 @@ const ProjectDetails = () => {
             description: "Parts list imported successfully",
           });
         }}
+      />
+
+      {/* Accessories Dialog */}
+      <AccessoriesDialog
+        open={showAccessoriesDialog}
+        onOpenChange={setShowAccessoriesDialog}
+        projectId={projectId!}
       />
     </div>
   );

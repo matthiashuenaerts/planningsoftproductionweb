@@ -9,6 +9,63 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      accessories: {
+        Row: {
+          article_code: string | null
+          article_description: string | null
+          article_name: string
+          created_at: string
+          id: string
+          order_id: string | null
+          project_id: string
+          quantity: number
+          status: string
+          stock_location: string | null
+          updated_at: string
+        }
+        Insert: {
+          article_code?: string | null
+          article_description?: string | null
+          article_name: string
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          project_id: string
+          quantity?: number
+          status?: string
+          stock_location?: string | null
+          updated_at?: string
+        }
+        Update: {
+          article_code?: string | null
+          article_description?: string | null
+          article_name?: string
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          project_id?: string
+          quantity?: number
+          status?: string
+          stock_location?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accessories_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accessories_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       broken_parts: {
         Row: {
           created_at: string

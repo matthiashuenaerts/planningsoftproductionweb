@@ -1,106 +1,68 @@
 
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
-import { X, Plus } from 'lucide-react';
 
 interface NewOrderModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
   onSuccess: () => void;
+  showAddOrderButton?: boolean;
 }
 
-const NewOrderModal: React.FC<NewOrderModalProps> = ({
-  open,
-  onOpenChange,
-  projectId,
-  onSuccess
-}) => {
+const NewOrderModal = ({ open, onOpenChange, projectId, onSuccess, showAddOrderButton = false }: NewOrderModalProps) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [supplier, setSupplier] = useState('');
-  const [expectedDelivery, setExpectedDelivery] = useState('');
-  const [orderItems, setOrderItems] = useState([
-    { description: '', quantity: 1, articleCode: '' }
-  ]);
-
-  const addItem = () => {
-    setOrderItems([...orderItems, { description: '', quantity: 1, articleCode: '' }]);
-  };
-
-  const removeItem = (index: number) => {
-    if (orderItems.length > 1) {
-      setOrderItems(orderItems.filter((_, i) => i !== index));
-    }
-  };
-
-  const updateItem = (index: number, field: string, value: string | number) => {
-    const newItems = [...orderItems];
-    newItems[index] = { ...newItems[index], [field]: value };
-    setOrderItems(newItems);
-  };
+  const [formData, setFormData] = useState({
+    supplier: '',
+    expected_delivery: '',
+    status: 'pending'
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!supplier || !expectedDelivery) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    if (orderItems.some(item => !item.description || item.quantity < 1 || !item.articleCode)) {
-      toast({
-        title: "Error",
-        description: "Please fill in all item details correctly",
-        variant: "destructive"
-      });
-      return;
-    }
-    
     setLoading(true);
-    
+
     try {
-      // Create the order
-      const order = await orderService.createOrder({
+      await orderService.create({
         project_id: projectId,
-        supplier,
+        supplier: formData.supplier,
         order_date: new Date().toISOString(),
-        expected_delivery: new Date(expectedDelivery).toISOString(),
-        status: 'pending',
+        expected_delivery: new Date(formData.expected_delivery).toISOString(),
+        status: formData.status
       });
-      
-      // Create the order items
-      const orderItemsData = orderItems.map(item => ({
-        order_id: order.id,
-        description: item.description,
-        quantity: item.quantity,
-        article_code: item.articleCode
-      }));
-      
-      await orderService.createOrderItems(orderItemsData);
-      
+
       toast({
         title: "Success",
-        description: "Order created successfully",
+        description: "Order created successfully"
+      });
+
+      setFormData({
+        supplier: '',
+        expected_delivery: '',
+        status: 'pending'
       });
       
-      // Reset the form
-      setSupplier('');
-      setExpectedDelivery('');
-      setOrderItems([
-        { description: '', quantity: 1, articleCode: '' }
-      ]);
-      
-      // Close the modal and refresh the parent component
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
@@ -114,117 +76,83 @@ const NewOrderModal: React.FC<NewOrderModalProps> = ({
     }
   };
 
+  const modalContent = (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Create New Order</DialogTitle>
+        <DialogDescription>
+          Add a new order for this project.
+        </DialogDescription>
+      </DialogHeader>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Label htmlFor="supplier">Supplier *</Label>
+          <Input
+            id="supplier"
+            value={formData.supplier}
+            onChange={(e) => setFormData(prev => ({ ...prev, supplier: e.target.value }))}
+            required
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="expected_delivery">Expected Delivery *</Label>
+          <Input
+            id="expected_delivery"
+            type="date"
+            value={formData.expected_delivery}
+            onChange={(e) => setFormData(prev => ({ ...prev, expected_delivery: e.target.value }))}
+            required
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="status">Status</Label>
+          <Select
+            value={formData.status}
+            onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
+              <SelectItem value="canceled">Canceled</SelectItem>
+              <SelectItem value="delayed">Delayed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex gap-2">
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Creating...' : 'Create Order'}
+          </Button>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </DialogContent>
+  );
+
+  if (showAddOrderButton) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogTrigger asChild>
+          <Button variant="outline">
+            <Plus className="mr-2 h-4 w-4" /> Add Order
+          </Button>
+        </DialogTrigger>
+        {modalContent}
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Add New Order</DialogTitle>
-        </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="supplier">Supplier</Label>
-              <Input 
-                id="supplier" 
-                value={supplier} 
-                onChange={(e) => setSupplier(e.target.value)} 
-                placeholder="Enter supplier name"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="expected-delivery">Expected Delivery</Label>
-              <Input 
-                id="expected-delivery" 
-                type="date" 
-                value={expectedDelivery} 
-                onChange={(e) => setExpectedDelivery(e.target.value)} 
-                required
-              />
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <Label>Order Items</Label>
-              <Button 
-                type="button" 
-                size="sm" 
-                variant="outline" 
-                onClick={addItem}
-                className="h-8"
-              >
-                <Plus className="h-4 w-4 mr-1" /> Add Item
-              </Button>
-            </div>
-            
-            {orderItems.map((item, index) => (
-              <div 
-                key={index} 
-                className="grid grid-cols-[1fr_80px_120px_30px] gap-2 items-start"
-              >
-                <div>
-                  <Input 
-                    placeholder="Item description" 
-                    value={item.description} 
-                    onChange={(e) => updateItem(index, 'description', e.target.value)} 
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <Input 
-                    type="number" 
-                    min="1" 
-                    placeholder="Qty"
-                    value={item.quantity} 
-                    onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)} 
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <Input 
-                    placeholder="Article code"
-                    value={item.articleCode} 
-                    onChange={(e) => updateItem(index, 'articleCode', e.target.value)} 
-                    required
-                  />
-                </div>
-                
-                <div className="flex justify-center">
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => removeItem(index)}
-                    className="h-8 w-8"
-                    disabled={orderItems.length <= 1}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          <DialogFooter>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create Order"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
+      {modalContent}
     </Dialog>
   );
 };
