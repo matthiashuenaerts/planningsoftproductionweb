@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Order, OrderItem, OrderAttachment } from '@/types/order';
 
@@ -71,6 +70,12 @@ export const orderService = {
       .single();
 
     if (error) throw error;
+
+    // If the order status is being changed to delivered, update linked accessories
+    if (updates.status === 'delivered') {
+      await this.updateLinkedAccessoriesStatus(id, 'delivered');
+    }
+
     return {
       ...data,
       status: data.status as Order['status']
@@ -79,6 +84,15 @@ export const orderService = {
 
   async updateOrderStatus(id: string, status: Order['status']): Promise<Order> {
     return this.update(id, { status });
+  },
+
+  async updateLinkedAccessoriesStatus(orderId: string, status: 'delivered'): Promise<void> {
+    const { error } = await supabase
+      .from('accessories')
+      .update({ status })
+      .eq('order_id', orderId);
+
+    if (error) throw error;
   },
 
   async delete(id: string): Promise<void> {

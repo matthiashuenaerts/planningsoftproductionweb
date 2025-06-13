@@ -21,10 +21,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, Package, ShoppingCart } from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Plus, Trash2, ShoppingCart, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { accessoriesService, Accessory } from '@/services/accessoriesService';
 import { orderService } from '@/services/orderService';
+import { useNavigate } from 'react-router-dom';
 
 interface AccessoriesDialogProps {
   open: boolean;
@@ -34,7 +43,9 @@ interface AccessoriesDialogProps {
 
 export const AccessoriesDialog = ({ open, onOpenChange, projectId }: AccessoriesDialogProps) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [accessories, setAccessories] = useState<Accessory[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [selectedAccessories, setSelectedAccessories] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -50,6 +61,7 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
   useEffect(() => {
     if (open) {
       loadAccessories();
+      loadOrders();
     }
   }, [open, projectId]);
 
@@ -66,6 +78,19 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadOrders = async () => {
+    try {
+      const data = await orderService.getByProject(projectId);
+      setOrders(data);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to load orders: ${error.message}`,
+        variant: "destructive"
+      });
     }
   };
 
@@ -118,6 +143,23 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
     }
   };
 
+  const handleStatusChange = async (accessoryId: string, newStatus: Accessory['status']) => {
+    try {
+      await accessoriesService.update(accessoryId, { status: newStatus });
+      toast({
+        title: "Success",
+        description: "Accessory status updated successfully"
+      });
+      loadAccessories();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to update status: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
   const handlePlaceOrder = async () => {
     if (selectedAccessories.length === 0) {
       toast({
@@ -148,6 +190,7 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
 
       setSelectedAccessories([]);
       loadAccessories();
+      loadOrders();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -178,9 +221,31 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
     );
   };
 
+  const getOrderInfo = (orderId: string | undefined) => {
+    if (!orderId) return null;
+    return orders.find(order => order.id === orderId);
+  };
+
+  const handleGoToOrder = (orderId: string) => {
+    navigate(`/projects/${projectId}/orders`);
+    onOpenChange(false);
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Project Accessories</DialogTitle>
           <DialogDescription>
@@ -290,52 +355,105 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
             </Card>
           )}
 
-          <div className="space-y-3">
-            {loading ? (
-              <div className="text-center py-8">Loading accessories...</div>
-            ) : accessories.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No accessories found. Add your first accessory above.
-              </div>
-            ) : (
-              accessories.map((accessory) => (
-                <Card key={accessory.id}>
-                  <CardContent className="pt-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <Checkbox
-                          checked={selectedAccessories.includes(accessory.id)}
-                          onCheckedChange={() => toggleAccessorySelection(accessory.id)}
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <h4 className="font-medium">{accessory.article_name}</h4>
-                            {getStatusBadge(accessory.status)}
-                          </div>
-                          {accessory.article_description && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {accessory.article_description}
-                            </p>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">Select</TableHead>
+                  <TableHead>Article Name</TableHead>
+                  <TableHead>Article Code</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Stock Location</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Expected Delivery</TableHead>
+                  <TableHead>Order</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-8">
+                      Loading accessories...
+                    </TableCell>
+                  </TableRow>
+                ) : accessories.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      No accessories found. Add your first accessory above.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  accessories.map((accessory) => {
+                    const orderInfo = getOrderInfo(accessory.order_id);
+                    return (
+                      <TableRow key={accessory.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedAccessories.includes(accessory.id)}
+                            onCheckedChange={() => toggleAccessorySelection(accessory.id)}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{accessory.article_name}</TableCell>
+                        <TableCell>{accessory.article_code || '-'}</TableCell>
+                        <TableCell className="max-w-xs truncate" title={accessory.article_description || ''}>
+                          {accessory.article_description || '-'}
+                        </TableCell>
+                        <TableCell>{accessory.quantity}</TableCell>
+                        <TableCell>{accessory.stock_location || '-'}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={accessory.status}
+                            onValueChange={(value: Accessory['status']) => 
+                              handleStatusChange(accessory.id, value)
+                            }
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="to_check">To Check</SelectItem>
+                              <SelectItem value="in_stock">In Stock</SelectItem>
+                              <SelectItem value="delivered">Delivered</SelectItem>
+                              <SelectItem value="to_order">To Order</SelectItem>
+                              <SelectItem value="ordered">Ordered</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          {orderInfo ? formatDate(orderInfo.expected_delivery) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {orderInfo ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGoToOrder(orderInfo.id)}
+                              className="flex items-center gap-1"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              Go to
+                            </Button>
+                          ) : (
+                            '-'
                           )}
-                          <div className="flex gap-4 text-sm text-muted-foreground mt-2">
-                            {accessory.article_code && <span>Code: {accessory.article_code}</span>}
-                            <span>Qty: {accessory.quantity}</span>
-                            {accessory.stock_location && <span>Location: {accessory.stock_location}</span>}
-                          </div>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(accessory.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(accessory.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
           </div>
         </div>
       </DialogContent>
