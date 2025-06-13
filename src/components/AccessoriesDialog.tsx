@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -29,11 +28,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Trash2, ShoppingCart, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, ShoppingCart, ExternalLink, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { accessoriesService, Accessory } from '@/services/accessoriesService';
 import { orderService } from '@/services/orderService';
 import { useNavigate } from 'react-router-dom';
+import NewOrderModal from './NewOrderModal';
+import OrderEditModal from './OrderEditModal';
 
 interface AccessoriesDialogProps {
   open: boolean;
@@ -49,6 +50,10 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
   const [selectedAccessories, setSelectedAccessories] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [showOrderEditModal, setShowOrderEditModal] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [prefilledOrderData, setPrefilledOrderData] = useState<any>(null);
   const [formData, setFormData] = useState({
     article_name: '',
     article_description: '',
@@ -160,7 +165,7 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
     }
   };
 
-  const handlePlaceOrder = async () => {
+  const handleCreateOrderForAccessories = () => {
     if (selectedAccessories.length === 0) {
       toast({
         title: "Error",
@@ -170,34 +175,56 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
       return;
     }
 
+    // Get selected accessories data
+    const selectedAccessoriesData = accessories.filter(acc => 
+      selectedAccessories.includes(acc.id)
+    );
+
+    // Prefill order data with selected accessories
+    const orderItems = selectedAccessoriesData.map(acc => ({
+      description: acc.article_description || acc.article_name,
+      quantity: acc.quantity,
+      article_code: acc.article_code || '',
+      article_name: acc.article_name
+    }));
+
+    setPrefilledOrderData({
+      accessories: selectedAccessoriesData,
+      orderItems: orderItems
+    });
+    setShowOrderModal(true);
+  };
+
+  const handleOrderSuccess = async (orderId: string) => {
     try {
-      // Create a new order
-      const order = await orderService.create({
-        project_id: projectId,
-        supplier: 'Accessories Order',
-        order_date: new Date().toISOString(),
-        expected_delivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
-        status: 'pending'
-      });
-
-      // Link selected accessories to the order
-      await accessoriesService.linkToOrder(selectedAccessories, order.id);
-
-      toast({
-        title: "Success",
-        description: "Order placed successfully for selected accessories"
-      });
-
-      setSelectedAccessories([]);
-      loadAccessories();
+      // Link selected accessories to the new order
+      if (selectedAccessories.length > 0) {
+        await accessoriesService.linkToOrder(selectedAccessories, orderId);
+        setSelectedAccessories([]);
+        loadAccessories();
+      }
       loadOrders();
+      setShowOrderModal(false);
+      setPrefilledOrderData(null);
     } catch (error: any) {
       toast({
         title: "Error",
-        description: `Failed to place order: ${error.message}`,
+        description: `Failed to link accessories to order: ${error.message}`,
         variant: "destructive"
       });
     }
+  };
+
+  const handleEditOrder = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setShowOrderEditModal(true);
+  };
+
+  const handleOrderEditSuccess = () => {
+    loadOrders();
+    loadAccessories();
+    setShowOrderEditModal(false);
+    setSelectedOrderId(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -211,6 +238,18 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
 
     const config = statusConfig[status as keyof typeof statusConfig];
     return <Badge className={config.className}>{config.label}</Badge>;
+  };
+
+  const getRowClassName = (status: string) => {
+    switch (status) {
+      case 'in_stock':
+      case 'delivered':
+        return 'bg-green-50 hover:bg-green-100';
+      case 'to_order':
+        return 'bg-red-50 hover:bg-red-100';
+      default:
+        return '';
+    }
   };
 
   const toggleAccessorySelection = (accessoryId: string) => {
@@ -244,219 +283,249 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Project Accessories</DialogTitle>
-          <DialogDescription>
-            Manage accessories for this project. You can add new accessories and place orders.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Project Accessories</DialogTitle>
+            <DialogDescription>
+              Manage accessories for this project. You can add new accessories and place orders.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <Button onClick={() => setShowForm(!showForm)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Accessory
-            </Button>
-            
-            {selectedAccessories.length > 0 && (
-              <Button onClick={handlePlaceOrder} variant="outline">
-                <ShoppingCart className="mr-2 h-4 w-4" />
-                Place Order ({selectedAccessories.length})
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <Button onClick={() => setShowForm(!showForm)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Accessory
               </Button>
+              
+              {selectedAccessories.length > 0 && (
+                <Button onClick={handleCreateOrderForAccessories} variant="outline">
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  Create Order ({selectedAccessories.length})
+                </Button>
+              )}
+            </div>
+
+            {showForm && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Add New Accessory</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="article_name">Article Name *</Label>
+                        <Input
+                          id="article_name"
+                          value={formData.article_name}
+                          onChange={(e) => setFormData(prev => ({ ...prev, article_name: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="article_code">Article Code</Label>
+                        <Input
+                          id="article_code"
+                          value={formData.article_code}
+                          onChange={(e) => setFormData(prev => ({ ...prev, article_code: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="article_description">Article Description</Label>
+                      <Textarea
+                        id="article_description"
+                        value={formData.article_description}
+                        onChange={(e) => setFormData(prev => ({ ...prev, article_description: e.target.value }))}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="quantity">Quantity *</Label>
+                        <Input
+                          id="quantity"
+                          type="number"
+                          min="1"
+                          value={formData.quantity}
+                          onChange={(e) => setFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) }))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="stock_location">Stock Location</Label>
+                        <Input
+                          id="stock_location"
+                          value={formData.stock_location}
+                          onChange={(e) => setFormData(prev => ({ ...prev, stock_location: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="status">Status</Label>
+                        <Select
+                          value={formData.status}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as any }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="to_check">To Check</SelectItem>
+                            <SelectItem value="in_stock">In Stock</SelectItem>
+                            <SelectItem value="delivered">Delivered</SelectItem>
+                            <SelectItem value="to_order">To Order</SelectItem>
+                            <SelectItem value="ordered">Ordered</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button type="submit">Add Accessory</Button>
+                      <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
             )}
-          </div>
 
-          {showForm && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Add New Accessory</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="article_name">Article Name *</Label>
-                      <Input
-                        id="article_name"
-                        value={formData.article_name}
-                        onChange={(e) => setFormData(prev => ({ ...prev, article_name: e.target.value }))}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="article_code">Article Code</Label>
-                      <Input
-                        id="article_code"
-                        value={formData.article_code}
-                        onChange={(e) => setFormData(prev => ({ ...prev, article_code: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="article_description">Article Description</Label>
-                    <Textarea
-                      id="article_description"
-                      value={formData.article_description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, article_description: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor="quantity">Quantity *</Label>
-                      <Input
-                        id="quantity"
-                        type="number"
-                        min="1"
-                        value={formData.quantity}
-                        onChange={(e) => setFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) }))}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="stock_location">Stock Location</Label>
-                      <Input
-                        id="stock_location"
-                        value={formData.stock_location}
-                        onChange={(e) => setFormData(prev => ({ ...prev, stock_location: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="status">Status</Label>
-                      <Select
-                        value={formData.status}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as any }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="to_check">To Check</SelectItem>
-                          <SelectItem value="in_stock">In Stock</SelectItem>
-                          <SelectItem value="delivered">Delivered</SelectItem>
-                          <SelectItem value="to_order">To Order</SelectItem>
-                          <SelectItem value="ordered">Ordered</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button type="submit">Add Accessory</Button>
-                    <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">Select</TableHead>
-                  <TableHead>Article Name</TableHead>
-                  <TableHead>Article Code</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Stock Location</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Expected Delivery</TableHead>
-                  <TableHead>Order</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8">
-                      Loading accessories...
-                    </TableCell>
+                    <TableHead className="w-12">Select</TableHead>
+                    <TableHead>Article Name</TableHead>
+                    <TableHead>Article Code</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Quantity</TableHead>
+                    <TableHead>Stock Location</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Expected Delivery</TableHead>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ) : accessories.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                      No accessories found. Add your first accessory above.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  accessories.map((accessory) => {
-                    const orderInfo = getOrderInfo(accessory.order_id);
-                    return (
-                      <TableRow key={accessory.id}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedAccessories.includes(accessory.id)}
-                            onCheckedChange={() => toggleAccessorySelection(accessory.id)}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">{accessory.article_name}</TableCell>
-                        <TableCell>{accessory.article_code || '-'}</TableCell>
-                        <TableCell className="max-w-xs truncate" title={accessory.article_description || ''}>
-                          {accessory.article_description || '-'}
-                        </TableCell>
-                        <TableCell>{accessory.quantity}</TableCell>
-                        <TableCell>{accessory.stock_location || '-'}</TableCell>
-                        <TableCell>
-                          <Select
-                            value={accessory.status}
-                            onValueChange={(value: Accessory['status']) => 
-                              handleStatusChange(accessory.id, value)
-                            }
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="to_check">To Check</SelectItem>
-                              <SelectItem value="in_stock">In Stock</SelectItem>
-                              <SelectItem value="delivered">Delivered</SelectItem>
-                              <SelectItem value="to_order">To Order</SelectItem>
-                              <SelectItem value="ordered">Ordered</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          {orderInfo ? formatDate(orderInfo.expected_delivery) : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {orderInfo ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleGoToOrder(orderInfo.id)}
-                              className="flex items-center gap-1"
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center py-8">
+                        Loading accessories...
+                      </TableCell>
+                    </TableRow>
+                  ) : accessories.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                        No accessories found. Add your first accessory above.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    accessories.map((accessory) => {
+                      const orderInfo = getOrderInfo(accessory.order_id);
+                      return (
+                        <TableRow key={accessory.id} className={getRowClassName(accessory.status)}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedAccessories.includes(accessory.id)}
+                              onCheckedChange={() => toggleAccessorySelection(accessory.id)}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">{accessory.article_name}</TableCell>
+                          <TableCell>{accessory.article_code || '-'}</TableCell>
+                          <TableCell className="max-w-xs truncate" title={accessory.article_description || ''}>
+                            {accessory.article_description || '-'}
+                          </TableCell>
+                          <TableCell>{accessory.quantity}</TableCell>
+                          <TableCell>{accessory.stock_location || '-'}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={accessory.status}
+                              onValueChange={(value: Accessory['status']) => 
+                                handleStatusChange(accessory.id, value)
+                              }
                             >
-                              <ExternalLink className="h-3 w-3" />
-                              Go to
+                              <SelectTrigger className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="to_check">To Check</SelectItem>
+                                <SelectItem value="in_stock">In Stock</SelectItem>
+                                <SelectItem value="delivered">Delivered</SelectItem>
+                                <SelectItem value="to_order">To Order</SelectItem>
+                                <SelectItem value="ordered">Ordered</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            {orderInfo ? formatDate(orderInfo.expected_delivery) : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {orderInfo ? (
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleGoToOrder(orderInfo.id)}
+                                  className="flex items-center gap-1"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  Go to
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditOrder(orderInfo.id)}
+                                  className="flex items-center gap-1"
+                                >
+                                  <Edit className="h-3 w-3" />
+                                  Edit
+                                </Button>
+                              </div>
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(accessory.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
-                          ) : (
-                            '-'
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(accessory.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <NewOrderModal
+        open={showOrderModal}
+        onOpenChange={setShowOrderModal}
+        projectId={projectId}
+        onSuccess={handleOrderSuccess}
+        prefilledData={prefilledOrderData}
+      />
+
+      {selectedOrderId && (
+        <OrderEditModal
+          open={showOrderEditModal}
+          onOpenChange={setShowOrderEditModal}
+          orderId={selectedOrderId}
+          onSuccess={handleOrderEditSuccess}
+        />
+      )}
+    </>
   );
 };
