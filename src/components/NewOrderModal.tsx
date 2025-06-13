@@ -77,9 +77,18 @@ const NewOrderModal = ({
       setOrderItems(prefilledData.orderItems);
       
       // Generate supplier name based on accessories
-      const supplierName = prefilledData.accessories.length > 0 
-        ? `Accessories Order - ${prefilledData.accessories.map(a => a.article_name).join(', ').substring(0, 50)}${prefilledData.accessories.length > 1 ? '...' : ''}`
-        : 'Accessories Order';
+      let supplierName = '';
+      if (prefilledData.accessories.length > 0) {
+        // Use supplier from first accessory if available, otherwise use article names
+        const firstAccessorySupplier = prefilledData.accessories[0].supplier;
+        if (firstAccessorySupplier) {
+          supplierName = firstAccessorySupplier;
+        } else {
+          supplierName = `Accessories Order - ${prefilledData.accessories.map(a => a.article_name).join(', ').substring(0, 50)}${prefilledData.accessories.length > 1 ? '...' : ''}`;
+        }
+      } else {
+        supplierName = 'Accessories Order';
+      }
       
       setFormData(prev => ({
         ...prev,

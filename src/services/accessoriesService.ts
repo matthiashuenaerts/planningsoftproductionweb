@@ -11,6 +11,7 @@ export interface Accessory {
   stock_location?: string;
   status: 'to_check' | 'in_stock' | 'delivered' | 'to_order' | 'ordered';
   order_id?: string;
+  supplier?: string;
   created_at: string;
   updated_at: string;
 }
