@@ -1,45 +1,22 @@
-
 import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
 import { Order } from '@/types/order';
-
 interface OrderItem {
   description: string;
   quantity: number;
   article_code: string;
   article_name?: string;
 }
-
 interface NewOrderModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -52,16 +29,17 @@ interface NewOrderModalProps {
     supplier?: string;
   } | null;
 }
-
-const NewOrderModal = ({ 
-  open, 
-  onOpenChange, 
-  projectId, 
-  onSuccess, 
+const NewOrderModal = ({
+  open,
+  onOpenChange,
+  projectId,
+  onSuccess,
   showAddOrderButton = false,
   prefilledData = null
 }: NewOrderModalProps) => {
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     supplier: '',
@@ -71,24 +49,20 @@ const NewOrderModal = ({
     order_reference: ''
   });
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-
   useEffect(() => {
     if (prefilledData && open) {
       // Set order items from prefilled data
       setOrderItems(prefilledData.orderItems);
-      
+
       // Use the supplier from prefilled data if available
       let supplierName = prefilledData.supplier || '';
-      
       if (!supplierName && prefilledData.accessories.length > 0) {
         // Generate supplier name based on accessories if no common supplier
         supplierName = `Accessories Order - ${prefilledData.accessories.map(a => a.article_name).join(', ').substring(0, 50)}${prefilledData.accessories.length > 1 ? '...' : ''}`;
       }
-      
       if (!supplierName) {
         supplierName = 'Accessories Order';
       }
-      
       setFormData(prev => ({
         ...prev,
         supplier: supplierName
@@ -105,11 +79,9 @@ const NewOrderModal = ({
       });
     }
   }, [prefilledData, open]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       // Create the order
       const order = await orderService.create({
@@ -129,12 +101,10 @@ const NewOrderModal = ({
           article_code: item.article_code
         });
       }
-
       toast({
         title: "Success",
         description: "Order created successfully"
       });
-
       setFormData({
         supplier: '',
         expected_delivery: '',
@@ -143,7 +113,6 @@ const NewOrderModal = ({
         order_reference: ''
       });
       setOrderItems([]);
-      
       onOpenChange(false);
       onSuccess(order.id);
     } catch (error: any) {
@@ -156,7 +125,6 @@ const NewOrderModal = ({
       setLoading(false);
     }
   };
-
   const addOrderItem = () => {
     setOrderItems(prev => [...prev, {
       description: '',
@@ -164,19 +132,16 @@ const NewOrderModal = ({
       article_code: ''
     }]);
   };
-
   const updateOrderItem = (index: number, field: keyof OrderItem, value: string | number) => {
-    setOrderItems(prev => prev.map((item, i) => 
-      i === index ? { ...item, [field]: value } : item
-    ));
+    setOrderItems(prev => prev.map((item, i) => i === index ? {
+      ...item,
+      [field]: value
+    } : item));
   };
-
   const removeOrderItem = (index: number) => {
     setOrderItems(prev => prev.filter((_, i) => i !== index));
   };
-
-  const modalContent = (
-    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+  const modalContent = <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>Create New Order</DialogTitle>
         <DialogDescription>
@@ -188,41 +153,34 @@ const NewOrderModal = ({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="supplier">Supplier *</Label>
-            <Input
-              id="supplier"
-              value={formData.supplier}
-              onChange={(e) => setFormData(prev => ({ ...prev, supplier: e.target.value }))}
-              required
-            />
+            <Input id="supplier" value={formData.supplier} onChange={e => setFormData(prev => ({
+            ...prev,
+            supplier: e.target.value
+          }))} required />
           </div>
           <div>
             <Label htmlFor="order_reference">Order Reference</Label>
-            <Input
-              id="order_reference"
-              value={formData.order_reference}
-              onChange={(e) => setFormData(prev => ({ ...prev, order_reference: e.target.value }))}
-              placeholder="PO number, reference, etc."
-            />
+            <Input id="order_reference" value={formData.order_reference} onChange={e => setFormData(prev => ({
+            ...prev,
+            order_reference: e.target.value
+          }))} placeholder="PO number, reference, etc." />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="expected_delivery">Expected Delivery *</Label>
-            <Input
-              id="expected_delivery"
-              type="date"
-              value={formData.expected_delivery}
-              onChange={(e) => setFormData(prev => ({ ...prev, expected_delivery: e.target.value }))}
-              required
-            />
+            <Input id="expected_delivery" type="date" value={formData.expected_delivery} onChange={e => setFormData(prev => ({
+            ...prev,
+            expected_delivery: e.target.value
+          }))} required />
           </div>
           <div>
             <Label htmlFor="status">Status</Label>
-            <Select
-              value={formData.status}
-              onValueChange={(value: Order['status']) => setFormData(prev => ({ ...prev, status: value }))}
-            >
+            <Select value={formData.status} onValueChange={(value: Order['status']) => setFormData(prev => ({
+            ...prev,
+            status: value
+          }))}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -238,12 +196,10 @@ const NewOrderModal = ({
 
         <div>
           <Label htmlFor="notes">Notes</Label>
-          <Textarea
-            id="notes"
-            value={formData.notes}
-            onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-            placeholder="Additional notes about this order..."
-          />
+          <Textarea id="notes" value={formData.notes} onChange={e => setFormData(prev => ({
+          ...prev,
+          notes: e.target.value
+        }))} placeholder="Additional notes about this order..." />
         </div>
 
         <Card>
@@ -257,12 +213,9 @@ const NewOrderModal = ({
             </div>
           </CardHeader>
           <CardContent>
-            {orderItems.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">
+            {orderItems.length === 0 ? <p className="text-muted-foreground text-center py-4">
                 No items added yet. Click "Add Item" to get started.
-              </p>
-            ) : (
-              <Table>
+              </p> : <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Article Code</TableHead>
@@ -272,47 +225,24 @@ const NewOrderModal = ({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {orderItems.map((item, index) => (
-                    <TableRow key={index}>
+                  {orderItems.map((item, index) => <TableRow key={index}>
                       <TableCell>
-                        <Input
-                          value={item.article_code}
-                          onChange={(e) => updateOrderItem(index, 'article_code', e.target.value)}
-                          placeholder="Article code"
-                        />
+                        <Input value={item.article_code} onChange={e => updateOrderItem(index, 'article_code', e.target.value)} placeholder="Article code" />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          value={item.description}
-                          onChange={(e) => updateOrderItem(index, 'description', e.target.value)}
-                          placeholder="Item description"
-                          required
-                        />
+                        <Input value={item.description} onChange={e => updateOrderItem(index, 'description', e.target.value)} placeholder="Item description" required />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => updateOrderItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                          required
-                        />
+                        <Input type="number" min="1" value={item.quantity} onChange={e => updateOrderItem(index, 'quantity', parseInt(e.target.value) || 1)} required />
                       </TableCell>
                       <TableCell>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeOrderItem(index)}
-                        >
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeOrderItem(index)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>
-                    </TableRow>
-                  ))}
+                    </TableRow>)}
                 </TableBody>
-              </Table>
-            )}
+              </Table>}
           </CardContent>
         </Card>
 
@@ -325,27 +255,17 @@ const NewOrderModal = ({
           </Button>
         </div>
       </form>
-    </DialogContent>
-  );
-
+    </DialogContent>;
   if (showAddOrderButton) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
+    return <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogTrigger asChild>
-          <Button variant="outline">
-            <Plus className="mr-2 h-4 w-4" /> Add Order
-          </Button>
+          
         </DialogTrigger>
         {modalContent}
-      </Dialog>
-    );
+      </Dialog>;
   }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+  return <Dialog open={open} onOpenChange={onOpenChange}>
       {modalContent}
-    </Dialog>
-  );
+    </Dialog>;
 };
-
 export default NewOrderModal;
