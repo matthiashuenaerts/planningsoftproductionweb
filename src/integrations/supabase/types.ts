@@ -255,6 +255,27 @@ export type Database = {
         }
         Relationships: []
       }
+      holidays: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          team: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          team: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          team?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string

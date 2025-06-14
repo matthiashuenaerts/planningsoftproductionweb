@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Accessory {
@@ -44,6 +43,19 @@ export const accessoriesService = {
       ...data,
       status: data.status as Accessory['status']
     };
+  },
+
+  async createMany(accessories: Omit<Accessory, 'id' | 'created_at' | 'updated_at'>[]): Promise<Accessory[]> {
+    const { data, error } = await supabase
+      .from('accessories')
+      .insert(accessories)
+      .select();
+
+    if (error) throw error;
+    return (data || []).map(accessory => ({
+      ...accessory,
+      status: accessory.status as Accessory['status']
+    }));
   },
 
   async update(id: string, updates: Partial<Accessory>): Promise<Accessory> {
