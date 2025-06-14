@@ -21,7 +21,7 @@ interface EditRushOrderFormProps {
   onSuccess: () => void;
 }
 
-const formSchema: z.ZodType<EditRushOrderPayload> = z.object({
+const formSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().min(1, 'Description is required'),
   deadline: z.date({ required_error: 'Deadline is required' }),
