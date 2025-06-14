@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays, startOfWeek, endOfWeek } from 'date-fns';
 import type { Task } from './dataService';
@@ -168,8 +167,8 @@ export const planningService = {
     }
   },
   
-  // Generate a weekly plan based on available tasks and employees
-  async generateWeeklyPlan(date: Date): Promise<void> {
+  // Generate a daily plan based on available tasks and employees
+  async generateDailyPlan(date: Date): Promise<void> {
     if (!(date instanceof Date) || isNaN(date.getTime())) {
       console.error('Invalid date provided for generating plan:', date);
       throw new Error('Invalid date provided');
