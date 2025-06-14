@@ -345,6 +345,7 @@ const Orders: React.FC = () => {
                                       <Table>
                                         <TableHeader>
                                           <TableRow>
+                                            <TableHead>Article Code</TableHead>
                                             <TableHead>Description</TableHead>
                                             <TableHead className="text-right">Quantity</TableHead>
                                           </TableRow>
@@ -352,6 +353,7 @@ const Orders: React.FC = () => {
                                         <TableBody>
                                           {orderItems[order.id].map((item) => (
                                             <TableRow key={item.id}>
+                                              <TableCell>{item.article_code || 'N/A'}</TableCell>
                                               <TableCell>{item.description}</TableCell>
                                               <TableCell className="text-right">{item.quantity}</TableCell>
                                             </TableRow>

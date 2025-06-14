@@ -559,7 +559,7 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
                                 }}
                             >
                                 <PopoverTrigger asChild>
-                                    <Button variant="link" className="underline capitalize p-0 h-auto">
+                                    <Button variant="outline" size="sm" className="capitalize">
                                         {accessory.status.replace('_', ' ')}
                                     </Button>
                                 </PopoverTrigger>
@@ -676,6 +676,8 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
         open={showQrCodeDialog}
         onOpenChange={setShowQrCodeDialog}
         accessories={sortedAccessoriesForQr}
+        projectId={projectId}
+        onAccessoryUpdate={loadAccessories}
       />
     </>
   );
