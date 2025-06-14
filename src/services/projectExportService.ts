@@ -15,6 +15,7 @@ interface ExportData {
   employees: any[];
   workstations: any[];
   documents: any[];
+  orderAttachments: any[];
 }
 
 // Custom file download function to replace file-saver
@@ -77,10 +78,57 @@ export const exportProjectData = async (project: Project): Promise<void> => {
     const overviewBuffer = XLSX.write(overviewWorkbook, { type: 'array', bookType: 'xlsx' });
     excelFolder?.file('Project_Overview.xlsx', overviewBuffer);
     
-    // Add project documents if any exist
+    // Add project documents (files from file manager)
     if (exportData.documents.length > 0) {
       const documentsFolder = zip.folder('project_documents');
-      await addProjectDocuments(documentsFolder, exportData.documents);
+      for (const doc of exportData.documents) {
+        try {
+          const { data, error } = await supabase.storage
+            .from('project_files')
+            .download(`${project.id}/${doc.name}`);
+          if (error) throw error;
+          documentsFolder?.file(doc.name, data);
+        } catch(e) {
+          console.error(`Failed to download document ${doc.name}:`, e);
+          documentsFolder?.file(`${doc.name}.error.txt`, `Could not download file.`);
+        }
+      }
+    }
+
+    // Add broken part images
+    if (exportData.brokenParts.some(p => p.image_path)) {
+      const brokenPartsImagesFolder = zip.folder('broken_parts_images');
+      for (const part of exportData.brokenParts) {
+        if (part.image_path) {
+          try {
+            const { data, error } = await supabase.storage
+              .from('broken_parts')
+              .download(part.image_path);
+            if (error) throw error;
+            brokenPartsImagesFolder?.file(part.image_path.split('/').pop() || part.image_path, data);
+          } catch(e) {
+            console.error(`Failed to download broken part image ${part.image_path}:`, e);
+            brokenPartsImagesFolder?.file(`${part.image_path.split('/').pop() || part.image_path}.error.txt`, `Could not download file.`);
+          }
+        }
+      }
+    }
+
+    // Add order attachments (e.g. delivery notes)
+    if (exportData.orderAttachments.length > 0) {
+      const attachmentsFolder = zip.folder('order_attachments');
+      for (const attachment of exportData.orderAttachments) {
+        try {
+          const { data, error } = await supabase.storage
+            .from('order_attachments')
+            .download(attachment.file_path);
+          if (error) throw error;
+          attachmentsFolder?.file(attachment.file_name, data);
+        } catch(e) {
+          console.error(`Failed to download attachment ${attachment.file_name}:`, e);
+          attachmentsFolder?.file(`${attachment.file_name}.error.txt`, `Could not download file.`);
+        }
+      }
     }
     
     // Add raw data as JSON
@@ -143,11 +191,29 @@ const collectProjectData = async (projectId: string): Promise<ExportData> => {
   
   // Get order items for all orders
   let orderItems: any[] = [];
-  for (const order of orders) {
-    const items = await orderService.getOrderItems(order.id);
-    orderItems = [...orderItems, ...items];
+  if (orders.length > 0) {
+    const orderIds = orders.map(order => order.id);
+    const { data: items, error } = await supabase
+      .from('order_items')
+      .select('*')
+      .in('order_id', orderIds);
+    if (error) throw error;
+    orderItems = items || [];
   }
   
+  // Get order attachments
+  const orderIdsForAttachments = orders.map(o => o.id);
+  let orderAttachments: any[] = [];
+  if (orderIdsForAttachments.length > 0) {
+      const { data: attachments, error: attachmentsError } = await supabase
+          .from('order_attachments')
+          .select('*')
+          .in('order_id', orderIdsForAttachments);
+
+      if (attachmentsError) throw attachmentsError;
+      orderAttachments = attachments || [];
+  }
+
   // Get time registrations for project tasks
   const taskIds = tasks?.map(t => t.id) || [];
   const { data: timeRegistrations, error: timeError } = await supabase
@@ -186,24 +252,17 @@ const collectProjectData = async (projectId: string): Promise<ExportData> => {
     .select('*')
     .order('name');
   
-  // Get project documents from OneDrive config
-  const { data: oneDriveConfig } = await supabase
-    .from('project_onedrive_configs')
-    .select('*')
-    .eq('project_id', projectId)
-    .single();
-  
-  let documents: any[] = [];
-  if (oneDriveConfig) {
-    // For now, we'll create a placeholder for documents
-    // In a real implementation, you would fetch actual files from OneDrive
-    documents = [{
-      name: 'OneDrive Folder',
-      url: oneDriveConfig.folder_url,
-      type: 'folder'
-    }];
+  // Get project documents from storage
+  const { data: projectFilesList, error: projectFilesError } = await supabase.storage
+    .from('project_files')
+    .list(projectId);
+
+  if (projectFilesError && !projectFilesError.message.includes('The resource was not found')) {
+    throw projectFilesError;
   }
-  
+
+  const documents = projectFilesList?.filter(f => f.name !== '.folder' && !f.name.endsWith('/')) || [];
+
   return {
     project: project as Project,
     phases: phases || [],
@@ -214,7 +273,8 @@ const collectProjectData = async (projectId: string): Promise<ExportData> => {
     brokenParts: brokenParts || [],
     employees: employees || [],
     workstations: workstations || [],
-    documents: documents || []
+    documents: documents || [],
+    orderAttachments: orderAttachments || [],
   };
 };
 
@@ -287,6 +347,25 @@ const generateOrdersExcel = (data: ExportData): XLSX.WorkBook => {
 
 const generateTimeRegistrationExcel = (data: ExportData): XLSX.WorkBook => {
   const workbook = XLSX.utils.book_new();
+
+  // Summary by Employee
+  const employeeHours: { [key: string]: number } = {};
+  data.timeRegistrations.forEach(reg => {
+    const employeeName = reg.employees?.name || 'Unknown';
+    if (reg.duration_minutes) {
+      employeeHours[employeeName] = (employeeHours[employeeName] || 0) + reg.duration_minutes;
+    }
+  });
+
+  const employeeSummaryData = Object.entries(employeeHours).map(([name, minutes]) => ({
+    'Employee': name,
+    'Total Hours': Math.round(minutes / 60 * 100) / 100
+  }));
+
+  const employeeSummarySheet = XLSX.utils.json_to_sheet(employeeSummaryData.length > 0 ? employeeSummaryData : [
+    { 'Info': 'No time registered with duration.' }
+  ]);
+  XLSX.utils.book_append_sheet(workbook, employeeSummarySheet, 'Summary by Employee');
   
   const timeData = data.timeRegistrations.map(reg => ({
     'Employee': reg.employees?.name || 'Unknown',
@@ -382,7 +461,7 @@ ${data.phases.map(phase => `
 
 ## Export Information
 - **Exported on:** ${new Date().toLocaleString()}
-- **Export includes:** Tasks, Orders, Time Registrations, Broken Parts, Excel files, and detailed reports
+- **Export includes:** Project Files, Order Attachments, Broken Part Images, Tasks, Orders, Time Registrations, Broken Parts, Excel files, and detailed reports
 `;
 };
 
@@ -477,7 +556,7 @@ ${data.brokenParts.map(part => `
 - **Workstation:** ${part.workstations?.name || 'Not specified'}
 - **Description:** ${part.description}
 - **Reported on:** ${new Date(part.created_at).toLocaleString()}
-${part.image_path ? `- **Image:** Attached (${part.image_path})` : '- **Image:** No image provided'}
+${part.image_path ? `- **Image:** See 'broken_parts_images/${part.image_path.split('/').pop() || part.image_path}' in ZIP.` : '- **Image:** No image provided'}
 `).join('')}
 `;
 };
