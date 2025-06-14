@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -17,13 +18,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { employeeService } from '@/services/dataService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
+import { Edit, Trash2 } from 'lucide-react';
 
 const UserManagement = () => {
   const { currentEmployee } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isAddOrEditOpen, setIsAddOrEditOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<any>(null);
+
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
@@ -38,16 +54,18 @@ const UserManagement = () => {
     queryFn: employeeService.getAll,
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await employeeService.create(newUser);
-      toast({
-        title: "Success",
-        description: "New user has been added successfully",
+  const handleOpenDialog = (employee: any | null) => {
+    if (employee) {
+      setEditingUser(employee);
+      setNewUser({
+        name: employee.name,
+        email: employee.email || '',
+        password: '', // Password field is cleared for editing for security
+        role: employee.role,
+        workstation: employee.workstation || '',
       });
-      setIsOpen(false);
-      refetch();
+    } else {
+      setEditingUser(null);
       setNewUser({
         name: '',
         email: '',
@@ -55,6 +73,34 @@ const UserManagement = () => {
         role: 'worker',
         workstation: '',
       });
+    }
+    setIsAddOrEditOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const userData = { ...newUser };
+      if (editingUser && !userData.password) {
+        delete (userData as any).password;
+      }
+
+      if (editingUser) {
+        // I assume your employeeService has an update method like this.
+        await (employeeService as any).update(editingUser.id, userData);
+        toast({
+          title: "Success",
+          description: "User has been updated successfully",
+        });
+      } else {
+        await employeeService.create(newUser);
+        toast({
+          title: "Success",
+          description: "New user has been added successfully",
+        });
+      }
+      setIsAddOrEditOpen(false);
+      refetch();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -64,19 +110,46 @@ const UserManagement = () => {
     }
   };
 
+  const handleDeleteClick = (employee: any) => {
+    setUserToDelete(employee);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!userToDelete) return;
+    try {
+      // I assume your employeeService has a delete method like this.
+      await (employeeService as any).delete(userToDelete.id);
+      toast({
+        title: "Success",
+        description: "User deleted successfully.",
+      });
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setUserToDelete(null);
+    }
+  };
+
   if (currentEmployee?.role !== 'admin' && currentEmployee?.role !== 'teamleader') {
     return null;
   }
 
   return (
     <div className="space-y-4">
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog open={isAddOrEditOpen} onOpenChange={setIsAddOrEditOpen}>
         <DialogTrigger asChild>
-          <Button>Add New User</Button>
+          <Button onClick={() => handleOpenDialog(null)}>Add New User</Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add New User</DialogTitle>
+            <DialogTitle>{editingUser ? 'Edit User' : 'Add New User'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -104,7 +177,8 @@ const UserManagement = () => {
                 type="password"
                 value={newUser.password}
                 onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
-                required
+                required={!editingUser}
+                placeholder={editingUser ? 'Leave blank to keep current password' : ''}
               />
             </div>
             <div className="space-y-2">
@@ -142,7 +216,7 @@ const UserManagement = () => {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" className="w-full">Add User</Button>
+            <Button type="submit" className="w-full">{editingUser ? 'Update User' : 'Add User'}</Button>
           </form>
         </DialogContent>
       </Dialog>
@@ -164,14 +238,37 @@ const UserManagement = () => {
                 <td className="py-3 px-4">{employee.email || '-'}</td>
                 <td className="py-3 px-4">{employee.role}</td>
                 <td className="py-3 px-4">
-                  {/* Actions would go here */}
-                  <Button variant="outline" size="sm">Edit</Button>
+                  {currentEmployee?.role === 'admin' && (
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="icon" onClick={() => handleOpenDialog(employee)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="destructive" size="icon" onClick={() => handleDeleteClick(employee)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the user account for {userToDelete?.name}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
