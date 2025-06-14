@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Card,
@@ -24,9 +23,19 @@ import {
   DialogTrigger,
   DialogClose
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, UserCog, UserPlus } from 'lucide-react';
+import { Loader2, UserCog, UserPlus, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { employeeService } from '@/services/dataService';
 import { EmployeeWorkstationsManager } from './EmployeeWorkstationsManager';
@@ -46,8 +55,12 @@ const EmployeeSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showWorkstationMapping, setShowWorkstationMapping] = useState(false);
-  const [showAddEmployeeDialog, setShowAddEmployeeDialog] = useState(false);
-  const [newEmployee, setNewEmployee] = useState({
+  
+  const [isAddOrEditOpen, setIsAddOrEditOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
+  const [employeeData, setEmployeeData] = useState({
     name: '',
     email: '',
     password: '',
@@ -87,40 +100,76 @@ const EmployeeSettings: React.FC = () => {
     }
   };
 
-  const handleAddEmployee = async () => {
-    try {
-      if (!newEmployee.name || !newEmployee.password) {
-        toast({
-          title: "Validation Error",
-          description: "Name and password are required",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      await employeeService.create(newEmployee);
-      
-      toast({
-        title: "Success",
-        description: "Employee added successfully"
+  const handleOpenAddOrEditDialog = (employee: Employee | null) => {
+    if (employee) {
+      setEditingEmployee(employee);
+      setEmployeeData({
+        name: employee.name,
+        email: employee.email || '',
+        password: '',
+        role: employee.role,
       });
-      
-      setNewEmployee({
+    } else {
+      setEditingEmployee(null);
+      setEmployeeData({
         name: '',
         email: '',
         password: '',
         role: 'worker'
       });
+    }
+    setIsAddOrEditOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const dataToSend = { ...employeeData };
+      if (editingEmployee && !dataToSend.password) {
+        delete (dataToSend as any).password;
+      }
+
+      if (editingEmployee) {
+        await (employeeService as any).update(editingEmployee.id, dataToSend);
+        toast({ title: "Success", description: "Employee updated successfully" });
+      } else {
+        if (!dataToSend.name || !dataToSend.password) {
+          toast({ title: "Validation Error", description: "Name and password are required", variant: "destructive" });
+          return;
+        }
+        await employeeService.create(dataToSend);
+        toast({ title: "Success", description: "Employee added successfully" });
+      }
       
-      setShowAddEmployeeDialog(false);
+      setIsAddOrEditOpen(false);
+      setEditingEmployee(null);
       loadEmployees();
     } catch (error: any) {
-      console.error('Error adding employee:', error);
+      console.error('Error saving employee:', error);
       toast({
         title: "Error",
-        description: `Failed to add employee: ${error.message}`,
+        description: `Failed to save employee: ${error.message}`,
         variant: "destructive"
       });
+    }
+  };
+
+  const handleDeleteClick = (employee: Employee) => {
+    setEmployeeToDelete(employee);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!employeeToDelete) return;
+    try {
+      await (employeeService as any).delete(employeeToDelete.id);
+      toast({ title: "Success", description: "Employee deleted successfully" });
+      loadEmployees();
+    } catch (error: any) {
+      console.error('Error deleting employee:', error);
+      toast({ title: "Error", description: `Failed to delete employee: ${error.message}`, variant: "destructive" });
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setEmployeeToDelete(null);
     }
   };
 
@@ -130,20 +179,20 @@ const EmployeeSettings: React.FC = () => {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Employees</CardTitle>
-            <CardDescription>Manage employee workstation assignments</CardDescription>
+            <CardDescription>Manage employees, their roles, and workstation assignments</CardDescription>
           </div>
-          <Dialog open={showAddEmployeeDialog} onOpenChange={setShowAddEmployeeDialog}>
+          <Dialog open={isAddOrEditOpen} onOpenChange={setIsAddOrEditOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button onClick={() => handleOpenAddOrEditDialog(null)}>
                 <UserPlus className="mr-2 h-4 w-4" />
                 Add Employee
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add New Employee</DialogTitle>
+                <DialogTitle>{editingEmployee ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
                 <DialogDescription>
-                  Create a new employee account
+                  {editingEmployee ? 'Update employee details.' : 'Create a new employee account.'}
                 </DialogDescription>
               </DialogHeader>
               
@@ -153,8 +202,9 @@ const EmployeeSettings: React.FC = () => {
                   <Input 
                     id="name" 
                     placeholder="Enter name" 
-                    value={newEmployee.name}
-                    onChange={(e) => setNewEmployee(prev => ({ ...prev, name: e.target.value }))}
+                    value={employeeData.name}
+                    onChange={(e) => setEmployeeData(prev => ({ ...prev, name: e.target.value }))}
+                    required
                   />
                 </div>
                 
@@ -164,8 +214,8 @@ const EmployeeSettings: React.FC = () => {
                     id="email" 
                     type="email" 
                     placeholder="Enter email" 
-                    value={newEmployee.email}
-                    onChange={(e) => setNewEmployee(prev => ({ ...prev, email: e.target.value }))}
+                    value={employeeData.email}
+                    onChange={(e) => setEmployeeData(prev => ({ ...prev, email: e.target.value }))}
                   />
                 </div>
                 
@@ -174,17 +224,18 @@ const EmployeeSettings: React.FC = () => {
                   <Input 
                     id="password" 
                     type="password" 
-                    placeholder="Enter password" 
-                    value={newEmployee.password}
-                    onChange={(e) => setNewEmployee(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder={editingEmployee ? "Leave blank to keep current password" : "Enter password"}
+                    value={employeeData.password}
+                    onChange={(e) => setEmployeeData(prev => ({ ...prev, password: e.target.value }))}
+                    required={!editingEmployee}
                   />
                 </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="role">Role</Label>
                   <Select 
-                    value={newEmployee.role} 
-                    onValueChange={(value) => setNewEmployee(prev => ({ ...prev, role: value }))}
+                    value={employeeData.role} 
+                    onValueChange={(value) => setEmployeeData(prev => ({ ...prev, role: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
@@ -204,7 +255,7 @@ const EmployeeSettings: React.FC = () => {
                 <DialogClose asChild>
                   <Button variant="outline">Cancel</Button>
                 </DialogClose>
-                <Button onClick={handleAddEmployee}>Add Employee</Button>
+                <Button onClick={handleSubmit}>{editingEmployee ? 'Update Employee' : 'Add Employee'}</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -241,17 +292,35 @@ const EmployeeSettings: React.FC = () => {
                         <Badge variant={getRoleBadgeVariant(employee.role)}>{employee.role}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            setSelectedEmployee(employee);
-                            setShowWorkstationMapping(true);
-                          }}
-                        >
-                          <UserCog className="mr-2 h-4 w-4" />
-                          Workstations
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline" 
+                            size="icon"
+                            onClick={() => handleOpenAddOrEditDialog(employee)}
+                            title="Edit Employee"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            onClick={() => handleDeleteClick(employee)}
+                            title="Delete Employee"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline" 
+                            size="icon"
+                            onClick={() => {
+                              setSelectedEmployee(employee);
+                              setShowWorkstationMapping(true);
+                            }}
+                            title="Manage Workstations"
+                          >
+                            <UserCog className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -285,6 +354,21 @@ const EmployeeSettings: React.FC = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the account for {employeeToDelete?.name}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
