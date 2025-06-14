@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -28,7 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Plus, Trash2, ExternalLink, Edit, ShoppingCart, QrCode } from 'lucide-react';
+import { Plus, Trash2, ExternalLink, Edit, ShoppingCart, QrCode, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { accessoriesService, Accessory } from '@/services/accessoriesService';
 import { orderService } from '@/services/orderService';
@@ -36,6 +37,7 @@ import { useNavigate } from 'react-router-dom';
 import OrderEditModal from './OrderEditModal';
 import NewOrderModal from './NewOrderModal';
 import { AccessoryQrCodeDialog } from './AccessoryQrCodeDialog';
+import AccessoryCsvImporter from './AccessoryCsvImporter';
 
 interface AccessoriesDialogProps {
   open: boolean;
@@ -51,6 +53,7 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
   const [selectedAccessories, setSelectedAccessories] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showCsvImporter, setShowCsvImporter] = useState(false);
   const [showOrderEditModal, setShowOrderEditModal] = useState(false);
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -60,6 +63,8 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
   
   const [editingStatusAccessoryId, setEditingStatusAccessoryId] = useState<string | null>(null);
   const [statusUpdateInfo, setStatusUpdateInfo] = useState<{status: Accessory['status'], quantity: number}>({status: 'to_check', quantity: 1});
+
+  const statuses: Accessory['status'][] = ['to_check', 'in_stock', 'delivered', 'to_order', 'ordered'];
 
   const [formData, setFormData] = useState({
     article_name: '',
@@ -371,9 +376,13 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <div className="flex gap-2">
-                <Button onClick={() => setShowForm(!showForm)}>
+                <Button onClick={() => { setShowForm(!showForm); setShowCsvImporter(false); }}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Accessory
+                </Button>
+                <Button variant="outline" onClick={() => { setShowCsvImporter(!showCsvImporter); setShowForm(false); }}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import from CSV
                 </Button>
                 {selectedAccessories.length > 0 && (
                   <Button onClick={handleCreateOrderFromAccessories} variant="outline">
@@ -492,6 +501,24 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
               </Card>
             )}
 
+            {showCsvImporter && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Import Accessories from CSV</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AccessoryCsvImporter 
+                    projectId={projectId} 
+                    onImportSuccess={() => {
+                      loadAccessories();
+                      setShowCsvImporter(false);
+                    }} 
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -552,7 +579,7 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
                                 onOpenChange={(isOpen) => {
                                     if (isOpen) {
                                         setEditingStatusAccessoryId(accessory.id);
-                                        setStatusUpdateInfo({ status: accessory.status, quantity: 1 });
+                                        setStatusUpdateInfo({ status: accessory.status, quantity: accessory.status === 'to_order' ? statusUpdateInfo.quantity : 1 });
                                     } else {
                                         setEditingStatusAccessoryId(null);
                                     }
@@ -560,28 +587,26 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
                             >
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" size="sm" className="capitalize">
-                                        {accessory.status.replace('_', ' ')}
+                                        {accessory.status.replace(/_/g, ' ')}
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-64 p-4 space-y-4">
+                                <PopoverContent className="w-80 p-4 space-y-4">
                                     <h4 className="font-medium leading-none">Update Status</h4>
                                     <div className="space-y-2">
                                         <Label>New Status</Label>
-                                        <Select 
-                                            value={statusUpdateInfo.status} 
-                                            onValueChange={(value: Accessory['status']) => setStatusUpdateInfo(prev => ({ ...prev, status: value }))}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="to_check">To Check</SelectItem>
-                                                <SelectItem value="in_stock">In Stock</SelectItem>
-                                                <SelectItem value="delivered">Delivered</SelectItem>
-                                                <SelectItem value="to_order">To Order</SelectItem>
-                                                <SelectItem value="ordered">Ordered</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <div className="grid grid-cols-2 gap-2 pt-2">
+                                            {statuses.map((status) => (
+                                                <Button
+                                                  key={status}
+                                                  variant={statusUpdateInfo.status === status ? 'default' : 'outline'}
+                                                  size="sm"
+                                                  onClick={() => setStatusUpdateInfo(prev => ({...prev, status}))}
+                                                  className="capitalize w-full justify-center"
+                                                >
+                                                    {status.replace(/_/g, ' ')}
+                                                </Button>
+                                            ))}
+                                        </div>
                                     </div>
                                     {statusUpdateInfo.status === 'to_order' && accessory.quantity > 1 && (
                                         <div className="space-y-2">
