@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -22,7 +21,7 @@ export const DeliveryConfirmationModal: React.FC<DeliveryConfirmationModalProps>
 }) => {
   const [step, setStep] = useState<'confirm' | 'camera' | 'preview' | 'uploading'>('confirm');
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -74,14 +73,21 @@ export const DeliveryConfirmationModal: React.FC<DeliveryConfirmationModalProps>
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-    setCapturedImage(imageDataUrl);
+    setCapturedImages(prev => [...prev, imageDataUrl]);
     stopCamera();
     setStep('preview');
   };
 
-  const retakePhoto = () => {
-    setCapturedImage(null);
+  const addAnotherPhoto = () => {
     startCamera();
+  };
+
+  const removeImage = (index: number) => {
+    const newImages = capturedImages.filter((_, i) => i !== index);
+    setCapturedImages(newImages);
+    if (newImages.length === 0) {
+      setStep('confirm');
+    }
   };
 
   const switchCamera = async () => {
@@ -93,29 +99,29 @@ export const DeliveryConfirmationModal: React.FC<DeliveryConfirmationModalProps>
   };
 
   const confirmDelivery = async () => {
-    if (!capturedImage) return;
+    if (capturedImages.length === 0) return;
 
     setStep('uploading');
     
     try {
-      // Convert base64 to blob
-      const response = await fetch(capturedImage);
-      const blob = await response.blob();
-      
-      // Create a file from the blob
-      const file = new File([blob], `delivery-note-${order.id}-${Date.now()}.jpg`, {
-        type: 'image/jpeg'
-      });
+      // Upload all images
+      for (const image of capturedImages) {
+        const response = await fetch(image);
+        const blob = await response.blob();
+        
+        const file = new File([blob], `delivery-note-${order.id}-${Date.now()}.jpg`, {
+          type: 'image/jpeg'
+        });
 
-      // Upload the image as an attachment
-      await orderService.uploadOrderAttachment(order.id, file);
+        await orderService.uploadOrderAttachment(order.id, file);
+      }
       
       // Update order status to delivered
       await orderService.updateOrderStatus(order.id, 'delivered');
 
       toast({
         title: "Delivery Confirmed",
-        description: "Order has been marked as delivered and photo uploaded.",
+        description: `Order has been marked as delivered and ${capturedImages.length} photo(s) uploaded.`,
       });
 
       onConfirmed();
@@ -133,7 +139,7 @@ export const DeliveryConfirmationModal: React.FC<DeliveryConfirmationModalProps>
 
   const handleClose = () => {
     stopCamera();
-    setCapturedImage(null);
+    setCapturedImages([]);
     setStep('confirm');
     onClose();
   };
@@ -211,23 +217,36 @@ export const DeliveryConfirmationModal: React.FC<DeliveryConfirmationModalProps>
           </div>
         )}
 
-        {step === 'preview' && capturedImage && (
+        {step === 'preview' && capturedImages.length > 0 && (
           <div className="space-y-4">
-            <div className="relative">
-              <img
-                src={capturedImage}
-                alt="Captured delivery note"
-                className="w-full rounded-lg max-h-96 object-contain bg-gray-100"
-              />
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-96 overflow-y-auto p-2 bg-gray-100 rounded-lg">
+              {capturedImages.map((image, index) => (
+                <div key={index} className="relative group">
+                  <img
+                    src={image}
+                    alt={`Captured delivery note ${index + 1}`}
+                    className="w-full h-full object-cover rounded-lg aspect-square"
+                  />
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => removeImage(index)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
             </div>
             <p className="text-sm text-gray-600">
-              Photo captured successfully. Confirm to mark this order as delivered.
+              {capturedImages.length} photo(s) captured. Add more or confirm to finish.
             </p>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={retakePhoto}>
-                Retake Photo
+              <Button variant="outline" onClick={addAnotherPhoto}>
+                <Camera className="h-4 w-4 mr-2" />
+                Add Photo
               </Button>
-              <Button onClick={confirmDelivery} className="flex items-center gap-2 bg-green-600 hover:bg-green-700">
+              <Button onClick={confirmDelivery} className="flex items-center gap-2 bg-green-600 hover:bg-green-700" disabled={capturedImages.length === 0}>
                 <Check className="h-4 w-4" />
                 Confirm Delivery
               </Button>
