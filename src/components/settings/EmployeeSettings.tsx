@@ -80,6 +80,7 @@ const EmployeeSettings: React.FC = () => {
     switch (role) {
       case 'admin': return 'destructive';
       case 'manager': return 'default';
+      case 'teamleader': return 'default';
       case 'worker': return 'secondary';
       case 'workstation': return 'outline';
       default: return 'outline';
@@ -191,6 +192,7 @@ const EmployeeSettings: React.FC = () => {
                     <SelectContent>
                       <SelectItem value="admin">Admin</SelectItem>
                       <SelectItem value="manager">Manager</SelectItem>
+                      <SelectItem value="teamleader">Team Leader</SelectItem>
                       <SelectItem value="worker">Worker</SelectItem>
                       <SelectItem value="workstation">Workstation</SelectItem>
                     </SelectContent>
@@ -288,4 +290,3 @@ const EmployeeSettings: React.FC = () => {
 };
 
 export default EmployeeSettings;
-

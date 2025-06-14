@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -65,7 +64,7 @@ const UserManagement = () => {
     }
   };
 
-  if (currentEmployee?.role !== 'admin') {
+  if (currentEmployee?.role !== 'admin' && currentEmployee?.role !== 'teamleader') {
     return null;
   }
 
@@ -119,6 +118,7 @@ const UserManagement = () => {
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="teamleader">Team Leader</SelectItem>
                   <SelectItem value="worker">Worker</SelectItem>
                   <SelectItem value="workstation">Workstation</SelectItem>
                 </SelectContent>

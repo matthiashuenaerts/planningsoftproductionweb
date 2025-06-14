@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 interface Employee {
   id: string;
   name: string;
-  role: 'admin' | 'manager' | 'worker' | 'workstation' | 'installation_team';
+  role: 'admin' | 'manager' | 'worker' | 'workstation' | 'installation_team' | 'teamleader';
   workstation?: string;
   expires?: number;
 }
