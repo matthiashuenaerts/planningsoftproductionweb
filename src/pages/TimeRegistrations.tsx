@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { useAuth } from '@/context/AuthContext';
-import { Clock, Users, Calendar, BarChart3, Download, Filter } from 'lucide-react';
+import { Clock, Users, Calendar as CalendarIcon, BarChart3, Download, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -242,7 +242,7 @@ const TimeRegistrations = () => {
     doc.text(`Period: ${format(summaryDates.from, "d MMM yyyy")} - ${format(summaryDates.to, "d MMM yyyy")}`, 14, 22);
 
     const tableColumns = ["Employee", "Total Hours", "Earliest Start", "Latest Stop"];
-    const tableRows = Object.values(employeeSummary).map(emp => [
+    const tableRows = Object.values(employeeSummary).map((emp: { name: string; totalMinutes: number; earliestStart: Date; latestEnd: Date }) => [
       emp.name,
       formatDuration(emp.totalMinutes),
       format(emp.earliestStart, 'HH:mm'),
@@ -447,7 +447,7 @@ const TimeRegistrations = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Today's Hours</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatDuration(totalMinutesToday)}</div>
