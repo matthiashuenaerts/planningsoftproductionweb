@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppProvider } from "./context/AppContext";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
-import TaskTimer from "./components/TaskTimer";
+import GlobalComponents from "./components/GlobalComponents";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Projects from "./pages/Projects";
@@ -38,107 +38,91 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
             <Sonner />
+            <GlobalComponents />
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <Index />
                 </ProtectedRoute>
               } />
               <Route path="/projects" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <Projects />
                 </ProtectedRoute>
               } />
               <Route path="/projects/:projectId" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <ProjectDetails />
                 </ProtectedRoute>
               } />
               <Route path="/workstations" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <Workstations />
                 </ProtectedRoute>
               } />
               <Route path="/personal-tasks" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <PersonalTasks />
                 </ProtectedRoute>
               } />
               <Route path="/daily-tasks" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <DailyTasks />
                 </ProtectedRoute>
               } />
               <Route path="/planning" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <Planning />
                 </ProtectedRoute>
               } />
               <Route path="/settings" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <Settings />
                 </ProtectedRoute>
               } />
               <Route path="/orders" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <Orders />
                 </ProtectedRoute>
               } />
               <Route path="/projects/:projectId/orders" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <ProjectOrders />
                 </ProtectedRoute>
               } />
               <Route path="/rush-orders" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <RushOrders />
                 </ProtectedRoute>
               } />
               <Route path="/rush-orders/:rushOrderId" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <RushOrderDetails />
                 </ProtectedRoute>
               } />
               <Route path="/broken-parts" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <BrokenParts />
                 </ProtectedRoute>
               } />
               <Route path="/broken-parts/summary" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <BrokenPartsSummary />
                 </ProtectedRoute>
               } />
               <Route path="/broken-parts/new" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <NewBrokenPart />
                 </ProtectedRoute>
               } />
               <Route path="/logistics" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <Logistics />
                 </ProtectedRoute>
               } />
               <Route path="/time-registrations" element={
                 <ProtectedRoute>
-                  <TaskTimer />
                   <TimeRegistrations />
                 </ProtectedRoute>
               } />

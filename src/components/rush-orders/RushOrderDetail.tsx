@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
-import { Check, Clock, UserCheck, ListChecks } from 'lucide-react';
+import { Check, Clock, UserCheck, ListChecks, File as FileIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import RushOrderChat from './RushOrderChat';
 
@@ -51,6 +51,11 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
     },
     enabled: !!rushOrder?.assignments && rushOrder.assignments.length > 0,
   });
+  
+  const isImage = (url: string | undefined): boolean => {
+    if (!url) return false;
+    return /\.(jpg|jpeg|png|gif|svg|webp)$/i.test(url);
+  };
   
   const handleStatusUpdate = async (newStatus: "pending" | "in_progress" | "completed") => {
     try {
@@ -149,13 +154,32 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
           
           {rushOrder.image_url && (
             <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Image</h3>
+              <h3 className="text-sm font-medium text-gray-500 mb-2">Attachment</h3>
               <div className="overflow-hidden rounded-lg border">
-                <img 
-                  src={rushOrder.image_url} 
-                  alt={rushOrder.title} 
-                  className="w-full h-auto max-h-96 object-contain"
-                />
+                {isImage(rushOrder.image_url) ? (
+                  <img 
+                    src={rushOrder.image_url} 
+                    alt={rushOrder.title} 
+                    className="w-full h-auto max-h-96 object-contain"
+                  />
+                ) : (
+                  <a 
+                    href={rushOrder.image_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="block p-4 hover:bg-gray-50"
+                  >
+                    <div className="flex items-center gap-4">
+                      <FileIcon className="h-10 w-10 text-gray-500 flex-shrink-0" />
+                      <div className="flex-grow overflow-hidden">
+                        <p className="font-medium truncate">{decodeURIComponent(rushOrder.image_url.split('/').pop() ?? 'Document')}</p>
+                        <span className="text-sm text-blue-600 hover:underline">
+                          View Document
+                        </span>
+                      </div>
+                    </div>
+                  </a>
+                )}
               </div>
             </div>
           )}

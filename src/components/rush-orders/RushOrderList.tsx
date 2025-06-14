@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
@@ -10,7 +9,7 @@ import { format, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, File as FileIcon } from 'lucide-react';
 
 interface RushOrderListProps {
   statusFilter?: "pending" | "in_progress" | "completed" | "all";
@@ -24,6 +23,11 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
     queryKey: ['rushOrders', statusFilter],
     queryFn: rushOrderService.getAllRushOrders,
   });
+  
+  const isImage = (url: string | undefined): boolean => {
+    if (!url) return false;
+    return /\.(jpg|jpeg|png|gif|svg|webp)$/i.test(url);
+  };
   
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -123,11 +127,20 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
             
             {order.image_url && (
               <div className="mt-4">
-                <img 
-                  src={order.image_url} 
-                  alt={order.title} 
-                  className="h-40 w-full object-cover rounded-md"
-                />
+                {isImage(order.image_url) ? (
+                  <img 
+                    src={order.image_url} 
+                    alt={order.title} 
+                    className="h-40 w-full object-cover rounded-md"
+                  />
+                ) : (
+                  <div className="h-40 w-full rounded-md bg-gray-100 flex items-center justify-center">
+                    <div className="text-center text-gray-500">
+                        <FileIcon className="mx-auto h-12 w-12" />
+                        <p className="text-sm mt-2">Document Attached</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             
