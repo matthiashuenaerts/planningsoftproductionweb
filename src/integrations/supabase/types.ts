@@ -18,6 +18,7 @@ export type Database = {
           id: string
           order_id: string | null
           project_id: string
+          qr_code_text: string | null
           quantity: number
           status: string
           stock_location: string | null
@@ -32,6 +33,7 @@ export type Database = {
           id?: string
           order_id?: string | null
           project_id: string
+          qr_code_text?: string | null
           quantity?: number
           status?: string
           stock_location?: string | null
@@ -46,6 +48,7 @@ export type Database = {
           id?: string
           order_id?: string | null
           project_id?: string
+          qr_code_text?: string | null
           quantity?: number
           status?: string
           stock_location?: string | null

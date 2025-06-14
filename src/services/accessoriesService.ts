@@ -12,6 +12,7 @@ export interface Accessory {
   status: 'to_check' | 'in_stock' | 'delivered' | 'to_order' | 'ordered';
   order_id?: string;
   supplier?: string;
+  qr_code_text?: string | null;
   created_at: string;
   updated_at: string;
 }

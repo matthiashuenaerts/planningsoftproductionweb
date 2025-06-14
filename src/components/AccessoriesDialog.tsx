@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -28,13 +27,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Trash2, ExternalLink, Edit, ShoppingCart } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Plus, Trash2, ExternalLink, Edit, ShoppingCart, QrCode } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { accessoriesService, Accessory } from '@/services/accessoriesService';
 import { orderService } from '@/services/orderService';
 import { useNavigate } from 'react-router-dom';
 import OrderEditModal from './OrderEditModal';
 import NewOrderModal from './NewOrderModal';
+import { AccessoryQrCodeDialog } from './AccessoryQrCodeDialog';
 
 interface AccessoriesDialogProps {
   open: boolean;
@@ -53,6 +54,13 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
   const [showOrderEditModal, setShowOrderEditModal] = useState(false);
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  
+  const [showQrCodeDialog, setShowQrCodeDialog] = useState(false);
+  const [sortedAccessoriesForQr, setSortedAccessoriesForQr] = useState<Accessory[]>([]);
+  
+  const [editingStatusAccessoryId, setEditingStatusAccessoryId] = useState<string | null>(null);
+  const [statusUpdateInfo, setStatusUpdateInfo] = useState<{status: Accessory['status'], quantity: number}>({status: 'to_check', quantity: 1});
+
   const [formData, setFormData] = useState({
     article_name: '',
     article_description: '',
@@ -60,7 +68,8 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
     quantity: 1,
     stock_location: '',
     supplier: '',
-    status: 'to_check' as const
+    status: 'to_check' as const,
+    qr_code_text: ''
   });
 
   useEffect(() => {
@@ -119,7 +128,8 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
         quantity: 1,
         stock_location: '',
         supplier: '',
-        status: 'to_check'
+        status: 'to_check',
+        qr_code_text: ''
       });
       setShowForm(false);
       loadAccessories();
@@ -149,20 +159,36 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
     }
   };
 
-  const handleStatusChange = async (accessoryId: string, newStatus: Accessory['status']) => {
+  const handleStatusUpdate = async (accessoryId: string, newStatus: Accessory['status'], quantityToOrder: number) => {
+    const accessory = accessories.find(a => a.id === accessoryId);
+    if (!accessory) return;
+
+    setLoading(true);
+
     try {
-      await accessoriesService.update(accessoryId, { status: newStatus });
-      toast({
-        title: "Success",
-        description: "Accessory status updated successfully"
-      });
-      loadAccessories();
+        if (newStatus === 'to_order' && quantityToOrder > 0 && quantityToOrder < accessory.quantity) {
+            // Split accessory
+            await accessoriesService.update(accessory.id, {
+                quantity: accessory.quantity - quantityToOrder,
+            });
+            const { id, created_at, updated_at, ...restOfAccessory } = accessory;
+            await accessoriesService.create({
+                ...restOfAccessory,
+                project_id: projectId,
+                quantity: quantityToOrder,
+                status: 'to_order',
+            });
+            toast({ title: "Success", description: "Accessory status updated and new 'to order' item created." });
+        } else {
+            await accessoriesService.update(accessory.id, { status: newStatus });
+            toast({ title: "Success", description: "Accessory status updated successfully" });
+        }
+        loadAccessories();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: `Failed to update status: ${error.message}`,
-        variant: "destructive"
-      });
+        toast({ title: "Error", description: `Failed to update status: ${error.message}`, variant: "destructive" });
+    } finally {
+        setLoading(false);
+        setEditingStatusAccessoryId(null);
     }
   };
 
@@ -258,6 +284,20 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
     }
   };
 
+  const handleOpenQrDialog = () => {
+    if (accessories.length === 0) {
+        toast({ title: "No accessories", description: "There are no accessories to show.", variant: "destructive" });
+        return;
+    }
+    const sorted = [...accessories].sort((a, b) => {
+        const locA = a.stock_location || '';
+        const locB = b.stock_location || '';
+        return locA.localeCompare(locB);
+    });
+    setSortedAccessoriesForQr(sorted);
+    setShowQrCodeDialog(true);
+  };
+
   const getRowClassName = (status: string) => {
     switch (status) {
       case 'in_stock':
@@ -341,6 +381,10 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
                     Create Order ({selectedAccessories.length})
                   </Button>
                 )}
+                <Button onClick={handleOpenQrDialog} variant="outline">
+                  <QrCode className="mr-2 h-4 w-4" />
+                  Open with QR
+                </Button>
               </div>
             </div>
 
@@ -378,6 +422,15 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
                         value={formData.article_description}
                         onChange={(e) => setFormData(prev => ({ ...prev, article_description: e.target.value }))}
                       />
+                    </div>
+                    
+                    <div>
+                        <Label htmlFor="qr_code_text">QR Code Text</Label>
+                        <Input
+                          id="qr_code_text"
+                          value={formData.qr_code_text}
+                          onChange={(e) => setFormData(prev => ({ ...prev, qr_code_text: e.target.value }))}
+                        />
                     </div>
 
                     <div className="grid grid-cols-4 gap-4">
@@ -494,23 +547,64 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
                           <TableCell>{accessory.stock_location || '-'}</TableCell>
                           <TableCell>{accessory.supplier || '-'}</TableCell>
                           <TableCell>
-                            <Select
-                              value={accessory.status}
-                              onValueChange={(value: Accessory['status']) => 
-                                handleStatusChange(accessory.id, value)
-                              }
+                            <Popover 
+                                open={editingStatusAccessoryId === accessory.id} 
+                                onOpenChange={(isOpen) => {
+                                    if (isOpen) {
+                                        setEditingStatusAccessoryId(accessory.id);
+                                        setStatusUpdateInfo({ status: accessory.status, quantity: 1 });
+                                    } else {
+                                        setEditingStatusAccessoryId(null);
+                                    }
+                                }}
                             >
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="to_check">To Check</SelectItem>
-                                <SelectItem value="in_stock">In Stock</SelectItem>
-                                <SelectItem value="delivered">Delivered</SelectItem>
-                                <SelectItem value="to_order">To Order</SelectItem>
-                                <SelectItem value="ordered">Ordered</SelectItem>
-                              </SelectContent>
-                            </Select>
+                                <PopoverTrigger asChild>
+                                    <Button variant="link" className="underline capitalize p-0 h-auto">
+                                        {accessory.status.replace('_', ' ')}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-64 p-4 space-y-4">
+                                    <h4 className="font-medium leading-none">Update Status</h4>
+                                    <div className="space-y-2">
+                                        <Label>New Status</Label>
+                                        <Select 
+                                            value={statusUpdateInfo.status} 
+                                            onValueChange={(value: Accessory['status']) => setStatusUpdateInfo(prev => ({ ...prev, status: value }))}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="to_check">To Check</SelectItem>
+                                                <SelectItem value="in_stock">In Stock</SelectItem>
+                                                <SelectItem value="delivered">Delivered</SelectItem>
+                                                <SelectItem value="to_order">To Order</SelectItem>
+                                                <SelectItem value="ordered">Ordered</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {statusUpdateInfo.status === 'to_order' && accessory.quantity > 1 && (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="quantity_to_order">Quantity to Order</Label>
+                                            <Input
+                                                id="quantity_to_order"
+                                                type="number"
+                                                min="1"
+                                                max={accessory.quantity}
+                                                value={statusUpdateInfo.quantity}
+                                                onChange={(e) => setStatusUpdateInfo(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                                            />
+                                        </div>
+                                    )}
+                                    <Button 
+                                        onClick={() => handleStatusUpdate(accessory.id, statusUpdateInfo.status, statusUpdateInfo.quantity)}
+                                        disabled={loading}
+                                        className="w-full"
+                                    >
+                                        {loading ? 'Saving...' : 'Save'}
+                                    </Button>
+                                </PopoverContent>
+                            </Popover>
                           </TableCell>
                           <TableCell>
                             {orderInfo ? formatDate(orderInfo.expected_delivery) : '-'}
@@ -576,6 +670,12 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
         projectId={projectId}
         onSuccess={handleOrderCreated}
         prefilledData={selectedAccessories.length > 0 ? getPrefilledOrderData() : null}
+      />
+      
+      <AccessoryQrCodeDialog
+        open={showQrCodeDialog}
+        onOpenChange={setShowQrCodeDialog}
+        accessories={sortedAccessoriesForQr}
       />
     </>
   );
