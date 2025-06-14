@@ -1,4 +1,3 @@
-
 export interface RushOrderTask {
   id: string;
   rush_order_id: string;
@@ -56,7 +55,7 @@ export interface RushOrderFormData {
   title: string;
   description: string;
   deadline: Date;
-  image?: File;
+  attachment?: File;
   selectedTasks: string[];
   assignedUsers: string[];
 }

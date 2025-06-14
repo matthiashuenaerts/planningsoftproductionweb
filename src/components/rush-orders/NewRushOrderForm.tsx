@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useToast } from '@/components/ui/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Camera } from 'lucide-react';
+import { Calendar as CalendarIcon, Camera, File as FileIcon } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { StandardTask, standardTasksService } from '@/services/standardTasksService';
 import { rushOrderService } from '@/services/rushOrderService';
@@ -34,12 +33,13 @@ const NewRushOrderForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) =
       title: '',
       description: '',
       deadline: new Date(),
+      attachment: undefined,
       selectedTasks: [],
       assignedUsers: []
     }
   });
   
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [filePreview, setFilePreview] = useState<{ name: string; type: string; url?: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [date, setDate] = useState<Date>(new Date());
   const { toast } = useToast();
@@ -96,18 +96,23 @@ const NewRushOrderForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) =
     setValue('deadline', date);
   }, [date, setValue]);
   
-  // Handle image upload
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file upload
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setValue('image', file);
+      setValue('attachment', file);
       
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      if (file.type.startsWith('image/')) {
+        // Create preview for images
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setFilePreview({ name: file.name, type: file.type, url: reader.result as string });
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // For documents, just store file info
+        setFilePreview({ name: file.name, type: file.type });
+      }
     }
   };
   
@@ -145,7 +150,7 @@ const NewRushOrderForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) =
         data.description,
         formattedDeadline,
         currentEmployee.id,
-        data.image
+        data.attachment
       );
       
       if (!rushOrder) throw new Error("Failed to create rush order");
@@ -173,7 +178,7 @@ const NewRushOrderForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) =
       
       // Reset form
       reset();
-      setImagePreview(null);
+      setFilePreview(null);
       setSelectedTaskIds([]);
       setSelectedUserIds([]);
       
@@ -256,38 +261,49 @@ const NewRushOrderForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) =
           </div>
           
           <div className="space-y-2">
-            <label className="block text-sm font-medium">Image</label>
+            <label className="block text-sm font-medium">Attachment</label>
             <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer" onClick={triggerFileInput}>
-              {imagePreview ? (
-                <div className="relative w-full">
-                  <img src={imagePreview} alt="Preview" className="w-full h-auto rounded-md" />
+              {filePreview ? (
+                <div className="relative w-full text-center">
+                  {filePreview.url ? (
+                    <img src={filePreview.url} alt="Preview" className="w-full h-auto rounded-md" />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <FileIcon className="h-12 w-12 text-gray-400" />
+                      <p className="font-medium text-sm break-all">{filePreview.name}</p>
+                    </div>
+                  )}
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="destructive"
+                    size="sm"
                     className="absolute top-2 right-2"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setImagePreview(null);
-                      setValue('image', undefined);
+                      setFilePreview(null);
+                      setValue('attachment', undefined);
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = "";
+                      }
                     }}
                   >
-                    Change
+                    Remove
                   </Button>
                 </div>
               ) : (
                 <div className="text-center">
                   <Camera className="mx-auto h-12 w-12 text-gray-400" />
-                  <p className="mt-2 text-sm text-gray-500">Click to take a photo or upload an image</p>
+                  <p className="mt-2 text-sm text-gray-500">Click to upload an image or document</p>
+                  <p className="text-xs text-gray-400">Images, PDF, DOC, XLS, etc.</p>
                 </div>
               )}
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleImageChange}
+                accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                onChange={handleFileChange}
                 className="hidden"
-                id="image-upload"
+                id="attachment-upload"
               />
             </div>
           </div>

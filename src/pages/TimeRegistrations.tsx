@@ -66,16 +66,21 @@ const TimeRegistrations = () => {
   };
 
   const getUniqueProjects = (registrations: any[]) => {
-    const projects = new Set();
+    const projects = new Map<string, { id: string; name: string }>();
     registrations.forEach((reg: any) => {
       if (reg.tasks?.phases?.projects) {
-        projects.add(JSON.stringify({
+        projects.set(reg.tasks.phases.projects.id, {
           id: reg.tasks.phases.projects.id,
           name: reg.tasks.phases.projects.name
-        }));
+        });
+      } else if (reg.workstation_tasks?.workstations) {
+        projects.set(reg.workstation_tasks.workstations.id, {
+          id: reg.workstation_tasks.workstations.id,
+          name: `Workstation: ${reg.workstation_tasks.workstations.name}`
+        });
       }
     });
-    return Array.from(projects).map((proj: any) => JSON.parse(proj));
+    return Array.from(projects.values());
   };
 
   // Apply filters
@@ -102,7 +107,8 @@ const TimeRegistrations = () => {
     // Project filter
     if (projectFilter !== 'all') {
       filtered = filtered.filter((reg: any) => 
-        reg.tasks?.phases?.projects?.id === projectFilter
+        reg.tasks?.phases?.projects?.id === projectFilter ||
+        reg.workstation_tasks?.workstations?.id === projectFilter
       );
     }
 
@@ -143,8 +149,8 @@ const TimeRegistrations = () => {
 
       const csvData = filteredRegistrations.map((reg: any) => [
         reg.employees?.name || 'Unknown Employee',
-        reg.tasks?.phases?.projects?.name || 'Unknown Project',
-        reg.tasks?.title || 'Unknown Task',
+        reg.tasks?.phases?.projects?.name || (reg.workstation_tasks?.workstations ? `Workstation: ${reg.workstation_tasks.workstations.name}` : 'Unknown Project'),
+        reg.tasks?.title || reg.workstation_tasks?.task_name || 'Unknown Task',
         formatDateTime(reg.start_time),
         reg.end_time ? formatDateTime(reg.end_time) : '',
         reg.duration_minutes || 0,
@@ -323,9 +329,9 @@ const TimeRegistrations = () => {
                   {filteredRegistrations.map((registration: any) => (
                     <TableRow key={registration.id}>
                       <TableCell className="font-medium">
-                        {registration.tasks?.phases?.projects?.name || 'Unknown Project'}
+                        {registration.tasks?.phases?.projects?.name || (registration.workstation_tasks?.workstations ? `Workstation: ${registration.workstation_tasks.workstations.name}` : 'Unknown Project')}
                       </TableCell>
-                      <TableCell>{registration.tasks?.title || 'Unknown Task'}</TableCell>
+                      <TableCell>{registration.tasks?.title || registration.workstation_tasks?.task_name || 'Unknown Task'}</TableCell>
                       <TableCell>{formatDateTime(registration.start_time)}</TableCell>
                       <TableCell>
                         {registration.end_time ? formatDateTime(registration.end_time) : '-'}
@@ -523,9 +529,9 @@ const TimeRegistrations = () => {
                       {registration.employees?.name || 'Unknown Employee'}
                     </TableCell>
                     <TableCell>
-                      {registration.tasks?.phases?.projects?.name || 'Unknown Project'}
+                      {registration.tasks?.phases?.projects?.name || (registration.workstation_tasks?.workstations ? `Workstation: ${registration.workstation_tasks.workstations.name}` : 'Unknown Project')}
                     </TableCell>
-                    <TableCell>{registration.tasks?.title || 'Unknown Task'}</TableCell>
+                    <TableCell>{registration.tasks?.title || registration.workstation_tasks?.task_name || 'Unknown Task'}</TableCell>
                     <TableCell>{formatDateTime(registration.start_time)}</TableCell>
                     <TableCell>
                       {registration.end_time ? formatDateTime(registration.end_time) : '-'}

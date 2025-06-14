@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { RushOrder, RushOrderTask, RushOrderAssignment, RushOrderMessage } from "@/types/rushOrder";
 import { toast } from "@/hooks/use-toast";
@@ -9,7 +10,7 @@ export const rushOrderService = {
     description: string,
     deadline: string,
     createdBy: string,
-    imageFile?: File
+    attachmentFile?: File
   ): Promise<RushOrder | null> {
     try {
       // Create rush order record
@@ -28,18 +29,18 @@ export const rushOrderService = {
       
       if (error) throw error;
       
-      // Upload image if provided
-      if (imageFile && data) {
+      // Upload attachment if provided
+      if (attachmentFile && data) {
         // Ensure storage bucket exists
         await ensureStorageBucket('attachments');
         
-        const fileExt = imageFile.name.split('.').pop();
+        const fileExt = attachmentFile.name.split('.').pop();
         const fileName = `${data.id}-${Date.now()}.${fileExt}`;
         const filePath = `rush-orders/${fileName}`;
         
         const { error: uploadError } = await supabase.storage
           .from('attachments')
-          .upload(filePath, imageFile);
+          .upload(filePath, attachmentFile);
           
         if (uploadError) throw uploadError;
         
