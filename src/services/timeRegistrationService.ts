@@ -330,7 +330,7 @@ export const timeRegistrationService = {
     
     if (error) throw error;
     return data as TimeRegistration | null;
-  }
+  },
 
   async getAllRegistrations(): Promise<any[]> {
     const { data, error } = await supabase
@@ -362,3 +362,4 @@ export const timeRegistrationService = {
     return data || [];
   }
 };
+
