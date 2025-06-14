@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -235,7 +236,7 @@ const UserManagement = () => {
                 <td className="py-3 px-4">{employee.email || '-'}</td>
                 <td className="py-3 px-4">{employee.role}</td>
                 <td className="py-3 px-4">
-                  {currentEmployee?.role === 'admin' && (
+                  {(currentEmployee?.role === 'admin' || currentEmployee?.role === 'teamleader') && (
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="icon" onClick={() => handleOpenDialog(employee)}>
                         <Edit className="h-4 w-4" />

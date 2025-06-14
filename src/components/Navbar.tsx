@@ -130,12 +130,14 @@ const NavbarContent = ({
                   <span className="ml-3">Time Registrations</span>
                 </NavLink>
               </li>}
-            <li>
-              <NavLink to="/settings" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
-                <Settings className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">Settings</span>
-              </NavLink>
-            </li>
+            {currentEmployee?.role === 'admin' && (
+              <li>
+                <NavLink to="/settings" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                  <Settings className="w-5 h-5 text-white group-hover:text-white" />
+                  <span className="ml-3">Settings</span>
+                </NavLink>
+              </li>
+            )}
           </ul>
         </div>
         
