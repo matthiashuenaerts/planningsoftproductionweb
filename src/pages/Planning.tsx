@@ -501,7 +501,7 @@ const Planning = () => {
     }
   };
 
-  const formatTime = (timeStr: string) => {
+  const formatTime = (timeStr: string | Date) => {
     return format(new Date(timeStr), 'HH:mm');
   };
 
@@ -518,17 +518,79 @@ const Planning = () => {
     return Math.round((totalScheduledMinutes / totalWorkingMinutes) * 100);
   };
 
+  const isOverlapping = (startTime: Date, endTime: Date, schedule: ScheduleItem[], ignoreItemId?: string): { overlap: boolean; reason?: string; details?: string } => {
+    const start = startTime.getTime();
+    const end = endTime.getTime();
+
+    // Check timeline boundaries
+    const dayStart = new Date(startTime);
+    dayStart.setHours(TIMELINE_START_HOUR, 0, 0, 0);
+    const dayEnd = new Date(startTime);
+    dayEnd.setHours(TIMELINE_END_HOUR, 0, 0, 0);
+
+    if (start < dayStart.getTime() || end > dayEnd.getTime()) {
+      return { overlap: true, reason: "Out of working hours", details: "Task must be within the timeline." };
+    }
+
+    // Check for overlap with other tasks
+    for (const item of schedule) {
+      if (item.id === ignoreItemId) continue;
+      const itemStart = new Date(item.start_time).getTime();
+      const itemEnd = new Date(item.end_time).getTime();
+      if (start < itemEnd && end > itemStart) {
+        return { overlap: true, reason: "Task Overlap", details: `Overlaps with: ${item.title}` };
+      }
+    }
+
+    // Check for overlap with breaks
+    const getBreaks = () => {
+      const breaks = [];
+      for (let i = 0; i < workingHours.length - 1; i++) {
+        breaks.push({
+          start: workingHours[i].end,
+          end: workingHours[i + 1].start,
+        });
+      }
+      return breaks;
+    };
+    const breaks = getBreaks();
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    for (const breakPeriod of breaks) {
+      const breakStart = new Date(`${dateStr}T${breakPeriod.start}:00`).getTime();
+      const breakEnd = new Date(`${dateStr}T${breakPeriod.end}:00`).getTime();
+      if (start < breakEnd && end > breakStart) {
+        return { overlap: true, reason: "Break Overlap", details: "Cannot schedule tasks during breaks." };
+      }
+    }
+
+    return { overlap: false };
+  };
+
   const handleMoveTask = async (itemId: string, deltaY: number) => {
     const workerSchedule = workerSchedules.find(w => w.employee.id === selectedWorker);
     const itemToMove = workerSchedule?.schedule.find(i => i.id === itemId);
-    if (!itemToMove) return;
+    if (!workerSchedule || !itemToMove) return;
 
-    const minutesChange = Math.round(deltaY / MINUTE_TO_PIXEL_SCALE);
+    const unroundedMinutes = deltaY / MINUTE_TO_PIXEL_SCALE;
+    const minutesChange = Math.round(unroundedMinutes / 5) * 5;
+
+    if (minutesChange === 0) return;
+
     const newStartTime = new Date(itemToMove.start_time);
     newStartTime.setMinutes(newStartTime.getMinutes() + minutesChange);
 
     const newEndTime = new Date(itemToMove.end_time);
     newEndTime.setMinutes(newEndTime.getMinutes() + minutesChange);
+
+    const { overlap, reason, details } = isOverlapping(newStartTime, newEndTime, workerSchedule.schedule, itemId);
+    if (overlap) {
+      toast({
+        title: reason,
+        description: details,
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
       await supabase
@@ -550,15 +612,31 @@ const Planning = () => {
   const handleResizeTask = async (itemId: string, deltaY: number) => {
     const workerSchedule = workerSchedules.find(w => w.employee.id === selectedWorker);
     const itemToResize = workerSchedule?.schedule.find(i => i.id === itemId);
-    if (!itemToResize) return;
+    if (!workerSchedule || !itemToResize) return;
 
-    const minutesChange = Math.round(deltaY / MINUTE_TO_PIXEL_SCALE);
+    const unroundedMinutes = deltaY / MINUTE_TO_PIXEL_SCALE;
+    const minutesChange = Math.round(unroundedMinutes / 5) * 5;
+
+    if (minutesChange === 0) return;
+
     const newEndTime = new Date(itemToResize.end_time);
     newEndTime.setMinutes(newEndTime.getMinutes() + minutesChange);
 
-    const newDuration = (newEndTime.getTime() - new Date(itemToResize.start_time).getTime()) / 60000;
+    const startTime = new Date(itemToResize.start_time);
+    const newDuration = (newEndTime.getTime() - startTime.getTime()) / 60000;
+    
     if (newDuration < 5) {
       toast({ title: "Invalid duration", description: "Task duration cannot be less than 5 minutes.", variant: "destructive" });
+      return;
+    }
+
+    const { overlap, reason, details } = isOverlapping(startTime, newEndTime, workerSchedule.schedule, itemId);
+    if (overlap) {
+      toast({
+        title: reason,
+        description: details,
+        variant: "destructive"
+      });
       return;
     }
 
@@ -860,6 +938,8 @@ const Planning = () => {
                                     onMove={handleMoveTask}
                                     onResize={handleResizeTask}
                                     isAdmin={isAdmin}
+                                    MINUTE_TO_PIXEL_SCALE={MINUTE_TO_PIXEL_SCALE}
+                                    formatTime={formatTime}
                                   >
                                     <div className={cn(
                                         "relative h-full overflow-hidden rounded border p-2",
@@ -937,7 +1017,7 @@ const Planning = () => {
                               onClick={() => setShowTaskManager(true)}
                               className="mt-2"
                             >
-                              <Plus className="mr-1 h-4 w-4" />
+                              <Plus className="h-4 w-4 mr-2" />
                               Add Task
                             </Button>
                           )}

@@ -13,9 +13,11 @@ interface DraggableScheduleItemProps {
   onResize: (itemId: string, deltaY: number) => void;
   children: React.ReactNode;
   isAdmin: boolean;
+  MINUTE_TO_PIXEL_SCALE: number;
+  formatTime: (time: string | Date) => string;
 }
 
-const DraggableScheduleItem: React.FC<DraggableScheduleItemProps> = ({ item, onMove, onResize, children, isAdmin }) => {
+const DraggableScheduleItem: React.FC<DraggableScheduleItemProps> = ({ item, onMove, onResize, children, isAdmin, MINUTE_TO_PIXEL_SCALE, formatTime }) => {
   const [{ isDragging }, moveDrag] = useDrag(() => ({
     type: ItemTypes.SCHEDULE_ITEM,
     item: { id: item.id },
@@ -31,7 +33,7 @@ const DraggableScheduleItem: React.FC<DraggableScheduleItemProps> = ({ item, onM
     }),
   }), [item.id, onMove, isAdmin]);
 
-  const [{ isResizing }, resizeDrag] = useDrag(() => ({
+  const [{ isResizing, resizeDeltaY }, resizeDrag] = useDrag(() => ({
     type: ItemTypes.RESIZE_HANDLE,
     item: { id: item.id, type: 'resize' },
     canDrag: isAdmin,
@@ -43,8 +45,22 @@ const DraggableScheduleItem: React.FC<DraggableScheduleItemProps> = ({ item, onM
     },
     collect: (monitor) => ({
       isResizing: !!monitor.isDragging(),
+      resizeDeltaY: monitor.getDifferenceFromInitialOffset()?.y || 0,
     }),
   }), [item.id, onResize, isAdmin]);
+
+  const calculateNewEndTime = () => {
+    if (!isResizing) return null;
+
+    const minutesChange = Math.round((resizeDeltaY / MINUTE_TO_PIXEL_SCALE) / 5) * 5;
+    
+    const newEndTime = new Date(item.end_time);
+    newEndTime.setMinutes(newEndTime.getMinutes() + minutesChange);
+    
+    return formatTime(newEndTime);
+  };
+
+  const newEndTimeString = calculateNewEndTime();
 
   return (
     <div
@@ -64,7 +80,15 @@ const DraggableScheduleItem: React.FC<DraggableScheduleItemProps> = ({ item, onM
           <div className="w-8 h-1 bg-gray-600 rounded-full" />
         </div>
       )}
-      {isResizing && <div className="absolute inset-0 bg-blue-400/20 rounded" />}
+      {isResizing && (
+        <div className="absolute inset-0 bg-blue-400/20 rounded pointer-events-none flex items-end justify-end p-2">
+          {newEndTimeString && (
+            <div className="text-xs bg-white/80 backdrop-blur-sm font-semibold p-1 rounded shadow-lg">
+              {newEndTimeString}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
