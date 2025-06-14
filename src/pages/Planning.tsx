@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format, startOfDay } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
@@ -246,163 +245,20 @@ const Planning = () => {
     }
   };
 
-  const generateDailySchedule = async (workerId: string) => {
+  const handleGenerateWeeklyPlan = async () => {
+    setGeneratingSchedule(true);
     try {
-      setGeneratingSchedule(true);
-      
-      const worker = workerSchedules.find(w => w.employee.id === workerId);
-      if (!worker) {
-        throw new Error('Worker not found');
-      }
-
-      console.log(`Generating schedule for ${worker.employee.name}`);
-      console.log(`Available TODO tasks: ${worker.tasks.length}`);
-      console.log(`Assigned workstations: ${worker.assignedWorkstations.join(', ')}`);
-
-      if (worker.assignedWorkstations.length === 0) {
-        toast({
-          title: "No Workstations Assigned",
-          description: "This worker has no workstations assigned. Please assign workstations first.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Clear existing auto-generated schedules for this worker and date
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      await supabase
-        .from('schedules')
-        .delete()
-        .eq('employee_id', workerId)
-        .gte('start_time', `${dateStr}T00:00:00`)
-        .lte('start_time', `${dateStr}T23:59:59`)
-        .eq('is_auto_generated', true);
-
-      const availableTasks = worker.tasks;
-
-      console.log(`TODO tasks ready for scheduling: ${availableTasks.length}`);
-
-      if (availableTasks.length === 0) {
-        toast({
-          title: "No TODO Tasks Available",
-          description: `No TODO tasks available for ${worker.employee.name}'s workstations: ${worker.assignedWorkstations.join(', ')}.`,
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Sort tasks by priority and due date
-      const priorityOrder = { 'Urgent': 0, 'High': 1, 'Medium': 2, 'Low': 3 };
-      availableTasks.sort((a, b) => {
-        const priorityA = priorityOrder[a.priority as keyof typeof priorityOrder] || 4;
-        const priorityB = priorityOrder[b.priority as keyof typeof priorityOrder] || 4;
-        
-        if (priorityA !== priorityB) return priorityA - priorityB;
-        
-        const dateA = new Date(a.due_date);
-        const dateB = new Date(b.due_date);
-        return dateA.getTime() - dateB.getTime();
+      await planningService.generateWeeklyPlan(selectedDate);
+      toast({
+        title: "Weekly Plan Generated",
+        description: "The weekly plan has been successfully generated for all workers.",
       });
-
-      // Create continuous schedule that fills the entire day
-      const schedulesToInsert = [];
-      let currentTaskIndex = 0;
-      let remainingTaskDuration = availableTasks[currentTaskIndex]?.duration || 60;
-      let currentTask = availableTasks[currentTaskIndex];
-      let taskPartCounter = 1;
-
-      for (const period of workingHours) {
-        if (!currentTask) break;
-
-        const periodStartTime = new Date(`${dateStr}T${period.start}:00`);
-        let periodRemainingMinutes = period.duration;
-        let periodCurrentTime = new Date(periodStartTime);
-
-        while (periodRemainingMinutes > 0 && currentTask) {
-          const timeToAllocate = Math.min(remainingTaskDuration, periodRemainingMinutes);
-          const endTime = new Date(periodCurrentTime.getTime() + (timeToAllocate * 60000));
-
-          // Determine if this is a partial task
-          const totalParts = Math.ceil((availableTasks[currentTaskIndex]?.duration || 60) / period.duration);
-          
-          let taskTitle = currentTask.title;
-          if (totalParts > 1) {
-            taskTitle = `${currentTask.title} (Part ${taskPartCounter})`;
-          }
-
-          schedulesToInsert.push({
-            employee_id: workerId,
-            task_id: currentTask.id,
-            title: taskTitle,
-            description: currentTask.description || '',
-            start_time: periodCurrentTime.toISOString(),
-            end_time: endTime.toISOString(),
-            is_auto_generated: true
-          });
-
-          // Update counters
-          remainingTaskDuration -= timeToAllocate;
-          periodRemainingMinutes -= timeToAllocate;
-          periodCurrentTime = new Date(endTime);
-
-          // If task is completed, move to next task
-          if (remainingTaskDuration <= 0) {
-            currentTaskIndex++;
-            currentTask = availableTasks[currentTaskIndex];
-            remainingTaskDuration = currentTask?.duration || 60;
-            taskPartCounter = 1;
-          } else {
-            taskPartCounter++;
-          }
-        }
-      }
-
-      console.log(`Schedules to insert: ${schedulesToInsert.length}`);
-
-      // Insert schedules
-      if (schedulesToInsert.length > 0) {
-        const { error } = await supabase
-          .from('schedules')
-          .insert(schedulesToInsert);
-
-        if (error) throw error;
-      }
-
       await fetchAllData();
-      
-      toast({
-        title: "Schedule Generated",
-        description: `Generated ${schedulesToInsert.length} schedule items for ${worker.employee.name}`,
-      });
     } catch (error: any) {
-      console.error('Error generating schedule:', error);
+      console.error('Error generating weekly plan:', error);
       toast({
         title: "Error",
-        description: `Failed to generate schedule: ${error.message}`,
-        variant: "destructive"
-      });
-    } finally {
-      setGeneratingSchedule(false);
-    }
-  };
-
-  const generateAllSchedules = async () => {
-    try {
-      setGeneratingSchedule(true);
-      
-      for (const workerSchedule of workerSchedules) {
-        await generateDailySchedule(workerSchedule.employee.id);
-      }
-      
-      toast({
-        title: "All Schedules Generated",
-        description: "Generated schedules for all workers",
-      });
-    } catch (error: any) {
-      console.error('Error generating all schedules:', error);
-      toast({
-        title: "Error",
-        description: `Failed to generate schedules: ${error.message}`,
+        description: `Failed to generate weekly plan: ${error.message}`,
         variant: "destructive"
       });
     } finally {
@@ -568,12 +424,12 @@ const Planning = () => {
               {isAdmin && (
                 <div className="flex space-x-2">
                   <Button
-                    onClick={generateAllSchedules}
+                    onClick={handleGenerateWeeklyPlan}
                     disabled={generatingSchedule}
                     className="whitespace-nowrap"
                   >
                     <Zap className="mr-2 h-4 w-4" />
-                    {generatingSchedule ? 'Generating...' : 'Generate All Schedules'}
+                    {generatingSchedule ? 'Generating...' : 'Generate Weekly Plan'}
                   </Button>
                 </div>
               )}
@@ -616,14 +472,6 @@ const Planning = () => {
 
                 {isAdmin && selectedWorker && (
                   <div className="flex space-x-2">
-                    <Button
-                      onClick={() => generateDailySchedule(selectedWorker)}
-                      disabled={generatingSchedule}
-                      variant="outline"
-                    >
-                      <Zap className="mr-2 h-4 w-4" />
-                      Generate Schedule
-                    </Button>
                     <Button
                       onClick={() => setShowTaskManager(true)}
                     >
