@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { 
@@ -43,6 +43,32 @@ const ProjectDetails = () => {
   const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
   const { currentEmployee } = useAuth();
 
+  const fetchAndSetSortedTasks = useCallback(async (pId: string) => {
+    const phaseData = await projectService.getProjectPhases(pId);
+    const standardTasks = await standardTasksService.getAll();
+    const standardTaskMap = new Map(standardTasks.map(st => [st.id, st.task_number]));
+
+    let allTasks: Task[] = [];
+    for (const phase of phaseData) {
+      const phaseTasks = await taskService.getByPhase(phase.id);
+      allTasks = [...allTasks, ...phaseTasks];
+    }
+
+    allTasks.sort((a, b) => {
+      const taskA_number = a.standard_task_id ? standardTaskMap.get(a.standard_task_id) : undefined;
+      const taskB_number = b.standard_task_id ? standardTaskMap.get(b.standard_task_id) : undefined;
+
+      if (taskA_number && taskB_number) {
+        return taskA_number.localeCompare(taskB_number, undefined, { numeric: true });
+      }
+      if (taskA_number) return -1;
+      if (taskB_number) return 1;
+      return a.title.localeCompare(b.title);
+    });
+    
+    setTasks(allTasks);
+  }, []);
+
   useEffect(() => {
     const fetchProjectData = async () => {
       if (!projectId) return;
@@ -52,17 +78,7 @@ const ProjectDetails = () => {
         const projectData = await projectService.getById(projectId);
         setProject(projectData);
         
-        // Fetch phases for this project
-        const phaseData = await projectService.getProjectPhases(projectId);
-        
-        // Fetch tasks for all phases
-        let allTasks: Task[] = [];
-        for (const phase of phaseData) {
-          const phaseTasks = await taskService.getByPhase(phase.id);
-          allTasks = [...allTasks, ...phaseTasks];
-        }
-        
-        setTasks(allTasks);
+        await fetchAndSetSortedTasks(projectId);
 
         // Fetch accessories and orders
         const accessoriesData = await accessoriesService.getByProject(projectId);
@@ -82,7 +98,7 @@ const ProjectDetails = () => {
     };
 
     fetchProjectData();
-  }, [projectId, toast]);
+  }, [projectId, toast, fetchAndSetSortedTasks]);
 
   const checkAndUpdateLimitPhases = async (completedTaskId?: string) => {
     if (!projectId) return;
@@ -141,15 +157,8 @@ const ProjectDetails = () => {
             })
             .eq('id', task.id);
         }
-
-        // Refresh the tasks list to show the updated statuses
-        const phaseData = await projectService.getProjectPhases(projectId);
-        let allTasks: Task[] = [];
-        for (const phase of phaseData) {
-          const phaseTasks = await taskService.getByPhase(phase.id);
-          allTasks = [...allTasks, ...phaseTasks];
-        }
-        setTasks(allTasks);
+        
+        // No longer refetching here, caller will handle it.
 
         toast({
           title: "Tasks Updated",
@@ -186,7 +195,7 @@ const ProjectDetails = () => {
   };
 
   const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
-    if (!currentEmployee) {
+    if (!currentEmployee || !projectId) {
       toast({
         title: "Authentication Error",
         description: "You must be logged in to update tasks.",
@@ -196,110 +205,53 @@ const ProjectDetails = () => {
     }
     
     try {
-      // Use explicit status checks without type narrowing
       const statusValue = newStatus as string;
       const currentTask = tasks.find(task => task.id === taskId);
       
-      // If starting a task, check limit phases first
       if (statusValue === 'IN_PROGRESS') {
         const canStart = await checkLimitPhasesBeforeStart(taskId, currentTask?.standard_task_id);
         if (!canStart) {
-          return; // Don't proceed if limit phases aren't satisfied
+          return;
         }
-
         await timeRegistrationService.startTask(currentEmployee.id, taskId);
-        
-        // Update local state
-        setTasks(prevTasks => 
-          prevTasks.map(task => 
-            task.id === taskId ? { 
-              ...task, 
-              status: 'IN_PROGRESS',
-              status_changed_at: new Date().toISOString(),
-              assignee_id: currentEmployee.id
-            } : task
-          )
-        );
-        
         toast({
           title: "Task Started",
           description: "Task has been started and time registration created.",
         });
-        return;
-      }
-      
-      // If completing a task, use time registration service
-      if (statusValue === 'COMPLETED') {
+      } else if (statusValue === 'COMPLETED') {
         await timeRegistrationService.completeTask(taskId);
-        
-        // Update local state
-        setTasks(prevTasks => 
-          prevTasks.map(task => 
-            task.id === taskId ? { 
-              ...task, 
-              status: 'COMPLETED',
-              completed_at: new Date().toISOString(),
-              completed_by: currentEmployee.id
-            } : task
-          )
-        );
-        
-        // Check and update limit phases after completing a task
-        await checkAndUpdateLimitPhases(taskId);
-        
         toast({
           title: "Task Completed",
           description: "Task has been completed and time registration ended.",
         });
-        return;
+      } else {
+        const updateData: Partial<Task> = { 
+          status: newStatus, 
+          status_changed_at: new Date().toISOString() 
+        };
+      
+        if (statusValue === 'IN_PROGRESS') {
+          updateData.assignee_id = currentEmployee.id;
+        }
+      
+        if (statusValue === 'COMPLETED') {
+          updateData.completed_at = new Date().toISOString();
+          updateData.completed_by = currentEmployee.id;
+        }
+      
+        await taskService.update(taskId, updateData);
+        toast({
+          title: "Task updated",
+          description: `Task status has been updated to ${newStatus}.`,
+        });
       }
-      
-      // For other status changes, use regular task service
-      const updateData: Partial<Task> = { 
-        status: newStatus, 
-        status_changed_at: new Date().toISOString() 
-      };
-      
-      // Set assignee when changing to IN_PROGRESS
-      if (statusValue === 'IN_PROGRESS') {
-        updateData.assignee_id = currentEmployee.id;
-      }
-      
-      // Add completion info if task is being marked as completed
-      if (statusValue === 'COMPLETED') {
-        updateData.completed_at = new Date().toISOString();
-        updateData.completed_by = currentEmployee.id;
-      }
-      
-      await taskService.update(taskId, updateData);
-      
-      // Update local state
-      setTasks(prevTasks => 
-        prevTasks.map(task => 
-          task.id === taskId ? { 
-            ...task, 
-            status: newStatus,
-            status_changed_at: updateData.status_changed_at,
-            ...(statusValue === 'IN_PROGRESS' ? {
-              assignee_id: currentEmployee.id
-            } : {}),
-            ...(statusValue === 'COMPLETED' ? {
-              completed_at: updateData.completed_at,
-              completed_by: currentEmployee.id
-            } : {})
-          } : task
-        )
-      );
 
-      // Check limit phases after any status change to COMPLETED
-      if (statusValue === 'COMPLETED') {
+      if (newStatus === 'COMPLETED') {
         await checkAndUpdateLimitPhases(taskId);
       }
-      
-      toast({
-        title: "Task updated",
-        description: `Task status has been updated to ${newStatus}.`,
-      });
+
+      await fetchAndSetSortedTasks(projectId);
+
     } catch (error: any) {
       toast({
         title: "Error",
