@@ -518,7 +518,7 @@ const Planning = () => {
     return Math.round((totalScheduledMinutes / totalWorkingMinutes) * 100);
   };
 
-  const isOverlapping = (startTime: Date, endTime: Date, schedule: ScheduleItem[], ignoreItemId?: string): { overlap: boolean; reason?: string; details?: string } => {
+  const isOverlapping = (startTime: Date, endTime: Date, schedule: ScheduleItem[], ignoreItemId?: string): { overlap: boolean; reason?: string; details?: string; conflictingItem?: any; outOfBounds?: 'start' | 'end' } => {
     const start = startTime.getTime();
     const end = endTime.getTime();
 
@@ -528,8 +528,11 @@ const Planning = () => {
     const dayEnd = new Date(startTime);
     dayEnd.setHours(TIMELINE_END_HOUR, 0, 0, 0);
 
-    if (start < dayStart.getTime() || end > dayEnd.getTime()) {
-      return { overlap: true, reason: "Out of working hours", details: "Task must be within the timeline." };
+    if (start < dayStart.getTime()) {
+      return { overlap: true, reason: "Out of working hours", details: "Task must be within the timeline.", outOfBounds: 'start' };
+    }
+    if (end > dayEnd.getTime()) {
+      return { overlap: true, reason: "Out of working hours", details: "Task must be within the timeline.", outOfBounds: 'end' };
     }
 
     // Check for overlap with other tasks
@@ -538,7 +541,7 @@ const Planning = () => {
       const itemStart = new Date(item.start_time).getTime();
       const itemEnd = new Date(item.end_time).getTime();
       if (start < itemEnd && end > itemStart) {
-        return { overlap: true, reason: "Task Overlap", details: `Overlaps with: ${item.title}` };
+        return { overlap: true, reason: "Task Overlap", details: `Overlaps with: ${item.title}`, conflictingItem: item };
       }
     }
 
@@ -549,6 +552,7 @@ const Planning = () => {
         breaks.push({
           start: workingHours[i].end,
           end: workingHours[i + 1].start,
+          title: 'Break',
         });
       }
       return breaks;
@@ -556,10 +560,10 @@ const Planning = () => {
     const breaks = getBreaks();
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     for (const breakPeriod of breaks) {
-      const breakStart = new Date(`${dateStr}T${breakPeriod.start}:00`).getTime();
-      const breakEnd = new Date(`${dateStr}T${breakPeriod.end}:00`).getTime();
-      if (start < breakEnd && end > breakStart) {
-        return { overlap: true, reason: "Break Overlap", details: "Cannot schedule tasks during breaks." };
+      const breakStart = new Date(`${dateStr}T${breakPeriod.start}:00`);
+      const breakEnd = new Date(`${dateStr}T${breakPeriod.end}:00`);
+      if (start < breakEnd.getTime() && end > breakStart.getTime()) {
+        return { overlap: true, reason: "Break Overlap", details: "Cannot schedule tasks during breaks.", conflictingItem: { start_time: breakStart.toISOString(), end_time: breakEnd.toISOString(), title: 'Break' } };
       }
     }
 
@@ -576,20 +580,71 @@ const Planning = () => {
 
     if (minutesChange === 0) return;
 
-    const newStartTime = new Date(itemToMove.start_time);
+    let newStartTime = new Date(itemToMove.start_time);
     newStartTime.setMinutes(newStartTime.getMinutes() + minutesChange);
 
-    const newEndTime = new Date(itemToMove.end_time);
+    let newEndTime = new Date(itemToMove.end_time);
     newEndTime.setMinutes(newEndTime.getMinutes() + minutesChange);
 
-    const { overlap, reason, details } = isOverlapping(newStartTime, newEndTime, workerSchedule.schedule, itemId);
+    const itemDuration = new Date(itemToMove.end_time).getTime() - new Date(itemToMove.start_time).getTime();
+
+    const { overlap, reason, details, conflictingItem, outOfBounds } = isOverlapping(newStartTime, newEndTime, workerSchedule.schedule, itemId);
+    
     if (overlap) {
-      toast({
-        title: reason,
-        description: details,
-        variant: "destructive"
-      });
-      return;
+      if (outOfBounds) {
+        const dayStart = new Date(newStartTime);
+        dayStart.setHours(TIMELINE_START_HOUR, 0, 0, 0);
+        const dayEnd = new Date(newStartTime);
+        dayEnd.setHours(TIMELINE_END_HOUR, 0, 0, 0);
+
+        if (outOfBounds === 'start') {
+            newStartTime = dayStart;
+        } else { // 'end'
+            newStartTime = new Date(dayEnd.getTime() - itemDuration);
+        }
+        const roundedMinutes = Math.round(newStartTime.getMinutes() / 5) * 5;
+        newStartTime.setMinutes(roundedMinutes, 0, 0);
+        
+        newEndTime = new Date(newStartTime.getTime() + itemDuration);
+      } else if (conflictingItem) {
+        const conflictingItemStart = new Date(conflictingItem.start_time);
+        const conflictingItemEnd = new Date(conflictingItem.end_time);
+
+        let adjustedStartTime;
+        
+        // Snap based on which half of the conflicting item is overlapped
+        const conflictingItemCenter = conflictingItemStart.getTime() + (conflictingItemEnd.getTime() - conflictingItemStart.getTime()) / 2;
+        
+        if (newStartTime.getTime() < conflictingItemCenter) { // Snap before
+          adjustedStartTime = new Date(conflictingItemStart.getTime() - itemDuration);
+        } else { // Snap after
+          adjustedStartTime = new Date(conflictingItemEnd.getTime());
+        }
+        
+        const roundedMinutes = Math.round(adjustedStartTime.getMinutes() / 5) * 5;
+        adjustedStartTime.setMinutes(roundedMinutes, 0, 0);
+
+        const adjustedEndTime = new Date(adjustedStartTime.getTime() + itemDuration);
+        
+        const finalCheck = isOverlapping(adjustedStartTime, adjustedEndTime, workerSchedule.schedule, itemId);
+        if (finalCheck.overlap) {
+            toast({
+                title: "Cannot place task",
+                description: finalCheck.details ? `Blocked: ${finalCheck.details}` : "The adjusted position is also blocked.",
+                variant: "destructive"
+            });
+            return; // Abort move
+        }
+        newStartTime = adjustedStartTime;
+        newEndTime = adjustedEndTime;
+      } else {
+        toast({
+          title: reason,
+          description: details,
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     try {
@@ -619,7 +674,7 @@ const Planning = () => {
 
     if (minutesChange === 0) return;
 
-    const newEndTime = new Date(itemToResize.end_time);
+    let newEndTime = new Date(itemToResize.end_time);
     newEndTime.setMinutes(newEndTime.getMinutes() + minutesChange);
 
     const startTime = new Date(itemToResize.start_time);
