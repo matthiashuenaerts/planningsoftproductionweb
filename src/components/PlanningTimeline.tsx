@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -78,6 +77,7 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
   const [loading, setLoading] = useState(true);
   const [editingTask, setEditingTask] = useState<ScheduledTask | null>(null);
   const [showTaskManager, setShowTaskManager] = useState(false);
+  const [activeEmployeeId, setActiveEmployeeId] = useState<string | null>(null);
   const [generatingSchedule, setGeneratingSchedule] = useState(false);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
@@ -370,8 +370,15 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
     }
   };
 
-  const editTask = (task: ScheduledTask) => {
+  const handleEditTask = (task: ScheduledTask) => {
     setEditingTask(task);
+    setActiveEmployeeId(task.employee_id);
+    setShowTaskManager(true);
+  };
+
+  const handleAddTask = (employeeId: string) => {
+    setEditingTask(null);
+    setActiveEmployeeId(employeeId);
     setShowTaskManager(true);
   };
 
@@ -379,6 +386,7 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
     fetchScheduledTasks();
     setShowTaskManager(false);
     setEditingTask(null);
+    setActiveEmployeeId(null);
   };
   
   // Helper to format time
@@ -428,189 +436,213 @@ const PlanningTimeline: React.FC<PlanningTimelineProps> = ({
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
         </div>
       ) : (
-        <div className="space-y-6">
-          {employees.length > 0 ? (
-            employees.map((employee) => (
-              <Card key={employee.id} className="overflow-hidden">
-                <CardHeader className="bg-muted/50 pb-3">
-                  <CardTitle className="text-lg flex items-center justify-between">
-                    <div className="flex items-center">
-                      <User className="h-5 w-5 mr-2" />
-                      {employee.name}
-                      {employee.workstation && (
-                        <Badge variant="outline" className="ml-2">
-                          {employee.workstation}
-                        </Badge>
-                      )}
-                    </div>
-                    {isAdmin && (
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => fetchScheduledTasks()}
-                        >
-                          <RefreshCw className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => generateScheduleForEmployee(employee.id)}
-                          disabled={generatingSchedule}
-                        >
-                          <Zap className="h-4 w-4 mr-1" />
-                          {generatingSchedule ? 'Generating...' : 'Generate'}
-                        </Button>
-                      </div>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4">
-                  <div className="space-y-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse min-w-[1200px]">
+                <thead>
+                  <tr className="border-b">
+                    <th className="p-2 text-left font-semibold w-64">Employee</th>
                     {timeSegments.map((segment) => (
-                      <div key={segment.name} className="rounded-md border overflow-hidden">
-                        <div className={cn("px-4 py-2 font-medium border-b", segment.color)}>
-                          {segment.name} ({segment.startTime} - {segment.endTime})
-                        </div>
-                        
-                        <div className="p-2 bg-white">
-                          {getTasksForSegment(employee.id, segment.startTime, segment.endTime).length > 0 ? (
-                            <div className="space-y-2">
-                              {getTasksForSegment(employee.id, segment.startTime, segment.endTime).map((task) => (
-                                <div 
-                                  key={task.id} 
-                                  className={cn(
-                                    "rounded border p-3",
-                                    task.is_auto_generated ? "bg-gray-50 border-gray-200" : "bg-white border-blue-200",
-                                    task.is_completed && "opacity-60"
-                                  )}
+                      <th key={segment.name} className="p-2 text-left font-semibold">
+                        {segment.name} <span className="font-normal text-muted-foreground">({segment.startTime} - {segment.endTime})</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees.length > 0 ? (
+                    employees.map((employee) => (
+                      <tr key={employee.id} className="border-b align-top">
+                        <td className="p-2">
+                          <div className="flex flex-col sticky left-0">
+                            <div className="font-medium flex items-center">
+                              <User className="h-5 w-5 mr-2 flex-shrink-0" />
+                              <span className="truncate">{employee.name}</span>
+                            </div>
+                            {employee.workstation && (
+                              <Badge variant="outline" className="ml-7 mt-1 w-fit">
+                                {employee.workstation}
+                              </Badge>
+                            )}
+                            {isAdmin && (
+                              <div className="flex items-center space-x-2 mt-2 ml-7">
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => fetchScheduledTasks()}
+                                  title="Refresh schedule"
+                                  className="h-8 w-8"
                                 >
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                      <div className="font-medium">{task.title}</div>
-                                      
-                                      {task.project && (
-                                        <div className="text-sm text-blue-600 mb-1">
-                                          Project: {task.project.name}
+                                  <RefreshCw className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  onClick={() => generateScheduleForEmployee(employee.id)}
+                                  disabled={generatingSchedule}
+                                  title="Generate schedule"
+                                  className="h-8 w-8"
+                                >
+                                  <Zap className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        {timeSegments.map((segment) => (
+                          <td key={segment.name} className="p-2 align-top">
+                            <div className="space-y-2">
+                              {getTasksForSegment(employee.id, segment.startTime, segment.endTime).length > 0 ? (
+                                getTasksForSegment(employee.id, segment.startTime, segment.endTime).map((task) => (
+                                  <div 
+                                    key={task.id} 
+                                    className={cn(
+                                      "rounded border p-3",
+                                      task.is_auto_generated ? "bg-gray-50 border-gray-200" : "bg-white border-blue-200",
+                                      task.is_completed && "opacity-60"
+                                    )}
+                                  >
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex-1 pr-2">
+                                        <div className="font-medium">{task.title}</div>
+                                        
+                                        {task.project && (
+                                          <div className="text-sm text-blue-600 mb-1">
+                                            Project: {task.project.name}
+                                          </div>
+                                        )}
+                                        
+                                        {task.task?.workstation && (
+                                          <div className="text-sm text-purple-600 mb-1">
+                                            Workstation: {task.task.workstation}
+                                          </div>
+                                        )}
+                                        
+                                        <div className="flex items-center text-sm text-muted-foreground">
+                                          <Clock className="h-3 w-3 mr-1" />
+                                          {formatTime(task.start_time)} - {formatTime(task.end_time)}
+                                          {task.task?.duration && (
+                                            <span className="ml-2">
+                                              ({task.task.duration}m)
+                                            </span>
+                                          )}
                                         </div>
-                                      )}
-                                      
-                                      {task.task?.workstation && (
-                                        <div className="text-sm text-purple-600 mb-1">
-                                          Workstation: {task.task.workstation}
-                                        </div>
-                                      )}
-                                      
-                                      <div className="flex items-center text-sm text-muted-foreground">
-                                        <Clock className="h-3 w-3 mr-1" />
-                                        {formatTime(task.start_time)} - {formatTime(task.end_time)}
-                                        {task.task?.duration && (
-                                          <span className="ml-2">
-                                            ({task.task.duration}m)
-                                          </span>
+                                        
+                                        {task.description && (
+                                          <p className="text-sm mt-2 text-gray-600 line-clamp-2">{task.description}</p>
                                         )}
                                       </div>
                                       
-                                      {task.description && (
-                                        <p className="text-sm mt-2 text-gray-600">{task.description}</p>
-                                      )}
-                                    </div>
-                                    
-                                    <div className="flex items-center space-x-2">
-                                      {task.task?.priority && (
-                                        <Badge className={cn("text-xs", getPriorityColor(task.task.priority))}>
-                                          {task.task.priority}
-                                        </Badge>
-                                      )}
-                                      
-                                      {task.is_auto_generated && (
-                                        <Badge variant="outline" className="text-xs">
-                                          Auto
-                                        </Badge>
-                                      )}
-                                      
-                                      {isAdmin && (
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                                              <MoreVertical className="h-4 w-4" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end">
-                                            <DropdownMenuItem 
-                                              onClick={() => editTask(task)}
-                                            >
-                                              <Edit className="h-4 w-4 mr-2" />
-                                              Edit Task
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem 
-                                              onClick={() => markTaskCompleted(task.id)}
-                                              disabled={task.task?.status === 'COMPLETED' || task.is_completed}
-                                            >
-                                              <CheckSquare className="h-4 w-4 mr-2" />
-                                              Mark as Completed
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                              onClick={() => removeFromSchedule(task.id)}
-                                              className="text-red-600"
-                                            >
-                                              <Trash2 className="h-4 w-4 mr-2" />
-                                              Remove from Schedule
-                                            </DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                      )}
+                                      <div className="flex flex-col items-end space-y-1">
+                                        <div className="flex items-center space-x-2">
+                                          {task.task?.priority && (
+                                            <Badge className={cn("text-xs", getPriorityColor(task.task.priority))}>
+                                              {task.task.priority}
+                                            </Badge>
+                                          )}
+                                          
+                                          {task.is_auto_generated && (
+                                            <Badge variant="outline" className="text-xs">
+                                              Auto
+                                            </Badge>
+                                          )}
+                                          
+                                          {isAdmin && (
+                                            <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                  <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent align="end">
+                                                <DropdownMenuItem 
+                                                  onClick={() => handleEditTask(task)}
+                                                >
+                                                  <Edit className="h-4 w-4 mr-2" />
+                                                  Edit Task
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem 
+                                                  onClick={() => markTaskCompleted(task.id)}
+                                                  disabled={task.task?.status === 'COMPLETED' || task.is_completed}
+                                                >
+                                                  <CheckSquare className="h-4 w-4 mr-2" />
+                                                  Mark as Completed
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                  onClick={() => removeFromSchedule(task.id)}
+                                                  className="text-red-600"
+                                                >
+                                                  <Trash2 className="h-4 w-4 mr-2" />
+                                                  Remove from Schedule
+                                                </DropdownMenuItem>
+                                              </DropdownMenuContent>
+                                            </DropdownMenu>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
+                                ))
+                              ) : (
+                                <div className="py-6 text-center text-muted-foreground border-2 border-dashed border-gray-200 rounded h-full flex flex-col justify-center items-center min-h-[100px]">
+                                  {isAdmin && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleAddTask(employee.id)}
+                                      className="mt-2"
+                                    >
+                                      <Square className="h-4 w-4 mr-1" />
+                                      Add Task
+                                    </Button>
+                                  )}
+                                  {!isAdmin && (
+                                    <>
+                                      <Square className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                      <p className="text-sm">No tasks scheduled</p>
+                                    </>
+                                  )}
                                 </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="py-6 text-center text-muted-foreground border-2 border-dashed border-gray-200 rounded">
-                              <Square className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                              <p>No tasks scheduled for this time segment</p>
-                              {isAdmin && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setShowTaskManager(true)}
-                                  className="mt-2"
-                                >
-                                  <Square className="h-4 w-4 mr-1" />
-                                  Add Task
-                                </Button>
                               )}
                             </div>
-                          )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={timeSegments.length + 1}>
+                        <div className="text-center py-8 px-4 border rounded-lg m-2">
+                          <p className="text-muted-foreground">
+                            {isAdmin 
+                              ? "No employees found. Please add employees first."
+                              : "No schedule available for you on this date."}
+                          </p>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <div className="text-center py-8 px-4 border rounded-lg">
-              <p className="text-muted-foreground">
-                {isAdmin 
-                  ? "No employees found. Please add employees first."
-                  : "No schedule available for you on this date."}
-              </p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
+          </CardContent>
+        </Card>
       )}
 
-      <PlanningTaskManager
-        isOpen={showTaskManager}
-        onClose={() => {
-          setShowTaskManager(false);
-          setEditingTask(null);
-        }}
-        selectedDate={selectedDate}
-        selectedEmployee={editingTask?.employee_id || ''}
-        scheduleItem={editingTask}
-        onSave={handleTaskManagerSave}
-      />
+      {showTaskManager && (
+        <PlanningTaskManager
+          isOpen={showTaskManager}
+          onClose={() => {
+            setShowTaskManager(false);
+            setEditingTask(null);
+            setActiveEmployeeId(null);
+          }}
+          selectedDate={selectedDate}
+          selectedEmployee={activeEmployeeId || ''}
+          scheduleItem={editingTask}
+          onSave={handleTaskManagerSave}
+        />
+      )}
     </div>
   );
 };
