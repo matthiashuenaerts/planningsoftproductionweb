@@ -55,9 +55,10 @@ export interface Employee {
   id: string;
   name: string;
   email: string | null;
-  role: 'admin' | 'manager' | 'worker';
+  role: string;
   password?: string;
   created_at: string;
+  workstation?: string | null;
 }
 
 // Project service functions
@@ -118,7 +119,6 @@ export const projectService = {
   },
   
   async delete(id: string): Promise<void> {
-    // ... keep existing code (delete implementation)
     try {
       // Get all phases for this project
       const { data: phases, error: phasesError } = await supabase
@@ -648,6 +648,7 @@ export const employeeService = {
     email?: string | null; 
     password: string; 
     role: string; 
+    workstation?: string;
   }): Promise<Employee> {
     const { data, error } = await supabase
       .from('employees')
@@ -657,6 +658,27 @@ export const employeeService = {
     
     if (error) throw error;
     return data as Employee;
+  },
+
+  async update(id: string, employee: Partial<Omit<Employee, 'id' | 'created_at'>>): Promise<Employee> {
+    const { data, error } = await supabase
+      .from('employees')
+      .update(employee)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as Employee;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('employees')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
   }
 };
 

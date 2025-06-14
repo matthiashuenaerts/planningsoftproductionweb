@@ -129,7 +129,7 @@ const EmployeeSettings: React.FC = () => {
       }
 
       if (editingEmployee) {
-        await (employeeService as any).update(editingEmployee.id, dataToSend);
+        await employeeService.update(editingEmployee.id, dataToSend);
         toast({ title: "Success", description: "Employee updated successfully" });
       } else {
         if (!dataToSend.name || !dataToSend.password) {
@@ -161,7 +161,7 @@ const EmployeeSettings: React.FC = () => {
   const handleDeleteConfirm = async () => {
     if (!employeeToDelete) return;
     try {
-      await (employeeService as any).delete(employeeToDelete.id);
+      await employeeService.delete(employeeToDelete.id);
       toast({ title: "Success", description: "Employee deleted successfully" });
       loadEmployees();
     } catch (error: any) {

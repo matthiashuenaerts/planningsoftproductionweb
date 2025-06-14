@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -28,7 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { employeeService } from '@/services/dataService';
+import { employeeService, Employee } from '@/services/dataService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Edit, Trash2 } from 'lucide-react';
@@ -36,9 +35,9 @@ import { Edit, Trash2 } from 'lucide-react';
 const UserManagement = () => {
   const { currentEmployee } = useAuth();
   const [isAddOrEditOpen, setIsAddOrEditOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<Employee | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<any>(null);
+  const [userToDelete, setUserToDelete] = useState<Employee | null>(null);
 
   const [newUser, setNewUser] = useState({
     name: '',
@@ -54,7 +53,7 @@ const UserManagement = () => {
     queryFn: employeeService.getAll,
   });
 
-  const handleOpenDialog = (employee: any | null) => {
+  const handleOpenDialog = (employee: Employee | null) => {
     if (employee) {
       setEditingUser(employee);
       setNewUser({
@@ -86,8 +85,7 @@ const UserManagement = () => {
       }
 
       if (editingUser) {
-        // I assume your employeeService has an update method like this.
-        await (employeeService as any).update(editingUser.id, userData);
+        await employeeService.update(editingUser.id, userData);
         toast({
           title: "Success",
           description: "User has been updated successfully",
@@ -110,7 +108,7 @@ const UserManagement = () => {
     }
   };
 
-  const handleDeleteClick = (employee: any) => {
+  const handleDeleteClick = (employee: Employee) => {
     setUserToDelete(employee);
     setIsDeleteDialogOpen(true);
   };
@@ -118,8 +116,7 @@ const UserManagement = () => {
   const handleDeleteConfirm = async () => {
     if (!userToDelete) return;
     try {
-      // I assume your employeeService has a delete method like this.
-      await (employeeService as any).delete(userToDelete.id);
+      await employeeService.delete(userToDelete.id);
       toast({
         title: "Success",
         description: "User deleted successfully.",
