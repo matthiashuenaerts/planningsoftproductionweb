@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { RushOrder, RushOrderTask, RushOrderAssignment, RushOrderMessage } from "@/types/rushOrder";
+import { RushOrder, RushOrderTask, RushOrderAssignment, RushOrderMessage, EditRushOrderPayload } from "@/types/rushOrder";
 import { toast } from "@/hooks/use-toast";
 import { ensureStorageBucket } from "@/integrations/supabase/createBucket";
 
@@ -202,7 +202,7 @@ export const rushOrderService = {
   
   async updateRushOrder(
     id: string,
-    updateData: { title: string; description: string; deadline: Date; attachment?: File },
+    updateData: EditRushOrderPayload,
     originalImageUrl?: string | null
   ): Promise<RushOrder | null> {
     try {

@@ -51,6 +51,13 @@ export interface RushOrder {
   unread_messages_count?: number;
 }
 
+export interface EditRushOrderPayload {
+  title: string;
+  description: string;
+  deadline: Date;
+  attachment?: File;
+}
+
 export interface RushOrderFormData {
   title: string;
   description: string;

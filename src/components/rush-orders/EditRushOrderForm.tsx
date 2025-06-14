@@ -1,11 +1,10 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
-import { RushOrder } from '@/types/rushOrder';
+import { RushOrder, EditRushOrderPayload } from '@/types/rushOrder';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,21 +21,19 @@ interface EditRushOrderFormProps {
   onSuccess: () => void;
 }
 
-const formSchema = z.object({
+const formSchema: z.ZodType<EditRushOrderPayload> = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().min(1, 'Description is required'),
   deadline: z.date({ required_error: 'Deadline is required' }),
   attachment: z.instanceof(File).optional(),
 });
 
-type EditRushOrderFormData = z.infer<typeof formSchema>;
-
 const EditRushOrderForm: React.FC<EditRushOrderFormProps> = ({ rushOrder, onSuccess }) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
 
-  const form = useForm<EditRushOrderFormData>({
+  const form = useForm<EditRushOrderPayload>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: rushOrder.title,
@@ -49,7 +46,7 @@ const EditRushOrderForm: React.FC<EditRushOrderFormProps> = ({ rushOrder, onSucc
   const updateMutation = useMutation({
     mutationFn: (data: {
       id: string;
-      formData: EditRushOrderFormData;
+      formData: EditRushOrderPayload;
       originalImageUrl?: string | null;
     }) => rushOrderService.updateRushOrder(data.id, data.formData, data.originalImageUrl),
     onSuccess: () => {
@@ -60,7 +57,7 @@ const EditRushOrderForm: React.FC<EditRushOrderFormProps> = ({ rushOrder, onSucc
     },
   });
 
-  const onSubmit = (data: EditRushOrderFormData) => {
+  const onSubmit = (data: EditRushOrderPayload) => {
     updateMutation.mutate({
       id: rushOrder.id,
       formData: data,
