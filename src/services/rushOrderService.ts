@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { RushOrder, RushOrderTask, RushOrderAssignment, RushOrderMessage } from "@/types/rushOrder";
 import { toast } from "@/hooks/use-toast";
@@ -198,6 +197,119 @@ export const rushOrderService = {
         variant: "destructive"
       });
       return null;
+    }
+  },
+  
+  async updateRushOrder(
+    id: string,
+    updateData: { title: string; description: string; deadline: Date; attachment?: File },
+    originalImageUrl?: string | null
+  ): Promise<RushOrder | null> {
+    try {
+      const updatePayload: {
+        title: string;
+        description: string;
+        deadline: string;
+        image_url?: string;
+        updated_at: string;
+      } = {
+        title: updateData.title,
+        description: updateData.description,
+        deadline: updateData.deadline.toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updateData.attachment) {
+        if (originalImageUrl) {
+           try {
+            const url = new URL(originalImageUrl);
+            const path = url.pathname.split('/').slice(6).join('/');
+            if (path) {
+                await supabase.storage.from('attachments').remove([path]);
+            }
+          } catch(e) {
+            console.error("Could not parse old image_url to delete attachment", e)
+          }
+        }
+        
+        await ensureStorageBucket('attachments');
+        const fileExt = updateData.attachment.name.split('.').pop();
+        const fileName = `${id}-${Date.now()}.${fileExt}`;
+        const filePath = `rush-orders/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('attachments')
+          .upload(filePath, updateData.attachment);
+          
+        if (uploadError) throw uploadError;
+        
+        const { data: publicUrlData } = supabase.storage
+          .from('attachments')
+          .getPublicUrl(filePath);
+        
+        updatePayload.image_url = publicUrlData.publicUrl;
+      }
+
+      const { data, error } = await supabase
+        .from('rush_orders')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      return data as RushOrder;
+    } catch (error: any) {
+      console.error('Error updating rush order:', error);
+      toast({
+        title: "Error",
+        description: `Failed to update rush order: ${error.message}`,
+        variant: "destructive"
+      });
+      return null;
+    }
+  },
+  
+  async deleteRushOrder(id: string): Promise<boolean> {
+    try {
+      const { data: order, error: fetchError } = await supabase
+        .from('rush_orders')
+        .select('image_url')
+        .eq('id', id)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+      
+      if (order?.image_url) {
+        try {
+            const url = new URL(order.image_url);
+            const path = url.pathname.split('/').slice(6).join('/');
+            if (path) {
+              await supabase.storage.from('attachments').remove([path]);
+            }
+        } catch(e) {
+            console.error("Could not parse image_url to delete attachment", e)
+        }
+      }
+
+      const { error: deleteOrderError } = await supabase
+        .from('rush_orders')
+        .delete()
+        .eq('id', id);
+        
+      if (deleteOrderError) throw deleteOrderError;
+      
+      toast({ title: "Success", description: "Rush order deleted." });
+      return true;
+    } catch (error: any) {
+      console.error('Error deleting rush order:', error);
+      toast({
+        title: "Error",
+        description: `Failed to delete rush order: ${error.message}`,
+        variant: "destructive"
+      });
+      return false;
     }
   },
   

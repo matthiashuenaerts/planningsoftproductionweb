@@ -1,5 +1,6 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
 import { RushOrder } from '@/types/rushOrder';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -9,7 +10,26 @@ import { format, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, File as FileIcon } from 'lucide-react';
+import { MessageCircle, File as FileIcon, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import EditRushOrderForm from './EditRushOrderForm';
 
 interface RushOrderListProps {
   statusFilter?: "pending" | "in_progress" | "completed" | "all";
@@ -18,11 +38,38 @@ interface RushOrderListProps {
 const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { currentEmployee } = useAuth();
+  const queryClient = useQueryClient();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<RushOrder | null>(null);
+  
+  const isAdmin = currentEmployee?.role === 'admin';
   
   const { data: rushOrders, isLoading, error, refetch } = useQuery({
     queryKey: ['rushOrders', statusFilter],
-    queryFn: rushOrderService.getAllRushOrders,
+    queryFn: () => rushOrderService.getAllRushOrders(),
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: rushOrderService.deleteRushOrder,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rushOrders'] });
+      setIsDeleteDialogOpen(false);
+      setSelectedOrder(null);
+    },
+  });
+
+  const handleDelete = () => {
+    if (selectedOrder) {
+      deleteMutation.mutate(selectedOrder.id);
+    }
+  };
+  
+  const handleEditSuccess = () => {
+    setIsEditDialogOpen(false);
+    setSelectedOrder(null);
+  };
   
   const isImage = (url: string | undefined): boolean => {
     if (!url) return false;
@@ -42,7 +89,6 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
     }
   };
 
-  // Filter the rush orders based on the statusFilter prop
   const filteredOrders = rushOrders?.filter(order => 
     statusFilter === "all" ? true : order.status === statusFilter
   );
@@ -113,7 +159,29 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
                   </Badge>
                 )}
               </div>
-              {getStatusBadge(order.status)}
+              <div className="flex items-center gap-2">
+                {getStatusBadge(order.status)}
+                {isAdmin && (
+                   <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => { setSelectedOrder(order); setIsEditDialogOpen(true); }}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        <span>Edit</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50" onClick={() => { setSelectedOrder(order); setIsDeleteDialogOpen(true); }}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        <span>Delete</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
             </div>
             <CardDescription className="flex justify-between">
               <span>Created: {format(parseISO(order.created_at), 'MMM d, yyyy')}</span>
@@ -172,6 +240,43 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
           </CardFooter>
         </Card>
       ))}
+
+      {/* Edit Dialog */}
+      {selectedOrder && (
+        <Dialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open) setSelectedOrder(null); setIsEditDialogOpen(open); }}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Rush Order</DialogTitle>
+              <DialogDescription>
+                Update the details for this rush order.
+              </DialogDescription>
+            </DialogHeader>
+            <EditRushOrderForm onSuccess={handleEditSuccess} rushOrder={selectedOrder} />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the rush order "{selectedOrder?.title}" and its associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSelectedOrder(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
