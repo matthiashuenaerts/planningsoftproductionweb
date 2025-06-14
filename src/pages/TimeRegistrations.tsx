@@ -52,9 +52,9 @@ const TimeRegistrations = () => {
     return format(parseISO(dateString), 'MMM dd, yyyy HH:mm');
   };
 
-  const getUniqueEmployees = () => {
+  const getUniqueEmployees = (registrations: any[]) => {
     const employees = new Set();
-    allRegistrations.forEach((reg: any) => {
+    registrations.forEach((reg: any) => {
       if (reg.employees) {
         employees.add(JSON.stringify({
           id: reg.employee_id,
@@ -65,9 +65,9 @@ const TimeRegistrations = () => {
     return Array.from(employees).map((emp: any) => JSON.parse(emp));
   };
 
-  const getUniqueProjects = () => {
+  const getUniqueProjects = (registrations: any[]) => {
     const projects = new Set();
-    allRegistrations.forEach((reg: any) => {
+    registrations.forEach((reg: any) => {
       if (reg.tasks?.phases?.projects) {
         projects.add(JSON.stringify({
           id: reg.tasks.phases.projects.id,
@@ -111,6 +111,11 @@ const TimeRegistrations = () => {
 
   const filteredRegistrations = getFilteredRegistrations();
 
+  const totalFilteredMinutes = filteredRegistrations.reduce(
+    (total: number, reg: any) => total + (reg.duration_minutes || 0),
+    0
+  );
+  
   // Calculate statistics
   const todayRegistrations = filteredRegistrations.filter((reg: any) => {
     const regDate = new Date(reg.start_time).toDateString();
@@ -176,9 +181,9 @@ const TimeRegistrations = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex">
         <Navbar />
-        <div className="ml-64 container mx-auto px-4 py-8">
+        <div className="flex-1 ml-64 p-6">
           <div>Loading...</div>
         </div>
       </div>
@@ -187,35 +192,33 @@ const TimeRegistrations = () => {
 
   if (!canViewAllRegistrations) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex">
         <Navbar />
-        <div className="ml-64 container mx-auto px-4 py-8">
+        <div className="flex-1 ml-64 p-6">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">My Time Registrations</h1>
-            <p className="text-gray-600 mt-2">View your personal time tracking history</p>
+            <p className="text-gray-600 mt-2">View and filter your personal time tracking history</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
+                <CardTitle className="text-sm font-medium">Total Sessions (Filtered)</CardTitle>
                 <Clock className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{myRegistrations.length}</div>
+                <div className="text-2xl font-bold">{filteredRegistrations.length}</div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Time</CardTitle>
+                <CardTitle className="text-sm font-medium">Total Time (Filtered)</CardTitle>
                 <BarChart3 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {formatDuration(myRegistrations.reduce((total: number, reg: any) => 
-                    total + (reg.duration_minutes || 0), 0
-                  ))}
+                  {formatDuration(totalFilteredMinutes)}
                 </div>
               </CardContent>
             </Card>
@@ -227,11 +230,69 @@ const TimeRegistrations = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {myRegistrations.filter((reg: any) => reg.is_active).length}
+                  {activeRegistrations.length}
                 </div>
               </CardContent>
             </Card>
           </div>
+
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Filters
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="start-date">Start Date</Label>
+                  <Input
+                    id="start-date"
+                    type="date"
+                    value={dateFilter.startDate}
+                    onChange={(e) => setDateFilter(prev => ({ ...prev, startDate: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="end-date">End Date</Label>
+                  <Input
+                    id="end-date"
+                    type="date"
+                    value={dateFilter.endDate}
+                    onChange={(e) => setDateFilter(prev => ({ ...prev, endDate: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="project-filter">Project</Label>
+                  <Select value={projectFilter} onValueChange={setProjectFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Projects" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Projects</SelectItem>
+                      {getUniqueProjects(myRegistrations).map((project: any) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDateFilter({ startDate: '', endDate: '' });
+                    setProjectFilter('all');
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
@@ -242,6 +303,9 @@ const TimeRegistrations = () => {
                   Export CSV
                 </Button>
               </div>
+              <CardDescription>
+                Showing {filteredRegistrations.length} registration(s)
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -256,7 +320,7 @@ const TimeRegistrations = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {myRegistrations.map((registration: any) => (
+                  {filteredRegistrations.map((registration: any) => (
                     <TableRow key={registration.id}>
                       <TableCell className="font-medium">
                         {registration.tasks?.phases?.projects?.name || 'Unknown Project'}
@@ -284,9 +348,9 @@ const TimeRegistrations = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex">
       <Navbar />
-      <div className="ml-64 w-full p-6">
+      <div className="flex-1 ml-64 p-6">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Time Registration Dashboard</h1>
           <p className="text-gray-600 mt-2">Monitor time tracking across all employees</p>
@@ -326,7 +390,7 @@ const TimeRegistrations = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{getUniqueEmployees().length}</div>
+              <div className="text-2xl font-bold">{getUniqueEmployees(allRegistrations).length}</div>
               <p className="text-xs text-muted-foreground">
                 With registrations
               </p>
@@ -335,13 +399,13 @@ const TimeRegistrations = () => {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Time (Filtered)</CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{filteredRegistrations.length}</div>
+              <div className="text-2xl font-bold">{formatDuration(totalFilteredMinutes)}</div>
               <p className="text-xs text-muted-foreground">
-                Filtered results
+                in {filteredRegistrations.length} sessions
               </p>
             </CardContent>
           </Card>
@@ -365,7 +429,7 @@ const TimeRegistrations = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Employees</SelectItem>
-                    {getUniqueEmployees().map((employee: any) => (
+                    {getUniqueEmployees(allRegistrations).map((employee: any) => (
                       <SelectItem key={employee.id} value={employee.id}>
                         {employee.name}
                       </SelectItem>
@@ -402,7 +466,7 @@ const TimeRegistrations = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Projects</SelectItem>
-                    {getUniqueProjects().map((project: any) => (
+                    {getUniqueProjects(allRegistrations).map((project: any) => (
                       <SelectItem key={project.id} value={project.id}>
                         {project.name}
                       </SelectItem>
