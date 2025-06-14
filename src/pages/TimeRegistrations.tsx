@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
@@ -20,6 +19,8 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const TimeRegistrations = () => {
   const { currentEmployee } = useAuth();
@@ -186,10 +187,7 @@ const TimeRegistrations = () => {
     }
   };
 
-  const handleGenerateSummaryPDF = async () => {
-    const { default: jsPDF } = await import('jspdf');
-    await import('jspdf-autotable');
-
+  const handleGenerateSummaryPDF = () => {
     if (!summaryDates?.from || !summaryDates?.to) {
       toast({
         title: "Please select a date range",
