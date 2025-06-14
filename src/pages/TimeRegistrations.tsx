@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { useAuth } from '@/context/AuthContext';
-import { Clock, Users, Calendar as CalendarIcon, BarChart3, Download, Filter } from 'lucide-react';
+import { Clock, Users, Calendar, BarChart3, Download, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -14,14 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths } from 'date-fns';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { DateRange } from 'react-day-picker';
-import { cn } from '@/lib/utils';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import { format, parseISO } from 'date-fns';
 
 const TimeRegistrations = () => {
   const { currentEmployee } = useAuth();
@@ -32,8 +25,6 @@ const TimeRegistrations = () => {
     endDate: ''
   });
   const [projectFilter, setProjectFilter] = useState<string>('all');
-  const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
-  const [summaryDates, setSummaryDates] = useState<DateRange | undefined>();
 
   // Check if user is admin or manager
   const canViewAllRegistrations = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
@@ -111,7 +102,7 @@ const TimeRegistrations = () => {
     // Project filter
     if (projectFilter !== 'all') {
       filtered = filtered.filter((reg: any) => 
-        reg.tasks?.phases?.projects?.id.toString() === projectFilter
+        reg.tasks?.phases?.projects?.id === projectFilter
       );
     }
 
@@ -186,84 +177,6 @@ const TimeRegistrations = () => {
         variant: "destructive"
       });
     }
-  };
-
-  const handleGenerateSummaryPDF = () => {
-    if (!summaryDates?.from || !summaryDates?.to) {
-      toast({
-        title: "Please select a date range",
-        description: "A start and end date are required to generate the summary.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const filtered = allRegistrations.filter((reg: any) => {
-      const regDate = new Date(reg.start_time);
-      return reg.end_time && regDate >= summaryDates.from! && regDate <= summaryDates.to!;
-    });
-
-    if (filtered.length === 0) {
-      toast({
-        title: "No Data",
-        description: "No completed time registrations found for the selected period.",
-      });
-      return;
-    }
-
-    const employeeSummary = filtered.reduce((acc, reg) => {
-      const employeeId = reg.employee_id;
-      if (!acc[employeeId]) {
-        acc[employeeId] = {
-          name: reg.employees.name,
-          totalMinutes: 0,
-          earliestStart: new Date(reg.start_time),
-          latestEnd: new Date(reg.end_time),
-        };
-      }
-
-      acc[employeeId].totalMinutes += reg.duration_minutes || 0;
-
-      const startTime = new Date(reg.start_time);
-      if (startTime < acc[employeeId].earliestStart) {
-        acc[employeeId].earliestStart = startTime;
-      }
-
-      const endTime = new Date(reg.end_time);
-      if (endTime > acc[employeeId].latestEnd) {
-        acc[employeeId].latestEnd = endTime;
-      }
-
-      return acc;
-    }, {} as { [key: string]: { name: string; totalMinutes: number; earliestStart: Date; latestEnd: Date } });
-
-    const doc = new jsPDF();
-    doc.text("Employee Time Registration Summary", 14, 16);
-    doc.setFontSize(10);
-    doc.text(`Period: ${format(summaryDates.from, "d MMM yyyy")} - ${format(summaryDates.to, "d MMM yyyy")}`, 14, 22);
-
-    const tableColumns = ["Employee", "Total Hours", "Earliest Start", "Latest Stop"];
-    const tableRows = Object.values(employeeSummary).map((emp: { name: string; totalMinutes: number; earliestStart: Date; latestEnd: Date }) => [
-      emp.name,
-      formatDuration(emp.totalMinutes),
-      format(emp.earliestStart, 'HH:mm'),
-      format(emp.latestEnd, 'HH:mm'),
-    ]);
-
-    (doc as any).autoTable({
-      head: [tableColumns],
-      body: tableRows,
-      startY: 30,
-    });
-    
-    doc.save(`employee_summary_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-    
-    toast({
-      title: "PDF Generated",
-      description: "The employee summary has been downloaded.",
-    });
-
-    setIsSummaryDialogOpen(false);
   };
 
   if (isLoading) {
@@ -448,7 +361,7 @@ const TimeRegistrations = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Today's Hours</CardTitle>
-              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatDuration(totalMinutesToday)}</div>
@@ -554,7 +467,7 @@ const TimeRegistrations = () => {
                   <SelectContent>
                     <SelectItem value="all">All Projects</SelectItem>
                     {getUniqueProjects(allRegistrations).map((project: any) => (
-                      <SelectItem key={project.id} value={project.id.toString()}>
+                      <SelectItem key={project.id} value={project.id}>
                         {project.name}
                       </SelectItem>
                     ))}
@@ -578,80 +491,6 @@ const TimeRegistrations = () => {
                 <Download className="h-4 w-4 mr-2" />
                 Export Filtered Data
               </Button>
-               <Dialog open={isSummaryDialogOpen} onOpenChange={setIsSummaryDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline">
-                    <Users className="h-4 w-4 mr-2" />
-                    Employee Summary
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Employee Summary</DialogTitle>
-                    <DialogDescription>
-                      Select a date range to generate a PDF summary for all employees.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            id="date"
-                            variant={"outline"}
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !summaryDates && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {summaryDates?.from ? (
-                              summaryDates.to ? (
-                                <>
-                                  {format(summaryDates.from, "LLL dd, y")} -{" "}
-                                  {format(summaryDates.to, "LLL dd, y")}
-                                </>
-                              ) : (
-                                format(summaryDates.from, "LLL dd, y")
-                              )
-                            ) : (
-                              <span>Pick a date range</span>
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            initialFocus
-                            mode="range"
-                            defaultMonth={summaryDates?.from}
-                            selected={summaryDates}
-                            onSelect={setSummaryDates}
-                            numberOfMonths={2}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => setSummaryDates({ from: new Date(), to: new Date() })}>Today</Button>
-                        <Button size="sm" variant="secondary" onClick={() => setSummaryDates({ from: startOfWeek(new Date()), to: endOfWeek(new Date()) })}>This Week</Button>
-                        <Button size="sm" variant="secondary" onClick={() => {
-                            const lastWeekStart = startOfWeek(subWeeks(new Date(), 1));
-                            const lastWeekEnd = endOfWeek(subWeeks(new Date(), 1));
-                            setSummaryDates({ from: lastWeekStart, to: lastWeekEnd });
-                        }}>Last Week</Button>
-                        <Button size="sm" variant="secondary" onClick={() => setSummaryDates({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}>This Month</Button>
-                        <Button size="sm" variant="secondary" onClick={() => {
-                            const lastMonthStart = startOfMonth(subMonths(new Date(), 1));
-                            const lastMonthEnd = endOfMonth(subMonths(new Date(), 1));
-                            setSummaryDates({ from: lastMonthStart, to: lastMonthEnd });
-                        }}>Last Month</Button>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleGenerateSummaryPDF}>Generate PDF</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
             </div>
           </CardContent>
         </Card>
