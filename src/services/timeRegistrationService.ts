@@ -330,7 +330,7 @@ export const timeRegistrationService = {
     
     if (error) throw error;
     return data as TimeRegistration | null;
-  },
+  }
 
   async getAllRegistrations(): Promise<any[]> {
     const { data, error } = await supabase
@@ -338,8 +338,8 @@ export const timeRegistrationService = {
       .select(`
         *,
         employees (name),
-        tasks (title, phases (name, projects (name))),
-        workstation_tasks (task_name, workstations (name))
+        tasks (title, phases (name, projects (id, name))),
+        workstation_tasks (task_name, workstations (id, name))
       `)
       .order('start_time', { ascending: false });
     
@@ -352,8 +352,8 @@ export const timeRegistrationService = {
       .from('time_registrations')
       .select(`
         *,
-        tasks (title, phases (name, projects (name))),
-        workstation_tasks (task_name, workstations (name))
+        tasks (title, phases (name, projects (id, name))),
+        workstation_tasks (task_name, workstations (id, name))
       `)
       .eq('employee_id', employeeId)
       .order('start_time', { ascending: false });
