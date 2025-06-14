@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format, startOfDay } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
@@ -216,6 +215,8 @@ const Planning = () => {
           }
           return scheduleItem;
         }));
+
+        enhancedSchedule.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
         const totalDuration = workerTasks.reduce((sum, task) => sum + (task.duration || 60), 0);
 
@@ -716,108 +717,100 @@ const Planning = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {workingHours.map((period) => {
-                        const periodSchedules = selectedWorkerSchedule.schedule.filter(item => {
-                          const startTime = format(new Date(item.start_time), 'HH:mm');
-                          return startTime >= period.start && startTime < period.end;
-                        });
+                    <div className="relative pl-8">
+                      {selectedWorkerSchedule.schedule.length > 0 && (
+                        <div className="absolute left-4 top-0 h-full w-0.5 bg-gray-200" />
+                      )}
+                      
+                      {selectedWorkerSchedule.schedule.length > 0 ? (
+                        <div className="space-y-8">
+                          {selectedWorkerSchedule.schedule.map((item) => {
+                            const itemDuration = Math.round((new Date(item.end_time).getTime() - new Date(item.start_time).getTime()) / (1000 * 60));
+                            return (
+                              <div key={item.id} className="relative">
+                                <div className="absolute left-4 top-1 h-4 w-4 -translate-x-1/2 rounded-full border-4 border-white bg-blue-500" />
 
-                        return (
-                          <div key={period.name} className="border rounded-lg overflow-hidden">
-                            <div className="bg-blue-50 px-4 py-2 border-b">
-                              <h4 className="font-medium">{period.name}</h4>
-                              <p className="text-sm text-gray-600">{period.start} - {period.end} ({period.duration} min)</p>
-                            </div>
-                            
-                            <div className="p-4">
-                              {periodSchedules.length > 0 ? (
-                                <div className="space-y-2">
-                                  {periodSchedules.map((item) => {
-                                    const itemDuration = Math.round((new Date(item.end_time).getTime() - new Date(item.start_time).getTime()) / (1000 * 60));
-                                    return (
-                                      <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
-                                        <div className="flex-1">
-                                          <h5 className="font-medium">{item.title}</h5>
-                                          {item.task && item.task.phases && (
-                                            <p className="text-sm text-blue-600">
-                                              Project: {item.task.phases.projects?.name}
-                                            </p>
-                                          )}
-                                          {item.description && (
-                                            <p className="text-sm text-gray-600">{item.description}</p>
-                                          )}
-                                          <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
-                                            <span className="flex items-center">
-                                              <Clock className="h-3 w-3 mr-1" />
-                                              {formatTime(item.start_time)} - {formatTime(item.end_time)} ({itemDuration}m)
-                                            </span>
-                                            {item.task && (
-                                              <Badge className={getPriorityColor(item.task.priority)}>
-                                                {item.task.priority}
-                                              </Badge>
-                                            )}
-                                            {item.is_auto_generated && (
-                                              <Badge variant="outline">Auto</Badge>
-                                            )}
-                                          </div>
-                                        </div>
-                                        
-                                        {isAdmin && (
-                                          <div className="flex items-center space-x-2">
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={() => markTaskCompleted(item)}
-                                              className="text-green-600 hover:bg-green-50"
-                                            >
-                                              <CheckCircle className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={() => {
-                                                setEditingScheduleItem(item);
-                                                setShowTaskManager(true);
-                                              }}
-                                            >
-                                              <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={() => deleteScheduleItem(item.id)}
-                                              className="text-red-600 hover:bg-red-50"
-                                            >
-                                              <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                          </div>
+                                <div className="ml-4">
+                                  <div className="flex items-center justify-between rounded border bg-gray-50 p-3">
+                                    <div className="flex-1">
+                                      <h5 className="font-medium">{item.title}</h5>
+                                      {item.task?.phases?.projects?.name && (
+                                        <p className="text-sm text-blue-600">
+                                          Project: {item.task.phases.projects.name}
+                                        </p>
+                                      )}
+                                      {item.description && (
+                                        <p className="text-sm text-gray-600">{item.description}</p>
+                                      )}
+                                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                                        <span className="flex items-center">
+                                          <Clock className="mr-1 h-3 w-3" />
+                                          {formatTime(item.start_time)} - {formatTime(item.end_time)} ({itemDuration}m)
+                                        </span>
+                                        {item.task && (
+                                          <Badge className={getPriorityColor(item.task.priority)}>
+                                            {item.task.priority}
+                                          </Badge>
+                                        )}
+                                        {item.is_auto_generated && (
+                                          <Badge variant="outline">Auto</Badge>
                                         )}
                                       </div>
-                                    );
-                                  })}
+                                    </div>
+                                    
+                                    {isAdmin && (
+                                      <div className="flex items-center space-x-2">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => markTaskCompleted(item)}
+                                          className="text-green-600 hover:bg-green-50"
+                                        >
+                                          <CheckCircle className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => {
+                                            setEditingScheduleItem(item);
+                                            setShowTaskManager(true);
+                                          }}
+                                        >
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => deleteScheduleItem(item.id)}
+                                          className="text-red-600 hover:bg-red-50"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              ) : (
-                                <div className="text-center text-gray-500 py-8 border-2 border-dashed border-gray-200 rounded">
-                                  <Clock className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                                  <p>No tasks scheduled for this period</p>
-                                  {isAdmin && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => setShowTaskManager(true)}
-                                      className="mt-2"
-                                    >
-                                      <Plus className="h-4 w-4 mr-1" />
-                                      Add Task
-                                    </Button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="rounded border-2 border-dashed border-gray-200 py-8 text-center text-gray-500">
+                          <Clock className="mx-auto mb-2 h-8 w-8 text-gray-400" />
+                          <p>No tasks scheduled for this day</p>
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowTaskManager(true)}
+                              className="mt-2"
+                            >
+                              <Plus className="mr-1 h-4 w-4" />
+                              Add Task
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
