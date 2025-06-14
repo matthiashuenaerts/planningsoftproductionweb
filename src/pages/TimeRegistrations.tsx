@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
@@ -6,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { useAuth } from '@/context/AuthContext';
-import { Clock, Users, Calendar, BarChart3, Download, Filter } from 'lucide-react';
+import { Clock, Users, Calendar as CalendarIcon, BarChart3, Download, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -14,7 +13,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const TimeRegistrations = () => {
   const { currentEmployee } = useAuth();
@@ -25,6 +30,8 @@ const TimeRegistrations = () => {
     endDate: ''
   });
   const [projectFilter, setProjectFilter] = useState<string>('all');
+  const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
+  const [summaryDates, setSummaryDates] = useState<{ from: Date | undefined, to: Date | undefined }>({ from: undefined, to: undefined });
 
   // Check if user is admin or manager
   const canViewAllRegistrations = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
@@ -177,6 +184,93 @@ const TimeRegistrations = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const handleGenerateSummaryPDF = () => {
+    if (!summaryDates.from || !summaryDates.to) {
+        toast({
+            title: "Please select a date range",
+            description: "A start and end date are required to generate the summary.",
+            variant: "destructive",
+        });
+        return;
+    }
+
+    const summaryStartDate = new Date(summaryDates.from);
+    summaryStartDate.setHours(0, 0, 0, 0);
+
+    const summaryEndDate = new Date(summaryDates.to);
+    summaryEndDate.setHours(23, 59, 59, 999);
+
+    const filtered = allRegistrations.filter((reg: any) => {
+        const regStartDate = new Date(reg.start_time);
+        return reg.end_time && regStartDate >= summaryStartDate && regStartDate <= summaryEndDate;
+    });
+
+    if (filtered.length === 0) {
+        toast({
+            title: "No Data",
+            description: "No completed time registrations found for the selected period.",
+        });
+        return;
+    }
+
+    const employeeSummary = filtered.reduce((acc: any, reg: any) => {
+        const employeeId = reg.employee_id;
+        if (!acc[employeeId]) {
+            acc[employeeId] = {
+                name: reg.employees.name,
+                totalMinutes: 0,
+                earliestStart: new Date(reg.start_time),
+                latestEnd: new Date(reg.end_time!),
+            };
+        }
+        
+        acc[employeeId].totalMinutes += reg.duration_minutes || 0;
+        
+        const startTime = new Date(reg.start_time);
+        if (startTime < acc[employeeId].earliestStart) {
+            acc[employeeId].earliestStart = startTime;
+        }
+
+        if(reg.end_time) {
+          const endTime = new Date(reg.end_time);
+          if (endTime > acc[employeeId].latestEnd) {
+              acc[employeeId].latestEnd = endTime;
+          }
+        }
+
+        return acc;
+    }, {});
+
+
+    const doc = new jsPDF();
+    doc.text("Employee Time Registration Summary", 14, 16);
+    doc.setFontSize(10);
+    doc.text(`Period: ${format(summaryDates.from, 'd MMM yyyy')} - ${format(summaryDates.to, 'd MMM yyyy')}`, 14, 22);
+
+    const tableColumns = ["Employee", "Total Hours", "Earliest Start", "Latest Stop"];
+    const tableRows = Object.values(employeeSummary).map((emp: any) => [
+        emp.name,
+        formatDuration(emp.totalMinutes),
+        format(emp.earliestStart, 'HH:mm'),
+        format(emp.latestEnd, 'HH:mm'),
+    ]);
+
+    (doc as any).autoTable({
+        head: [tableColumns],
+        body: tableRows,
+        startY: 30,
+    });
+
+    doc.save(`employee_summary_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+
+    toast({
+        title: "PDF Generated",
+        description: "The employee summary has been downloaded.",
+    });
+
+    setIsSummaryDialogOpen(false);
   };
 
   if (isLoading) {
@@ -361,7 +455,7 @@ const TimeRegistrations = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Today's Hours</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatDuration(totalMinutesToday)}</div>
@@ -491,6 +585,9 @@ const TimeRegistrations = () => {
                 <Download className="h-4 w-4 mr-2" />
                 Export Filtered Data
               </Button>
+              <Button onClick={() => setIsSummaryDialogOpen(true)}>
+                Employee Summary
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -542,6 +639,79 @@ const TimeRegistrations = () => {
             </Table>
           </CardContent>
         </Card>
+
+        <Dialog open={isSummaryDialogOpen} onOpenChange={setIsSummaryDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Employee Summary</DialogTitle>
+              <DialogDescription>
+                Select a period to generate a PDF summary for all employees.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="date-from"
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !summaryDates.from && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {summaryDates.from ? format(summaryDates.from, "PPP") : <span>Start date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={summaryDates.from}
+                        onSelect={(date) => setSummaryDates(prev => ({...prev, from: date || undefined}))}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="date-to"
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !summaryDates.to && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {summaryDates.to ? format(summaryDates.to, "PPP") : <span>End date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={summaryDates.to}
+                        onSelect={(date) => setSummaryDates(prev => ({...prev, to: date || undefined}))}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="secondary" onClick={() => setSummaryDates({ from: new Date(), to: new Date() })}>Today</Button>
+                <Button size="sm" variant="secondary" onClick={() => setSummaryDates({ from: startOfWeek(new Date()), to: endOfWeek(new Date()) })}>This Week</Button>
+                <Button size="sm" variant="secondary" onClick={() => setSummaryDates({ from: startOfWeek(subWeeks(new Date(), 1)), to: endOfWeek(subWeeks(new Date(), 1)) })}>Last Week</Button>
+                <Button size="sm" variant="secondary" onClick={() => setSummaryDates({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}>This Month</Button>
+                <Button size="sm" variant="secondary" onClick={() => setSummaryDates({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) })}>Last Month</Button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsSummaryDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleGenerateSummaryPDF}>Generate PDF</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
