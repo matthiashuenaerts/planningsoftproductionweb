@@ -30,7 +30,7 @@ const PlanningControls: React.FC<PlanningControlsProps> = ({
         ) : (
           <>
             <Wand2 className="mr-2 h-4 w-4" />
-            Auto-Generate All
+            Generate Weekly Plan
           </>
         )}
       </Button>
