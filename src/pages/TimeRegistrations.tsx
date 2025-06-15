@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
@@ -39,6 +40,49 @@ const TimeRegistrations = () => {
     queryFn: () => currentEmployee ? timeRegistrationService.getRegistrationsByEmployee(currentEmployee.id) : [],
     enabled: !!currentEmployee
   });
+
+  const isFilterActive = React.useMemo(() => (
+    (canViewAllRegistrations && selectedEmployee !== 'all') ||
+    dateFilter.startDate !== '' ||
+    dateFilter.endDate !== '' ||
+    projectFilter !== 'all'
+  ), [canViewAllRegistrations, selectedEmployee, dateFilter, projectFilter]);
+
+  const filteredRegistrations = React.useMemo(() => {
+    let sourceData = canViewAllRegistrations ? allRegistrations : myRegistrations;
+    if (!isFilterActive) {
+      return sourceData.slice(0, 50);
+    }
+
+    let filtered = sourceData;
+
+    // Employee filter (only for admins/managers)
+    if (canViewAllRegistrations && selectedEmployee !== 'all') {
+      filtered = filtered.filter((reg: any) => reg.employee_id === selectedEmployee);
+    }
+
+    // Date filters
+    if (dateFilter.startDate) {
+      filtered = filtered.filter((reg: any) => 
+        new Date(reg.start_time) >= new Date(dateFilter.startDate)
+      );
+    }
+    if (dateFilter.endDate) {
+      filtered = filtered.filter((reg: any) => 
+        new Date(reg.start_time) <= new Date(dateFilter.endDate + 'T23:59:59')
+      );
+    }
+
+    // Project filter
+    if (projectFilter !== 'all') {
+      filtered = filtered.filter((reg: any) => 
+        reg.tasks?.phases?.projects?.id === projectFilter ||
+        reg.workstation_tasks?.workstations?.id === projectFilter
+      );
+    }
+
+    return filtered;
+  }, [allRegistrations, myRegistrations, canViewAllRegistrations, selectedEmployee, dateFilter, projectFilter, isFilterActive]);
 
   const formatDuration = (minutes: number | null) => {
     if (!minutes) return '0h 0m';
@@ -85,40 +129,6 @@ const TimeRegistrations = () => {
     });
     return Array.from(projects.values());
   };
-
-  // Apply filters
-  const getFilteredRegistrations = () => {
-    let filtered = canViewAllRegistrations ? allRegistrations : myRegistrations;
-
-    // Employee filter (only for admins/managers)
-    if (canViewAllRegistrations && selectedEmployee !== 'all') {
-      filtered = filtered.filter((reg: any) => reg.employee_id === selectedEmployee);
-    }
-
-    // Date filters
-    if (dateFilter.startDate) {
-      filtered = filtered.filter((reg: any) => 
-        new Date(reg.start_time) >= new Date(dateFilter.startDate)
-      );
-    }
-    if (dateFilter.endDate) {
-      filtered = filtered.filter((reg: any) => 
-        new Date(reg.start_time) <= new Date(dateFilter.endDate + 'T23:59:59')
-      );
-    }
-
-    // Project filter
-    if (projectFilter !== 'all') {
-      filtered = filtered.filter((reg: any) => 
-        reg.tasks?.phases?.projects?.id === projectFilter ||
-        reg.workstation_tasks?.workstations?.id === projectFilter
-      );
-    }
-
-    return filtered;
-  };
-
-  const filteredRegistrations = getFilteredRegistrations();
 
   const { totalFilteredMinutes, totalCost } = filteredRegistrations.reduce(
     (acc: { totalFilteredMinutes: number; totalCost: number; }, reg: any) => {
@@ -359,6 +369,11 @@ const TimeRegistrations = () => {
               </div>
               <CardDescription>
                 Showing {filteredRegistrations.length} registration(s)
+                {!isFilterActive && myRegistrations.length > 50 && (
+                  <span className="text-muted-foreground ml-2">
+                    (Showing the 50 most recent. Use filters to see more.)
+                  </span>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -578,6 +593,11 @@ const TimeRegistrations = () => {
             <CardTitle>Time Registration History</CardTitle>
             <CardDescription>
               Showing {filteredRegistrations.length} registration(s)
+              {!isFilterActive && allRegistrations.length > 50 && (
+                  <span className="text-muted-foreground ml-2">
+                    (Showing the 50 most recent. Use filters to see more.)
+                  </span>
+                )}
             </CardDescription>
           </CardHeader>
           <CardContent>
