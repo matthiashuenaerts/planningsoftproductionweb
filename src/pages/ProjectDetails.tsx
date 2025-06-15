@@ -577,6 +577,7 @@ const ProjectDetails = () => {
         onSuccess={handleNewOrderSuccess}
         showAddOrderButton={true}
         accessories={accessories}
+        installationDate={project?.installation_date}
       />
 
       {/* Parts List Dialog */}

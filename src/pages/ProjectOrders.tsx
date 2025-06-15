@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -27,6 +28,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { projectService } from '@/services/dataService';
+import { Project } from '@/services/dataService';
 
 interface Order {
   id: string;
@@ -68,6 +71,7 @@ const ProjectOrders = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [project, setProject] = useState<Project | null>(null);
   const [accessories, setAccessories] = useState<Accessory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
@@ -87,6 +91,9 @@ const ProjectOrders = () => {
       if (!projectId) {
         throw new Error('Project ID is required');
       }
+
+      const projectData = await projectService.getById(projectId);
+      setProject(projectData);
 
       // Fetch accessories for the project
       const accessoriesData = await accessoriesService.getByProject(projectId);
@@ -453,6 +460,7 @@ const ProjectOrders = () => {
         projectId={projectId!}
         onSuccess={handleOrderSuccess}
         accessories={accessories}
+        installationDate={project?.installation_date}
       />
 
       {selectedOrderId && (

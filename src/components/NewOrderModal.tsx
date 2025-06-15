@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
 import { Order, OrderItem, OrderStep } from '@/types/order';
 import { Accessory } from '@/services/accessoriesService';
+import { addBusinessDays, subBusinessDays, format, parseISO, isAfter } from 'date-fns';
 
 interface NewOrderModalProps {
   open: boolean;
@@ -26,6 +26,7 @@ interface NewOrderModalProps {
     supplier?: string;
   } | null;
   accessories?: Accessory[];
+  installationDate?: string;
 }
 const NewOrderModal = ({
   open,
@@ -34,7 +35,8 @@ const NewOrderModal = ({
   onSuccess,
   showAddOrderButton = false,
   prefilledData = null,
-  accessories = []
+  accessories = [],
+  installationDate,
 }: NewOrderModalProps) => {
   const {
     toast
@@ -50,6 +52,68 @@ const NewOrderModal = ({
   });
   const [orderItems, setOrderItems] = useState<Partial<OrderItem>[]>([]);
   const [orderSteps, setOrderSteps] = useState<Partial<OrderStep>[]>([]);
+  const [isScheduleInvalid, setIsScheduleInvalid] = useState(false);
+  const [scheduleWarning, setScheduleWarning] = useState<string | null>(null);
+
+  const stepDurations = useMemo(() => orderSteps.map(s => s.expected_duration_days || 0).join(','), [orderSteps]);
+  const stepCount = orderSteps.length;
+
+  useEffect(() => {
+    if (orderType !== 'semi-finished' || !formData.expected_delivery || orderSteps.length === 0) {
+      setScheduleWarning(null);
+      setIsScheduleInvalid(false);
+      return;
+    }
+
+    const newSteps = JSON.parse(JSON.stringify(orderSteps));
+    let currentDate = parseISO(formData.expected_delivery);
+    let modified = false;
+
+    for (let i = 0; i < newSteps.length; i++) {
+      const step = newSteps[i];
+      const nextStartDate = addBusinessDays(currentDate, 1);
+      const formattedStartDate = format(nextStartDate, 'yyyy-MM-dd');
+      
+      if (step.start_date !== formattedStartDate) {
+          step.start_date = formattedStartDate;
+          modified = true;
+      }
+
+      if (step.expected_duration_days && step.expected_duration_days > 0) {
+        currentDate = addBusinessDays(nextStartDate, step.expected_duration_days - 1);
+      } else {
+        currentDate = nextStartDate;
+      }
+    }
+
+    if (installationDate) {
+      const lastStep = newSteps[newSteps.length - 1];
+      if (lastStep.start_date && (lastStep.expected_duration_days || 0) > 0) {
+        const lastStepStartDate = parseISO(lastStep.start_date);
+        const finalDeliveryDate = addBusinessDays(lastStepStartDate, (lastStep.expected_duration_days || 1) - 1);
+        const deadline = subBusinessDays(parseISO(installationDate), 5);
+        
+        if (isAfter(finalDeliveryDate, deadline)) {
+          setIsScheduleInvalid(true);
+          setScheduleWarning(`Error: The process is scheduled to finish on ${format(finalDeliveryDate, 'MMM dd, yyyy')}, which is less than 5 working days before the installation date (${format(parseISO(installationDate), 'MMM dd, yyyy')}). Please adjust delivery dates or step durations.`);
+        } else {
+          setIsScheduleInvalid(false);
+          setScheduleWarning(null);
+        }
+      } else {
+        setIsScheduleInvalid(false);
+        setScheduleWarning(null);
+      }
+    } else {
+      setIsScheduleInvalid(false);
+      setScheduleWarning("Warning: Project installation date is not set. Cannot validate delivery timeline.");
+    }
+    
+    if (modified) {
+      setOrderSteps(newSteps);
+    }
+
+  }, [formData.expected_delivery, stepDurations, stepCount, orderType, installationDate]);
 
   useEffect(() => {
     if (prefilledData && open) {
@@ -260,6 +324,13 @@ const NewOrderModal = ({
         }))} placeholder="Additional notes about this order..." />
         </div>
 
+        {scheduleWarning && (
+            <div className={`p-3 border-l-4 ${isScheduleInvalid ? 'bg-red-100 border-red-500 text-red-700' : 'bg-yellow-100 border-yellow-500 text-yellow-700'}`}>
+                <p className="font-bold">{isScheduleInvalid ? 'Error' : 'Warning'}</p>
+                <p>{scheduleWarning}</p>
+            </div>
+        )}
+
         {orderType === 'semi-finished' && (
           <Card>
             <CardHeader>
@@ -293,7 +364,7 @@ const NewOrderModal = ({
                         <div className="grid grid-cols-2 gap-2">
                             <div>
                                 <Label>Start Date</Label>
-                                <Input type="date" value={step.start_date || ''} onChange={e => updateOrderStep(index, 'start_date', e.target.value)} />
+                                <Input type="date" value={step.start_date || ''} readOnly />
                             </div>
                             <div>
                                 <Label>Expected Duration (days)</Label>
@@ -328,7 +399,6 @@ const NewOrderModal = ({
               </p> : <Table>
                 <TableHeader>
                   <TableRow>
-                    {orderType === 'semi-finished' && <TableHead>Stock Item</TableHead>}
                     <TableHead>Article Code</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Quantity</TableHead>
@@ -337,42 +407,11 @@ const NewOrderModal = ({
                 </TableHeader>
                 <TableBody>
                   {orderItems.map((item, index) => <TableRow key={index}>
-                      {orderType === 'semi-finished' && (
-                        <TableCell>
-                          <Select
-                            value={item.accessory_id || ''}
-                            onValueChange={value => {
-                              if (value === 'none') {
-                                updateOrderItem(index, 'accessory_id', null);
-                                updateOrderItem(index, 'description', '');
-                                updateOrderItem(index, 'article_code', '');
-                              } else {
-                                const selectedAccessory = accessories.find(a => a.id === value);
-                                updateOrderItem(index, 'accessory_id', value);
-                                if (selectedAccessory) {
-                                    updateOrderItem(index, 'description', selectedAccessory.article_description || selectedAccessory.article_name);
-                                    updateOrderItem(index, 'article_code', selectedAccessory.article_code || '');
-                                }
-                              }
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select stock item" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">None (New Item)</SelectItem>
-                              {accessories.map(acc => (
-                                <SelectItem key={acc.id} value={acc.id}>{acc.article_name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                      )}
                       <TableCell>
-                        <Input value={item.article_code || ''} onChange={e => updateOrderItem(index, 'article_code', e.target.value)} placeholder="Article code" disabled={!!item.accessory_id} />
+                        <Input value={item.article_code || ''} onChange={e => updateOrderItem(index, 'article_code', e.target.value)} placeholder="Article code" />
                       </TableCell>
                       <TableCell>
-                        <Input value={item.description || ''} onChange={e => updateOrderItem(index, 'description', e.target.value)} placeholder="Item description" required disabled={!!item.accessory_id} />
+                        <Input value={item.description || ''} onChange={e => updateOrderItem(index, 'description', e.target.value)} placeholder="Item description" required />
                       </TableCell>
                       <TableCell>
                         <Input type="number" min="1" value={item.quantity} onChange={e => updateOrderItem(index, 'quantity', parseInt(e.target.value) || 1)} required />
@@ -389,7 +428,7 @@ const NewOrderModal = ({
         </Card>
 
         <div className="flex gap-2">
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" disabled={loading || isScheduleInvalid}>
             {loading ? 'Creating...' : 'Create Order'}
           </Button>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
