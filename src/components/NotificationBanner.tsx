@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
@@ -7,15 +6,12 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { X, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-
 const NotificationBanner = () => {
   const {
     currentEmployee
   } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
   const [latestUnread, setLatestUnread] = useState<Notification | null>(null);
   const {
     data: notifications,
@@ -60,11 +56,8 @@ const NotificationBanner = () => {
   };
   const handleClick = () => {
     if (latestUnread) {
-      const lang = i18n.language;
-      if (latestUnread.link) {
-        navigate(`/${lang}${latestUnread.link}`);
-      } else if (latestUnread.rush_order_id) {
-        navigate(`/${lang}/rush-orders/${latestUnread.rush_order_id}`);
+      if (latestUnread.rush_order_id) {
+        navigate(`/rush-orders/${latestUnread.rush_order_id}`);
       }
       handleClose();
     }
@@ -74,7 +67,7 @@ const NotificationBanner = () => {
   }
   return <Alert className="fixed top-4 right-4 w-auto max-w-sm z-50 bg-primary text-primary-foreground shadow-xl cursor-pointer animate-in fade-in-0 slide-in-from-top-5" onClick={handleClick}>
       <Bell className="h-4 w-4 text-primary-foreground" />
-      <AlertTitle>{t('notifications.newNotification')}</AlertTitle>
+      <AlertTitle>New Notification!</AlertTitle>
       <AlertDescription>
           {latestUnread.message}
       </AlertDescription>

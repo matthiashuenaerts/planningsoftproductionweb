@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,12 +15,10 @@ import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { useTranslation } from 'react-i18next';
 
 const NotificationDropdown: React.FC = () => {
   const { currentEmployee } = useAuth();
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -70,7 +67,7 @@ const NotificationDropdown: React.FC = () => {
       
       // Navigate to rush order if applicable
       if (notification.rush_order_id) {
-        navigate(`/${i18n.language}/rush-orders/${notification.rush_order_id}`);
+        navigate(`/rush-orders/${notification.rush_order_id}`);
       }
     } catch (error) {
       console.error('Error handling notification click:', error);
@@ -118,7 +115,7 @@ const NotificationDropdown: React.FC = () => {
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-80" align="end">
         <div className="flex items-center justify-between py-2 px-4">
-          <h2 className="text-sm font-medium">{t('notifications.title')}</h2>
+          <h2 className="text-sm font-medium">Notifications</h2>
           {unreadCount > 0 && (
             <Button 
               variant="ghost" 
@@ -126,7 +123,7 @@ const NotificationDropdown: React.FC = () => {
               className="h-auto py-1 px-2 text-xs"
               onClick={markAllAsRead}
             >
-              {t('notifications.markAllAsRead')}
+              Mark all as read
             </Button>
           )}
         </div>
@@ -136,11 +133,11 @@ const NotificationDropdown: React.FC = () => {
         <ScrollArea className="h-[400px]">
           {loading ? (
             <div className="py-4 px-4 text-center text-sm text-gray-500">
-              {t('notifications.loading')}
+              Loading notifications...
             </div>
           ) : notifications.length === 0 ? (
             <div className="py-4 px-4 text-center text-sm text-gray-500">
-              {t('notifications.noNotifications')}
+              No notifications
             </div>
           ) : (
             notifications.map((notification, i) => (
@@ -156,7 +153,7 @@ const NotificationDropdown: React.FC = () => {
                       </span>
                       {!notification.read && (
                         <Badge variant="outline" className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0 h-5">
-                          {t('notifications.new')}
+                          New
                         </Badge>
                       )}
                     </div>

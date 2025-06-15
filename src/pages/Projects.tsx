@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -13,11 +12,9 @@ import { projectService, Project } from '@/services/dataService';
 import { useAuth } from '@/context/AuthContext';
 import NewProjectModal from '@/components/NewProjectModal';
 import { exportProjectData } from '@/services/projectExportService';
-import { useTranslation } from 'react-i18next';
 
 const Projects = () => {
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
   const {
     toast
   } = useToast();
@@ -57,8 +54,8 @@ const Projects = () => {
       setFilteredProjects(data);
     } catch (error: any) {
       toast({
-        title: t('projects.toasts.error'),
-        description: t('projects.toasts.loadFailed', { error: error.message }),
+        title: "Error",
+        description: `Failed to load projects: ${error.message}`,
         variant: "destructive"
       });
     } finally {
@@ -72,13 +69,13 @@ const Projects = () => {
     try {
       await exportProjectData(project);
       toast({
-        title: t('projects.toasts.success'),
-        description: t('projects.toasts.exportSuccess', { name: project.name })
+        title: "Success",
+        description: `Project "${project.name}" has been exported successfully`
       });
     } catch (error: any) {
       toast({
-        title: t('projects.toasts.error'),
-        description: t('projects.toasts.exportFailed', { error: error.message }),
+        title: "Error",
+        description: `Failed to export project: ${error.message}`,
         variant: "destructive"
       });
     } finally {
@@ -90,8 +87,8 @@ const Projects = () => {
     try {
       await projectService.delete(projectToDelete);
       toast({
-        title: t('projects.toasts.success'),
-        description: t('projects.toasts.deleteSuccess')
+        title: "Success",
+        description: "Project deleted successfully"
       });
 
       // Remove the deleted project from state
@@ -99,8 +96,8 @@ const Projects = () => {
       setFilteredProjects(prev => prev.filter(p => p.id !== projectToDelete));
     } catch (error: any) {
       toast({
-        title: t('projects.toasts.error'),
-        description: t('projects.toasts.deleteFailed', { error: error.message }),
+        title: "Error",
+        description: `Failed to delete project: ${error.message}`,
         variant: "destructive"
       });
     } finally {
@@ -108,7 +105,7 @@ const Projects = () => {
     }
   };
   const handleProjectClick = (projectId: string) => {
-    navigate(`/${i18n.language}/projects/${projectId}`);
+    navigate(`/projects/${projectId}`);
   };
   return <div className="flex min-h-screen">
       <div className="w-64 bg-sidebar fixed top-0 bottom-0">
@@ -119,14 +116,14 @@ const Projects = () => {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{t('projects.title')}</h1>
-              <p className="text-muted-foreground mt-1">{t('projects.description')}</p>
+              <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
+              <p className="text-muted-foreground mt-1">Manage your projects from start to finish.</p>
             </div>
             
             {isAdmin && (
               <Button size="sm" onClick={() => setIsNewProjectModalOpen(true)} className="mx-0">
                 <Plus className="mr-2 h-4 w-4" />
-                {t('projects.newProject')}
+                New Project
               </Button>
             )}
           </div>
@@ -135,7 +132,7 @@ const Projects = () => {
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder={t('projects.searchPlaceholder')}
+                placeholder="Search projects by name or client..." 
                 className="pl-8" 
                 value={searchQuery} 
                 onChange={e => setSearchQuery(e.target.value)} 
@@ -172,21 +169,21 @@ const Projects = () => {
                                   disabled={exportingProject === project.id}
                                 >
                                   <Download className="mr-2 h-4 w-4" />
-                                  {exportingProject === project.id ? t('projects.exporting') : t('projects.exportProject')}
+                                  {exportingProject === project.id ? 'Exporting...' : 'Export Project'}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={e => {
                                   e.stopPropagation();
-                                  navigate(`/${i18n.language}/projects/${project.id}/edit`);
+                                  navigate(`/projects/${project.id}/edit`);
                                 }}>
                                   <Settings className="mr-2 h-4 w-4" />
-                                  {t('projects.editProject')}
+                                  Edit Project
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={e => {
                                   e.stopPropagation();
-                                  navigate(`/${i18n.language}/projects/${project.id}/orders`);
+                                  navigate(`/projects/${project.id}/orders`);
                                 }}>
                                   <Package className="mr-2 h-4 w-4" />
-                                  {t('projects.orders')}
+                                  Orders
                                 </DropdownMenuItem>
                                 <DropdownMenuItem 
                                   className="text-red-600 focus:text-red-600" 
@@ -196,7 +193,7 @@ const Projects = () => {
                                   }}
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />
-                                  {t('projects.deleteProject')}
+                                  Delete Project
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -212,20 +209,20 @@ const Projects = () => {
                         <div className="flex items-center">
                           <Clock className="mr-1 h-4 w-4" />
                           <span>
-                            {t('projects.startDate')}: {new Date(project.start_date).toLocaleDateString()}
+                            Start: {new Date(project.start_date).toLocaleDateString()}
                           </span>
                         </div>
                         <div className="flex items-center">
                           <CalendarDays className="mr-1 h-4 w-4" />
                           <span>
-                            {t('projects.installationDate')}: {new Date(project.installation_date).toLocaleDateString()}
+                            Installation: {new Date(project.installation_date).toLocaleDateString()}
                           </span>
                         </div>
                       </div>
                       
                       <div className="mt-4">
                         <div className="flex justify-between text-sm mb-1">
-                          <span>{t('projects.progress')}</span>
+                          <span>Progress</span>
                           <span>{project.progress}%</span>
                         </div>
                         <div className="w-full bg-muted rounded-full h-2.5">
@@ -238,13 +235,13 @@ const Projects = () => {
                   </div>
                 </Card>)}
             </div> : <div className="text-center p-12 border border-dashed rounded-lg">
-              <h3 className="text-lg font-medium mb-2">{t('projects.noProjectsFound')}</h3>
+              <h3 className="text-lg font-medium mb-2">No projects found</h3>
               <p className="text-muted-foreground">
-                {searchQuery ? t('projects.noProjectsSearch') : t('projects.noProjectsStart')}
+                {searchQuery ? 'Try a different search term.' : 'Get started by creating a new project.'}
               </p>
               {isAdmin && !searchQuery && <Button variant="outline" className="mt-4" onClick={() => setIsNewProjectModalOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
-                  {t('projects.createProject')}
+                  Create Project
                 </Button>}
             </div>}
         </div>
@@ -256,15 +253,16 @@ const Projects = () => {
       <AlertDialog open={!!projectToDelete} onOpenChange={open => !open && setProjectToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('projects.deleteDialogTitle')}</AlertDialogTitle>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription className="text-red-600">
-              {t('projects.deleteDialogDescription')}
+              This action will delete the project and all associated data including tasks, phases, orders, and attachments.
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('projects.cancel')}</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteProject} className="bg-red-600 hover:bg-red-700">
-              {t('projects.confirmDelete')}
+              Delete Project
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
