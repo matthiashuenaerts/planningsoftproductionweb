@@ -246,6 +246,32 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
                                 {task.status}
                               </Badge>
                             )}
+                            {(task.canStart && onStartTask || task.canComplete && onCompleteTask) && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                {task.canStart && onStartTask && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => onStartTask && onStartTask(task.id)}
+                                    className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-100"
+                                    title="Start Task"
+                                  >
+                                    <Play className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {task.canComplete && onCompleteTask && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => onCompleteTask && onCompleteTask(task.id)}
+                                    className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+                                    title="Complete Task"
+                                  >
+                                    <CheckCircle className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            )}
                           </>
                         ) : (
                           // Full view
