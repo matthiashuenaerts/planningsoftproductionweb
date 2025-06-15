@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -17,11 +16,13 @@ import NewRushOrderForm from '@/components/rush-orders/NewRushOrderForm';
 import RushOrderList from '@/components/rush-orders/RushOrderList';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
+import { useTranslation } from 'react-i18next';
 
 const RushOrders = () => {
   const { currentEmployee } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const { t } = useTranslation();
   
   // Keep this existing check - only admin, manager, installation_team can create rush orders
   const canCreateRushOrder = currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role);
@@ -52,21 +53,21 @@ const RushOrders = () => {
       <div className="ml-64 w-full p-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold">Rush Orders</h1>
+            <h1 className="text-3xl font-bold">{t('rushOrdersPage.title')}</h1>
             
             {/* Only show add button to users with permission */}
             {canCreateRushOrder && (
               <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="bg-red-600 hover:bg-red-700">
-                    <Plus className="mr-1 h-4 w-4" /> New Rush Order
+                    <Plus className="mr-1 h-4 w-4" /> {t('rushOrdersPage.newRushOrder')}
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
                   <DialogHeader>
-                    <DialogTitle>Create New Rush Order</DialogTitle>
+                    <DialogTitle>{t('rushOrdersPage.createDialogTitle')}</DialogTitle>
                     <DialogDescription>
-                      Rush orders receive the highest priority and will be completed as quickly as possible.
+                      {t('rushOrdersPage.createDialogDescription')}
                     </DialogDescription>
                   </DialogHeader>
                   <NewRushOrderForm onSuccess={handleCreateSuccess} />
@@ -78,13 +79,13 @@ const RushOrders = () => {
           <Tabs defaultValue="pending" className="mb-6">
             <TabsList>
               <TabsTrigger value="pending">
-                Pending ({pendingCount})
+                {t('rushOrdersPage.tabs.pending')} ({pendingCount})
               </TabsTrigger>
               <TabsTrigger value="in_progress">
-                In Progress ({inProgressCount})
+                {t('rushOrdersPage.tabs.inProgress')} ({inProgressCount})
               </TabsTrigger>
               <TabsTrigger value="completed">
-                Completed ({completedCount})
+                {t('rushOrdersPage.tabs.completed')} ({completedCount})
               </TabsTrigger>
             </TabsList>
             <TabsContent value="pending" className="mt-6">
