@@ -246,15 +246,16 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
                                 {task.status}
                               </Badge>
                             )}
-                            {(task.canStart && onStartTask || task.canComplete && onCompleteTask) && (
+                            {(onStartTask || onCompleteTask) && (
                               <div className="flex items-center gap-1 shrink-0">
-                                {task.canStart && onStartTask && (
+                                {onStartTask && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => onStartTask && onStartTask(task.id)}
+                                    onClick={() => onStartTask(task.id)}
                                     className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-100"
                                     title="Start Task"
+                                    disabled={!task.canStart}
                                   >
                                     <Play className="h-4 w-4" />
                                   </Button>
@@ -263,7 +264,7 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => onCompleteTask && onCompleteTask(task.id)}
+                                    onClick={() => onCompleteTask(task.id)}
                                     className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-100"
                                     title="Complete Task"
                                   >
@@ -377,13 +378,14 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
                               </div>
                               
                               {/* Task Control Buttons */}
-                              {(task.canStart && onStartTask || task.canComplete && onCompleteTask) && (
+                              {(onStartTask || onCompleteTask) && (
                                 <div className="flex flex-col gap-1">
-                                  {task.canStart && onStartTask && (
+                                  {onStartTask && (
                                     <Button
                                       size="sm"
                                       onClick={() => onStartTask(task.id)}
                                       className="w-full text-xs px-2 py-1 h-6"
+                                      disabled={!task.canStart}
                                     >
                                       <Play className="h-3 w-3 mr-1" />
                                       Start

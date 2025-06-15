@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -186,16 +185,15 @@ const EnhancedTaskCard: React.FC<EnhancedTaskCardProps> = ({
 
           {/* Task Control Buttons */}
           <div className="flex gap-1">
-            {canStart && (
-              <Button
-                size="sm"
-                onClick={() => onStatusChange(task.id, 'IN_PROGRESS')}
-                className="flex-1 h-8 text-xs"
-              >
-                <Play className="h-3 w-3 mr-1" />
-                Start
-              </Button>
-            )}
+            <Button
+              size="sm"
+              onClick={() => onStatusChange(task.id, 'IN_PROGRESS')}
+              className="flex-1 h-8 text-xs"
+              disabled={!canStart}
+            >
+              <Play className="h-3 w-3 mr-1" />
+              Start
+            </Button>
             
             {isActive && (
               <Button
