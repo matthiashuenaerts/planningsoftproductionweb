@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock } from 'lucide-react';
@@ -64,61 +63,61 @@ const NavbarContent = ({
               </NavLink>
             </li>
             <li>
-              <NavLink to="projects" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+              <NavLink to={`/${lang}/projects`} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <LayoutDashboard className="w-5 h-5 text-white group-hover:text-white" />
                 <span className="ml-3">{t('navbar.projects')}</span>
               </NavLink>
             </li>
             <li>
-              <NavLink to="workstations" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+              <NavLink to={`/${lang}/workstations`} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <Truck className="w-5 h-5 text-white group-hover:text-white" />
                 <span className="ml-3">{t('navbar.workstations')}</span>
               </NavLink>
             </li>
             <li>
-              <NavLink to="broken-parts" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+              <NavLink to={`/${lang}/broken-parts`} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <AlertTriangle className="w-5 h-5 text-white group-hover:text-white" />
                 <span className="ml-3">{t('navbar.brokenParts')}</span>
               </NavLink>
             </li>
             <li>
-              <NavLink to="personal-tasks" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+              <NavLink to={`/${lang}/personal-tasks`} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <ListChecks className="w-5 h-5 text-white group-hover:text-white" />
                 <span className="ml-3">{t('navbar.personalTasks')}</span>
               </NavLink>
             </li>
             <li>
-              <NavLink to="daily-tasks" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+              <NavLink to={`/${lang}/daily-tasks`} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <ListChecks className="w-5 h-5 text-white group-hover:text-white" />
                 <span className="ml-3">{t('navbar.installationPlanning')}</span>
               </NavLink>
             </li>
             {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
-                <NavLink to="planning" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <NavLink to={`/${lang}/planning`} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Users className="w-5 h-5 text-white group-hover:text-white" />
                   <span className="ml-3">{t('navbar.planning')}</span>
                 </NavLink>
               </li>}
             {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
-                <NavLink to="orders" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <NavLink to={`/${lang}/orders`} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <PackagePlus className="w-5 h-5 text-white group-hover:text-white" />
                   <span className="ml-3">{t('navbar.orders')}</span>
                 </NavLink>
               </li>}
             {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
-                <NavLink to="logistics" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <NavLink to={`/${lang}/logistics`} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Truck className="w-5 h-5 text-white group-hover:text-white" />
                   <span className="ml-3">{t('navbar.logistics')}</span>
                 </NavLink>
               </li>}
             {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
-                <NavLink to="logistics-out" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <NavLink to={`/${lang}/logistics-out`} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Truck className="w-5 h-5 text-white group-hover:text-white" />
                   <span className="ml-3">{t('navbar.logisticsOut')}</span>
                 </NavLink>
               </li>}
             {canSeeRushOrders && <li>
-                <NavLink to="rush-orders" className="flex items-center justify-between p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <NavLink to={`/${lang}/rush-orders`} className="flex items-center justify-between p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <div className="flex items-center">
                     <PackagePlus className="w-5 h-5 text-white group-hover:text-white" />
                     <span className="ml-3">{t('navbar.rushOrders')}</span>
@@ -134,14 +133,14 @@ const NavbarContent = ({
                 </NavLink>
               </li>}
             {canSeeTimeRegistrations && <li>
-                <NavLink to="time-registrations" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <NavLink to={`/${lang}/time-registrations`} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Clock className="w-5 h-5 text-white group-hover:text-white" />
                   <span className="ml-3">{t('navbar.timeRegistrations')}</span>
                 </NavLink>
               </li>}
             {currentEmployee?.role === 'admin' && (
               <li>
-                <NavLink to="settings" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <NavLink to={`/${lang}/settings`} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Settings className="w-5 h-5 text-white group-hover:text-white" />
                   <span className="ml-3">{t('navbar.settings')}</span>
                 </NavLink>

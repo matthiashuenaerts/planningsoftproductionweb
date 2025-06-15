@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 const BrokenParts: React.FC = () => {
   const { currentEmployee } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   
   return (
     <div className="flex h-screen bg-gray-50">
@@ -23,13 +23,13 @@ const BrokenParts: React.FC = () => {
             <h1 className="text-2xl font-bold">{t('brokenParts.title')}</h1>
             <div className="flex space-x-2">
               <Button variant="outline" asChild>
-                <Link to={`/${t('navbar.dashboard').toLowerCase()}/broken-parts/summary`}>
+                <Link to={`/${i18n.language}/broken-parts/summary`}>
                   <BarChart className="h-4 w-4 mr-2" />
                   {t('brokenParts.viewSummary')}
                 </Link>
               </Button>
               <Button asChild>
-                <Link to={`/${t('navbar.dashboard').toLowerCase()}/broken-parts/new`}>
+                <Link to={`/${i18n.language}/broken-parts/new`}>
                   <PlusCircle className="h-4 w-4 mr-2" />
                   {t('brokenParts.reportNew')}
                 </Link>
