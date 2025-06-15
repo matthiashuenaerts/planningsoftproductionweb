@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -54,6 +55,7 @@ interface Schedule {
 const PersonalTasks = () => {
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -144,6 +146,9 @@ const PersonalTasks = () => {
         await timeRegistrationService.startTask(currentEmployee.id, taskId);
         await fetchActiveTimeRegistrations();
         
+        await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+        await queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
+        
         toast({
           title: "Task Started",
           description: "Task has been started and time registration created.",
@@ -152,6 +157,9 @@ const PersonalTasks = () => {
         await timeRegistrationService.completeTask(taskId);
         await fetchActiveTimeRegistrations();
         
+        await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+        await queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
+        
         toast({
           title: "Task Completed",
           description: "Task has been completed and time registration ended.",
@@ -159,6 +167,10 @@ const PersonalTasks = () => {
       } else if (newStatus === 'TODO' && isTaskActive(taskId)) {
         await timeRegistrationService.stopActiveRegistrations(currentEmployee.id);
         await fetchActiveTimeRegistrations();
+        
+        await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+        await queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
+
         toast({
           title: "Task Paused",
           description: "Time registration has been stopped.",
