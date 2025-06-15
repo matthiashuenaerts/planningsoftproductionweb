@@ -79,6 +79,13 @@ const RushOrderChat: React.FC<RushOrderChatProps> = ({ rushOrderId }) => {
         queryClient.invalidateQueries({ queryKey: ['rushOrderMessages', rushOrderId] });
         // Also update the rush orders list to update unread count
         queryClient.invalidateQueries({ queryKey: ['rushOrders'] });
+
+        // Notify other assigned users. Fire-and-forget.
+        rushOrderService.notifyAssignedUsersOfNewMessage(
+          rushOrderId,
+          currentEmployee.id,
+          currentEmployee.name
+        );
       }
     } catch (error: any) {
       toast({

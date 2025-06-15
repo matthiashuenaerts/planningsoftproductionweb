@@ -385,6 +385,63 @@ export const rushOrderService = {
     }
   },
   
+  async notifyAssignedUsersOfNewMessage(rushOrderId: string, senderId: string, senderName: string): Promise<boolean> {
+    try {
+      // 1. Get assigned users for the rush order
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from('rush_order_assignments')
+        .select('employee_id')
+        .eq('rush_order_id', rushOrderId);
+
+      if (assignmentsError) throw assignmentsError;
+
+      if (!assignments || assignments.length === 0) {
+        return true; // No one to notify
+      }
+
+      // 2. Get rush order title for a more descriptive notification
+      const { data: rushOrder, error: rushOrderError } = await supabase
+        .from('rush_orders')
+        .select('title')
+        .eq('id', rushOrderId)
+        .single();
+
+      if (rushOrderError) {
+        console.warn(`Could not fetch rush order title for notification: ${rushOrderError.message}`);
+      }
+
+      const rushOrderTitle = rushOrder?.title || 'a rush order';
+      const notificationMessage = `New message from ${senderName} in "${rushOrderTitle}"`;
+      
+      // 3. Filter out the sender and create notification payloads
+      const notifications = assignments
+        .filter(assignment => assignment.employee_id !== senderId)
+        .map(assignment => ({
+          user_id: assignment.employee_id,
+          message: notificationMessage,
+          rush_order_id: rushOrderId,
+          read: false
+        }));
+
+      if (notifications.length === 0) {
+        return true; // Only sender is assigned, no one else to notify
+      }
+
+      // 4. Insert notifications
+      const { error: notifyError } = await supabase
+        .from('notifications')
+        .insert(notifications);
+
+      if (notifyError) throw notifyError;
+
+      return true;
+    } catch (error: any) {
+      console.error('Error notifying assigned users of new message:', error);
+      // Don't show toast here as it's a background task, just log it.
+      return false;
+    }
+  },
+  
   async getRushOrdersForWorkstation(workstationId: string): Promise<RushOrder[]> {
     try {
       // First get the standard task IDs associated with this workstation
