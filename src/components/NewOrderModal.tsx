@@ -52,6 +52,7 @@ const NewOrderModal = ({
   });
   const [orderItems, setOrderItems] = useState<Partial<OrderItem>[]>([]);
   const [orderSteps, setOrderSteps] = useState<Partial<OrderStep>[]>([]);
+  const [internalProcessingDays, setInternalProcessingDays] = useState<number>(0);
   const [isScheduleInvalid, setIsScheduleInvalid] = useState(false);
   const [scheduleWarning, setScheduleWarning] = useState<string | null>(null);
 
@@ -59,47 +60,52 @@ const NewOrderModal = ({
   const stepCount = orderSteps.length;
 
   useEffect(() => {
-    if (orderType !== 'semi-finished' || !formData.expected_delivery || orderSteps.length === 0) {
+    if (orderType !== 'semi-finished' || !formData.expected_delivery) {
       setScheduleWarning(null);
       setIsScheduleInvalid(false);
       return;
     }
 
-    const newSteps = JSON.parse(JSON.stringify(orderSteps));
-    let currentDate = parseISO(formData.expected_delivery);
-    let modified = false;
+    const materialDeliveryDate = parseISO(formData.expected_delivery);
+    // This will be the end date of the last completed process (internal or external)
+    let endOfLastProcess = materialDeliveryDate; 
 
-    for (let i = 0; i < newSteps.length; i++) {
-      const step = newSteps[i];
-      const nextStartDate = addBusinessDays(currentDate, 1);
-      const formattedStartDate = format(nextStartDate, 'yyyy-MM-dd');
-      
-      if (step.start_date !== formattedStartDate) {
-          step.start_date = formattedStartDate;
-          modified = true;
-      }
-
-      if (step.expected_duration_days && step.expected_duration_days > 0) {
-        currentDate = addBusinessDays(nextStartDate, step.expected_duration_days - 1);
-      } else {
-        currentDate = nextStartDate;
-      }
+    if (internalProcessingDays > 0) {
+        endOfLastProcess = addBusinessDays(materialDeliveryDate, internalProcessingDays - 1);
     }
 
-    if (installationDate) {
-      const lastStep = newSteps[newSteps.length - 1];
-      if (lastStep.start_date && (lastStep.expected_duration_days || 0) > 0) {
-        const lastStepStartDate = parseISO(lastStep.start_date);
-        const finalDeliveryDate = addBusinessDays(lastStepStartDate, (lastStep.expected_duration_days || 1) - 1);
-        const deadline = subBusinessDays(parseISO(installationDate), 5);
-        
-        if (isAfter(finalDeliveryDate, deadline)) {
-          setIsScheduleInvalid(true);
-          setScheduleWarning(`Error: The process is scheduled to finish on ${format(finalDeliveryDate, 'MMM dd, yyyy')}, which is less than 5 working days before the installation date (${format(parseISO(installationDate), 'MMM dd, yyyy')}). Please adjust delivery dates or step durations.`);
-        } else {
-          setIsScheduleInvalid(false);
-          setScheduleWarning(null);
+    const newSteps = JSON.parse(JSON.stringify(orderSteps));
+    let modified = false;
+
+    if (newSteps.length > 0) {
+      let nextStepStartDate = addBusinessDays(materialDeliveryDate, internalProcessingDays);
+      
+      for (let i = 0; i < newSteps.length; i++) {
+        const step = newSteps[i];
+        const stepStartDate = nextStepStartDate;
+        const formattedStartDate = format(stepStartDate, 'yyyy-MM-dd');
+
+        if (step.start_date !== formattedStartDate) {
+          step.start_date = formattedStartDate;
+          modified = true;
         }
+
+        const duration = Math.max(1, step.expected_duration_days || 1);
+        const stepEndDate = addBusinessDays(stepStartDate, duration - 1);
+
+        nextStepStartDate = addBusinessDays(stepEndDate, 1);
+        endOfLastProcess = stepEndDate; // Update with end date of this step
+      }
+    }
+    
+    if (installationDate) {
+      const deadline = subBusinessDays(parseISO(installationDate), 5);
+      
+      if (isAfter(endOfLastProcess, deadline)) {
+        setIsScheduleInvalid(true);
+        const finishDateStr = format(endOfLastProcess, 'MMM dd, yyyy');
+        const installDateStr = format(parseISO(installationDate), 'MMM dd, yyyy');
+        setScheduleWarning(`Error: The process is scheduled to finish on ${finishDateStr}, which is less than 5 working days before the installation date (${installDateStr}). Please adjust delivery dates, internal processing, or step durations.`);
       } else {
         setIsScheduleInvalid(false);
         setScheduleWarning(null);
@@ -113,7 +119,7 @@ const NewOrderModal = ({
       setOrderSteps(newSteps);
     }
 
-  }, [formData.expected_delivery, stepDurations, stepCount, orderType, installationDate]);
+  }, [formData.expected_delivery, stepDurations, stepCount, orderType, installationDate, internalProcessingDays]);
 
   useEffect(() => {
     if (prefilledData && open) {
@@ -145,6 +151,7 @@ const NewOrderModal = ({
         notes: '',
         order_reference: ''
       });
+      setInternalProcessingDays(0);
     }
   }, [prefilledData, open]);
 
@@ -291,7 +298,7 @@ const NewOrderModal = ({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="expected_delivery">Expected Delivery *</Label>
+            <Label htmlFor="expected_delivery">Material Delivery *</Label>
             <Input id="expected_delivery" type="date" value={formData.expected_delivery} onChange={e => setFormData(prev => ({
             ...prev,
             expected_delivery: e.target.value
@@ -315,6 +322,20 @@ const NewOrderModal = ({
             </Select>
           </div>
         </div>
+        
+        {orderType === 'semi-finished' && (
+            <div>
+                <Label htmlFor="internal_processing_days">Internal Processing Duration (days)</Label>
+                <Input
+                  id="internal_processing_days"
+                  type="number"
+                  min="0"
+                  value={internalProcessingDays}
+                  onChange={(e) => setInternalProcessingDays(parseInt(e.target.value) || 0)}
+                  placeholder="Days for internal work before external steps"
+                />
+            </div>
+        )}
 
         <div>
           <Label htmlFor="notes">Notes</Label>
@@ -335,7 +356,7 @@ const NewOrderModal = ({
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle>Processing Steps</CardTitle>
+                <CardTitle>External Processing Steps</CardTitle>
                 <Button type="button" onClick={addOrderStep} variant="outline" size="sm">
                   <Plus className="mr-2 h-4 w-4" /> Add Step
                 </Button>
@@ -344,7 +365,7 @@ const NewOrderModal = ({
             <CardContent>
               {orderSteps.length === 0 ? (
                 <p className="text-muted-foreground text-center py-4">
-                  Define the steps for this semi-finished product order.
+                  Define any external processing steps for this order.
                 </p>
               ) : (
                 <div className="space-y-4">
@@ -368,7 +389,7 @@ const NewOrderModal = ({
                             </div>
                             <div>
                                 <Label>Expected Duration (days)</Label>
-                                <Input type="number" value={step.expected_duration_days || ''} onChange={e => updateOrderStep(index, 'expected_duration_days', parseInt(e.target.value))} />
+                                <Input type="number" min="1" value={step.expected_duration_days || ''} onChange={e => updateOrderStep(index, 'expected_duration_days', parseInt(e.target.value))} />
                             </div>
                         </div>
                       </div>
