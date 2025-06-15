@@ -213,130 +213,138 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
               {/* Tasks */}
               {sortedTasks.map(task => {
                 const style = getTaskStyle(task);
+                const blockHeight = parseFloat(style.height); // height in rem
+
                 return (
                   <div
                     key={task.id}
                     className="absolute left-2 right-2 z-10"
                     style={style}
                   >
-                    <Card className="h-full shadow-sm border-l-4 border-l-blue-500">
-                      <CardContent className="p-3 h-full flex flex-col">
-                        <div className="flex justify-between items-start mb-1">
-                          <div className="flex-1">
-                            {task.project_name && (
-                              <h3 className="font-medium text-sm truncate">
-                                {task.project_name}
-                              </h3>
+                    <Card className="h-full shadow-sm border-l-4 border-l-blue-500 overflow-hidden">
+                      <CardContent className="p-2 h-full flex flex-col justify-between">
+                        <div className="flex-grow overflow-y-auto pr-1"> {/* Main content area */}
+                          <div className="flex justify-between items-start mb-1">
+                            <div className="flex-1 min-w-0">
+                              {task.project_name && (
+                                <h3 className="font-medium text-sm truncate">
+                                  {task.project_name}
+                                </h3>
+                              )}
+                              <h4 className="font-medium text-xs truncate text-muted-foreground">
+                                {task.title}
+                              </h4>
+                            </div>
+                            {task.status && (
+                              <Badge className={`text-xs whitespace-nowrap ${getStatusColor(task.status)}`}>
+                                {task.status}
+                              </Badge>
                             )}
-                            <h4 className="font-medium text-xs truncate text-muted-foreground">
-                              {task.title}
-                            </h4>
                           </div>
-                          {task.status && (
-                            <Badge className={`text-xs ${getStatusColor(task.status)}`}>
-                              {task.status}
-                            </Badge>
+                          
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                            <Clock className="h-3 w-3" />
+                            {format(new Date(task.start_time), 'HH:mm')} - 
+                            {format(new Date(task.end_time), 'HH:mm')}
+                          </div>
+                          
+                          {blockHeight > 2.5 && task.workstation && (
+                            <div className="text-xs text-muted-foreground mb-1">
+                              Workstation: {task.workstation}
+                            </div>
                           )}
-                        </div>
-                        
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
-                          <Clock className="h-3 w-3" />
-                          {format(new Date(task.start_time), 'HH:mm')} - 
-                          {format(new Date(task.end_time), 'HH:mm')}
-                        </div>
-                        
-                        {task.workstation && (
-                          <div className="text-xs text-muted-foreground mb-1">
-                            Workstation: {task.workstation}
-                          </div>
-                        )}
 
-                        {task.priority && (
-                          <div className="mb-1">
-                            {getPriorityBadge(task.priority)}
-                          </div>
-                        )}
-                        
-                        {task.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-2 flex-1 mb-2">
-                            {task.description}
-                          </p>
-                        )}
+                          {blockHeight > 2.5 && task.priority && (
+                            <div className="mb-1">
+                              {getPriorityBadge(task.priority)}
+                            </div>
+                          )}
+                          
+                          {blockHeight > 3.5 && task.description && (
+                            <p className="text-xs text-muted-foreground">
+                              {task.description}
+                            </p>
+                          )}
 
-                        {/* Action Buttons */}
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {onShowFiles && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onShowFiles(task.id)}
-                              className="text-xs px-2 py-1 h-6"
-                            >
-                              <FileText className="h-3 w-3 mr-1" />
-                              Files
-                            </Button>
+                          {/* Action Buttons */}
+                          {blockHeight > 4.5 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {onShowFiles && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => onShowFiles(task.id)}
+                                  className="text-xs px-2 py-1 h-6"
+                                >
+                                  <FileText className="h-3 w-3 mr-1" />
+                                  Files
+                                </Button>
+                              )}
+                              
+                              {onShowParts && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => onShowParts(task.id)}
+                                  className="text-xs px-2 py-1 h-6"
+                                >
+                                  <Package2 className="h-3 w-3 mr-1" />
+                                  Parts
+                                </Button>
+                              )}
+                              
+                              {onShowBarcode && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => onShowBarcode(task.id)}
+                                  className="text-xs px-2 py-1 h-6"
+                                >
+                                  <QrCode className="h-3 w-3 mr-1" />
+                                  Barcode
+                                </Button>
+                              )}
+                              
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(`/projects/${task.id}`, '_blank')}
+                                className="text-xs px-2 py-1 h-6"
+                              >
+                                <ExternalLink className="h-3 w-3 mr-1" />
+                                Project
+                              </Button>
+                            </div>
                           )}
-                          
-                          {onShowParts && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onShowParts(task.id)}
-                              className="text-xs px-2 py-1 h-6"
-                            >
-                              <Package2 className="h-3 w-3 mr-1" />
-                              Parts
-                            </Button>
-                          )}
-                          
-                          {onShowBarcode && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onShowBarcode(task.id)}
-                              className="text-xs px-2 py-1 h-6"
-                            >
-                              <QrCode className="h-3 w-3 mr-1" />
-                              Barcode
-                            </Button>
-                          )}
-                          
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => window.open(`/projects/${task.id}`, '_blank')}
-                            className="text-xs px-2 py-1 h-6"
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            Project
-                          </Button>
                         </div>
 
                         {/* Task Control Buttons */}
-                        <div className="flex gap-1 pt-1 border-t">
-                          {task.canStart && onStartTask && (
-                            <Button
-                              size="sm"
-                              onClick={() => onStartTask(task.id)}
-                              className="flex-1 text-xs px-2 py-1 h-6"
-                            >
-                              <Play className="h-3 w-3 mr-1" />
-                              Start
-                            </Button>
-                          )}
-                          
-                          {task.canComplete && onCompleteTask && (
-                            <Button
-                              size="sm"
-                              onClick={() => onCompleteTask(task.id)}
-                              className="flex-1 text-xs px-2 py-1 h-6"
-                              variant="default"
-                            >
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Complete
-                            </Button>
-                          )}
-                        </div>
+                        {(task.canStart && onStartTask || task.canComplete && onCompleteTask) && (
+                          <div className="flex-shrink-0 flex gap-1 pt-2 mt-1 border-t">
+                            {task.canStart && onStartTask && (
+                              <Button
+                                size="sm"
+                                onClick={() => onStartTask(task.id)}
+                                className="flex-1 text-xs px-2 py-1 h-6"
+                              >
+                                <Play className="h-3 w-3 mr-1" />
+                                Start
+                              </Button>
+                            )}
+                            
+                            {task.canComplete && onCompleteTask && (
+                              <Button
+                                size="sm"
+                                onClick={() => onCompleteTask(task.id)}
+                                className="flex-1 text-xs px-2 py-1 h-6"
+                                variant="default"
+                              >
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Complete
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>
