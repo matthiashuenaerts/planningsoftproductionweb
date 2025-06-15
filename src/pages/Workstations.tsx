@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from '@/components/Navbar';
 import WorkstationView from '@/components/WorkstationView';
@@ -24,10 +23,7 @@ interface WorkstationWithIcon {
   icon: React.ReactNode;
 }
 const Workstations: React.FC = () => {
-  const { id: workstationIdFromParams } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-
-  const selectedWorkstation = workstationIdFromParams || null;
+  const [selectedWorkstation, setSelectedWorkstation] = useState<string | null>(null);
   const [workstations, setWorkstations] = useState<WorkstationWithIcon[]>([]);
   const [loading, setLoading] = useState(true);
   const [showWorkstationTasks, setShowWorkstationTasks] = useState<string | null>(null);
@@ -137,10 +133,6 @@ const Workstations: React.FC = () => {
         return <Badge>{priority}</Badge>;
     }
   };
-  const handleBack = () => {
-    navigate('/workstations');
-  };
-
   if (loading) {
     return <div className="flex min-h-screen">
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
@@ -159,10 +151,10 @@ const Workstations: React.FC = () => {
       <div className="ml-64 w-full p-6">
         <div className="max-w-7xl mx-auto">
           {selectedWorkstation ? <div>
-              <Button variant="outline" className="mb-4" onClick={handleBack}>
+              <Button variant="outline" className="mb-4" onClick={() => setSelectedWorkstation(null)}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back to Workstations
               </Button>
-              <WorkstationView workstationId={selectedWorkstation} onBack={handleBack} />
+              <WorkstationView workstationId={selectedWorkstation} onBack={() => setSelectedWorkstation(null)} />
             </div> : <div>
               <h1 className="text-2xl font-bold mb-6">Workstations</h1>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -185,7 +177,7 @@ const Workstations: React.FC = () => {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                    <CardContent className="p-6 flex flex-col items-center text-center" onClick={() => navigate(`/workstations/${workstation.id}`)}>
+                    <CardContent className="p-6 flex flex-col items-center text-center" onClick={() => setSelectedWorkstation(workstation.id)}>
                       <div className="bg-primary/10 p-4 rounded-full mb-4">
                         {workstation.icon}
                       </div>
