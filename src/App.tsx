@@ -44,7 +44,7 @@ const App = () => (
             <GlobalComponents />
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/:lang" element={<LanguageWrapper />}>
+              <Route path="/:lang(en|nl)" element={<LanguageWrapper />}>
                 <Route index element={
                   <ProtectedRoute>
                     <Index />
