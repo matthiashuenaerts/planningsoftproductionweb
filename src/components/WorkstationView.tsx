@@ -13,12 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package, Barcode, Play } from 'lucide-react';
-import ProjectFilesPopup from './ProjectFilesPopup';
-import { PartsListViewer } from './PartsListViewer';
-import { PartsListDialog } from './PartsListDialog';
-import { ProjectBarcodeDialog } from './ProjectBarcodeDialog';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package, Barcode } from 'lucide-react';
 import { format, differenceInDays, isAfter, isBefore } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
@@ -28,7 +24,6 @@ interface WorkstationViewProps {
   onBack?: () => void;
 }
 
-// Custom Task interface that includes countdown timer properties
 interface ExtendedTask extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
@@ -39,9 +34,6 @@ interface ExtendedTask extends Task {
 }
 
 const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, workstationId, onBack }) => {
-  const [tasks, setTasks] = useState<ExtendedTask[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [actualWorkstationName, setActualWorkstationName] = useState<string>('');
   const [showProjectFiles, setShowProjectFiles] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -56,7 +48,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Load standard tasks for color mapping
   useEffect(() => {
     loadStandardTasks();
   }, []);
@@ -74,7 +65,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     }
   };
 
-  // Function to get task color from standard task
   const getTaskColor = (task: ExtendedTask): string | null => {
     if (task.standard_task_id && standardTasks[task.standard_task_id]) {
       return standardTasks[task.standard_task_id].color || null;
@@ -82,7 +72,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     return null;
   };
 
-  // Function to get urgency class based on due date
   const getUrgencyClass = (dueDate: string) => {
     const today = new Date();
     const due = new Date(dueDate);
@@ -101,114 +90,17 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     }
   };
 
-  // Start task timer mutation
-  const startTimerMutation = useMutation({
-    mutationFn: ({ employeeId, taskId, remainingDuration }: { employeeId: string; taskId: string; remainingDuration?: number }) =>
-      timeRegistrationService.startTask(employeeId, taskId, remainingDuration),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
-      toast({
-        title: 'Timer Started',
-        description: 'Time tracking has begun for this task',
-      });
-      loadTasks(); // Reload tasks to update the display
-    },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: 'Failed to start timer',
-        variant: 'destructive'
-      });
-      console.error('Start timer error:', error);
-    }
-  });
-
-  // Timer for updating countdown
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTasks(prevTasks => prevTasks.map(task => {
-        if (task.status === 'IN_PROGRESS' && task.status_changed_at && task.duration !== null && task.duration !== undefined) {
-          const startTime = new Date(task.status_changed_at);
-          const now = new Date();
-          const elapsedMs = now.getTime() - startTime.getTime();
-          const durationMs = task.duration * 60 * 1000; // Convert minutes to milliseconds
-          const remainingMs = durationMs - elapsedMs;
-          
-          if (remainingMs > 0) {
-            const hours = Math.floor(remainingMs / (1000 * 60 * 60));
-            const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
-            
-            return {
-              ...task,
-              timeRemaining: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
-              isOvertime: false
-            };
-          } else {
-            const overtimeMs = Math.abs(remainingMs);
-            const hours = Math.floor(overtimeMs / (1000 * 60 * 60));
-            const minutes = Math.floor((overtimeMs % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((overtimeMs % (1000 * 60)) / 1000);
-            
-            return {
-              ...task,
-              timeRemaining: `-${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
-              isOvertime: true
-            };
-          }
-        }
-        return task;
-      }));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // First, resolve the workstation name if we only have the ID
-  useEffect(() => {
-    const resolveWorkstationName = async () => {
-      if (workstationName) {
-        setActualWorkstationName(workstationName);
-        return;
-      }
+  const { data: fetchedTasks = [], isLoading: loading, error: queryError, refetch: loadTasks } = useQuery<ExtendedTask[], Error>({
+    queryKey: ['workstationTasks', actualWorkstationName],
+    queryFn: async () => {
+      if (!actualWorkstationName) return [];
       
-      if (workstationId) {
-        try {
-          const workstation = await workstationService.getById(workstationId);
-          if (workstation) {
-            setActualWorkstationName(workstation.name);
-          } else {
-            setError('Workstation not found');
-          }
-        } catch (error) {
-          console.error('Error fetching workstation:', error);
-          setError('Failed to load workstation details');
-        }
-      }
-    };
-    
-    resolveWorkstationName();
-  }, [workstationName, workstationId]);
-
-  const loadTasks = async () => {
-    if (!actualWorkstationName) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      console.log(`Loading tasks for workstation: ${actualWorkstationName}`);
-      
-      // Load regular tasks using the name - only TODO and IN_PROGRESS tasks
       const regularTasks = await taskService.getByWorkstation(actualWorkstationName);
       const activeTasks = regularTasks.filter(task => task.status === 'TODO' || task.status === 'IN_PROGRESS');
-      console.log(`Found ${activeTasks.length} active regular tasks`);
       
-      // Get project info and assignee name for each regular task
       const tasksWithProjectInfo = await Promise.all(
         activeTasks.map(async (task) => {
           try {
-            // Get phase data to get project id
             const { data: phaseData, error: phaseError } = await supabase
               .from('phases')
               .select('project_id, name')
@@ -217,7 +109,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
             
             if (phaseError) throw phaseError;
             
-            // Get project name
             const { data: projectData, error: projectError } = await supabase
               .from('projects')
               .select('name')
@@ -226,7 +117,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
             
             if (projectError) throw projectError;
 
-            // Get assignee name if task is IN_PROGRESS and has assignee_id
             let assigneeName = null;
             if (task.status === 'IN_PROGRESS' && task.assignee_id) {
               const { data: employeeData, error: employeeError } = await supabase
@@ -240,7 +130,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
               }
             }
 
-            // Get count of active workers on this task
             let activeWorkers = 0;
             if (task.status === 'IN_PROGRESS') {
               const { data: activeRegistrations, error: regError } = await supabase
@@ -275,7 +164,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         })
       );
       
-      // Load rush order tasks
       let workstationDbId = workstationId;
       if (!workstationDbId && actualWorkstationName) {
         const { data: workstationData, error: workstationError } = await supabase
@@ -292,9 +180,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
       
       if (workstationDbId) {
         const rushOrders = await rushOrderService.getRushOrdersForWorkstation(workstationDbId);
-        console.log(`Found ${rushOrders.length} rush orders for workstation`);
         
-        // Process rush order tasks
         if (rushOrders.length > 0) {
           for (const rushOrder of rushOrders) {
             if (rushOrder.tasks && rushOrder.tasks.length > 0) {
@@ -329,7 +215,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                     
                     const status = validateTaskStatus(task.status);
                     
-                    // Only include TODO and IN_PROGRESS tasks from rush orders
                     if (status !== 'TODO' && status !== 'IN_PROGRESS') {
                       return null;
                     }
@@ -356,36 +241,112 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
             }
           }
         }
-
-        // Note: Workstation tasks are NOT loaded here anymore - they're only accessible via the 3-dot menu
       }
       
-      console.log(`Total active tasks found: ${allTasks.length}`);
-      setTasks(allTasks);
-    } catch (error) {
-      console.error('Error loading tasks:', error);
-      setError('Failed to load tasks');
+      return allTasks;
+    },
+    enabled: !!actualWorkstationName,
+  });
+
+  const [tasks, setTasks] = useState<ExtendedTask[]>([]);
+  useEffect(() => {
+    if (fetchedTasks) {
+      setTasks(fetchedTasks);
+    }
+  }, [fetchedTasks]);
+
+  const error = queryError ? 'Failed to load tasks' : null;
+
+  const startTimerMutation = useMutation({
+    mutationFn: ({ employeeId, taskId, remainingDuration }: { employeeId: string; taskId: string; remainingDuration?: number }) =>
+      timeRegistrationService.startTask(employeeId, taskId, remainingDuration),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+      toast({
+        title: 'Timer Started',
+        description: 'Time tracking has begun for this task',
+      });
+      loadTasks();
+    },
+    onError: (error) => {
       toast({
         title: 'Error',
-        description: 'Failed to load tasks for this workstation',
+        description: 'Failed to start timer',
         variant: 'destructive'
       });
-    } finally {
-      setLoading(false);
+      console.error('Start timer error:', error);
     }
-  };
+  });
 
   useEffect(() => {
-    if (actualWorkstationName) {
-      loadTasks();
-    }
-  }, [actualWorkstationName]);
+    const timer = setInterval(() => {
+      setTasks(prevTasks => prevTasks.map(task => {
+        if (task.status === 'IN_PROGRESS' && task.status_changed_at && task.duration !== null && task.duration !== undefined) {
+          const startTime = new Date(task.status_changed_at);
+          const now = new Date();
+          const elapsedMs = now.getTime() - startTime.getTime();
+          const durationMs = task.duration * 60 * 1000;
+          const remainingMs = durationMs - elapsedMs;
+          
+          if (remainingMs > 0) {
+            const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+            const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
+            
+            return {
+              ...task,
+              timeRemaining: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
+              isOvertime: false
+            };
+          } else {
+            const overtimeMs = Math.abs(remainingMs);
+            const hours = Math.floor(overtimeMs / (1000 * 60 * 60));
+            const minutes = Math.floor((overtimeMs % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((overtimeMs % (1000 * 60)) / 1000);
+            
+            return {
+              ...task,
+              timeRemaining: `-${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
+              isOvertime: true
+            };
+          }
+        }
+        return task;
+      }));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const resolveWorkstationName = async () => {
+      if (workstationName) {
+        setActualWorkstationName(workstationName);
+        return;
+      }
+      
+      if (workstationId) {
+        try {
+          const workstation = await workstationService.getById(workstationId);
+          if (workstation) {
+            setActualWorkstationName(workstation.name);
+          } else {
+            setError('Workstation not found');
+          }
+        } catch (error) {
+          console.error('Error fetching workstation:', error);
+          setError('Failed to load workstation details');
+        }
+      }
+    };
+    
+    resolveWorkstationName();
+  }, [workstationName, workstationId]);
 
   const checkAndUpdateLimitPhases = async (completedTask: ExtendedTask) => {
     try {
       if (!completedTask.standard_task_id) return;
 
-      // Get the project ID from the completed task
       const { data: phaseData, error: phaseError } = await supabase
         .from('phases')
         .select('project_id')
@@ -396,7 +357,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
 
       const projectId = phaseData.project_id;
 
-      // Find all tasks in the project that are on HOLD and have limit phases
       const { data: holdTasks, error: holdError } = await supabase
         .from('tasks')
         .select(`
@@ -409,7 +369,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
 
       if (holdError || !holdTasks) return;
 
-      // Check each HOLD task to see if its limit phases are now satisfied
       for (const holdTask of holdTasks) {
         if (holdTask.standard_task_id) {
           const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(
@@ -418,7 +377,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
           );
 
           if (limitPhasesSatisfied) {
-            // Update the task status from HOLD to TODO
             await supabase
               .from('tasks')
               .update({ 
@@ -432,7 +390,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         }
       }
 
-      // Reload tasks to reflect changes
       await loadTasks();
     } catch (error) {
       console.error('Error checking limit phases:', error);
@@ -442,18 +399,14 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const handleTaskUpdate = async (taskId: string, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     try {
       if (newStatus === 'COMPLETED') {
-        // Use the new completeTask method that stops time registration first
         await timeRegistrationService.completeTask(taskId);
         
-        // Find the completed task for limit phase checking
-        const completedTask = tasks.find(task => task.id === taskId);
+        const completedTask = fetchedTasks.find(task => task.id === taskId);
         
-        // Remove completed task from local state
-        setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
-        
-        // Check limit phases if task was completed
         if (completedTask) {
           await checkAndUpdateLimitPhases(completedTask);
+        } else {
+          await loadTasks();
         }
         
         toast({
@@ -463,22 +416,11 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         return;
       }
       
-      const updateData: any = { 
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      };
-      
-      // Set status_changed_at and assignee when changing status to IN_PROGRESS
       if (newStatus === 'IN_PROGRESS') {
-        updateData.status_changed_at = new Date().toISOString();
         if (currentEmployee) {
-          updateData.assignee_id = currentEmployee.id;
-          
-          // Get current task duration for the timer
-          const currentTask = tasks.find(task => task.id === taskId);
+          const currentTask = fetchedTasks.find(task => task.id === taskId);
           const remainingDuration = currentTask?.duration;
           
-          // Start time tracking for this task
           startTimerMutation.mutate({
             employeeId: currentEmployee.id,
             taskId: taskId,
@@ -487,6 +429,11 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         }
       }
       
+      const updateData: any = { 
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      };
+      
       const { error } = await supabase
         .from('tasks')
         .update(updateData)
@@ -494,11 +441,10 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         
       if (error) throw error;
       
-      // Update local state
       setTasks(prevTasks => 
         prevTasks.map(task => 
           task.id === taskId 
-            ? { ...task, status: newStatus, status_changed_at: updateData.status_changed_at || task.status_changed_at }
+            ? { ...task, status: newStatus }
             : task
         )
       );
@@ -521,18 +467,15 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     if (!currentEmployee) return;
     
     try {
-      // Get current task to check if it's a workstation task
       const currentTask = tasks.find(task => task.id === taskId);
       
       if (currentTask?.is_workstation_task) {
-        // Use the workstation task method
         await timeRegistrationService.startWorkstationTask(currentEmployee.id, taskId);
         toast({
           title: 'Workstation Task Started',
           description: 'Time tracking has begun for this workstation task',
         });
       } else {
-        // Use the regular task method
         const remainingDuration = currentTask?.duration;
         await startTimerMutation.mutateAsync({
           employeeId: currentEmployee.id,
@@ -541,7 +484,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         });
       }
       
-      // Reload tasks to update the display
       loadTasks();
     } catch (error) {
       console.error('Error joining task:', error);
@@ -604,12 +546,8 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     if (!currentEmployee) return;
     
     try {
-      // Use the new startWorkstationTask method instead of regular startTask
       await timeRegistrationService.startWorkstationTask(currentEmployee.id, workstationTask.id);
-      
-      // Invalidate queries to refresh the TaskTimer
       queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
-      
       toast({
         title: 'Workstation Task Started',
         description: `Started working on ${workstationTask.task_name}`,
@@ -637,10 +575,8 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     }
   };
 
-  // Sort tasks by due date ascending, then by project name
   const sortTasks = (tasksToSort: ExtendedTask[]) => {
     return tasksToSort.sort((a, b) => {
-      // First sort by due date (ascending)
       const dateA = new Date(a.due_date);
       const dateB = new Date(b.due_date);
       const dateComparison = dateA.getTime() - dateB.getTime();
@@ -649,7 +585,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         return dateComparison;
       }
       
-      // If dates are equal, sort by project name (ascending)
       return (a.project_name || '').localeCompare(b.project_name || '');
     });
   };
@@ -670,7 +605,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     );
   }
 
-  // Filter out workstation tasks from the main task lists and sort them
   const inProgressTasks = sortTasks(tasks.filter(task => task.status === 'IN_PROGRESS' && !task.is_workstation_task));
   const todoTasks = sortTasks(tasks.filter(task => task.status === 'TODO' && !task.is_workstation_task));
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -119,6 +118,7 @@ const TaskTimer = () => {
       timeRegistrationService.stopTask(registrationId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+      queryClient.invalidateQueries({ queryKey: ['workstationTasks'] });
       toast({
         title: 'Task Paused',
         description: 'Time tracking has been paused',
