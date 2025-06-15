@@ -177,7 +177,7 @@ export const timeRegistrationService = {
       if (!stillActive || stillActive.length === 0) {
         const updateData: any = { 
           status: 'TODO',
-          assignee_id: null
+          // assignee_id: null // This was causing the issue, task should remain assigned
         };
         
         // Save remaining duration if available
@@ -302,7 +302,7 @@ export const timeRegistrationService = {
           if (!stillActive || stillActive.length === 0) {
             const updateData: any = { 
               status: 'TODO',
-              assignee_id: null
+              // assignee_id: null // This was causing the issue, task should remain assigned
             };
             
             if (remainingDuration !== undefined) {

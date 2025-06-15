@@ -181,7 +181,7 @@ const PersonalTasks = () => {
   };
 
   const isTaskActive = (taskId: string) => {
-    return activeTimeRegistrations.some(reg => reg.task_id === taskId);
+    return activeTimeRegistrations.some(reg => reg.task_id === taskId || reg.workstation_task_id === taskId);
   };
 
   const canStartTask = (task: Task) => {
