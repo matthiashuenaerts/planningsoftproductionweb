@@ -1190,6 +1190,7 @@ export type Database = {
           color: string | null
           created_at: string
           day_counter: number
+          hourly_cost: number
           id: string
           task_name: string
           task_number: string
@@ -1200,6 +1201,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           day_counter?: number
+          hourly_cost?: number
           id?: string
           task_name: string
           task_number: string
@@ -1210,6 +1212,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           day_counter?: number
+          hourly_cost?: number
           id?: string
           task_name?: string
           task_number?: string

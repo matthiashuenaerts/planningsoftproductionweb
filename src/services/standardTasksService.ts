@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface StandardTask {
@@ -7,6 +8,7 @@ export interface StandardTask {
   time_coefficient: number;
   day_counter: number;
   color?: string;
+  hourly_cost: number;
   created_at: string;
   updated_at: string;
 }
@@ -94,6 +96,18 @@ export const standardTasksService = {
       throw error;
     }
     console.log('Color updated successfully:', data);
+    return data as StandardTask;
+  },
+
+  async updateHourlyCost(id: string, hourlyCost: number): Promise<StandardTask | null> {
+    const { data, error } = await supabase
+      .from('standard_tasks')
+      .update({ hourly_cost: hourlyCost })
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+
+    if (error) throw error;
     return data as StandardTask;
   },
 

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
@@ -6,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { useAuth } from '@/context/AuthContext';
-import { Clock, Users, Calendar, BarChart3, Download, Filter } from 'lucide-react';
+import { Clock, Users, Calendar, BarChart3, Download, Filter, DollarSign } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -50,6 +49,10 @@ const TimeRegistrations = () => {
 
   const formatDateTime = (dateString: string) => {
     return format(parseISO(dateString), 'MMM dd, yyyy HH:mm');
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
   };
 
   const getUniqueEmployees = (registrations: any[]) => {
@@ -117,9 +120,20 @@ const TimeRegistrations = () => {
 
   const filteredRegistrations = getFilteredRegistrations();
 
-  const totalFilteredMinutes = filteredRegistrations.reduce(
-    (total: number, reg: any) => total + (reg.duration_minutes || 0),
-    0
+  const { totalFilteredMinutes, totalCost } = filteredRegistrations.reduce(
+    (acc: { totalFilteredMinutes: number; totalCost: number; }, reg: any) => {
+      const duration = reg.duration_minutes || 0;
+      acc.totalFilteredMinutes += duration;
+      
+      const hourlyCost = reg.tasks?.standard_tasks?.hourly_cost;
+      if (hourlyCost && duration > 0) {
+        const cost = (duration / 60) * hourlyCost;
+        acc.totalCost += parseFloat(cost.toFixed(2));
+      }
+      
+      return acc;
+    },
+    { totalFilteredMinutes: 0, totalCost: 0 }
   );
   
   // Calculate statistics
@@ -206,7 +220,7 @@ const TimeRegistrations = () => {
             <p className="text-gray-600 mt-2">View and filter your personal time tracking history</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Sessions (Filtered)</CardTitle>
@@ -225,6 +239,18 @@ const TimeRegistrations = () => {
               <CardContent>
                 <div className="text-2xl font-bold">
                   {formatDuration(totalFilteredMinutes)}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Cost (Filtered)</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {formatCurrency(totalCost)}
                 </div>
               </CardContent>
             </Card>
@@ -363,7 +389,7 @@ const TimeRegistrations = () => {
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Today's Hours</CardTitle>
@@ -412,6 +438,19 @@ const TimeRegistrations = () => {
               <div className="text-2xl font-bold">{formatDuration(totalFilteredMinutes)}</div>
               <p className="text-xs text-muted-foreground">
                 in {filteredRegistrations.length} sessions
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Cost (Filtered)</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(totalCost)}</div>
+              <p className="text-xs text-muted-foreground">
+                based on standard task cost
               </p>
             </CardContent>
           </Card>

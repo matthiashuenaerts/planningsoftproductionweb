@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { StandardTask, standardTasksService } from '@/services/standardTasksService';
 import { Card, CardContent } from '@/components/ui/card';
@@ -106,6 +105,16 @@ const StandardTasksSettings: React.FC = () => {
     setStandardTasks(updatedTasks);
   };
 
+  const handleHourlyCostChange = (taskId: string, value: string) => {
+    const updatedTasks = standardTasks.map(task => {
+      if (task.id === taskId) {
+        return { ...task, hourly_cost: parseFloat(value) || 0 };
+      }
+      return task;
+    });
+    setStandardTasks(updatedTasks);
+  };
+
   const handleColorChange = (taskId: string, color: string) => {
     const updatedTasks = standardTasks.map(task => {
       if (task.id === taskId) {
@@ -153,6 +162,26 @@ const StandardTasksSettings: React.FC = () => {
       });
     } finally {
       setSaving(prev => ({ ...prev, [`${task.id}_day`]: false }));
+    }
+  };
+
+  const saveHourlyCost = async (task: StandardTask) => {
+    setSaving(prev => ({ ...prev, [`${task.id}_hourly_cost`]: true }));
+    try {
+      await standardTasksService.updateHourlyCost(task.id, task.hourly_cost || 0);
+      toast({
+        title: 'Success',
+        description: `Hourly cost for ${task.task_number} updated successfully`,
+      });
+    } catch (error) {
+      console.error('Error updating hourly cost:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update hourly cost. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setSaving(prev => ({ ...prev, [`${task.id}_hourly_cost`]: false }));
     }
   };
 
@@ -277,6 +306,8 @@ const StandardTasksSettings: React.FC = () => {
                 <TableHead className="w-20">Actions</TableHead>
                 <TableHead className="w-32">Day Counter</TableHead>
                 <TableHead className="w-20">Actions</TableHead>
+                <TableHead className="w-32">Hourly Cost (€)</TableHead>
+                <TableHead className="w-20">Actions</TableHead>
                 <TableHead className="w-32">Color</TableHead>
                 <TableHead className="w-20">Actions</TableHead>
                 <TableHead className="w-96">Limit Phases (Standard Tasks)</TableHead>
@@ -347,6 +378,32 @@ const StandardTasksSettings: React.FC = () => {
                         className="w-full"
                       >
                         {saving[`${task.id}_day`] ? (
+                          <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={task.hourly_cost || 0}
+                        onChange={(e) => handleHourlyCostChange(task.id, e.target.value)}
+                        className="w-full"
+                        placeholder="e.g. 50.00"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => saveHourlyCost(task)}
+                        disabled={saving[`${task.id}_hourly_cost`]}
+                        className="w-full"
+                      >
+                        {saving[`${task.id}_hourly_cost`] ? (
                           <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
                         ) : (
                           <Save className="h-4 w-4" />

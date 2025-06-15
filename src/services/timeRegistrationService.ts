@@ -337,7 +337,11 @@ export const timeRegistrationService = {
       .select(`
         *,
         employees (name),
-        tasks (title, phases (name, projects (id, name))),
+        tasks (
+          title, 
+          phases (name, projects (id, name)), 
+          standard_tasks (hourly_cost)
+        ),
         workstation_tasks (task_name, workstations (id, name))
       `)
       .order('start_time', { ascending: false });
@@ -351,7 +355,11 @@ export const timeRegistrationService = {
       .from('time_registrations')
       .select(`
         *,
-        tasks (title, phases (name, projects (id, name))),
+        tasks (
+          title, 
+          phases (name, projects (id, name)),
+          standard_tasks (hourly_cost)
+        ),
         workstation_tasks (task_name, workstations (id, name))
       `)
       .eq('employee_id', employeeId)
