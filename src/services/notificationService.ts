@@ -8,6 +8,7 @@ export interface Notification {
   message: string;
   read: boolean;
   rush_order_id?: string;
+  link?: string;
   created_at: string;
 }
 

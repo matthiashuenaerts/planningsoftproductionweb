@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Order, OrderItem, OrderAttachment, OrderStep } from '@/types/order';
 
@@ -132,6 +131,29 @@ export const orderService = {
       .eq('order_id', orderId);
 
     if (accessoriesError) throw accessoriesError;
+  },
+
+  async getLogisticsOutOrders(): Promise<Order[]> {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*, order_items(count)')
+      .eq('order_type', 'semi-finished');
+
+    if (error) throw error;
+
+    return (data || [])
+      .map((order: any) => {
+        const { order_items, ...rest } = order;
+        const orderItemsCount = (Array.isArray(order_items) && order_items.length > 0) ? order_items[0].count : 0;
+
+        return {
+          ...rest,
+          status: order.status as Order['status'],
+          order_type: order.order_type as Order['order_type'],
+          order_items_count: orderItemsCount,
+        };
+      })
+      .filter(order => order.order_items_count === 0);
   },
 
   // Order Items

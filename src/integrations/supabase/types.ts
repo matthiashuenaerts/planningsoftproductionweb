@@ -280,6 +280,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          link: string | null
           message: string
           read: boolean
           rush_order_id: string | null
@@ -288,6 +289,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          link?: string | null
           message: string
           read?: boolean
           rush_order_id?: string | null
@@ -296,6 +298,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          link?: string | null
           message?: string
           read?: boolean
           rush_order_id?: string | null

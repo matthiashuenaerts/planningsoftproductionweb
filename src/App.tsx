@@ -25,6 +25,7 @@ import BrokenParts from "./pages/BrokenParts";
 import BrokenPartsSummary from "./pages/BrokenPartsSummary";
 import NewBrokenPart from "./pages/NewBrokenPart";
 import Logistics from "./pages/Logistics";
+import LogisticsOut from "./pages/LogisticsOut";
 import TimeRegistrations from "./pages/TimeRegistrations";
 import NotFound from "./pages/NotFound";
 
@@ -119,6 +120,11 @@ const App = () => (
               <Route path="/logistics" element={
                 <ProtectedRoute>
                   <Logistics />
+                </ProtectedRoute>
+              } />
+              <Route path="/logistics-out" element={
+                <ProtectedRoute>
+                  <LogisticsOut />
                 </ProtectedRoute>
               } />
               <Route path="/time-registrations" element={

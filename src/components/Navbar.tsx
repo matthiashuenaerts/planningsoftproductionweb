@@ -108,6 +108,12 @@ const NavbarContent = ({
                   <span className="ml-3">Logistics</span>
                 </NavLink>
               </li>}
+            {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
+                <NavLink to="/logistics-out" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                  <Truck className="w-5 h-5 text-white group-hover:text-white" />
+                  <span className="ml-3">Logistics out</span>
+                </NavLink>
+              </li>}
             {canSeeRushOrders && <li>
                 <NavLink to="/rush-orders" className="flex items-center justify-between p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <div className="flex items-center">
