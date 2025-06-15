@@ -249,8 +249,9 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
                           </>
                         ) : (
                           // Full view
-                          <>
-                            <div className="flex-grow overflow-y-auto pr-1"> {/* Main content area */}
+                          <div className="flex h-full w-full">
+                            {/* Left side: Task info */}
+                            <div className="flex-grow overflow-y-auto pr-2">
                               <div className="flex justify-between items-start mb-1">
                                 <div className="flex-1 min-w-0">
                                   <h3 className="font-medium text-sm truncate" title={task.project_name || task.title}>
@@ -292,87 +293,92 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
                                   {task.description}
                                 </p>
                               )}
+                            </div>
 
+                            {/* Right side: Buttons */}
+                            <div className="flex-shrink-0 flex flex-col justify-between pl-2 border-l w-[100px]">
                               {/* Action Buttons */}
-                              {blockHeight > 6.75 && (
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                  {onShowFiles && (
+                              <div className="flex flex-col gap-1">
+                                {blockHeight > 6.75 && (
+                                  <>
+                                    {onShowFiles && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => onShowFiles(task.id)}
+                                        className="text-xs px-2 py-1 h-6 w-full justify-start"
+                                      >
+                                        <FileText className="h-3 w-3 mr-1" />
+                                        Files
+                                      </Button>
+                                    )}
+                                    
+                                    {onShowParts && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => onShowParts(task.id)}
+                                        className="text-xs px-2 py-1 h-6 w-full justify-start"
+                                      >
+                                        <Package2 className="h-3 w-3 mr-1" />
+                                        Parts
+                                      </Button>
+                                    )}
+                                    
+                                    {onShowBarcode && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => onShowBarcode(task.id)}
+                                        className="text-xs px-2 py-1 h-6 w-full justify-start"
+                                      >
+                                        <QrCode className="h-3 w-3 mr-1" />
+                                        Barcode
+                                      </Button>
+                                    )}
+                                    
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => onShowFiles(task.id)}
-                                      className="text-xs px-2 py-1 h-6"
+                                      onClick={() => window.open(`/projects/${task.id}`, '_blank')}
+                                      className="text-xs px-2 py-1 h-6 w-full justify-start"
                                     >
-                                      <FileText className="h-3 w-3 mr-1" />
-                                      Files
+                                      <ExternalLink className="h-3 w-3 mr-1" />
+                                      Project
                                     </Button>
-                                  )}
-                                  
-                                  {onShowParts && (
+                                  </>
+                                )}
+                              </div>
+                              
+                              {/* Task Control Buttons */}
+                              {(task.canStart && onStartTask || task.canComplete && onCompleteTask) && (
+                                <div className="flex flex-col gap-1">
+                                  {task.canStart && onStartTask && (
                                     <Button
-                                      variant="outline"
                                       size="sm"
-                                      onClick={() => onShowParts(task.id)}
-                                      className="text-xs px-2 py-1 h-6"
+                                      onClick={() => onStartTask(task.id)}
+                                      className="w-full text-xs px-2 py-1 h-6"
                                     >
-                                      <Package2 className="h-3 w-3 mr-1" />
-                                      Parts
+                                      <Play className="h-3 w-3 mr-1" />
+                                      Start
                                     </Button>
                                   )}
                                   
-                                  {onShowBarcode && (
+                                  {task.canComplete && onCompleteTask && (
                                     <Button
-                                      variant="outline"
                                       size="sm"
-                                      onClick={() => onShowBarcode(task.id)}
-                                      className="text-xs px-2 py-1 h-6"
+                                      onClick={() => onCompleteTask(task.id)}
+                                      className="w-full text-xs px-2 py-1 h-6"
+                                      variant="default"
                                     >
-                                      <QrCode className="h-3 w-3 mr-1" />
-                                      Barcode
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Complete
                                     </Button>
                                   )}
-                                  
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => window.open(`/projects/${task.id}`, '_blank')}
-                                    className="text-xs px-2 py-1 h-6"
-                                  >
-                                    <ExternalLink className="h-3 w-3 mr-1" />
-                                    Project
-                                  </Button>
                                 </div>
                               )}
                             </div>
-
-                            {/* Task Control Buttons */}
-                            {(task.canStart && onStartTask || task.canComplete && onCompleteTask) && (
-                              <div className="flex-shrink-0 flex gap-1 pt-2 mt-1 border-t">
-                                {task.canStart && onStartTask && (
-                                  <Button
-                                    size="sm"
-                                    onClick={() => onStartTask(task.id)}
-                                    className="flex-1 text-xs px-2 py-1 h-6"
-                                  >
-                                    <Play className="h-3 w-3 mr-1" />
-                                    Start
-                                  </Button>
-                                )}
-                                
-                                {task.canComplete && onCompleteTask && (
-                                  <Button
-                                    size="sm"
-                                    onClick={() => onCompleteTask(task.id)}
-                                    className="flex-1 text-xs px-2 py-1 h-6"
-                                    variant="default"
-                                  >
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Complete
-                                  </Button>
-                                )}
-                              </div>
-                            )}
-                          </>
+                          </div>
                         )}
                       </CardContent>
                     </Card>
