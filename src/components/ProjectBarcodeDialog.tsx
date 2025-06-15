@@ -1,10 +1,10 @@
-
 import React, { useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Barcode as BarcodeIcon, Download, Copy } from 'lucide-react';
+import Barcode from 'react-barcode';
 
 interface ProjectBarcodeDialogProps {
   isOpen: boolean;
@@ -30,77 +30,6 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
   };
 
   const barcodeData = generateBarcodeData();
-
-  // Simple Code 39 barcode implementation
-  const drawBarcode = () => {
-    if (!canvasRef.current) return;
-    
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const width = 400;
-    const height = 100;
-    canvas.width = width;
-    canvas.height = height;
-
-    // Clear canvas
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, width, height);
-
-    // Code 39 character encoding (simplified)
-    const code39 = {
-      '/': '101001101',
-      '0': '101001101',
-      '1': '110100101',
-      '2': '101100101',
-      '3': '110110100',
-      '4': '101001110',
-      '5': '110100110',
-      '6': '101100110',
-      '7': '101010011',
-      '8': '110101001',
-      '9': '101101001',
-      '*': '100101101' // Start/stop character
-    };
-
-    // Start and end with asterisk
-    const fullData = '*' + barcodeData + '*';
-    
-    let x = 20;
-    const barHeight = 60;
-    const barWidth = 2;
-    const gap = 1;
-
-    ctx.fillStyle = 'black';
-
-    for (let i = 0; i < fullData.length; i++) {
-      const char = fullData[i];
-      const pattern = code39[char as keyof typeof code39] || code39['0'];
-      
-      for (let j = 0; j < pattern.length; j++) {
-        if (pattern[j] === '1') {
-          ctx.fillRect(x, 20, barWidth, barHeight);
-        }
-        x += barWidth + gap;
-      }
-      
-      // Gap between characters
-      x += gap * 2;
-    }
-
-    // Draw text below barcode
-    ctx.fillStyle = 'black';
-    ctx.font = '14px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(barcodeData, width / 2, height - 10);
-  };
-
-  React.useEffect(() => {
-    if (isOpen) {
-      setTimeout(drawBarcode, 100);
-    }
-  }, [isOpen, barcodeData]);
 
   const handleCopyData = () => {
     navigator.clipboard.writeText(barcodeData);
@@ -143,7 +72,7 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
               <div className="flex items-center justify-between">
                 <span className="font-mono text-lg">{barcodeData}</span>
                 <Button variant="outline" size="sm" onClick={handleCopyData}>
-                  <Copy className="h-4 w-4" />
+                  <Copy className="h-4 w-4 mr-2" />
                   Copy
                 </Button>
               </div>
@@ -158,11 +87,23 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
               <CardTitle className="text-lg">Barcode</CardTitle>
             </CardHeader>
             <CardContent className="text-center">
-              <canvas
-                ref={canvasRef}
-                className="border border-gray-200 rounded mx-auto"
-                style={{ maxWidth: '100%' }}
-              />
+              <div className="border border-gray-200 rounded mx-auto inline-block p-4 bg-white">
+                <Barcode
+                  // @ts-ignore - react-barcode doesn't have official types
+                  ref={canvasRef}
+                  value={barcodeData}
+                  format="CODE39"
+                  renderer="canvas"
+                  width={2}
+                  height={60}
+                  displayValue={true}
+                  font="monospace"
+                  fontSize={16}
+                  textAlign="center"
+                  textMargin={2}
+                  margin={10}
+                />
+              </div>
               <div className="mt-4">
                 <Button onClick={handleDownload}>
                   <Download className="h-4 w-4 mr-2" />
