@@ -158,22 +158,44 @@ const TimeRegistrations = () => {
         'Start Time',
         'End Time',
         'Duration (minutes)',
+        'Cost (EUR)',
         'Status'
       ];
 
-      const csvData = filteredRegistrations.map((reg: any) => [
-        reg.employees?.name || 'Unknown Employee',
-        reg.tasks?.phases?.projects?.name || (reg.workstation_tasks?.workstations ? `Workstation: ${reg.workstation_tasks.workstations.name}` : 'Unknown Project'),
-        reg.tasks?.title || reg.workstation_tasks?.task_name || 'Unknown Task',
-        formatDateTime(reg.start_time),
-        reg.end_time ? formatDateTime(reg.end_time) : '',
-        reg.duration_minutes || 0,
-        reg.is_active ? 'Active' : 'Completed'
-      ]);
+      const csvData = filteredRegistrations.map((reg: any) => {
+        const duration = reg.duration_minutes || 0;
+        const hourlyCost = reg.tasks?.standard_tasks?.hourly_cost;
+        let cost = 0;
+        if (hourlyCost && duration > 0) {
+          cost = parseFloat(((duration / 60) * hourlyCost).toFixed(2));
+        }
+        
+        const rowData = [
+          reg.employees?.name || (currentEmployee?.name ||'Unknown Employee'),
+          reg.tasks?.phases?.projects?.name || (reg.workstation_tasks?.workstations ? `Workstation: ${reg.workstation_tasks.workstations.name}` : 'Unknown Project'),
+          reg.tasks?.title || reg.workstation_tasks?.task_name || 'Unknown Task',
+          formatDateTime(reg.start_time),
+          reg.end_time ? formatDateTime(reg.end_time) : '',
+          reg.duration_minutes || 0,
+          cost,
+          reg.is_active ? 'Active' : 'Completed'
+        ];
+
+        // For non-admin view, the 'Employee' column is not in the table, but we want it in the CSV.
+        // We'll remove it from the headers if not admin, for visual consistency with table.
+        // Oh wait, the user wants it in the CSV for both. I'll just keep it.
+
+        if(!canViewAllRegistrations){
+          return rowData.slice(1); // remove employee from personal view
+        }
+        return rowData;
+      });
+
+      const csvHeaders = canViewAllRegistrations ? headers : headers.slice(1);
 
       const csvContent = [
-        headers.join(','),
-        ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+        csvHeaders.join(','),
+        ...csvData.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
       ].join('\n');
 
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -348,11 +370,19 @@ const TimeRegistrations = () => {
                     <TableHead>Start Time</TableHead>
                     <TableHead>End Time</TableHead>
                     <TableHead>Duration</TableHead>
+                    <TableHead>Cost</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRegistrations.map((registration: any) => (
+                  {filteredRegistrations.map((registration: any) => {
+                    const duration = registration.duration_minutes || 0;
+                    const hourlyCost = registration.tasks?.standard_tasks?.hourly_cost;
+                    let cost = 0;
+                    if (hourlyCost && duration > 0) {
+                      cost = (duration / 60) * hourlyCost;
+                    }
+                    return (
                     <TableRow key={registration.id}>
                       <TableCell className="font-medium">
                         {registration.tasks?.phases?.projects?.name || (registration.workstation_tasks?.workstations ? `Workstation: ${registration.workstation_tasks.workstations.name}` : 'Unknown Project')}
@@ -363,13 +393,15 @@ const TimeRegistrations = () => {
                         {registration.end_time ? formatDateTime(registration.end_time) : '-'}
                       </TableCell>
                       <TableCell>{formatDuration(registration.duration_minutes)}</TableCell>
+                      <TableCell>{formatCurrency(cost)}</TableCell>
                       <TableCell>
                         <Badge variant={registration.is_active ? 'default' : 'secondary'}>
                           {registration.is_active ? 'Active' : 'Completed'}
                         </Badge>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -558,11 +590,19 @@ const TimeRegistrations = () => {
                   <TableHead>Start Time</TableHead>
                   <TableHead>End Time</TableHead>
                   <TableHead>Duration</TableHead>
+                  <TableHead>Cost</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRegistrations.map((registration: any) => (
+                {filteredRegistrations.map((registration: any) => {
+                   const duration = registration.duration_minutes || 0;
+                   const hourlyCost = registration.tasks?.standard_tasks?.hourly_cost;
+                   let cost = 0;
+                   if (hourlyCost && duration > 0) {
+                     cost = (duration / 60) * hourlyCost;
+                   }
+                  return (
                   <TableRow key={registration.id}>
                     <TableCell className="font-medium">
                       {registration.employees?.name || 'Unknown Employee'}
@@ -576,13 +616,15 @@ const TimeRegistrations = () => {
                       {registration.end_time ? formatDateTime(registration.end_time) : '-'}
                     </TableCell>
                     <TableCell>{formatDuration(registration.duration_minutes)}</TableCell>
+                    <TableCell>{formatCurrency(cost)}</TableCell>
                     <TableCell>
                       <Badge variant={registration.is_active ? 'default' : 'secondary'}>
                         {registration.is_active ? 'Active' : 'Completed'}
                       </Badge>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>

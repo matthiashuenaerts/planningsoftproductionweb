@@ -355,6 +355,7 @@ export const timeRegistrationService = {
       .from('time_registrations')
       .select(`
         *,
+        employees (name),
         tasks (
           title, 
           phases (name, projects (id, name)),
