@@ -447,8 +447,10 @@ const ProjectOrders = () => {
                                   <TableHead className="h-8 py-2 text-xs">Step</TableHead>
                                   <TableHead className="h-8 py-2 text-xs">Supplier</TableHead>
                                   <TableHead className="h-8 py-2 text-xs">Status</TableHead>
-                                  <TableHead className="h-8 py-2 text-xs">Start Date</TableHead>
-                                  <TableHead className="h-8 py-2 text-xs">End Date</TableHead>
+                                  <TableHead className="h-8 py-2 text-xs">Start</TableHead>
+                                  <TableHead className="h-8 py-2 text-xs">End</TableHead>
+                                  <TableHead className="h-8 py-2 text-xs text-center">Duration</TableHead>
+                                  <TableHead className="h-8 py-2 text-xs">Notes</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -460,6 +462,8 @@ const ProjectOrders = () => {
                                     <TableCell className="py-1 text-xs">{getStepStatusBadge(step.status)}</TableCell>
                                     <TableCell className="py-1 text-xs">{step.start_date ? format(new Date(step.start_date), 'MMM d, yy') : 'N/A'}</TableCell>
                                     <TableCell className="py-1 text-xs">{step.end_date ? format(new Date(step.end_date), 'MMM d, yy') : 'N/A'}</TableCell>
+                                    <TableCell className="py-1 text-xs text-center">{step.expected_duration_days ? `${step.expected_duration_days}d` : '-'}</TableCell>
+                                    <TableCell className="py-1 text-xs">{step.notes || '-'}</TableCell>
                                   </TableRow>
                                 ))}
                               </TableBody>

@@ -85,7 +85,17 @@ const ProjectDetails = () => {
         setAccessories(accessoriesData);
 
         const ordersData = await orderService.getByProject(projectId);
-        setOrders(ordersData);
+        
+        const ordersWithDetails = await Promise.all(
+          ordersData.map(async (order) => {
+            if (order.order_type === 'semi-finished') {
+              const orderSteps = await orderService.getOrderSteps(order.id);
+              return { ...order, orderSteps };
+            }
+            return order;
+          })
+        );
+        setOrders(ordersWithDetails);
       } catch (error: any) {
         toast({
           title: "Error",
@@ -530,11 +540,26 @@ const ProjectDetails = () => {
                     <div className="space-y-2">
                       <h4 className="text-sm font-medium">Semi-finished Product Deliveries</h4>
                       <div className="space-y-1.5 text-sm">
-                        {semiFinishedOrders.map(order => (
-                          <div key={order.id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                            <span className="font-medium">{order.supplier}</span>
-                            <span className="text-muted-foreground">{formatDate(order.expected_delivery)}</span>
-                          </div>
+                        {semiFinishedOrders.map((order: any) => (
+                          order.orderSteps && order.orderSteps.length > 0 && (
+                            <div key={order.id} className="bg-gray-50 p-2 rounded">
+                              <p className="font-medium mb-1">{order.supplier} (Main Order)</p>
+                              <div className="pl-2 space-y-1">
+                                {order.orderSteps
+                                  .filter((step: any) => step.supplier)
+                                  .map((step: any) => (
+                                    <div key={step.id} className="flex justify-between items-center">
+                                      <span className="text-muted-foreground truncate" title={`${step.name} (${step.supplier})`}>
+                                        {step.name} ({step.supplier})
+                                      </span>
+                                      <span className="font-medium whitespace-nowrap ml-2">
+                                        {step.end_date ? formatDate(step.end_date) : 'N/A'}
+                                      </span>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )
                         ))}
                       </div>
                     </div>
