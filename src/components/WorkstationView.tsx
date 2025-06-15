@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
@@ -128,7 +127,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   useEffect(() => {
     const timer = setInterval(() => {
       setTasks(prevTasks => prevTasks.map(task => {
-        if (task.status === 'IN_PROGRESS' && task.status_changed_at && task.duration) {
+        if (task.status === 'IN_PROGRESS' && task.status_changed_at && task.duration !== null && task.duration !== undefined) {
           const startTime = new Date(task.status_changed_at);
           const now = new Date();
           const elapsedMs = now.getTime() - startTime.getTime();
@@ -153,7 +152,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
             
             return {
               ...task,
-              timeRemaining: `+${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
+              timeRemaining: `-${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
               isOvertime: true
             };
           }

@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface TimeRegistration {
@@ -145,8 +144,8 @@ export const timeRegistrationService = {
         .eq('id', registration.task_id)
         .maybeSingle();
       
-      if (taskData && taskData.duration) {
-        remainingDuration = Math.max(0, taskData.duration - durationMinutes);
+      if (taskData && typeof taskData.duration === 'number') {
+        remainingDuration = taskData.duration - durationMinutes;
       }
     }
     
@@ -273,8 +272,8 @@ export const timeRegistrationService = {
             .eq('id', registration.task_id)
             .maybeSingle();
           
-          if (taskData?.duration) {
-            remainingDuration = Math.max(0, taskData.duration - durationMinutes);
+          if (taskData && typeof taskData.duration === 'number') {
+            remainingDuration = taskData.duration - durationMinutes;
           }
         }
         
@@ -362,4 +361,3 @@ export const timeRegistrationService = {
     return data || [];
   }
 };
-
