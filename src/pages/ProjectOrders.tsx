@@ -349,181 +349,187 @@ const ProjectOrders = () => {
               </Card>
             ) : (
               <div className="grid gap-4">
-                {orders.map((order) => (
-                  <Card key={order.id} className="overflow-hidden">
-                    <CardHeader className="pb-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-lg">{order.supplier}</CardTitle>
-                          <CardDescription>
-                            Ordered: {format(new Date(order.order_date), 'MMM dd, yyyy')} | 
-                            Expected: {format(new Date(order.expected_delivery), 'MMM dd, yyyy')}
-                          </CardDescription>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(order.status)}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedOrderId(order.id);
-                              setShowEditOrderModal(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Order</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This order has linked accessories. What would you like to do?
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteOrder(order.id, false)}
-                                  className="bg-blue-600 hover:bg-blue-700"
-                                >
-                                  Keep Accessories
-                                </AlertDialogAction>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteOrder(order.id, true)}
-                                  className="bg-red-600 hover:bg-red-700"
-                                >
-                                  Delete All
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {/* Order Items */}
-                      {order.orderItems && order.orderItems.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-semibold mb-2">Order Items</h4>
-                          <div className="border rounded-lg overflow-hidden">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="h-8 py-2 text-xs">Article Code</TableHead>
-                                  <TableHead className="h-8 py-2 text-xs">Description</TableHead>
-                                  <TableHead className="h-8 py-2 text-xs text-right">Quantity</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {order.orderItems.map((item) => (
-                                  <TableRow key={item.id} className="h-8">
-                                    <TableCell className="py-1 text-xs font-medium">
-                                      {item.article_code || 'N/A'}
-                                    </TableCell>
-                                    <TableCell className="py-1 text-xs">{item.description}</TableCell>
-                                    <TableCell className="py-1 text-xs text-right">{item.quantity}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
+                {orders.map((order) => {
+                  const isProcessingOnlyOrder = order.order_type === 'semi-finished' && (!order.orderItems || order.orderItems.length === 0) && order.orderSteps && order.orderSteps.length > 0;
+                  
+                  return (
+                    <Card key={order.id} className="overflow-hidden">
+                      <CardHeader className="pb-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-lg">{order.supplier}</CardTitle>
+                            <CardDescription>
+                              {isProcessingOnlyOrder
+                                ? `Processing Order | Starts: ${format(new Date(order.expected_delivery), 'MMM dd, yyyy')}`
+                                : `Ordered: ${format(new Date(order.order_date), 'MMM dd, yyyy')} | Expected: ${format(new Date(order.expected_delivery), 'MMM dd, yyyy')}`
+                              }
+                            </CardDescription>
                           </div>
-                        </div>
-                      )}
-
-                      {/* Order Steps for semi-finished products */}
-                      {order.order_type === 'semi-finished' && order.orderSteps && order.orderSteps.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-semibold mb-2">Processing Steps</h4>
-                          <div className="border rounded-lg overflow-hidden">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="h-8 py-2 text-xs">#</TableHead>
-                                  <TableHead className="h-8 py-2 text-xs">Step</TableHead>
-                                  <TableHead className="h-8 py-2 text-xs">Supplier</TableHead>
-                                  <TableHead className="h-8 py-2 text-xs">Status</TableHead>
-                                  <TableHead className="h-8 py-2 text-xs">Start</TableHead>
-                                  <TableHead className="h-8 py-2 text-xs">End</TableHead>
-                                  <TableHead className="h-8 py-2 text-xs text-center">Duration</TableHead>
-                                  <TableHead className="h-8 py-2 text-xs">Notes</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {order.orderSteps.map((step) => (
-                                  <TableRow key={step.id} className="h-8">
-                                    <TableCell className="py-1 text-xs font-medium">{step.step_number}</TableCell>
-                                    <TableCell className="py-1 text-xs">{step.name}</TableCell>
-                                    <TableCell className="py-1 text-xs">{step.supplier || 'Internal'}</TableCell>
-                                    <TableCell className="py-1 text-xs">{getStepStatusBadge(step.status)}</TableCell>
-                                    <TableCell className="py-1 text-xs">{step.start_date ? format(new Date(step.start_date), 'MMM d, yy') : 'N/A'}</TableCell>
-                                    <TableCell className="py-1 text-xs">{step.end_date ? format(new Date(step.end_date), 'MMM d, yy') : 'N/A'}</TableCell>
-                                    <TableCell className="py-1 text-xs text-center">{step.expected_duration_days ? `${step.expected_duration_days}d` : '-'}</TableCell>
-                                    <TableCell className="py-1 text-xs">{step.notes || '-'}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Order Attachments */}
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <h4 className="text-sm font-semibold">Files</h4>
-                          <OrderAttachmentUploader 
-                            orderId={order.id} 
-                            onUploadSuccess={handleAttachmentUpload}
-                            compact={true}
-                          />
-                        </div>
-                        
-                        {order.attachments && order.attachments.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                            {order.attachments.map((attachment) => (
-                              <div 
-                                key={attachment.id} 
-                                className="border rounded p-2 flex items-center justify-between bg-gray-50 text-xs"
-                              >
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium truncate">{attachment.file_name}</p>
-                                  <p className="text-muted-foreground">
-                                    {(attachment.file_size / 1024).toFixed(1)} KB
-                                  </p>
-                                </div>
-                                <div className="flex items-center gap-1 ml-2">
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="h-6 w-12 text-xs"
-                                    onClick={() => window.open(attachment.file_path, '_blank')}
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(order.status)}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedOrderId(order.id);
+                                setShowEditOrderModal(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This order has linked accessories. What would you like to do?
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteOrder(order.id, false)}
+                                    className="bg-blue-600 hover:bg-blue-700"
                                   >
-                                    View
-                                  </Button>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    className="h-6 w-6 p-0"
-                                    onClick={() => handleDeleteAttachment(attachment.id, order.id)}
+                                    Keep Accessories
+                                  </AlertDialogAction>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteOrder(order.id, true)}
+                                    className="bg-red-600 hover:bg-red-700"
                                   >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
+                                    Delete All
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">No files attached to this order.</p>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {/* Order Items */}
+                        {order.orderItems && order.orderItems.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-semibold mb-2">Order Items</h4>
+                            <div className="border rounded-lg overflow-hidden">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="h-8 py-2 text-xs">Article Code</TableHead>
+                                    <TableHead className="h-8 py-2 text-xs">Description</TableHead>
+                                    <TableHead className="h-8 py-2 text-xs text-right">Quantity</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {order.orderItems.map((item) => (
+                                    <TableRow key={item.id} className="h-8">
+                                      <TableCell className="py-1 text-xs font-medium">
+                                        {item.article_code || 'N/A'}
+                                      </TableCell>
+                                      <TableCell className="py-1 text-xs">{item.description}</TableCell>
+                                      <TableCell className="py-1 text-xs text-right">{item.quantity}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
                         )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+
+                        {/* Order Steps for semi-finished products */}
+                        {order.order_type === 'semi-finished' && order.orderSteps && order.orderSteps.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-semibold mb-2">Logistics Out</h4>
+                            <div className="border rounded-lg overflow-hidden">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="h-8 py-2 text-xs">#</TableHead>
+                                    <TableHead className="h-8 py-2 text-xs">Step</TableHead>
+                                    <TableHead className="h-8 py-2 text-xs">Supplier</TableHead>
+                                    <TableHead className="h-8 py-2 text-xs">Status</TableHead>
+                                    <TableHead className="h-8 py-2 text-xs">Start</TableHead>
+                                    <TableHead className="h-8 py-2 text-xs">End</TableHead>
+                                    <TableHead className="h-8 py-2 text-xs text-center">Duration</TableHead>
+                                    <TableHead className="h-8 py-2 text-xs">Notes</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {order.orderSteps.map((step) => (
+                                    <TableRow key={step.id} className="h-8">
+                                      <TableCell className="py-1 text-xs font-medium">{step.step_number}</TableCell>
+                                      <TableCell className="py-1 text-xs">{step.name}</TableCell>
+                                      <TableCell className="py-1 text-xs">{step.supplier || 'Internal'}</TableCell>
+                                      <TableCell className="py-1 text-xs">{getStepStatusBadge(step.status)}</TableCell>
+                                      <TableCell className="py-1 text-xs">{step.start_date ? format(new Date(step.start_date), 'MMM d, yy') : 'N/A'}</TableCell>
+                                      <TableCell className="py-1 text-xs">{step.end_date ? format(new Date(step.end_date), 'MMM d, yy') : 'N/A'}</TableCell>
+                                      <TableCell className="py-1 text-xs text-center">{step.expected_duration_days ? `${step.expected_duration_days}d` : '-'}</TableCell>
+                                      <TableCell className="py-1 text-xs">{step.notes || '-'}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Order Attachments */}
+                        <div>
+                          <div className="flex justify-between items-center mb-2">
+                            <h4 className="text-sm font-semibold">Files</h4>
+                            <OrderAttachmentUploader 
+                              orderId={order.id} 
+                              onUploadSuccess={handleAttachmentUpload}
+                              compact={true}
+                            />
+                          </div>
+                          
+                          {order.attachments && order.attachments.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                              {order.attachments.map((attachment) => (
+                                <div 
+                                  key={attachment.id} 
+                                  className="border rounded p-2 flex items-center justify-between bg-gray-50 text-xs"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium truncate">{attachment.file_name}</p>
+                                    <p className="text-muted-foreground">
+                                      {(attachment.file_size / 1024).toFixed(1)} KB
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-1 ml-2">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-6 w-12 text-xs"
+                                      onClick={() => window.open(attachment.file_path, '_blank')}
+                                    >
+                                      View
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      className="h-6 w-6 p-0"
+                                      onClick={() => handleDeleteAttachment(attachment.id, order.id)}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">No files attached to this order.</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </div>
             )}
           </div>

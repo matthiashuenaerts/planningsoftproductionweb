@@ -56,6 +56,8 @@ const NewOrderModal = ({
   const [isScheduleInvalid, setIsScheduleInvalid] = useState(false);
   const [scheduleWarning, setScheduleWarning] = useState<string | null>(null);
 
+  const isProcessingOnly = orderType === 'semi-finished' && orderItems.length === 0;
+
   const stepDurations = useMemo(() => orderSteps.map(s => s.expected_duration_days || 0).join(','), [orderSteps]);
   const stepCount = orderSteps.length;
 
@@ -281,11 +283,14 @@ const NewOrderModal = ({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="supplier">Supplier *</Label>
-            <Input id="supplier" value={formData.supplier} onChange={e => setFormData(prev => ({
-            ...prev,
-            supplier: e.target.value
-          }))} required />
+            <Label htmlFor="supplier">{isProcessingOnly ? 'Order Name *' : 'Supplier *'}</Label>
+            <Input 
+              id="supplier" 
+              value={formData.supplier} 
+              onChange={e => setFormData(prev => ({ ...prev, supplier: e.target.value }))} 
+              placeholder={isProcessingOnly ? "e.g., External Powder Coating Job" : "Supplier name"}
+              required 
+            />
           </div>
           <div>
             <Label htmlFor="order_reference">Order Reference</Label>
@@ -298,7 +303,7 @@ const NewOrderModal = ({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="expected_delivery">Material Delivery *</Label>
+            <Label htmlFor="expected_delivery">{isProcessingOnly ? 'Processing Start *' : 'Material Delivery *'}</Label>
             <Input id="expected_delivery" type="date" value={formData.expected_delivery} onChange={e => setFormData(prev => ({
             ...prev,
             expected_delivery: e.target.value
@@ -416,7 +421,9 @@ const NewOrderModal = ({
           </CardHeader>
           <CardContent>
             {orderItems.length === 0 ? <p className="text-muted-foreground text-center py-4">
-                No items added yet. Click "Add Item" to get started.
+                {isProcessingOnly
+                  ? "This is a processing-only order. Add items if you also need to order materials."
+                  : 'No items added yet. Click "Add Item" to get started.'}
               </p> : <Table>
                 <TableHeader>
                   <TableRow>
