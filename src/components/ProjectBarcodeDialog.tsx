@@ -1,3 +1,4 @@
+
 import React, { useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,7 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
   projectId,
   projectName
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const barcodeContainerRef = useRef<HTMLDivElement>(null);
   const {
     toast
   } = useToast();
@@ -37,10 +38,19 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
     });
   };
   const handleDownload = () => {
-    if (!canvasRef.current) return;
+    if (!barcodeContainerRef.current) return;
+    const canvas = barcodeContainerRef.current.querySelector('canvas');
+    if (!canvas) {
+      toast({
+        title: 'Error',
+        description: 'Could not find barcode canvas to download.',
+        variant: 'destructive'
+      });
+      return;
+    }
     const link = document.createElement('a');
     link.download = `barcode-${projectName.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
-    link.href = canvasRef.current.toDataURL();
+    link.href = canvas.toDataURL('image/png');
     link.click();
     toast({
       title: 'Downloaded',
@@ -64,10 +74,9 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
               <CardTitle className="text-lg">Barcode</CardTitle>
             </CardHeader>
             <CardContent className="text-center">
-              <div className="border border-gray-200 rounded mx-auto inline-block p-4 bg-white">
+              <div ref={barcodeContainerRef} className="border border-gray-200 rounded mx-auto inline-block p-4 bg-white">
                 <Barcode
-              // @ts-ignore - react-barcode doesn't have official types
-              ref={canvasRef} value={barcodeData} format="CODE39" renderer="canvas" width={2} height={60} displayValue={true} font="monospace" fontSize={16} textAlign="center" textMargin={2} margin={10} />
+                  value={barcodeData} format="CODE39" renderer="canvas" width={2} height={60} displayValue={true} font="monospace" fontSize={16} textAlign="center" textMargin={2} margin={10} />
               </div>
               <div className="mt-4">
                 <Button onClick={handleDownload}>
