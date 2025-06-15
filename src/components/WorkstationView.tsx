@@ -19,7 +19,7 @@ import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Packag
 import { format, differenceInDays, isAfter, isBefore } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
-import PartsListViewer from '@/components/PartsListViewer';
+import { PartsListViewer } from '@/components/PartsListViewer';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 
