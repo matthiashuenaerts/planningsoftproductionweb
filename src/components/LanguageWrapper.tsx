@@ -18,7 +18,8 @@ const LanguageWrapper = () => {
 
     if (!lang || !supportedLanguages.includes(lang)) {
         const restOfPath = location.pathname.substring(lang ? `/${lang}`.length : 0);
-        return <Navigate to={`/${i18n.fallbackLng}${restOfPath}`} replace />;
+        const fallbackLng = Array.isArray(i18n.options.fallbackLng) ? i18n.options.fallbackLng[0] : i18n.options.fallbackLng;
+        return <Navigate to={`/${fallbackLng}${restOfPath}`} replace />;
     }
     
     return <Outlet />;
