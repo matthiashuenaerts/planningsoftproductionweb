@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,7 @@ interface NewOrderModalProps {
     orderItems: Partial<OrderItem>[];
     supplier?: string;
   } | null;
-  accessories: Accessory[];
+  accessories?: Accessory[];
 }
 const NewOrderModal = ({
   open,
@@ -33,7 +34,7 @@ const NewOrderModal = ({
   onSuccess,
   showAddOrderButton = false,
   prefilledData = null,
-  accessories
+  accessories = []
 }: NewOrderModalProps) => {
   const {
     toast

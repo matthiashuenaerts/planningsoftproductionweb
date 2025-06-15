@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -13,7 +12,7 @@ import Navbar from '@/components/Navbar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useNavigate } from 'react-router-dom';
 import { orderService } from '@/services/orderService';
-import { accessoriesService } from '@/services/accessoriesService';
+import { accessoriesService, Accessory } from '@/services/accessoriesService';
 import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
 import NewOrderModal from '@/components/NewOrderModal';
 import OrderEditModal from '@/components/OrderEditModal';
@@ -69,6 +68,7 @@ const ProjectOrders = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [accessories, setAccessories] = useState<Accessory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [showEditOrderModal, setShowEditOrderModal] = useState(false);
@@ -87,6 +87,10 @@ const ProjectOrders = () => {
       if (!projectId) {
         throw new Error('Project ID is required');
       }
+
+      // Fetch accessories for the project
+      const accessoriesData = await accessoriesService.getByProject(projectId);
+      setAccessories(accessoriesData);
 
       // Fetch orders for the specific project
       const { data: ordersData, error: ordersError } = await supabase
@@ -448,6 +452,7 @@ const ProjectOrders = () => {
         onOpenChange={setShowNewOrderModal}
         projectId={projectId!}
         onSuccess={handleOrderSuccess}
+        accessories={accessories}
       />
 
       {selectedOrderId && (
