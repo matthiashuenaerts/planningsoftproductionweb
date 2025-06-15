@@ -71,7 +71,7 @@ const NotificationBanner = () => {
             <AlertDescription>
                 {latestUnread.message}
             </AlertDescription>
-            <Button variant="ghost" size="icon" onClick={handleClose} className="absolute top-1 right-1 h-6 w-6 px-0">
+            <Button variant="ghost" size="icon" onClick={handleClose} className="absolute top-1 right-1 h-6 w-6 px-px">
                 <X className="h-4 w-4" />
             </Button>
         </Alert>;
