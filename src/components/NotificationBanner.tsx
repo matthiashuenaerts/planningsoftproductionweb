@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
@@ -6,12 +7,15 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { X, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+
 const NotificationBanner = () => {
   const {
     currentEmployee
   } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { i18n } = useTranslation();
   const [latestUnread, setLatestUnread] = useState<Notification | null>(null);
   const {
     data: notifications,
@@ -56,8 +60,11 @@ const NotificationBanner = () => {
   };
   const handleClick = () => {
     if (latestUnread) {
-      if (latestUnread.rush_order_id) {
-        navigate(`/rush-orders/${latestUnread.rush_order_id}`);
+      const lang = i18n.language;
+      if (latestUnread.link) {
+        navigate(`/${lang}${latestUnread.link}`);
+      } else if (latestUnread.rush_order_id) {
+        navigate(`/${lang}/rush-orders/${latestUnread.rush_order_id}`);
       }
       handleClose();
     }

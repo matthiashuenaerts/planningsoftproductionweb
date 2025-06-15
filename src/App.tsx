@@ -28,6 +28,8 @@ import Logistics from "./pages/Logistics";
 import LogisticsOut from "./pages/LogisticsOut";
 import TimeRegistrations from "./pages/TimeRegistrations";
 import NotFound from "./pages/NotFound";
+import LanguageWrapper from "./components/LanguageWrapper";
+import RedirectToLang from "./components/RedirectToLang";
 
 const queryClient = new QueryClient();
 
@@ -42,97 +44,100 @@ const App = () => (
             <GlobalComponents />
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              } />
-              <Route path="/projects" element={
-                <ProtectedRoute>
-                  <Projects />
-                </ProtectedRoute>
-              } />
-              <Route path="/projects/:projectId" element={
-                <ProtectedRoute>
-                  <ProjectDetails />
-                </ProtectedRoute>
-              } />
-              <Route path="/workstations" element={
-                <ProtectedRoute>
-                  <Workstations />
-                </ProtectedRoute>
-              } />
-              <Route path="/personal-tasks" element={
-                <ProtectedRoute>
-                  <PersonalTasks />
-                </ProtectedRoute>
-              } />
-              <Route path="/daily-tasks" element={
-                <ProtectedRoute>
-                  <DailyTasks />
-                </ProtectedRoute>
-              } />
-              <Route path="/planning" element={
-                <ProtectedRoute>
-                  <Planning />
-                </ProtectedRoute>
-              } />
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              } />
-              <Route path="/orders" element={
-                <ProtectedRoute>
-                  <Orders />
-                </ProtectedRoute>
-              } />
-              <Route path="/projects/:projectId/orders" element={
-                <ProtectedRoute>
-                  <ProjectOrders />
-                </ProtectedRoute>
-              } />
-              <Route path="/rush-orders" element={
-                <ProtectedRoute>
-                  <RushOrders />
-                </ProtectedRoute>
-              } />
-              <Route path="/rush-orders/:rushOrderId" element={
-                <ProtectedRoute>
-                  <RushOrderDetails />
-                </ProtectedRoute>
-              } />
-              <Route path="/broken-parts" element={
-                <ProtectedRoute>
-                  <BrokenParts />
-                </ProtectedRoute>
-              } />
-              <Route path="/broken-parts/summary" element={
-                <ProtectedRoute>
-                  <BrokenPartsSummary />
-                </ProtectedRoute>
-              } />
-              <Route path="/broken-parts/new" element={
-                <ProtectedRoute>
-                  <NewBrokenPart />
-                </ProtectedRoute>
-              } />
-              <Route path="/logistics" element={
-                <ProtectedRoute>
-                  <Logistics />
-                </ProtectedRoute>
-              } />
-              <Route path="/logistics-out" element={
-                <ProtectedRoute>
-                  <LogisticsOut />
-                </ProtectedRoute>
-              } />
-              <Route path="/time-registrations" element={
-                <ProtectedRoute>
-                  <TimeRegistrations />
-                </ProtectedRoute>
-              } />
-              <Route path="*" element={<NotFound />} />
+              <Route path="/:lang" element={<LanguageWrapper />}>
+                <Route index element={
+                  <ProtectedRoute>
+                    <Index />
+                  </ProtectedRoute>
+                } />
+                <Route path="projects" element={
+                  <ProtectedRoute>
+                    <Projects />
+                  </ProtectedRoute>
+                } />
+                <Route path="projects/:projectId" element={
+                  <ProtectedRoute>
+                    <ProjectDetails />
+                  </ProtectedRoute>
+                } />
+                <Route path="workstations" element={
+                  <ProtectedRoute>
+                    <Workstations />
+                  </ProtectedRoute>
+                } />
+                <Route path="personal-tasks" element={
+                  <ProtectedRoute>
+                    <PersonalTasks />
+                  </ProtectedRoute>
+                } />
+                <Route path="daily-tasks" element={
+                  <ProtectedRoute>
+                    <DailyTasks />
+                  </ProtectedRoute>
+                } />
+                <Route path="planning" element={
+                  <ProtectedRoute>
+                    <Planning />
+                  </ProtectedRoute>
+                } />
+                <Route path="settings" element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                } />
+                <Route path="orders" element={
+                  <ProtectedRoute>
+                    <Orders />
+                  </ProtectedRoute>
+                } />
+                <Route path="projects/:projectId/orders" element={
+                  <ProtectedRoute>
+                    <ProjectOrders />
+                  </ProtectedRoute>
+                } />
+                <Route path="rush-orders" element={
+                  <ProtectedRoute>
+                    <RushOrders />
+                  </ProtectedRoute>
+                } />
+                <Route path="rush-orders/:rushOrderId" element={
+                  <ProtectedRoute>
+                    <RushOrderDetails />
+                  </ProtectedRoute>
+                } />
+                <Route path="broken-parts" element={
+                  <ProtectedRoute>
+                    <BrokenParts />
+                  </ProtectedRoute>
+                } />
+                <Route path="broken-parts/summary" element={
+                  <ProtectedRoute>
+                    <BrokenPartsSummary />
+                  </ProtectedRoute>
+                } />
+                <Route path="broken-parts/new" element={
+                  <ProtectedRoute>
+                    <NewBrokenPart />
+                  </ProtectedRoute>
+                } />
+                <Route path="logistics" element={
+                  <ProtectedRoute>
+                    <Logistics />
+                  </ProtectedRoute>
+                } />
+                <Route path="logistics-out" element={
+                  <ProtectedRoute>
+                    <LogisticsOut />
+                  </ProtectedRoute>
+                } />
+                <Route path="time-registrations" element={
+                  <ProtectedRoute>
+                    <TimeRegistrations />
+                  </ProtectedRoute>
+                } />
+                <Route path="*" element={<NotFound />} />
+              </Route>
+              <Route path="*" element={<RedirectToLang />} />
             </Routes>
           </TooltipProvider>
         </AppProvider>

@@ -1,0 +1,22 @@
+
+{
+  "dashboardTitle": "Production Phase Monitoring",
+  "userManagementTitle": "User Management",
+  "userManagementDescription": "As an administrator or team leader, you can add and manage users in the system.",
+  "navbar": {
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "workstations": "Workstations",
+    "brokenParts": "Broken Parts",
+    "personalTasks": "Personal Tasks",
+    "installationPlanning": "Installation planning",
+    "planning": "Planning",
+    "orders": "Orders",
+    "logistics": "Logistics",
+    "logisticsOut": "Logistics out",
+    "rushOrders": "Rush Orders",
+    "timeRegistrations": "Time Registrations",
+    "settings": "Settings",
+    "logout": "Logout"
+  }
+}

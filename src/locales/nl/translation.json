@@ -1,0 +1,22 @@
+
+{
+  "dashboardTitle": "Faseopvolging productie",
+  "userManagementTitle": "Gebruikersbeheer",
+  "userManagementDescription": "Als beheerder of teamleider kunt u gebruikers in het systeem toevoegen en beheren.",
+  "navbar": {
+    "dashboard": "Dashboard",
+    "projects": "Projecten",
+    "workstations": "Werkstations",
+    "brokenParts": "Gebroken onderdelen",
+    "personalTasks": "Persoonlijke taken",
+    "installationPlanning": "Installatieplanning",
+    "planning": "Planning",
+    "orders": "Bestellingen",
+    "logistics": "Logistiek",
+    "logisticsOut": "Logistiek uit",
+    "rushOrders": "Spoedbestellingen",
+    "timeRegistrations": "Tijdregistraties",
+    "settings": "Instellingen",
+    "logout": "Uitloggen"
+  }
+}
