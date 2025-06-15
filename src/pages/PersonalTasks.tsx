@@ -16,7 +16,7 @@ import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import EnhancedTaskCard from '@/components/EnhancedTaskCard';
-import { startOfDay, endOfDay } from 'date-fns';
+import { startOfDay, endOfDay, isToday } from 'date-fns';
 
 interface Task {
   id: string;
@@ -214,7 +214,14 @@ const PersonalTasks = () => {
     }
   });
 
-  const sortedTasksForTab = [...tasks].sort((a, b) => {
+  const dailyTasks = tasks.filter(task => {
+    const isScheduledForToday = scheduledTaskIds.includes(task.id);
+    // Appending T00:00:00 to treat date as local, not UTC
+    const isDueToday = isToday(new Date(`${task.due_date}T00:00:00`));
+    return isScheduledForToday || isDueToday;
+  });
+
+  const sortedTasksForTab = [...dailyTasks].sort((a, b) => {
     const aStartTimeStr = scheduleTimeMap.get(a.id);
     const bStartTimeStr = scheduleTimeMap.get(b.id);
 
@@ -262,11 +269,11 @@ const PersonalTasks = () => {
     };
   });
 
-  const scheduledTaskIds = schedules.map(s => s.task_id).filter(Boolean);
+  const scheduledTaskIdsInTimeline = schedules.map(s => s.task_id).filter(Boolean);
 
   // Add actual tasks to timeline with proper project information
   const taskTimelineItems = tasks
-    .filter(task => !scheduledTaskIds.includes(task.id))
+    .filter(task => !scheduledTaskIdsInTimeline.includes(task.id))
     .map(task => ({
       id: task.id,
       title: task.title,
@@ -391,6 +398,15 @@ const PersonalTasks = () => {
                 />
               ))}
             </div>
+
+            {tasks.length > 0 && sortedTasksForTab.length === 0 && (
+              <Card>
+                <CardContent className="pt-6 text-center">
+                  <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-500">No tasks scheduled or due for today.</p>
+                </CardContent>
+              </Card>
+            )}
 
             {tasks.length === 0 && (
               <Card>
