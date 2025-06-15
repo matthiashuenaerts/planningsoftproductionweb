@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,7 @@ import {
   DropdownMenuTrigger, 
   DropdownMenuSeparator 
 } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
 
 interface AccessoryQrCodeDialogProps {
   open: boolean;
@@ -47,6 +47,22 @@ export const AccessoryQrCodeDialog = ({ open, onOpenChange, accessories, startIn
   };
 
   const accessory = accessories[currentIndex];
+
+  const getDialogClassName = (status: Accessory['status']) => {
+    switch (status) {
+      case 'in_stock':
+      case 'delivered':
+        return 'bg-green-50';
+      case 'to_order':
+        return 'bg-red-50';
+      case 'ordered':
+        return 'bg-blue-50';
+      case 'to_check':
+        return 'bg-yellow-50';
+      default:
+        return '';
+    }
+  };
 
   const handleStatusUpdate = async (accessoryId: string, newStatus: Accessory['status'], quantityToUpdate: number) => {
     const accessoryToUpdate = accessories.find(a => a.id === accessoryId);
@@ -102,7 +118,7 @@ export const AccessoryQrCodeDialog = ({ open, onOpenChange, accessories, startIn
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-4xl">
+        <DialogContent className={cn("sm:max-w-4xl", getDialogClassName(accessory.status))}>
           <DialogHeader>
             <DialogTitle>Accessory QR Code</DialogTitle>
             <DialogDescription>
