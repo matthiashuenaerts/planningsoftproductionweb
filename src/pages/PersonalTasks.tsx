@@ -207,6 +207,26 @@ const PersonalTasks = () => {
     return (task.status === 'IN_PROGRESS' || isTaskActive(task.id)) && task.status !== 'COMPLETED';
   };
 
+  const scheduleTimeMap = new Map<string, string>();
+  schedules.forEach(schedule => {
+    if (schedule.task_id) {
+      scheduleTimeMap.set(schedule.task_id, schedule.start_time);
+    }
+  });
+
+  const sortedTasksForTab = [...tasks].sort((a, b) => {
+    const aStartTimeStr = scheduleTimeMap.get(a.id);
+    const bStartTimeStr = scheduleTimeMap.get(b.id);
+
+    if (aStartTimeStr && bStartTimeStr) {
+      return new Date(aStartTimeStr).getTime() - new Date(bStartTimeStr).getTime();
+    }
+    if (aStartTimeStr) return -1;
+    if (bStartTimeStr) return 1;
+    
+    return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+  });
+
   // Convert schedules to timeline format for DailyTimeline component
   const timelineTasks = schedules.map(schedule => {
     const associatedTask = schedule.task_id ? tasks.find(t => t.id === schedule.task_id) : undefined;
@@ -357,12 +377,13 @@ const PersonalTasks = () => {
 
           <TabsContent value="tasks" className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-              {tasks.map((task) => (
+              {sortedTasksForTab.map((task) => (
                 <EnhancedTaskCard
                   key={task.id}
                   task={task}
                   isActive={isTaskActive(task.id)}
                   canComplete={canCompleteTask(task)}
+                  scheduledTime={scheduleTimeMap.get(task.id)}
                   onStatusChange={handleTaskStatusChange}
                   onShowFiles={(projectId) => setShowFilesPopup(task.phases.projects.id)}
                   onShowParts={(projectId) => setShowPartsDialog(task.phases.projects.id)}

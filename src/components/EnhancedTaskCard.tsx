@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +32,7 @@ interface EnhancedTaskCardProps {
   task: Task;
   isActive: boolean;
   canComplete: boolean;
+  scheduledTime?: string;
   onStatusChange: (taskId: string, status: Task['status']) => void;
   onShowFiles: (projectId: string) => void;
   onShowParts: (projectId: string) => void;
@@ -41,6 +43,7 @@ const EnhancedTaskCard: React.FC<EnhancedTaskCardProps> = ({
   task,
   isActive,
   canComplete,
+  scheduledTime,
   onStatusChange,
   onShowFiles,
   onShowParts,
@@ -113,6 +116,12 @@ const EnhancedTaskCard: React.FC<EnhancedTaskCardProps> = ({
 
         {/* Task Details */}
         <div className="space-y-2">
+          {scheduledTime && (
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <Clock className="h-3 w-3 text-blue-500" />
+              <span>Scheduled for {format(new Date(scheduledTime), 'HH:mm')}</span>
+            </div>
+          )}
           <div className="flex items-center gap-2 text-xs text-gray-600">
             <User className="h-3 w-3" />
             <span className="truncate">Workstation: {task.workstation}</span>
