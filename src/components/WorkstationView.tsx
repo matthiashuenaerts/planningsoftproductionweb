@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
@@ -17,6 +18,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package, Barcode } from 'lucide-react';
 import { format, differenceInDays, isAfter, isBefore } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import ProjectFilesPopup from '@/components/ProjectFilesPopup';
+import PartsListViewer from '@/components/PartsListViewer';
+import { PartsListDialog } from '@/components/PartsListDialog';
+import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 
 interface WorkstationViewProps {
   workstationName?: string;
@@ -35,6 +40,7 @@ interface ExtendedTask extends Task {
 
 const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, workstationId, onBack }) => {
   const [actualWorkstationName, setActualWorkstationName] = useState<string>('');
+  const [componentError, setComponentError] = useState<string | null>(null);
   const [showProjectFiles, setShowProjectFiles] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [selectedProjectName, setSelectedProjectName] = useState<string>('');
@@ -255,7 +261,8 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     }
   }, [fetchedTasks]);
 
-  const error = queryError ? 'Failed to load tasks' : null;
+  const queryErrorMessage = queryError ? 'Failed to load tasks' : null;
+  const error = componentError || queryErrorMessage;
 
   const startTimerMutation = useMutation({
     mutationFn: ({ employeeId, taskId, remainingDuration }: { employeeId: string; taskId: string; remainingDuration?: number }) =>
@@ -331,11 +338,11 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
           if (workstation) {
             setActualWorkstationName(workstation.name);
           } else {
-            setError('Workstation not found');
+            setComponentError('Workstation not found');
           }
         } catch (error) {
           console.error('Error fetching workstation:', error);
-          setError('Failed to load workstation details');
+          setComponentError('Failed to load workstation details');
         }
       }
     };
