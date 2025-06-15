@@ -175,6 +175,7 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
             // Split accessory
             await accessoriesService.update(accessory.id, {
                 quantity: accessory.quantity - quantityToOrder,
+                status: 'in_stock',
             });
             const { id, created_at, updated_at, ...restOfAccessory } = accessory;
             await accessoriesService.create({
