@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { useQueryClient } from '@tanstack/react-query';
+import { useLanguage } from '@/context/LanguageContext';
 
 // Define workstation with appropriate icon mapping
 interface WorkstationWithIcon {
@@ -36,6 +37,7 @@ const Workstations: React.FC = () => {
     currentEmployee
   } = useAuth();
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
   useEffect(() => {
     const loadWorkstations = async () => {
       try {
@@ -51,8 +53,8 @@ const Workstations: React.FC = () => {
         setWorkstations(workstationsWithIcons);
       } catch (error: any) {
         toast({
-          title: "Error",
-          description: `Failed to load workstations: ${error.message}`,
+          title: t('error'),
+          description: t('failed_to_load_workstations', { message: error.message }),
           variant: "destructive"
         });
       } finally {
@@ -60,7 +62,7 @@ const Workstations: React.FC = () => {
       }
     };
     loadWorkstations();
-  }, [toast]);
+  }, [toast, t]);
 
   // Function to get icon based on workstation name
   const getWorkstationIcon = (name: string) => {
@@ -84,8 +86,8 @@ const Workstations: React.FC = () => {
       setWorkstationTasks(tasks);
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: `Failed to load workstation tasks: ${error.message}`,
+        title: t('error'),
+        description: t('failed_to_load_workstation_tasks', { message: error.message }),
         variant: "destructive"
       });
     } finally {
@@ -107,16 +109,16 @@ const Workstations: React.FC = () => {
         queryKey: ['activeTimeRegistration']
       });
       toast({
-        title: "Workstation Task Started",
-        description: `Started working on ${task.task_name}`
+        title: t('workstation_task_started'),
+        description: t('workstation_task_started_desc', { taskName: task.task_name })
       });
 
       // Close the dialog after starting the task
       setShowWorkstationTasks(null);
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: `Failed to start task: ${error.message}`,
+        title: t('error'),
+        description: t('failed_to_start_task', { message: error.message }),
         variant: "destructive"
       });
     }
@@ -124,11 +126,11 @@ const Workstations: React.FC = () => {
   const getPriorityBadge = (priority: string) => {
     switch (priority.toLowerCase()) {
       case 'high':
-        return <Badge className="bg-red-100 text-red-800 border-red-300">High</Badge>;
+        return <Badge className="bg-red-100 text-red-800 border-red-300">{t('priority_high_label')}</Badge>;
       case 'medium':
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Medium</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">{t('priority_medium_label')}</Badge>;
       case 'low':
-        return <Badge className="bg-green-100 text-green-800 border-green-300">Low</Badge>;
+        return <Badge className="bg-green-100 text-green-800 border-green-300">{t('priority_low_label')}</Badge>;
       default:
         return <Badge>{priority}</Badge>;
     }
@@ -152,11 +154,11 @@ const Workstations: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           {selectedWorkstation ? <div>
               <Button variant="outline" className="mb-4" onClick={() => setSelectedWorkstation(null)}>
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Workstations
+                <ArrowLeft className="mr-2 h-4 w-4" /> {t('back_to_workstations')}
               </Button>
               <WorkstationView workstationId={selectedWorkstation} onBack={() => setSelectedWorkstation(null)} />
             </div> : <div>
-              <h1 className="text-2xl font-bold mb-6">Workstations</h1>
+              <h1 className="text-2xl font-bold mb-6">{t('workstations_title')}</h1>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                 {workstations.map(workstation => <Card key={workstation.id} className="hover:shadow-md transition-shadow cursor-pointer relative">
                     <div className="absolute top-2 right-2 z-10">
@@ -172,7 +174,7 @@ const Workstations: React.FC = () => {
                       handleShowWorkstationTasks(workstation.id);
                     }}>
                             <ListCheck className="mr-2 h-4 w-4" />
-                            Workstation Tasks
+                            {t('workstation_tasks')}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -195,10 +197,10 @@ const Workstations: React.FC = () => {
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>
-              Workstation Tasks - {selectedWorkstationForTasks?.name}
+              {t('workstation_tasks_for', { name: selectedWorkstationForTasks?.name })}
             </DialogTitle>
             <DialogDescription>
-              Start tasks specific to this workstation
+              {t('workstation_tasks_desc')}
             </DialogDescription>
           </DialogHeader>
           
@@ -207,8 +209,8 @@ const Workstations: React.FC = () => {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
               </div> : workstationTasks.length === 0 ? <div className="text-center py-8">
                 <ListCheck className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-500">No workstation tasks available.</p>
-                <p className="text-sm text-gray-400">Add tasks in the settings page.</p>
+                <p className="text-gray-500">{t('no_workstation_tasks')}</p>
+                <p className="text-sm text-gray-400">{t('add_tasks_in_settings')}</p>
               </div> : <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {workstationTasks.map(task => <Card key={task.id} className="h-fit">
                     <CardContent className="p-4">
@@ -228,7 +230,7 @@ const Workstations: React.FC = () => {
                         <div className="flex gap-2 pt-2 border-t">
                           <Button size="sm" onClick={() => handleStartWorkstationTask(task)} className="flex-1">
                             <Play className="h-4 w-4 mr-1" />
-                            Start Task
+                            {t('start_task')}
                           </Button>
                         </div>
                       </div>

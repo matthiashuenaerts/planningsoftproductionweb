@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
@@ -22,11 +21,13 @@ import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListViewer } from '@/components/PartsListViewer';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface WorkstationViewProps {
   workstationName?: string;
   workstationId?: string;
   onBack?: () => void;
+  is_workstation_task?: boolean;
 }
 
 interface ExtendedTask extends Task {
@@ -38,7 +39,7 @@ interface ExtendedTask extends Task {
   is_workstation_task?: boolean;
 }
 
-const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, workstationId, onBack }) => {
+const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, workstationId, onBack, is_workstation_task }) => {
   const [actualWorkstationName, setActualWorkstationName] = useState<string>('');
   const [componentError, setComponentError] = useState<string | null>(null);
   const [showProjectFiles, setShowProjectFiles] = useState(false);
@@ -53,6 +54,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const { currentEmployee } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { t, createLocalizedPath } = useLanguage();
 
   useEffect(() => {
     loadStandardTasks();
@@ -84,15 +86,15 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     const daysUntilDue = differenceInDays(due, today);
 
     if (isBefore(due, today)) {
-      return { class: 'overdue', label: 'Overdue', variant: 'destructive' as const };
+      return { class: 'overdue', label: t('urgency_overdue'), variant: 'destructive' as const };
     } else if (daysUntilDue <= 1) {
-      return { class: 'critical', label: 'Critical', variant: 'destructive' as const };
+      return { class: 'critical', label: t('urgency_critical'), variant: 'destructive' as const };
     } else if (daysUntilDue <= 3) {
-      return { class: 'urgent', label: 'Urgent', variant: 'default' as const };
+      return { class: 'urgent', label: t('urgency_urgent'), variant: 'default' as const };
     } else if (daysUntilDue <= 7) {
-      return { class: 'high', label: 'High', variant: 'secondary' as const };
+      return { class: 'high', label: t('urgency_high'), variant: 'secondary' as const };
     } else {
-      return { class: 'normal', label: 'Normal', variant: 'outline' as const };
+      return { class: 'normal', label: t('urgency_normal'), variant: 'outline' as const };
     }
   };
 
@@ -261,7 +263,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     }
   }, [fetchedTasks]);
 
-  const queryErrorMessage = queryError ? 'Failed to load tasks' : null;
+  const queryErrorMessage = queryError ? t('failed_to_load_projects', { message: '' }) : null;
   const error = componentError || queryErrorMessage;
 
   const startTimerMutation = useMutation({
@@ -270,15 +272,15 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
       toast({
-        title: 'Timer Started',
-        description: 'Time tracking has begun for this task',
+        title: t('timer_started'),
+        description: t('timer_started_desc'),
       });
       loadTasks();
     },
     onError: (error) => {
       toast({
-        title: 'Error',
-        description: 'Failed to start timer',
+        title: t('error'),
+        description: t('failed_to_start_timer_error'),
         variant: 'destructive'
       });
       console.error('Start timer error:', error);
@@ -338,17 +340,17 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
           if (workstation) {
             setActualWorkstationName(workstation.name);
           } else {
-            setComponentError('Workstation not found');
+            setComponentError(t('workstation_not_found_error'));
           }
         } catch (error) {
           console.error('Error fetching workstation:', error);
-          setComponentError('Failed to load workstation details');
+          setComponentError(t('failed_to_load_workstation_details_error'));
         }
       }
     };
     
     resolveWorkstationName();
-  }, [workstationName, workstationId]);
+  }, [workstationName, workstationId, t]);
 
   const checkAndUpdateLimitPhases = async (completedTask: ExtendedTask) => {
     try {
@@ -417,8 +419,8 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         }
         
         toast({
-          title: 'Success',
-          description: 'Task completed successfully',
+          title: t('success'),
+          description: t('task_completed_successfully'),
         });
         return;
       }
@@ -457,14 +459,14 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
       );
       
       toast({
-        title: 'Success',
-        description: 'Task updated successfully',
+        title: t('success'),
+        description: t('task_updated'),
       });
     } catch (error) {
       console.error('Error updating task:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to update task',
+        title: t('error'),
+        description: t('failed_to_update_task_error'),
         variant: 'destructive'
       });
     }
@@ -479,8 +481,8 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
       if (currentTask?.is_workstation_task) {
         await timeRegistrationService.startWorkstationTask(currentEmployee.id, taskId);
         toast({
-          title: 'Workstation Task Started',
-          description: 'Time tracking has begun for this workstation task',
+          title: t('workstation_task_started'),
+          description: t('timer_started_ws_desc'),
         });
       } else {
         const remainingDuration = currentTask?.duration;
@@ -495,8 +497,8 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     } catch (error) {
       console.error('Error joining task:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to start task timer',
+        title: t('error'),
+        description: t('failed_to_start_ws_task_timer_error'),
         variant: 'destructive'
       });
     }
@@ -509,8 +511,8 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
       setShowProjectFiles(true);
     } else {
       toast({
-        title: 'Error',
-        description: 'Project information not available for this task',
+        title: t('error'),
+        description: t('project_info_not_available_error'),
         variant: 'destructive'
       });
     }
@@ -523,8 +525,8 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
       setShowPartsListDialog(true);
     } else {
       toast({
-        title: 'Error',
-        description: 'Project information not available for this task',
+        title: t('error'),
+        description: t('project_info_not_available_error'),
         variant: 'destructive'
       });
     }
@@ -537,8 +539,8 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
       setShowBarcodeDialog(true);
     } else {
       toast({
-        title: 'Error',
-        description: 'Project information not available for this task',
+        title: t('error'),
+        description: t('project_info_not_available_error'),
         variant: 'destructive'
       });
     }
@@ -556,14 +558,14 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
       await timeRegistrationService.startWorkstationTask(currentEmployee.id, workstationTask.id);
       queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
       toast({
-        title: 'Workstation Task Started',
-        description: `Started working on ${workstationTask.task_name}`,
+        title: t('workstation_task_started'),
+        description: t('workstation_task_started_desc', { taskName: workstationTask.task_name }),
       });
     } catch (error) {
       console.error('Error starting workstation task:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to start workstation task',
+        title: t('error'),
+        description: t('failed_to_start_ws_task_error'),
         variant: 'destructive'
       });
     }
@@ -572,11 +574,11 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const getPriorityBadge = (priority: string) => {
     switch (priority.toLowerCase()) {
       case 'high':
-        return <Badge className="bg-red-100 text-red-800 border-red-300">High</Badge>;
+        return <Badge className="bg-red-100 text-red-800 border-red-300">{t('priority_high_label')}</Badge>;
       case 'medium':
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Medium</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">{t('priority_medium_label')}</Badge>;
       case 'low':
-        return <Badge className="bg-green-100 text-green-800 border-green-300">Low</Badge>;
+        return <Badge className="bg-green-100 text-green-800 border-green-300">{t('priority_low_label')}</Badge>;
       default:
         return <Badge>{priority}</Badge>;
     }
@@ -618,15 +620,15 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">{actualWorkstationName} Workstation</h1>
+        <h1 className="text-2xl font-bold">{t('workstation_view_title', { name: actualWorkstationName })}</h1>
         <div className="flex gap-2">
           {onBack && (
             <button onClick={onBack} className="text-blue-600 hover:underline">
-              ← Back
+              ← {t('back')}
             </button>
           )}
           <Badge variant="outline" className="text-lg px-3 py-1">
-            {tasks.length} Active Tasks
+            {t('active_tasks', { count: tasks.length.toString() })}
           </Badge>
         </div>
       </div>
@@ -636,7 +638,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PlayCircle className="h-5 w-5" />
-              In Progress Tasks ({inProgressTasks.length})
+              {t('in_progress_tasks', { count: inProgressTasks.length.toString() })}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -660,12 +662,12 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                           <h3 className="font-medium">{task.project_name}</h3>
                           <p className="text-sm text-gray-600">{task.title}</p>
                           {task.assignee_name && (
-                            <p className="text-sm text-blue-600">Assigned to: {task.assignee_name}</p>
+                            <p className="text-sm text-blue-600">{t('assigned_to_label', { name: task.assignee_name })}</p>
                           )}
                           {task.due_date && (
                             <div className="flex items-center gap-2 mt-1">
                               <p className="text-sm text-gray-500">
-                                Due: {format(new Date(task.due_date), 'MMM dd, yyyy')}
+                                {t('due_date_label', { date: format(new Date(task.due_date), 'MMM dd, yyyy') })}
                               </p>
                               {urgency && (
                                 <Badge variant={urgency.variant} className="text-xs">
@@ -677,7 +679,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                           )}
                           {task.timeRemaining && (
                             <p className={`text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-green-600'}`}>
-                              Time: {task.timeRemaining}
+                              {t('time_remaining_label', { time: task.timeRemaining })}
                             </p>
                           )}
                         </div>
@@ -692,20 +694,20 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                             variant="outline"
                             size="sm"
                             onClick={() => handleShowProjectParts(task)}
-                            title="View Project Parts List"
+                            title={t('view_parts')}
                           >
                             <Package className="h-4 w-4" />
-                            Parts
+                            {t('view_parts')}
                           </Button>
                           {task.project_id && (
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleGoToFiles(task)}
-                              title="View Project Files"
+                              title={t('view_files')}
                             >
                               <FileText className="h-4 w-4" />
-                              Files
+                              {t('view_files')}
                             </Button>
                           )}
                           {task.project_id && (
@@ -713,34 +715,34 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                               variant="outline"
                               size="sm"
                               onClick={() => handleShowBarcode(task)}
-                              title="Show Project Barcode"
+                              title={t('show_barcode')}
                             >
                               <Barcode className="h-4 w-4" />
-                              Barcode
+                              {t('show_barcode')}
                             </Button>
                           )}
                           {task.project_id && (
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => navigate(`/projects/${task.project_id}`)}
-                              title="Go to Project Details"
+                              onClick={() => navigate(createLocalizedPath(`/projects/${task.project_id}`))}
+                              title={t('go_to_project')}
                             >
                               <ExternalLink className="h-4 w-4" />
-                              Project
+                              {t('go_to_project')}
                             </Button>
                           )}
                           <button
                             onClick={() => handleJoinTask(task.id)}
                             className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
                           >
-                            Join Task
+                            {t('join_task')}
                           </button>
                           <button
                             onClick={() => handleTaskUpdate(task.id, 'COMPLETED')}
                             className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
                           >
-                            Complete
+                            {t('complete_task')}
                           </button>
                         </div>
                       </div>
@@ -749,7 +751,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                 })}
               </div>
             ) : (
-              <p className="text-gray-500 text-center py-4">No tasks in progress</p>
+              <p className="text-gray-500 text-center py-4">{t('no_tasks_in_progress')}</p>
             )}
           </CardContent>
         </Card>
@@ -758,7 +760,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
-              TODO Tasks ({todoTasks.length})
+              {t('todo_tasks', { count: todoTasks.length.toString() })}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -784,7 +786,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                           {task.due_date && (
                             <div className="flex items-center gap-2 mt-1">
                               <p className="text-sm text-gray-500">
-                                Due: {format(new Date(task.due_date), 'MMM dd, yyyy')}
+                                {t('due_date_label', { date: format(new Date(task.due_date), 'MMM dd, yyyy') })}
                               </p>
                               {urgency && (
                                 <Badge variant={urgency.variant} className="text-xs">
@@ -800,20 +802,20 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                             variant="outline"
                             size="sm"
                             onClick={() => handleShowProjectParts(task)}
-                            title="View Project Parts List"
+                            title={t('view_parts')}
                           >
                             <Package className="h-4 w-4" />
-                            Parts
+                            {t('view_parts')}
                           </Button>
                           {task.project_id && (
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleGoToFiles(task)}
-                              title="View Project Files"
+                              title={t('view_files')}
                             >
                               <FileText className="h-4 w-4" />
-                              Files
+                              {t('view_files')}
                             </Button>
                           )}
                           {task.project_id && (
@@ -821,28 +823,28 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                               variant="outline"
                               size="sm"
                               onClick={() => handleShowBarcode(task)}
-                              title="Show Project Barcode"
+                              title={t('show_barcode')}
                             >
                               <Barcode className="h-4 w-4" />
-                              Barcode
+                              {t('show_barcode')}
                             </Button>
                           )}
                           {task.project_id && (
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => navigate(`/projects/${task.project_id}`)}
-                              title="Go to Project Details"
+                              onClick={() => navigate(createLocalizedPath(`/projects/${task.project_id}`))}
+                              title={t('go_to_project')}
                             >
                               <ExternalLink className="h-4 w-4" />
-                              Project
+                              {t('go_to_project')}
                             </Button>
                           )}
                           <button
                             onClick={() => handleTaskUpdate(task.id, 'IN_PROGRESS')}
                             className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
                           >
-                            Start
+                            {t('start')}
                           </button>
                         </div>
                       </div>
@@ -851,7 +853,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                 })}
               </div>
             ) : (
-              <p className="text-gray-500 text-center py-4">No TODO tasks available</p>
+              <p className="text-gray-500 text-center py-4">{t('no_todo_tasks')}</p>
             )}
           </CardContent>
         </Card>
