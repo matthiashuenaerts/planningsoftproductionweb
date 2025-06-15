@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Play, Pause, Clock } from 'lucide-react';
+import { Play, Pause, Clock, Timer } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 const TaskTimer = () => {
@@ -47,6 +47,7 @@ const TaskTimer = () => {
           .from('tasks')
           .select(`
             title,
+            duration,
             phases (
               name,
               projects (name)
@@ -59,6 +60,7 @@ const TaskTimer = () => {
         return {
           title: data.title,
           project_name: data.phases?.projects?.name || 'Unknown Project',
+          duration: data.duration,
           is_workstation_task: false
         };
       }
@@ -69,6 +71,7 @@ const TaskTimer = () => {
           .from('workstation_tasks')
           .select(`
             task_name,
+            duration,
             workstations (name)
           `)
           .eq('id', activeRegistration.workstation_task_id)
@@ -79,6 +82,7 @@ const TaskTimer = () => {
         return {
           title: workstationTask.task_name,
           project_name: `Workstation: ${workstationTask.workstations?.name || 'Unknown'}`,
+          duration: workstationTask.duration,
           is_workstation_task: true
         };
       }
@@ -156,6 +160,38 @@ const TaskTimer = () => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const formatRemainingDuration = (startTime: string, durationMinutes: number | null | undefined) => {
+    if (durationMinutes === null || typeof durationMinutes === 'undefined') {
+        return null;
+    }
+
+    const start = new Date(startTime);
+    const now = currentTime;
+    const elapsedMs = now.getTime() - start.getTime();
+    const durationMs = durationMinutes * 60 * 1000;
+    const remainingMs = durationMs - elapsedMs;
+
+    const isNegative = remainingMs < 0;
+    const absRemainingMs = Math.abs(remainingMs);
+
+    const hours = Math.floor(absRemainingMs / (1000 * 60 * 60));
+    const minutes = Math.floor((absRemainingMs % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((absRemainingMs % (1000 * 60)) / 1000);
+
+    return `${isNegative ? '-' : ''}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  const isTimeNegative = (startTime: string, durationMinutes: number | null | undefined) => {
+    if (durationMinutes === null || typeof durationMinutes === 'undefined') {
+        return false;
+    }
+    const start = new Date(startTime);
+    const now = currentTime;
+    const elapsedMs = now.getTime() - start.getTime();
+    const durationMs = durationMinutes * 60 * 1000;
+    return durationMs - elapsedMs < 0;
+  }
+
   if (isLoading || !currentEmployee) {
     return null;
   }
@@ -206,14 +242,24 @@ const TaskTimer = () => {
               </div>
             </div>
             
-            <div className="flex items-center space-x-1 ml-2">
-              <Clock className="h-3 w-3 text-gray-500" />
-              <span className="font-mono text-sm font-medium">
-                {activeRegistration && activeRegistration.is_active 
-                  ? formatDuration(activeRegistration.start_time)
-                  : '00:00:00'
-                }
-              </span>
+            <div className="flex flex-col items-end ml-2">
+              <div className="flex items-center space-x-1">
+                <Clock className="h-3 w-3 text-gray-500" />
+                <span className="font-mono text-sm font-medium">
+                  {activeRegistration && activeRegistration.is_active 
+                    ? formatDuration(activeRegistration.start_time)
+                    : '00:00:00'
+                  }
+                </span>
+              </div>
+              {activeRegistration && activeRegistration.is_active && taskDetails?.duration != null && (
+                <div className="flex items-center space-x-1">
+                  <Timer className="h-3 w-3 text-gray-500" />
+                  <span className={`font-mono text-xs font-medium ${isTimeNegative(activeRegistration.start_time, taskDetails.duration) ? 'text-red-500' : ''}`}>
+                    {formatRemainingDuration(activeRegistration.start_time, taskDetails.duration)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
