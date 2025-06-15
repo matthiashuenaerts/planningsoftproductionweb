@@ -300,6 +300,7 @@ const PersonalTasks = () => {
     <div className="min-h-screen bg-gray-50 flex">
       <Navbar />
       <div className="flex-1 ml-64 p-6 max-w-none">
+        <TaskTimer />
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">My Tasks</h1>
           <p className="text-gray-600 mt-2">Manage your personal tasks and schedule</p>
