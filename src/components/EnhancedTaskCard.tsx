@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -72,7 +73,7 @@ const EnhancedTaskCard: React.FC<EnhancedTaskCardProps> = ({
   };
 
   return (
-    <Card className={`h-fit transition-all duration-200 ${isActive ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}>
+    <Card className={`h-fit transition-all duration-200 ${isActive ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
       <CardHeader className="pb-3">
         <div className="space-y-2">
           {/* Project Information */}

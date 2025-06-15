@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -114,9 +115,9 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
       case 'completed':
         return 'bg-green-100 text-green-800 border-green-300';
       case 'in_progress':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
+        return 'bg-amber-100 text-amber-800 border-amber-300';
       case 'todo':
-        return 'bg-gray-100 text-gray-800 border-gray-300';
+        return 'bg-blue-100 text-blue-800 border-blue-300';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-300';
     }
@@ -220,7 +221,7 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
                     className="absolute left-2 right-2 z-10"
                     style={style}
                   >
-                    <Card className="h-full shadow-sm border-l-4 border-l-blue-500 overflow-hidden">
+                    <Card className={`h-full shadow-sm border-l-4 ${task.isActive ? 'border-l-green-500' : 'border-l-blue-500'} overflow-hidden`}>
                       <CardContent className={`p-2 h-full flex ${blockHeight <= 3.75 ? 'flex-row items-center justify-start gap-2' : 'flex-col justify-between'}`}>
                         {blockHeight <= 3.75 ? (
                           // Compact view
