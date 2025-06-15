@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Order, OrderItem, OrderAttachment, OrderStep } from '@/types/order';
 
@@ -5,15 +6,21 @@ export const orderService = {
   async getAll(): Promise<Order[]> {
     const { data, error } = await supabase
       .from('orders')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('*, order_items(count)');
 
     if (error) throw error;
-    return (data || []).map(order => ({
-      ...order,
-      status: order.status as Order['status'],
-      order_type: order.order_type as Order['order_type']
-    }));
+    
+    return (data || []).map((order: any) => {
+      const { order_items, ...rest } = order;
+      const orderItemsCount = (Array.isArray(order_items) && order_items.length > 0) ? order_items[0].count : 0;
+
+      return {
+        ...rest,
+        status: order.status as Order['status'],
+        order_type: order.order_type as Order['order_type'],
+        order_items_count: orderItemsCount,
+      };
+    });
   },
 
   async getAllOrders(): Promise<Order[]> {

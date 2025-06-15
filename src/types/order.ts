@@ -10,6 +10,7 @@ export interface Order {
   updated_at: string;
   order_type: 'standard' | 'semi-finished';
   notes?: string | null;
+  order_items_count?: number;
 }
 
 export interface OrderItem {

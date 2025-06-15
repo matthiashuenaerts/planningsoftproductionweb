@@ -52,10 +52,18 @@ const Orders: React.FC = () => {
         
         // Get all orders
         const allOrders = await orderService.getAllOrders();
+
+        // Filter out semi-finished orders with no items (logistics out orders)
+        const ordersToDisplay = allOrders.filter(order => {
+          if (order.order_type === 'semi-finished') {
+            return order.order_items_count && order.order_items_count > 0;
+          }
+          return true;
+        });
         
         // Get project details for each order
         const ordersWithProjectNames = await Promise.all(
-          allOrders.map(async (order) => {
+          ordersToDisplay.map(async (order) => {
             let projectName = "Unknown Project";
             
             try {
