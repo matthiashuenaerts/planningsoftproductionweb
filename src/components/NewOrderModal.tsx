@@ -342,11 +342,17 @@ const NewOrderModal = ({
                           <Select
                             value={item.accessory_id || ''}
                             onValueChange={value => {
-                              const selectedAccessory = accessories.find(a => a.id === value);
-                              updateOrderItem(index, 'accessory_id', value);
-                              if (selectedAccessory) {
-                                  updateOrderItem(index, 'description', selectedAccessory.article_description || selectedAccessory.article_name);
-                                  updateOrderItem(index, 'article_code', selectedAccessory.article_code || '');
+                              if (value === 'none') {
+                                updateOrderItem(index, 'accessory_id', null);
+                                updateOrderItem(index, 'description', '');
+                                updateOrderItem(index, 'article_code', '');
+                              } else {
+                                const selectedAccessory = accessories.find(a => a.id === value);
+                                updateOrderItem(index, 'accessory_id', value);
+                                if (selectedAccessory) {
+                                    updateOrderItem(index, 'description', selectedAccessory.article_description || selectedAccessory.article_name);
+                                    updateOrderItem(index, 'article_code', selectedAccessory.article_code || '');
+                                }
                               }
                             }}
                           >
@@ -354,7 +360,7 @@ const NewOrderModal = ({
                               <SelectValue placeholder="Select stock item" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">None (New Item)</SelectItem>
+                              <SelectItem value="none">None (New Item)</SelectItem>
                               {accessories.map(acc => (
                                 <SelectItem key={acc.id} value={acc.id}>{acc.article_name}</SelectItem>
                               ))}
@@ -363,10 +369,10 @@ const NewOrderModal = ({
                         </TableCell>
                       )}
                       <TableCell>
-                        <Input value={item.article_code} onChange={e => updateOrderItem(index, 'article_code', e.target.value)} placeholder="Article code" disabled={!!item.accessory_id} />
+                        <Input value={item.article_code || ''} onChange={e => updateOrderItem(index, 'article_code', e.target.value)} placeholder="Article code" disabled={!!item.accessory_id} />
                       </TableCell>
                       <TableCell>
-                        <Input value={item.description} onChange={e => updateOrderItem(index, 'description', e.target.value)} placeholder="Item description" required disabled={!!item.accessory_id} />
+                        <Input value={item.description || ''} onChange={e => updateOrderItem(index, 'description', e.target.value)} placeholder="Item description" required disabled={!!item.accessory_id} />
                       </TableCell>
                       <TableCell>
                         <Input type="number" min="1" value={item.quantity} onChange={e => updateOrderItem(index, 'quantity', parseInt(e.target.value) || 1)} required />
