@@ -12,15 +12,13 @@ import { projectService, Project } from '@/services/dataService';
 import { useAuth } from '@/context/AuthContext';
 import NewProjectModal from '@/components/NewProjectModal';
 import { exportProjectData } from '@/services/projectExportService';
+import { useLanguage } from '@/context/LanguageContext';
 
 const Projects = () => {
   const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
-  const {
-    currentEmployee
-  } = useAuth();
+  const { toast } = useToast();
+  const { currentEmployee } = useAuth();
+  const { t, createLocalizedPath } = useLanguage();
   const [isLoading, setIsLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
@@ -105,7 +103,7 @@ const Projects = () => {
     }
   };
   const handleProjectClick = (projectId: string) => {
-    navigate(`/projects/${projectId}`);
+    navigate(createLocalizedPath(`/projects/${projectId}`));
   };
   return <div className="flex min-h-screen">
       <div className="w-64 bg-sidebar fixed top-0 bottom-0">
@@ -116,14 +114,14 @@ const Projects = () => {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-              <p className="text-muted-foreground mt-1">Manage your projects from start to finish.</p>
+              <h1 className="text-3xl font-bold tracking-tight">{t('projects_title')}</h1>
+              <p className="text-muted-foreground mt-1">{t('projects_description')}</p>
             </div>
             
             {isAdmin && (
               <Button size="sm" onClick={() => setIsNewProjectModalOpen(true)} className="mx-0">
                 <Plus className="mr-2 h-4 w-4" />
-                New Project
+                {t('new_project')}
               </Button>
             )}
           </div>
@@ -132,7 +130,7 @@ const Projects = () => {
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Search projects by name or client..." 
+                placeholder={t('search_projects_placeholder')}
                 className="pl-8" 
                 value={searchQuery} 
                 onChange={e => setSearchQuery(e.target.value)} 
@@ -169,21 +167,21 @@ const Projects = () => {
                                   disabled={exportingProject === project.id}
                                 >
                                   <Download className="mr-2 h-4 w-4" />
-                                  {exportingProject === project.id ? 'Exporting...' : 'Export Project'}
+                                  {exportingProject === project.id ? t('exporting_project') : t('export_project')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={e => {
                                   e.stopPropagation();
-                                  navigate(`/projects/${project.id}/edit`);
+                                  navigate(createLocalizedPath(`/projects/${project.id}/edit`));
                                 }}>
                                   <Settings className="mr-2 h-4 w-4" />
-                                  Edit Project
+                                  {t('edit_project')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={e => {
                                   e.stopPropagation();
-                                  navigate(`/projects/${project.id}/orders`);
+                                  navigate(createLocalizedPath(`/projects/${project.id}/orders`));
                                 }}>
                                   <Package className="mr-2 h-4 w-4" />
-                                  Orders
+                                  {t('orders')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem 
                                   className="text-red-600 focus:text-red-600" 
@@ -193,7 +191,7 @@ const Projects = () => {
                                   }}
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete Project
+                                  {t('delete_project')}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -209,20 +207,20 @@ const Projects = () => {
                         <div className="flex items-center">
                           <Clock className="mr-1 h-4 w-4" />
                           <span>
-                            Start: {new Date(project.start_date).toLocaleDateString()}
+                            {t('start_date')}: {new Date(project.start_date).toLocaleDateString()}
                           </span>
                         </div>
                         <div className="flex items-center">
                           <CalendarDays className="mr-1 h-4 w-4" />
                           <span>
-                            Installation: {new Date(project.installation_date).toLocaleDateString()}
+                            {t('installation_date')}: {new Date(project.installation_date).toLocaleDateString()}
                           </span>
                         </div>
                       </div>
                       
                       <div className="mt-4">
                         <div className="flex justify-between text-sm mb-1">
-                          <span>Progress</span>
+                          <span>{t('progress')}</span>
                           <span>{project.progress}%</span>
                         </div>
                         <div className="w-full bg-muted rounded-full h-2.5">
@@ -235,13 +233,13 @@ const Projects = () => {
                   </div>
                 </Card>)}
             </div> : <div className="text-center p-12 border border-dashed rounded-lg">
-              <h3 className="text-lg font-medium mb-2">No projects found</h3>
+              <h3 className="text-lg font-medium mb-2">{t('no_projects_found')}</h3>
               <p className="text-muted-foreground">
-                {searchQuery ? 'Try a different search term.' : 'Get started by creating a new project.'}
+                {searchQuery ? t('no_projects_found_search') : t('no_projects_found_create')}
               </p>
               {isAdmin && !searchQuery && <Button variant="outline" className="mt-4" onClick={() => setIsNewProjectModalOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Create Project
+                  {t('create_project')}
                 </Button>}
             </div>}
         </div>
@@ -253,16 +251,15 @@ const Projects = () => {
       <AlertDialog open={!!projectToDelete} onOpenChange={open => !open && setProjectToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>{t('delete_project_confirm_title')}</AlertDialogTitle>
             <AlertDialogDescription className="text-red-600">
-              This action will delete the project and all associated data including tasks, phases, orders, and attachments.
-              This action cannot be undone.
+              {t('delete_project_confirm_description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteProject} className="bg-red-600 hover:bg-red-700">
-              Delete Project
+              {t('delete_project')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

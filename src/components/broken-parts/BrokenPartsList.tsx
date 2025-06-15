@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
@@ -19,10 +18,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLanguage } from '@/context/LanguageContext';
 
 const BrokenPartsList: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageError, setImageError] = useState<Record<string, boolean>>({});
+  const { t, createLocalizedPath } = useLanguage();
 
   const { data: brokenParts = [], isLoading, error } = useQuery({
     queryKey: ['broken-parts'],
@@ -76,12 +77,12 @@ const BrokenPartsList: React.FC = () => {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-500" />
-            Broken Parts
+            {t('broken_parts')}
           </CardTitle>
           <Button asChild>
-            <Link to="/broken-parts/new">
+            <Link to={createLocalizedPath("/broken-parts/new")}>
               <Plus className="mr-2 h-4 w-4" />
-              Report Broken Part
+              {t('report_broken_part')}
             </Link>
           </Button>
         </CardHeader>
@@ -157,9 +158,9 @@ const BrokenPartsList: React.FC = () => {
               </p>
               <div className="mt-6">
                 <Button asChild>
-                  <Link to="/broken-parts/new">
+                  <Link to={createLocalizedPath("/broken-parts/new")}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Report Broken Part
+                    {t('report_broken_part')}
                   </Link>
                 </Button>
               </div>

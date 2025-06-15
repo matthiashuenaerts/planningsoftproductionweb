@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock } from 'lucide-react';
@@ -9,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Drawer, DrawerClose, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
+import { useLanguage } from '@/context/LanguageContext';
 
 const NavbarContent = ({
   onItemClick
@@ -19,6 +19,7 @@ const NavbarContent = ({
     currentEmployee,
     logout
   } = useAuth();
+  const { t, lang, changeLang, createLocalizedPath } = useLanguage();
 
   // Allow admin, manager, installation_team, and worker roles to see the Rush Orders menu
   const canSeeRushOrders = currentEmployee && ['admin', 'manager', 'installation_team', 'worker'].includes(currentEmployee.role);
@@ -52,73 +53,73 @@ const NavbarContent = ({
   return <div className="h-full px-3 py-4 overflow-y-auto bg-sky-800 text-white flex flex-col">
       <div className="flex flex-col h-full justify-between">
         <div>
-          <h2 className="px-2 py-3 text-lg font-semibold mb-2">Demo Account</h2>
+          <h2 className="px-2 py-3 text-lg font-semibold mb-2">{t('demo_account')}</h2>
           <ul className="space-y-2 font-medium">
             <li>
-              <NavLink to="/" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+              <NavLink to={createLocalizedPath("/")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <Home className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">Dashboard</span>
+                <span className="ml-3">{t('dashboard')}</span>
               </NavLink>
             </li>
             <li>
-              <NavLink to="/projects" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+              <NavLink to={createLocalizedPath("/projects")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <LayoutDashboard className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">Projects</span>
+                <span className="ml-3">{t('projects')}</span>
               </NavLink>
             </li>
             <li>
-              <NavLink to="/workstations" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+              <NavLink to={createLocalizedPath("/workstations")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <Truck className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">Workstations</span>
+                <span className="ml-3">{t('workstations')}</span>
               </NavLink>
             </li>
             <li>
-              <NavLink to="/broken-parts" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+              <NavLink to={createLocalizedPath("/broken-parts")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <AlertTriangle className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">Broken Parts</span>
+                <span className="ml-3">{t('broken_parts')}</span>
               </NavLink>
             </li>
             <li>
-              <NavLink to="/personal-tasks" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+              <NavLink to={createLocalizedPath("/personal-tasks")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <ListChecks className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">Personal Tasks</span>
+                <span className="ml-3">{t('personal_tasks')}</span>
               </NavLink>
             </li>
             <li>
-              <NavLink to="/daily-tasks" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+              <NavLink to={createLocalizedPath("/daily-tasks")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <ListChecks className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">Installation planning</span>
+                <span className="ml-3">{t('installation_planning')}</span>
               </NavLink>
             </li>
             {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
-                <NavLink to="/planning" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <NavLink to={createLocalizedPath("/planning")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Users className="w-5 h-5 text-white group-hover:text-white" />
-                  <span className="ml-3">Planning</span>
+                  <span className="ml-3">{t('planning')}</span>
                 </NavLink>
               </li>}
             {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
-                <NavLink to="/orders" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <NavLink to={createLocalizedPath("/orders")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <PackagePlus className="w-5 h-5 text-white group-hover:text-white" />
-                  <span className="ml-3">Orders</span>
+                  <span className="ml-3">{t('orders')}</span>
                 </NavLink>
               </li>}
             {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
-                <NavLink to="/logistics" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <NavLink to={createLocalizedPath("/logistics")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Truck className="w-5 h-5 text-white group-hover:text-white" />
-                  <span className="ml-3">Logistics</span>
+                  <span className="ml-3">{t('logistics')}</span>
                 </NavLink>
               </li>}
             {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
-                <NavLink to="/logistics-out" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <NavLink to={createLocalizedPath("/logistics-out")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Truck className="w-5 h-5 text-white group-hover:text-white" />
-                  <span className="ml-3">Logistics out</span>
+                  <span className="ml-3">{t('logistics_out')}</span>
                 </NavLink>
               </li>}
             {canSeeRushOrders && <li>
-                <NavLink to="/rush-orders" className="flex items-center justify-between p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <NavLink to={createLocalizedPath("/rush-orders")} className="flex items-center justify-between p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <div className="flex items-center">
                     <PackagePlus className="w-5 h-5 text-white group-hover:text-white" />
-                    <span className="ml-3">Rush Orders</span>
+                    <span className="ml-3">{t('rush_orders')}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     {pendingOrdersCount > 0 && <Badge variant="outline" className="bg-yellow-500 text-white border-0 font-medium">
@@ -131,24 +132,28 @@ const NavbarContent = ({
                 </NavLink>
               </li>}
             {canSeeTimeRegistrations && <li>
-                <NavLink to="/time-registrations" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <NavLink to={createLocalizedPath("/time-registrations")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Clock className="w-5 h-5 text-white group-hover:text-white" />
-                  <span className="ml-3">Time Registrations</span>
+                  <span className="ml-3">{t('time_registrations')}</span>
                 </NavLink>
               </li>}
             {currentEmployee?.role === 'admin' && (
               <li>
-                <NavLink to="/settings" className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <NavLink to={createLocalizedPath("/settings")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Settings className="w-5 h-5 text-white group-hover:text-white" />
-                  <span className="ml-3">Settings</span>
+                  <span className="ml-3">{t('settings')}</span>
                 </NavLink>
               </li>
             )}
           </ul>
         </div>
         
-        {/* User profile at bottom */}
-        <div className="mt-auto border-t border-blue-600 pt-2">
+        {/* User profile and language switcher at bottom */}
+        <div className="mt-auto pt-2">
+            <div className="flex justify-center items-center gap-2 mb-2 p-2 border-t border-b border-blue-600">
+                <Button size="sm" variant={lang === 'nl' ? 'secondary' : 'ghost'} className="text-white" onClick={() => changeLang('nl')}>NL</Button>
+                <Button size="sm" variant={lang === 'en' ? 'secondary' : 'ghost'} className="text-white" onClick={() => changeLang('en')}>EN</Button>
+            </div>
           {currentEmployee && <div className="flex items-center p-2 mb-2">
               <User className="w-5 h-5 text-white" />
               <span className="ml-3 text-sm">{currentEmployee.name}</span>
@@ -158,7 +163,7 @@ const NavbarContent = ({
           handleItemClick();
         }} className="flex w-full items-center p-2 rounded-lg hover:bg-sky-700 group text-white">
             <LogOut className="w-5 h-5 text-white" />
-            <span className="ml-3">Logout</span>
+            <span className="ml-3">{t('logout')}</span>
           </button>
         </div>
       </div>
