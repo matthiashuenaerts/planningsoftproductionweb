@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
@@ -17,8 +16,6 @@ import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import EnhancedTaskCard from '@/components/EnhancedTaskCard';
-import ProjectCard from '@/components/ProjectCard';
-import { Link } from 'react-router-dom';
 import { startOfDay, endOfDay } from 'date-fns';
 
 interface Task {
@@ -39,11 +36,6 @@ interface Task {
       id: string;
       name: string;
       client: string;
-      description: string | null;
-      status: string;
-      progress: number | null;
-      start_date: string;
-      installation_date: string;
     };
   };
 }
@@ -95,12 +87,7 @@ const PersonalTasks = () => {
             projects!inner(
               id,
               name,
-              client,
-              description,
-              status,
-              progress,
-              start_date,
-              installation_date
+              client
             )
           )
         `)
@@ -296,27 +283,6 @@ const PersonalTasks = () => {
   const inProgressTasks = tasks.filter(task => task.status === 'IN_PROGRESS');
   const completedTasks = tasks.filter(task => task.status === 'COMPLETED');
 
-  // Group tasks by project
-  const projectsMap = new Map();
-  tasks.forEach(task => {
-    const project = task.phases.projects;
-    if (project && !projectsMap.has(project.id)) {
-      projectsMap.set(project.id, {
-        ...project,
-        progress: Number(project.progress) || 0,
-      });
-    }
-  });
-
-  const uniqueProjects = Array.from(projectsMap.values()).sort((a, b) => {
-    try {
-      return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
-    } catch (e) {
-      return 0;
-    }
-  });
-
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex">
@@ -391,10 +357,17 @@ const PersonalTasks = () => {
 
           <TabsContent value="tasks" className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-              {uniqueProjects.map((project) => (
-                <Link to={`/projects/${project.id}`} key={project.id} className="h-full">
-                  <ProjectCard project={project} />
-                </Link>
+              {tasks.map((task) => (
+                <EnhancedTaskCard
+                  key={task.id}
+                  task={task}
+                  isActive={isTaskActive(task.id)}
+                  canComplete={canCompleteTask(task)}
+                  onStatusChange={handleTaskStatusChange}
+                  onShowFiles={(projectId) => setShowFilesPopup(task.phases.projects.id)}
+                  onShowParts={(projectId) => setShowPartsDialog(task.phases.projects.id)}
+                  onShowBarcode={(projectId) => setShowBarcodeDialog(task.phases.projects.id)}
+                />
               ))}
             </div>
 

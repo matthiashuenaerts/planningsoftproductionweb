@@ -37,7 +37,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow animate-fade-in h-full flex flex-col">
+    <Card className="hover:shadow-md transition-shadow animate-fade-in">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <CardTitle className="text-lg">{project.name}</CardTitle>
@@ -47,7 +47,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
         </div>
         <p className="text-sm text-muted-foreground">{project.client}</p>
       </CardHeader>
-      <CardContent className="pb-2 flex-grow">
+      <CardContent className="pb-2">
         <p className="text-sm mb-3 line-clamp-2">{project.description}</p>
         <div className="flex flex-col gap-1.5">
           <div className="flex justify-between text-xs">
