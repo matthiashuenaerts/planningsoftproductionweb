@@ -30,7 +30,6 @@ interface Task {
 interface EnhancedTaskCardProps {
   task: Task;
   isActive: boolean;
-  canStart: boolean;
   canComplete: boolean;
   onStatusChange: (taskId: string, status: Task['status']) => void;
   onShowFiles: (projectId: string) => void;
@@ -41,7 +40,6 @@ interface EnhancedTaskCardProps {
 const EnhancedTaskCard: React.FC<EnhancedTaskCardProps> = ({
   task,
   isActive,
-  canStart,
   canComplete,
   onStatusChange,
   onShowFiles,
@@ -189,7 +187,6 @@ const EnhancedTaskCard: React.FC<EnhancedTaskCardProps> = ({
               size="sm"
               onClick={() => onStatusChange(task.id, 'IN_PROGRESS')}
               className="flex-1 h-8 text-xs"
-              disabled={!canStart}
             >
               <Play className="h-3 w-3 mr-1" />
               Start

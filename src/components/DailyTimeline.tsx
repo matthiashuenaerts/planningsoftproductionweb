@@ -15,7 +15,6 @@ interface TimelineTask {
   status?: string;
   workstation?: string;
   priority?: string;
-  canStart?: boolean;
   canComplete?: boolean;
   isActive?: boolean;
 }
@@ -255,7 +254,6 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
                                     onClick={() => onStartTask(task.id)}
                                     className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-100"
                                     title="Start Task"
-                                    disabled={!task.canStart}
                                   >
                                     <Play className="h-4 w-4" />
                                   </Button>
@@ -385,7 +383,6 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
                                       size="sm"
                                       onClick={() => onStartTask(task.id)}
                                       className="w-full text-xs px-2 py-1 h-6"
-                                      disabled={!task.canStart}
                                     >
                                       <Play className="h-3 w-3 mr-1" />
                                       Start

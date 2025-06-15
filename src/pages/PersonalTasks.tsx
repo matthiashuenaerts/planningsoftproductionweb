@@ -156,6 +156,13 @@ const PersonalTasks = () => {
           title: "Task Completed",
           description: "Task has been completed and time registration ended.",
         });
+      } else if (newStatus === 'TODO' && isTaskActive(taskId)) {
+        await timeRegistrationService.stopActiveRegistrations(currentEmployee.id);
+        await fetchActiveTimeRegistrations();
+        toast({
+          title: "Task Paused",
+          description: "Time registration has been stopped.",
+        });
       } else {
         // Regular status update
         const { error } = await supabase
@@ -184,10 +191,6 @@ const PersonalTasks = () => {
     return activeTimeRegistrations.some(reg => reg.task_id === taskId || reg.workstation_task_id === taskId);
   };
 
-  const canStartTask = (task: Task) => {
-    return task.status === 'TODO' && !isTaskActive(task.id);
-  };
-
   const canCompleteTask = (task: Task) => {
     return (task.status === 'IN_PROGRESS' || isTaskActive(task.id)) && task.status !== 'COMPLETED';
   };
@@ -207,7 +210,6 @@ const PersonalTasks = () => {
         project_name: associatedTask.phases.projects.name,
         workstation: associatedTask.workstation,
         priority: associatedTask.priority,
-        canStart: canStartTask(associatedTask),
         canComplete: canCompleteTask(associatedTask),
         isActive: isTaskActive(associatedTask.id)
       };
@@ -223,7 +225,6 @@ const PersonalTasks = () => {
       project_name: schedule.title,
       workstation: '',
       priority: 'medium',
-      canStart: false,
       canComplete: false,
       isActive: false
     };
@@ -244,7 +245,6 @@ const PersonalTasks = () => {
       project_name: task.phases.projects.name,
       workstation: task.workstation,
       priority: task.priority,
-      canStart: canStartTask(task),
       canComplete: canCompleteTask(task),
       isActive: isTaskActive(task.id)
     }));
@@ -349,7 +349,6 @@ const PersonalTasks = () => {
                   key={task.id}
                   task={task}
                   isActive={isTaskActive(task.id)}
-                  canStart={canStartTask(task)}
                   canComplete={canCompleteTask(task)}
                   onStatusChange={handleTaskStatusChange}
                   onShowFiles={(projectId) => setShowFilesPopup(task.phases.projects.id)}
