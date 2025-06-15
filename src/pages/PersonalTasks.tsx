@@ -214,6 +214,8 @@ const PersonalTasks = () => {
     }
   });
 
+  const scheduledTaskIds = schedules.map(s => s.task_id).filter(Boolean);
+
   const dailyTasks = tasks.filter(task => {
     const isScheduledForToday = scheduledTaskIds.includes(task.id);
     // Appending T00:00:00 to treat date as local, not UTC
@@ -269,11 +271,9 @@ const PersonalTasks = () => {
     };
   });
 
-  const scheduledTaskIdsInTimeline = schedules.map(s => s.task_id).filter(Boolean);
-
   // Add actual tasks to timeline with proper project information
   const taskTimelineItems = tasks
-    .filter(task => !scheduledTaskIdsInTimeline.includes(task.id))
+    .filter(task => !scheduledTaskIds.includes(task.id))
     .map(task => ({
       id: task.id,
       title: task.title,
