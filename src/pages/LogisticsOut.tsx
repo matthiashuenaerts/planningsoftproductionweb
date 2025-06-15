@@ -73,6 +73,17 @@ const LogisticsOut: React.FC = () => {
   
   const selectedDayOrders = selectedDate ? ordersByDate[format(selectedDate, 'yyyy-MM-dd')] : [];
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const upcomingOrders = orders
+    .filter(order => {
+      const deliveryDate = new Date(order.expected_delivery);
+      deliveryDate.setHours(0, 0, 0, 0);
+      return deliveryDate >= today;
+    })
+    .sort((a, b) => new Date(a.expected_delivery).getTime() - new Date(b.expected_delivery).getTime());
+
   if (loading) {
     return (
       <div className="flex min-h-screen">
@@ -106,6 +117,7 @@ const LogisticsOut: React.FC = () => {
                   modifiersClassNames={{
                     event: 'bg-sky-100 text-sky-800 rounded-md font-bold',
                   }}
+                  weekStartsOn={1}
                 />
               </CardContent>
             </Card>
@@ -127,6 +139,28 @@ const LogisticsOut: React.FC = () => {
                   </ul>
                 ) : (
                   <p className="text-muted-foreground">No logistics out orders for this day.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+          <div className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Upcoming Deadlines</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {upcomingOrders.length > 0 ? (
+                  <ul className="space-y-4">
+                    {upcomingOrders.map(order => (
+                      <li key={order.id} className="p-3 border rounded-md">
+                        <p><strong>Project:</strong> {order.project_name}</p>
+                        <p><strong>Supplier:</strong> {order.supplier}</p>
+                        <p><strong>Expected Delivery:</strong> {format(new Date(order.expected_delivery), 'MMMM d, yyyy')}</p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-muted-foreground">No upcoming deadlines found.</p>
                 )}
               </CardContent>
             </Card>
