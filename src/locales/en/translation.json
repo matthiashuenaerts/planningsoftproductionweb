@@ -1,4 +1,3 @@
-
 {
   "dashboardTitle": "Production Phase Monitoring",
   "userManagementTitle": "User Management",
@@ -56,5 +55,36 @@
     "loading": "Loading notifications...",
     "noNotifications": "No notifications",
     "new": "New"
+  },
+  "projects": {
+    "title": "Projects",
+    "description": "Manage your projects from start to finish.",
+    "newProject": "New Project",
+    "searchPlaceholder": "Search projects by name or client...",
+    "exporting": "Exporting...",
+    "exportProject": "Export Project",
+    "editProject": "Edit Project",
+    "orders": "Orders",
+    "deleteProject": "Delete Project",
+    "startDate": "Start",
+    "installationDate": "Installation",
+    "progress": "Progress",
+    "noProjectsFound": "No projects found",
+    "noProjectsSearch": "Try a different search term.",
+    "noProjectsStart": "Get started by creating a new project.",
+    "createProject": "Create Project",
+    "deleteDialogTitle": "Are you absolutely sure?",
+    "deleteDialogDescription": "This action will delete the project and all associated data including tasks, phases, orders, and attachments. This action cannot be undone.",
+    "cancel": "Cancel",
+    "confirmDelete": "Delete Project",
+    "toasts": {
+      "error": "Error",
+      "loadFailed": "Failed to load projects: {{error}}",
+      "success": "Success",
+      "exportSuccess": "Project \"{{name}}\" has been exported successfully.",
+      "exportFailed": "Failed to export project: {{error}}",
+      "deleteSuccess": "Project deleted successfully.",
+      "deleteFailed": "Failed to delete project: {{error}}"
+    }
   }
 }

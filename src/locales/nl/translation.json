@@ -1,4 +1,3 @@
-
 {
   "dashboardTitle": "Faseopvolging productie",
   "userManagementTitle": "Gebruikersbeheer",
@@ -56,5 +55,36 @@
     "loading": "Meldingen laden...",
     "noNotifications": "Geen meldingen",
     "new": "Nieuw"
+  },
+  "projects": {
+    "title": "Projecten",
+    "description": "Beheer uw projecten van begin tot eind.",
+    "newProject": "Nieuw Project",
+    "searchPlaceholder": "Zoek projecten op naam of klant...",
+    "exporting": "Exporteren...",
+    "exportProject": "Exporteer Project",
+    "editProject": "Bewerk Project",
+    "orders": "Bestellingen",
+    "deleteProject": "Verwijder Project",
+    "startDate": "Start",
+    "installationDate": "Installatie",
+    "progress": "Voortgang",
+    "noProjectsFound": "Geen projecten gevonden",
+    "noProjectsSearch": "Probeer een andere zoekterm.",
+    "noProjectsStart": "Begin met het aanmaken van een nieuw project.",
+    "createProject": "Maak Project",
+    "deleteDialogTitle": "Weet u het zeker?",
+    "deleteDialogDescription": "Deze actie zal het project en alle bijbehorende gegevens verwijderen, inclusief taken, fasen, bestellingen en bijlagen. Deze actie kan niet ongedaan worden gemaakt.",
+    "cancel": "Annuleren",
+    "confirmDelete": "Verwijder Project",
+    "toasts": {
+      "error": "Fout",
+      "loadFailed": "Projecten laden mislukt: {{error}}",
+      "success": "Succes",
+      "exportSuccess": "Project \"{{name}}\" is succesvol geëxporteerd.",
+      "exportFailed": "Exporteren van project mislukt: {{error}}",
+      "deleteSuccess": "Project succesvol verwijderd.",
+      "deleteFailed": "Verwijderen van project mislukt: {{error}}"
+    }
   }
 }
