@@ -52,8 +52,8 @@ const Projects = () => {
       setFilteredProjects(data);
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: `Failed to load projects: ${error.message}`,
+        title: t('error'),
+        description: t('failed_to_load_projects', { message: error.message }),
         variant: "destructive"
       });
     } finally {
@@ -67,13 +67,13 @@ const Projects = () => {
     try {
       await exportProjectData(project);
       toast({
-        title: "Success",
-        description: `Project "${project.name}" has been exported successfully`
+        title: t('success'),
+        description: t('project_exported_successfully', { name: project.name })
       });
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: `Failed to export project: ${error.message}`,
+        title: t('error'),
+        description: t('failed_to_export_project', { message: error.message }),
         variant: "destructive"
       });
     } finally {
@@ -85,8 +85,8 @@ const Projects = () => {
     try {
       await projectService.delete(projectToDelete);
       toast({
-        title: "Success",
-        description: "Project deleted successfully"
+        title: t('success'),
+        description: t('project_deleted_successfully')
       });
 
       // Remove the deleted project from state
@@ -94,8 +94,8 @@ const Projects = () => {
       setFilteredProjects(prev => prev.filter(p => p.id !== projectToDelete));
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: `Failed to delete project: ${error.message}`,
+        title: t('error'),
+        description: t('failed_to_delete_project', { message: error.message }),
         variant: "destructive"
       });
     } finally {

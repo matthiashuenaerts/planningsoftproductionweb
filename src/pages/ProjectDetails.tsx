@@ -27,6 +27,7 @@ import { PartsListDialog } from '@/components/PartsListDialog';
 import { AccessoriesDialog } from '@/components/AccessoriesDialog';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useLanguage } from '@/context/LanguageContext';
 
 const ProjectDetails = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -42,6 +43,7 @@ const ProjectDetails = () => {
   const [showPartsListDialog, setShowPartsListDialog] = useState(false);
   const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
   const { currentEmployee } = useAuth();
+  const { t, lang, createLocalizedPath } = useLanguage();
 
   const fetchAndSetSortedTasks = useCallback(async (pId: string) => {
     const phaseData = await projectService.getProjectPhases(pId);
@@ -98,8 +100,8 @@ const ProjectDetails = () => {
         setOrders(ordersWithDetails);
       } catch (error: any) {
         toast({
-          title: "Error",
-          description: `Failed to load project data: ${error.message}`,
+          title: t('error'),
+          description: t('failed_to_load_projects', { message: error.message }),
           variant: "destructive"
         });
       } finally {
@@ -108,7 +110,7 @@ const ProjectDetails = () => {
     };
 
     fetchProjectData();
-  }, [projectId, toast, fetchAndSetSortedTasks]);
+  }, [projectId, toast, fetchAndSetSortedTasks, t]);
 
   const checkAndUpdateLimitPhases = async (completedTaskId?: string) => {
     if (!projectId) return;
@@ -171,8 +173,8 @@ const ProjectDetails = () => {
         // No longer refetching here, caller will handle it.
 
         toast({
-          title: "Tasks Updated",
-          description: `${tasksToUpdate.length} task(s) moved from HOLD to TODO due to satisfied dependencies.`,
+          title: t('tasks_updated'),
+          description: t('tasks_updated_desc', { count: tasksToUpdate.length.toString() }),
         });
       }
     } catch (error) {
@@ -191,8 +193,8 @@ const ProjectDetails = () => {
 
       if (!limitPhasesSatisfied) {
         toast({
-          title: "Cannot Start Task",
-          description: "This task cannot be started because its dependencies are not yet completed.",
+          title: t('cannot_start_task'),
+          description: t('cannot_start_task_desc'),
           variant: "destructive"
         });
         return false;
@@ -207,8 +209,8 @@ const ProjectDetails = () => {
   const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
     if (!currentEmployee || !projectId) {
       toast({
-        title: "Authentication Error",
-        description: "You must be logged in to update tasks.",
+        title: t('auth_error'),
+        description: t('auth_error_desc'),
         variant: "destructive"
       });
       return;
@@ -225,14 +227,14 @@ const ProjectDetails = () => {
         }
         await timeRegistrationService.startTask(currentEmployee.id, taskId);
         toast({
-          title: "Task Started",
-          description: "Task has been started and time registration created.",
+          title: t('task_started'),
+          description: t('task_started_desc'),
         });
       } else if (statusValue === 'COMPLETED') {
         await timeRegistrationService.completeTask(taskId);
         toast({
-          title: "Task Completed",
-          description: "Task has been completed and time registration ended.",
+          title: t('task_completed'),
+          description: t('task_completed_desc'),
         });
       } else {
         const updateData: Partial<Task> = { 
@@ -251,8 +253,8 @@ const ProjectDetails = () => {
       
         await taskService.update(taskId, updateData);
         toast({
-          title: "Task updated",
-          description: `Task status has been updated to ${newStatus}.`,
+          title: t('task_updated'),
+          description: t('task_updated_desc', { status: newStatus }),
         });
       }
 
@@ -264,8 +266,8 @@ const ProjectDetails = () => {
 
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: `Failed to update task status: ${error.message}`,
+        title: t('error'),
+        description: t('task_status_update_error', { message: error.message }),
         variant: "destructive"
       });
     }
@@ -273,8 +275,8 @@ const ProjectDetails = () => {
 
   const handleNewOrderSuccess = () => {
     toast({
-      title: "Success",
-      description: "Order created successfully",
+      title: t('success'),
+      description: t('order_created_successfully'),
     });
     // Refresh orders data
     if (projectId) {
@@ -304,10 +306,10 @@ const ProjectDetails = () => {
         <div className="ml-64 w-full p-6">
           <div className="max-w-3xl mx-auto">
             <div className="text-center">
-              <h2 className="text-2xl font-bold mb-2">Project Not Found</h2>
-              <p className="text-muted-foreground mb-4">The project you're looking for doesn't exist or has been removed.</p>
-              <Button onClick={() => navigate('/projects')}>
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
+              <h2 className="text-2xl font-bold mb-2">{t('project_not_found')}</h2>
+              <p className="text-muted-foreground mb-4">{t('project_not_found_description')}</p>
+              <Button onClick={() => navigate(createLocalizedPath('/projects'))}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> {t('back_to_projects')}
               </Button>
             </div>
           </div>
@@ -318,7 +320,7 @@ const ProjectDetails = () => {
 
   const formatDate = (dateString: string) => {
     try {
-      return new Date(dateString).toLocaleDateString('en-US', {
+      return new Date(dateString).toLocaleDateString(lang, {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
@@ -331,13 +333,13 @@ const ProjectDetails = () => {
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
       case 'planned':
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-300">Planned</Badge>;
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-300">{t('status_planned')}</Badge>;
       case 'in_progress':
-        return <Badge className="bg-amber-100 text-amber-800 border-amber-300">In Progress</Badge>;
+        return <Badge className="bg-amber-100 text-amber-800 border-amber-300">{t('in_progress')}</Badge>;
       case 'completed':
-        return <Badge className="bg-green-100 text-green-800 border-green-300">Completed</Badge>;
+        return <Badge className="bg-green-100 text-green-800 border-green-300">{t('completed')}</Badge>;
       case 'on_hold':
-        return <Badge className="bg-gray-100 text-gray-800 border-gray-300">On Hold</Badge>;
+        return <Badge className="bg-gray-100 text-gray-800 border-gray-300">{t('status_on_hold')}</Badge>;
       default:
         return <Badge>{status}</Badge>;
     }
@@ -395,47 +397,47 @@ const ProjectDetails = () => {
           <div className="mb-6">
             <Button 
               variant="outline" 
-              onClick={() => navigate(`/projects`)}
+              onClick={() => navigate(createLocalizedPath('/projects'))}
               className="mb-4"
             >
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
+              <ArrowLeft className="mr-2 h-4 w-4" /> {t('back_to_projects')}
             </Button>
             
             <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">{project?.name}</h1>
-                <p className="text-muted-foreground">Client: {project?.client}</p>
+                <p className="text-muted-foreground">{t('client_label')}: {project?.client}</p>
               </div>
               <div className="flex gap-2">
                 <Button 
                   variant="outline"
-                  onClick={() => navigate(`/projects/${projectId}/orders`)}
+                  onClick={() => navigate(createLocalizedPath(`/projects/${projectId}/orders`))}
                 >
-                  <Package className="mr-2 h-4 w-4" /> Orders
+                  <Package className="mr-2 h-4 w-4" /> {t('orders')}
                 </Button>
                 <Button 
                   variant="outline"
                   onClick={() => setShowPartsListDialog(true)}
                 >
-                  <List className="mr-2 h-4 w-4" /> Parts List
+                  <List className="mr-2 h-4 w-4" /> {t('parts_list')}
                 </Button>
                 <Button 
                   variant="outline"
                   onClick={() => setShowAccessoriesDialog(true)}
                 >
-                  <Settings className="mr-2 h-4 w-4" /> Accessories
+                  <Settings className="mr-2 h-4 w-4" /> {t('accessories')}
                 </Button>
                 <Button 
                   variant={activeTab === 'files' ? 'default' : 'outline'}
                   onClick={() => setActiveTab('files')}
                 >
-                  <FileText className="mr-2 h-4 w-4" /> Files
+                  <FileText className="mr-2 h-4 w-4" /> {t('files')}
                 </Button>
                 <Button 
                   variant={activeTab === 'onedrive' ? 'default' : 'outline'}
                   onClick={() => setActiveTab('onedrive')}
                 >
-                  <Folder className="mr-2 h-4 w-4" /> OneDrive
+                  <Folder className="mr-2 h-4 w-4" /> {t('onedrive')}
                 </Button>
               </div>
             </div>
@@ -445,25 +447,25 @@ const ProjectDetails = () => {
             <Card>
               <CardContent className="pt-6">
                 <div className="text-2xl font-bold">{openTasks.length}</div>
-                <p className="text-xs text-muted-foreground">Open Tasks</p>
+                <p className="text-xs text-muted-foreground">{t('open_tasks')}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
                 <div className="text-2xl font-bold">{getTaskCountByStatus('IN_PROGRESS')}</div>
-                <p className="text-xs text-muted-foreground">In Progress</p>
+                <p className="text-xs text-muted-foreground">{t('in_progress')}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
                 <div className="text-2xl font-bold">{getTaskCountByStatus('COMPLETED')}</div>
-                <p className="text-xs text-muted-foreground">Completed</p>
+                <p className="text-xs text-muted-foreground">{t('completed')}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
                 <div className="text-2xl font-bold">{tasks.length}</div>
-                <p className="text-xs text-muted-foreground">Total Tasks</p>
+                <p className="text-xs text-muted-foreground">{t('total_tasks')}</p>
               </CardContent>
             </Card>
           </div>
@@ -477,18 +479,18 @@ const ProjectDetails = () => {
               {/* Project Summary Card */}
               <Card className="lg:col-span-1">
                 <CardHeader>
-                  <CardTitle>Project Summary</CardTitle>
+                  <CardTitle>{t('project_summary')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <h4 className="text-sm font-medium mb-1">Status</h4>
+                    <h4 className="text-sm font-medium mb-1">{t('status')}</h4>
                     <div>{project && getStatusBadge(project.status)}</div>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium mb-1">Project Progress</h4>
+                    <h4 className="text-sm font-medium mb-1">{t('project_progress')}</h4>
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Completion</span>
+                        <span className="text-muted-foreground">{t('completion')}</span>
                         <span className="font-medium">{project?.progress}%</span>
                       </div>
                       <div className="w-full bg-muted rounded-full h-2.5">
@@ -501,49 +503,49 @@ const ProjectDetails = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Orders & Accessories</h4>
+                    <h4 className="text-sm font-medium">{t('orders_and_accessories')}</h4>
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div className="bg-orange-50 p-2 rounded">
                         <div className="font-medium text-orange-800">{openOrdersCount}</div>
-                        <div className="text-orange-600 text-xs">Open Orders</div>
+                        <div className="text-orange-600 text-xs">{t('open_orders')}</div>
                       </div>
                       <div className="bg-red-50 p-2 rounded">
                         <div className="font-medium text-red-800">{unavailableAccessoriesCount}</div>
-                        <div className="text-red-600 text-xs">To Order</div>
+                        <div className="text-red-600 text-xs">{t('to_order')}</div>
                       </div>
                       <div className="bg-green-50 p-2 rounded">
                         <div className="font-medium text-green-800">{inStockAccessoriesCount}</div>
-                        <div className="text-green-600 text-xs">In Stock</div>
+                        <div className="text-green-600 text-xs">{t('in_stock')}</div>
                       </div>
                       <div className="bg-blue-50 p-2 rounded">
                         <div className="font-medium text-blue-800">{deliveredAccessoriesCount}</div>
-                        <div className="text-blue-600 text-xs">Delivered</div>
+                        <div className="text-blue-600 text-xs">{t('delivered')}</div>
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Important Dates</h4>
+                    <h4 className="text-sm font-medium">{t('important_dates')}</h4>
                     <div className="flex items-center gap-2 text-sm">
                       <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Start Date:</span>
+                      <span className="text-muted-foreground">{t('start_date_label')}:</span>
                       <span>{project?.start_date && formatDate(project.start_date)}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Installation Date:</span>
+                      <span className="text-muted-foreground">{t('installation_date_label')}:</span>
                       <span>{project?.installation_date && formatDate(project.installation_date)}</span>
                     </div>
                   </div>
 
                   {semiFinishedOrders.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="text-sm font-medium">Semi-finished Product Deliveries</h4>
+                      <h4 className="text-sm font-medium">{t('semi_finished_deliveries')}</h4>
                       <div className="space-y-1.5 text-sm">
                         {semiFinishedOrders.map((order: any) => (
                           order.orderSteps && order.orderSteps.length > 0 && (
                             <div key={order.id} className="bg-gray-50 p-2 rounded">
-                              <p className="font-medium mb-1">{order.supplier} (Main Order)</p>
+                              <p className="font-medium mb-1">{order.supplier}{t('main_order_suffix')}</p>
                               <div className="pl-2 space-y-1">
                                 {order.orderSteps
                                   .filter((step: any) => step.supplier)
@@ -553,7 +555,7 @@ const ProjectDetails = () => {
                                         {step.name} ({step.supplier})
                                       </span>
                                       <span className="font-medium whitespace-nowrap ml-2">
-                                        {step.end_date ? formatDate(step.end_date) : 'N/A'}
+                                        {step.end_date ? formatDate(step.end_date) : t('not_applicable')}
                                       </span>
                                     </div>
                                   ))}
@@ -570,19 +572,19 @@ const ProjectDetails = () => {
               {/* Project Tasks Card */}
               <Card className="lg:col-span-2">
                 <CardHeader>
-                  <CardTitle>Project Tasks</CardTitle>
+                  <CardTitle>{t('project_tasks')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Tabs defaultValue="todo">
                     <TabsList className="mb-4">
-                      <TabsTrigger value="todo">Open tasks ({openTasks.length})</TabsTrigger>
-                      <TabsTrigger value="in_progress">In Progress ({inProgressTasks.length})</TabsTrigger>
-                      <TabsTrigger value="completed">Completed ({completedTasks.length})</TabsTrigger>
+                      <TabsTrigger value="todo">{t('open_tasks_tab', { count: openTasks.length.toString() })}</TabsTrigger>
+                      <TabsTrigger value="in_progress">{t('in_progress_tab', { count: inProgressTasks.length.toString() })}</TabsTrigger>
+                      <TabsTrigger value="completed">{t('completed_tab', { count: completedTasks.length.toString() })}</TabsTrigger>
                     </TabsList>
                     <TabsContent value="todo">
                       <TaskList 
                         tasks={openTasks} 
-                        title="Open Tasks" 
+                        title={t('open_tasks_title')} 
                         onTaskStatusChange={handleTaskStatusChange}
                         showCompleteButton={true}
                       />
@@ -590,14 +592,14 @@ const ProjectDetails = () => {
                     <TabsContent value="in_progress">
                       <TaskList 
                         tasks={inProgressTasks} 
-                        title="In Progress Tasks" 
+                        title={t('in_progress_tasks_title')} 
                         onTaskStatusChange={handleTaskStatusChange}
                       />
                     </TabsContent>
                     <TabsContent value="completed">
                       <TaskList 
                         tasks={completedTasks} 
-                        title="Completed Tasks" 
+                        title={t('completed_tasks_title')}
                         onTaskStatusChange={handleTaskStatusChange}
                       />
                     </TabsContent>
@@ -627,8 +629,8 @@ const ProjectDetails = () => {
         projectId={projectId!}
         onImportComplete={() => {
           toast({
-            title: "Success",
-            description: "Parts list imported successfully",
+            title: t('success'),
+            description: t('parts_list_imported_successfully'),
           });
         }}
       />
