@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -233,6 +234,12 @@ const ProjectOrders = () => {
         .from('order_items')
         .delete()
         .eq('order_id', orderId);
+        
+      // Delete order steps
+      await supabase
+        .from('order_steps')
+        .delete()
+        .eq('order_id', orderId);
 
       // Delete order attachments
       await supabase
@@ -411,7 +418,6 @@ const ProjectOrders = () => {
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        {/* Order Items */}
                         {order.orderItems && order.orderItems.length > 0 && (
                           <div>
                             <h4 className="text-sm font-semibold mb-2">Order Items</h4>
@@ -440,7 +446,6 @@ const ProjectOrders = () => {
                           </div>
                         )}
 
-                        {/* Order Steps for semi-finished products */}
                         {order.order_type === 'semi-finished' && order.orderSteps && order.orderSteps.length > 0 && (
                           <div>
                             <h4 className="text-sm font-semibold mb-2">Logistics Out</h4>
@@ -477,7 +482,6 @@ const ProjectOrders = () => {
                           </div>
                         )}
 
-                        {/* Order Attachments */}
                         <div>
                           <div className="flex justify-between items-center mb-2">
                             <h4 className="text-sm font-semibold">Files</h4>
@@ -528,8 +532,8 @@ const ProjectOrders = () => {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -558,3 +562,4 @@ const ProjectOrders = () => {
 };
 
 export default ProjectOrders;
+
