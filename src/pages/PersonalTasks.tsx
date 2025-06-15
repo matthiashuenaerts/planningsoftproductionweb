@@ -193,20 +193,41 @@ const PersonalTasks = () => {
   };
 
   // Convert schedules to timeline format for DailyTimeline component
-  const timelineTasks = schedules.map(schedule => ({
-    id: schedule.id,
-    title: schedule.title,
-    start_time: schedule.start_time,
-    end_time: schedule.end_time,
-    description: schedule.description,
-    status: 'scheduled',
-    project_name: schedule.title,
-    workstation: '',
-    priority: 'medium',
-    canStart: false,
-    canComplete: false,
-    isActive: false
-  }));
+  const timelineTasks = schedules.map(schedule => {
+    const associatedTask = schedule.task_id ? tasks.find(t => t.id === schedule.task_id) : undefined;
+
+    if (associatedTask) {
+      return {
+        id: associatedTask.id, // Use task id
+        title: associatedTask.title,
+        start_time: schedule.start_time,
+        end_time: schedule.end_time,
+        description: associatedTask.description || schedule.description,
+        status: associatedTask.status.toLowerCase(),
+        project_name: associatedTask.phases.projects.name,
+        workstation: associatedTask.workstation,
+        priority: associatedTask.priority,
+        canStart: canStartTask(associatedTask),
+        canComplete: canCompleteTask(associatedTask),
+        isActive: isTaskActive(associatedTask.id)
+      };
+    }
+
+    return {
+      id: schedule.id,
+      title: schedule.title,
+      start_time: schedule.start_time,
+      end_time: schedule.end_time,
+      description: schedule.description,
+      status: 'scheduled',
+      project_name: schedule.title,
+      workstation: '',
+      priority: 'medium',
+      canStart: false,
+      canComplete: false,
+      isActive: false
+    };
+  });
 
   const scheduledTaskIds = schedules.map(s => s.task_id).filter(Boolean);
 
@@ -331,9 +352,9 @@ const PersonalTasks = () => {
                   canStart={canStartTask(task)}
                   canComplete={canCompleteTask(task)}
                   onStatusChange={handleTaskStatusChange}
-                  onShowFiles={setShowFilesPopup}
-                  onShowParts={setShowPartsDialog}
-                  onShowBarcode={setShowBarcodeDialog}
+                  onShowFiles={(projectId) => setShowFilesPopup(task.phases.projects.id)}
+                  onShowParts={(projectId) => setShowPartsDialog(task.phases.projects.id)}
+                  onShowBarcode={(projectId) => setShowBarcodeDialog(task.phases.projects.id)}
                 />
               ))}
             </div>
@@ -351,9 +372,18 @@ const PersonalTasks = () => {
           <TabsContent value="timeline" className="space-y-4">
             <DailyTimeline 
               tasks={allTimelineTasks}
-              onShowFiles={setShowFilesPopup}
-              onShowParts={setShowPartsDialog}
-              onShowBarcode={setShowBarcodeDialog}
+              onShowFiles={(projectId) => {
+                const task = tasks.find(t => t.phases.projects.id === projectId || t.id === projectId);
+                if (task) setShowFilesPopup(task.phases.projects.id);
+              }}
+              onShowParts={(projectId) => {
+                const task = tasks.find(t => t.phases.projects.id === projectId || t.id === projectId);
+                if (task) setShowPartsDialog(task.phases.projects.id);
+              }}
+              onShowBarcode={(projectId) => {
+                const task = tasks.find(t => t.phases.projects.id === projectId || t.id === projectId);
+                if (task) setShowBarcodeDialog(task.phases.projects.id);
+              }}
               onStartTask={handleTimelineStartTask}
               onCompleteTask={handleTimelineCompleteTask}
             />
