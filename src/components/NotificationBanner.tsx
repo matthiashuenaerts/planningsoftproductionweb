@@ -65,15 +65,25 @@ const NotificationBanner = () => {
   if (!latestUnread) {
     return null;
   }
-  return <Alert className="fixed top-4 right-4 w-auto max-w-sm z-50 bg-background border-primary shadow-lg cursor-pointer animate-in fade-in-0 slide-in-from-top-5" onClick={handleClick}>
-            <Bell className="h-4 w-4" />
-            <AlertTitle>New Notification!</AlertTitle>
-            <AlertDescription>
-                {latestUnread.message}
-            </AlertDescription>
-            <Button variant="ghost" size="icon" onClick={handleClose} className="absolute top-1 right-1 h-6 w-6 px-px">
-                <X className="h-4 w-4" />
-            </Button>
-        </Alert>;
+  return (
+    <Alert 
+      className="fixed top-4 right-4 w-auto max-w-sm z-50 bg-primary text-primary-foreground shadow-xl cursor-pointer animate-in fade-in-0 slide-in-from-top-5" 
+      onClick={handleClick}
+    >
+      <Bell className="h-4 w-4 text-primary-foreground" />
+      <AlertTitle>New Notification!</AlertTitle>
+      <AlertDescription>
+          {latestUnread.message}
+      </AlertDescription>
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        onClick={handleClose} 
+        className="absolute top-1 right-1 h-6 w-6 px-px text-primary-foreground hover:bg-black/20"
+      >
+          <X className="h-4 w-4" />
+      </Button>
+    </Alert>
+  );
 };
 export default NotificationBanner;
