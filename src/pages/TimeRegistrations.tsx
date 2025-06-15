@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
@@ -25,6 +24,7 @@ const TimeRegistrations = () => {
     endDate: ''
   });
   const [projectFilter, setProjectFilter] = useState<string>('all');
+  const [taskFilter, setTaskFilter] = useState<string>('all');
 
   // Check if user is admin or manager
   const canViewAllRegistrations = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
@@ -45,8 +45,9 @@ const TimeRegistrations = () => {
     (canViewAllRegistrations && selectedEmployee !== 'all') ||
     dateFilter.startDate !== '' ||
     dateFilter.endDate !== '' ||
-    projectFilter !== 'all'
-  ), [canViewAllRegistrations, selectedEmployee, dateFilter, projectFilter]);
+    projectFilter !== 'all' ||
+    taskFilter !== 'all'
+  ), [canViewAllRegistrations, selectedEmployee, dateFilter, projectFilter, taskFilter]);
 
   const filteredRegistrations = React.useMemo(() => {
     let sourceData = canViewAllRegistrations ? allRegistrations : myRegistrations;
@@ -81,8 +82,15 @@ const TimeRegistrations = () => {
       );
     }
 
+    // Task filter
+    if (taskFilter !== 'all') {
+      filtered = filtered.filter((reg: any) => 
+        reg.task_id === taskFilter || reg.workstation_task_id === taskFilter
+      );
+    }
+
     return filtered;
-  }, [allRegistrations, myRegistrations, canViewAllRegistrations, selectedEmployee, dateFilter, projectFilter, isFilterActive]);
+  }, [allRegistrations, myRegistrations, canViewAllRegistrations, selectedEmployee, dateFilter, projectFilter, taskFilter, isFilterActive]);
 
   const formatDuration = (minutes: number | null) => {
     if (!minutes) return '0h 0m';
@@ -128,6 +136,24 @@ const TimeRegistrations = () => {
       }
     });
     return Array.from(projects.values());
+  };
+
+  const getUniqueTasks = (registrations: any[]) => {
+    const tasks = new Map<string, { id: string; name: string }>();
+    registrations.forEach((reg: any) => {
+      if (reg.task_id && reg.tasks?.title) {
+        tasks.set(reg.task_id, {
+          id: reg.task_id,
+          name: reg.tasks.title,
+        });
+      } else if (reg.workstation_task_id && reg.workstation_tasks?.task_name) {
+        tasks.set(reg.workstation_task_id, {
+          id: reg.workstation_task_id,
+          name: reg.workstation_tasks.task_name,
+        });
+      }
+    });
+    return Array.from(tasks.values());
   };
 
   const { totalFilteredMinutes, totalCost } = filteredRegistrations.reduce(
@@ -308,7 +334,7 @@ const TimeRegistrations = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="start-date">Start Date</Label>
                   <Input
@@ -343,6 +369,22 @@ const TimeRegistrations = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="task-filter">Task</Label>
+                  <Select value={taskFilter} onValueChange={setTaskFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Tasks" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Tasks</SelectItem>
+                      {getUniqueTasks(myRegistrations).map((task: any) => (
+                        <SelectItem key={task.id} value={task.id}>
+                          {task.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="flex gap-2 mt-4">
                 <Button
@@ -350,6 +392,7 @@ const TimeRegistrations = () => {
                   onClick={() => {
                     setDateFilter({ startDate: '', endDate: '' });
                     setProjectFilter('all');
+                    setTaskFilter('all');
                   }}
                 >
                   Clear Filters
@@ -512,7 +555,7 @@ const TimeRegistrations = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="employee-filter">Employee</Label>
                 <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
@@ -566,6 +609,22 @@ const TimeRegistrations = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                  <Label htmlFor="task-filter">Task</Label>
+                  <Select value={taskFilter} onValueChange={setTaskFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Tasks" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Tasks</SelectItem>
+                      {getUniqueTasks(allRegistrations).map((task: any) => (
+                        <SelectItem key={task.id} value={task.id}>
+                          {task.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
             </div>
             
             <div className="flex gap-2 mt-4">
@@ -575,6 +634,7 @@ const TimeRegistrations = () => {
                   setSelectedEmployee('all');
                   setDateFilter({ startDate: '', endDate: '' });
                   setProjectFilter('all');
+                  setTaskFilter('all');
                 }}
               >
                 Clear Filters
