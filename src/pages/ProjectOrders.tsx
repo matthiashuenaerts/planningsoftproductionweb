@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -40,8 +39,10 @@ interface Order {
   status: 'pending' | 'delivered' | 'canceled' | 'delayed';
   created_at: string;
   updated_at: string;
+  order_type: 'standard' | 'semi-finished';
   orderItems?: OrderItem[];
   attachments?: OrderAttachment[];
+  orderSteps?: OrderStep[];
 }
 
 interface OrderItem {
@@ -63,6 +64,21 @@ interface OrderAttachment {
   file_path: string;
   file_type: string;
   file_size: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface OrderStep {
+  id: string;
+  order_id: string;
+  step_number: number;
+  name: string;
+  supplier?: string | null;
+  status: 'pending' | 'in_progress' | 'completed' | 'delayed';
+  start_date?: string | null;
+  expected_duration_days?: number | null;
+  end_date?: string | null;
+  notes?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -109,7 +125,7 @@ const ProjectOrders = () => {
       if (ordersError) throw ordersError;
 
       // Fetch order items and attachments for each order
-      const ordersWithItemsAndAttachments = await Promise.all(
+      const ordersWithDetails = await Promise.all(
         (ordersData || []).map(async (order) => {
           const { data: itemsData, error: itemsError } = await supabase
             .from('order_items')
@@ -123,16 +139,24 @@ const ProjectOrders = () => {
           // Fetch attachments
           const attachments = await orderService.getOrderAttachments(order.id);
           
+          // Fetch order steps if it's a semi-finished product
+          let orderSteps: OrderStep[] = [];
+          if (order.order_type === 'semi-finished') {
+            orderSteps = await orderService.getOrderSteps(order.id);
+          }
+          
           return { 
             ...order, 
             status: order.status as 'pending' | 'delivered' | 'canceled' | 'delayed',
+            order_type: order.order_type as 'standard' | 'semi-finished',
             orderItems: itemsData || [],
-            attachments: attachments || []
+            attachments: attachments || [],
+            orderSteps: orderSteps,
           };
         })
       );
 
-      setOrders(ordersWithItemsAndAttachments);
+      setOrders(ordersWithDetails);
     } catch (error: any) {
       console.error('Error fetching project orders:', error);
       toast({
@@ -256,6 +280,21 @@ const ProjectOrders = () => {
         return <Badge className="bg-green-100 text-green-800 border-green-300">Delivered</Badge>;
       case 'canceled':
         return <Badge className="bg-red-100 text-red-800 border-red-300">Canceled</Badge>;
+      case 'delayed':
+        return <Badge className="bg-orange-100 text-orange-800 border-orange-300">Delayed</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
+
+  const getStepStatusBadge = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return <Badge className="bg-gray-100 text-gray-800 border-gray-300">Pending</Badge>;
+      case 'in_progress':
+        return <Badge className="bg-amber-100 text-amber-800 border-amber-300">In Progress</Badge>;
+      case 'completed':
+        return <Badge className="bg-green-100 text-green-800 border-green-300">Completed</Badge>;
       case 'delayed':
         return <Badge className="bg-orange-100 text-orange-800 border-orange-300">Delayed</Badge>;
       default:
@@ -388,6 +427,39 @@ const ProjectOrders = () => {
                                     </TableCell>
                                     <TableCell className="py-1 text-xs">{item.description}</TableCell>
                                     <TableCell className="py-1 text-xs text-right">{item.quantity}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Order Steps for semi-finished products */}
+                      {order.order_type === 'semi-finished' && order.orderSteps && order.orderSteps.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold mb-2">Processing Steps</h4>
+                          <div className="border rounded-lg overflow-hidden">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="h-8 py-2 text-xs">#</TableHead>
+                                  <TableHead className="h-8 py-2 text-xs">Step</TableHead>
+                                  <TableHead className="h-8 py-2 text-xs">Supplier</TableHead>
+                                  <TableHead className="h-8 py-2 text-xs">Status</TableHead>
+                                  <TableHead className="h-8 py-2 text-xs">Start Date</TableHead>
+                                  <TableHead className="h-8 py-2 text-xs">End Date</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {order.orderSteps.map((step) => (
+                                  <TableRow key={step.id} className="h-8">
+                                    <TableCell className="py-1 text-xs font-medium">{step.step_number}</TableCell>
+                                    <TableCell className="py-1 text-xs">{step.name}</TableCell>
+                                    <TableCell className="py-1 text-xs">{step.supplier || 'Internal'}</TableCell>
+                                    <TableCell className="py-1 text-xs">{getStepStatusBadge(step.status)}</TableCell>
+                                    <TableCell className="py-1 text-xs">{step.start_date ? format(new Date(step.start_date), 'MMM d, yy') : 'N/A'}</TableCell>
+                                    <TableCell className="py-1 text-xs">{step.end_date ? format(new Date(step.end_date), 'MMM d, yy') : 'N/A'}</TableCell>
                                   </TableRow>
                                 ))}
                               </TableBody>

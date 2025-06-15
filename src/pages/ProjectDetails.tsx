@@ -373,6 +373,7 @@ const ProjectDetails = () => {
   ).length;
   const inStockAccessoriesCount = accessories.filter(acc => acc.status === 'in_stock').length;
   const deliveredAccessoriesCount = accessories.filter(acc => acc.status === 'delivered').length;
+  const semiFinishedOrders = orders.filter(order => order.order_type === 'semi-finished');
 
   return (
     <div className="flex min-h-screen">
@@ -524,6 +525,20 @@ const ProjectDetails = () => {
                       <span>{project?.installation_date && formatDate(project.installation_date)}</span>
                     </div>
                   </div>
+
+                  {semiFinishedOrders.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">Semi-finished Product Deliveries</h4>
+                      <div className="space-y-1.5 text-sm">
+                        {semiFinishedOrders.map(order => (
+                          <div key={order.id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                            <span className="font-medium">{order.supplier}</span>
+                            <span className="text-muted-foreground">{formatDate(order.expected_delivery)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
               
