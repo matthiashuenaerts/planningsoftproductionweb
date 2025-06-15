@@ -17,6 +17,44 @@
     "rushOrders": "Rush Orders",
     "timeRegistrations": "Time Registrations",
     "settings": "Settings",
-    "logout": "Logout"
+    "logout": "Logout",
+    "demoAccount": "Demo Account"
+  },
+  "login": {
+    "title": "PlanningSoftProduction",
+    "description": "Planning software for production environment",
+    "usernameLabel": "Username",
+    "usernamePlaceholder": "Enter your employee name",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "signInButton": "Sign in",
+    "signingInButton": "Signing in...",
+    "errorTitle": "Error",
+    "errorDescription": "Please enter both employee name and password",
+    "loginFailedTitle": "Login failed",
+    "loginFailedDescription": "An error occurred during login",
+    "loginSuccessTitle": "Login successful",
+    "welcomeMessage": "Welcome, {{name}}!"
+  },
+  "brokenParts": {
+    "title": "Broken Parts",
+    "viewSummary": "View Summary",
+    "reportNew": "Report New",
+    "reportTitle": "Report Broken Part"
+  },
+  "notFound": {
+    "title": "404",
+    "subtitle": "Page not found",
+    "description": "The page you are looking for doesn't exist or has been moved.",
+    "returnHome": "Return to Home",
+    "viewAllProjects": "View All Projects"
+  },
+  "notifications": {
+    "newNotification": "New Notification!",
+    "title": "Notifications",
+    "markAllAsRead": "Mark all as read",
+    "loading": "Loading notifications...",
+    "noNotifications": "No notifications",
+    "new": "New"
   }
 }

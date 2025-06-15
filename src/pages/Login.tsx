@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const Login: React.FC = () => {
   const [name, setName] = useState('');
@@ -15,6 +17,7 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { login, isAuthenticated } = useAuth();
+  const { t } = useTranslation();
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -28,8 +31,8 @@ const Login: React.FC = () => {
     
     if (!name || !password) {
       toast({
-        title: "Error",
-        description: "Please enter both employee name and password",
+        title: t('login.errorTitle'),
+        description: t('login.errorDescription'),
         variant: "destructive"
       });
       return;
@@ -74,8 +77,8 @@ const Login: React.FC = () => {
       });
       
       toast({
-        title: "Login successful",
-        description: `Welcome, ${employee.name}!`
+        title: t('login.loginSuccessTitle'),
+        description: t('login.welcomeMessage', { name: employee.name })
       });
       
       // Navigate based on role
@@ -83,8 +86,8 @@ const Login: React.FC = () => {
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
-        title: "Login failed",
-        description: error.message || "An error occurred during login",
+        title: t('login.loginFailedTitle'),
+        description: error.message || t('login.loginFailedDescription'),
         variant: "destructive"
       });
     } finally {
@@ -103,30 +106,30 @@ const Login: React.FC = () => {
         />
         <Card>
           <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-3xl font-bold">PlanningSoftProduction</CardTitle>
-            <CardDescription>Planningssoftware voor productieomgeving</CardDescription>
+            <CardTitle className="text-3xl font-bold">{t('login.title')}</CardTitle>
+            <CardDescription>{t('login.description')}</CardDescription>
           </CardHeader>
           <form onSubmit={handleLogin}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Gebruikersnaam</Label>
+                <Label htmlFor="name">{t('login.usernameLabel')}</Label>
                 <Input 
                   id="name" 
                   type="text" 
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter your employee name"
+                  placeholder={t('login.usernamePlaceholder')}
                   disabled={loading}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Paswoord</Label>
+                <Label htmlFor="password">{t('login.passwordLabel')}</Label>
                 <Input 
                   id="password" 
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
+                  placeholder={t('login.passwordPlaceholder')}
                   disabled={loading}
                 />
               </div>
@@ -137,7 +140,7 @@ const Login: React.FC = () => {
                 type="submit"
                 disabled={loading}
               >
-                {loading ? "Signing in..." : "Sign in"}
+                {loading ? t('login.signingInButton') : t('login.signInButton')}
               </Button>
             </CardFooter>
           </form>

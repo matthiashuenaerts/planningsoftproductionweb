@@ -15,7 +15,7 @@ const NotificationBanner = () => {
   } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [latestUnread, setLatestUnread] = useState<Notification | null>(null);
   const {
     data: notifications,
@@ -74,7 +74,7 @@ const NotificationBanner = () => {
   }
   return <Alert className="fixed top-4 right-4 w-auto max-w-sm z-50 bg-primary text-primary-foreground shadow-xl cursor-pointer animate-in fade-in-0 slide-in-from-top-5" onClick={handleClick}>
       <Bell className="h-4 w-4 text-primary-foreground" />
-      <AlertTitle>New Notification!</AlertTitle>
+      <AlertTitle>{t('notifications.newNotification')}</AlertTitle>
       <AlertDescription>
           {latestUnread.message}
       </AlertDescription>

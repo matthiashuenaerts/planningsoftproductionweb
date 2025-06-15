@@ -17,6 +17,44 @@
     "rushOrders": "Spoedbestellingen",
     "timeRegistrations": "Tijdregistraties",
     "settings": "Instellingen",
-    "logout": "Uitloggen"
+    "logout": "Uitloggen",
+    "demoAccount": "Demo Account"
+  },
+  "login": {
+    "title": "PlanningSoftProduction",
+    "description": "Planningssoftware voor productieomgeving",
+    "usernameLabel": "Gebruikersnaam",
+    "usernamePlaceholder": "Voer uw gebruikersnaam in",
+    "passwordLabel": "Paswoord",
+    "passwordPlaceholder": "Voer uw paswoord in",
+    "signInButton": "Inloggen",
+    "signingInButton": "Bezig met inloggen...",
+    "errorTitle": "Fout",
+    "errorDescription": "Gelieve zowel gebruikersnaam als paswoord in te vullen",
+    "loginFailedTitle": "Inloggen mislukt",
+    "loginFailedDescription": "Er is een fout opgetreden tijdens het inloggen",
+    "loginSuccessTitle": "Succesvol ingelogd",
+    "welcomeMessage": "Welkom, {{name}}!"
+  },
+  "brokenParts": {
+    "title": "Gebroken onderdelen",
+    "viewSummary": "Overzicht bekijken",
+    "reportNew": "Nieuw melden",
+    "reportTitle": "Meld een gebroken onderdeel"
+  },
+  "notFound": {
+    "title": "404",
+    "subtitle": "Pagina niet gevonden",
+    "description": "De pagina die u zoekt bestaat niet of is verplaatst.",
+    "returnHome": "Terug naar startpagina",
+    "viewAllProjects": "Bekijk alle projecten"
+  },
+  "notifications": {
+    "newNotification": "Nieuwe Melding!",
+    "title": "Meldingen",
+    "markAllAsRead": "Markeer alles als gelezen",
+    "loading": "Meldingen laden...",
+    "noNotifications": "Geen meldingen",
+    "new": "Nieuw"
   }
 }

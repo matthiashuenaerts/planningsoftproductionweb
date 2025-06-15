@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock } from 'lucide-react';
@@ -54,7 +55,7 @@ const NavbarContent = ({
   return <div className="h-full px-3 py-4 overflow-y-auto bg-sky-800 text-white flex flex-col">
       <div className="flex flex-col h-full justify-between">
         <div>
-          <h2 className="px-2 py-3 text-lg font-semibold mb-2">Demo Account</h2>
+          <h2 className="px-2 py-3 text-lg font-semibold mb-2">{t('navbar.demoAccount')}</h2>
           <ul className="space-y-2 font-medium">
             <li>
               <NavLink to={`/${lang}`} end className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>

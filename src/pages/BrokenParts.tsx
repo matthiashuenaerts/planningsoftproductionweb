@@ -6,9 +6,11 @@ import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, BarChart } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const BrokenParts: React.FC = () => {
   const { currentEmployee } = useAuth();
+  const { t } = useTranslation();
   
   return (
     <div className="flex h-screen bg-gray-50">
@@ -18,18 +20,18 @@ const BrokenParts: React.FC = () => {
       <div className="flex-1 overflow-auto">
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">Broken Parts</h1>
+            <h1 className="text-2xl font-bold">{t('brokenParts.title')}</h1>
             <div className="flex space-x-2">
               <Button variant="outline" asChild>
-                <Link to="/broken-parts/summary">
+                <Link to={`/${t('navbar.dashboard').toLowerCase()}/broken-parts/summary`}>
                   <BarChart className="h-4 w-4 mr-2" />
-                  View Summary
+                  {t('brokenParts.viewSummary')}
                 </Link>
               </Button>
               <Button asChild>
-                <Link to="/broken-parts/new">
+                <Link to={`/${t('navbar.dashboard').toLowerCase()}/broken-parts/new`}>
                   <PlusCircle className="h-4 w-4 mr-2" />
-                  Report New
+                  {t('brokenParts.reportNew')}
                 </Link>
               </Button>
             </div>
