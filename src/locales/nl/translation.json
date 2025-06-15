@@ -1,3 +1,4 @@
+
 {
   "dashboardTitle": "Faseopvolging productie",
   "userManagementTitle": "Gebruikersbeheer",
@@ -86,5 +87,38 @@
       "deleteSuccess": "Project succesvol verwijderd.",
       "deleteFailed": "Verwijderen van project mislukt: {{error}}"
     }
+  },
+  "settingsPage": {
+    "accessDenied": "Toegang geweigerd",
+    "permissionDenied": "U heeft geen toestemming om de instellingenpagina te openen",
+    "goBack": "Ga terug",
+    "title": "Systeeminstellingen",
+    "tabs": {
+      "workstations": "Werkstations",
+      "employees": "Medewerkers",
+      "standardTasks": "Standaard Taken",
+      "holidayPlanner": "Vakantieplanner"
+    },
+    "toasts": {
+      "accessDeniedTitle": "Toegang geweigerd",
+      "accessDeniedDescription": "U heeft geen toestemming om de instellingenpagina te openen"
+    }
+  },
+  "rushOrdersPage": {
+    "title": "Spoedbestellingen",
+    "newRushOrder": "Nieuwe Spoedbestelling",
+    "createDialogTitle": "Nieuwe Spoedbestelling Aanmaken",
+    "createDialogDescription": "Spoedbestellingen krijgen de hoogste prioriteit en worden zo snel mogelijk voltooid.",
+    "tabs": {
+      "pending": "In afwachting",
+      "inProgress": "In uitvoering",
+      "completed": "Voltooid"
+    }
+  },
+  "rushOrderDetailsPage": {
+    "backToRushOrders": "Terug naar Spoedbestellingen",
+    "title": "Details Spoedbestelling",
+    "notFound": "Spoedbestelling niet gevonden",
+    "returnToRushOrders": "Terug naar Spoedbestellingen"
   }
 }

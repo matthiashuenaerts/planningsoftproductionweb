@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import RushOrderDetail from '@/components/rush-orders/RushOrderDetail';
+import { useTranslation } from 'react-i18next';
 
 const RushOrderDetails = () => {
   const { rushOrderId } = useParams<{ rushOrderId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t, i18n } = useTranslation();
   
   const handleStatusChange = () => {
     // Invalidate the rush orders list to refresh data
@@ -28,13 +30,13 @@ const RushOrderDetails = () => {
             <Button
               variant="ghost"
               className="mb-4"
-              onClick={() => navigate('/rush-orders')}
+              onClick={() => navigate(`/${i18n.language}/rush-orders`)}
             >
               <ChevronLeft className="mr-1 h-4 w-4" />
-              Back to Rush Orders
+              {t('rushOrderDetailsPage.backToRushOrders')}
             </Button>
             
-            <h1 className="text-3xl font-bold">Rush Order Details</h1>
+            <h1 className="text-3xl font-bold">{t('rushOrderDetailsPage.title')}</h1>
           </div>
           
           {rushOrderId ? (
@@ -44,13 +46,13 @@ const RushOrderDetails = () => {
             />
           ) : (
             <div className="text-center py-12">
-              <p className="text-gray-500">Rush order not found</p>
+              <p className="text-gray-500">{t('rushOrderDetailsPage.notFound')}</p>
               <Button 
                 variant="outline" 
                 className="mt-4"
-                onClick={() => navigate('/rush-orders')}
+                onClick={() => navigate(`/${i18n.language}/rush-orders`)}
               >
-                Return to Rush Orders
+                {t('rushOrderDetailsPage.returnToRushOrders')}
               </Button>
             </div>
           )}

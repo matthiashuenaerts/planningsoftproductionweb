@@ -1,3 +1,4 @@
+
 {
   "dashboardTitle": "Production Phase Monitoring",
   "userManagementTitle": "User Management",
@@ -86,5 +87,38 @@
       "deleteSuccess": "Project deleted successfully.",
       "deleteFailed": "Failed to delete project: {{error}}"
     }
+  },
+  "settingsPage": {
+    "accessDenied": "Access Denied",
+    "permissionDenied": "You don't have permission to access the settings page",
+    "goBack": "Go Back",
+    "title": "System Settings",
+    "tabs": {
+      "workstations": "Workstations",
+      "employees": "Employees",
+      "standardTasks": "Standard Tasks",
+      "holidayPlanner": "Holiday Planner"
+    },
+    "toasts": {
+      "accessDeniedTitle": "Access Denied",
+      "accessDeniedDescription": "You don't have permission to access the settings page"
+    }
+  },
+  "rushOrdersPage": {
+    "title": "Rush Orders",
+    "newRushOrder": "New Rush Order",
+    "createDialogTitle": "Create New Rush Order",
+    "createDialogDescription": "Rush orders receive the highest priority and will be completed as quickly as possible.",
+    "tabs": {
+      "pending": "Pending",
+      "inProgress": "In Progress",
+      "completed": "Completed"
+    }
+  },
+  "rushOrderDetailsPage": {
+    "backToRushOrders": "Back to Rush Orders",
+    "title": "Rush Order Details",
+    "notFound": "Rush order not found",
+    "returnToRushOrders": "Return to Rush Orders"
   }
 }
