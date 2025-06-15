@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +15,7 @@ import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import EnhancedTaskCard from '@/components/EnhancedTaskCard';
+import { startOfDay, endOfDay } from 'date-fns';
 
 interface Task {
   id: string;
@@ -94,12 +94,14 @@ const PersonalTasks = () => {
 
       if (tasksError) throw tasksError;
 
-      // Fetch personal schedule
+      // Fetch personal schedule for today
+      const today = new Date();
       const { data: schedulesData, error: schedulesError } = await supabase
         .from('schedules')
         .select('*')
         .eq('employee_id', currentEmployee.id)
-        .gte('start_time', new Date().toISOString())
+        .gte('start_time', startOfDay(today).toISOString())
+        .lte('start_time', endOfDay(today).toISOString())
         .order('start_time', { ascending: true });
 
       if (schedulesError) throw schedulesError;
@@ -206,21 +208,25 @@ const PersonalTasks = () => {
     isActive: false
   }));
 
+  const scheduledTaskIds = schedules.map(s => s.task_id).filter(Boolean);
+
   // Add actual tasks to timeline with proper project information
-  const taskTimelineItems = tasks.map(task => ({
-    id: task.id,
-    title: task.title,
-    start_time: new Date().toISOString(),
-    end_time: new Date(Date.now() + (task.duration || 1) * 60 * 60 * 1000).toISOString(),
-    description: task.description || '',
-    status: task.status.toLowerCase(),
-    project_name: task.phases.projects.name,
-    workstation: task.workstation,
-    priority: task.priority,
-    canStart: canStartTask(task),
-    canComplete: canCompleteTask(task),
-    isActive: isTaskActive(task.id)
-  }));
+  const taskTimelineItems = tasks
+    .filter(task => !scheduledTaskIds.includes(task.id))
+    .map(task => ({
+      id: task.id,
+      title: task.title,
+      start_time: new Date().toISOString(),
+      end_time: new Date(Date.now() + (task.duration || 1) * 60 * 60 * 1000).toISOString(),
+      description: task.description || '',
+      status: task.status.toLowerCase(),
+      project_name: task.phases.projects.name,
+      workstation: task.workstation,
+      priority: task.priority,
+      canStart: canStartTask(task),
+      canComplete: canCompleteTask(task),
+      isActive: isTaskActive(task.id)
+    }));
 
   // Combine schedules and tasks for timeline
   const allTimelineTasks = [...timelineTasks, ...taskTimelineItems];
