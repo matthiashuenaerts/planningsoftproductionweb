@@ -283,48 +283,6 @@ const PersonalTasks = () => {
   const inProgressTasks = tasks.filter(task => task.status === 'IN_PROGRESS');
   const completedTasks = tasks.filter(task => task.status === 'COMPLETED');
 
-  // New logic for today's tasks
-  const tasksWithScheduleInfo = tasks.map(task => {
-    const schedule = schedules.find(s => s.task_id === task.id);
-    return { 
-      ...task, 
-      schedule_start_time: schedule?.start_time, 
-      schedule_end_time: schedule?.end_time 
-    };
-  });
-
-  const isSameDay = (d1: Date, d2: Date) => {
-    return d1.getFullYear() === d2.getFullYear() &&
-      d1.getMonth() === d2.getMonth() &&
-      d1.getDate() === d2.getDate();
-  }
-
-  const todayTasks = tasksWithScheduleInfo.filter(task => {
-    if (task.schedule_start_time) {
-      return true;
-    }
-    
-    try {
-      const dueDate = new Date(task.due_date + 'T00:00:00');
-      const today = new Date();
-      return isSameDay(dueDate, today);
-    } catch {
-      return false;
-    }
-  }).sort((a, b) => {
-    const aHasSchedule = !!a.schedule_start_time;
-    const bHasSchedule = !!b.schedule_start_time;
-
-    if (aHasSchedule && !bHasSchedule) return -1;
-    if (!aHasSchedule && bHasSchedule) return 1;
-
-    if (aHasSchedule && bHasSchedule) {
-      return new Date(a.schedule_start_time!).getTime() - new Date(b.schedule_start_time!).getTime();
-    }
-    
-    return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-  });
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex">
@@ -344,7 +302,7 @@ const PersonalTasks = () => {
       <div className="flex-1 ml-64 p-6 max-w-none">
         <TaskTimer />
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">My Tasks for Today</h1>
+          <h1 className="text-3xl font-bold text-gray-900">My Tasks</h1>
           <p className="text-gray-600 mt-2">Manage your personal tasks and schedule</p>
         </div>
 
@@ -393,33 +351,31 @@ const PersonalTasks = () => {
 
         <Tabs defaultValue="tasks" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="tasks">My Tasks for Today</TabsTrigger>
+            <TabsTrigger value="tasks">My Tasks</TabsTrigger>
             <TabsTrigger value="timeline">Daily Timeline</TabsTrigger>
           </TabsList>
 
           <TabsContent value="tasks" className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-              {todayTasks.map((task) => (
+              {tasks.map((task) => (
                 <EnhancedTaskCard
                   key={task.id}
                   task={task}
                   isActive={isTaskActive(task.id)}
                   canComplete={canCompleteTask(task)}
                   onStatusChange={handleTaskStatusChange}
-                  onShowFiles={() => setShowFilesPopup(task.phases.projects.id)}
-                  onShowParts={() => setShowPartsDialog(task.phases.projects.id)}
-                  onShowBarcode={() => setShowBarcodeDialog(task.phases.projects.id)}
-                  schedule_start_time={task.schedule_start_time}
-                  schedule_end_time={task.schedule_end_time}
+                  onShowFiles={(projectId) => setShowFilesPopup(task.phases.projects.id)}
+                  onShowParts={(projectId) => setShowPartsDialog(task.phases.projects.id)}
+                  onShowBarcode={(projectId) => setShowBarcodeDialog(task.phases.projects.id)}
                 />
               ))}
             </div>
 
-            {todayTasks.length === 0 && (
+            {tasks.length === 0 && (
               <Card>
                 <CardContent className="pt-6 text-center">
-                  <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-500">No tasks scheduled for you today.</p>
+                  <User className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-500">No tasks assigned to you.</p>
                 </CardContent>
               </Card>
             )}
