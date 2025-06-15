@@ -361,10 +361,12 @@ export type Database = {
       }
       order_items: {
         Row: {
+          accessory_id: string | null
           article_code: string | null
           created_at: string
           description: string
           id: string
+          notes: string | null
           order_id: string
           quantity: number
           total_price: number | null
@@ -372,10 +374,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accessory_id?: string | null
           article_code?: string | null
           created_at?: string
           description: string
           id?: string
+          notes?: string | null
           order_id: string
           quantity: number
           total_price?: number | null
@@ -383,10 +387,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accessory_id?: string | null
           article_code?: string | null
           created_at?: string
           description?: string
           id?: string
+          notes?: string | null
           order_id?: string
           quantity?: number
           total_price?: number | null
@@ -395,7 +401,67 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "order_items_accessory_id_fkey"
+            columns: ["accessory_id"]
+            isOneToOne: false
+            referencedRelation: "accessories"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_steps: {
+        Row: {
+          created_at: string
+          end_date: string | null
+          expected_duration_days: number | null
+          id: string
+          name: string
+          notes: string | null
+          order_id: string
+          start_date: string | null
+          status: string
+          step_number: number
+          supplier: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string | null
+          expected_duration_days?: number | null
+          id?: string
+          name: string
+          notes?: string | null
+          order_id: string
+          start_date?: string | null
+          status?: string
+          step_number: number
+          supplier?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string | null
+          expected_duration_days?: number | null
+          id?: string
+          name?: string
+          notes?: string | null
+          order_id?: string
+          start_date?: string | null
+          status?: string
+          step_number?: number
+          supplier?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_steps_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
@@ -408,7 +474,9 @@ export type Database = {
           created_at: string
           expected_delivery: string
           id: string
+          notes: string | null
           order_date: string
+          order_type: string
           project_id: string
           status: string
           supplier: string
@@ -418,7 +486,9 @@ export type Database = {
           created_at?: string
           expected_delivery: string
           id?: string
+          notes?: string | null
           order_date?: string
+          order_type?: string
           project_id: string
           status: string
           supplier: string
@@ -428,7 +498,9 @@ export type Database = {
           created_at?: string
           expected_delivery?: string
           id?: string
+          notes?: string | null
           order_date?: string
+          order_type?: string
           project_id?: string
           status?: string
           supplier?: string

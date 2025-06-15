@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Order, OrderItem, OrderAttachment } from '@/types/order';
+import { Order, OrderItem, OrderAttachment, OrderStep } from '@/types/order';
 
 export const orderService = {
   async getAll(): Promise<Order[]> {
@@ -11,7 +11,8 @@ export const orderService = {
     if (error) throw error;
     return (data || []).map(order => ({
       ...order,
-      status: order.status as Order['status']
+      status: order.status as Order['status'],
+      order_type: order.order_type as Order['order_type']
     }));
   },
 
@@ -29,7 +30,8 @@ export const orderService = {
     if (error) throw error;
     return {
       ...data,
-      status: data.status as Order['status']
+      status: data.status as Order['status'],
+      order_type: data.order_type as Order['order_type']
     };
   },
 
@@ -43,7 +45,8 @@ export const orderService = {
     if (error) throw error;
     return (data || []).map(order => ({
       ...order,
-      status: order.status as Order['status']
+      status: order.status as Order['status'],
+      order_type: order.order_type as Order['order_type']
     }));
   },
 
@@ -57,7 +60,8 @@ export const orderService = {
     if (error) throw error;
     return {
       ...data,
-      status: data.status as Order['status']
+      status: data.status as Order['status'],
+      order_type: data.order_type as Order['order_type']
     };
   },
 
@@ -78,7 +82,8 @@ export const orderService = {
 
     return {
       ...data,
-      status: data.status as Order['status']
+      status: data.status as Order['status'],
+      order_type: data.order_type as Order['order_type']
     };
   },
 
@@ -160,6 +165,59 @@ export const orderService = {
   async deleteOrderItem(id: string): Promise<void> {
     const { error } = await supabase
       .from('order_items')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
+  // Order Steps
+  async getOrderSteps(orderId: string): Promise<OrderStep[]> {
+    const { data, error } = await supabase
+      .from('order_steps')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('step_number', { ascending: true });
+
+    if (error) throw error;
+    return (data || []).map(step => ({
+        ...step,
+        status: step.status as OrderStep['status']
+    }));
+  },
+
+  async createOrderStep(step: Omit<OrderStep, 'id' | 'created_at' | 'updated_at'>): Promise<OrderStep> {
+    const { data, error } = await supabase
+      .from('order_steps')
+      .insert(step)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return {
+      ...data,
+      status: data.status as OrderStep['status']
+    };
+  },
+
+  async updateOrderStep(id: string, updates: Partial<OrderStep>): Promise<OrderStep> {
+    const { data, error } = await supabase
+      .from('order_steps')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return {
+      ...data,
+      status: data.status as OrderStep['status']
+    };
+  },
+
+  async deleteOrderStep(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('order_steps')
       .delete()
       .eq('id', id);
 

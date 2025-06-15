@@ -576,6 +576,7 @@ const ProjectDetails = () => {
         projectId={projectId!}
         onSuccess={handleNewOrderSuccess}
         showAddOrderButton={true}
+        accessories={accessories}
       />
 
       {/* Parts List Dialog */}
