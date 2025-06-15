@@ -59,10 +59,10 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
     new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
   );
 
-  // Generate time slots for the day (6 AM to 10 PM)
+  // Generate time slots for the day (6 AM to 6 PM)
   const generateTimeSlots = () => {
     const slots = [];
-    for (let hour = 6; hour <= 22; hour++) {
+    for (let hour = 6; hour < 18; hour++) {
       slots.push({
         hour,
         time: `${hour.toString().padStart(2, '0')}:00`,
@@ -89,8 +89,8 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
     const duration = ((endHour - startHour) * 60 + (endMinute - startMinute)) / 60;
     
     return {
-      top: `${startPosition * 4}rem`, // 4rem per hour
-      height: `${Math.max(duration * 4, 1)}rem`, // minimum 1rem height
+      top: `${startPosition * 6}rem`, // 6rem per hour
+      height: `${Math.max(duration * 6, 1.5)}rem`, // minimum 1.5rem height
     };
   };
 
@@ -102,10 +102,10 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     
-    if (currentHour < 6 || currentHour > 22) return null;
+    if (currentHour < 6 || currentHour >= 18) return null;
     
     const position = ((currentHour - 6) * 60 + currentMinute) / 60;
-    return `${position * 4}rem`;
+    return `${position * 6}rem`;
   };
 
   const currentTimePosition = getCurrentTimePosition();
@@ -180,20 +180,20 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
             {/* Time labels */}
             <div className="space-y-0">
               {timeSlots.map(slot => (
-                <div key={slot.hour} className="h-16 flex items-start text-sm text-muted-foreground">
+                <div key={slot.hour} className="h-24 flex items-start text-sm text-muted-foreground pt-1">
                   {slot.displayTime}
                 </div>
               ))}
             </div>
             
             {/* Timeline area */}
-            <div className="relative border-l border-gray-200 min-h-[64rem]">
+            <div className="relative border-l border-gray-200 min-h-[72rem]">
               {/* Hour lines */}
               {timeSlots.map((slot, index) => (
                 <div
                   key={slot.hour}
                   className="absolute w-full border-t border-gray-100"
-                  style={{ top: `${index * 4}rem` }}
+                  style={{ top: `${index * 6}rem` }}
                 />
               ))}
               
@@ -222,8 +222,8 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
                     style={style}
                   >
                     <Card className="h-full shadow-sm border-l-4 border-l-blue-500 overflow-hidden">
-                      <CardContent className={`p-2 h-full flex ${blockHeight <= 2.5 ? 'flex-row items-center justify-start gap-2' : 'flex-col justify-between'}`}>
-                        {blockHeight <= 2.5 ? (
+                      <CardContent className={`p-2 h-full flex ${blockHeight <= 3.75 ? 'flex-row items-center justify-start gap-2' : 'flex-col justify-between'}`}>
+                        {blockHeight <= 3.75 ? (
                           // Compact view
                           <>
                             <div className="flex-1 min-w-0">
@@ -287,14 +287,14 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
                                 </div>
                               )}
                               
-                              {blockHeight > 3.5 && task.description && (
+                              {blockHeight > 5.25 && task.description && (
                                 <p className="text-xs text-muted-foreground">
                                   {task.description}
                                 </p>
                               )}
 
                               {/* Action Buttons */}
-                              {blockHeight > 4.5 && (
+                              {blockHeight > 6.75 && (
                                 <div className="flex flex-wrap gap-1 mt-2">
                                   {onShowFiles && (
                                     <Button
