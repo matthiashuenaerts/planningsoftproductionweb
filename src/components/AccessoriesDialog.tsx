@@ -579,7 +579,7 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
                                 onOpenChange={(isOpen) => {
                                     if (isOpen) {
                                         setEditingStatusAccessoryId(accessory.id);
-                                        setStatusUpdateInfo({ status: accessory.status, quantity: accessory.status === 'to_order' ? accessory.quantity : 1 });
+                                        setStatusUpdateInfo({ status: accessory.status, quantity: accessory.status === 'to_order' ? statusUpdateInfo.quantity : 1 });
                                     } else {
                                         setEditingStatusAccessoryId(null);
                                     }
@@ -600,10 +600,7 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
                                                   key={status}
                                                   variant={statusUpdateInfo.status === status ? 'default' : 'outline'}
                                                   size="sm"
-                                                  onClick={() => {
-                                                    const newQuantity = status === 'to_order' ? accessory.quantity : 1;
-                                                    setStatusUpdateInfo({ status, quantity: newQuantity });
-                                                  }}
+                                                  onClick={() => setStatusUpdateInfo(prev => ({...prev, status}))}
                                                   className="capitalize w-full justify-center"
                                                 >
                                                     {status.replace(/_/g, ' ')}
