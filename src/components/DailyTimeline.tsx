@@ -222,128 +222,157 @@ const DailyTimeline: React.FC<DailyTimelineProps> = ({
                     style={style}
                   >
                     <Card className="h-full shadow-sm border-l-4 border-l-blue-500 overflow-hidden">
-                      <CardContent className="p-2 h-full flex flex-col justify-between">
-                        <div className="flex-grow overflow-y-auto pr-1"> {/* Main content area */}
-                          <div className="flex justify-between items-start mb-1">
+                      <CardContent className={`p-2 h-full flex ${blockHeight <= 2.5 ? 'flex-row items-center justify-start gap-2' : 'flex-col justify-between'}`}>
+                        {blockHeight <= 2.5 ? (
+                          // Compact view
+                          <>
                             <div className="flex-1 min-w-0">
+                              <h3 className="font-medium text-sm truncate" title={task.project_name || task.title}>
+                                {task.project_name || task.title}
+                              </h3>
                               {task.project_name && (
-                                <h3 className="font-medium text-sm truncate">
-                                  {task.project_name}
-                                </h3>
+                                <h4 className="font-medium text-xs truncate text-muted-foreground" title={task.title}>
+                                  {task.title}
+                                </h4>
                               )}
-                              <h4 className="font-medium text-xs truncate text-muted-foreground">
-                                {task.title}
-                              </h4>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                              <Clock className="h-3 w-3" />
+                              {format(new Date(task.start_time), 'HH:mm')} - 
+                              {format(new Date(task.end_time), 'HH:mm')}
                             </div>
                             {task.status && (
-                              <Badge className={`text-xs whitespace-nowrap ${getStatusColor(task.status)}`}>
+                              <Badge className={`text-xs whitespace-nowrap shrink-0 ${getStatusColor(task.status)}`}>
                                 {task.status}
                               </Badge>
                             )}
-                          </div>
-                          
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
-                            <Clock className="h-3 w-3" />
-                            {format(new Date(task.start_time), 'HH:mm')} - 
-                            {format(new Date(task.end_time), 'HH:mm')}
-                          </div>
-                          
-                          {blockHeight > 2.5 && task.workstation && (
-                            <div className="text-xs text-muted-foreground mb-1">
-                              Workstation: {task.workstation}
-                            </div>
-                          )}
+                          </>
+                        ) : (
+                          // Full view
+                          <>
+                            <div className="flex-grow overflow-y-auto pr-1"> {/* Main content area */}
+                              <div className="flex justify-between items-start mb-1">
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-medium text-sm truncate" title={task.project_name || task.title}>
+                                    {task.project_name || task.title}
+                                  </h3>
+                                  {task.project_name && (
+                                    <h4 className="font-medium text-xs truncate text-muted-foreground" title={task.title}>
+                                      {task.title}
+                                    </h4>
+                                  )}
+                                </div>
+                                {task.status && (
+                                  <Badge className={`text-xs whitespace-nowrap ${getStatusColor(task.status)}`}>
+                                    {task.status}
+                                  </Badge>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                                <Clock className="h-3 w-3" />
+                                {format(new Date(task.start_time), 'HH:mm')} - 
+                                {format(new Date(task.end_time), 'HH:mm')}
+                              </div>
+                              
+                              {task.workstation && (
+                                <div className="text-xs text-muted-foreground mb-1">
+                                  Workstation: {task.workstation}
+                                </div>
+                              )}
 
-                          {blockHeight > 2.5 && task.priority && (
-                            <div className="mb-1">
-                              {getPriorityBadge(task.priority)}
-                            </div>
-                          )}
-                          
-                          {blockHeight > 3.5 && task.description && (
-                            <p className="text-xs text-muted-foreground">
-                              {task.description}
-                            </p>
-                          )}
-
-                          {/* Action Buttons */}
-                          {blockHeight > 4.5 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {onShowFiles && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => onShowFiles(task.id)}
-                                  className="text-xs px-2 py-1 h-6"
-                                >
-                                  <FileText className="h-3 w-3 mr-1" />
-                                  Files
-                                </Button>
+                              {task.priority && (
+                                <div className="mb-1">
+                                  {getPriorityBadge(task.priority)}
+                                </div>
                               )}
                               
-                              {onShowParts && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => onShowParts(task.id)}
-                                  className="text-xs px-2 py-1 h-6"
-                                >
-                                  <Package2 className="h-3 w-3 mr-1" />
-                                  Parts
-                                </Button>
+                              {blockHeight > 3.5 && task.description && (
+                                <p className="text-xs text-muted-foreground">
+                                  {task.description}
+                                </p>
                               )}
-                              
-                              {onShowBarcode && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => onShowBarcode(task.id)}
-                                  className="text-xs px-2 py-1 h-6"
-                                >
-                                  <QrCode className="h-3 w-3 mr-1" />
-                                  Barcode
-                                </Button>
-                              )}
-                              
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.open(`/projects/${task.id}`, '_blank')}
-                                className="text-xs px-2 py-1 h-6"
-                              >
-                                <ExternalLink className="h-3 w-3 mr-1" />
-                                Project
-                              </Button>
-                            </div>
-                          )}
-                        </div>
 
-                        {/* Task Control Buttons */}
-                        {(task.canStart && onStartTask || task.canComplete && onCompleteTask) && (
-                          <div className="flex-shrink-0 flex gap-1 pt-2 mt-1 border-t">
-                            {task.canStart && onStartTask && (
-                              <Button
-                                size="sm"
-                                onClick={() => onStartTask(task.id)}
-                                className="flex-1 text-xs px-2 py-1 h-6"
-                              >
-                                <Play className="h-3 w-3 mr-1" />
-                                Start
-                              </Button>
+                              {/* Action Buttons */}
+                              {blockHeight > 4.5 && (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {onShowFiles && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => onShowFiles(task.id)}
+                                      className="text-xs px-2 py-1 h-6"
+                                    >
+                                      <FileText className="h-3 w-3 mr-1" />
+                                      Files
+                                    </Button>
+                                  )}
+                                  
+                                  {onShowParts && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => onShowParts(task.id)}
+                                      className="text-xs px-2 py-1 h-6"
+                                    >
+                                      <Package2 className="h-3 w-3 mr-1" />
+                                      Parts
+                                    </Button>
+                                  )}
+                                  
+                                  {onShowBarcode && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => onShowBarcode(task.id)}
+                                      className="text-xs px-2 py-1 h-6"
+                                    >
+                                      <QrCode className="h-3 w-3 mr-1" />
+                                      Barcode
+                                    </Button>
+                                  )}
+                                  
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(`/projects/${task.id}`, '_blank')}
+                                    className="text-xs px-2 py-1 h-6"
+                                  >
+                                    <ExternalLink className="h-3 w-3 mr-1" />
+                                    Project
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Task Control Buttons */}
+                            {(task.canStart && onStartTask || task.canComplete && onCompleteTask) && (
+                              <div className="flex-shrink-0 flex gap-1 pt-2 mt-1 border-t">
+                                {task.canStart && onStartTask && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => onStartTask(task.id)}
+                                    className="flex-1 text-xs px-2 py-1 h-6"
+                                  >
+                                    <Play className="h-3 w-3 mr-1" />
+                                    Start
+                                  </Button>
+                                )}
+                                
+                                {task.canComplete && onCompleteTask && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => onCompleteTask(task.id)}
+                                    className="flex-1 text-xs px-2 py-1 h-6"
+                                    variant="default"
+                                  >
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Complete
+                                  </Button>
+                                )}
+                              </div>
                             )}
-                            
-                            {task.canComplete && onCompleteTask && (
-                              <Button
-                                size="sm"
-                                onClick={() => onCompleteTask(task.id)}
-                                className="flex-1 text-xs px-2 py-1 h-6"
-                                variant="default"
-                              >
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Complete
-                              </Button>
-                            )}
-                          </div>
+                          </>
                         )}
                       </CardContent>
                     </Card>
