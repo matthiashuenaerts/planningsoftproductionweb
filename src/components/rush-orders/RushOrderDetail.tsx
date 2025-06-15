@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
@@ -11,6 +12,7 @@ import { format, parseISO } from 'date-fns';
 import { Check, Clock, UserCheck, ListChecks, File as FileIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import RushOrderChat from './RushOrderChat';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface RushOrderDetailProps {
   rushOrderId: string;
@@ -20,6 +22,7 @@ interface RushOrderDetailProps {
 const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatusChange }) => {
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
+  const { t } = useLanguage();
   
   const { data: rushOrder, isLoading, error, refetch } = useQuery({
     queryKey: ['rushOrder', rushOrderId],
@@ -64,8 +67,8 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
       
       if (success) {
         toast({
-          title: "Status Updated",
-          description: `Rush order status changed to ${newStatus.replace('_', ' ')}`,
+          title: t('status_updated'),
+          description: t('status_updated_description', { status: t(`status_${newStatus}`) }),
         });
         
         refetch();
@@ -75,8 +78,8 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
       }
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: `Failed to update status: ${error.message}`,
+        title: t('status_update_error'),
+        description: t('status_update_error_description', { error: error.message }),
         variant: "destructive"
       });
     } finally {
@@ -86,27 +89,27 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
   
   const getTaskName = (taskId: string) => {
     const task = standardTasks?.find(t => t.id === taskId);
-    return task ? `${task.task_name} (Task #${task.task_number})` : 'Unknown Task';
+    return task ? `${task.task_name} (Task #${task.task_number})` : t('unknown_task');
   };
   
   const getEmployeeName = (employeeId: string) => {
     const employee = assignedEmployees?.find(e => e.id === employeeId);
-    return employee ? `${employee.name} (${employee.role})` : 'Unknown Employee';
+    return employee ? `${employee.name} (${employee.role})` : t('unknown_employee');
   };
   
   if (isLoading) {
-    return <div className="text-center py-8">Loading rush order details...</div>;
+    return <div className="text-center py-8">{t('loading_rush_order_details')}</div>;
   }
   
   if (error || !rushOrder) {
     return (
       <Card className="bg-red-50 border-red-200">
         <CardHeader>
-          <CardTitle>Error Loading Rush Order</CardTitle>
-          <CardDescription>There was a problem loading this rush order.</CardDescription>
+          <CardTitle>{t('error_loading_rush_order')}</CardTitle>
+          <CardDescription>{t('error_loading_rush_order_description')}</CardDescription>
         </CardHeader>
         <CardFooter>
-          <Button onClick={() => refetch()}>Try Again</Button>
+          <Button onClick={() => refetch()}>{t('try_again')}</Button>
         </CardFooter>
       </Card>
     );
@@ -120,7 +123,7 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
             <div>
               <CardTitle className="text-xl">{rushOrder.title}</CardTitle>
               <CardDescription>
-                Created: {format(parseISO(rushOrder.created_at), 'MMM d, yyyy HH:mm')}
+                {t('created_at_label')}: {format(parseISO(rushOrder.created_at), 'MMM d, yyyy HH:mm')}
               </CardDescription>
             </div>
             <Badge className={`
@@ -129,7 +132,7 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
                 'bg-green-100 text-green-800'} 
               px-3 py-1 text-sm capitalize
             `}>
-              {rushOrder.status.replace('_', ' ')}
+              {t(`status_${rushOrder.status}`)}
             </Badge>
           </div>
         </CardHeader>
@@ -137,12 +140,12 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Description</h3>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">{t('description_label')}</h3>
               <p className="text-gray-800 whitespace-pre-wrap">{rushOrder.description}</p>
             </div>
             
             <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Deadline</h3>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">{t('deadline_label')}</h3>
               <div className="flex items-center">
                 <Clock className="h-4 w-4 text-red-500 mr-2" />
                 <p className="text-red-600 font-medium">
@@ -154,7 +157,7 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
           
           {rushOrder.image_url && (
             <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Attachment</h3>
+              <h3 className="text-sm font-medium text-gray-500 mb-2">{t('attachment_label')}</h3>
               <div className="overflow-hidden rounded-lg border">
                 {isImage(rushOrder.image_url) ? (
                   <img 
@@ -174,7 +177,7 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
                       <div className="flex-grow overflow-hidden">
                         <p className="font-medium truncate">{decodeURIComponent(rushOrder.image_url.split('/').pop() ?? 'Document')}</p>
                         <span className="text-sm text-blue-600 hover:underline">
-                          View Document
+                          {t('view_document')}
                         </span>
                       </div>
                     </div>
@@ -188,11 +191,11 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
             <div>
               <div className="flex items-center mb-2">
                 <ListChecks className="h-5 w-5 text-blue-500 mr-2" />
-                <h3 className="text-md font-medium">Required Tasks</h3>
+                <h3 className="text-md font-medium">{t('required_tasks_label')}</h3>
               </div>
               
               {(!rushOrder.tasks || rushOrder.tasks.length === 0) ? (
-                <p className="text-gray-500 text-sm">No tasks assigned</p>
+                <p className="text-gray-500 text-sm">{t('no_tasks_assigned')}</p>
               ) : (
                 <ul className="space-y-2">
                   {rushOrder.tasks.map((task) => (
@@ -208,11 +211,11 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
             <div>
               <div className="flex items-center mb-2">
                 <UserCheck className="h-5 w-5 text-indigo-500 mr-2" />
-                <h3 className="text-md font-medium">Assigned Team Members</h3>
+                <h3 className="text-md font-medium">{t('assigned_team_members_label')}</h3>
               </div>
               
               {(!rushOrder.assignments || rushOrder.assignments.length === 0) ? (
-                <p className="text-gray-500 text-sm">No team members assigned</p>
+                <p className="text-gray-500 text-sm">{t('no_team_members_assigned')}</p>
               ) : (
                 <ul className="space-y-2">
                   {rushOrder.assignments.map((assignment) => (
@@ -234,7 +237,7 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
             ${rushOrder.priority === 'critical' ? 'bg-red-100 text-red-800 border-red-300' : 'bg-orange-100 text-orange-800 border-orange-300'}
             px-3 py-1
           `}>
-            {rushOrder.priority.toUpperCase()} PRIORITY
+            {rushOrder.priority.toUpperCase()} {t('priority_label')}
           </Badge>
           
           <div className="flex gap-3">
@@ -244,7 +247,7 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
                 onClick={() => handleStatusUpdate('in_progress')}
                 disabled={isUpdating}
               >
-                Mark as In Progress
+                {t('mark_as_in_progress')}
               </Button>
             )}
             
@@ -254,7 +257,7 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
                 onClick={() => handleStatusUpdate('completed')}
                 disabled={isUpdating}
               >
-                Mark as Completed
+                {t('mark_as_completed')}
               </Button>
             )}
             
@@ -264,7 +267,7 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
                 onClick={() => handleStatusUpdate('in_progress')}
                 disabled={isUpdating}
               >
-                Reopen
+                {t('reopen')}
               </Button>
             )}
           </div>
@@ -278,3 +281,4 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
 };
 
 export default RushOrderDetail;
+

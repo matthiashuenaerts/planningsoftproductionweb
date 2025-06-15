@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import EditRushOrderForm from './EditRushOrderForm';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface RushOrderListProps {
   statusFilter?: "pending" | "in_progress" | "completed" | "all";
@@ -40,6 +41,7 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
   const navigate = useNavigate();
   const { currentEmployee } = useAuth();
   const queryClient = useQueryClient();
+  const { t, createLocalizedPath } = useLanguage();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<RushOrder | null>(null);
@@ -79,13 +81,13 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">Pending</Badge>;
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">{t('status_pending')}</Badge>;
       case 'in_progress':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">In Progress</Badge>;
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">{t('status_in_progress')}</Badge>;
       case 'completed':
-        return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">Completed</Badge>;
+        return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">{t('status_completed')}</Badge>;
       default:
-        return <Badge variant="outline">Unknown</Badge>;
+        return <Badge variant="outline">{t('status_unknown')}</Badge>;
     }
   };
 
@@ -124,11 +126,11 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
     return (
       <Card className="bg-red-50 border-red-200">
         <CardHeader>
-          <CardTitle>Error Loading Rush Orders</CardTitle>
-          <CardDescription>There was a problem loading the rush orders.</CardDescription>
+          <CardTitle>{t('error_loading_rush_orders')}</CardTitle>
+          <CardDescription>{t('error_loading_rush_orders_description')}</CardDescription>
         </CardHeader>
         <CardFooter>
-          <Button onClick={() => refetch()}>Try Again</Button>
+          <Button onClick={() => refetch()}>{t('try_again')}</Button>
         </CardFooter>
       </Card>
     );
@@ -138,7 +140,7 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
     return (
       <Card className="bg-gray-50 border-gray-200 text-center py-8">
         <CardContent>
-          <p className="text-gray-500">No rush orders found</p>
+          <p className="text-gray-500">{t('no_rush_orders_found')}</p>
         </CardContent>
       </Card>
     );
@@ -172,11 +174,11 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => { setSelectedOrder(order); setIsEditDialogOpen(true); }}>
                         <Edit className="mr-2 h-4 w-4" />
-                        <span>Edit</span>
+                        <span>{t('edit')}</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50" onClick={() => { setSelectedOrder(order); setIsDeleteDialogOpen(true); }}>
                         <Trash2 className="mr-2 h-4 w-4" />
-                        <span>Delete</span>
+                        <span>{t('delete')}</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -184,9 +186,9 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
               </div>
             </div>
             <CardDescription className="flex justify-between">
-              <span>Created: {format(parseISO(order.created_at), 'MMM d, yyyy')}</span>
+              <span>{t('created')}: {format(parseISO(order.created_at), 'MMM d, yyyy')}</span>
               <span className="font-medium text-red-600">
-                Deadline: {format(parseISO(order.deadline), 'MMM d, yyyy')}
+                {t('deadline')}: {format(parseISO(order.deadline), 'MMM d, yyyy')}
               </span>
             </CardDescription>
           </CardHeader>
@@ -214,12 +216,12 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
             
             <div className="mt-4 grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-gray-500">Tasks</p>
-                <p className="text-sm font-medium">{order.tasks?.length || 0} tasks assigned</p>
+                <p className="text-xs text-gray-500">{t('tasks')}</p>
+                <p className="text-sm font-medium">{t('tasks_assigned', { count: (order.tasks?.length || 0).toString() })}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Assigned to</p>
-                <p className="text-sm font-medium">{order.assignments?.length || 0} team members</p>
+                <p className="text-xs text-gray-500">{t('assigned_to')}</p>
+                <p className="text-sm font-medium">{t('team_members_assigned', { count: (order.assignments?.length || 0).toString() })}</p>
               </div>
             </div>
           </CardContent>
@@ -228,13 +230,13 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
               <Badge variant="outline" className={`
                 ${order.priority === 'critical' ? 'bg-red-100 text-red-800 border-red-300' : 'bg-orange-100 text-orange-800 border-orange-300'}
               `}>
-                {order.priority === 'critical' ? 'CRITICAL' : 'HIGH'}
+                {order.priority === 'critical' ? t('priority_critical') : t('priority_high')}
               </Badge>
               <Button 
                 variant="outline"
-                onClick={() => navigate(`/rush-orders/${order.id}`)}
+                onClick={() => navigate(createLocalizedPath(`/rush-orders/${order.id}`))}
               >
-                View Details
+                {t('view_details')}
               </Button>
             </div>
           </CardFooter>
@@ -246,9 +248,9 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
         <Dialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open) setSelectedOrder(null); setIsEditDialogOpen(open); }}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
             <DialogHeader>
-              <DialogTitle>Edit Rush Order</DialogTitle>
+              <DialogTitle>{t('edit_rush_order')}</DialogTitle>
               <DialogDescription>
-                Update the details for this rush order.
+                {t('edit_rush_order_description')}
               </DialogDescription>
             </DialogHeader>
             <EditRushOrderForm onSuccess={handleEditSuccess} rushOrder={selectedOrder} />
@@ -260,19 +262,19 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>{t('are_you_sure')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the rush order "{selectedOrder?.title}" and its associated data.
+              {t('delete_rush_order_confirm_description', { title: selectedOrder?.title || '' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setSelectedOrder(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setSelectedOrder(null)}>{t('cancel')}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+              {deleteMutation.isPending ? t('deleting') : t('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -282,3 +284,4 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
 };
 
 export default RushOrderList;
+
