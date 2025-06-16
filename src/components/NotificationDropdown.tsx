@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { notificationService, Notification } from '@/services/notificationService';
 import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +20,7 @@ import { Separator } from '@/components/ui/separator';
 
 const NotificationDropdown: React.FC = () => {
   const { currentEmployee } = useAuth();
+  const { createLocalizedPath } = useLanguage();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -67,7 +70,7 @@ const NotificationDropdown: React.FC = () => {
       
       // Navigate to rush order if applicable
       if (notification.rush_order_id) {
-        navigate(`/rush-orders/${notification.rush_order_id}`);
+        navigate(createLocalizedPath(`/rush-orders/${notification.rush_order_id}`));
       }
     } catch (error) {
       console.error('Error handling notification click:', error);

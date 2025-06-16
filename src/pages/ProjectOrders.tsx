@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -87,6 +88,7 @@ interface OrderStep {
 const ProjectOrders = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const { createLocalizedPath } = useLanguage();
   const [orders, setOrders] = useState<Order[]>([]);
   const [project, setProject] = useState<Project | null>(null);
   const [accessories, setAccessories] = useState<Accessory[]>([]);
@@ -319,7 +321,7 @@ const ProjectOrders = () => {
           <div className="mb-6">
             <Button 
               variant="outline" 
-              onClick={() => navigate(`/projects/${projectId}`)}
+              onClick={() => navigate(createLocalizedPath(`/projects/${projectId}`))}
               className="mb-4"
             >
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Project
@@ -562,4 +564,3 @@ const ProjectOrders = () => {
 };
 
 export default ProjectOrders;
-

@@ -1,27 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { notificationService, Notification } from '@/services/notificationService';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { X, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+
 const NotificationBanner = () => {
-  const {
-    currentEmployee
-  } = useAuth();
+  const { currentEmployee } = useAuth();
+  const { createLocalizedPath } = useLanguage();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [latestUnread, setLatestUnread] = useState<Notification | null>(null);
-  const {
-    data: notifications,
-    isSuccess
-  } = useQuery({
+
+  const { data: notifications, isSuccess } = useQuery({
     queryKey: ['notifications', currentEmployee?.id],
     queryFn: () => notificationService.getUserNotifications(currentEmployee!.id),
     enabled: !!currentEmployee,
     refetchInterval: 15000
   });
+
   useEffect(() => {
     if (isSuccess && notifications) {
       const unread = notifications.filter(n => !n.read);
@@ -36,6 +36,7 @@ const NotificationBanner = () => {
       }
     }
   }, [notifications, isSuccess, latestUnread?.id]);
+
   const handleClose = async (e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (latestUnread) {
@@ -54,17 +55,20 @@ const NotificationBanner = () => {
       });
     }
   };
+
   const handleClick = () => {
     if (latestUnread) {
       if (latestUnread.rush_order_id) {
-        navigate(`/rush-orders/${latestUnread.rush_order_id}`);
+        navigate(createLocalizedPath(`/rush-orders/${latestUnread.rush_order_id}`));
       }
       handleClose();
     }
   };
+
   if (!latestUnread) {
     return null;
   }
+
   return <Alert className="fixed top-4 right-4 w-auto max-w-sm z-50 bg-primary text-primary-foreground shadow-xl cursor-pointer animate-in fade-in-0 slide-in-from-top-5" onClick={handleClick}>
       <Bell className="h-4 w-4 text-primary-foreground" />
       <AlertTitle>New Notification!</AlertTitle>
@@ -76,4 +80,5 @@ const NotificationBanner = () => {
       </Button>
     </Alert>;
 };
+
 export default NotificationBanner;
