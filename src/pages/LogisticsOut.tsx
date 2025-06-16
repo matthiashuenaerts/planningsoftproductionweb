@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -11,9 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format, parseISO, isToday, isTomorrow, isPast } from 'date-fns';
-import { Search, Package, Truck, Calendar as CalendarIcon, Filter, Clock, AlertTriangle } from 'lucide-react';
+import { format, parseISO, isToday, isTomorrow, isPast, addDays } from 'date-fns';
+import { Search, Package, Truck, Calendar as CalendarIcon, Filter, Clock, AlertTriangle, ExternalLink, FileText, Barcode, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
+import ProjectFilesPopup from '@/components/ProjectFilesPopup';
+import { PartsListDialog } from '@/components/PartsListDialog';
 
 type LogisticsOutOrder = Order & { 
   project_name: string;
@@ -22,14 +26,16 @@ type LogisticsOutOrder = Order & {
 
 type CalendarEvent = {
   date: string;
-  type: 'delivery' | 'step';
+  type: 'start' | 'return';
   order: LogisticsOutOrder;
-  step?: OrderStep;
+  step: OrderStep;
   title: string;
   description: string;
+  expectedReturnDate?: string;
 };
 
 const LogisticsOut: React.FC = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<LogisticsOutOrder[]>([]);
@@ -37,6 +43,10 @@ const LogisticsOut: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
+  const [showFilesDialog, setShowFilesDialog] = useState(false);
+  const [showPartsDialog, setShowPartsDialog] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     const loadLogisticsOutOrders = async () => {
@@ -55,8 +65,11 @@ const LogisticsOut: React.FC = () => {
                 projectName = project.name;
               }
               
-              // Fetch order processing steps
-              processingSteps = await orderService.getOrderSteps(order.id);
+              // Fetch order processing steps and filter for external steps with start dates
+              const allSteps = await orderService.getOrderSteps(order.id);
+              processingSteps = allSteps.filter(step => 
+                step.supplier && step.supplier.trim() !== '' && step.start_date
+              );
             } catch (error) {
               console.error(`Error fetching details for order ${order.id}:`, error);
             }
@@ -69,8 +82,13 @@ const LogisticsOut: React.FC = () => {
           })
         );
         
-        setOrders(ordersWithDetails);
-        generateCalendarEvents(ordersWithDetails);
+        // Filter orders that have external processing steps
+        const filteredOrders = ordersWithDetails.filter(order => 
+          order.processing_steps && order.processing_steps.length > 0
+        );
+        
+        setOrders(filteredOrders);
+        generateCalendarEvents(filteredOrders);
       } catch (error: any) {
         toast({
           title: "Error",
@@ -89,36 +107,34 @@ const LogisticsOut: React.FC = () => {
     const events: CalendarEvent[] = [];
     
     orders.forEach(order => {
-      // Add delivery event
-      events.push({
-        date: format(new Date(order.expected_delivery), 'yyyy-MM-dd'),
-        type: 'delivery',
-        order,
-        title: `Delivery: ${order.project_name}`,
-        description: `Expected delivery from ${order.supplier}`
-      });
-      
-      // Add processing step events
+      // Add external processing step events with start dates
       order.processing_steps?.forEach(step => {
-        if (step.start_date) {
+        if (step.start_date && step.supplier) {
+          // Add start date event
+          const startDate = format(new Date(step.start_date), 'yyyy-MM-dd');
           events.push({
-            date: format(new Date(step.start_date), 'yyyy-MM-dd'),
-            type: 'step',
+            date: startDate,
+            type: 'start',
             order,
             step,
-            title: `${step.name}`,
-            description: `${order.project_name} - ${step.supplier || 'Internal'}`
+            title: `Start: ${step.name}`,
+            description: `${order.project_name} - ${step.supplier}`
           });
-        }
-        if (step.end_date) {
-          events.push({
-            date: format(new Date(step.end_date), 'yyyy-MM-dd'),
-            type: 'step',
-            order,
-            step,
-            title: `${step.name} Complete`,
-            description: `${order.project_name} - ${step.supplier || 'Internal'}`
-          });
+          
+          // Calculate and add expected return date if duration is provided
+          if (step.expected_duration_days) {
+            const returnDate = addDays(new Date(step.start_date), step.expected_duration_days);
+            const returnDateStr = format(returnDate, 'yyyy-MM-dd');
+            events.push({
+              date: returnDateStr,
+              type: 'return',
+              order,
+              step,
+              title: `Return: ${step.name}`,
+              description: `${order.project_name} - ${step.supplier}`,
+              expectedReturnDate: returnDateStr
+            });
+          }
         }
       });
     });
@@ -151,21 +167,40 @@ const LogisticsOut: React.FC = () => {
 
   const getEventColor = (event: CalendarEvent) => {
     const priority = getEventPriority(event);
-    if (event.type === 'delivery') {
+    if (event.type === 'start') {
       switch (priority) {
-        case 'urgent': return 'bg-red-500 text-white';
-        case 'high': return 'bg-orange-500 text-white';
+        case 'urgent': return 'bg-blue-600 text-white';
+        case 'high': return 'bg-blue-500 text-white';
         case 'overdue': return 'bg-gray-500 text-white';
-        default: return 'bg-blue-500 text-white';
+        default: return 'bg-blue-400 text-white';
       }
     } else {
       switch (priority) {
-        case 'urgent': return 'bg-red-100 text-red-800 border-red-300';
-        case 'high': return 'bg-orange-100 text-orange-800 border-orange-300';
-        case 'overdue': return 'bg-gray-100 text-gray-800 border-gray-300';
-        default: return 'bg-green-100 text-green-800 border-green-300';
+        case 'urgent': return 'bg-green-600 text-white';
+        case 'high': return 'bg-green-500 text-white';
+        case 'overdue': return 'bg-red-500 text-white';
+        default: return 'bg-green-400 text-white';
       }
     }
+  };
+
+  const handleProjectNavigation = (projectId: string) => {
+    navigate(`/nl/projects/${projectId}`);
+  };
+
+  const handleShowBarcode = (projectId: string, projectName: string) => {
+    setSelectedProject({ id: projectId, name: projectName });
+    setShowBarcodeDialog(true);
+  };
+
+  const handleShowFiles = (projectId: string, projectName: string) => {
+    setSelectedProject({ id: projectId, name: projectName });
+    setShowFilesDialog(true);
+  };
+
+  const handleShowParts = (projectId: string, projectName: string) => {
+    setSelectedProject({ id: projectId, name: projectName });
+    setShowPartsDialog(true);
   };
 
   const today = new Date();
@@ -203,7 +238,7 @@ const LogisticsOut: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-3xl font-bold">Logistics Out</h1>
-              <p className="text-gray-600 mt-1">Semi-finished product processing & delivery tracking</p>
+              <p className="text-gray-600 mt-1">External processing & return tracking</p>
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="px-3 py-1">
@@ -255,7 +290,7 @@ const LogisticsOut: React.FC = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CalendarIcon className="h-5 w-5" />
-                  Processing Timeline
+                  External Processing Timeline
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
@@ -294,7 +329,7 @@ const LogisticsOut: React.FC = () => {
                       >
                         <div className="flex items-start justify-between mb-2">
                           <Badge variant="outline" className="mb-1">
-                            {event.type === 'delivery' ? 'Delivery' : 'Processing'}
+                            {event.type === 'start' ? 'Start' : 'Return'}
                           </Badge>
                           {getEventPriority(event) === 'urgent' && (
                             <AlertTriangle className="h-4 w-4 text-red-500" />
@@ -302,30 +337,62 @@ const LogisticsOut: React.FC = () => {
                         </div>
                         <h4 className="font-medium mb-1">{event.title}</h4>
                         <p className="text-sm opacity-90">{event.description}</p>
-                        {event.step && (
-                          <div className="mt-2 pt-2 border-t border-current/20">
-                            <div className="flex items-center gap-2 text-xs">
-                              <Badge 
-                                variant={event.step.status === 'completed' ? 'default' : 'secondary'}
-                                className="text-xs"
-                              >
-                                {event.step.status}
-                              </Badge>
-                              {event.step.expected_duration_days && (
-                                <span className="text-xs opacity-75">
-                                  {event.step.expected_duration_days} days
-                                </span>
-                              )}
-                            </div>
+                        <div className="mt-2 pt-2 border-t border-current/20">
+                          <div className="flex items-center gap-2 text-xs">
+                            <Badge 
+                              variant={event.step.status === 'completed' ? 'default' : 'secondary'}
+                              className="text-xs"
+                            >
+                              {event.step.status}
+                            </Badge>
+                            {event.step.expected_duration_days && (
+                              <span className="text-xs opacity-75">
+                                {event.step.expected_duration_days} days
+                              </span>
+                            )}
                           </div>
-                        )}
+                          <div className="flex gap-1 mt-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleProjectNavigation(event.order.project_id)}
+                              className="text-xs h-6 px-2"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleShowFiles(event.order.project_id, event.order.project_name)}
+                              className="text-xs h-6 px-2"
+                            >
+                              <FileText className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleShowBarcode(event.order.project_id, event.order.project_name)}
+                              className="text-xs h-6 px-2"
+                            >
+                              <Barcode className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleShowParts(event.order.project_id, event.order.project_name)}
+                              className="text-xs h-6 px-2"
+                            >
+                              <List className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <div className="text-center py-6 text-gray-500">
                     <CalendarIcon className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                    <p>No events scheduled for this day</p>
+                    <p>No external processing events for this day</p>
                   </div>
                 )}
               </CardContent>
@@ -338,7 +405,7 @@ const LogisticsOut: React.FC = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Clock className="h-5 w-5" />
-                  Upcoming Events ({upcomingEvents.length})
+                  Upcoming External Processing Events ({upcomingEvents.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -354,7 +421,7 @@ const LogisticsOut: React.FC = () => {
                       >
                         <div className="flex items-center justify-between mb-2">
                           <Badge variant="outline" className="text-xs">
-                            {event.type === 'delivery' ? 'Delivery' : 'Process'}
+                            {event.type === 'start' ? 'Start' : 'Return'}
                           </Badge>
                           <span className="text-xs font-medium">
                             {format(new Date(event.date), 'MMM d')}
@@ -364,7 +431,41 @@ const LogisticsOut: React.FC = () => {
                         <p className="text-xs opacity-90 line-clamp-2">{event.description}</p>
                         <div className="mt-2 flex items-center gap-2">
                           <Truck className="h-3 w-3" />
-                          <span className="text-xs truncate">{event.order.supplier}</span>
+                          <span className="text-xs truncate">{event.step.supplier}</span>
+                        </div>
+                        <div className="flex gap-1 mt-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleProjectNavigation(event.order.project_id)}
+                            className="text-xs h-6 px-2 flex-1"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleShowFiles(event.order.project_id, event.order.project_name)}
+                            className="text-xs h-6 px-2 flex-1"
+                          >
+                            <FileText className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleShowBarcode(event.order.project_id, event.order.project_name)}
+                            className="text-xs h-6 px-2 flex-1"
+                          >
+                            <Barcode className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleShowParts(event.order.project_id, event.order.project_name)}
+                            className="text-xs h-6 px-2 flex-1"
+                          >
+                            <List className="h-3 w-3" />
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -372,7 +473,7 @@ const LogisticsOut: React.FC = () => {
                 ) : (
                   <div className="text-center py-6 text-gray-500">
                     <Clock className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                    <p>No upcoming events found</p>
+                    <p>No upcoming external processing events</p>
                   </div>
                 )}
               </CardContent>
@@ -385,7 +486,7 @@ const LogisticsOut: React.FC = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Package className="h-5 w-5" />
-                  Semi-Finished Orders Summary
+                  External Processing Orders Summary
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -403,8 +504,8 @@ const LogisticsOut: React.FC = () => {
                       <h4 className="font-medium mb-1 truncate">{order.project_name}</h4>
                       <p className="text-sm text-gray-600 mb-2">{order.supplier}</p>
                       {order.processing_steps && order.processing_steps.length > 0 && (
-                        <div className="space-y-1">
-                          <div className="text-xs font-medium text-gray-700">Processing Steps:</div>
+                        <div className="space-y-1 mb-3">
+                          <div className="text-xs font-medium text-gray-700">External Steps:</div>
                           {order.processing_steps.slice(0, 2).map(step => (
                             <div key={step.id} className="flex items-center gap-2 text-xs">
                               <div className={cn(
@@ -414,6 +515,7 @@ const LogisticsOut: React.FC = () => {
                                 step.status === 'delayed' ? 'bg-red-500' : 'bg-gray-400'
                               )} />
                               <span className="truncate">{step.name}</span>
+                              <span className="text-gray-500">({step.supplier})</span>
                             </div>
                           ))}
                           {order.processing_steps.length > 2 && (
@@ -423,6 +525,44 @@ const LogisticsOut: React.FC = () => {
                           )}
                         </div>
                       )}
+                      <div className="flex gap-1">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleProjectNavigation(order.project_id)}
+                          className="text-xs h-7 px-2 flex-1"
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Project
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleShowFiles(order.project_id, order.project_name)}
+                          className="text-xs h-7 px-2 flex-1"
+                        >
+                          <FileText className="h-3 w-3 mr-1" />
+                          Files
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleShowBarcode(order.project_id, order.project_name)}
+                          className="text-xs h-7 px-2 flex-1"
+                        >
+                          <Barcode className="h-3 w-3 mr-1" />
+                          Code
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleShowParts(order.project_id, order.project_name)}
+                          className="text-xs h-7 px-2 flex-1"
+                        >
+                          <List className="h-3 w-3 mr-1" />
+                          Parts
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -431,6 +571,31 @@ const LogisticsOut: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Dialogs */}
+      {selectedProject && (
+        <>
+          <ProjectBarcodeDialog
+            isOpen={showBarcodeDialog}
+            onClose={() => setShowBarcodeDialog(false)}
+            projectId={selectedProject.id}
+            projectName={selectedProject.name}
+          />
+          
+          <ProjectFilesPopup
+            isOpen={showFilesDialog}
+            onClose={() => setShowFilesDialog(false)}
+            projectId={selectedProject.id}
+            projectName={selectedProject.name}
+          />
+          
+          <PartsListDialog
+            isOpen={showPartsDialog}
+            onClose={() => setShowPartsDialog(false)}
+            projectId={selectedProject.id}
+          />
+        </>
+      )}
     </div>
   );
 };
