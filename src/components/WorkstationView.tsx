@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package, Barcode } from 'lucide-react';
+import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package, Barcode, Loader2 } from 'lucide-react';
 import { format, differenceInDays, isAfter, isBefore } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
@@ -37,6 +37,7 @@ interface ExtendedTask extends Task {
   active_workers?: number;
   project_id?: string;
   is_workstation_task?: boolean;
+  isCompleting?: boolean; // Add optimistic state
 }
 
 const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, workstationId, onBack, is_workstation_task }) => {
@@ -50,6 +51,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const [showPartsListDialog, setShowPartsListDialog] = useState(false);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
   const [standardTasks, setStandardTasks] = useState<Record<string, any>>({});
+  const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set()); // Track completing tasks
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const queryClient = useQueryClient();
@@ -408,6 +410,17 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const handleTaskUpdate = async (taskId: string, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     try {
       if (newStatus === 'COMPLETED') {
+        // Add optimistic update - immediately mark task as completing and remove from UI
+        setCompletingTasks(prev => new Set(prev).add(taskId));
+        setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+        
+        // Show immediate feedback
+        toast({
+          title: t('success'),
+          description: t('task_completed_successfully'),
+        });
+        
+        // Perform the actual completion in background
         await timeRegistrationService.completeTask(taskId);
         
         const completedTask = fetchedTasks.find(task => task.id === taskId);
@@ -418,10 +431,13 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
           await loadTasks();
         }
         
-        toast({
-          title: t('success'),
-          description: t('task_completed_successfully'),
+        // Remove from completing set
+        setCompletingTasks(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(taskId);
+          return newSet;
         });
+        
         return;
       }
       
@@ -464,6 +480,17 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
       });
     } catch (error) {
       console.error('Error updating task:', error);
+      
+      // If completion failed, restore the task in UI
+      if (newStatus === 'COMPLETED') {
+        setCompletingTasks(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(taskId);
+          return newSet;
+        });
+        await loadTasks(); // Reload to restore correct state
+      }
+      
       toast({
         title: t('error'),
         description: t('failed_to_update_task_error'),
@@ -647,10 +674,12 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                 {inProgressTasks.map((task) => {
                   const urgency = task.due_date ? getUrgencyClass(task.due_date) : null;
                   const taskColor = getTaskColor(task);
+                  const isCompleting = completingTasks.has(task.id);
+                  
                   return (
                     <div 
                       key={task.id} 
-                      className="border rounded-lg p-4 relative"
+                      className={`border rounded-lg p-4 relative transition-opacity ${isCompleting ? 'opacity-50' : ''}`}
                       style={{
                         borderLeftWidth: '4px',
                         borderLeftColor: taskColor || '#e5e7eb',
@@ -735,13 +764,16 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                           <button
                             onClick={() => handleJoinTask(task.id)}
                             className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                            disabled={isCompleting}
                           >
                             {t('join_task')}
                           </button>
                           <button
                             onClick={() => handleTaskUpdate(task.id, 'COMPLETED')}
-                            className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                            className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 flex items-center gap-1"
+                            disabled={isCompleting}
                           >
+                            {isCompleting && <Loader2 className="h-3 w-3 animate-spin" />}
                             {t('complete_task')}
                           </button>
                         </div>
