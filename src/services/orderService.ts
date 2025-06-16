@@ -1,311 +1,300 @@
-import { supabase } from '@/integrations/supabase/client';
-import { Order, OrderItem, OrderAttachment, OrderStep } from '@/types/order';
+
+import { supabase } from "@/integrations/supabase/client";
+import { Order, OrderItem, OrderAttachment, OrderStep } from "@/types/order";
 
 export const orderService = {
-  async getAll(): Promise<Order[]> {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*, order_items(count)');
+  async getProjectOrders(projectId: string): Promise<Order[]> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items_count:order_items(count)
+        `)
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    
-    return (data || []).map((order: any) => {
-      const { order_items, ...rest } = order;
-      const orderItemsCount = (Array.isArray(order_items) && order_items.length > 0) ? order_items[0].count : 0;
+      if (error) throw error;
 
-      return {
-        ...rest,
-        status: order.status as Order['status'],
-        order_type: order.order_type as Order['order_type'],
-        order_items_count: orderItemsCount,
-      };
-    });
-  },
-
-  async getAllOrders(): Promise<Order[]> {
-    return this.getAll();
-  },
-
-  async getById(id: string): Promise<Order> {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-    return {
-      ...data,
-      status: data.status as Order['status'],
-      order_type: data.order_type as Order['order_type']
-    };
-  },
-
-  async getByProject(projectId: string): Promise<Order[]> {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('project_id', projectId)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return (data || []).map(order => ({
-      ...order,
-      status: order.status as Order['status'],
-      order_type: order.order_type as Order['order_type']
-    }));
-  },
-
-  async create(order: Omit<Order, 'id' | 'created_at' | 'updated_at'>): Promise<Order> {
-    const { data, error } = await supabase
-      .from('orders')
-      .insert(order)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return {
-      ...data,
-      status: data.status as Order['status'],
-      order_type: data.order_type as Order['order_type']
-    };
-  },
-
-  async update(id: string, updates: Partial<Order>): Promise<Order> {
-    const { data, error } = await supabase
-      .from('orders')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // If the order status is being changed to delivered, update linked accessories
-    if (updates.status === 'delivered') {
-      await this.updateLinkedAccessoriesStatus(id, 'delivered');
+      return data?.map(order => ({
+        ...order,
+        order_items_count: order.order_items_count?.[0]?.count || 0
+      })) || [];
+    } catch (error: any) {
+      console.error('Error fetching project orders:', error);
+      throw error;
     }
-
-    return {
-      ...data,
-      status: data.status as Order['status'],
-      order_type: data.order_type as Order['order_type']
-    };
   },
 
-  async updateOrderStatus(id: string, status: Order['status']): Promise<Order> {
-    return this.update(id, { status });
+  async getOrderById(orderId: string): Promise<Order | null> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('Error fetching order:', error);
+      throw error;
+    }
   },
 
-  async updateLinkedAccessoriesStatus(orderId: string, status: 'delivered'): Promise<void> {
-    const { error } = await supabase
-      .from('accessories')
-      .update({ status })
-      .eq('order_id', orderId);
+  async createOrder(order: Partial<Order>): Promise<Order> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .insert(order)
+        .select()
+        .single();
 
-    if (error) throw error;
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('Error creating order:', error);
+      throw error;
+    }
   },
 
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('orders')
-      .delete()
-      .eq('id', id);
+  async updateOrder(orderId: string, updates: Partial<Order>): Promise<Order> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .update(updates)
+        .eq('id', orderId)
+        .select()
+        .single();
 
-    if (error) throw error;
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('Error updating order:', error);
+      throw error;
+    }
   },
 
-  async confirmDelivery(orderId: string): Promise<void> {
-    // Update order status to delivered
-    const { error: orderError } = await supabase
-      .from('orders')
-      .update({ status: 'delivered' })
-      .eq('id', orderId);
+  async deleteOrder(orderId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
 
-    if (orderError) throw orderError;
-
-    // Update all accessories linked to this order to 'delivered' status
-    const { error: accessoriesError } = await supabase
-      .from('accessories')
-      .update({ status: 'delivered' })
-      .eq('order_id', orderId);
-
-    if (accessoriesError) throw accessoriesError;
-  },
-
-  async getLogisticsOutOrders(): Promise<Order[]> {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*, order_items(count)')
-      .eq('order_type', 'semi-finished');
-
-    if (error) throw error;
-
-    return (data || [])
-      .map((order: any) => {
-        const { order_items, ...rest } = order;
-        const orderItemsCount = (Array.isArray(order_items) && order_items.length > 0) ? order_items[0].count : 0;
-
-        return {
-          ...rest,
-          status: order.status as Order['status'],
-          order_type: order.order_type as Order['order_type'],
-          order_items_count: orderItemsCount,
-        };
-      })
-      .filter(order => order.order_items_count === 0);
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Error deleting order:', error);
+      throw error;
+    }
   },
 
   // Order Items
   async getOrderItems(orderId: string): Promise<OrderItem[]> {
-    const { data, error } = await supabase
-      .from('order_items')
-      .select('*')
-      .eq('order_id', orderId)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: true });
 
-    if (error) throw error;
-    return data || [];
+      if (error) throw error;
+      return data || [];
+    } catch (error: any) {
+      console.error('Error fetching order items:', error);
+      throw error;
+    }
   },
 
-  async createOrderItem(item: Omit<OrderItem, 'id' | 'created_at' | 'updated_at'>): Promise<OrderItem> {
-    const { data, error } = await supabase
-      .from('order_items')
-      .insert(item)
-      .select()
-      .single();
+  async createOrderItem(orderItem: Partial<OrderItem>): Promise<OrderItem> {
+    try {
+      const { data, error } = await supabase
+        .from('order_items')
+        .insert(orderItem)
+        .select()
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('Error creating order item:', error);
+      throw error;
+    }
   },
 
-  async updateOrderItem(id: string, updates: Partial<OrderItem>): Promise<OrderItem> {
-    const { data, error } = await supabase
-      .from('order_items')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
+  async updateOrderItem(itemId: string, updates: Partial<OrderItem>): Promise<OrderItem> {
+    try {
+      const { data, error } = await supabase
+        .from('order_items')
+        .update(updates)
+        .eq('id', itemId)
+        .select()
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('Error updating order item:', error);
+      throw error;
+    }
   },
 
-  async deleteOrderItem(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('order_items')
-      .delete()
-      .eq('id', id);
+  async deleteOrderItem(itemId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('id', itemId);
 
-    if (error) throw error;
-  },
-
-  // Order Steps
-  async getOrderSteps(orderId: string): Promise<OrderStep[]> {
-    const { data, error } = await supabase
-      .from('order_steps')
-      .select('*')
-      .eq('order_id', orderId)
-      .order('step_number', { ascending: true });
-
-    if (error) throw error;
-    return (data || []).map(step => ({
-        ...step,
-        status: step.status as OrderStep['status']
-    }));
-  },
-
-  async createOrderStep(step: Omit<OrderStep, 'id' | 'created_at' | 'updated_at'>): Promise<OrderStep> {
-    const { data, error } = await supabase
-      .from('order_steps')
-      .insert(step)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return {
-      ...data,
-      status: data.status as OrderStep['status']
-    };
-  },
-
-  async updateOrderStep(id: string, updates: Partial<OrderStep>): Promise<OrderStep> {
-    const { data, error } = await supabase
-      .from('order_steps')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return {
-      ...data,
-      status: data.status as OrderStep['status']
-    };
-  },
-
-  async deleteOrderStep(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('order_steps')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Error deleting order item:', error);
+      throw error;
+    }
   },
 
   // Order Attachments
   async getOrderAttachments(orderId: string): Promise<OrderAttachment[]> {
-    const { data, error } = await supabase
-      .from('order_attachments')
-      .select('*')
-      .eq('order_id', orderId)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('order_attachments')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: true });
 
-    if (error) throw error;
-    return data || [];
+      if (error) throw error;
+      return data || [];
+    } catch (error: any) {
+      console.error('Error fetching order attachments:', error);
+      throw error;
+    }
   },
 
-  async createOrderAttachment(attachment: Omit<OrderAttachment, 'id' | 'created_at' | 'updated_at'>): Promise<OrderAttachment> {
-    const { data, error } = await supabase
-      .from('order_attachments')
-      .insert(attachment)
-      .select()
-      .single();
+  async createOrderAttachment(attachment: Partial<OrderAttachment>): Promise<OrderAttachment> {
+    try {
+      const { data, error } = await supabase
+        .from('order_attachments')
+        .insert(attachment)
+        .select()
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('Error creating order attachment:', error);
+      throw error;
+    }
   },
 
-  async uploadOrderAttachment(orderId: string, file: File): Promise<OrderAttachment> {
-    // Upload file to Supabase storage
-    const fileName = `${Date.now()}-${file.name}`;
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('order-attachments')
-      .upload(fileName, file);
+  async deleteOrderAttachment(attachmentId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('order_attachments')
+        .delete()
+        .eq('id', attachmentId);
 
-    if (uploadError) throw uploadError;
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('order-attachments')
-      .getPublicUrl(fileName);
-
-    // Create attachment record
-    return this.createOrderAttachment({
-      order_id: orderId,
-      file_name: file.name,
-      file_path: publicUrl,
-      file_type: file.type,
-      file_size: file.size
-    });
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Error deleting order attachment:', error);
+      throw error;
+    }
   },
 
-  async deleteOrderAttachment(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('order_attachments')
-      .delete()
-      .eq('id', id);
+  // Order Steps
+  async getOrderSteps(orderId: string): Promise<OrderStep[]> {
+    try {
+      const { data, error } = await supabase
+        .from('order_steps')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('step_number', { ascending: true });
 
-    if (error) throw error;
+      if (error) throw error;
+      return data || [];
+    } catch (error: any) {
+      console.error('Error fetching order steps:', error);
+      throw error;
+    }
+  },
+
+  async createOrderStep(step: Partial<OrderStep>): Promise<OrderStep> {
+    try {
+      const { data, error } = await supabase
+        .from('order_steps')
+        .insert(step)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('Error creating order step:', error);
+      throw error;
+    }
+  },
+
+  async updateOrderStep(stepId: string, updates: Partial<OrderStep>): Promise<OrderStep> {
+    try {
+      const { data, error } = await supabase
+        .from('order_steps')
+        .update(updates)
+        .eq('id', stepId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('Error updating order step:', error);
+      throw error;
+    }
+  },
+
+  async deleteOrderStep(stepId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('order_steps')
+        .delete()
+        .eq('id', stepId);
+
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Error deleting order step:', error);
+      throw error;
+    }
+  },
+
+  // Logistics Out
+  async getLogisticsOutOrders(): Promise<Order[]> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('status', 'delivered')
+        .order('expected_delivery', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error: any) {
+      console.error('Error fetching logistics out orders:', error);
+      throw error;
+    }
+  },
+
+  // Semi-finished orders
+  async getSemiFinishedOrders(): Promise<Order[]> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('order_type', 'semi-finished')
+        .order('expected_delivery', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error: any) {
+      console.error('Error fetching semi-finished orders:', error);
+      throw error;
+    }
   }
 };
