@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock } from 'lucide-react';
@@ -151,8 +152,32 @@ const NavbarContent = ({
         {/* User profile and language switcher at bottom */}
         <div className="mt-auto pt-2">
             <div className="flex justify-center items-center gap-2 mb-2 p-2 border-t border-b border-blue-600">
-                <Button size="sm" variant={lang === 'nl' ? 'secondary' : 'ghost'} className="text-white" onClick={() => changeLang('nl')}>NL</Button>
-                <Button size="sm" variant={lang === 'en' ? 'secondary' : 'ghost'} className="text-white" onClick={() => changeLang('en')}>EN</Button>
+                <Button 
+                  size="sm" 
+                  variant={lang === 'nl' ? 'default' : 'ghost'} 
+                  className={cn(
+                    "text-sm font-medium",
+                    lang === 'nl' 
+                      ? 'bg-white text-sky-800 hover:bg-gray-100' 
+                      : 'text-white hover:bg-sky-700 hover:text-white'
+                  )}
+                  onClick={() => changeLang('nl')}
+                >
+                  NL
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant={lang === 'en' ? 'default' : 'ghost'} 
+                  className={cn(
+                    "text-sm font-medium",
+                    lang === 'en' 
+                      ? 'bg-white text-sky-800 hover:bg-gray-100' 
+                      : 'text-white hover:bg-sky-700 hover:text-white'
+                  )}
+                  onClick={() => changeLang('en')}
+                >
+                  EN
+                </Button>
             </div>
           {currentEmployee && <div className="flex items-center p-2 mb-2">
               <User className="w-5 h-5 text-white" />

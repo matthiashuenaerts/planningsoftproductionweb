@@ -328,7 +328,7 @@ const LogisticsOut: React.FC = () => {
                         )}
                       >
                         <div className="flex items-start justify-between mb-2">
-                          <Badge variant="outline" className="mb-1">
+                          <Badge variant="outline" className="mb-1 bg-white/90 text-gray-800 border-white">
                             {event.type === 'start' ? 'Start' : 'Return'}
                           </Badge>
                           {getEventPriority(event) === 'urgent' && (
@@ -341,7 +341,7 @@ const LogisticsOut: React.FC = () => {
                           <div className="flex items-center gap-2 text-xs">
                             <Badge 
                               variant={event.step.status === 'completed' ? 'default' : 'secondary'}
-                              className="text-xs"
+                              className="text-xs bg-white/90 text-gray-800"
                             >
                               {event.step.status}
                             </Badge>
@@ -356,7 +356,7 @@ const LogisticsOut: React.FC = () => {
                               size="sm" 
                               variant="outline"
                               onClick={() => handleProjectNavigation(event.order.project_id)}
-                              className="text-xs h-6 px-2"
+                              className="text-xs h-6 px-2 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
                             >
                               <ExternalLink className="h-3 w-3" />
                             </Button>
@@ -364,7 +364,7 @@ const LogisticsOut: React.FC = () => {
                               size="sm" 
                               variant="outline"
                               onClick={() => handleShowFiles(event.order.project_id, event.order.project_name)}
-                              className="text-xs h-6 px-2"
+                              className="text-xs h-6 px-2 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
                             >
                               <FileText className="h-3 w-3" />
                             </Button>
@@ -372,7 +372,7 @@ const LogisticsOut: React.FC = () => {
                               size="sm" 
                               variant="outline"
                               onClick={() => handleShowBarcode(event.order.project_id, event.order.project_name)}
-                              className="text-xs h-6 px-2"
+                              className="text-xs h-6 px-2 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
                             >
                               <Barcode className="h-3 w-3" />
                             </Button>
@@ -380,7 +380,7 @@ const LogisticsOut: React.FC = () => {
                               size="sm" 
                               variant="outline"
                               onClick={() => handleShowParts(event.order.project_id, event.order.project_name)}
-                              className="text-xs h-6 px-2"
+                              className="text-xs h-6 px-2 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
                             >
                               <List className="h-3 w-3" />
                             </Button>
@@ -420,7 +420,7 @@ const LogisticsOut: React.FC = () => {
                         )}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs bg-white/90 text-gray-800 border-white">
                             {event.type === 'start' ? 'Start' : 'Return'}
                           </Badge>
                           <span className="text-xs font-medium">
@@ -438,7 +438,7 @@ const LogisticsOut: React.FC = () => {
                             size="sm" 
                             variant="outline"
                             onClick={() => handleProjectNavigation(event.order.project_id)}
-                            className="text-xs h-6 px-2 flex-1"
+                            className="text-xs h-6 px-2 flex-1 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
                           >
                             <ExternalLink className="h-3 w-3" />
                           </Button>
@@ -446,7 +446,7 @@ const LogisticsOut: React.FC = () => {
                             size="sm" 
                             variant="outline"
                             onClick={() => handleShowFiles(event.order.project_id, event.order.project_name)}
-                            className="text-xs h-6 px-2 flex-1"
+                            className="text-xs h-6 px-2 flex-1 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
                           >
                             <FileText className="h-3 w-3" />
                           </Button>
@@ -454,7 +454,7 @@ const LogisticsOut: React.FC = () => {
                             size="sm" 
                             variant="outline"
                             onClick={() => handleShowBarcode(event.order.project_id, event.order.project_name)}
-                            className="text-xs h-6 px-2 flex-1"
+                            className="text-xs h-6 px-2 flex-1 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
                           >
                             <Barcode className="h-3 w-3" />
                           </Button>
@@ -462,7 +462,7 @@ const LogisticsOut: React.FC = () => {
                             size="sm" 
                             variant="outline"
                             onClick={() => handleShowParts(event.order.project_id, event.order.project_name)}
-                            className="text-xs h-6 px-2 flex-1"
+                            className="text-xs h-6 px-2 flex-1 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
                           >
                             <List className="h-3 w-3" />
                           </Button>
@@ -530,7 +530,7 @@ const LogisticsOut: React.FC = () => {
                           size="sm" 
                           variant="outline"
                           onClick={() => handleProjectNavigation(order.project_id)}
-                          className="text-xs h-7 px-2 flex-1"
+                          className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
                         >
                           <ExternalLink className="h-3 w-3 mr-1" />
                           Project
@@ -539,7 +539,7 @@ const LogisticsOut: React.FC = () => {
                           size="sm" 
                           variant="outline"
                           onClick={() => handleShowFiles(order.project_id, order.project_name)}
-                          className="text-xs h-7 px-2 flex-1"
+                          className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
                         >
                           <FileText className="h-3 w-3 mr-1" />
                           Files
@@ -548,7 +548,7 @@ const LogisticsOut: React.FC = () => {
                           size="sm" 
                           variant="outline"
                           onClick={() => handleShowBarcode(order.project_id, order.project_name)}
-                          className="text-xs h-7 px-2 flex-1"
+                          className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
                         >
                           <Barcode className="h-3 w-3 mr-1" />
                           Code
@@ -557,7 +557,7 @@ const LogisticsOut: React.FC = () => {
                           size="sm" 
                           variant="outline"
                           onClick={() => handleShowParts(order.project_id, order.project_name)}
-                          className="text-xs h-7 px-2 flex-1"
+                          className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
                         >
                           <List className="h-3 w-3 mr-1" />
                           Parts
