@@ -247,22 +247,5 @@
   "timer_started_ws_desc": "Tijdregistratie is gestart voor deze werkstation taak",
   "failed_to_start_ws_task_timer_error": "Starten van taak timer mislukt",
   "project_info_not_available_error": "Projectinformatie niet beschikbaar voor deze taak",
-  "failed_to_start_ws_task_error": "Starten van werkstation taak mislukt",
-
-  "notifications": "Meldingen",
-  "mark_all_as_read": "Markeer alles als gelezen",
-  "loading_notifications": "Meldingen laden...",
-  "no_notifications": "Geen meldingen",
-  "new": "Nieuw",
-  "new_notification": "Nieuwe Melding!",
-  "failed_to_load_logistics_out": "Laden van logistiek uitgaand mislukt",
-  "details_for_date": "Details voor {{date}}",
-  "project": "Project",
-  "supplier": "Leverancier",
-  "step": "Stap",
-  "no_logistics_events_for_day": "Geen logistieke gebeurtenissen voor deze dag.",
-  "upcoming_deadlines": "Aankomende Deadlines",
-  "expected_delivery": "Verwachte Levering",
-  "date": "Datum",
-  "no_upcoming_deadlines": "Geen aankomende deadlines gevonden."
+  "failed_to_start_ws_task_error": "Starten van werkstation taak mislukt"
 }

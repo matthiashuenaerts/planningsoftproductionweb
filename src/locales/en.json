@@ -246,22 +246,5 @@
   "timer_started_ws_desc": "Time tracking has begun for this workstation task",
   "failed_to_start_ws_task_timer_error": "Failed to start task timer",
   "project_info_not_available_error": "Project information not available for this task",
-  "failed_to_start_ws_task_error": "Failed to start workstation task",
-
-  "notifications": "Notifications",
-  "mark_all_as_read": "Mark all as read",
-  "loading_notifications": "Loading notifications...",
-  "no_notifications": "No notifications",
-  "new": "New",
-  "new_notification": "New Notification!",
-  "failed_to_load_logistics_out": "Failed to load logistics out data",
-  "details_for_date": "Details for {{date}}",
-  "project": "Project",
-  "supplier": "Supplier",
-  "step": "Step",
-  "no_logistics_events_for_day": "No logistics events for this day.",
-  "upcoming_deadlines": "Upcoming Deadlines",
-  "expected_delivery": "Expected Delivery",
-  "date": "Date",
-  "no_upcoming_deadlines": "No upcoming deadlines found."
+  "failed_to_start_ws_task_error": "Failed to start workstation task"
 }
