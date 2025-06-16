@@ -3,6 +3,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { Order, OrderItem, OrderAttachment, OrderStep } from "@/types/order";
 
 export const orderService = {
+  async getAllOrders(): Promise<Order[]> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items_count:order_items(count)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return data?.map(order => ({
+        ...order,
+        order_items_count: order.order_items_count?.[0]?.count || 0
+      })) || [];
+    } catch (error: any) {
+      console.error('Error fetching all orders:', error);
+      throw error;
+    }
+  },
+
   async getProjectOrders(projectId: string): Promise<Order[]> {
     try {
       const { data, error } = await supabase
@@ -26,6 +48,11 @@ export const orderService = {
     }
   },
 
+  // Alias for backwards compatibility
+  async getByProject(projectId: string): Promise<Order[]> {
+    return this.getProjectOrders(projectId);
+  },
+
   async getOrderById(orderId: string): Promise<Order | null> {
     try {
       const { data, error } = await supabase
@@ -40,6 +67,11 @@ export const orderService = {
       console.error('Error fetching order:', error);
       throw error;
     }
+  },
+
+  // Alias for backwards compatibility
+  async getById(orderId: string): Promise<Order | null> {
+    return this.getOrderById(orderId);
   },
 
   async createOrder(order: Partial<Order>): Promise<Order> {
@@ -58,6 +90,11 @@ export const orderService = {
     }
   },
 
+  // Alias for backwards compatibility
+  async create(order: Partial<Order>): Promise<Order> {
+    return this.createOrder(order);
+  },
+
   async updateOrder(orderId: string, updates: Partial<Order>): Promise<Order> {
     try {
       const { data, error } = await supabase
@@ -71,6 +108,28 @@ export const orderService = {
       return data;
     } catch (error: any) {
       console.error('Error updating order:', error);
+      throw error;
+    }
+  },
+
+  // Alias for backwards compatibility
+  async update(orderId: string, updates: Partial<Order>): Promise<Order> {
+    return this.updateOrder(orderId, updates);
+  },
+
+  async updateOrderStatus(orderId: string, status: Order['status']): Promise<Order> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .update({ status })
+        .eq('id', orderId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('Error updating order status:', error);
       throw error;
     }
   },
@@ -182,6 +241,41 @@ export const orderService = {
       return data;
     } catch (error: any) {
       console.error('Error creating order attachment:', error);
+      throw error;
+    }
+  },
+
+  async uploadOrderAttachment(orderId: string, file: File): Promise<OrderAttachment> {
+    try {
+      // Create unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}_${file.name}`;
+      const filePath = `${orderId}/${fileName}`;
+
+      // Upload file to Supabase storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('order-attachments')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('order-attachments')
+        .getPublicUrl(filePath);
+
+      // Create attachment record
+      const attachmentData = {
+        order_id: orderId,
+        file_name: file.name,
+        file_path: publicUrl,
+        file_type: file.type,
+        file_size: file.size
+      };
+
+      return await this.createOrderAttachment(attachmentData);
+    } catch (error: any) {
+      console.error('Error uploading order attachment:', error);
       throw error;
     }
   },

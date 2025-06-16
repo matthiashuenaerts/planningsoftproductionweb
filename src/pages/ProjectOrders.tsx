@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -20,7 +21,8 @@ import { useLanguage } from '@/context/LanguageContext';
 const ProjectOrders: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { toast, createLocalizedPath } = useLanguage();
+  const { toast } = useToast();
+  const { t, createLocalizedPath } = useLanguage();
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<any>(null);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
