@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Index from './pages/Index';
 import Projects from './pages/Projects';
@@ -40,6 +40,7 @@ function App() {
         <AuthProvider>
           <LanguageProvider>
             <Routes>
+              <Route path="/" element={<Navigate to="/nl/" replace />} />
               <Route path="/login" element={<Login />} />
               <Route path="/:lang/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/:lang/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
