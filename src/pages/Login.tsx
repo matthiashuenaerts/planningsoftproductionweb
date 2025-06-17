@@ -62,7 +62,7 @@ const Login: React.FC = () => {
       }
       
       // Ensure role is a valid type
-      const validRoles = ['workstation', 'admin', 'manager', 'worker', 'installation_team'] as const;
+      const validRoles = ['workstation', 'admin', 'manager', 'worker', 'installation_team', 'preparater', 'teamleader'] as const;
       const employeeRole = validRoles.includes(employee.role as any) ? employee.role as typeof validRoles[number] : 'workstation';
       
       // Use the login function from AuthContext
