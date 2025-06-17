@@ -1,249 +1,585 @@
-
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Calendar } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { projectService, phaseService } from '@/services/dataService';
-import { useLanguage } from '@/context/LanguageContext';
-import { Phase } from '@/services/dataService';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
-import { Plus } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { format } from 'date-fns';
+import { CalendarIcon, Plus, Trash } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { projectService, phaseService, taskService, Task } from '@/services/dataService';
+import { workstationService } from '@/services/workstationService';
+import { standardTasksService, StandardTask } from '@/services/standardTasksService';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from './ui/scroll-area';
+import { Checkbox } from './ui/checkbox';
+import { Loader2 } from 'lucide-react';
+
+// Add the missing interface
 interface NewProjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  onSuccess?: () => void;
 }
 
-interface PhaseInput {
+const formSchema = z.object({
+  name: z.string().min(1, { message: 'Project name is required' }),
+  client: z.string().min(1, { message: 'Client name is required' }),
+  description: z.string().optional(),
+  start_date: z.date({ required_error: 'Start date is required' }),
+  installation_date: z.date({ required_error: 'Installation date is required' }),
+  project_value: z.number()
+    .min(1, { message: 'Project value must be at least 1' })
+    .max(100, { message: 'Project value must be at most 100' })
+}).refine(
+  (data) => {
+    return data.installation_date >= data.start_date;
+  },
+  {
+    message: 'Installation date must be after start date',
+    path: ['installation_date'],
+  }
+);
+
+type FormValues = z.infer<typeof formSchema>;
+
+interface TaskItem {
   id: string;
   name: string;
+  workstation: string;
+  selected?: boolean;
+  task_number?: string;
+  standard_task_id?: string;
+  time_coefficient?: number;
+  duration?: number;
+  day_counter?: number;
 }
 
-export const NewProjectModal = ({ open, onOpenChange, onSuccess }: NewProjectModalProps) => {
+const NewProjectModal: React.FC<NewProjectModalProps> = ({
+  open,
+  onOpenChange,
+  onSuccess
+}) => {
   const { toast } = useToast();
-  const { t } = useLanguage();
-  const [formData, setFormData] = useState({
-    name: '',
-    client: '',
-    description: '',
-    start_date: '',
-    installation_date: ''
-  });
-  const [isCreating, setIsCreating] = useState(false);
-  const [phases, setPhases] = useState<PhaseInput[]>([]);
-
+  const [loading, setLoading] = useState(false);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [newTaskName, setNewTaskName] = useState('');
+  const [newTaskWorkstation, setNewTaskWorkstation] = useState('');
+  const [workstations, setWorkstations] = useState<{id: string, name: string}[]>([]);
+  
+  // Fetch all workstations and standard tasks when component mounts
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Get all workstations
+        const workstationData = await workstationService.getAll();
+        setWorkstations(workstationData.map(w => ({ id: w.id, name: w.name })));
+        
+        // Get all standard tasks with their linked workstations
+        const standardTasks = await standardTasksService.getAll();
+        
+        const taskItems: TaskItem[] = [];
+        
+        // For each standard task, get its linked workstations
+        for (const task of standardTasks) {
+          try {
+            const links = await workstationService.getWorkstationsForStandardTask(task.id);
+            const workstationName = links && links.length > 0 ? links[0].name : '';
+            
+            const projectValue = form.getValues('project_value') || 50;
+            const duration = task.time_coefficient ? Math.round(task.time_coefficient * projectValue) : 60;
+            
+            taskItems.push({
+              id: task.task_number,
+              name: task.task_name,
+              workstation: workstationName,
+              selected: true,
+              task_number: task.task_number,
+              standard_task_id: task.id,
+              time_coefficient: task.time_coefficient,
+              duration: duration,
+              day_counter: task.day_counter || 0
+            });
+          } catch (error) {
+            console.error(`Error fetching workstation for task ${task.task_name}:`, error);
+          }
+        }
+        
+        setTasks(taskItems);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load standard tasks and workstations",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     if (open) {
-      setPhases([{ id: uuidv4(), name: t('phase') + ' 1' }]);
+      fetchData();
     }
-  }, [open, t]);
+  }, [open, toast]);
+  
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: '',
+      client: '',
+      description: '',
+      start_date: new Date(),
+      installation_date: new Date(),
+      project_value: 50,
+    },
+  });
 
-  const handlePhaseNameChange = (id: string, name: string) => {
-    setPhases(phases.map(phase => phase.id === id ? { ...phase, name } : phase));
-  };
-
-  const addPhase = () => {
-    setPhases([...phases, { id: uuidv4(), name: t('phase') + ' ' + (phases.length + 1) }]);
-  };
-
-  const removePhase = (id: string) => {
-    setPhases(phases.filter(phase => phase.id !== id));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Calculate task durations whenever project_value changes or when tasks are loaded/modified
+  useEffect(() => {
+    const projectValue = form.watch('project_value') || 50;
     
-    if (isCreating) return; // Prevent multiple submissions
-    
-    try {
-      setIsCreating(true);
+    // Update tasks with calculated durations
+    setTasks(currentTasks => 
+      currentTasks.map(task => ({
+        ...task,
+        duration: calculateTaskDuration(task, projectValue)
+      }))
+    );
+  }, [form.watch('project_value'), tasks.length]);
+
+  // Calculate task duration based on coefficient and project value
+  const calculateTaskDuration = (task: TaskItem, projectValue: number): number => {
+    if (!task.time_coefficient) return 60;
+    return Math.round(task.time_coefficient * projectValue);
+  };
+
+  const handleAddCustomTask = () => {
+    if (newTaskName.trim()) {
+      const nextId = (tasks.length + 1).toString().padStart(2, '0');
+      const projectValue = form.getValues('project_value') || 50;
       
-      // Create project
-      const projectData = {
-        name: formData.name,
-        client: formData.client,
-        description: formData.description,
-        start_date: formData.start_date,
-        installation_date: formData.installation_date,
-        status: 'planned' as const,
-        progress: 0
+      const newTask: TaskItem = { 
+        id: nextId, 
+        name: newTaskName.trim(), 
+        workstation: newTaskWorkstation.trim(),
+        selected: true,
+        time_coefficient: 1.0,
+        duration: projectValue,
+        day_counter: 0
       };
       
-      const newProject = await projectService.create(projectData);
-      
-      // Create phases for the project
-      await Promise.all(
-        phases.map(phase => 
-          phaseService.create({
-            name: phase.name,
-            project_id: newProject.id,
-            start_date: formData.start_date,
-            end_date: formData.installation_date,
-            progress: 0
-          })
-        )
-      );
+      setTasks([...tasks, newTask]);
+      setNewTaskName('');
+      setNewTaskWorkstation('');
+    }
+  };
 
-      toast({
-        title: t('success'),
-        description: t('project_created_successfully')
+  const handleRemoveTask = (index: number) => {
+    setTasks(tasks.filter((_, i) => i !== index));
+  };
+
+  const handleToggleTask = (index: number) => {
+    setTasks(tasks.map((task, i) => 
+      i === index ? { ...task, selected: !task.selected } : task
+    ));
+  };
+
+  // Helper function to find workstation ID by name
+  const findWorkstationIdByName = (name: string): string | undefined => {
+    if (!name) return undefined;
+    
+    // Try exact match first
+    const exactMatch = workstations.find(w => 
+      w.name.toLowerCase() === name.toLowerCase()
+    );
+    if (exactMatch) return exactMatch.id;
+    
+    // Try partial match if exact match fails
+    const partialMatch = workstations.find(w => 
+      w.name.toLowerCase().includes(name.toLowerCase()) || 
+      name.toLowerCase().includes(w.name.toLowerCase())
+    );
+    return partialMatch?.id;
+  };
+
+  const onSubmit = async (data: FormValues) => {
+    try {
+      // First create the project
+      const newProject = await projectService.create({
+        name: data.name,
+        client: data.client,
+        description: data.description || null,
+        start_date: format(data.start_date, 'yyyy-MM-dd'),
+        installation_date: format(data.installation_date, 'yyyy-MM-dd'),
+        status: 'planned',
+        progress: 0,
       });
       
-      // Reset form
-      setFormData({
-        name: '',
-        client: '',
-        description: '',
-        start_date: '',
-        installation_date: ''
+      // Create a generic phase for these tasks
+      const phase = await phaseService.create({
+        project_id: newProject.id,
+        name: 'Project Tasks',
+        start_date: format(data.start_date, 'yyyy-MM-dd'),
+        end_date: format(data.installation_date, 'yyyy-MM-dd'),
+        progress: 0
       });
-      setPhases([]);
-      onSuccess();
+      
+      // Get selected tasks
+      const selectedTasks = tasks.filter(task => task.selected);
+      
+      // Create all tasks with proper timing and link to workstations
+      const createdTasks: Task[] = [];
+      for (let index = 0; index < selectedTasks.length; index++) {
+        const task = selectedTasks[index];
+        
+        // Calculate due date based on installation date and day counter
+        const dueDate = standardTasksService.calculateTaskDueDate(data.installation_date, task.day_counter || 0);
+        
+        // Create a task name with the ID prefix and duration
+        const durationText = task.duration ? ` (${task.duration} min)` : '';
+        const taskName = `${task.id} - ${task.name}${durationText}`;
+        
+        // Simple mapping of workstations to standard categories
+        let workstationType: 'CUTTING' | 'WELDING' | 'PAINTING' | 'ASSEMBLY' | 'PACKAGING' | 'SHIPPING' = 'ASSEMBLY';
+        
+        if (task.workstation.toLowerCase().includes('zaag')) {
+          workstationType = 'CUTTING';
+        } else if (task.workstation.toLowerCase().includes('cnc')) {
+          workstationType = 'CUTTING';
+        } else if (task.workstation.toLowerCase().includes('pers')) {
+          workstationType = 'ASSEMBLY';
+        } else if (task.workstation.toLowerCase().includes('productie')) {
+          workstationType = 'ASSEMBLY';
+        }
+        
+        // Create task description with duration and workstation info
+        const taskDescription = `Duration: ${task.duration || 60} minutes\n${task.workstation ? `Workstation: ${task.workstation}` : ''}`;
+        
+        // Determine initial task status based on limit phases
+        let initialStatus: 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD' = 'TODO';
+        if (task.standard_task_id) {
+          // Check if this standard task has limit phases that aren't completed yet
+          const limitPhasesCompleted = await standardTasksService.checkLimitPhasesCompleted(
+            task.standard_task_id, 
+            newProject.id
+          );
+          
+          if (!limitPhasesCompleted) {
+            initialStatus = 'HOLD';
+          }
+        }
+        
+        // Create the task with duration and calculated due date
+        const newTask = await taskService.create({
+          phase_id: phase.id,
+          assignee_id: null,
+          title: taskName,
+          description: taskDescription,
+          workstation: workstationType,
+          status: initialStatus,
+          priority: index < 5 ? 'High' : index < 15 ? 'Medium' : 'Low',
+          due_date: format(dueDate, 'yyyy-MM-dd'),
+          standard_task_id: task.standard_task_id || null,
+          duration: task.duration || 60 // Save the calculated duration
+        });
+        
+        createdTasks.push(newTask);
+        
+        // Link task to workstation if we can find a matching workstation
+        const workstationId = findWorkstationIdByName(task.workstation);
+        if (workstationId && newTask.id) {
+          try {
+            await workstationService.linkTaskToWorkstation(newTask.id, workstationId);
+            console.log(`Linked task ${newTask.id} to workstation ${workstationId}`);
+          } catch (error) {
+            console.error(`Failed to link task ${newTask.id} to workstation ${workstationId}:`, error);
+          }
+        }
+      }
+      
+      toast({
+        title: "Success",
+        description: `Project created successfully with ${selectedTasks.length} tasks`,
+      });
+      
+      form.reset();
       onOpenChange(false);
+      if (onSuccess) onSuccess();
     } catch (error: any) {
       toast({
-        title: t('error'),
-        description: t('failed_to_create_project', { message: error.message }),
-        variant: "destructive"
+        title: "Error",
+        description: `Failed to create project: ${error.message}`,
+        variant: "destructive",
       });
-    } finally {
-      setIsCreating(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>{t('create_new_project')}</DialogTitle>
-          <DialogDescription>
-            {t('create_new_project_description')}
-          </DialogDescription>
+          <DialogTitle>Create New Project</DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="name">{t('project_name')}</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="client">{t('client')}</Label>
-            <Input
-              id="client"
-              value={formData.client}
-              onChange={(e) => setFormData({ ...formData, client: e.target.value })}
-              required
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="description">{t('description')}</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            />
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="start_date">{t('start_date')}</Label>
-              <Input
-                id="start_date"
-                type="date"
-                value={formData.start_date}
-                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                required
+        <ScrollArea className="max-h-[70vh] pr-4">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Project Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Kitchen Pro - Client XYZ" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            
-            <div>
-              <Label htmlFor="installation_date">{t('installation_date')}</Label>
-              <Input
-                id="installation_date"
-                type="date"
-                value={formData.installation_date}
-                onChange={(e) => setFormData({ ...formData, installation_date: e.target.value })}
-                required
+              
+              <FormField
+                control={form.control}
+                name="client"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Client</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Client Name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-          </div>
+              
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Project details..." 
+                        className="resize-none" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="project_value"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Project Value (1-100)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="1" 
+                        max="100" 
+                        {...field} 
+                        onChange={e => field.onChange(parseInt(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="start_date"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Start Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "w-full pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) => date < new Date("1900-01-01")}
+                            initialFocus
+                            className={cn("p-3 pointer-events-auto")}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="installation_date"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Installation Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "w-full pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) => 
+                              date < new Date("1900-01-01") ||
+                              (form.getValues("start_date") && date < form.getValues("start_date"))
+                            }
+                            initialFocus
+                            className={cn("p-3 pointer-events-auto")}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-          <div>
-            <Label>{t('phases')}</Label>
-            <Accordion type="multiple">
-              {phases.map((phase, index) => (
-                <AccordionItem key={phase.id} value={phase.id} className="border-b">
-                  <AccordionTrigger>
-                    {phase.name || `${t('phase')} ${index + 1}`}
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="grid grid-cols-1 gap-4">
-                      <div>
-                        <Label htmlFor={`phase-name-${phase.id}`}>{t('phase_name')}</Label>
-                        <Input
-                          type="text"
-                          id={`phase-name-${phase.id}`}
-                          value={phase.name}
-                          onChange={(e) => handlePhaseNameChange(phase.id, e.target.value)}
+              <div className="border rounded-md p-4">
+                <h3 className="font-medium mb-2">Project Tasks</h3>
+                
+                {loading ? (
+                  <div className="flex justify-center p-4">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : (
+                  <div className="space-y-2 mb-4 max-h-[300px] overflow-y-auto pr-2">
+                    {tasks.map((task, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`task-${index}`} 
+                          checked={task.selected} 
+                          onCheckedChange={() => handleToggleTask(index)} 
                         />
+                        <label htmlFor={`task-${index}`} className="text-sm flex-1 flex flex-wrap items-center">
+                          <span className="mr-1">{task.id} - {task.name}</span>
+                          {task.workstation && <span className="text-muted-foreground mr-2">({task.workstation})</span>}
+                          {task.duration && (
+                            <span className="text-xs bg-muted px-2 py-0.5 rounded-full mr-2">
+                              {task.duration} min
+                            </span>
+                          )}
+                          {task.day_counter !== undefined && (
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                              -{task.day_counter} days
+                            </span>
+                          )}
+                        </label>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleRemoveTask(index)}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
                       </div>
-                    </div>
-                    <Button variant="destructive" size="sm" className="mt-2" onClick={() => removePhase(phase.id)}>
-                      {t('remove_phase')}
+                    ))}
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-1 gap-2 mt-2">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="New task name"
+                      value={newTaskName}
+                      onChange={(e) => setNewTaskName(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Input
+                      placeholder="Workstation (optional)"
+                      value={newTaskWorkstation}
+                      onChange={(e) => setNewTaskWorkstation(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button 
+                      type="button" 
+                      size="icon" 
+                      onClick={handleAddCustomTask}
+                    >
+                      <Plus className="h-4 w-4" />
                     </Button>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-            <Button variant="outline" size="sm" className="mt-2" onClick={addPhase}>
-              <Plus className="mr-2 h-4 w-4" />
-              {t('add_phase')}
-            </Button>
-          </div>
-          
-          <DialogFooter>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => onOpenChange(false)}
-              disabled={isCreating}
-            >
-              {t('cancel')}
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={isCreating || !formData.name || !formData.client || !formData.start_date || !formData.installation_date}
-            >
-              {isCreating ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  {t('creating_project')}
-                </>
-              ) : (
-                t('create_project')
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="pt-4">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Cancel</Button>
+                </DialogClose>
+                <Button type="submit">Create Project</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
 };
+
+export default NewProjectModal;
