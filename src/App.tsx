@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Index from './pages/Index';
 import Projects from './pages/Projects';
 import ProjectDetails from './pages/ProjectDetails';
+import ProjectOrders from './pages/ProjectOrders';
 import Workstations from './pages/Workstations';
 import BrokenParts from './pages/BrokenParts';
 import PersonalTasks from './pages/PersonalTasks';
@@ -43,6 +44,7 @@ function App() {
               <Route path="/:lang/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/:lang/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
               <Route path="/:lang/projects/:projectId" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
+              <Route path="/:lang/projects/:projectId/orders" element={<ProtectedRoute><ProjectOrders /></ProtectedRoute>} />
               <Route path="/:lang/workstations" element={<ProtectedRoute><Workstations /></ProtectedRoute>} />
               <Route path="/:lang/broken-parts" element={<ProtectedRoute><BrokenParts /></ProtectedRoute>} />
               <Route path="/:lang/personal-tasks" element={<ProtectedRoute><PersonalTasks /></ProtectedRoute>} />
