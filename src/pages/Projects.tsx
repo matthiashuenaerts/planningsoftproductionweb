@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -10,7 +11,7 @@ import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Cl
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project } from '@/services/dataService';
 import { useAuth } from '@/context/AuthContext';
-import { NewProjectModal } from '@/components/NewProjectModal';
+import NewProjectModal from '@/components/NewProjectModal';
 import { exportProjectData } from '@/services/projectExportService';
 import { useLanguage } from '@/context/LanguageContext';
 
