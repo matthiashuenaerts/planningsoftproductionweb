@@ -28,6 +28,7 @@ import { AccessoriesDialog } from '@/components/AccessoriesDialog';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
+import { cn } from '@/lib/utils';
 
 const ProjectDetails = () => {
   const { projectId } = useParams<{ projectId: string }>();

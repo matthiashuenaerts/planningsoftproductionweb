@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ export const AccessoryQrCodeDialog = ({ open, onOpenChange, accessories, startIn
   const [loading, setLoading] = useState(false);
   const [isToOrderDialogOpen, setIsToOrderDialogOpen] = useState(false);
   const [quantityToOrder, setQuantityToOrder] = useState(1);
+  const [localAccessories, setLocalAccessories] = useState<Accessory[]>(accessories);
 
   useEffect(() => {
     if (open) {
@@ -38,15 +40,19 @@ export const AccessoryQrCodeDialog = ({ open, onOpenChange, accessories, startIn
     }
   }, [startIndex, open]);
 
+  useEffect(() => {
+    setLocalAccessories(accessories);
+  }, [accessories]);
+
   const handleNext = () => {
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % accessories.length);
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % localAccessories.length);
   };
 
   const handlePrevious = () => {
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + accessories.length) % accessories.length);
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + localAccessories.length) % localAccessories.length);
   };
 
-  const accessory = accessories[currentIndex];
+  const accessory = localAccessories[currentIndex];
 
   const getDialogClassName = (status: Accessory['status']) => {
     switch (status) {
@@ -65,13 +71,35 @@ export const AccessoryQrCodeDialog = ({ open, onOpenChange, accessories, startIn
   };
 
   const handleStatusUpdate = async (accessoryId: string, newStatus: Accessory['status'], quantityToUpdate: number) => {
-    const accessoryToUpdate = accessories.find(a => a.id === accessoryId);
+    const accessoryToUpdate = localAccessories.find(a => a.id === accessoryId);
     if (!accessoryToUpdate) return;
 
     setLoading(true);
 
     try {
+        // Update local state immediately for instant feedback
+        const updatedAccessories = [...localAccessories];
+        const accessoryIndex = updatedAccessories.findIndex(a => a.id === accessoryId);
+        
         if (newStatus === 'to_order' && quantityToUpdate > 0 && quantityToUpdate < accessoryToUpdate.quantity) {
+            // Update existing accessory quantity
+            updatedAccessories[accessoryIndex] = {
+                ...accessoryToUpdate,
+                quantity: accessoryToUpdate.quantity - quantityToUpdate,
+            };
+            
+            // Add new 'to_order' accessory
+            const newAccessory = {
+                ...accessoryToUpdate,
+                id: `temp-${Date.now()}`, // Temporary ID for immediate UI update
+                quantity: quantityToUpdate,
+                status: 'to_order' as const,
+            };
+            updatedAccessories.push(newAccessory);
+            
+            setLocalAccessories(updatedAccessories);
+            
+            // Then update the backend
             await accessoriesService.update(accessoryToUpdate.id, {
                 quantity: accessoryToUpdate.quantity - quantityToUpdate,
             });
@@ -84,11 +112,21 @@ export const AccessoryQrCodeDialog = ({ open, onOpenChange, accessories, startIn
             });
             toast({ title: "Success", description: "Accessory status updated and new 'to order' item created." });
         } else {
+            // Update status immediately in local state
+            updatedAccessories[accessoryIndex] = {
+                ...accessoryToUpdate,
+                status: newStatus,
+            };
+            setLocalAccessories(updatedAccessories);
+            
+            // Then update the backend
             await accessoriesService.update(accessoryToUpdate.id, { status: newStatus });
             toast({ title: "Success", description: "Accessory status updated successfully" });
         }
         onAccessoryUpdate();
     } catch (error: any) {
+        // Revert local changes on error
+        setLocalAccessories(accessories);
         toast({ title: "Error", description: `Failed to update status: ${error.message}`, variant: "destructive" });
     } finally {
         setLoading(false);
@@ -169,7 +207,7 @@ export const AccessoryQrCodeDialog = ({ open, onOpenChange, accessories, startIn
             <Button onClick={handlePrevious} variant="outline" disabled={loading}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Previous
             </Button>
-            <span>{currentIndex + 1} / {accessories.length}</span>
+            <span>{currentIndex + 1} / {localAccessories.length}</span>
             <Button onClick={handleNext} variant="outline" disabled={loading}>
               Next <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
