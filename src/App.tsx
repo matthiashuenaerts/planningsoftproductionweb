@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
@@ -13,13 +14,13 @@ import Logistics from './pages/Logistics';
 import LogisticsOut from './pages/LogisticsOut';
 import RushOrders from './pages/RushOrders';
 import TimeRegistrations from './pages/TimeRegistrations';
-import SettingsPage from './pages/SettingsPage';
+import SettingsPage from './pages/Settings';
 import Login from './pages/Login';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import NewOrder from './pages/NewOrder';
-import EditOrder from './pages/EditOrder';
+import NewOrder from './pages/Orders';
+import EditOrder from './pages/Orders';
 import EditProject from '@/pages/EditProject';
 
 function App() {

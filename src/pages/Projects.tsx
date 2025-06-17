@@ -10,7 +10,7 @@ import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Cl
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project } from '@/services/dataService';
 import { useAuth } from '@/context/AuthContext';
-import NewProjectModal from '@/components/NewProjectModal';
+import { NewProjectModal } from '@/components/NewProjectModal';
 import { exportProjectData } from '@/services/projectExportService';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -27,6 +27,7 @@ const Projects = () => {
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
   const [exportingProject, setExportingProject] = useState<string | null>(null);
   const isAdmin = currentEmployee?.role === 'admin';
+
   useEffect(() => {
     loadProjects();
   }, []);
@@ -105,7 +106,8 @@ const Projects = () => {
   const handleProjectClick = (projectId: string) => {
     navigate(createLocalizedPath(`/projects/${projectId}`));
   };
-  return <div className="flex min-h-screen">
+  return (
+    <div className="flex min-h-screen">
       <div className="w-64 bg-sidebar fixed top-0 bottom-0">
         <Navbar />
       </div>
@@ -264,6 +266,8 @@ const Projects = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>;
+    </div>
+  );
 };
+
 export default Projects;

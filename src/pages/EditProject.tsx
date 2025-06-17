@@ -26,7 +26,7 @@ const EditProject = () => {
     description: '',
     start_date: '',
     installation_date: '',
-    status: 'planned' as const
+    status: 'planned' as "planned" | "in_progress" | "completed" | "on_hold"
   });
 
   useEffect(() => {

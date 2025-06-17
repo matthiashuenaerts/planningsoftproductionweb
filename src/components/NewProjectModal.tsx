@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,11 @@ interface NewProjectModalProps {
   onSuccess: () => void;
 }
 
+interface PhaseInput {
+  id: string;
+  name: string;
+}
+
 export const NewProjectModal = ({ open, onOpenChange, onSuccess }: NewProjectModalProps) => {
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -35,11 +41,11 @@ export const NewProjectModal = ({ open, onOpenChange, onSuccess }: NewProjectMod
     installation_date: ''
   });
   const [isCreating, setIsCreating] = useState(false);
-  const [phases, setPhases] = useState<Phase[]>([]);
+  const [phases, setPhases] = useState<PhaseInput[]>([]);
 
   useEffect(() => {
     if (open) {
-      setPhases([{ id: uuidv4(), name: t('phase') + ' 1', description: '' }]);
+      setPhases([{ id: uuidv4(), name: t('phase') + ' 1' }]);
     }
   }, [open, t]);
 
@@ -47,12 +53,8 @@ export const NewProjectModal = ({ open, onOpenChange, onSuccess }: NewProjectMod
     setPhases(phases.map(phase => phase.id === id ? { ...phase, name } : phase));
   };
 
-  const handlePhaseDescriptionChange = (id: string, description: string) => {
-    setPhases(phases.map(phase => phase.id === id ? { ...phase, description } : phase));
-  };
-
   const addPhase = () => {
-    setPhases([...phases, { id: uuidv4(), name: t('phase') + ' ' + (phases.length + 1), description: '' }]);
+    setPhases([...phases, { id: uuidv4(), name: t('phase') + ' ' + (phases.length + 1) }]);
   };
 
   const removePhase = (id: string) => {
@@ -74,7 +76,8 @@ export const NewProjectModal = ({ open, onOpenChange, onSuccess }: NewProjectMod
         description: formData.description,
         start_date: formData.start_date,
         installation_date: formData.installation_date,
-        status: 'planned' as const
+        status: 'planned' as const,
+        progress: 0
       };
       
       const newProject = await projectService.create(projectData);
@@ -83,8 +86,12 @@ export const NewProjectModal = ({ open, onOpenChange, onSuccess }: NewProjectMod
       await Promise.all(
         phases.map(phase => 
           phaseService.create({
-            ...phase,
-            project_id: newProject.id
+            id: phase.id,
+            name: phase.name,
+            project_id: newProject.id,
+            start_date: formData.start_date,
+            end_date: formData.installation_date,
+            progress: 0
           })
         )
       );
@@ -182,14 +189,14 @@ export const NewProjectModal = ({ open, onOpenChange, onSuccess }: NewProjectMod
 
           <div>
             <Label>{t('phases')}</Label>
-            <Accordion type="multiple" collapsible>
+            <Accordion type="multiple">
               {phases.map((phase, index) => (
                 <AccordionItem key={phase.id} value={phase.id} className="border-b">
                   <AccordionTrigger>
                     {phase.name || `${t('phase')} ${index + 1}`}
                   </AccordionTrigger>
                   <AccordionContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div>
                         <Label htmlFor={`phase-name-${phase.id}`}>{t('phase_name')}</Label>
                         <Input
@@ -197,15 +204,6 @@ export const NewProjectModal = ({ open, onOpenChange, onSuccess }: NewProjectMod
                           id={`phase-name-${phase.id}`}
                           value={phase.name}
                           onChange={(e) => handlePhaseNameChange(phase.id, e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor={`phase-description-${phase.id}`}>{t('phase_description')}</Label>
-                        <Input
-                          type="text"
-                          id={`phase-description-${phase.id}`}
-                          value={phase.description}
-                          onChange={(e) => handlePhaseDescriptionChange(phase.id, e.target.value)}
                         />
                       </div>
                     </div>
