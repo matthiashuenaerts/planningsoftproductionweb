@@ -9,7 +9,7 @@ import WorkstationDashboard from '@/components/WorkstationDashboard';
 const Index = () => {
   const { currentEmployee } = useAuth();
   
-  // Display dedicated workstation dashboard for workstation role
+  // Display dedicated workstation dashboard ONLY for workstation role
   if (currentEmployee?.role === 'workstation') {
     return <WorkstationDashboard />;
   }
