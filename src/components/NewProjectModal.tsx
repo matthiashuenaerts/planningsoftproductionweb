@@ -86,7 +86,6 @@ export const NewProjectModal = ({ open, onOpenChange, onSuccess }: NewProjectMod
       await Promise.all(
         phases.map(phase => 
           phaseService.create({
-            id: phase.id,
             name: phase.name,
             project_id: newProject.id,
             start_date: formData.start_date,

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import Dashboard from './pages/Dashboard';
+import Index from './pages/Index';
 import Projects from './pages/Projects';
 import ProjectDetails from './pages/ProjectDetails';
 import Workstations from './pages/Workstations';
@@ -14,13 +14,11 @@ import Logistics from './pages/Logistics';
 import LogisticsOut from './pages/LogisticsOut';
 import RushOrders from './pages/RushOrders';
 import TimeRegistrations from './pages/TimeRegistrations';
-import SettingsPage from './pages/Settings';
+import Settings from './pages/Settings';
 import Login from './pages/Login';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import NewOrder from './pages/Orders';
-import EditOrder from './pages/Orders';
 import EditProject from '@/pages/EditProject';
 
 function App() {
@@ -28,7 +26,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/:lang/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/:lang/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
         <Route path="/:lang/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
         <Route path="/:lang/projects/:projectId" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
         <Route path="/:lang/workstations" element={<ProtectedRoute><Workstations /></ProtectedRoute>} />
@@ -41,9 +39,9 @@ function App() {
         <Route path="/:lang/logistics-out" element={<ProtectedRoute><LogisticsOut /></ProtectedRoute>} />
         <Route path="/:lang/rush-orders" element={<ProtectedRoute><RushOrders /></ProtectedRoute>} />
         <Route path="/:lang/time-registrations" element={<ProtectedRoute><TimeRegistrations /></ProtectedRoute>} />
-        <Route path="/:lang/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-        <Route path="/:lang/orders/new" element={<ProtectedRoute><NewOrder /></ProtectedRoute>} />
-        <Route path="/:lang/orders/:orderId/edit" element={<ProtectedRoute><EditOrder /></ProtectedRoute>} />
+        <Route path="/:lang/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/:lang/orders/new" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+        <Route path="/:lang/orders/:orderId/edit" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
         <Route path="/:lang/projects/:projectId/edit" element={<ProtectedRoute><EditProject /></ProtectedRoute>} />
       </Routes>
     </Router>
