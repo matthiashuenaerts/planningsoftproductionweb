@@ -24,26 +24,30 @@ import EditProject from '@/pages/EditProject';
 function App() {
   return (
     <Router>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/:lang/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-        <Route path="/:lang/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
-        <Route path="/:lang/projects/:projectId" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
-        <Route path="/:lang/workstations" element={<ProtectedRoute><Workstations /></ProtectedRoute>} />
-        <Route path="/:lang/broken-parts" element={<ProtectedRoute><BrokenParts /></ProtectedRoute>} />
-        <Route path="/:lang/personal-tasks" element={<ProtectedRoute><PersonalTasks /></ProtectedRoute>} />
-        <Route path="/:lang/daily-tasks" element={<ProtectedRoute><DailyTasks /></ProtectedRoute>} />
-        <Route path="/:lang/planning" element={<ProtectedRoute><Planning /></ProtectedRoute>} />
-        <Route path="/:lang/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-        <Route path="/:lang/logistics" element={<ProtectedRoute><Logistics /></ProtectedRoute>} />
-        <Route path="/:lang/logistics-out" element={<ProtectedRoute><LogisticsOut /></ProtectedRoute>} />
-        <Route path="/:lang/rush-orders" element={<ProtectedRoute><RushOrders /></ProtectedRoute>} />
-        <Route path="/:lang/time-registrations" element={<ProtectedRoute><TimeRegistrations /></ProtectedRoute>} />
-        <Route path="/:lang/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-        <Route path="/:lang/orders/new" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-        <Route path="/:lang/orders/:orderId/edit" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-        <Route path="/:lang/projects/:projectId/edit" element={<ProtectedRoute><EditProject /></ProtectedRoute>} />
-      </Routes>
+      <AuthProvider>
+        <LanguageProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/:lang/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/:lang/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+            <Route path="/:lang/projects/:projectId" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
+            <Route path="/:lang/workstations" element={<ProtectedRoute><Workstations /></ProtectedRoute>} />
+            <Route path="/:lang/broken-parts" element={<ProtectedRoute><BrokenParts /></ProtectedRoute>} />
+            <Route path="/:lang/personal-tasks" element={<ProtectedRoute><PersonalTasks /></ProtectedRoute>} />
+            <Route path="/:lang/daily-tasks" element={<ProtectedRoute><DailyTasks /></ProtectedRoute>} />
+            <Route path="/:lang/planning" element={<ProtectedRoute><Planning /></ProtectedRoute>} />
+            <Route path="/:lang/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+            <Route path="/:lang/logistics" element={<ProtectedRoute><Logistics /></ProtectedRoute>} />
+            <Route path="/:lang/logistics-out" element={<ProtectedRoute><LogisticsOut /></ProtectedRoute>} />
+            <Route path="/:lang/rush-orders" element={<ProtectedRoute><RushOrders /></ProtectedRoute>} />
+            <Route path="/:lang/time-registrations" element={<ProtectedRoute><TimeRegistrations /></ProtectedRoute>} />
+            <Route path="/:lang/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/:lang/orders/new" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+            <Route path="/:lang/orders/:orderId/edit" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+            <Route path="/:lang/projects/:projectId/edit" element={<ProtectedRoute><EditProject /></ProtectedRoute>} />
+          </Routes>
+        </LanguageProvider>
+      </AuthProvider>
     </Router>
   );
 }
