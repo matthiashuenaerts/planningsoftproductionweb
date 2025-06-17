@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -192,6 +191,7 @@ const UserManagement = () => {
                   <SelectItem value="manager">Manager</SelectItem>
                   <SelectItem value="teamleader">Team Leader</SelectItem>
                   <SelectItem value="worker">Worker</SelectItem>
+                  <SelectItem value="preparater">Preparater</SelectItem>
                   <SelectItem value="workstation">Workstation</SelectItem>
                 </SelectContent>
               </Select>

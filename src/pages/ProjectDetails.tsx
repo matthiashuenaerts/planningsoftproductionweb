@@ -381,6 +381,8 @@ const ProjectDetails = () => {
 
   // Calculate summary stats
   const openOrdersCount = orders.filter(order => order.status === 'pending').length;
+  const undeliveredOrdersCount = orders.filter(order => order.status !== 'delivered').length;
+  const allOrdersDelivered = orders.length > 0 && undeliveredOrdersCount === 0;
   const unavailableAccessoriesCount = accessories.filter(acc => 
     acc.status === 'to_order' || acc.status === 'ordered'
   ).length;
@@ -413,8 +415,21 @@ const ProjectDetails = () => {
                 <Button 
                   variant="outline"
                   onClick={() => navigate(createLocalizedPath(`/projects/${projectId}/orders`))}
+                  className={cn(
+                    allOrdersDelivered 
+                      ? "bg-green-500 text-white hover:bg-green-600" 
+                      : undeliveredOrdersCount > 0 
+                        ? "bg-red-500 text-white hover:bg-red-600" 
+                        : ""
+                  )}
                 >
-                  <Package className="mr-2 h-4 w-4" /> {t('orders')}
+                  <Package className="mr-2 h-4 w-4" /> 
+                  {t('orders')}
+                  {undeliveredOrdersCount > 0 && (
+                    <span className="ml-2 bg-white text-red-500 px-2 py-1 rounded-full text-xs font-bold">
+                      {undeliveredOrdersCount}
+                    </span>
+                  )}
                 </Button>
                 <Button 
                   variant="outline"
