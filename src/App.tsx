@@ -22,6 +22,7 @@ import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import EditProject from '@/pages/EditProject';
+import GlobalComponents from './components/GlobalComponents';
 
 // Create a QueryClient instance
 const queryClient = new QueryClient({
@@ -39,6 +40,7 @@ function App() {
       <Router>
         <AuthProvider>
           <LanguageProvider>
+            <GlobalComponents />
             <Routes>
               <Route path="/" element={<Navigate to="/nl/" replace />} />
               <Route path="/login" element={<Login />} />

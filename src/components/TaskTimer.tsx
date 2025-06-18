@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -197,73 +198,75 @@ const TaskTimer = () => {
   }
 
   return (
-    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 ml-32">
-      <Card 
-        className={`cursor-pointer transition-colors max-w-sm ${
-          activeRegistration && activeRegistration.is_active 
-            ? 'border-green-500 bg-green-50 hover:bg-green-100' 
-            : 'border-red-500 bg-red-50 hover:bg-red-100'
-        }`}
-        onClick={handleTimerClick}
-      >
-        <CardContent className="p-3">
-          <div className="flex items-center justify-between space-x-2">
-            <div className="flex items-center space-x-2 flex-1 min-w-0">
-              <div className={`p-1.5 rounded-full ${
-                activeRegistration && activeRegistration.is_active 
-                  ? 'bg-green-500 text-white' 
-                  : 'bg-red-500 text-white'
-              }`}>
-                {activeRegistration && activeRegistration.is_active ? 
-                  <Pause className="h-3 w-3" /> : 
-                  <Play className="h-3 w-3" />
-                }
+    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none">
+      <div className="pointer-events-auto">
+        <Card 
+          className={`cursor-pointer transition-colors max-w-sm ${
+            activeRegistration && activeRegistration.is_active 
+              ? 'border-green-500 bg-green-50 hover:bg-green-100' 
+              : 'border-red-500 bg-red-50 hover:bg-red-100'
+          }`}
+          onClick={handleTimerClick}
+        >
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between space-x-2">
+              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                <div className={`p-1.5 rounded-full ${
+                  activeRegistration && activeRegistration.is_active 
+                    ? 'bg-green-500 text-white' 
+                    : 'bg-red-500 text-white'
+                }`}>
+                  {activeRegistration && activeRegistration.is_active ? 
+                    <Pause className="h-3 w-3" /> : 
+                    <Play className="h-3 w-3" />
+                  }
+                </div>
+                
+                <div className="min-w-0 flex-1">
+                  {activeRegistration && taskDetails ? (
+                    <div>
+                      <p className="font-medium text-xs truncate">
+                        {taskDetails.project_name}
+                      </p>
+                      <p className="text-xs text-gray-600 truncate">
+                        {taskDetails.title}
+                      </p>
+                      {taskDetails.is_workstation_task && (
+                        <p className="text-xs text-blue-600">Workstation Task</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="font-medium text-xs text-gray-500">No Active Task</p>
+                      <p className="text-xs text-gray-400">Click to start</p>
+                    </div>
+                  )}
+                </div>
               </div>
               
-              <div className="min-w-0 flex-1">
-                {activeRegistration && taskDetails ? (
-                  <div>
-                    <p className="font-medium text-xs truncate">
-                      {taskDetails.project_name}
-                    </p>
-                    <p className="text-xs text-gray-600 truncate">
-                      {taskDetails.title}
-                    </p>
-                    {taskDetails.is_workstation_task && (
-                      <p className="text-xs text-blue-600">Workstation Task</p>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <p className="font-medium text-xs text-gray-500">No Active Task</p>
-                    <p className="text-xs text-gray-400">Click to start</p>
+              <div className="flex flex-col items-end">
+                <div className="flex items-center space-x-1">
+                  <Clock className="h-3 w-3 text-gray-500" />
+                  <span className="font-mono text-sm font-medium">
+                    {activeRegistration && activeRegistration.is_active 
+                      ? formatDuration(activeRegistration.start_time)
+                      : '00:00:00'
+                    }
+                  </span>
+                </div>
+                {activeRegistration && activeRegistration.is_active && taskDetails?.duration != null && (
+                  <div className="flex items-center space-x-1">
+                    <Timer className="h-3 w-3 text-gray-500" />
+                    <span className={`font-mono text-xs font-medium ${isTimeNegative(activeRegistration.start_time, taskDetails.duration) ? 'text-red-500' : ''}`}>
+                      {formatRemainingDuration(activeRegistration.start_time, taskDetails.duration)}
+                    </span>
                   </div>
                 )}
               </div>
             </div>
-            
-            <div className="flex flex-col items-end">
-              <div className="flex items-center space-x-1">
-                <Clock className="h-3 w-3 text-gray-500" />
-                <span className="font-mono text-sm font-medium">
-                  {activeRegistration && activeRegistration.is_active 
-                    ? formatDuration(activeRegistration.start_time)
-                    : '00:00:00'
-                  }
-                </span>
-              </div>
-              {activeRegistration && activeRegistration.is_active && taskDetails?.duration != null && (
-                <div className="flex items-center space-x-1">
-                  <Timer className="h-3 w-3 text-gray-500" />
-                  <span className={`font-mono text-xs font-medium ${isTimeNegative(activeRegistration.start_time, taskDetails.duration) ? 'text-red-500' : ''}`}>
-                    {formatRemainingDuration(activeRegistration.start_time, taskDetails.duration)}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

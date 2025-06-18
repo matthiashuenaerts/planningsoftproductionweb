@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -138,16 +137,15 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     });
 
     // Initialize the free drawing brush properly for Fabric.js v6
-    if (fabricCanvas.freeDrawingBrush) {
-      fabricCanvas.freeDrawingBrush.color = drawingColor;
-      fabricCanvas.freeDrawingBrush.width = strokeWidth;
-    }
+    fabricCanvas.freeDrawingBrush.color = drawingColor;
+    fabricCanvas.freeDrawingBrush.width = strokeWidth;
 
     fabricCanvasRef.current = fabricCanvas;
 
     // Handle canvas events
     fabricCanvas.on('path:created', handleDrawingCreated);
     fabricCanvas.on('object:added', handleObjectAdded);
+    fabricCanvas.on('object:modified', handleObjectModified);
   };
 
   const renderPage = async (pageNum: number) => {
@@ -185,11 +183,11 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
           if (fabricCanvasRef.current) {
             fabricCanvasRef.current.backgroundImage = img;
             fabricCanvasRef.current.renderAll();
+            
+            // Load drawings for current page after background is set
+            loadPageDrawings(pageNum);
           }
         });
-
-        // Load drawings for current page
-        loadPageDrawings(pageNum);
       }
     } catch (error) {
       console.error('Error rendering page:', error);
@@ -202,6 +200,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   };
 
   const handleDrawingCreated = () => {
+    console.log('Drawing created, auto-saving...');
     autoSaveDrawings();
   };
 
@@ -209,6 +208,11 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     if (fabricCanvasRef.current) {
       fabricCanvasRef.current.renderAll();
     }
+  };
+
+  const handleObjectModified = () => {
+    console.log('Object modified, auto-saving...');
+    autoSaveDrawings();
   };
 
   const handleToolChange = (tool: typeof activeTool) => {
@@ -223,10 +227,9 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     switch (tool) {
       case 'draw':
         fabricCanvasRef.current.isDrawingMode = true;
-        if (fabricCanvasRef.current.freeDrawingBrush) {
-          fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
-          fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
-        }
+        fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
+        fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
+        console.log('Drawing mode enabled');
         break;
       case 'text':
         addTextbox();
@@ -239,6 +242,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
         break;
       case 'select':
         fabricCanvasRef.current.selection = true;
+        console.log('Selection mode enabled');
         break;
     }
   };
@@ -320,11 +324,17 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
 
     const pageDrawing = drawings.find(d => d.page === pageNum);
     if (pageDrawing) {
-      fabricCanvasRef.current.loadFromJSON(pageDrawing.canvasData, () => {
-        fabricCanvasRef.current?.renderAll();
-      });
+      try {
+        fabricCanvasRef.current.loadFromJSON(pageDrawing.canvasData, () => {
+          fabricCanvasRef.current?.renderAll();
+        });
+      } catch (error) {
+        console.error('Error loading page drawings:', error);
+      }
     } else {
-      fabricCanvasRef.current.clear();
+      // Clear only objects, keep background
+      const objects = fabricCanvasRef.current.getObjects();
+      objects.forEach(obj => fabricCanvasRef.current?.remove(obj));
       fabricCanvasRef.current.renderAll();
     }
   };
@@ -359,6 +369,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
 
       setDrawings(updatedDrawings);
       onSave?.();
+      
+      console.log('Drawings saved successfully');
     } catch (error) {
       console.error('Error saving drawings:', error);
       toast({
@@ -374,7 +386,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   const clearCanvas = () => {
     if (!fabricCanvasRef.current) return;
     
-    fabricCanvasRef.current.clear();
+    const objects = fabricCanvasRef.current.getObjects();
+    objects.forEach(obj => fabricCanvasRef.current?.remove(obj));
     fabricCanvasRef.current.renderAll();
     autoSaveDrawings();
   };
@@ -398,6 +411,39 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   const changeScale = (newScale: number) => {
     if (newScale >= 0.5 && newScale <= 3) {
       setScale(newScale);
+    }
+  };
+
+  const exportPDFWithAnnotations = async () => {
+    if (!fabricCanvasRef.current || !pdfDoc) return;
+
+    try {
+      setSaving(true);
+      
+      // This is a simplified export - in a real implementation, you'd need a library like PDF-lib
+      // to properly embed annotations into the PDF
+      const canvas = fabricCanvasRef.current.getElement();
+      const dataURL = canvas.toDataURL('image/png');
+      
+      // Create a download link
+      const link = document.createElement('a');
+      link.download = `${fileName}_annotated.png`;
+      link.href = dataURL;
+      link.click();
+      
+      toast({
+        title: "Export Complete",
+        description: "Annotated PDF exported as image. For full PDF export, additional PDF processing library would be needed.",
+      });
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast({
+        title: "Error",
+        description: "Failed to export annotated PDF",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -570,6 +616,15 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
               >
                 <Save className="h-4 w-4 mr-2" />
                 {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
+              <Button
+                onClick={exportPDFWithAnnotations}
+                disabled={saving}
+                variant="outline"
+                className="w-full"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export
               </Button>
             </div>
           </CardContent>
