@@ -1,7 +1,6 @@
 
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface TaskPopupProps {
   isOpen: boolean;
@@ -26,16 +25,7 @@ export const TaskPopup: React.FC<TaskPopupProps> = ({
         </DialogHeader>
         <div className="p-4">
           <p>Task creation functionality will be implemented here.</p>
-          {phaseId && <p className="text-sm text-gray-600">Phase ID: {phaseId}</p>}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={onTaskCreated}>
-            Create Task
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
