@@ -27,7 +27,7 @@ const Projects = () => {
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
   const [exportingProject, setExportingProject] = useState<string | null>(null);
-  const isAdmin = ['admin', 'teamleader', 'prepareter'].includes(currentEmployee?.role);
+  const isAdmin = ['admin', 'teamleader', 'preparater'].includes(currentEmployee?.role);
 
 
   useEffect(() => {
