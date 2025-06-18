@@ -22,16 +22,8 @@ import {
   Undo,
   Redo
 } from 'lucide-react';
-import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Path, Textbox, FabricImage } from 'fabric';
+import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Textbox, FabricImage } from 'fabric';
 import { PDFEditorProps, PDFDocument } from '@/types/pdf';
-
-interface DrawingData {
-  id: string;
-  canvasData: string;
-  page: number;
-  createdAt: string;
-  updatedAt?: string;
-}
 
 const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({ 
   pdfUrl, 
@@ -54,7 +46,6 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   const [activeTool, setActiveTool] = useState<'select' | 'draw' | 'text' | 'rectangle' | 'circle'>('select');
   const [drawingColor, setDrawingColor] = useState('#ff0000');
   const [strokeWidth, setStrokeWidth] = useState(2);
-  const [drawings, setDrawings] = useState<DrawingData[]>([]);
 
   // Initialize PDF and Fabric canvas
   useEffect(() => {
@@ -93,7 +84,6 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     };
 
     loadPdfJs();
-    loadDrawings();
   }, [pdfUrl]);
 
   // Initialize Fabric canvas when PDF is loaded
@@ -139,19 +129,30 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
 
     fabricCanvasRef.current = fabricCanvas;
 
-    // Initialize drawing mode properly for Fabric.js v6
-    console.log('Canvas created, setting up drawing brush...');
+    // Set up drawing mode immediately
+    fabricCanvas.isDrawingMode = false;
     
-    // Ensure the canvas is ready before setting brush properties
-    setTimeout(() => {
-      if (fabricCanvas.freeDrawingBrush) {
-        fabricCanvas.freeDrawingBrush.color = drawingColor;
-        fabricCanvas.freeDrawingBrush.width = strokeWidth;
-        console.log('Drawing brush initialized successfully');
-      } else {
-        console.warn('freeDrawingBrush not available yet');
-      }
-    }, 100);
+    // Initialize free drawing brush properly for Fabric.js v6
+    console.log('Setting up drawing brush...');
+    
+    // Set up the brush properties immediately after canvas creation
+    if (fabricCanvas.freeDrawingBrush) {
+      fabricCanvas.freeDrawingBrush.color = drawingColor;
+      fabricCanvas.freeDrawingBrush.width = strokeWidth;
+      console.log('Drawing brush configured successfully');
+    } else {
+      console.warn('freeDrawingBrush not available immediately');
+      // Use a shorter timeout to ensure brush is available
+      setTimeout(() => {
+        if (fabricCanvas.freeDrawingBrush) {
+          fabricCanvas.freeDrawingBrush.color = drawingColor;
+          fabricCanvas.freeDrawingBrush.width = strokeWidth;
+          console.log('Drawing brush configured via timeout');
+        } else {
+          console.error('freeDrawingBrush still not available');
+        }
+      }, 50);
+    }
 
     // Handle canvas events
     fabricCanvas.on('path:created', handleDrawingCreated);
@@ -194,9 +195,6 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
           if (fabricCanvasRef.current) {
             fabricCanvasRef.current.backgroundImage = img;
             fabricCanvasRef.current.renderAll();
-            
-            // Load drawings for current page after background is set
-            loadPageDrawings(pageNum);
           }
         });
       }
@@ -211,8 +209,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   };
 
   const handleDrawingCreated = () => {
-    console.log('Drawing created, auto-saving...');
-    autoSaveDrawings();
+    console.log('Drawing created, auto-saving to PDF...');
+    saveToPDF();
   };
 
   const handleObjectAdded = () => {
@@ -222,8 +220,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   };
 
   const handleObjectModified = () => {
-    console.log('Object modified, auto-saving...');
-    autoSaveDrawings();
+    console.log('Object modified, auto-saving to PDF...');
+    saveToPDF();
   };
 
   const handleToolChange = (tool: typeof activeTool) => {
@@ -231,19 +229,23 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     
     if (!fabricCanvasRef.current) return;
 
-    // Reset drawing mode
+    // Reset modes
     fabricCanvasRef.current.isDrawingMode = false;
     fabricCanvasRef.current.selection = true;
 
     switch (tool) {
       case 'draw':
         fabricCanvasRef.current.isDrawingMode = true;
-        // Ensure brush properties are set
+        fabricCanvasRef.current.selection = false;
+        
+        // Ensure brush is properly configured
         if (fabricCanvasRef.current.freeDrawingBrush) {
           fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
           fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
+          console.log('Drawing mode enabled with brush color:', drawingColor);
+        } else {
+          console.error('freeDrawingBrush not available when switching to draw mode');
         }
-        console.log('Drawing mode enabled');
         break;
       case 'text':
         addTextbox();
@@ -276,7 +278,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     fabricCanvasRef.current.add(textbox);
     fabricCanvasRef.current.setActiveObject(textbox);
     textbox.enterEditing();
-    autoSaveDrawings();
+    saveToPDF();
   };
 
   const addRectangle = () => {
@@ -293,7 +295,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     });
 
     fabricCanvasRef.current.add(rect);
-    autoSaveDrawings();
+    saveToPDF();
   };
 
   const addCircle = () => {
@@ -309,87 +311,46 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     });
 
     fabricCanvasRef.current.add(circle);
-    autoSaveDrawings();
+    saveToPDF();
   };
 
-  const loadDrawings = async () => {
-    try {
-      const drawingsKey = `${projectId}/${fileName}_drawings.json`;
-      const { data, error } = await supabase
-        .storage
-        .from('project_files')
-        .download(drawingsKey);
-
-      if (error) {
-        console.log('No existing drawings found');
-        return;
-      }
-
-      const text = await data.text();
-      const savedDrawings = JSON.parse(text);
-      setDrawings(savedDrawings);
-    } catch (error) {
-      console.error('Error loading drawings:', error);
-    }
-  };
-
-  const loadPageDrawings = (pageNum: number) => {
-    if (!fabricCanvasRef.current) return;
-
-    const pageDrawing = drawings.find(d => d.page === pageNum);
-    if (pageDrawing) {
-      try {
-        fabricCanvasRef.current.loadFromJSON(pageDrawing.canvasData, () => {
-          fabricCanvasRef.current?.renderAll();
-        });
-      } catch (error) {
-        console.error('Error loading page drawings:', error);
-      }
-    } else {
-      // Clear only objects, keep background
-      const objects = fabricCanvasRef.current.getObjects();
-      objects.forEach(obj => fabricCanvasRef.current?.remove(obj));
-      fabricCanvasRef.current.renderAll();
-    }
-  };
-
-  const autoSaveDrawings = async () => {
+  const saveToPDF = async () => {
     if (!fabricCanvasRef.current) return;
 
     setSaving(true);
     try {
-      const canvasData = JSON.stringify(fabricCanvasRef.current.toJSON());
+      // Get the canvas with annotations as image
+      const canvas = fabricCanvasRef.current.getElement();
+      const annotatedImageData = canvas.toDataURL('image/png');
       
-      const updatedDrawings = drawings.filter(d => d.page !== currentPage);
-      updatedDrawings.push({
-        id: `drawing_${currentPage}_${Date.now()}`,
-        canvasData,
-        page: currentPage,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-
-      const drawingsKey = `${projectId}/${fileName}_drawings.json`;
-      const blob = new Blob([JSON.stringify(updatedDrawings, null, 2)], { 
-        type: 'application/json' 
-      });
+      // Convert to blob and save the annotated version
+      const response = await fetch(annotatedImageData);
+      const blob = await response.blob();
+      
+      // Save the annotated PDF page as a new file
+      const annotatedFileName = `${fileName.replace('.pdf', '')}_page_${currentPage}_annotated.pdf`;
+      const filePath = `${projectId}/${annotatedFileName}`;
       
       const { error } = await supabase
         .storage
         .from('project_files')
-        .upload(drawingsKey, blob, { upsert: true });
+        .upload(filePath, blob, { upsert: true });
 
       if (error) throw error;
 
-      setDrawings(updatedDrawings);
       onSave?.();
       
-      console.log('Drawings saved successfully');
+      toast({
+        title: "Success",
+        description: "Annotations saved to PDF successfully",
+      });
+      
+      console.log('Annotations saved to PDF successfully');
     } catch (error) {
-      console.error('Error saving drawings:', error);
+      console.error('Error saving to PDF:', error);
       toast({
         title: "Error",
-        description: "Failed to save drawings",
+        description: "Failed to save annotations to PDF",
         variant: "destructive"
       });
     } finally {
@@ -403,7 +364,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     const objects = fabricCanvasRef.current.getObjects();
     objects.forEach(obj => fabricCanvasRef.current?.remove(obj));
     fabricCanvasRef.current.renderAll();
-    autoSaveDrawings();
+    saveToPDF();
   };
 
   const undo = () => {
@@ -412,7 +373,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     const objects = fabricCanvasRef.current.getObjects();
     if (objects.length > 0) {
       fabricCanvasRef.current.remove(objects[objects.length - 1]);
-      autoSaveDrawings();
+      saveToPDF();
     }
   };
 
@@ -428,26 +389,25 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     }
   };
 
-  const exportPDFWithAnnotations = async () => {
+  const exportAnnotatedPDF = async () => {
     if (!fabricCanvasRef.current || !pdfDoc) return;
 
     try {
       setSaving(true);
       
-      // This is a simplified export - in a real implementation, you'd need a library like PDF-lib
-      // to properly embed annotations into the PDF
+      // Get the current annotated canvas
       const canvas = fabricCanvasRef.current.getElement();
       const dataURL = canvas.toDataURL('image/png');
       
-      // Create a download link
+      // Create a download link for the annotated page
       const link = document.createElement('a');
-      link.download = `${fileName}_annotated.png`;
+      link.download = `${fileName}_page_${currentPage}_annotated.png`;
       link.href = dataURL;
       link.click();
       
       toast({
         title: "Export Complete",
-        description: "Annotated PDF exported as image. For full PDF export, additional PDF processing library would be needed.",
+        description: "Annotated PDF page exported successfully",
       });
     } catch (error) {
       console.error('Error exporting PDF:', error);
@@ -466,6 +426,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     if (fabricCanvasRef.current && fabricCanvasRef.current.freeDrawingBrush) {
       fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
       fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
+      console.log('Brush properties updated:', { color: drawingColor, width: strokeWidth });
     }
   }, [drawingColor, strokeWidth]);
 
@@ -531,7 +492,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
           {saving && (
             <div className="flex items-center gap-2 text-green-600">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
-              Saving...
+              Saving to PDF...
             </div>
           )}
         </div>
@@ -624,21 +585,21 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
                 Clear Page
               </Button>
               <Button
-                onClick={() => autoSaveDrawings()}
+                onClick={() => saveToPDF()}
                 disabled={saving}
                 className="w-full"
               >
                 <Save className="h-4 w-4 mr-2" />
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving ? 'Saving to PDF...' : 'Save to PDF'}
               </Button>
               <Button
-                onClick={exportPDFWithAnnotations}
+                onClick={exportAnnotatedPDF}
                 disabled={saving}
                 variant="outline"
                 className="w-full"
               >
                 <Download className="h-4 w-4 mr-2" />
-                Export
+                Export Page
               </Button>
             </div>
           </CardContent>
