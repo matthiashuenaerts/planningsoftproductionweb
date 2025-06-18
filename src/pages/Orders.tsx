@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
 import { projectService } from '@/services/dataService';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { Order, OrderItem, OrderAttachment } from '@/types/order';
 import { format } from 'date-fns';
 import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
@@ -34,6 +35,7 @@ const Orders: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
+  const { createLocalizedPath } = useLanguage();
   
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<(Order & { project_name: string })[]>([]);
@@ -179,7 +181,7 @@ const Orders: React.FC = () => {
   };
   
   const handleViewProjectOrders = (projectId: string) => {
-    navigate(`/projects/${projectId}/orders`);
+    navigate(createLocalizedPath(`/projects/${projectId}/orders`));
   };
   
   const handleSortToggle = () => {
