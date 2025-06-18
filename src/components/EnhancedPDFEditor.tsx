@@ -137,8 +137,11 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       preserveObjectStacking: true
     });
 
-    fabricCanvas.freeDrawingBrush.color = drawingColor;
-    fabricCanvas.freeDrawingBrush.width = strokeWidth;
+    // Initialize the free drawing brush properly for Fabric.js v6
+    if (fabricCanvas.freeDrawingBrush) {
+      fabricCanvas.freeDrawingBrush.color = drawingColor;
+      fabricCanvas.freeDrawingBrush.width = strokeWidth;
+    }
 
     fabricCanvasRef.current = fabricCanvas;
 
@@ -176,11 +179,9 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
           height: viewport.height
         });
 
-        // Set PDF as background
-        fabricCanvasRef.current.setBackgroundImage(
-          tempCanvas.toDataURL(),
-          fabricCanvasRef.current.renderAll.bind(fabricCanvasRef.current)
-        );
+        // Set PDF as background using Fabric.js v6 API
+        fabricCanvasRef.current.backgroundImage = tempCanvas.toDataURL();
+        fabricCanvasRef.current.renderAll();
 
         // Load drawings for current page
         loadPageDrawings(pageNum);
@@ -217,8 +218,10 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     switch (tool) {
       case 'draw':
         fabricCanvasRef.current.isDrawingMode = true;
-        fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
-        fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
+        if (fabricCanvasRef.current.freeDrawingBrush) {
+          fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
+          fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
+        }
         break;
       case 'text':
         addTextbox();
@@ -392,6 +395,14 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       setScale(newScale);
     }
   };
+
+  // Update brush properties when color or stroke width changes
+  useEffect(() => {
+    if (fabricCanvasRef.current && fabricCanvasRef.current.freeDrawingBrush) {
+      fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
+      fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
+    }
+  }, [drawingColor, strokeWidth]);
 
   if (loading) {
     return (
