@@ -46,9 +46,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <BrowserRouter>
-          <LanguageProvider>
-            <AuthProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <BrowserRouter>
               <GlobalComponents />
               <Routes>
                 <Route path="/login" element={<Login />} />
@@ -77,9 +77,9 @@ function App() {
               </Routes>
               <Toaster />
               <Sonner />
-            </AuthProvider>
-          </LanguageProvider>
-        </BrowserRouter>
+            </BrowserRouter>
+          </AuthProvider>
+        </LanguageProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
