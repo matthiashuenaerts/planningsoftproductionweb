@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
@@ -24,14 +25,21 @@ const NotificationBanner = () => {
 
   useEffect(() => {
     if (isSuccess && notifications) {
+      console.log('Notifications received:', notifications.length, 'total');
       const unread = notifications.filter(n => !n.read);
+      console.log('Unread notifications:', unread.length);
+      
       if (unread.length > 0) {
         const latest = unread.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
         // Only update if it's a new notification
         if (latest.id !== latestUnread?.id) {
+          console.log('Setting new notification banner:', latest.message);
           setLatestUnread(latest);
         }
       } else {
+        if (latestUnread) {
+          console.log('Clearing notification banner - no unread notifications');
+        }
         setLatestUnread(null);
       }
     }
@@ -69,16 +77,25 @@ const NotificationBanner = () => {
     return null;
   }
 
-  return <Alert className="fixed top-4 right-4 w-auto max-w-sm z-50 bg-primary text-primary-foreground shadow-xl cursor-pointer animate-in fade-in-0 slide-in-from-top-5" onClick={handleClick}>
+  console.log('Rendering notification banner:', latestUnread.message);
+
+  return (
+    <Alert className="fixed bottom-6 right-6 w-auto max-w-sm z-[9999] bg-primary text-primary-foreground shadow-2xl cursor-pointer animate-in fade-in slide-in-from-bottom-5 border-2 border-primary-foreground/20" onClick={handleClick}>
       <Bell className="h-4 w-4 text-primary-foreground" />
-      <AlertTitle>New Notification!</AlertTitle>
-      <AlertDescription>
-          {latestUnread.message}
+      <AlertTitle className="text-primary-foreground font-semibold">New Notification!</AlertTitle>
+      <AlertDescription className="text-primary-foreground/90">
+        {latestUnread.message}
       </AlertDescription>
-      <Button variant="ghost" size="icon" onClick={handleClose} className="absolute top-1 right-1 h-6 w-6 text-primary-foreground hover:bg-black/20 p-0 mx-[5px] text-base text-left">
-          <X className="h-4 w-4" />
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        onClick={handleClose} 
+        className="absolute top-1 right-1 h-6 w-6 text-primary-foreground hover:bg-primary-foreground/20 p-0 mx-[5px] text-base"
+      >
+        <X className="h-4 w-4" />
       </Button>
-    </Alert>;
+    </Alert>
+  );
 };
 
 export default NotificationBanner;
