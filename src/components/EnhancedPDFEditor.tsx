@@ -22,7 +22,7 @@ import {
   Undo,
   Redo
 } from 'lucide-react';
-import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Path, Textbox } from 'fabric';
+import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Path, Textbox, FabricImage } from 'fabric';
 import { PDFEditorProps, PDFDocument } from '@/types/pdf';
 
 interface DrawingData {
@@ -180,8 +180,13 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
         });
 
         // Set PDF as background using Fabric.js v6 API
-        fabricCanvasRef.current.backgroundImage = tempCanvas.toDataURL();
-        fabricCanvasRef.current.renderAll();
+        const dataURL = tempCanvas.toDataURL();
+        FabricImage.fromURL(dataURL).then((img) => {
+          if (fabricCanvasRef.current) {
+            fabricCanvasRef.current.backgroundImage = img;
+            fabricCanvasRef.current.renderAll();
+          }
+        });
 
         // Load drawings for current page
         loadPageDrawings(pageNum);
