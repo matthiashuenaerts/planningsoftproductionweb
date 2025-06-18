@@ -12,14 +12,10 @@ const GlobalComponents = () => {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 pointer-events-none">
-      <div className="pointer-events-auto">
-        <TaskTimer />
-      </div>
-      <div className="pointer-events-auto">
-        <NotificationBanner />
-      </div>
-    </div>
+    <>
+      <TaskTimer />
+      <NotificationBanner />
+    </>
   );
 };
 

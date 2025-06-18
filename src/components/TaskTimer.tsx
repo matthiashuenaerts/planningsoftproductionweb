@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -198,9 +197,9 @@ const TaskTimer = () => {
   }
 
   return (
-    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-40">
+    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 ml-32">
       <Card 
-        className={`cursor-pointer transition-colors max-w-sm shadow-lg ${
+        className={`cursor-pointer transition-colors max-w-sm ${
           activeRegistration && activeRegistration.is_active 
             ? 'border-green-500 bg-green-50 hover:bg-green-100' 
             : 'border-red-500 bg-red-50 hover:bg-red-100'
