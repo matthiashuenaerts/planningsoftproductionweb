@@ -178,19 +178,6 @@ const NavbarContent = ({
                 >
                   EN
                 </Button>
-              <Button 
-                  size="sm" 
-                  variant={lang === 'fr' ? 'default' : 'ghost'} 
-                  className={cn(
-                    "text-sm font-medium",
-                    lang === 'fr' 
-                      ? 'bg-white text-sky-800 hover:bg-gray-100' 
-                      : 'text-white hover:bg-sky-700 hover:text-white'
-                  )}
-                  onClick={() => changeLang('fr')}
-                >
-                  FR
-                </Button>
             </div>
           {currentEmployee && <div className="flex items-center p-2 mb-2">
               <User className="w-5 h-5 text-white" />
