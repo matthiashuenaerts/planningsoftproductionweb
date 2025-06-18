@@ -92,25 +92,25 @@ const NavbarContent = ({
                 <span className="ml-3">{t('installation_planning')}</span>
               </NavLink>
             </li>
-            {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
+            {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader'].includes(currentEmployee.role) && <li>
                 <NavLink to={createLocalizedPath("/planning")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Users className="w-5 h-5 text-white group-hover:text-white" />
                   <span className="ml-3">{t('planning')}</span>
                 </NavLink>
               </li>}
-            {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
+            {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader', 'prepareter'].includes(currentEmployee.role) && <li>
                 <NavLink to={createLocalizedPath("/orders")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <PackagePlus className="w-5 h-5 text-white group-hover:text-white" />
                   <span className="ml-3">{t('orders')}</span>
                 </NavLink>
               </li>}
-            {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
+            {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader', 'preparater'].includes(currentEmployee.role) && <li>
                 <NavLink to={createLocalizedPath("/logistics")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Truck className="w-5 h-5 text-white group-hover:text-white" />
                   <span className="ml-3">{t('logistics')}</span>
                 </NavLink>
               </li>}
-            {currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role) && <li>
+            {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader', 'prepareter'].includes(currentEmployee.role) && <li>
                 <NavLink to={createLocalizedPath("/logistics-out")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                   <Truck className="w-5 h-5 text-white group-hover:text-white" />
                   <span className="ml-3">{t('logistics_out')}</span>
