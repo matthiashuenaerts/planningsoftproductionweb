@@ -7,12 +7,14 @@ import { ChevronLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import RushOrderDetail from '@/components/rush-orders/RushOrderDetail';
 import { useLanguage } from '@/context/LanguageContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const RushOrderDetails = () => {
   const { rushOrderId } = useParams<{ rushOrderId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t, createLocalizedPath } = useLanguage();
+  const isMobile = useIsMobile();
   
   const handleStatusChange = () => {
     // Invalidate the rush orders list to refresh data
@@ -21,10 +23,12 @@ const RushOrderDetails = () => {
   
   return (
     <div className="flex min-h-screen">
-      <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-        <Navbar />
-      </div>
-      <div className="ml-64 w-full p-6">
+      {!isMobile && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : ''}`}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <Button

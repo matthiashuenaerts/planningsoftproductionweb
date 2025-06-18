@@ -17,12 +17,14 @@ import RushOrderList from '@/components/rush-orders/RushOrderList';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
 import { useLanguage } from '@/context/LanguageContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const RushOrders = () => {
   const { currentEmployee } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   
   // Keep this existing check - only admin, manager, installation_team can create rush orders
   const canCreateRushOrder = currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role);
@@ -47,10 +49,12 @@ const RushOrders = () => {
   
   return (
     <div className="flex min-h-screen">
-      <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-        <Navbar />
-      </div>
-      <div className="ml-64 w-full p-6">
+      {!isMobile && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : ''}`}>
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold">{t('rush_orders')}</h1>
