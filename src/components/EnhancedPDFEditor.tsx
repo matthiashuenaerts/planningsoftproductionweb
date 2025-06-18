@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +54,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   const [drawingColor, setDrawingColor] = useState('#ff0000');
   const [strokeWidth, setStrokeWidth] = useState(2);
   const [drawings, setDrawings] = useState<DrawingData[]>([]);
+  const [pageViewport, setPageViewport] = useState<any>(null);
 
   // Initialize PDF and Fabric canvas
   useEffect(() => {
@@ -134,20 +134,24 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       width: 800,
       height: 600,
       backgroundColor: 'transparent',
-      preserveObjectStacking: true
+      preserveObjectStacking: true,
+      selection: true
     });
 
-    // Initialize the free drawing brush properly for Fabric.js v6
-    if (fabricCanvas.freeDrawingBrush) {
-      fabricCanvas.freeDrawingBrush.color = drawingColor;
-      fabricCanvas.freeDrawingBrush.width = strokeWidth;
-    }
+    // Enable drawing mode and configure brush
+    fabricCanvas.isDrawingMode = false;
+    fabricCanvas.freeDrawingBrush.color = drawingColor;
+    fabricCanvas.freeDrawingBrush.width = strokeWidth;
 
     fabricCanvasRef.current = fabricCanvas;
 
     // Handle canvas events
     fabricCanvas.on('path:created', handleDrawingCreated);
     fabricCanvas.on('object:added', handleObjectAdded);
+    fabricCanvas.on('object:modified', handleObjectModified);
+    fabricCanvas.on('text:changed', handleTextChanged);
+
+    console.log('Fabric canvas initialized');
   };
 
   const renderPage = async (pageNum: number) => {
@@ -156,6 +160,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     try {
       const page = await pdfDoc.getPage(pageNum);
       const viewport = page.getViewport({ scale });
+      setPageViewport(viewport);
       
       // Create a temporary canvas for PDF rendering
       const tempCanvas = document.createElement('canvas');
@@ -201,14 +206,26 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     }
   };
 
-  const handleDrawingCreated = () => {
+  const handleDrawingCreated = (e: any) => {
+    console.log('Drawing created:', e);
     autoSaveDrawings();
   };
 
-  const handleObjectAdded = () => {
+  const handleObjectAdded = (e: any) => {
+    console.log('Object added:', e);
     if (fabricCanvasRef.current) {
       fabricCanvasRef.current.renderAll();
     }
+  };
+
+  const handleObjectModified = (e: any) => {
+    console.log('Object modified:', e);
+    autoSaveDrawings();
+  };
+
+  const handleTextChanged = (e: any) => {
+    console.log('Text changed:', e);
+    autoSaveDrawings();
   };
 
   const handleToolChange = (tool: typeof activeTool) => {
@@ -216,17 +233,16 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     
     if (!fabricCanvasRef.current) return;
 
-    // Reset drawing mode
+    // Reset modes
     fabricCanvasRef.current.isDrawingMode = false;
     fabricCanvasRef.current.selection = true;
 
     switch (tool) {
       case 'draw':
         fabricCanvasRef.current.isDrawingMode = true;
-        if (fabricCanvasRef.current.freeDrawingBrush) {
-          fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
-          fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
-        }
+        fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
+        fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
+        fabricCanvasRef.current.selection = false;
         break;
       case 'text':
         addTextbox();
@@ -241,6 +257,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
         fabricCanvasRef.current.selection = true;
         break;
     }
+
+    console.log('Tool changed to:', tool);
   };
 
   const addTextbox = () => {
@@ -252,7 +270,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       width: 200,
       fontSize: 16,
       fill: drawingColor,
-      fontFamily: 'Arial'
+      fontFamily: 'Arial',
+      editable: true
     });
 
     fabricCanvasRef.current.add(textbox);
@@ -275,6 +294,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     });
 
     fabricCanvasRef.current.add(rect);
+    fabricCanvasRef.current.setActiveObject(rect);
     autoSaveDrawings();
   };
 
@@ -291,6 +311,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     });
 
     fabricCanvasRef.current.add(circle);
+    fabricCanvasRef.current.setActiveObject(circle);
     autoSaveDrawings();
   };
 
@@ -320,11 +341,20 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
 
     const pageDrawing = drawings.find(d => d.page === pageNum);
     if (pageDrawing) {
-      fabricCanvasRef.current.loadFromJSON(pageDrawing.canvasData, () => {
-        fabricCanvasRef.current?.renderAll();
-      });
+      try {
+        fabricCanvasRef.current.loadFromJSON(pageDrawing.canvasData, () => {
+          fabricCanvasRef.current?.renderAll();
+        });
+      } catch (error) {
+        console.error('Error loading page drawings:', error);
+        fabricCanvasRef.current.clear();
+        fabricCanvasRef.current.renderAll();
+      }
     } else {
+      // Clear canvas but keep background
+      const bgImage = fabricCanvasRef.current.backgroundImage;
       fabricCanvasRef.current.clear();
+      fabricCanvasRef.current.backgroundImage = bgImage;
       fabricCanvasRef.current.renderAll();
     }
   };
@@ -359,6 +389,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
 
       setDrawings(updatedDrawings);
       onSave?.();
+      
+      console.log('Drawings saved successfully');
     } catch (error) {
       console.error('Error saving drawings:', error);
       toast({
@@ -374,7 +406,9 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   const clearCanvas = () => {
     if (!fabricCanvasRef.current) return;
     
+    const bgImage = fabricCanvasRef.current.backgroundImage;
     fabricCanvasRef.current.clear();
+    fabricCanvasRef.current.backgroundImage = bgImage;
     fabricCanvasRef.current.renderAll();
     autoSaveDrawings();
   };
@@ -398,6 +432,40 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   const changeScale = (newScale: number) => {
     if (newScale >= 0.5 && newScale <= 3) {
       setScale(newScale);
+    }
+  };
+
+  const exportAnnotatedPDF = async () => {
+    if (!fabricCanvasRef.current || !pdfDoc) return;
+
+    try {
+      setSaving(true);
+      
+      // Create a new PDF with annotations
+      // This would require a PDF manipulation library like PDF-lib
+      // For now, we'll export as an image with annotations
+      const canvas = fabricCanvasRef.current.getElement();
+      const dataURL = canvas.toDataURL('image/png');
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.download = `${fileName}_annotated.png`;
+      link.href = dataURL;
+      link.click();
+      
+      toast({
+        title: "Success",
+        description: "Annotated page exported as image",
+      });
+    } catch (error) {
+      console.error('Error exporting:', error);
+      toast({
+        title: "Error",
+        description: "Failed to export annotated PDF",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -491,36 +559,45 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
                 onClick={() => handleToolChange('select')}
                 variant={activeTool === 'select' ? 'default' : 'outline'}
                 size="sm"
+                className="flex flex-col items-center p-2"
               >
-                Select
+                <span className="text-xs">Select</span>
               </Button>
               <Button
                 onClick={() => handleToolChange('draw')}
                 variant={activeTool === 'draw' ? 'default' : 'outline'}
                 size="sm"
+                className="flex flex-col items-center p-2"
               >
-                <Edit3 className="h-4 w-4" />
+                <Edit3 className="h-4 w-4 mb-1" />
+                <span className="text-xs">Draw</span>
               </Button>
               <Button
                 onClick={() => handleToolChange('text')}
                 variant={activeTool === 'text' ? 'default' : 'outline'}
                 size="sm"
+                className="flex flex-col items-center p-2"
               >
-                <Type className="h-4 w-4" />
+                <Type className="h-4 w-4 mb-1" />
+                <span className="text-xs">Text</span>
               </Button>
               <Button
                 onClick={() => handleToolChange('rectangle')}
                 variant={activeTool === 'rectangle' ? 'default' : 'outline'}
                 size="sm"
+                className="flex flex-col items-center p-2"
               >
-                <Square className="h-4 w-4" />
+                <Square className="h-4 w-4 mb-1" />
+                <span className="text-xs">Rect</span>
               </Button>
               <Button
                 onClick={() => handleToolChange('circle')}
                 variant={activeTool === 'circle' ? 'default' : 'outline'}
                 size="sm"
+                className="flex flex-col items-center p-2"
               >
-                <Circle className="h-4 w-4" />
+                <Circle className="h-4 w-4 mb-1" />
+                <span className="text-xs">Circle</span>
               </Button>
             </div>
             
@@ -570,6 +647,15 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
               >
                 <Save className="h-4 w-4 mr-2" />
                 {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
+              <Button
+                onClick={exportAnnotatedPDF}
+                disabled={saving}
+                variant="outline"
+                className="w-full"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export Page
               </Button>
             </div>
           </CardContent>
