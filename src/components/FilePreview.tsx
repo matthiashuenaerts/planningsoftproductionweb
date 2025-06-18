@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Dialog,
@@ -12,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AlertCircle, File, FileText, Image, FileImage, FileVideo, Video, FileAudio, AudioLines, Edit } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import PDFEditor from '@/components/PDFEditor';
+import EnhancedPDFEditor from '@/components/EnhancedPDFEditor';
 
 interface FilePreviewProps {
   isOpen: boolean;
@@ -159,11 +158,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({
     
     const mimeType = getMimeType();
     
-    // PDF preview with edit mode
+    // PDF preview with enhanced edit mode
     if (mimeType === 'application/pdf') {
       if (editMode) {
         return (
-          <PDFEditor
+          <EnhancedPDFEditor
             pdfUrl={previewUrl}
             projectId={projectId}
             fileName={fileName}
@@ -290,7 +289,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({
             )}
           </DialogTitle>
           <DialogDescription>
-            {editMode ? 'PDF Editor - Click to add text annotations' : 'File Preview'}
+            {editMode ? 'Enhanced PDF Editor - Draw, add text, and edit annotations' : 'File Preview'}
           </DialogDescription>
         </DialogHeader>
         <div className="mt-2 overflow-auto">
