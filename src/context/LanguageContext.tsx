@@ -3,9 +3,10 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { useNavigate, useLocation } from 'react-router-dom';
 import en from '../locales/en.json';
 import nl from '../locales/nl.json';
+import fr from '../locales/fr.json';
 
 const translations: Record<string, Record<string, string>> = { en, nl };
-const availableLanguages = ['en', 'nl'];
+const availableLanguages = ['en', 'nl', 'fr'];
 const defaultLang = 'nl';
 
 interface LanguageContextType {
