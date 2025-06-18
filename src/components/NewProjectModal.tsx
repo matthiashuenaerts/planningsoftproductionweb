@@ -339,12 +339,12 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh]">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Create New Project</DialogTitle>
         </DialogHeader>
         
-        <ScrollArea className="max-h-[70vh] pr-4">
+        <ScrollArea className="flex-1 pr-4">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
               <FormField
@@ -567,16 +567,16 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   </div>
                 </div>
               </div>
-
-              <DialogFooter className="pt-4">
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">Cancel</Button>
-                </DialogClose>
-                <Button type="submit">Create Project</Button>
-              </DialogFooter>
             </form>
           </Form>
         </ScrollArea>
+
+        <DialogFooter className="mt-4 pt-4 border-t">
+          <DialogClose asChild>
+            <Button type="button" variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button type="submit" onClick={form.handleSubmit(onSubmit)}>Create Project</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
