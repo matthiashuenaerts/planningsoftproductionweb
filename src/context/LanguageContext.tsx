@@ -5,7 +5,7 @@ import en from '../locales/en.json';
 import nl from '../locales/nl.json';
 import fr from '../locales/fr.json';
 
-const translations: Record<string, Record<string, string>> = { en, nl };
+const translations: Record<string, Record<string, string>> = { en, nl, fr };
 const availableLanguages = ['en', 'nl', 'fr'];
 const defaultLang = 'nl';
 
