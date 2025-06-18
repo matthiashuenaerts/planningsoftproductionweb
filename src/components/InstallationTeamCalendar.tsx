@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useLanguage } from '@/context/LanguageContext';
 
 // Define project type
 interface Project {
@@ -167,6 +168,7 @@ const ProjectItem = ({
   totalDays = 1
 }) => {
   const navigate = useNavigate();
+  const { createLocalizedPath } = useLanguage();
   const [{
     isDragging
   }, drag] = useDrag(() => ({
@@ -191,7 +193,7 @@ const ProjectItem = ({
   };
   const handleNavigateToProject = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigate(`/projects/${project.id}`);
+    navigate(createLocalizedPath(`/projects/${project.id}`));
   };
 
   // Show full content only on the start day
