@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -136,11 +137,21 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       preserveObjectStacking: true
     });
 
-    // Initialize the free drawing brush properly for Fabric.js v6
-    fabricCanvas.freeDrawingBrush.color = drawingColor;
-    fabricCanvas.freeDrawingBrush.width = strokeWidth;
-
     fabricCanvasRef.current = fabricCanvas;
+
+    // Initialize drawing mode properly for Fabric.js v6
+    console.log('Canvas created, setting up drawing brush...');
+    
+    // Ensure the canvas is ready before setting brush properties
+    setTimeout(() => {
+      if (fabricCanvas.freeDrawingBrush) {
+        fabricCanvas.freeDrawingBrush.color = drawingColor;
+        fabricCanvas.freeDrawingBrush.width = strokeWidth;
+        console.log('Drawing brush initialized successfully');
+      } else {
+        console.warn('freeDrawingBrush not available yet');
+      }
+    }, 100);
 
     // Handle canvas events
     fabricCanvas.on('path:created', handleDrawingCreated);
@@ -227,8 +238,11 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     switch (tool) {
       case 'draw':
         fabricCanvasRef.current.isDrawingMode = true;
-        fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
-        fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
+        // Ensure brush properties are set
+        if (fabricCanvasRef.current.freeDrawingBrush) {
+          fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
+          fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
+        }
         console.log('Drawing mode enabled');
         break;
       case 'text':
