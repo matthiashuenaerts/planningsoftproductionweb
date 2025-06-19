@@ -53,7 +53,8 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
             start_date: new Date().toISOString().split('T')[0],
             status: 'in_progress',
             client: 'Internal Stock',
-            installation_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            installation_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            progress: 0
           });
         }
       } catch (error) {
