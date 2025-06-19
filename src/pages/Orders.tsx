@@ -20,7 +20,9 @@ import {
   Search,
   FileText, 
   Paperclip,
-  ArrowUpDown
+  ArrowUpDown,
+  Package,
+  Filter
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
@@ -30,6 +32,8 @@ import { useLanguage } from '@/context/LanguageContext';
 import { Order, OrderItem, OrderAttachment } from '@/types/order';
 import { format } from 'date-fns';
 import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import ImportStockOrderModal from '@/components/ImportStockOrderModal';
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
@@ -44,6 +48,9 @@ const Orders: React.FC = () => {
   const [orderAttachments, setOrderAttachments] = useState<Record<string, OrderAttachment[]>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [orderTypeFilter, setOrderTypeFilter] = useState<string>('all');
+  const [showImportStockModal, setShowImportStockModal] = useState(false);
   
   const isAdmin = currentEmployee?.role === 'admin';
   
@@ -205,11 +212,83 @@ const Orders: React.FC = () => {
     }
   };
   
+  const handleImportStockOrder = () => {
+    setShowImportStockModal(true);
+  };
+
+  const handleStockOrderImported = () => {
+    setShowImportStockModal(false);
+    // Reload orders to show the new stock order
+    const loadOrders = async () => {
+      try {
+        setLoading(true);
+        
+        // Get all orders
+        const allOrders = await orderService.getAllOrders();
+
+        // Filter out semi-finished orders with no items (logistics out orders)
+        const ordersToDisplay = allOrders.filter(order => {
+          if (order.order_type === 'semi-finished') {
+            return order.order_items_count && order.order_items_count > 0;
+          }
+          return true;
+        });
+        
+        // Get project details for each order
+        const ordersWithProjectNames = await Promise.all(
+          ordersToDisplay.map(async (order) => {
+            let projectName = "Unknown Project";
+            
+            try {
+              const project = await projectService.getById(order.project_id);
+              if (project) {
+                projectName = project.name;
+              }
+            } catch (error) {
+              console.error("Error fetching project name:", error);
+            }
+            
+            return {
+              ...order,
+              project_name: projectName
+            };
+          })
+        );
+        
+        setOrders(ordersWithProjectNames);
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: `Failed to load orders: ${error.message}`,
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadOrders();
+    
+    toast({
+      title: "Success",
+      description: "Stock order imported successfully",
+    });
+  };
+  
   const filteredOrders = orders
-    .filter(order => 
-      order.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.project_name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    .filter(order => {
+      // Search filter
+      const matchesSearch = order.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.project_name.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Status filter
+      const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+      
+      // Order type filter
+      const matchesOrderType = orderTypeFilter === 'all' || order.order_type === orderTypeFilter;
+      
+      return matchesSearch && matchesStatus && matchesOrderType;
+    })
     .sort((a, b) => {
       const dateA = new Date(a.expected_delivery).getTime();
       const dateB = new Date(b.expected_delivery).getTime();
@@ -248,7 +327,41 @@ const Orders: React.FC = () => {
                   className="pl-9 w-full"
                 />
               </div>
+              <Button onClick={handleImportStockOrder} variant="outline">
+                <Package className="mr-2 h-4 w-4" />
+                Import STOCK Order
+              </Button>
             </div>
+          </div>
+          
+          {/* Filters */}
+          <div className="flex flex-wrap gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Filters:</span>
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="delayed">Delayed</SelectItem>
+                <SelectItem value="canceled">Canceled</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="standard">Standard</SelectItem>
+                <SelectItem value="semi-finished">Semi-finished</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           
           <Card>
@@ -426,9 +539,9 @@ const Orders: React.FC = () => {
                     </TableBody>
                   </Table>
                 </div>
-              ) : searchTerm ? (
+              ) : searchTerm || statusFilter !== 'all' || orderTypeFilter !== 'all' ? (
                 <div className="p-6 text-center bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                  <p className="text-muted-foreground">No orders found matching "{searchTerm}".</p>
+                  <p className="text-muted-foreground">No orders found matching the current filters.</p>
                 </div>
               ) : (
                 <div className="p-6 text-center bg-gray-50 rounded-lg border border-dashed border-gray-300">
@@ -439,6 +552,13 @@ const Orders: React.FC = () => {
           </Card>
         </div>
       </div>
+      
+      {showImportStockModal && (
+        <ImportStockOrderModal 
+          onClose={() => setShowImportStockModal(false)}
+          onImportSuccess={handleStockOrderImported}
+        />
+      )}
     </div>
   );
 };
