@@ -339,117 +339,24 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh]">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Create New Project</DialogTitle>
         </DialogHeader>
         
-        <ScrollArea className="max-h-[70vh] pr-4">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Project Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Kitchen Pro - Client XYZ" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="client"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Client</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Client Name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Project details..." 
-                        className="resize-none" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="project_value"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Project Value (1-100)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min="1" 
-                        max="100" 
-                        {...field} 
-                        onChange={e => field.onChange(parseInt(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex-1 overflow-hidden">
+          <ScrollArea className="h-full pr-4">
+            <Form {...form}>
+              <div className="space-y-4 mt-4">
                 <FormField
                   control={form.control}
-                  name="start_date"
+                  name="name"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Start Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) => date < new Date("1900-01-01")}
-                            initialFocus
-                            className={cn("p-3 pointer-events-auto")}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                    <FormItem>
+                      <FormLabel>Project Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Kitchen Pro - Client XYZ" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -457,126 +364,223 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 
                 <FormField
                   control={form.control}
-                  name="installation_date"
+                  name="client"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Installation Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) => 
-                              date < new Date("1900-01-01") ||
-                              (form.getValues("start_date") && date < form.getValues("start_date"))
-                            }
-                            initialFocus
-                            className={cn("p-3 pointer-events-auto")}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                    <FormItem>
+                      <FormLabel>Client</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Client Name" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
-
-              <div className="border rounded-md p-4">
-                <h3 className="font-medium mb-2">Project Tasks</h3>
                 
-                {loading ? (
-                  <div className="flex justify-center p-4">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                  </div>
-                ) : (
-                  <div className="space-y-2 mb-4 max-h-[300px] overflow-y-auto pr-2">
-                    {tasks.map((task, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <Checkbox 
-                          id={`task-${index}`} 
-                          checked={task.selected} 
-                          onCheckedChange={() => handleToggleTask(index)} 
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Project details..." 
+                          className="resize-none" 
+                          {...field} 
                         />
-                        <label htmlFor={`task-${index}`} className="text-sm flex-1 flex flex-wrap items-center">
-                          <span className="mr-1">{task.id} - {task.name}</span>
-                          {task.workstation && <span className="text-muted-foreground mr-2">({task.workstation})</span>}
-                          {task.duration && (
-                            <span className="text-xs bg-muted px-2 py-0.5 rounded-full mr-2">
-                              {task.duration} min
-                            </span>
-                          )}
-                          {task.day_counter !== undefined && (
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                              -{task.day_counter} days
-                            </span>
-                          )}
-                        </label>
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleRemoveTask(index)}
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
-                <div className="grid grid-cols-1 gap-2 mt-2">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="New task name"
-                      value={newTaskName}
-                      onChange={(e) => setNewTaskName(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Input
-                      placeholder="Workstation (optional)"
-                      value={newTaskWorkstation}
-                      onChange={(e) => setNewTaskWorkstation(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button 
-                      type="button" 
-                      size="icon" 
-                      onClick={handleAddCustomTask}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
+                <FormField
+                  control={form.control}
+                  name="project_value"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Project Value (1-100)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="1" 
+                          max="100" 
+                          {...field} 
+                          onChange={e => field.onChange(parseInt(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="start_date"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Start Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value ? (
+                                  format(field.value, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              disabled={(date) => date < new Date("1900-01-01")}
+                              initialFocus
+                              className={cn("p-3 pointer-events-auto")}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="installation_date"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Installation Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value ? (
+                                  format(field.value, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              disabled={(date) => 
+                                date < new Date("1900-01-01") ||
+                                (form.getValues("start_date") && date < form.getValues("start_date"))
+                              }
+                              initialFocus
+                              className={cn("p-3 pointer-events-auto")}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="border rounded-md p-4">
+                  <h3 className="font-medium mb-2">Project Tasks</h3>
+                  
+                  {loading ? (
+                    <div className="flex justify-center p-4">
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="space-y-2 mb-4 max-h-[300px] overflow-y-auto pr-2">
+                      {tasks.map((task, index) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`task-${index}`} 
+                            checked={task.selected} 
+                            onCheckedChange={() => handleToggleTask(index)} 
+                          />
+                          <label htmlFor={`task-${index}`} className="text-sm flex-1 flex flex-wrap items-center">
+                            <span className="mr-1">{task.id} - {task.name}</span>
+                            {task.workstation && <span className="text-muted-foreground mr-2">({task.workstation})</span>}
+                            {task.duration && (
+                              <span className="text-xs bg-muted px-2 py-0.5 rounded-full mr-2">
+                                {task.duration} min
+                              </span>
+                            )}
+                            {task.day_counter !== undefined && (
+                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                                -{task.day_counter} days
+                              </span>
+                            )}
+                          </label>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleRemoveTask(index)}
+                          >
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <div className="grid grid-cols-1 gap-2 mt-2">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="New task name"
+                        value={newTaskName}
+                        onChange={(e) => setNewTaskName(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Input
+                        placeholder="Workstation (optional)"
+                        value={newTaskWorkstation}
+                        onChange={(e) => setNewTaskWorkstation(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button 
+                        type="button" 
+                        size="icon" 
+                        onClick={handleAddCustomTask}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
+            </Form>
+          </ScrollArea>
+        </div>
 
-              <DialogFooter className="pt-4">
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">Cancel</Button>
-                </DialogClose>
-                <Button type="submit">Create Project</Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </ScrollArea>
+        <DialogFooter className="mt-4 pt-4 border-t">
+          <DialogClose asChild>
+            <Button type="button" variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button type="submit" onClick={form.handleSubmit(onSubmit)}>
+            Create Project
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
