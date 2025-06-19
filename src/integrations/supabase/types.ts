@@ -480,7 +480,7 @@ export type Database = {
           notes: string | null
           order_date: string
           order_type: string
-          project_id: string
+          project_id: string | null
           status: string
           supplier: string
           updated_at: string
@@ -492,7 +492,7 @@ export type Database = {
           notes?: string | null
           order_date?: string
           order_type?: string
-          project_id: string
+          project_id?: string | null
           status: string
           supplier: string
           updated_at?: string
@@ -504,7 +504,7 @@ export type Database = {
           notes?: string | null
           order_date?: string
           order_type?: string
-          project_id?: string
+          project_id?: string | null
           status?: string
           supplier?: string
           updated_at?: string
