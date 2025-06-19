@@ -26,6 +26,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import EditProject from '@/pages/EditProject';
 import GlobalComponents from './components/GlobalComponents';
+import { Toaster } from '@/components/ui/toaster';
 
 // Create a QueryClient instance
 const queryClient = new QueryClient({
@@ -70,6 +71,7 @@ function App() {
               <Route path="/:lang/time-registrations" element={<ProtectedRoute><TimeRegistrations /></ProtectedRoute>} />
               <Route path="/:lang/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             </Routes>
+            <Toaster />
           </LanguageProvider>
         </AuthProvider>
       </Router>
