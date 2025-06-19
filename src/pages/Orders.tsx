@@ -73,15 +73,19 @@ const Orders: React.FC = () => {
         // Get project details for each order
         const ordersWithProjectNames = await Promise.all(
           ordersToDisplay.map(async (order) => {
-            let projectName = "Unknown Project";
+            let projectName = "STOCK Order";
             
-            try {
-              const project = await projectService.getById(order.project_id);
-              if (project) {
-                projectName = project.name;
+            // Only fetch project name if project_id exists
+            if (order.project_id) {
+              try {
+                const project = await projectService.getById(order.project_id);
+                if (project) {
+                  projectName = project.name;
+                }
+              } catch (error) {
+                console.error("Error fetching project name:", error);
+                projectName = "Unknown Project";
               }
-            } catch (error) {
-              console.error("Error fetching project name:", error);
             }
             
             return {
@@ -188,7 +192,10 @@ const Orders: React.FC = () => {
   };
   
   const handleViewProjectOrders = (projectId: string) => {
-    navigate(createLocalizedPath(`/projects/${projectId}/orders`));
+    // Only navigate if project_id exists
+    if (projectId) {
+      navigate(createLocalizedPath(`/projects/${projectId}/orders`));
+    }
   };
   
   const handleSortToggle = () => {
@@ -237,15 +244,19 @@ const Orders: React.FC = () => {
         // Get project details for each order
         const ordersWithProjectNames = await Promise.all(
           ordersToDisplay.map(async (order) => {
-            let projectName = "Unknown Project";
+            let projectName = "STOCK Order";
             
-            try {
-              const project = await projectService.getById(order.project_id);
-              if (project) {
-                projectName = project.name;
+            // Only fetch project name if project_id exists
+            if (order.project_id) {
+              try {
+                const project = await projectService.getById(order.project_id);
+                if (project) {
+                  projectName = project.name;
+                }
+              } catch (error) {
+                console.error("Error fetching project name:", error);
+                projectName = "Unknown Project";
               }
-            } catch (error) {
-              console.error("Error fetching project name:", error);
             }
             
             return {
@@ -429,14 +440,16 @@ const Orders: React.FC = () => {
                               {getStatusBadge(order.status)}
                             </TableCell>
                             <TableCell className="flex justify-end gap-2">
-                              <Button 
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleViewProjectOrders(order.project_id)}
-                              >
-                                <FileText className="h-4 w-4" />
-                                <span className="sr-only">View Project Orders</span>
-                              </Button>
+                              {order.project_id && (
+                                <Button 
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleViewProjectOrders(order.project_id)}
+                                >
+                                  <FileText className="h-4 w-4" />
+                                  <span className="sr-only">View Project Orders</span>
+                                </Button>
+                              )}
                               {isAdmin && (
                                 <select 
                                   value={order.status}

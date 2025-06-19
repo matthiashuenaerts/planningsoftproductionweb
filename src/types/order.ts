@@ -1,7 +1,7 @@
 
 export interface Order {
   id: string;
-  project_id: string;
+  project_id: string | null;
   supplier: string;
   order_date: string;
   expected_delivery: string;

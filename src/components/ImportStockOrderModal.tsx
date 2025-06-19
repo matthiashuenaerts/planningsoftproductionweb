@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
-import { projectService } from '@/services/dataService';
 import { Plus, Trash2 } from 'lucide-react';
 
 interface ImportStockOrderModalProps {
@@ -26,7 +25,6 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    supplier: '',
     orderDate: new Date().toISOString().split('T')[0],
     expectedDelivery: '',
     notes: ''
@@ -55,10 +53,10 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.supplier || !formData.expectedDelivery) {
+    if (!formData.expectedDelivery) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Please fill in the expected delivery date",
         variant: "destructive"
       });
       return;
@@ -78,33 +76,10 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
     setLoading(true);
 
     try {
-      // First, check if STOCK project exists, if not create it
-      let stockProject;
-      try {
-        const projects = await projectService.getAll();
-        stockProject = projects.find(p => p.name === 'STOCK');
-        
-        if (!stockProject) {
-          // Create STOCK project
-          stockProject = await projectService.create({
-            name: 'STOCK',
-            description: 'Stock orders not linked to specific projects',
-            start_date: new Date().toISOString().split('T')[0],
-            status: 'in_progress',
-            client: 'Internal Stock',
-            installation_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            progress: 0
-          });
-        }
-      } catch (error) {
-        console.error('Error handling STOCK project:', error);
-        throw new Error('Failed to create or find STOCK project');
-      }
-
-      // Create the stock order
+      // Create the stock order with supplier "STOCK" and no project_id
       const newOrder = await orderService.create({
-        project_id: stockProject.id,
-        supplier: formData.supplier,
+        project_id: null, // No project linking
+        supplier: 'STOCK',
         order_date: formData.orderDate,
         expected_delivery: formData.expectedDelivery,
         status: 'pending',
@@ -144,14 +119,13 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="supplier">Supplier *</Label>
+            <Label>Supplier</Label>
             <Input
-              id="supplier"
-              value={formData.supplier}
-              onChange={(e) => setFormData(prev => ({ ...prev, supplier: e.target.value }))}
-              placeholder="Enter supplier name"
-              required
+              value="STOCK"
+              disabled
+              className="bg-gray-50"
             />
+            <p className="text-sm text-muted-foreground mt-1">Stock orders are automatically assigned to supplier "STOCK"</p>
           </div>
           
           <div>
