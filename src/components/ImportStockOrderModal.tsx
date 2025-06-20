@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -25,6 +24,7 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
+    supplier: '',
     orderDate: new Date().toISOString().split('T')[0],
     expectedDelivery: '',
     notes: ''
@@ -53,6 +53,15 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.supplier.trim()) {
+      toast({
+        title: "Error",
+        description: "Please fill in the supplier name",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!formData.expectedDelivery) {
       toast({
         title: "Error",
@@ -76,10 +85,10 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
     setLoading(true);
 
     try {
-      // Create the stock order with supplier "STOCK" and no project_id
+      // Create the stock order with the provided supplier and no project_id
       const newOrder = await orderService.create({
         project_id: null, // No project linking
-        supplier: 'STOCK',
+        supplier: formData.supplier,
         order_date: formData.orderDate,
         expected_delivery: formData.expectedDelivery,
         status: 'pending',
@@ -119,13 +128,15 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label>Supplier</Label>
+            <Label htmlFor="supplier">Supplier *</Label>
             <Input
-              value="STOCK"
-              disabled
-              className="bg-gray-50"
+              id="supplier"
+              value={formData.supplier}
+              onChange={(e) => setFormData(prev => ({ ...prev, supplier: e.target.value }))}
+              placeholder="Enter supplier name"
+              required
             />
-            <p className="text-sm text-muted-foreground mt-1">Stock orders are automatically assigned to supplier "STOCK"</p>
+            <p className="text-sm text-muted-foreground mt-1">This order will be marked as a STOCK order without project linking</p>
           </div>
           
           <div>
