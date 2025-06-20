@@ -22,7 +22,8 @@ import {
   Paperclip,
   ArrowUpDown,
   Package,
-  Filter
+  Filter,
+  Trash2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
@@ -34,6 +35,17 @@ import { format } from 'date-fns';
 import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ImportStockOrderModal from '@/components/ImportStockOrderModal';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
@@ -53,6 +65,7 @@ const Orders: React.FC = () => {
   const [showImportStockModal, setShowImportStockModal] = useState(false);
   
   const isAdmin = currentEmployee?.role === 'admin';
+  const canDeleteOrder = currentEmployee?.role && ['admin', 'manager', 'preparater', 'teamleader'].includes(currentEmployee.role);
   
   useEffect(() => {
     const loadOrders = async () => {
@@ -286,6 +299,31 @@ const Orders: React.FC = () => {
     });
   };
   
+  const handleDeleteOrder = async (orderId: string) => {
+    try {
+      await orderService.delete(orderId);
+      
+      // Remove the order from local state
+      setOrders(prev => prev.filter(order => order.id !== orderId));
+      
+      // Clear expanded order if it's the one being deleted
+      if (expandedOrder === orderId) {
+        setExpandedOrder(null);
+      }
+      
+      toast({
+        title: "Success",
+        description: "Order deleted successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to delete order: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+  
   const filteredOrders = orders
     .filter(order => {
       // Search filter
@@ -449,6 +487,33 @@ const Orders: React.FC = () => {
                                   <FileText className="h-4 w-4" />
                                   <span className="sr-only">View Project Orders</span>
                                 </Button>
+                              )}
+                              {canDeleteOrder && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <Trash2 className="h-4 w-4" />
+                                      <span className="sr-only">Delete Order</span>
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete this order? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteOrder(order.id)}
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
                               )}
                               {isAdmin && (
                                 <select 
