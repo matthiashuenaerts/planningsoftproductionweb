@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -6,7 +5,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, ArrowLeft, Package, Trash2, Plus, Edit } from 'lucide-react';
+import { Clock, ArrowLeft, Package, Trash2, Plus, Edit, Camera } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -18,6 +17,7 @@ import { accessoriesService, Accessory } from '@/services/accessoriesService';
 import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
 import NewOrderModal from '@/components/NewOrderModal';
 import OrderEditModal from '@/components/OrderEditModal';
+import { DeliveryConfirmationModal } from '@/components/logistics/DeliveryConfirmationModal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -96,6 +96,8 @@ const ProjectOrders = () => {
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [showEditOrderModal, setShowEditOrderModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
 
@@ -173,7 +175,6 @@ const ProjectOrders = () => {
   };
 
   const handleAttachmentUpload = async () => {
-    // Refresh orders to show new attachments
     const updatedOrders = await Promise.all(
       orders.map(async (order) => {
         const attachments = await orderService.getOrderAttachments(order.id);
@@ -187,7 +188,6 @@ const ProjectOrders = () => {
     try {
       await orderService.deleteOrderAttachment(attachmentId);
       
-      // Update the order's attachments in state
       setOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === orderId 
@@ -211,7 +211,6 @@ const ProjectOrders = () => {
 
   const handleDeleteOrder = async (orderId: string, deleteAccessories: boolean = false) => {
     try {
-      // If deleteAccessories is true, delete linked accessories
       if (deleteAccessories) {
         const { data: linkedAccessories } = await supabase
           .from('accessories')
@@ -224,32 +223,27 @@ const ProjectOrders = () => {
           }
         }
       } else {
-        // Just unlink accessories from the order
         await supabase
           .from('accessories')
           .update({ order_id: null, status: 'to_check' })
           .eq('order_id', orderId);
       }
 
-      // Delete order items
       await supabase
         .from('order_items')
         .delete()
         .eq('order_id', orderId);
         
-      // Delete order steps
       await supabase
         .from('order_steps')
         .delete()
         .eq('order_id', orderId);
 
-      // Delete order attachments
       await supabase
         .from('order_attachments')
         .delete()
         .eq('order_id', orderId);
 
-      // Delete the order
       await supabase
         .from('orders')
         .delete()
@@ -279,6 +273,17 @@ const ProjectOrders = () => {
     fetchProjectOrders();
     setShowEditOrderModal(false);
     setSelectedOrderId(null);
+  };
+
+  const handleConfirmDelivery = (order: Order) => {
+    setSelectedOrderForDelivery(order);
+    setShowDeliveryModal(true);
+  };
+
+  const handleDeliveryConfirmed = () => {
+    fetchProjectOrders(); // Reload orders to show updated status
+    setShowDeliveryModal(false);
+    setSelectedOrderForDelivery(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -376,6 +381,16 @@ const ProjectOrders = () => {
                           </div>
                           <div className="flex items-center gap-2">
                             {getStatusBadge(order.status)}
+                            {order.status === 'pending' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleConfirmDelivery(order)}
+                                className="text-green-600 hover:text-green-700"
+                              >
+                                <Camera className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="outline"
                               size="sm"
@@ -557,6 +572,18 @@ const ProjectOrders = () => {
           onOpenChange={setShowEditOrderModal}
           orderId={selectedOrderId}
           onSuccess={handleOrderEditSuccess}
+        />
+      )}
+
+      {selectedOrderForDelivery && (
+        <DeliveryConfirmationModal
+          order={selectedOrderForDelivery}
+          isOpen={showDeliveryModal}
+          onClose={() => {
+            setShowDeliveryModal(false);
+            setSelectedOrderForDelivery(null);
+          }}
+          onConfirmed={handleDeliveryConfirmed}
         />
       )}
     </div>

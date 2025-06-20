@@ -23,7 +23,8 @@ import {
   ArrowUpDown,
   Package,
   Filter,
-  Trash2
+  Trash2,
+  Camera
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
@@ -35,6 +36,7 @@ import { format } from 'date-fns';
 import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ImportStockOrderModal from '@/components/ImportStockOrderModal';
+import { DeliveryConfirmationModal } from '@/components/logistics/DeliveryConfirmationModal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,6 +65,8 @@ const Orders: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState<string>('all');
   const [showImportStockModal, setShowImportStockModal] = useState(false);
+  const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   
   const isAdmin = currentEmployee?.role === 'admin';
   const canDeleteOrder = currentEmployee?.role && ['admin', 'manager', 'preparater', 'teamleader'].includes(currentEmployee.role);
@@ -323,6 +327,70 @@ const Orders: React.FC = () => {
       });
     }
   };
+
+  const handleConfirmDelivery = (order: Order) => {
+    setSelectedOrderForDelivery(order);
+    setShowDeliveryModal(true);
+  };
+
+  const handleDeliveryConfirmed = () => {
+    // Reload orders to show updated status
+    const loadOrders = async () => {
+      try {
+        setLoading(true);
+        
+        // Get all orders
+        const allOrders = await orderService.getAllOrders();
+
+        // Filter out semi-finished orders with no items (logistics out orders)
+        const ordersToDisplay = allOrders.filter(order => {
+          if (order.order_type === 'semi-finished') {
+            return order.order_items_count && order.order_items_count > 0;
+          }
+          return true;
+        });
+        
+        // Get project details for each order
+        const ordersWithProjectNames = await Promise.all(
+          ordersToDisplay.map(async (order) => {
+            let projectName = "STOCK Order";
+            
+            // Only fetch project name if project_id exists
+            if (order.project_id) {
+              try {
+                const project = await projectService.getById(order.project_id);
+                if (project) {
+                  projectName = project.name;
+                }
+              } catch (error) {
+                console.error("Error fetching project name:", error);
+                projectName = "Unknown Project";
+              }
+            }
+            
+            return {
+              ...order,
+              project_name: projectName
+            };
+          })
+        );
+        
+        setOrders(ordersWithProjectNames);
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: `Failed to load orders: ${error.message}`,
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadOrders();
+    setShowDeliveryModal(false);
+    setSelectedOrderForDelivery(null);
+  };
   
   const filteredOrders = orders
     .filter(order => {
@@ -478,6 +546,17 @@ const Orders: React.FC = () => {
                               {getStatusBadge(order.status)}
                             </TableCell>
                             <TableCell className="flex justify-end gap-2">
+                              {order.status === 'pending' && (
+                                <Button 
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleConfirmDelivery(order)}
+                                  className="text-green-600 hover:text-green-700"
+                                >
+                                  <Camera className="h-4 w-4" />
+                                  <span className="sr-only">Confirm Delivery</span>
+                                </Button>
+                              )}
                               {order.project_id && (
                                 <Button 
                                   variant="ghost"
@@ -635,6 +714,18 @@ const Orders: React.FC = () => {
         <ImportStockOrderModal 
           onClose={() => setShowImportStockModal(false)}
           onImportSuccess={handleStockOrderImported}
+        />
+      )}
+
+      {selectedOrderForDelivery && (
+        <DeliveryConfirmationModal
+          order={selectedOrderForDelivery}
+          isOpen={showDeliveryModal}
+          onClose={() => {
+            setShowDeliveryModal(false);
+            setSelectedOrderForDelivery(null);
+          }}
+          onConfirmed={handleDeliveryConfirmed}
         />
       )}
     </div>
