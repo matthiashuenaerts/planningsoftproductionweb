@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
@@ -13,6 +12,7 @@ import { Check, Clock, UserCheck, ListChecks, File as FileIcon } from 'lucide-re
 import { supabase } from '@/integrations/supabase/client';
 import RushOrderChat from './RushOrderChat';
 import { useLanguage } from '@/context/LanguageContext';
+import ImageModal from '@/components/ui/image-modal';
 
 interface RushOrderDetailProps {
   rushOrderId: string;
@@ -22,6 +22,7 @@ interface RushOrderDetailProps {
 const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatusChange }) => {
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
   const { t } = useLanguage();
   
   const { data: rushOrder, isLoading, error, refetch } = useQuery({
@@ -163,7 +164,8 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
                   <img 
                     src={rushOrder.image_url} 
                     alt={rushOrder.title} 
-                    className="w-full h-auto max-h-96 object-contain"
+                    className="w-full h-auto max-h-96 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => setShowImageModal(true)}
                   />
                 ) : (
                   <a 
@@ -276,9 +278,18 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
       
       {/* Rush Order Chat */}
       <RushOrderChat rushOrderId={rushOrderId} />
+      
+      {/* Fullscreen Image Modal */}
+      {rushOrder.image_url && isImage(rushOrder.image_url) && (
+        <ImageModal
+          src={rushOrder.image_url}
+          alt={rushOrder.title}
+          isOpen={showImageModal}
+          onClose={() => setShowImageModal(false)}
+        />
+      )}
     </div>
   );
 };
 
 export default RushOrderDetail;
-
