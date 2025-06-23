@@ -120,8 +120,6 @@ export const projectService = {
   
   async delete(id: string): Promise<void> {
     try {
-      console.log(`Starting deletion of project ${id}`);
-      
       // Get all phases for this project
       const { data: phases, error: phasesError } = await supabase
         .from('phases')
@@ -130,11 +128,11 @@ export const projectService = {
       
       if (phasesError) throw phasesError;
 
-      // Delete all data associated with phases and tasks
+      // Delete all tasks associated with these phases
       if (phases && phases.length > 0) {
         const phaseIds = phases.map(phase => phase.id);
         
-        // Get all tasks for these phases
+        // Delete task-workstation links first
         const { data: tasks, error: tasksError } = await supabase
           .from('tasks')
           .select('id')
@@ -145,224 +143,47 @@ export const projectService = {
         if (tasks && tasks.length > 0) {
           const taskIds = tasks.map(task => task.id);
           
-          // STEP 1: Delete time registrations for these tasks FIRST
-          console.log('Deleting time registrations...');
-          const { error: timeRegError } = await supabase
-            .from('time_registrations')
-            .delete()
-            .in('task_id', taskIds);
-          
-          if (timeRegError) {
-            console.error('Error deleting time registrations:', timeRegError);
-            throw timeRegError;
-          }
-
-          // STEP 2: Delete time registrations for workstation tasks that might reference these task IDs
-          const { error: workstationTimeRegError } = await supabase
-            .from('time_registrations')
-            .delete()
-            .in('workstation_task_id', taskIds);
-          
-          if (workstationTimeRegError) {
-            console.error('Error deleting workstation time registrations:', workstationTimeRegError);
-            // Don't throw here as workstation_task_id might not match regular task IDs
-          }
-          
-          // STEP 3: Delete schedules associated with tasks
-          console.log('Deleting task schedules...');
-          const { error: schedulesError } = await supabase
-            .from('schedules')
-            .delete()
-            .in('task_id', taskIds);
-          
-          if (schedulesError && schedulesError.code !== '42P01') {
-            console.error('Error deleting schedules:', schedulesError);
-            throw schedulesError;
-          }
-          
-          // STEP 4: Delete task-workstation links
-          console.log('Deleting task workstation links...');
+          // Delete task_workstation_links
           const { error: linksError } = await supabase
             .from('task_workstation_links')
             .delete()
             .in('task_id', taskIds);
           
-          if (linksError) {
-            console.error('Error deleting task workstation links:', linksError);
-            throw linksError;
-          }
+          if (linksError) throw linksError;
           
-          // STEP 5: Delete rush order task links
-          console.log('Deleting rush order task links...');
-          const { error: rushTaskLinksError } = await supabase
-            .from('rush_order_task_links')
+          // Delete schedules associated with tasks
+          const { error: schedulesError } = await supabase
+            .from('schedules')
             .delete()
             .in('task_id', taskIds);
           
-          if (rushTaskLinksError) {
-            console.error('Error deleting rush order task links:', rushTaskLinksError);
-            throw rushTaskLinksError;
-          }
+          if (schedulesError && schedulesError.code !== '42P01') throw schedulesError;
           
-          // STEP 6: Delete parts lists associated with tasks
-          console.log('Deleting task parts lists...');
-          const { error: partsListsError } = await supabase
-            .from('parts_lists')
-            .delete()
-            .in('task_id', taskIds);
-          
-          if (partsListsError) {
-            console.error('Error deleting parts lists:', partsListsError);
-            throw partsListsError;
-          }
-          
-          // STEP 7: NOW Delete tasks (after all references are gone)
-          console.log('Deleting tasks...');
+          // Delete tasks
           const { error: deleteTasksError } = await supabase
             .from('tasks')
             .delete()
             .in('phase_id', phaseIds);
           
-          if (deleteTasksError) {
-            console.error('Error deleting tasks:', deleteTasksError);
-            throw deleteTasksError;
-          }
+          if (deleteTasksError) throw deleteTasksError;
         }
         
-        // STEP 8: Delete schedules associated with phases
-        console.log('Deleting phase schedules...');
-        const { error: phaseSchedulesError } = await supabase
-          .from('schedules')
-          .delete()
-          .in('phase_id', phaseIds);
-        
-        if (phaseSchedulesError && phaseSchedulesError.code !== '42P01') {
-          console.error('Error deleting phase schedules:', phaseSchedulesError);
-          throw phaseSchedulesError;
-        }
-        
-        // STEP 9: Delete phases
-        console.log('Deleting phases...');
+        // Delete phases
         const { error: deletePhasesError } = await supabase
           .from('phases')
           .delete()
           .eq('project_id', id);
         
-        if (deletePhasesError) {
-          console.error('Error deleting phases:', deletePhasesError);
-          throw deletePhasesError;
-        }
+        if (deletePhasesError) throw deletePhasesError;
       }
       
-      // STEP 10: Delete broken parts associated with this project
-      console.log('Deleting broken parts...');
-      const { error: brokenPartsError } = await supabase
-        .from('broken_parts')
-        .delete()
-        .eq('project_id', id);
-      
-      if (brokenPartsError) {
-        console.error('Error deleting broken parts:', brokenPartsError);
-        throw brokenPartsError;
-      }
-      
-      // STEP 11: Delete accessories associated with this project
-      console.log('Deleting accessories...');
-      const { error: accessoriesError } = await supabase
-        .from('accessories')
-        .delete()
-        .eq('project_id', id);
-      
-      if (accessoriesError) {
-        console.error('Error deleting accessories:', accessoriesError);
-        throw accessoriesError;
-      }
-      
-      // STEP 12: Delete parts lists directly associated with this project
-      console.log('Deleting project parts lists...');
-      const { data: projectPartsList, error: projectPartsListError } = await supabase
-        .from('parts_lists')
-        .select('id')
-        .eq('project_id', id);
-      
-      if (projectPartsListError) {
-        console.error('Error fetching project parts lists:', projectPartsListError);
-        throw projectPartsListError;
-      }
-      
-      if (projectPartsList && projectPartsList.length > 0) {
-        const partsListIds = projectPartsList.map(pl => pl.id);
-        
-        // Delete parts associated with these parts lists
-        const { error: partsError } = await supabase
-          .from('parts')
-          .delete()
-          .in('parts_list_id', partsListIds);
-        
-        if (partsError) {
-          console.error('Error deleting parts:', partsError);
-          throw partsError;
-        }
-        
-        // Delete the parts lists
-        const { error: deletePartsListsError } = await supabase
-          .from('parts_lists')
-          .delete()
-          .eq('project_id', id);
-        
-        if (deletePartsListsError) {
-          console.error('Error deleting project parts lists:', deletePartsListsError);
-          throw deletePartsListsError;
-        }
-      }
-      
-      // STEP 13: Delete project team assignments
-      console.log('Deleting project team assignments...');
-      const { error: teamAssignmentsError } = await supabase
-        .from('project_team_assignments')
-        .delete()
-        .eq('project_id', id);
-      
-      if (teamAssignmentsError) {
-        console.error('Error deleting project team assignments:', teamAssignmentsError);
-        throw teamAssignmentsError;
-      }
-      
-      // STEP 14: Delete project truck assignments
-      console.log('Deleting project truck assignments...');
-      const { error: truckAssignmentsError } = await supabase
-        .from('project_truck_assignments')
-        .delete()
-        .eq('project_id', id);
-      
-      if (truckAssignmentsError) {
-        console.error('Error deleting project truck assignments:', truckAssignmentsError);
-        throw truckAssignmentsError;
-      }
-      
-      // STEP 15: Delete project OneDrive configurations
-      console.log('Deleting project OneDrive configs...');
-      const { error: onedriveConfigsError } = await supabase
-        .from('project_onedrive_configs')
-        .delete()
-        .eq('project_id', id);
-      
-      if (onedriveConfigsError) {
-        console.error('Error deleting project OneDrive configs:', onedriveConfigsError);
-        throw onedriveConfigsError;
-      }
-      
-      // STEP 16: Delete all orders and their associated data
-      console.log('Deleting orders and related data...');
+      // Get all orders for this project
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('id')
         .eq('project_id', id);
       
-      if (ordersError) {
-        console.error('Error fetching orders:', ordersError);
-        throw ordersError;
-      }
+      if (ordersError) throw ordersError;
       
       // Delete all orders and their associated items and attachments
       if (orders && orders.length > 0) {
@@ -373,21 +194,7 @@ export const projectService = {
             .delete()
             .eq('order_id', order.id);
           
-          if (itemsError) {
-            console.error('Error deleting order items:', itemsError);
-            throw itemsError;
-          }
-          
-          // Delete order steps
-          const { error: stepsError } = await supabase
-            .from('order_steps')
-            .delete()
-            .eq('order_id', order.id);
-          
-          if (stepsError) {
-            console.error('Error deleting order steps:', stepsError);
-            throw stepsError;
-          }
+          if (itemsError) throw itemsError;
           
           // Get all attachments for this order
           const { data: attachments, error: attachmentsError } = await supabase
@@ -395,10 +202,7 @@ export const projectService = {
             .select('id, file_name, order_id')
             .eq('order_id', order.id);
           
-          if (attachmentsError && attachmentsError.code !== '42P01') {
-            console.error('Error fetching order attachments:', attachmentsError);
-            throw attachmentsError;
-          }
+          if (attachmentsError && attachmentsError.code !== '42P01') throw attachmentsError;
           
           // Delete all attachment files from storage
           if (attachments && attachments.length > 0) {
@@ -409,10 +213,7 @@ export const projectService = {
                 .from('order-attachments')
                 .remove([filePath]);
               
-              if (storageError) {
-                console.error("Error removing file from storage:", storageError);
-                // Don't throw here as storage might not exist
-              }
+              if (storageError) console.error("Error removing file from storage:", storageError);
             }
             
             // Delete attachment records
@@ -421,10 +222,7 @@ export const projectService = {
               .delete()
               .eq('order_id', order.id);
             
-            if (deleteAttachmentsError && deleteAttachmentsError.code !== '42P01') {
-              console.error('Error deleting order attachments:', deleteAttachmentsError);
-              throw deleteAttachmentsError;
-            }
+            if (deleteAttachmentsError && deleteAttachmentsError.code !== '42P01') throw deleteAttachmentsError;
           }
         }
         
@@ -434,111 +232,21 @@ export const projectService = {
           .delete()
           .eq('project_id', id);
         
-        if (deleteOrdersError) {
-          console.error('Error deleting orders:', deleteOrdersError);
-          throw deleteOrdersError;
-        }
+        if (deleteOrdersError) throw deleteOrdersError;
       }
       
-      // STEP 17: Delete rush orders and their associated data for this project
-      console.log('Deleting rush orders and related data...');
-      // First, we need to find rush orders that might be related to this project through rush_order_task_links
-      const { data: rushOrderTaskLinks, error: rushOrderTaskLinksError } = await supabase
-        .from('rush_order_task_links')
-        .select(`
-          rush_order_id,
-          tasks!inner(
-            phase_id,
-            phases!inner(project_id)
-          )
-        `)
-        .eq('tasks.phases.project_id', id);
-      
-      if (rushOrderTaskLinksError) {
-        console.error('Error fetching rush order task links:', rushOrderTaskLinksError);
-        // Don't throw here as this is just for cleanup
-      }
-      
-      if (rushOrderTaskLinks && rushOrderTaskLinks.length > 0) {
-        const rushOrderIds = [...new Set(rushOrderTaskLinks.map(link => link.rush_order_id))];
-        
-        for (const rushOrderId of rushOrderIds) {
-          // Delete rush order assignments
-          const { error: rushAssignmentsError } = await supabase
-            .from('rush_order_assignments')
-            .delete()
-            .eq('rush_order_id', rushOrderId);
-          
-          if (rushAssignmentsError) {
-            console.error('Error deleting rush order assignments:', rushAssignmentsError);
-            throw rushAssignmentsError;
-          }
-          
-          // Delete rush order messages
-          const { error: rushMessagesError } = await supabase
-            .from('rush_order_messages')
-            .delete()
-            .eq('rush_order_id', rushOrderId);
-          
-          if (rushMessagesError) {
-            console.error('Error deleting rush order messages:', rushMessagesError);
-            throw rushMessagesError;
-          }
-          
-          // Delete rush order tasks
-          const { error: rushTasksError } = await supabase
-            .from('rush_order_tasks')
-            .delete()
-            .eq('rush_order_id', rushOrderId);
-          
-          if (rushTasksError) {
-            console.error('Error deleting rush order tasks:', rushTasksError);
-            throw rushTasksError;
-          }
-          
-          // Delete notifications related to this rush order
-          const { error: notificationsError } = await supabase
-            .from('notifications')
-            .delete()
-            .eq('rush_order_id', rushOrderId);
-          
-          if (notificationsError) {
-            console.error('Error deleting rush order notifications:', notificationsError);
-            throw notificationsError;
-          }
-          
-          // Delete the rush order itself
-          const { error: rushOrderError } = await supabase
-            .from('rush_orders')
-            .delete()
-            .eq('id', rushOrderId);
-          
-          if (rushOrderError) {
-            console.error('Error deleting rush order:', rushOrderError);
-            throw rushOrderError;
-          }
-        }
-      }
-      
-      // STEP 18: Finally delete the project itself
-      console.log('Deleting project...');
+      // Finally delete the project itself
       const { error } = await supabase
         .from('projects')
         .delete()
         .eq('id', id);
       
-      if (error) {
-        console.error('Error deleting project:', error);
-        throw error;
-      }
-      
-      console.log(`Successfully deleted project ${id} and all related data`);
+      if (error) throw error;
     } catch (error) {
       console.error("Error deleting project:", error);
       throw error;
     }
-  },
-  
+  }
 };
 
 // Phase service functions
