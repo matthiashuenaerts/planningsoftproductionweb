@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { standardTasksService } from "./standardTasksService";
 
@@ -145,13 +146,17 @@ export const projectService = {
         if (tasks && tasks.length > 0) {
           const taskIds = tasks.map(task => task.id);
           
-          // Delete time registrations for these tasks
+          // FIRST: Delete time registrations for these tasks (this was the issue!)
+          console.log('Deleting time registrations...');
           const { error: timeRegError } = await supabase
             .from('time_registrations')
             .delete()
             .in('task_id', taskIds);
           
-          if (timeRegError) console.error('Error deleting time registrations:', timeRegError);
+          if (timeRegError) {
+            console.error('Error deleting time registrations:', timeRegError);
+            throw timeRegError;
+          }
           
           // Delete schedules associated with tasks
           const { error: schedulesError } = await supabase
@@ -185,7 +190,8 @@ export const projectService = {
           
           if (partsListsError) console.error('Error deleting parts lists:', partsListsError);
           
-          // Delete tasks
+          // NOW: Delete tasks (after time registrations are gone)
+          console.log('Deleting tasks...');
           const { error: deleteTasksError } = await supabase
             .from('tasks')
             .delete()
