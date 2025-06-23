@@ -262,8 +262,18 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         const durationText = task.duration ? ` (${task.duration} min)` : '';
         const taskName = `${task.id} - ${task.name}${durationText}`;
         
-        // Find the workstation ID for this task
-        const workstationId = findWorkstationIdByName(task.workstation);
+        // Simple mapping of workstations to standard categories
+        let workstationType: 'CUTTING' | 'WELDING' | 'PAINTING' | 'ASSEMBLY' | 'PACKAGING' | 'SHIPPING' = 'ASSEMBLY';
+        
+        if (task.workstation.toLowerCase().includes('zaag')) {
+          workstationType = 'CUTTING';
+        } else if (task.workstation.toLowerCase().includes('cnc')) {
+          workstationType = 'CUTTING';
+        } else if (task.workstation.toLowerCase().includes('pers')) {
+          workstationType = 'ASSEMBLY';
+        } else if (task.workstation.toLowerCase().includes('productie')) {
+          workstationType = 'ASSEMBLY';
+        }
         
         // Create task description with duration and workstation info
         const taskDescription = `Duration: ${task.duration || 60} minutes\n${task.workstation ? `Workstation: ${task.workstation}` : ''}`;
@@ -282,23 +292,24 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
           }
         }
         
-        // Create the task with workstation ID instead of workstation type
+        // Create the task with duration and calculated due date
         const newTask = await taskService.create({
           phase_id: phase.id,
           assignee_id: null,
           title: taskName,
           description: taskDescription,
-          workstation: workstationId || 'ASSEMBLY', // Use workstation ID or fallback to type
+          workstation: workstationType,
           status: initialStatus,
           priority: index < 5 ? 'High' : index < 15 ? 'Medium' : 'Low',
           due_date: format(dueDate, 'yyyy-MM-dd'),
           standard_task_id: task.standard_task_id || null,
-          duration: task.duration || 60
+          duration: task.duration || 60 // Save the calculated duration
         });
         
         createdTasks.push(newTask);
         
-        // Link task to workstation if we have a workstation ID
+        // Link task to workstation if we can find a matching workstation
+        const workstationId = findWorkstationIdByName(task.workstation);
         if (workstationId && newTask.id) {
           try {
             await workstationService.linkTaskToWorkstation(newTask.id, workstationId);
