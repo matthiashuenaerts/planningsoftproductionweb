@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -25,6 +25,7 @@ import OneDriveIntegration from '@/components/OneDriveIntegration';
 import NewOrderModal from '@/components/NewOrderModal';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { AccessoriesDialog } from '@/components/AccessoriesDialog';
+import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
@@ -43,6 +44,7 @@ const ProjectDetails = () => {
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [showPartsListDialog, setShowPartsListDialog] = useState(false);
   const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
+  const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
   const { currentEmployee } = useAuth();
   const { t, lang, createLocalizedPath } = useLanguage();
 
@@ -519,6 +521,19 @@ const ProjectDetails = () => {
                   </div>
 
                   <div className="space-y-2">
+                    <h4 className="text-sm font-medium">{t('project_barcode')}</h4>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setShowBarcodeDialog(true)}
+                      className="w-full"
+                    >
+                      <Barcode className="mr-2 h-4 w-4" />
+                      {t('view_barcode', 'View Barcode')}
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
                     <h4 className="text-sm font-medium">{t('orders_and_accessories')}</h4>
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div className="bg-orange-50 p-2 rounded">
@@ -656,6 +671,14 @@ const ProjectDetails = () => {
         open={showAccessoriesDialog}
         onOpenChange={setShowAccessoriesDialog}
         projectId={projectId!}
+      />
+
+      {/* Project Barcode Dialog */}
+      <ProjectBarcodeDialog
+        isOpen={showBarcodeDialog}
+        onClose={() => setShowBarcodeDialog(false)}
+        projectId={projectId!}
+        projectName={project?.name || ''}
       />
     </div>
   );
