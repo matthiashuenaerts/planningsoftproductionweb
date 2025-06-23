@@ -120,6 +120,8 @@ export const projectService = {
   
   async delete(id: string): Promise<void> {
     try {
+      console.log(`Starting deletion of project ${id}`);
+      
       // Get all phases for this project
       const { data: phases, error: phasesError } = await supabase
         .from('phases')
@@ -128,11 +130,11 @@ export const projectService = {
       
       if (phasesError) throw phasesError;
 
-      // Delete all tasks associated with these phases
+      // Delete all data associated with phases and tasks
       if (phases && phases.length > 0) {
         const phaseIds = phases.map(phase => phase.id);
         
-        // Delete task-workstation links first
+        // Get all tasks for these phases
         const { data: tasks, error: tasksError } = await supabase
           .from('tasks')
           .select('id')
@@ -143,13 +145,13 @@ export const projectService = {
         if (tasks && tasks.length > 0) {
           const taskIds = tasks.map(task => task.id);
           
-          // Delete task_workstation_links
-          const { error: linksError } = await supabase
-            .from('task_workstation_links')
+          // Delete time registrations for these tasks
+          const { error: timeRegError } = await supabase
+            .from('time_registrations')
             .delete()
             .in('task_id', taskIds);
           
-          if (linksError) throw linksError;
+          if (timeRegError) console.error('Error deleting time registrations:', timeRegError);
           
           // Delete schedules associated with tasks
           const { error: schedulesError } = await supabase
@@ -157,7 +159,31 @@ export const projectService = {
             .delete()
             .in('task_id', taskIds);
           
-          if (schedulesError && schedulesError.code !== '42P01') throw schedulesError;
+          if (schedulesError && schedulesError.code !== '42P01') console.error('Error deleting schedules:', schedulesError);
+          
+          // Delete task-workstation links
+          const { error: linksError } = await supabase
+            .from('task_workstation_links')
+            .delete()
+            .in('task_id', taskIds);
+          
+          if (linksError) console.error('Error deleting task workstation links:', linksError);
+          
+          // Delete rush order task links
+          const { error: rushTaskLinksError } = await supabase
+            .from('rush_order_task_links')
+            .delete()
+            .in('task_id', taskIds);
+          
+          if (rushTaskLinksError) console.error('Error deleting rush order task links:', rushTaskLinksError);
+          
+          // Delete parts lists associated with tasks
+          const { error: partsListsError } = await supabase
+            .from('parts_lists')
+            .delete()
+            .in('task_id', taskIds);
+          
+          if (partsListsError) console.error('Error deleting parts lists:', partsListsError);
           
           // Delete tasks
           const { error: deleteTasksError } = await supabase
@@ -168,6 +194,14 @@ export const projectService = {
           if (deleteTasksError) throw deleteTasksError;
         }
         
+        // Delete schedules associated with phases
+        const { error: phaseSchedulesError } = await supabase
+          .from('schedules')
+          .delete()
+          .in('phase_id', phaseIds);
+        
+        if (phaseSchedulesError && phaseSchedulesError.code !== '42P01') console.error('Error deleting phase schedules:', phaseSchedulesError);
+        
         // Delete phases
         const { error: deletePhasesError } = await supabase
           .from('phases')
@@ -176,6 +210,74 @@ export const projectService = {
         
         if (deletePhasesError) throw deletePhasesError;
       }
+      
+      // Delete broken parts associated with this project
+      const { error: brokenPartsError } = await supabase
+        .from('broken_parts')
+        .delete()
+        .eq('project_id', id);
+      
+      if (brokenPartsError) console.error('Error deleting broken parts:', brokenPartsError);
+      
+      // Delete accessories associated with this project
+      const { error: accessoriesError } = await supabase
+        .from('accessories')
+        .delete()
+        .eq('project_id', id);
+      
+      if (accessoriesError) console.error('Error deleting accessories:', accessoriesError);
+      
+      // Delete parts lists directly associated with this project
+      const { data: projectPartsList, error: projectPartsListError } = await supabase
+        .from('parts_lists')
+        .select('id')
+        .eq('project_id', id);
+      
+      if (projectPartsListError) console.error('Error fetching project parts lists:', projectPartsListError);
+      
+      if (projectPartsList && projectPartsList.length > 0) {
+        const partsListIds = projectPartsList.map(pl => pl.id);
+        
+        // Delete parts associated with these parts lists
+        const { error: partsError } = await supabase
+          .from('parts')
+          .delete()
+          .in('parts_list_id', partsListIds);
+        
+        if (partsError) console.error('Error deleting parts:', partsError);
+        
+        // Delete the parts lists
+        const { error: deletePartsListsError } = await supabase
+          .from('parts_lists')
+          .delete()
+          .eq('project_id', id);
+        
+        if (deletePartsListsError) console.error('Error deleting project parts lists:', deletePartsListsError);
+      }
+      
+      // Delete project team assignments
+      const { error: teamAssignmentsError } = await supabase
+        .from('project_team_assignments')
+        .delete()
+        .eq('project_id', id);
+      
+      if (teamAssignmentsError) console.error('Error deleting project team assignments:', teamAssignmentsError);
+      
+      // Delete project truck assignments
+      const { error: truckAssignmentsError } = await supabase
+        .from('project_truck_assignments')
+        .delete()
+        .eq('project_id', id);
+      
+      if (truckAssignmentsError) console.error('Error deleting project truck assignments:', truckAssignmentsError);
+      
+      // Delete project OneDrive configurations
+      const { error: onedriveConfigsError } = await supabase
+        .from('project_onedrive_configs')
+        .delete()
+        .eq('project_id', id);
+      
+      if (onedriveConfigsError) console.error('Error deleting project OneDrive configs:', onedriveConfigsError);
       
       // Get all orders for this project
       const { data: orders, error: ordersError } = await supabase
@@ -194,7 +296,15 @@ export const projectService = {
             .delete()
             .eq('order_id', order.id);
           
-          if (itemsError) throw itemsError;
+          if (itemsError) console.error('Error deleting order items:', itemsError);
+          
+          // Delete order steps
+          const { error: stepsError } = await supabase
+            .from('order_steps')
+            .delete()
+            .eq('order_id', order.id);
+          
+          if (stepsError) console.error('Error deleting order steps:', stepsError);
           
           // Get all attachments for this order
           const { data: attachments, error: attachmentsError } = await supabase
@@ -202,7 +312,7 @@ export const projectService = {
             .select('id, file_name, order_id')
             .eq('order_id', order.id);
           
-          if (attachmentsError && attachmentsError.code !== '42P01') throw attachmentsError;
+          if (attachmentsError && attachmentsError.code !== '42P01') console.error('Error fetching order attachments:', attachmentsError);
           
           // Delete all attachment files from storage
           if (attachments && attachments.length > 0) {
@@ -222,7 +332,7 @@ export const projectService = {
               .delete()
               .eq('order_id', order.id);
             
-            if (deleteAttachmentsError && deleteAttachmentsError.code !== '42P01') throw deleteAttachmentsError;
+            if (deleteAttachmentsError && deleteAttachmentsError.code !== '42P01') console.error('Error deleting order attachments:', deleteAttachmentsError);
           }
         }
         
@@ -235,6 +345,67 @@ export const projectService = {
         if (deleteOrdersError) throw deleteOrdersError;
       }
       
+      // Delete rush orders and their associated data for this project
+      // First, we need to find rush orders that might be related to this project through rush_order_task_links
+      const { data: rushOrderTaskLinks, error: rushOrderTaskLinksError } = await supabase
+        .from('rush_order_task_links')
+        .select(`
+          rush_order_id,
+          tasks!inner(
+            phase_id,
+            phases!inner(project_id)
+          )
+        `)
+        .eq('tasks.phases.project_id', id);
+      
+      if (rushOrderTaskLinksError) console.error('Error fetching rush order task links:', rushOrderTaskLinksError);
+      
+      if (rushOrderTaskLinks && rushOrderTaskLinks.length > 0) {
+        const rushOrderIds = [...new Set(rushOrderTaskLinks.map(link => link.rush_order_id))];
+        
+        for (const rushOrderId of rushOrderIds) {
+          // Delete rush order assignments
+          const { error: rushAssignmentsError } = await supabase
+            .from('rush_order_assignments')
+            .delete()
+            .eq('rush_order_id', rushOrderId);
+          
+          if (rushAssignmentsError) console.error('Error deleting rush order assignments:', rushAssignmentsError);
+          
+          // Delete rush order messages
+          const { error: rushMessagesError } = await supabase
+            .from('rush_order_messages')
+            .delete()
+            .eq('rush_order_id', rushOrderId);
+          
+          if (rushMessagesError) console.error('Error deleting rush order messages:', rushMessagesError);
+          
+          // Delete rush order tasks
+          const { error: rushTasksError } = await supabase
+            .from('rush_order_tasks')
+            .delete()
+            .eq('rush_order_id', rushOrderId);
+          
+          if (rushTasksError) console.error('Error deleting rush order tasks:', rushTasksError);
+          
+          // Delete notifications related to this rush order
+          const { error: notificationsError } = await supabase
+            .from('notifications')
+            .delete()
+            .eq('rush_order_id', rushOrderId);
+          
+          if (notificationsError) console.error('Error deleting rush order notifications:', notificationsError);
+          
+          // Delete the rush order itself
+          const { error: rushOrderError } = await supabase
+            .from('rush_orders')
+            .delete()
+            .eq('id', rushOrderId);
+          
+          if (rushOrderError) console.error('Error deleting rush order:', rushOrderError);
+        }
+      }
+      
       // Finally delete the project itself
       const { error } = await supabase
         .from('projects')
@@ -242,11 +413,14 @@ export const projectService = {
         .eq('id', id);
       
       if (error) throw error;
+      
+      console.log(`Successfully deleted project ${id} and all related data`);
     } catch (error) {
       console.error("Error deleting project:", error);
       throw error;
     }
-  }
+  },
+  
 };
 
 // Phase service functions
