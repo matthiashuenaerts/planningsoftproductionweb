@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { workstationService } from '@/services/workstationService';
 import { workstationTasksService, WorkstationTask } from '@/services/workstationTasksService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
-import { ArrowLeft, Package, FileText, PackagePlus, Edit, ListCheck, PackageX, Calendar, ListOrdered, CalendarArrowDown, MoreVertical, Play } from 'lucide-react';
+import { ArrowLeft, Package, FileText, PackagePlus, Edit, ListCheck, PackageX, Calendar, ListOrdered, CalendarArrowDown, MoreVertical, Play, Wrench, Cog, Factory, Truck, Hammer, Scissors, Drill, Saw, Package2, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
@@ -65,20 +65,28 @@ const Workstations: React.FC = () => {
     loadWorkstations();
   }, [toast, t]);
 
-  // Function to get icon based on workstation name
+  // Function to get icon based on workstation name (Dutch names)
   const getWorkstationIcon = (name: string) => {
     const lowercaseName = name.toLowerCase();
-    if (lowercaseName.includes('cnc')) return <FileText className="h-8 w-8" />;
-    if (lowercaseName.includes('assembly')) return <Package className="h-8 w-8" />;
-    if (lowercaseName.includes('warehouse')) return <PackagePlus className="h-8 w-8" />;
-    if (lowercaseName.includes('cutting')) return <Edit className="h-8 w-8" />;
-    if (lowercaseName.includes('quality')) return <ListCheck className="h-8 w-8" />;
-    if (lowercaseName.includes('packaging')) return <PackageX className="h-8 w-8" />;
-    if (lowercaseName.includes('planning')) return <Calendar className="h-8 w-8" />;
-    if (lowercaseName.includes('production')) return <ListOrdered className="h-8 w-8" />;
-
-    // Default icon
-    return <CalendarArrowDown className="h-8 w-8" />;
+    
+    // Dutch workstation names mapping
+    if (lowercaseName.includes('cnc') || lowercaseName.includes('numeriek')) return <Cog className="h-8 w-8" />;
+    if (lowercaseName.includes('montage') || lowercaseName.includes('assemblage')) return <Wrench className="h-8 w-8" />;
+    if (lowercaseName.includes('magazijn') || lowercaseName.includes('opslag')) return <Package2 className="h-8 w-8" />;
+    if (lowercaseName.includes('snij') || lowercaseName.includes('zaag')) return <Scissors className="h-8 w-8" />;
+    if (lowercaseName.includes('kwaliteit') || lowercaseName.includes('controle')) return <ListCheck className="h-8 w-8" />;
+    if (lowercaseName.includes('verpakking') || lowercaseName.includes('inpak')) return <PackageX className="h-8 w-8" />;
+    if (lowercaseName.includes('planning') || lowercaseName.includes('schema')) return <Calendar className="h-8 w-8" />;
+    if (lowercaseName.includes('productie') || lowercaseName.includes('fabricage')) return <Factory className="h-8 w-8" />;
+    if (lowercaseName.includes('boor') || lowercaseName.includes('drill')) return <Drill className="h-8 w-8" />;
+    if (lowercaseName.includes('zaag') || lowercaseName.includes('snij')) return <Saw className="h-8 w-8" />;
+    if (lowercaseName.includes('las') || lowercaseName.includes('weld')) return <Zap className="h-8 w-8" />;
+    if (lowercaseName.includes('transport') || lowercaseName.includes('verzend')) return <Truck className="h-8 w-8" />;
+    if (lowercaseName.includes('hamer') || lowercaseName.includes('smeed')) return <Hammer className="h-8 w-8" />;
+    if (lowercaseName.includes('bewerk') || lowercaseName.includes('machin')) return <Cog className="h-8 w-8" />;
+    
+    // Default icon for unmatched workstations
+    return <Factory className="h-8 w-8" />;
   };
   const loadWorkstationTasks = async (workstationId: string) => {
     try {
