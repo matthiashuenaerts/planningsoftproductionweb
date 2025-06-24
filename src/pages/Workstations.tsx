@@ -10,23 +10,24 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { workstationService } from '@/services/workstationService';
 import { workstationTasksService, WorkstationTask } from '@/services/workstationTasksService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
-import { ArrowLeft, Package, FileText, PackagePlus, Edit, ListCheck, PackageX, Calendar, ListOrdered, CalendarArrowDown, MoreVertical, Play } from 'lucide-react';
+import { ArrowLeft, MoreVertical, Play, ListCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '@/context/LanguageContext';
 
-// Define workstation with appropriate icon mapping
-interface WorkstationWithIcon {
+// Define workstation with appropriate image mapping
+interface WorkstationWithImage {
   id: string;
   name: string;
   description: string | null;
-  icon: React.ReactNode;
+  image: string;
 }
+
 const Workstations: React.FC = () => {
   const [selectedWorkstation, setSelectedWorkstation] = useState<string | null>(null);
-  const [workstations, setWorkstations] = useState<WorkstationWithIcon[]>([]);
+  const [workstations, setWorkstations] = useState<WorkstationWithImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [showWorkstationTasks, setShowWorkstationTasks] = useState<string | null>(null);
   const [workstationTasks, setWorkstationTasks] = useState<WorkstationTask[]>([]);
@@ -39,19 +40,20 @@ const Workstations: React.FC = () => {
   } = useAuth();
   const queryClient = useQueryClient();
   const { t } = useLanguage();
+
   useEffect(() => {
     const loadWorkstations = async () => {
       try {
         const data = await workstationService.getAll();
 
-        // Map workstations to include icons
-        const workstationsWithIcons = data.map(ws => {
+        // Map workstations to include images
+        const workstationsWithImages = data.map(ws => {
           return {
             ...ws,
-            icon: getWorkstationIcon(ws.name)
+            image: getWorkstationImage(ws.name)
           };
         });
-        setWorkstations(workstationsWithIcons);
+        setWorkstations(workstationsWithImages);
       } catch (error: any) {
         toast({
           title: t('error'),
@@ -65,21 +67,46 @@ const Workstations: React.FC = () => {
     loadWorkstations();
   }, [toast, t]);
 
-  // Function to get icon based on workstation name
-  const getWorkstationIcon = (name: string) => {
+  // Function to get image based on workstation name
+  const getWorkstationImage = (name: string) => {
     const lowercaseName = name.toLowerCase();
-    if (lowercaseName.includes('cnc')) return <FileText className="h-8 w-8" />;
-    if (lowercaseName.includes('assembly')) return <Package className="h-8 w-8" />;
-    if (lowercaseName.includes('warehouse')) return <PackagePlus className="h-8 w-8" />;
-    if (lowercaseName.includes('cutting')) return <Edit className="h-8 w-8" />;
-    if (lowercaseName.includes('quality')) return <ListCheck className="h-8 w-8" />;
-    if (lowercaseName.includes('packaging')) return <PackageX className="h-8 w-8" />;
-    if (lowercaseName.includes('planning')) return <Calendar className="h-8 w-8" />;
-    if (lowercaseName.includes('production')) return <ListOrdered className="h-8 w-8" />;
+    
+    // Factory/Manufacturing related images from Unsplash
+    if (lowercaseName.includes('cnc') || lowercaseName.includes('machining')) {
+      return 'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?w=400&h=300&fit=crop';
+    }
+    if (lowercaseName.includes('assembly') || lowercaseName.includes('montage')) {
+      return 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=400&h=300&fit=crop';
+    }
+    if (lowercaseName.includes('warehouse') || lowercaseName.includes('stock') || lowercaseName.includes('magazijn')) {
+      return 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&h=300&fit=crop';
+    }
+    if (lowercaseName.includes('cutting') || lowercaseName.includes('snijden') || lowercaseName.includes('laser')) {
+      return 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=400&h=300&fit=crop';
+    }
+    if (lowercaseName.includes('quality') || lowercaseName.includes('kwaliteit') || lowercaseName.includes('inspection')) {
+      return 'https://images.unsplash.com/photo-1582560475093-ba66accbc424?w=400&h=300&fit=crop';
+    }
+    if (lowercaseName.includes('packaging') || lowercaseName.includes('verpakking') || lowercaseName.includes('packing')) {
+      return 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=300&fit=crop';
+    }
+    if (lowercaseName.includes('planning') || lowercaseName.includes('office') || lowercaseName.includes('kantoor')) {
+      return 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=400&h=300&fit=crop';
+    }
+    if (lowercaseName.includes('production') || lowercaseName.includes('productie') || lowercaseName.includes('manufacturing')) {
+      return 'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?w=400&h=300&fit=crop';
+    }
+    if (lowercaseName.includes('welding') || lowercaseName.includes('lassen') || lowercaseName.includes('soldering')) {
+      return 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=400&h=300&fit=crop';
+    }
+    if (lowercaseName.includes('paint') || lowercaseName.includes('verf') || lowercaseName.includes('coating')) {
+      return 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=400&h=300&fit=crop';
+    }
 
-    // Default icon
-    return <CalendarArrowDown className="h-8 w-8" />;
+    // Default factory image
+    return 'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?w=400&h=300&fit=crop';
   };
+
   const loadWorkstationTasks = async (workstationId: string) => {
     try {
       setLoadingTasks(true);
@@ -95,10 +122,12 @@ const Workstations: React.FC = () => {
       setLoadingTasks(false);
     }
   };
+
   const handleShowWorkstationTasks = (workstationId: string) => {
     setShowWorkstationTasks(workstationId);
     loadWorkstationTasks(workstationId);
   };
+
   const handleStartWorkstationTask = async (task: WorkstationTask) => {
     if (!currentEmployee) return;
     try {
@@ -124,6 +153,7 @@ const Workstations: React.FC = () => {
       });
     }
   };
+
   const getPriorityBadge = (priority: string) => {
     switch (priority.toLowerCase()) {
       case 'high':
@@ -136,6 +166,7 @@ const Workstations: React.FC = () => {
         return <Badge>{priority}</Badge>;
     }
   };
+
   if (loading) {
     return <div className="flex min-h-screen">
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
@@ -146,7 +177,9 @@ const Workstations: React.FC = () => {
         </div>
       </div>;
   }
+
   const selectedWorkstationForTasks = workstations.find(ws => ws.id === showWorkstationTasks);
+
   return <div className="flex min-h-screen">
       <div className="w-64 bg-sidebar fixed top-0 bottom-0">
         <Navbar />
@@ -163,11 +196,11 @@ const Workstations: React.FC = () => {
                 </div> : <div>
                   <h1 className="text-2xl font-bold mb-6">{t('workstations_title')}</h1>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {workstations.map(workstation => <Card key={workstation.id} className="hover:shadow-md transition-shadow cursor-pointer relative">
+                    {workstations.map(workstation => <Card key={workstation.id} className="hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden">
                         <div className="absolute top-2 right-2 z-10">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={e => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 bg-white/80 backdrop-blur-sm" onClick={e => e.stopPropagation()}>
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -182,10 +215,19 @@ const Workstations: React.FC = () => {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
+                        <div className="relative h-48 overflow-hidden">
+                          <img
+                            src={workstation.image}
+                            alt={workstation.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Fallback to default factory image if image fails to load
+                              e.currentTarget.src = 'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?w=400&h=300&fit=crop';
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                        </div>
                         <CardContent className="p-6 flex flex-col items-center text-center" onClick={() => setSelectedWorkstation(workstation.id)}>
-                          <div className="bg-primary/10 p-4 rounded-full mb-4">
-                            {workstation.icon}
-                          </div>
                           <h3 className="text-lg font-medium mb-1">{workstation.name}</h3>
                           {workstation.description && <p className="text-sm text-muted-foreground">{workstation.description}</p>}
                         </CardContent>
@@ -249,4 +291,5 @@ const Workstations: React.FC = () => {
       </Dialog>
     </div>;
 };
+
 export default Workstations;
