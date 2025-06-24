@@ -529,7 +529,7 @@ const ProjectDetails = () => {
                       className="w-full"
                     >
                       <Barcode className="mr-2 h-4 w-4" />
-                      {t('view_barcode', 'View Barcode')}
+                      {t('view_barcode')}
                     </Button>
                   </div>
 
