@@ -115,100 +115,6 @@ const ProjectDetails = () => {
     fetchProjectData();
   }, [projectId, toast, fetchAndSetSortedTasks, t]);
 
-  const checkAndUpdateLimitPhases = async (completedTaskId?: string) => {
-    if (!projectId) return;
-    
-    try {
-      // Get all tasks in the project that are on HOLD and have standard_task_id
-      const { data: holdTasks, error: holdError } = await supabase
-        .from('tasks')
-        .select(`
-          *,
-          phases!inner(project_id)
-        `)
-        .eq('phases.project_id', projectId)
-        .eq('status', 'HOLD')
-        .not('standard_task_id', 'is', null);
-
-      if (holdError) {
-        console.error('Error fetching HOLD tasks:', holdError);
-        return;
-      }
-
-      if (!holdTasks || holdTasks.length === 0) {
-        console.log('No HOLD tasks found with standard_task_id');
-        return;
-      }
-
-      // Check each HOLD task to see if its limit phases are now satisfied
-      const tasksToUpdate = [];
-      for (const holdTask of holdTasks) {
-        if (holdTask.standard_task_id) {
-          try {
-            const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(
-              holdTask.standard_task_id,
-              projectId
-            );
-
-            if (limitPhasesSatisfied) {
-              tasksToUpdate.push(holdTask);
-            }
-          } catch (error) {
-            console.error(`Error checking limit phases for task ${holdTask.id}:`, error);
-          }
-        }
-      }
-
-      // Update all eligible tasks from HOLD to TODO
-      if (tasksToUpdate.length > 0) {
-        console.log(`Updating ${tasksToUpdate.length} tasks from HOLD to TODO`);
-        
-        for (const task of tasksToUpdate) {
-          await supabase
-            .from('tasks')
-            .update({ 
-              status: 'TODO',
-              status_changed_at: new Date().toISOString()
-            })
-            .eq('id', task.id);
-        }
-        
-        // No longer refetching here, caller will handle it.
-
-        toast({
-          title: t('tasks_updated'),
-          description: t('tasks_updated_desc', { count: tasksToUpdate.length.toString() }),
-        });
-      }
-    } catch (error) {
-      console.error('Error in checkAndUpdateLimitPhases:', error);
-    }
-  };
-
-  const checkLimitPhasesBeforeStart = async (taskId: string, standardTaskId?: string): Promise<boolean> => {
-    if (!projectId || !standardTaskId) return true;
-    
-    try {
-      const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(
-        standardTaskId,
-        projectId
-      );
-
-      if (!limitPhasesSatisfied) {
-        toast({
-          title: t('cannot_start_task'),
-          description: t('cannot_start_task_desc'),
-          variant: "destructive"
-        });
-        return false;
-      }
-      return true;
-    } catch (error) {
-      console.error('Error checking limit phases before start:', error);
-      return true; // Allow start if we can't check (fail open)
-    }
-  };
-
   const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
     if (!currentEmployee || !projectId) {
       toast({
@@ -234,11 +140,22 @@ const ProjectDetails = () => {
           description: t('task_started_desc'),
         });
       } else if (statusValue === 'COMPLETED') {
-        await timeRegistrationService.completeTask(taskId);
+        // Start the background processing immediately without waiting
+        const completePromise = timeRegistrationService.completeTask(taskId);
+        
+        // Show immediate feedback
         toast({
           title: t('task_completed'),
           description: t('task_completed_desc'),
         });
+        
+        // Wait for completion and then refresh tasks
+        await completePromise;
+        
+        // Refresh tasks immediately after completion
+        await fetchAndSetSortedTasks(projectId);
+        
+        return;
       } else {
         const updateData: Partial<Task> = { 
           status: newStatus, 
@@ -261,10 +178,7 @@ const ProjectDetails = () => {
         });
       }
 
-      if (newStatus === 'COMPLETED') {
-        await checkAndUpdateLimitPhases(taskId);
-      }
-
+      // Refresh tasks for non-completion status changes
       await fetchAndSetSortedTasks(projectId);
 
     } catch (error: any) {
@@ -273,6 +187,30 @@ const ProjectDetails = () => {
         description: t('task_status_update_error', { message: error.message }),
         variant: "destructive"
       });
+    }
+  };
+
+  const checkLimitPhasesBeforeStart = async (taskId: string, standardTaskId?: string): Promise<boolean> => {
+    if (!projectId || !standardTaskId) return true;
+    
+    try {
+      const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(
+        standardTaskId,
+        projectId
+      );
+
+      if (!limitPhasesSatisfied) {
+        toast({
+          title: t('cannot_start_task'),
+          description: t('cannot_start_task_desc'),
+          variant: "destructive"
+        });
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error checking limit phases before start:', error);
+      return true; // Allow start if we can't check (fail open)
     }
   };
 
