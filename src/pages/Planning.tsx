@@ -95,6 +95,7 @@ const Planning = () => {
   const [editingScheduleItem, setEditingScheduleItem] = useState<ScheduleItem | null>(null);
   const [showConflictResolver, setShowConflictResolver] = useState(false);
   const [taskConflicts, setTaskConflicts] = useState<any[]>([]);
+  const [excludedTasksPerUser, setExcludedTasksPerUser] = useState<Record<string, string[]>>({});
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const isAdmin = currentEmployee?.role === 'admin';
@@ -331,6 +332,9 @@ const Planning = () => {
     try {
       console.log('Resolving conflicts with resolutions:', resolutions);
       
+      // Track excluded tasks per user for this resolution cycle
+      const newExcludedTasksPerUser: Record<string, string[]> = {};
+      
       // For each resolution, handle the task assignments
       for (const [taskId, selectedUserIds] of Object.entries(resolutions)) {
         const conflict = taskConflicts.find(c => c.taskId === taskId);
@@ -341,18 +345,60 @@ const Planning = () => {
           user => !selectedUserIds.includes(user.userId)
         );
 
+        console.log(`Task ${taskId} - Selected users: ${selectedUserIds.join(', ')}`);
+        console.log(`Task ${taskId} - Removing from users: ${usersToRemoveFrom.map(u => u.userName).join(', ')}`);
+
         for (const user of usersToRemoveFrom) {
+          // Track this task as excluded for this user
+          if (!newExcludedTasksPerUser[user.userId]) {
+            newExcludedTasksPerUser[user.userId] = [];
+          }
+          newExcludedTasksPerUser[user.userId].push(taskId);
+
+          // Remove schedule items for this user
           for (const scheduleItem of user.scheduleItems) {
+            console.log(`Deleting schedule item ${scheduleItem.id} for user ${user.userName}`);
             await supabase
               .from('schedules')
               .delete()
               .eq('id', scheduleItem.id);
           }
-          
-          // Generate new schedule for this user to fill the gap
-          console.log(`Regenerating schedule for user ${user.userName} after removing task`);
-          await generateDailySchedule(user.userId);
         }
+      }
+
+      // Update the excluded tasks state
+      setExcludedTasksPerUser(prev => {
+        const updated = { ...prev };
+        for (const [userId, taskIds] of Object.entries(newExcludedTasksPerUser)) {
+          updated[userId] = [...(updated[userId] || []), ...taskIds];
+        }
+        return updated;
+      });
+
+      // Regenerate schedules for users who had tasks removed, excluding the conflicted tasks
+      const usersToRegenerate = new Set<string>();
+      for (const [taskId, selectedUserIds] of Object.entries(resolutions)) {
+        const conflict = taskConflicts.find(c => c.taskId === taskId);
+        if (!conflict) continue;
+
+        const usersToRemoveFrom = conflict.assignedUsers.filter(
+          user => !selectedUserIds.includes(user.userId)
+        );
+
+        for (const user of usersToRemoveFrom) {
+          usersToRegenerate.add(user.userId);
+        }
+      }
+
+      console.log(`Regenerating schedules for users: ${Array.from(usersToRegenerate).join(', ')}`);
+
+      // Regenerate schedules with excluded tasks
+      for (const userId of usersToRegenerate) {
+        const userExcludedTasks = newExcludedTasksPerUser[userId] || [];
+        const allExcludedForUser = [...(excludedTasksPerUser[userId] || []), ...userExcludedTasks];
+        
+        console.log(`Regenerating schedule for user ${userId} excluding tasks: ${allExcludedForUser.join(', ')}`);
+        await generateDailySchedule(userId, allExcludedForUser);
       }
 
       // Refresh the data to show updated schedules
@@ -367,6 +413,8 @@ const Planning = () => {
         setTaskConflicts(newConflicts);
         setShowConflictResolver(true);
       } else {
+        // Clear excluded tasks when all conflicts are resolved
+        setExcludedTasksPerUser({});
         toast({
           title: "Conflicts Resolved",
           description: "Task assignment conflicts have been resolved successfully.",
@@ -382,7 +430,7 @@ const Planning = () => {
     }
   };
 
-  const generateDailySchedule = async (workerId: string) => {
+  const generateDailySchedule = async (workerId: string, excludedTaskIds: string[] = []) => {
     try {
       setGeneratingSchedule(true);
       
@@ -392,8 +440,7 @@ const Planning = () => {
       }
 
       console.log(`Generating schedule for ${worker.employee.name}`);
-      console.log(`Available TODO tasks: ${worker.tasks.length}`);
-      console.log(`Assigned workstations: ${worker.assignedWorkstations.join(', ')}`);
+      console.log(`Excluded task IDs: ${excludedTaskIds.join(', ')}`);
 
       if (worker.assignedWorkstations.length === 0) {
         toast({
@@ -414,14 +461,15 @@ const Planning = () => {
         .lte('start_time', `${dateStr}T23:59:59`)
         .eq('is_auto_generated', true);
 
-      const availableTasks = worker.tasks;
+      // Filter out excluded tasks
+      const availableTasks = worker.tasks.filter(task => !excludedTaskIds.includes(task.id));
 
       console.log(`TODO tasks ready for scheduling: ${availableTasks.length}`);
 
       if (availableTasks.length === 0) {
         toast({
           title: "No TODO Tasks Available",
-          description: `No TODO tasks available for ${worker.employee.name}'s workstations: ${worker.assignedWorkstations.join(', ')}.`,
+          description: `No TODO tasks available for ${worker.employee.name} after excluding conflicted tasks.`,
           variant: "destructive"
         });
         return;
@@ -525,6 +573,9 @@ const Planning = () => {
   const generateAllSchedules = async () => {
     try {
       setGeneratingSchedule(true);
+      
+      // Clear excluded tasks when generating all schedules fresh
+      setExcludedTasksPerUser({});
       
       for (const workerSchedule of workerSchedules) {
         await generateDailySchedule(workerSchedule.employee.id);
