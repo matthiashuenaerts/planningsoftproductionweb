@@ -115,6 +115,18 @@ const ProjectDetails = () => {
     fetchProjectData();
   }, [projectId, toast, fetchAndSetSortedTasks, t]);
 
+          title: t('cannot_start_task'),
+          description: t('cannot_start_task_desc'),
+          variant: "destructive"
+        });
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error checking limit phases before start:', error);
+      return true; // Allow start if we can't check (fail open)
+    }
+  };
   const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
     if (!currentEmployee || !projectId) {
       toast({
