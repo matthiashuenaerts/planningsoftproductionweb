@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { workstationService } from '@/services/workstationService';
 import { workstationTasksService, WorkstationTask } from '@/services/workstationTasksService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
-import { ArrowLeft, Package, FileText, PackagePlus, Edit, ListCheck, PackageX, Calendar, ListOrdered, CalendarArrowDown, MoreVertical, Play } from 'lucide-react';
+import { ArrowLeft, Package, Wrench, Warehouse, Scissors, CheckCircle, PackageCheck, Calendar, Cog, Settings, MoreVertical, Play, Hammer, Drill, Zap, Truck, Factory } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
@@ -65,20 +65,77 @@ const Workstations: React.FC = () => {
     loadWorkstations();
   }, [toast, t]);
 
-  // Function to get icon based on workstation name
+  // Function to get icon based on workstation name (Dutch names)
   const getWorkstationIcon = (name: string) => {
     const lowercaseName = name.toLowerCase();
-    if (lowercaseName.includes('cnc')) return <FileText className="h-8 w-8" />;
-    if (lowercaseName.includes('assembly')) return <Package className="h-8 w-8" />;
-    if (lowercaseName.includes('warehouse')) return <PackagePlus className="h-8 w-8" />;
-    if (lowercaseName.includes('cutting')) return <Edit className="h-8 w-8" />;
-    if (lowercaseName.includes('quality')) return <ListCheck className="h-8 w-8" />;
-    if (lowercaseName.includes('packaging')) return <PackageX className="h-8 w-8" />;
-    if (lowercaseName.includes('planning')) return <Calendar className="h-8 w-8" />;
-    if (lowercaseName.includes('production')) return <ListOrdered className="h-8 w-8" />;
+    
+    // CNC related workstations
+    if (lowercaseName.includes('cnc') || lowercaseName.includes('draaibank') || lowercaseName.includes('freesmachine')) {
+      return <Cog className="h-8 w-8" />;
+    }
+    
+    // Assembly/Montage workstations
+    if (lowercaseName.includes('montage') || lowercaseName.includes('assemblage') || lowercaseName.includes('assembly')) {
+      return <Wrench className="h-8 w-8" />;
+    }
+    
+    // Warehouse/Magazijn workstations
+    if (lowercaseName.includes('magazijn') || lowercaseName.includes('warehouse') || lowercaseName.includes('opslag')) {
+      return <Warehouse className="h-8 w-8" />;
+    }
+    
+    // Cutting/Snijden workstations
+    if (lowercaseName.includes('snijden') || lowercaseName.includes('cutting') || lowercaseName.includes('zaag')) {
+      return <Scissors className="h-8 w-8" />;
+    }
+    
+    // Quality/Kwaliteit workstations
+    if (lowercaseName.includes('kwaliteit') || lowercaseName.includes('quality') || lowercaseName.includes('controle')) {
+      return <CheckCircle className="h-8 w-8" />;
+    }
+    
+    // Packaging/Verpakking workstations
+    if (lowercaseName.includes('verpakking') || lowercaseName.includes('packaging') || lowercaseName.includes('inpakken')) {
+      return <PackageCheck className="h-8 w-8" />;
+    }
+    
+    // Planning workstations
+    if (lowercaseName.includes('planning') || lowercaseName.includes('plan')) {
+      return <Calendar className="h-8 w-8" />;
+    }
+    
+    // Production/Productie workstations
+    if (lowercaseName.includes('productie') || lowercaseName.includes('production') || lowercaseName.includes('fabricage')) {
+      return <Factory className="h-8 w-8" />;
+    }
+    
+    // Welding/Lassen workstations
+    if (lowercaseName.includes('lassen') || lowercaseName.includes('welding') || lowercaseName.includes('weld')) {
+      return <Zap className="h-8 w-8" />;
+    }
+    
+    // Drilling/Boren workstations
+    if (lowercaseName.includes('boren') || lowercaseName.includes('drilling') || lowercaseName.includes('drill')) {
+      return <Drill className="h-8 w-8" />;
+    }
+    
+    // Hammering/Hameren workstations
+    if (lowercaseName.includes('hameren') || lowercaseName.includes('hammer') || lowercaseName.includes('smeden')) {
+      return <Hammer className="h-8 w-8" />;
+    }
+    
+    // Transport/Verzending workstations
+    if (lowercaseName.includes('transport') || lowercaseName.includes('verzending') || lowercaseName.includes('levering')) {
+      return <Truck className="h-8 w-8" />;
+    }
+    
+    // Settings/Instellingen workstations
+    if (lowercaseName.includes('instellingen') || lowercaseName.includes('settings') || lowercaseName.includes('configuratie')) {
+      return <Settings className="h-8 w-8" />;
+    }
 
-    // Default icon
-    return <CalendarArrowDown className="h-8 w-8" />;
+    // Default icon for unmatched workstations
+    return <Package className="h-8 w-8" />;
   };
   const loadWorkstationTasks = async (workstationId: string) => {
     try {
@@ -176,7 +233,7 @@ const Workstations: React.FC = () => {
                         e.stopPropagation();
                         handleShowWorkstationTasks(workstation.id);
                       }}>
-                                <ListCheck className="mr-2 h-4 w-4" />
+                                <CheckCircle className="mr-2 h-4 w-4" />
                                 {t('workstation_tasks')}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -214,7 +271,7 @@ const Workstations: React.FC = () => {
               {loadingTasks ? <div className="flex justify-center p-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                 </div> : workstationTasks.length === 0 ? <div className="text-center py-8">
-                  <ListCheck className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <CheckCircle className="h-12 w-12 mx-auto text-gray-400 mb-4" />
                   <p className="text-gray-500">{t('no_workstation_tasks')}</p>
                   <p className="text-sm text-gray-400">{t('add_tasks_in_settings')}</p>
                 </div> : <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
