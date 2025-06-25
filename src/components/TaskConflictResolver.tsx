@@ -29,7 +29,7 @@ interface TaskConflictResolverProps {
   isOpen: boolean;
   onClose: () => void;
   conflicts: TaskConflict[];
-  onResolve: (resolutions: Record<string, string>) => void;
+  onResolve: (resolutions: Record<string, string[]>) => void;
 }
 
 const TaskConflictResolver: React.FC<TaskConflictResolverProps> = ({
@@ -38,19 +38,35 @@ const TaskConflictResolver: React.FC<TaskConflictResolverProps> = ({
   conflicts,
   onResolve
 }) => {
-  const [resolutions, setResolutions] = useState<Record<string, string>>({});
+  const [resolutions, setResolutions] = useState<Record<string, string[]>>({});
   const [isResolving, setIsResolving] = useState(false);
 
   const handleUserSelection = (taskId: string, userId: string) => {
-    setResolutions(prev => ({
-      ...prev,
-      [taskId]: userId
-    }));
+    setResolutions(prev => {
+      const currentSelections = prev[taskId] || [];
+      const isSelected = currentSelections.includes(userId);
+      
+      if (isSelected) {
+        // Remove user from selection
+        return {
+          ...prev,
+          [taskId]: currentSelections.filter(id => id !== userId)
+        };
+      } else {
+        // Add user to selection
+        return {
+          ...prev,
+          [taskId]: [...currentSelections, userId]
+        };
+      }
+    });
   };
 
   const handleResolveAll = async () => {
-    // Check if all conflicts have been resolved
-    const unresolvedConflicts = conflicts.filter(conflict => !resolutions[conflict.taskId]);
+    // Check if all conflicts have at least one user selected
+    const unresolvedConflicts = conflicts.filter(conflict => 
+      !resolutions[conflict.taskId] || resolutions[conflict.taskId].length === 0
+    );
     
     if (unresolvedConflicts.length > 0) {
       return;
@@ -97,7 +113,9 @@ const TaskConflictResolver: React.FC<TaskConflictResolverProps> = ({
     }
   };
 
-  const allResolved = conflicts.length > 0 && conflicts.every(conflict => resolutions[conflict.taskId]);
+  const allResolved = conflicts.length > 0 && conflicts.every(conflict => 
+    resolutions[conflict.taskId] && resolutions[conflict.taskId].length > 0
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -111,7 +129,7 @@ const TaskConflictResolver: React.FC<TaskConflictResolverProps> = ({
 
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            The following tasks have been assigned to multiple users. Click on a user's name to assign the task to them.
+            The following tasks have been assigned to multiple users. Click on user names to select who should keep the task (you can select multiple users).
           </p>
 
           {conflicts.map((conflict) => (
@@ -119,7 +137,7 @@ const TaskConflictResolver: React.FC<TaskConflictResolverProps> = ({
               <CardHeader className="pb-4">
                 <CardTitle className="text-lg">{conflict.taskTitle}</CardTitle>
                 {conflict.projectName && (
-                  <div className="text-sm text-muted-foreground font-medium">
+                  <div className="text-sm text-blue-600 font-medium">
                     Project: {conflict.projectName}
                   </div>
                 )}
@@ -140,40 +158,55 @@ const TaskConflictResolver: React.FC<TaskConflictResolverProps> = ({
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium block">
-                    Click on a user to assign this task:
+                    Select users to assign this task (click to select/deselect):
                   </label>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {conflict.assignedUsers.map((user) => (
-                      <div 
-                        key={user.userId} 
-                        className={`border rounded-lg p-3 cursor-pointer transition-all hover:border-primary ${
-                          resolutions[conflict.taskId] === user.userId 
-                            ? 'border-primary bg-primary/5 ring-2 ring-primary/20' 
-                            : 'border-gray-200'
-                        }`}
-                        onClick={() => handleUserSelection(conflict.taskId, user.userId)}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center">
-                            <User className="h-4 w-4 mr-2" />
-                            <span className="font-medium">{user.userName}</span>
-                          </div>
-                          {resolutions[conflict.taskId] === user.userId && (
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                          )}
-                        </div>
-                        
-                        <div className="space-y-1 text-xs text-muted-foreground">
-                          {user.scheduleItems.map((item, index) => (
-                            <div key={item.id}>
-                              Schedule {index + 1}: {formatTime(item.startTime)} - {formatTime(item.endTime)}
+                    {conflict.assignedUsers.map((user) => {
+                      const isSelected = resolutions[conflict.taskId]?.includes(user.userId) || false;
+                      
+                      return (
+                        <div 
+                          key={user.userId} 
+                          className={`border rounded-lg p-3 cursor-pointer transition-all hover:border-primary ${
+                            isSelected
+                              ? 'border-primary bg-primary/5 ring-2 ring-primary/20' 
+                              : 'border-gray-200'
+                          }`}
+                          onClick={() => handleUserSelection(conflict.taskId, user.userId)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center">
+                              <User className="h-4 w-4 mr-2" />
+                              <span className="font-medium">{user.userName}</span>
                             </div>
-                          ))}
+                            {isSelected && (
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            )}
+                          </div>
+                          
+                          <div className="space-y-1 text-xs text-muted-foreground">
+                            {user.scheduleItems.map((item, index) => (
+                              <div key={item.id}>
+                                Schedule {index + 1}: {formatTime(item.startTime)} - {formatTime(item.endTime)}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
+
+                  {resolutions[conflict.taskId] && resolutions[conflict.taskId].length > 0 && (
+                    <div className="mt-2 p-2 bg-green-50 rounded border-l-4 border-green-400">
+                      <p className="text-sm text-green-800">
+                        Selected users: {conflict.assignedUsers
+                          .filter(user => resolutions[conflict.taskId]?.includes(user.userId))
+                          .map(user => user.userName)
+                          .join(', ')}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

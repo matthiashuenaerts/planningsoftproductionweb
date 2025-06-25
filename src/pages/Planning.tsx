@@ -314,7 +314,7 @@ const Planning = () => {
             taskId,
             taskTitle: scheduleItem.task.title,
             taskDescription: scheduleItem.task.description,
-            projectName: scheduleItem.task.project?.name || 'Unknown Project',
+            projectName: scheduleItem.task.phases?.projects?.name || 'Unknown Project',
             priority: scheduleItem.task.priority || 'Medium',
             duration: scheduleItem.task.duration || 60,
             assignedUsers: assignments
@@ -327,33 +327,51 @@ const Planning = () => {
     return conflicts;
   };
 
-  const resolveTaskConflicts = async (resolutions: Record<string, string>) => {
+  const resolveTaskConflicts = async (resolutions: Record<string, string[]>) => {
     try {
-      // For each resolution, remove the task from users who weren't selected
-      for (const [taskId, selectedUserId] of Object.entries(resolutions)) {
+      console.log('Resolving conflicts with resolutions:', resolutions);
+      
+      // For each resolution, handle the task assignments
+      for (const [taskId, selectedUserIds] of Object.entries(resolutions)) {
         const conflict = taskConflicts.find(c => c.taskId === taskId);
         if (!conflict) continue;
 
         // Remove schedule items from non-selected users
-        for (const user of conflict.assignedUsers) {
-          if (user.userId !== selectedUserId) {
-            for (const scheduleItem of user.scheduleItems) {
-              await supabase
-                .from('schedules')
-                .delete()
-                .eq('id', scheduleItem.id);
-            }
+        const usersToRemoveFrom = conflict.assignedUsers.filter(
+          user => !selectedUserIds.includes(user.userId)
+        );
+
+        for (const user of usersToRemoveFrom) {
+          for (const scheduleItem of user.scheduleItems) {
+            await supabase
+              .from('schedules')
+              .delete()
+              .eq('id', scheduleItem.id);
           }
+          
+          // Generate new schedule for this user to fill the gap
+          console.log(`Regenerating schedule for user ${user.userName} after removing task`);
+          await generateDailySchedule(user.userId);
         }
       }
 
       // Refresh the data to show updated schedules
       await fetchAllData();
       
-      toast({
-        title: "Conflicts Resolved",
-        description: "Task assignment conflicts have been resolved successfully.",
-      });
+      // Check for new conflicts after regeneration
+      const updatedSchedules = workerSchedules;
+      const newConflicts = detectTaskConflicts(updatedSchedules);
+      
+      if (newConflicts.length > 0) {
+        console.log('New conflicts detected after resolution, showing resolver again');
+        setTaskConflicts(newConflicts);
+        setShowConflictResolver(true);
+      } else {
+        toast({
+          title: "Conflicts Resolved",
+          description: "Task assignment conflicts have been resolved successfully.",
+        });
+      }
     } catch (error: any) {
       console.error('Error resolving conflicts:', error);
       toast({
