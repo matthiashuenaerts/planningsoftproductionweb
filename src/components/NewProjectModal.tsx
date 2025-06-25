@@ -242,7 +242,8 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       const phase = await phaseService.create({
         project_id: newProject.id,
         name: 'Project Tasks',
-        order_index: 1,
+        start_date: format(data.start_date, 'yyyy-MM-dd'),
+        end_date: format(data.installation_date, 'yyyy-MM-dd'),
         progress: 0
       });
       
@@ -302,7 +303,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
           priority: index < 5 ? 'High' : index < 15 ? 'Medium' : 'Low',
           due_date: format(dueDate, 'yyyy-MM-dd'),
           standard_task_id: task.standard_task_id || null,
-          duration: task.duration || 60
+          duration: task.duration || 60 // Save the calculated duration
         });
         
         createdTasks.push(newTask);

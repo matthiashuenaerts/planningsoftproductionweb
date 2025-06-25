@@ -149,15 +149,10 @@ const ProjectDetails = () => {
           description: t('task_completed_desc'),
         });
         
-        // Wait for completion and then trigger comprehensive HOLD task checking
+        // Wait for completion and then refresh tasks
         await completePromise;
         
-        // Trigger comprehensive HOLD task checking for the entire project
-        console.log('Task completed, triggering comprehensive HOLD task check for entire project...');
-        await taskService.processAllHoldTasksInProject(projectId);
-        
-        // Refresh tasks immediately after completion and HOLD task processing
-        console.log('Refreshing tasks after completion and HOLD task processing...');
+        // Refresh tasks immediately after completion
         await fetchAndSetSortedTasks(projectId);
         
         return;
@@ -175,28 +170,15 @@ const ProjectDetails = () => {
           updateData.completed_at = new Date().toISOString();
           updateData.completed_by = currentEmployee.id;
         }
-        
-        // Reset completion data when setting back to TODO
-        if (statusValue === 'TODO') {
-          updateData.completed_at = null;
-          updateData.completed_by = null;
-        }
       
         await taskService.update(taskId, updateData);
-        
-        // If we completed a task, trigger comprehensive HOLD task checking
-        if (statusValue === 'COMPLETED') {
-          console.log('Task completed via update, triggering comprehensive HOLD task check for entire project...');
-          await taskService.processAllHoldTasksInProject(projectId);
-        }
-        
         toast({
           title: t('task_updated'),
           description: t('task_updated_desc', { status: newStatus }),
         });
       }
 
-      // Refresh tasks for all status changes
+      // Refresh tasks for non-completion status changes
       await fetchAndSetSortedTasks(projectId);
 
     } catch (error: any) {
