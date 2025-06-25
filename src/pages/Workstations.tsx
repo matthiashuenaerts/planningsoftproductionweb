@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { workstationService } from '@/services/workstationService';
 import { workstationTasksService, WorkstationTask } from '@/services/workstationTasksService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
-import { ArrowLeft, Package, FileText, PackagePlus, Edit, ListCheck, PackageX, Calendar, ListOrdered, CalendarArrowDown, MoreVertical, Play, Wrench, Cog, Factory, Truck, Hammer, Scissors, Drill, Saw, Package2, Zap } from 'lucide-react';
+import { ArrowLeft, Package, FileText, PackagePlus, Edit, ListCheck, PackageX, Calendar, ListOrdered, CalendarArrowDown, MoreVertical, Play, Wrench, Cog, Factory, Truck, Hammer, Scissors, Drill, Package2, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
@@ -79,7 +79,7 @@ const Workstations: React.FC = () => {
     if (lowercaseName.includes('planning') || lowercaseName.includes('schema')) return <Calendar className="h-8 w-8" />;
     if (lowercaseName.includes('productie') || lowercaseName.includes('fabricage')) return <Factory className="h-8 w-8" />;
     if (lowercaseName.includes('boor') || lowercaseName.includes('drill')) return <Drill className="h-8 w-8" />;
-    if (lowercaseName.includes('zaag') || lowercaseName.includes('snij')) return <Saw className="h-8 w-8" />;
+    if (lowercaseName.includes('zaag') || lowercaseName.includes('snij')) return <Scissors className="h-8 w-8" />;
     if (lowercaseName.includes('las') || lowercaseName.includes('weld')) return <Zap className="h-8 w-8" />;
     if (lowercaseName.includes('transport') || lowercaseName.includes('verzend')) return <Truck className="h-8 w-8" />;
     if (lowercaseName.includes('hamer') || lowercaseName.includes('smeed')) return <Hammer className="h-8 w-8" />;
