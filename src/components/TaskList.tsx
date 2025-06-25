@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Task } from '@/services/dataService';
-import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader } from 'lucide-react';
+import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader, RotateCcw } from 'lucide-react';
 
 interface ExtendedTask extends Task {
   timeRemaining?: string;
@@ -78,6 +78,10 @@ const TaskList: React.FC<TaskListProps> = ({
         const updatedTask = { ...task, status: newStatus };
         if (newStatus === 'COMPLETED') {
           updatedTask.completed_at = new Date().toISOString();
+        } else if (newStatus === 'TODO') {
+          // Clear completion data when resetting to TODO
+          updatedTask.completed_at = undefined;
+          updatedTask.completed_by = undefined;
         }
         onTaskUpdate(updatedTask);
       }
@@ -273,10 +277,21 @@ const TaskList: React.FC<TaskListProps> = ({
                       </Button>
                     </>
                   )}
-                  {task.status === 'COMPLETED' && task.completed_at && (
-                    <div className="text-sm text-gray-500">
-                      Completed: {new Date(task.completed_at).toLocaleString()}
-                    </div>
+                  {task.status === 'COMPLETED' && (
+                    <>
+                      <div className="text-sm text-gray-500 flex items-center">
+                        {task.completed_at && `Completed: ${new Date(task.completed_at).toLocaleString()}`}
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleStatusChange(task, 'TODO')}
+                        className="ml-auto"
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Reset to TODO
+                      </Button>
+                    </>
                   )}
                   {task.status === 'HOLD' && (
                     <Button 

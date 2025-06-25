@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { standardTasksService } from "./standardTasksService";
 
@@ -372,10 +371,7 @@ export const taskService = {
         .from('task_workstation_links')
         .select(`
           task_id,
-          tasks (
-            *,
-            phases!inner(project_id)
-          )
+          tasks (*)
         `)
         .eq('workstation_id', workstationId);
       
@@ -526,6 +522,10 @@ export const taskService = {
             task.status = 'HOLD';
           }
         }
+        
+        // Clear completion data when resetting to TODO
+        task.completed_at = null;
+        task.completed_by = null;
       }
       
       // If the status is changed to IN_PROGRESS, make sure assignee_id is set
@@ -631,6 +631,8 @@ export const taskService = {
         
         if (updateError) {
           console.error('Error updating tasks from HOLD to TODO:', updateError);
+        } else {
+          console.log(`Successfully updated ${tasksToUpdate.length} tasks from HOLD to TODO`);
         }
       }
     } catch (error) {

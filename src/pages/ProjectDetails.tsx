@@ -152,7 +152,8 @@ const ProjectDetails = () => {
         // Wait for completion and then refresh tasks
         await completePromise;
         
-        // Refresh tasks immediately after completion
+        // Refresh tasks immediately after completion to show updated HOLD tasks
+        console.log('Task completed, refreshing tasks and checking HOLD tasks...');
         await fetchAndSetSortedTasks(projectId);
         
         return;
@@ -170,15 +171,28 @@ const ProjectDetails = () => {
           updateData.completed_at = new Date().toISOString();
           updateData.completed_by = currentEmployee.id;
         }
+        
+        // Reset completion data when setting back to TODO
+        if (statusValue === 'TODO') {
+          updateData.completed_at = null;
+          updateData.completed_by = null;
+        }
       
         await taskService.update(taskId, updateData);
+        
+        // If we completed a task, trigger HOLD task checking
+        if (statusValue === 'COMPLETED') {
+          console.log('Task completed via update, triggering HOLD task check...');
+          await taskService.processHoldTasksAsync(projectId);
+        }
+        
         toast({
           title: t('task_updated'),
           description: t('task_updated_desc', { status: newStatus }),
         });
       }
 
-      // Refresh tasks for non-completion status changes
+      // Refresh tasks for all status changes
       await fetchAndSetSortedTasks(projectId);
 
     } catch (error: any) {
