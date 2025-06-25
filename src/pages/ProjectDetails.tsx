@@ -189,7 +189,9 @@ const ProjectDetails = () => {
           description: t('task_updated_desc', { status: newStatus }),
         });
       }
-
+if (newStatus === 'COMPLETED') {
+        await checkAndUpdateLimitPhases(taskId);
+      }
       // Refresh tasks for non-completion status changes
       await fetchAndSetSortedTasks(projectId);
 
