@@ -12,7 +12,7 @@ export interface Task {
   assignee_id: string | null;
   created_at: string;
   updated_at: string;
-  status_changed_at: string | null;
+  status_changed_at?: string | null;
   duration: number | null;
   standard_task_id: string | null;
   completed_at?: string | null;
@@ -31,7 +31,6 @@ export interface Project {
   description: string | null;
   status: "planned" | "in_progress" | "completed" | "on_hold";
   start_date: string | null;
-  end_date: string | null;
   installation_date: string | null;
   client: string;
   progress: number;
@@ -42,9 +41,12 @@ export interface Project {
 export interface Phase {
   id: string;
   name: string;
-  description: string | null;
+  description?: string | null;
   project_id: string;
-  order_index: number;
+  order_index?: number;
+  start_date?: string | null;
+  end_date?: string | null;
+  progress?: number;
   created_at: string;
   updated_at: string;
 }
@@ -54,7 +56,8 @@ export interface Employee {
   name: string;
   email: string | null;
   role: string;
-  workstation: string | null;
+  workstation?: string | null;
+  password?: string;
   created_at: string;
 }
 
@@ -421,30 +424,29 @@ export class TaskService {
         if (holdTask.standard_task_id) {
           console.log('Checking limit phases for task:', holdTask.id, 'standard_task_id:', holdTask.standard_task_id);
           
-          // Get the standard task to check its limit phases
-          const { data: standardTask, error: standardTaskError } = await supabase
-            .from('standard_tasks')
-            .select('limit_phases')
-            .eq('id', holdTask.standard_task_id)
-            .single();
+          // Get the limit phases for this standard task from the junction table
+          const { data: limitPhases, error: limitPhasesError } = await supabase
+            .from('standard_task_limit_phases')
+            .select('limit_standard_task_id')
+            .eq('standard_task_id', holdTask.standard_task_id);
 
-          if (standardTaskError) {
-            console.error('Error fetching standard task:', standardTaskError);
+          if (limitPhasesError) {
+            console.error('Error fetching limit phases:', limitPhasesError);
             continue;
           }
 
-          if (!standardTask || !standardTask.limit_phases || standardTask.limit_phases.length === 0) {
+          if (!limitPhases || limitPhases.length === 0) {
             console.log('No limit phases for standard task:', holdTask.standard_task_id);
             continue;
           }
 
-          console.log('Limit phases to check:', standardTask.limit_phases);
+          console.log('Limit phases to check:', limitPhases);
 
           // Check if all limit phases are completed
           let allLimitPhasesCompleted = true;
           
-          for (const limitPhaseId of standardTask.limit_phases) {
-            // Get all tasks in this limit phase for the same project
+          for (const limitPhase of limitPhases) {
+            // Get all tasks for this limit standard task in the same project
             const { data: limitPhaseTasks, error: limitPhaseError } = await supabase
               .from('tasks')
               .select(`
@@ -452,7 +454,7 @@ export class TaskService {
                 phases!inner(project_id)
               `)
               .eq('phases.project_id', projectId)
-              .eq('phase_id', limitPhaseId);
+              .eq('standard_task_id', limitPhase.limit_standard_task_id);
 
             if (limitPhaseError) {
               console.error('Error fetching limit phase tasks:', limitPhaseError);
@@ -461,14 +463,14 @@ export class TaskService {
             }
 
             if (!limitPhaseTasks || limitPhaseTasks.length === 0) {
-              console.log('No tasks found in limit phase:', limitPhaseId);
+              console.log('No tasks found for limit standard task:', limitPhase.limit_standard_task_id);
               continue;
             }
 
-            // Check if all tasks in this limit phase are completed
+            // Check if all tasks for this limit standard task are completed
             const incompleteTasks = limitPhaseTasks.filter(task => task.status !== 'COMPLETED');
             if (incompleteTasks.length > 0) {
-              console.log('Found incomplete tasks in limit phase:', limitPhaseId, 'count:', incompleteTasks.length);
+              console.log('Found incomplete tasks for limit standard task:', limitPhase.limit_standard_task_id, 'count:', incompleteTasks.length);
               allLimitPhasesCompleted = false;
               break;
             }
@@ -514,7 +516,10 @@ export class ProjectService {
       throw new Error(`Failed to fetch projects: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []).map(project => ({
+      ...project,
+      status: project.status as "planned" | "in_progress" | "completed" | "on_hold"
+    }));
   }
 
   async getById(id: string): Promise<Project | null> {
@@ -532,7 +537,10 @@ export class ProjectService {
       throw new Error(`Failed to fetch project: ${error.message}`);
     }
 
-    return data;
+    return data ? {
+      ...data,
+      status: data.status as "planned" | "in_progress" | "completed" | "on_hold"
+    } : null;
   }
 
   async create(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<Project> {
@@ -551,7 +559,10 @@ export class ProjectService {
       throw new Error(`Failed to create project: ${error.message}`);
     }
 
-    return data;
+    return {
+      ...data,
+      status: data.status as "planned" | "in_progress" | "completed" | "on_hold"
+    };
   }
 
   async update(id: string, updates: Partial<Project>): Promise<Project> {
@@ -570,7 +581,10 @@ export class ProjectService {
       throw new Error(`Failed to update project: ${error.message}`);
     }
 
-    return data;
+    return {
+      ...data,
+      status: data.status as "planned" | "in_progress" | "completed" | "on_hold"
+    };
   }
 
   async delete(id: string): Promise<void> {
@@ -583,6 +597,21 @@ export class ProjectService {
       console.error('Error in delete:', error);
       throw new Error(`Failed to delete project: ${error.message}`);
     }
+  }
+
+  async getProjectPhases(projectId: string): Promise<Phase[]> {
+    const { data, error } = await supabase
+      .from('phases')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('order_index', { ascending: true });
+
+    if (error) {
+      console.error('Error in getProjectPhases:', error);
+      throw new Error(`Failed to fetch project phases: ${error.message}`);
+    }
+
+    return data || [];
   }
 }
 

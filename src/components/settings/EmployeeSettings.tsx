@@ -64,7 +64,8 @@ const EmployeeSettings: React.FC = () => {
     name: '',
     email: '',
     password: '',
-    role: 'worker'
+    role: 'worker',
+    workstation: null
   });
   const { toast } = useToast();
 
@@ -108,6 +109,7 @@ const EmployeeSettings: React.FC = () => {
         email: employee.email || '',
         password: '',
         role: employee.role,
+        workstation: employee.workstation || null
       });
     } else {
       setEditingEmployee(null);
@@ -115,7 +117,8 @@ const EmployeeSettings: React.FC = () => {
         name: '',
         email: '',
         password: '',
-        role: 'worker'
+        role: 'worker',
+        workstation: null
       });
     }
     setIsAddOrEditOpen(true);
@@ -123,7 +126,10 @@ const EmployeeSettings: React.FC = () => {
 
   const handleSubmit = async () => {
     try {
-      const dataToSend = { ...employeeData };
+      const dataToSend = { 
+        ...employeeData,
+        workstation: employeeData.workstation || null
+      };
       if (editingEmployee && !dataToSend.password) {
         delete (dataToSend as any).password;
       }
@@ -246,6 +252,23 @@ const EmployeeSettings: React.FC = () => {
                       <SelectItem value="teamleader">Team Leader</SelectItem>
                       <SelectItem value="worker">Worker</SelectItem>
                       <SelectItem value="workstation">Workstation</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="workstation">Workstation</Label>
+                  <Select 
+                    value={employeeData.workstation} 
+                    onValueChange={(value) => setEmployeeData(prev => ({ ...prev, workstation: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select workstation" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="workstation1">Workstation 1</SelectItem>
+                      <SelectItem value="workstation2">Workstation 2</SelectItem>
+                      <SelectItem value="workstation3">Workstation 3</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
