@@ -4,7 +4,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertTriangle, User, Clock, CheckCircle } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 
@@ -12,6 +11,7 @@ interface TaskConflict {
   taskId: string;
   taskTitle: string;
   taskDescription?: string;
+  projectName?: string;
   priority: string;
   duration: number;
   assignedUsers: Array<{
@@ -111,13 +111,18 @@ const TaskConflictResolver: React.FC<TaskConflictResolverProps> = ({
 
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            The following tasks have been assigned to multiple users. Please select which user should be assigned to each task.
+            The following tasks have been assigned to multiple users. Click on a user's name to assign the task to them.
           </p>
 
           {conflicts.map((conflict) => (
             <Card key={conflict.taskId} className="border-amber-200">
               <CardHeader className="pb-4">
                 <CardTitle className="text-lg">{conflict.taskTitle}</CardTitle>
+                {conflict.projectName && (
+                  <div className="text-sm text-muted-foreground font-medium">
+                    Project: {conflict.projectName}
+                  </div>
+                )}
                 {conflict.taskDescription && (
                   <p className="text-sm text-muted-foreground">{conflict.taskDescription}</p>
                 )}
@@ -133,49 +138,42 @@ const TaskConflictResolver: React.FC<TaskConflictResolverProps> = ({
               </CardHeader>
               
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {conflict.assignedUsers.map((user) => (
-                    <div key={user.userId} className="border rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center">
-                          <User className="h-4 w-4 mr-2" />
-                          <span className="font-medium">{user.userName}</span>
-                        </div>
-                        {resolutions[conflict.taskId] === user.userId && (
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        )}
-                      </div>
-                      
-                      <div className="space-y-1 text-xs text-muted-foreground">
-                        {user.scheduleItems.map((item, index) => (
-                          <div key={item.id}>
-                            Schedule {index + 1}: {formatTime(item.startTime)} - {formatTime(item.endTime)}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Assign this task to:
+                <div className="space-y-2">
+                  <label className="text-sm font-medium block">
+                    Click on a user to assign this task:
                   </label>
-                  <Select 
-                    value={resolutions[conflict.taskId] || ''} 
-                    onValueChange={(value) => handleUserSelection(conflict.taskId, value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select user to assign this task" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {conflict.assignedUsers.map((user) => (
-                        <SelectItem key={user.userId} value={user.userId}>
-                          {user.userName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {conflict.assignedUsers.map((user) => (
+                      <div 
+                        key={user.userId} 
+                        className={`border rounded-lg p-3 cursor-pointer transition-all hover:border-primary ${
+                          resolutions[conflict.taskId] === user.userId 
+                            ? 'border-primary bg-primary/5 ring-2 ring-primary/20' 
+                            : 'border-gray-200'
+                        }`}
+                        onClick={() => handleUserSelection(conflict.taskId, user.userId)}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center">
+                            <User className="h-4 w-4 mr-2" />
+                            <span className="font-medium">{user.userName}</span>
+                          </div>
+                          {resolutions[conflict.taskId] === user.userId && (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          )}
+                        </div>
+                        
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                          {user.scheduleItems.map((item, index) => (
+                            <div key={item.id}>
+                              Schedule {index + 1}: {formatTime(item.startTime)} - {formatTime(item.endTime)}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>

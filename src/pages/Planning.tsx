@@ -267,11 +267,11 @@ const Planning = () => {
   };
 
   const detectTaskConflicts = (schedules: any[]) => {
-    const taskAssignments: Record<string, Array<{ userId: string; userName: string; scheduleItems: any[] }>> = {};
+    const taskAssignments: Record<string, any[]> = {};
     
-    // Group schedule items by task_id
-    schedules.forEach(schedule => {
-      schedule.schedule.forEach((item: any) => {
+    // Group schedules by task_id
+    for (const schedule of schedules) {
+      for (const item of schedule.schedule) {
         if (item.task_id) {
           if (!taskAssignments[item.task_id]) {
             taskAssignments[item.task_id] = [];
@@ -296,9 +296,9 @@ const Planning = () => {
             });
           }
         }
-      });
-    });
-
+      }
+    }
+    
     // Find conflicts (tasks assigned to multiple users)
     const conflicts: any[] = [];
     for (const [taskId, assignments] of Object.entries(taskAssignments)) {
@@ -314,6 +314,7 @@ const Planning = () => {
             taskId,
             taskTitle: scheduleItem.task.title,
             taskDescription: scheduleItem.task.description,
+            projectName: scheduleItem.task.project?.name || 'Unknown Project',
             priority: scheduleItem.task.priority || 'Medium',
             duration: scheduleItem.task.duration || 60,
             assignedUsers: assignments
