@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { standardTasksService } from "./standardTasksService";
 
@@ -537,13 +538,6 @@ export const taskService = {
       if (task.status === 'COMPLETED') {
         task.completed_at = new Date().toISOString();
       }
-      
-      // Clear completion data when resetting from COMPLETED to TODO
-      if (task.status === 'TODO') {
-        task.completed_at = null;
-        task.completed_by = null;
-        task.assignee_id = null;
-      }
     }
     
     const { data, error } = await supabase
@@ -577,64 +571,55 @@ export const taskService = {
     return data as Task;
   },
   
-  // Enhanced method for processing hold tasks in background
+  // Optimized method for processing hold tasks in background
   async processHoldTasksAsync(projectId: string): Promise<void> {
     try {
-      console.log(`Processing ALL tasks for project ${projectId} to check limit phases`);
+      console.log(`Processing HOLD tasks for project ${projectId}`);
       
-      // Get ALL tasks in the project (not just HOLD tasks) that have standard_task_id
-      const { data: allTasks, error } = await supabase
+      // Get all HOLD tasks in the project that have standard_task_id in one query
+      const { data: holdTasks, error } = await supabase
         .from('tasks')
         .select(`
           id,
-          status,
           standard_task_id,
           phases!inner(project_id)
         `)
         .eq('phases.project_id', projectId)
+        .eq('status', 'HOLD')
         .not('standard_task_id', 'is', null);
       
       if (error) {
-        console.error('Error fetching tasks:', error);
+        console.error('Error fetching HOLD tasks:', error);
         return;
       }
       
-      if (!allTasks || allTasks.length === 0) {
-        console.log('No tasks with standard_task_id found');
+      if (!holdTasks || holdTasks.length === 0) {
+        console.log('No HOLD tasks found');
         return;
       }
       
-      console.log(`Found ${allTasks.length} tasks with standard_task_id to check`);
+      console.log(`Found ${holdTasks.length} HOLD tasks to check`);
       
-      const tasksToUpdateToTodo = [];
-      const tasksToUpdateToHold = [];
-      
-      // Check limit phases for ALL tasks
-      for (const task of allTasks) {
+      // Batch check limit phases for better performance
+      const tasksToUpdate = [];
+      for (const holdTask of holdTasks) {
         try {
           const limitPhasesCompleted = await standardTasksService.checkLimitPhasesCompleted(
-            task.standard_task_id!,
+            holdTask.standard_task_id!,
             projectId
           );
           
-          // If limit phases are completed and task is on HOLD, move to TODO
-          if (limitPhasesCompleted && task.status === 'HOLD') {
-            tasksToUpdateToTodo.push(task.id);
-            console.log(`Task ${task.id} can be moved from HOLD to TODO`);
-          }
-          // If limit phases are NOT completed and task is TODO, move to HOLD
-          else if (!limitPhasesCompleted && task.status === 'TODO') {
-            tasksToUpdateToHold.push(task.id);
-            console.log(`Task ${task.id} should be moved from TODO to HOLD`);
+          if (limitPhasesCompleted) {
+            tasksToUpdate.push(holdTask.id);
           }
         } catch (error) {
-          console.error(`Error checking limit phases for task ${task.id}:`, error);
+          console.error(`Error checking limit phases for task ${holdTask.id}:`, error);
         }
       }
       
       // Batch update tasks that can be released from HOLD
-      if (tasksToUpdateToTodo.length > 0) {
-        console.log(`Updating ${tasksToUpdateToTodo.length} tasks from HOLD to TODO`);
+      if (tasksToUpdate.length > 0) {
+        console.log(`Updating ${tasksToUpdate.length} tasks from HOLD to TODO`);
         
         const { error: updateError } = await supabase
           .from('tasks')
@@ -642,31 +627,12 @@ export const taskService = {
             status: 'TODO',
             status_changed_at: new Date().toISOString()
           })
-          .in('id', tasksToUpdateToTodo);
+          .in('id', tasksToUpdate);
         
         if (updateError) {
           console.error('Error updating tasks from HOLD to TODO:', updateError);
         }
       }
-      
-      // Batch update tasks that should be put on HOLD
-      if (tasksToUpdateToHold.length > 0) {
-        console.log(`Updating ${tasksToUpdateToHold.length} tasks from TODO to HOLD`);
-        
-        const { error: updateError } = await supabase
-          .from('tasks')
-          .update({ 
-            status: 'HOLD',
-            status_changed_at: new Date().toISOString()
-          })
-          .in('id', tasksToUpdateToHold);
-        
-        if (updateError) {
-          console.error('Error updating tasks from TODO to HOLD:', updateError);
-        }
-      }
-      
-      console.log(`Finished processing tasks for project ${projectId}`);
     } catch (error) {
       console.error('Error in processHoldTasksAsync:', error);
     }

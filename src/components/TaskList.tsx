@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Task } from '@/services/dataService';
-import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader, RotateCcw } from 'lucide-react';
+import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader } from 'lucide-react';
 
 interface ExtendedTask extends Task {
   timeRemaining?: string;
@@ -273,23 +273,10 @@ const TaskList: React.FC<TaskListProps> = ({
                       </Button>
                     </>
                   )}
-                  {task.status === 'COMPLETED' && (
-                    <>
-                      {task.completed_at && (
-                        <div className="text-sm text-gray-500 flex items-center">
-                          Completed: {new Date(task.completed_at).toLocaleString()}
-                        </div>
-                      )}
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => handleStatusChange(task, 'TODO')}
-                        className="ml-auto"
-                      >
-                        <RotateCcw className="h-4 w-4 mr-1" />
-                        Reset to Todo
-                      </Button>
-                    </>
+                  {task.status === 'COMPLETED' && task.completed_at && (
+                    <div className="text-sm text-gray-500">
+                      Completed: {new Date(task.completed_at).toLocaleString()}
+                    </div>
                   )}
                   {task.status === 'HOLD' && (
                     <Button 
