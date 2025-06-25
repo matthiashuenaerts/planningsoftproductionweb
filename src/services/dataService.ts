@@ -549,7 +549,7 @@ export const taskService = {
     
     if (error) throw error;
     
-    // If task was completed, trigger async background processing for hold tasks
+    // If task was completed, trigger comprehensive HOLD task checking
     if (task.status === 'COMPLETED') {
       // Get the current task to find its project
       const { data: currentTask, error: fetchError } = await supabase
@@ -561,22 +561,22 @@ export const taskService = {
         .eq('id', id)
         .single();
       
-      if (!fetchError && currentTask.standard_task_id) {
+      if (!fetchError && currentTask) {
         const projectId = (currentTask as any).phases.project_id;
         // Don't await this - let it run in background
-        this.processHoldTasksAsync(projectId);
+        this.processAllHoldTasksInProject(projectId);
       }
     }
     
     return data as Task;
   },
   
-  // Optimized method for processing hold tasks in background
-  async processHoldTasksAsync(projectId: string): Promise<void> {
+  // Comprehensive method to check and update ALL HOLD tasks in a project
+  async processAllHoldTasksInProject(projectId: string): Promise<void> {
     try {
-      console.log(`Processing HOLD tasks for project ${projectId}`);
+      console.log(`Starting comprehensive HOLD task processing for project ${projectId}`);
       
-      // Get all HOLD tasks in the project that have standard_task_id in one query
+      // Get ALL HOLD tasks in the project that have standard_task_id
       const { data: holdTasks, error } = await supabase
         .from('tasks')
         .select(`
@@ -594,30 +594,35 @@ export const taskService = {
       }
       
       if (!holdTasks || holdTasks.length === 0) {
-        console.log('No HOLD tasks found');
+        console.log('No HOLD tasks found in project');
         return;
       }
       
-      console.log(`Found ${holdTasks.length} HOLD tasks to check`);
+      console.log(`Found ${holdTasks.length} HOLD tasks to check in project`);
       
-      // Batch check limit phases for better performance
+      // Check each HOLD task individually and collect those that can be released
       const tasksToUpdate = [];
       for (const holdTask of holdTasks) {
         try {
+          console.log(`Checking limit phases for HOLD task ${holdTask.id} with standard_task_id ${holdTask.standard_task_id}`);
+          
           const limitPhasesCompleted = await standardTasksService.checkLimitPhasesCompleted(
             holdTask.standard_task_id!,
             projectId
           );
           
+          console.log(`Limit phases completed for task ${holdTask.id}: ${limitPhasesCompleted}`);
+          
           if (limitPhasesCompleted) {
             tasksToUpdate.push(holdTask.id);
+            console.log(`Task ${holdTask.id} can be released from HOLD`);
           }
         } catch (error) {
           console.error(`Error checking limit phases for task ${holdTask.id}:`, error);
         }
       }
       
-      // Batch update tasks that can be released from HOLD
+      // Batch update all tasks that can be released from HOLD
       if (tasksToUpdate.length > 0) {
         console.log(`Updating ${tasksToUpdate.length} tasks from HOLD to TODO`);
         
@@ -634,15 +639,22 @@ export const taskService = {
         } else {
           console.log(`Successfully updated ${tasksToUpdate.length} tasks from HOLD to TODO`);
         }
+      } else {
+        console.log('No HOLD tasks are ready to be released to TODO');
       }
     } catch (error) {
-      console.error('Error in processHoldTasksAsync:', error);
+      console.error('Error in processAllHoldTasksInProject:', error);
     }
+  },
+  
+  // Legacy method kept for compatibility - now calls the comprehensive version
+  async processHoldTasksAsync(projectId: string): Promise<void> {
+    return this.processAllHoldTasksInProject(projectId);
   },
   
   // Legacy method kept for compatibility - now calls the async version
   async checkAndUpdateHoldTasks(projectId: string): Promise<void> {
-    return this.processHoldTasksAsync(projectId);
+    return this.processAllHoldTasksInProject(projectId);
   },
   
   async delete(id: string): Promise<void> {

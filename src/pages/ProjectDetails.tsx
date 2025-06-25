@@ -149,11 +149,15 @@ const ProjectDetails = () => {
           description: t('task_completed_desc'),
         });
         
-        // Wait for completion and then refresh tasks
+        // Wait for completion and then trigger comprehensive HOLD task checking
         await completePromise;
         
-        // Refresh tasks immediately after completion to show updated HOLD tasks
-        console.log('Task completed, refreshing tasks and checking HOLD tasks...');
+        // Trigger comprehensive HOLD task checking for the entire project
+        console.log('Task completed, triggering comprehensive HOLD task check for entire project...');
+        await taskService.processAllHoldTasksInProject(projectId);
+        
+        // Refresh tasks immediately after completion and HOLD task processing
+        console.log('Refreshing tasks after completion and HOLD task processing...');
         await fetchAndSetSortedTasks(projectId);
         
         return;
@@ -180,10 +184,10 @@ const ProjectDetails = () => {
       
         await taskService.update(taskId, updateData);
         
-        // If we completed a task, trigger HOLD task checking
+        // If we completed a task, trigger comprehensive HOLD task checking
         if (statusValue === 'COMPLETED') {
-          console.log('Task completed via update, triggering HOLD task check...');
-          await taskService.processHoldTasksAsync(projectId);
+          console.log('Task completed via update, triggering comprehensive HOLD task check for entire project...');
+          await taskService.processAllHoldTasksInProject(projectId);
         }
         
         toast({
