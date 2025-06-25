@@ -36,6 +36,7 @@ export interface Project {
   progress: number;
   created_at: string;
   updated_at: string;
+  end_date: string | null;
 }
 
 export interface Phase {
@@ -43,9 +44,8 @@ export interface Phase {
   name: string;
   description?: string | null;
   project_id: string;
-  order_index?: number;
-  start_date?: string | null;
-  end_date?: string | null;
+  start_date: string;
+  end_date: string;
   progress?: number;
   created_at: string;
   updated_at: string;
@@ -518,7 +518,8 @@ export class ProjectService {
 
     return (data || []).map(project => ({
       ...project,
-      status: project.status as "planned" | "in_progress" | "completed" | "on_hold"
+      status: project.status as "planned" | "in_progress" | "completed" | "on_hold",
+      end_date: project.installation_date // Use installation_date as end_date
     }));
   }
 
@@ -539,11 +540,12 @@ export class ProjectService {
 
     return data ? {
       ...data,
-      status: data.status as "planned" | "in_progress" | "completed" | "on_hold"
+      status: data.status as "planned" | "in_progress" | "completed" | "on_hold",
+      end_date: data.installation_date // Use installation_date as end_date
     } : null;
   }
 
-  async create(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<Project> {
+  async create(project: Omit<Project, 'id' | 'created_at' | 'updated_at' | 'end_date'>): Promise<Project> {
     const { data, error } = await supabase
       .from('projects')
       .insert([{
@@ -561,7 +563,8 @@ export class ProjectService {
 
     return {
       ...data,
-      status: data.status as "planned" | "in_progress" | "completed" | "on_hold"
+      status: data.status as "planned" | "in_progress" | "completed" | "on_hold",
+      end_date: data.installation_date // Use installation_date as end_date
     };
   }
 
@@ -583,7 +586,8 @@ export class ProjectService {
 
     return {
       ...data,
-      status: data.status as "planned" | "in_progress" | "completed" | "on_hold"
+      status: data.status as "planned" | "in_progress" | "completed" | "on_hold",
+      end_date: data.installation_date // Use installation_date as end_date
     };
   }
 
@@ -604,7 +608,7 @@ export class ProjectService {
       .from('phases')
       .select('*')
       .eq('project_id', projectId)
-      .order('order_index', { ascending: true });
+      .order('created_at', { ascending: true });
 
     if (error) {
       console.error('Error in getProjectPhases:', error);
@@ -653,7 +657,7 @@ export class PhaseService {
       .from('phases')
       .select('*')
       .eq('project_id', projectId)
-      .order('order_index', { ascending: true });
+      .order('created_at', { ascending: true });
 
     if (error) {
       console.error('Error in getByProjectId:', error);
@@ -664,13 +668,21 @@ export class PhaseService {
   }
 
   async create(phase: Omit<Phase, 'id' | 'created_at' | 'updated_at'>): Promise<Phase> {
+    // Ensure required fields have default values
+    const phaseData = {
+      project_id: phase.project_id,
+      name: phase.name,
+      description: phase.description || null,
+      start_date: phase.start_date || new Date().toISOString().split('T')[0],
+      end_date: phase.end_date || new Date().toISOString().split('T')[0],
+      progress: phase.progress || 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
     const { data, error } = await supabase
       .from('phases')
-      .insert([{
-        ...phase,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }])
+      .insert([phaseData])
       .select()
       .single();
 
@@ -748,12 +760,19 @@ export class EmployeeService {
   }
 
   async create(employee: Omit<Employee, 'id' | 'created_at'>): Promise<Employee> {
+    // Ensure required fields are present
+    const employeeData = {
+      name: employee.name,
+      email: employee.email || null,
+      role: employee.role,
+      password: employee.password || 'defaultpassword', // Provide default password if missing
+      workstation: employee.workstation || null,
+      created_at: new Date().toISOString()
+    };
+
     const { data, error } = await supabase
       .from('employees')
-      .insert([{
-        ...employee,
-        created_at: new Date().toISOString()
-      }])
+      .insert([employeeData])
       .select()
       .single();
 
