@@ -15,6 +15,9 @@ export interface Task {
   status_changed_at: string | null;
   duration: number | null;
   standard_task_id: string | null;
+  completed_at?: string | null;
+  completed_by?: string | null;
+  workstation: string;
   project_name?: string;
   project_id?: string;
   assignee_name?: string;
@@ -29,6 +32,9 @@ export interface Project {
   status: "planned" | "in_progress" | "completed" | "on_hold";
   start_date: string | null;
   end_date: string | null;
+  installation_date: string | null;
+  client: string;
+  progress: number;
   created_at: string;
   updated_at: string;
 }
@@ -43,6 +49,15 @@ export interface Phase {
   updated_at: string;
 }
 
+export interface Employee {
+  id: string;
+  name: string;
+  email: string | null;
+  role: string;
+  workstation: string | null;
+  created_at: string;
+}
+
 export class TaskService {
   async getAll(): Promise<Task[]> {
     const { data, error } = await supabase
@@ -55,7 +70,10 @@ export class TaskService {
       throw new Error(`Failed to fetch tasks: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []).map(task => ({
+      ...task,
+      status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
+    }));
   }
 
   async getById(id: string): Promise<Task | null> {
@@ -73,7 +91,10 @@ export class TaskService {
       throw new Error(`Failed to fetch task: ${error.message}`);
     }
 
-    return data;
+    return data ? {
+      ...data,
+      status: data.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
+    } : null;
   }
 
   async create(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): Promise<Task> {
@@ -92,7 +113,10 @@ export class TaskService {
       throw new Error(`Failed to create task: ${error.message}`);
     }
 
-    return data;
+    return {
+      ...data,
+      status: data.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
+    };
   }
 
   async update(id: string, updates: Partial<Task>): Promise<Task> {
@@ -111,7 +135,10 @@ export class TaskService {
       throw new Error(`Failed to update task: ${error.message}`);
     }
 
-    return data;
+    return {
+      ...data,
+      status: data.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
+    };
   }
 
   async delete(id: string): Promise<void> {
@@ -123,6 +150,60 @@ export class TaskService {
     if (error) {
       console.error('Error in delete:', error);
       throw new Error(`Failed to delete task: ${error.message}`);
+    }
+  }
+
+  async getTodaysTasks(): Promise<Task[]> {
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('due_date', today)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error in getTodaysTasks:', error);
+      throw new Error(`Failed to fetch today's tasks: ${error.message}`);
+    }
+
+    return (data || []).map(task => ({
+      ...task,
+      status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
+    }));
+  }
+
+  async getOpenTasksByEmployeeOrWorkstation(employeeId?: string, workstation?: string): Promise<Task[]> {
+    let query = supabase
+      .from('tasks')
+      .select('*')
+      .in('status', ['TODO', 'IN_PROGRESS']);
+
+    if (employeeId) {
+      query = query.eq('assignee_id', employeeId);
+    }
+    if (workstation) {
+      query = query.eq('workstation', workstation);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error in getOpenTasksByEmployeeOrWorkstation:', error);
+      throw new Error(`Failed to fetch open tasks: ${error.message}`);
+    }
+
+    return (data || []).map(task => ({
+      ...task,
+      status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
+    }));
+  }
+
+  async processAllHoldTasksInProject(projectId: string): Promise<void> {
+    try {
+      await this.updateTasksOnHoldToTodo(projectId);
+    } catch (error) {
+      console.error('Error in processAllHoldTasksInProject:', error);
+      throw error;
     }
   }
 
@@ -210,6 +291,7 @@ export class TaskService {
               console.error('Error fetching phase for task:', task.id, phaseError);
               return {
                 ...task,
+                status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD",
                 project_name: 'Unknown Project',
                 project_id: null
               };
@@ -219,6 +301,7 @@ export class TaskService {
               console.log('No phase found for task:', task.id);
               return {
                 ...task,
+                status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD",
                 project_name: 'Unknown Project',
                 project_id: null
               };
@@ -235,6 +318,7 @@ export class TaskService {
               console.error('Error fetching project for phase:', phaseData.project_id, projectError);
               return {
                 ...task,
+                status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD",
                 project_name: 'Unknown Project',
                 project_id: phaseData.project_id
               };
@@ -242,6 +326,7 @@ export class TaskService {
 
             return {
               ...task,
+              status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD",
               project_name: projectData?.name || 'Unknown Project',
               project_id: phaseData.project_id
             };
@@ -249,6 +334,7 @@ export class TaskService {
             console.error('Error processing task:', task.id, error);
             return {
               ...task,
+              status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD",
               project_name: 'Unknown Project',
               project_id: null
             };
@@ -276,7 +362,10 @@ export class TaskService {
       throw new Error(`Failed to fetch tasks: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []).map(task => ({
+      ...task,
+      status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
+    }));
   }
 
   async getByProject(projectId: string): Promise<Task[]> {
@@ -294,7 +383,10 @@ export class TaskService {
       throw new Error(`Failed to fetch tasks: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []).map(task => ({
+      ...task,
+      status: task.status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD"
+    }));
   }
 
   async updateTasksOnHoldToTodo(projectId: string): Promise<void> {
@@ -410,4 +502,270 @@ export class TaskService {
   }
 }
 
+export class ProjectService {
+  async getAll(): Promise<Project[]> {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error in getAll:', error);
+      throw new Error(`Failed to fetch projects: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  async getById(id: string): Promise<Project | null> {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error('Error in getById:', error);
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      throw new Error(`Failed to fetch project: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async create(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<Project> {
+    const { data, error } = await supabase
+      .from('projects')
+      .insert([{
+        ...project,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error in create:', error);
+      throw new Error(`Failed to create project: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async update(id: string, updates: Partial<Project>): Promise<Project> {
+    const { data, error } = await supabase
+      .from('projects')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error in update:', error);
+      throw new Error(`Failed to update project: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error in delete:', error);
+      throw new Error(`Failed to delete project: ${error.message}`);
+    }
+  }
+}
+
+export class PhaseService {
+  async getAll(): Promise<Phase[]> {
+    const { data, error } = await supabase
+      .from('phases')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error in getAll:', error);
+      throw new Error(`Failed to fetch phases: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  async getById(id: string): Promise<Phase | null> {
+    const { data, error } = await supabase
+      .from('phases')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error('Error in getById:', error);
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      throw new Error(`Failed to fetch phase: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async getByProjectId(projectId: string): Promise<Phase[]> {
+    const { data, error } = await supabase
+      .from('phases')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('order_index', { ascending: true });
+
+    if (error) {
+      console.error('Error in getByProjectId:', error);
+      throw new Error(`Failed to fetch phases: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  async create(phase: Omit<Phase, 'id' | 'created_at' | 'updated_at'>): Promise<Phase> {
+    const { data, error } = await supabase
+      .from('phases')
+      .insert([{
+        ...phase,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error in create:', error);
+      throw new Error(`Failed to create phase: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async update(id: string, updates: Partial<Phase>): Promise<Phase> {
+    const { data, error } = await supabase
+      .from('phases')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error in update:', error);
+      throw new Error(`Failed to update phase: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('phases')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error in delete:', error);
+      throw new Error(`Failed to delete phase: ${error.message}`);
+    }
+  }
+}
+
+export class EmployeeService {
+  async getAll(): Promise<Employee[]> {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error in getAll:', error);
+      throw new Error(`Failed to fetch employees: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  async getById(id: string): Promise<Employee | null> {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error('Error in getById:', error);
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      throw new Error(`Failed to fetch employee: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async create(employee: Omit<Employee, 'id' | 'created_at'>): Promise<Employee> {
+    const { data, error } = await supabase
+      .from('employees')
+      .insert([{
+        ...employee,
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error in create:', error);
+      throw new Error(`Failed to create employee: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async update(id: string, updates: Partial<Employee>): Promise<Employee> {
+    const { data, error } = await supabase
+      .from('employees')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error in update:', error);
+      throw new Error(`Failed to update employee: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('employees')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error in delete:', error);
+      throw new Error(`Failed to delete employee: ${error.message}`);
+    }
+  }
+}
+
 export const taskService = new TaskService();
+export const projectService = new ProjectService();
+export const phaseService = new PhaseService();
+export const employeeService = new EmployeeService();
