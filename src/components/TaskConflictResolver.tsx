@@ -17,6 +17,7 @@ interface TaskConflict {
   assignedUsers: Array<{
     userId: string;
     userName: string;
+    totalOpenTaskHours: number;
     scheduleItems: Array<{
       id: string;
       startTime: string;
@@ -185,7 +186,11 @@ const TaskConflictResolver: React.FC<TaskConflictResolverProps> = ({
                             )}
                           </div>
                           
-                          <div className="space-y-1 text-xs text-muted-foreground">
+                          <div className="space-y-1 text-xs text-muted-foreground mb-2">
+                            <div className="flex items-center text-blue-600 font-medium">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Total open tasks: {user.totalOpenTaskHours.toFixed(1)}h
+                            </div>
                             {user.scheduleItems.map((item, index) => (
                               <div key={item.id}>
                                 Schedule {index + 1}: {formatTime(item.startTime)} - {formatTime(item.endTime)}

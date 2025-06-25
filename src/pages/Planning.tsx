@@ -286,9 +286,14 @@ const Planning = () => {
               endTime: item.end_time
             });
           } else {
+            // Calculate total open task hours for this user
+            const totalOpenTaskMinutes = schedule.tasks.reduce((sum: number, task: any) => sum + (task.duration || 60), 0);
+            const totalOpenTaskHours = totalOpenTaskMinutes / 60;
+
             taskAssignments[item.task_id].push({
               userId: schedule.employee.id,
               userName: schedule.employee.name,
+              totalOpenTaskHours: totalOpenTaskHours,
               scheduleItems: [{
                 id: item.id,
                 startTime: item.start_time,
