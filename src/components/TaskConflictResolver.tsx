@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertTriangle, User, Clock, CheckCircle } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 
 interface TaskConflict {
   taskId: string;
@@ -82,6 +82,21 @@ const TaskConflictResolver: React.FC<TaskConflictResolverProps> = ({
     }
   };
 
+  const formatTime = (timeString: string) => {
+    try {
+      const date = new Date(timeString);
+      if (isValid(date)) {
+        return format(date, 'HH:mm');
+      } else {
+        console.warn('Invalid date string:', timeString);
+        return 'Invalid time';
+      }
+    } catch (error) {
+      console.error('Error formatting time:', error, timeString);
+      return 'Invalid time';
+    }
+  };
+
   const allResolved = conflicts.length > 0 && conflicts.every(conflict => resolutions[conflict.taskId]);
 
   return (
@@ -134,7 +149,7 @@ const TaskConflictResolver: React.FC<TaskConflictResolverProps> = ({
                       <div className="space-y-1 text-xs text-muted-foreground">
                         {user.scheduleItems.map((item, index) => (
                           <div key={item.id}>
-                            Schedule {index + 1}: {format(new Date(item.startTime), 'HH:mm')} - {format(new Date(item.endTime), 'HH:mm')}
+                            Schedule {index + 1}: {formatTime(item.startTime)} - {formatTime(item.endTime)}
                           </div>
                         ))}
                       </div>

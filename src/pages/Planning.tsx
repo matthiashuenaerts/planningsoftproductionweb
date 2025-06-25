@@ -279,12 +279,20 @@ const Planning = () => {
           
           const existingUser = taskAssignments[item.task_id].find(u => u.userId === schedule.employee.id);
           if (existingUser) {
-            existingUser.scheduleItems.push(item);
+            existingUser.scheduleItems.push({
+              id: item.id,
+              startTime: item.start_time,
+              endTime: item.end_time
+            });
           } else {
             taskAssignments[item.task_id].push({
               userId: schedule.employee.id,
               userName: schedule.employee.name,
-              scheduleItems: [item]
+              scheduleItems: [{
+                id: item.id,
+                startTime: item.start_time,
+                endTime: item.end_time
+              }]
             });
           }
         }
@@ -297,19 +305,24 @@ const Planning = () => {
       if (assignments.length > 1) {
         // Get task details from the first assignment
         const firstItem = assignments[0].scheduleItems[0];
-        if (firstItem.task) {
+        const scheduleItem = schedules
+          .flatMap(s => s.schedule)
+          .find(item => item.id === firstItem.id);
+        
+        if (scheduleItem && scheduleItem.task) {
           conflicts.push({
             taskId,
-            taskTitle: firstItem.task.title,
-            taskDescription: firstItem.task.description,
-            priority: firstItem.task.priority || 'Medium',
-            duration: firstItem.task.duration || 60,
+            taskTitle: scheduleItem.task.title,
+            taskDescription: scheduleItem.task.description,
+            priority: scheduleItem.task.priority || 'Medium',
+            duration: scheduleItem.task.duration || 60,
             assignedUsers: assignments
           });
         }
       }
     }
 
+    console.log('Detected conflicts:', conflicts);
     return conflicts;
   };
 
@@ -497,6 +510,9 @@ const Planning = () => {
       for (const workerSchedule of workerSchedules) {
         await generateDailySchedule(workerSchedule.employee.id);
       }
+      
+      // Refresh data after generating all schedules
+      await fetchAllData();
       
       // After generating all schedules, check for conflicts
       const conflicts = detectTaskConflicts(workerSchedules);
