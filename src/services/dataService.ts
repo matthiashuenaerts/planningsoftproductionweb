@@ -1,791 +1,413 @@
-import { supabase } from "@/integrations/supabase/client";
-import { standardTasksService } from "./standardTasksService";
 
-// Project Types
+import { supabase } from '@/integrations/supabase/client';
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  status: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD";
+  priority: string;
+  due_date: string | null;
+  phase_id: string;
+  assignee_id: string | null;
+  created_at: string;
+  updated_at: string;
+  status_changed_at: string | null;
+  duration: number | null;
+  standard_task_id: string | null;
+  project_name?: string;
+  project_id?: string;
+  assignee_name?: string;
+  is_rush_order?: boolean;
+  rush_order_id?: string;
+}
+
 export interface Project {
   id: string;
   name: string;
-  client: string;
   description: string | null;
-  start_date: string;
-  installation_date: string;
-  progress: number;
-  status: 'planned' | 'in_progress' | 'completed' | 'on_hold';
+  status: "planned" | "in_progress" | "completed" | "on_hold";
+  start_date: string | null;
+  end_date: string | null;
   created_at: string;
   updated_at: string;
 }
 
-// Phase Types
 export interface Phase {
   id: string;
+  name: string;
+  description: string | null;
   project_id: string;
-  name: string;
-  start_date: string;
-  end_date: string;
-  progress: number;
+  order_index: number;
   created_at: string;
   updated_at: string;
 }
 
-// Task Types
-export interface Task {
-  id: string;
-  phase_id: string;
-  assignee_id?: string;
-  title: string;
-  description?: string;
-  workstation: string;
-  status: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD";
-  priority: "Low" | "Medium" | "High" | "Urgent";
-  due_date: string;
-  created_at: string;
-  updated_at: string;
-  project_name?: string;
-  completed_at?: string;
-  completed_by?: string;
-  status_changed_at?: string;
-  is_rush_order?: boolean;
-  rush_order_id?: string;
-  standard_task_id?: string;
-  duration?: number; // Task duration in minutes
-}
-
-// Employee Types
-export interface Employee {
-  id: string;
-  name: string;
-  email: string | null;
-  role: string;
-  password?: string;
-  created_at: string;
-  workstation?: string | null;
-}
-
-// Project service functions
-export const projectService = {
-  async getAll(): Promise<Project[]> {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .order('start_date', { ascending: true });
-    
-    if (error) throw error;
-    return data as Project[] || [];
-  },
-  
-  async getById(id: string): Promise<Project | null> {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (error && error.code !== 'PGRST116') throw error;
-    return data as Project;
-  },
-  
-  async getProjectPhases(projectId: string): Promise<Phase[]> {
-    const { data, error } = await supabase
-      .from('phases')
-      .select('*')
-      .eq('project_id', projectId)
-      .order('start_date', { ascending: true });
-    
-    if (error) throw error;
-    return data as Phase[] || [];
-  },
-  
-  async create(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<Project> {
-    const { data, error } = await supabase
-      .from('projects')
-      .insert([project])
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data as Project;
-  },
-  
-  async update(id: string, project: Partial<Project>): Promise<Project> {
-    const { data, error } = await supabase
-      .from('projects')
-      .update(project)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data as Project;
-  },
-  
-  async delete(id: string): Promise<void> {
-    try {
-      // Get all phases for this project
-      const { data: phases, error: phasesError } = await supabase
-        .from('phases')
-        .select('id')
-        .eq('project_id', id);
-      
-      if (phasesError) throw phasesError;
-
-      // Delete all tasks associated with these phases
-      if (phases && phases.length > 0) {
-        const phaseIds = phases.map(phase => phase.id);
-        
-        // Delete task-workstation links first
-        const { data: tasks, error: tasksError } = await supabase
-          .from('tasks')
-          .select('id')
-          .in('phase_id', phaseIds);
-        
-        if (tasksError) throw tasksError;
-        
-        if (tasks && tasks.length > 0) {
-          const taskIds = tasks.map(task => task.id);
-          
-          // Delete task_workstation_links
-          const { error: linksError } = await supabase
-            .from('task_workstation_links')
-            .delete()
-            .in('task_id', taskIds);
-          
-          if (linksError) throw linksError;
-          
-          // Delete schedules associated with tasks
-          const { error: schedulesError } = await supabase
-            .from('schedules')
-            .delete()
-            .in('task_id', taskIds);
-          
-          if (schedulesError && schedulesError.code !== '42P01') throw schedulesError;
-          
-          // Delete tasks
-          const { error: deleteTasksError } = await supabase
-            .from('tasks')
-            .delete()
-            .in('phase_id', phaseIds);
-          
-          if (deleteTasksError) throw deleteTasksError;
-        }
-        
-        // Delete phases
-        const { error: deletePhasesError } = await supabase
-          .from('phases')
-          .delete()
-          .eq('project_id', id);
-        
-        if (deletePhasesError) throw deletePhasesError;
-      }
-      
-      // Get all orders for this project
-      const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select('id')
-        .eq('project_id', id);
-      
-      if (ordersError) throw ordersError;
-      
-      // Delete all orders and their associated items and attachments
-      if (orders && orders.length > 0) {
-        for (const order of orders) {
-          // Delete order items
-          const { error: itemsError } = await supabase
-            .from('order_items')
-            .delete()
-            .eq('order_id', order.id);
-          
-          if (itemsError) throw itemsError;
-          
-          // Get all attachments for this order
-          const { data: attachments, error: attachmentsError } = await supabase
-            .from('order_attachments')
-            .select('id, file_name, order_id')
-            .eq('order_id', order.id);
-          
-          if (attachmentsError && attachmentsError.code !== '42P01') throw attachmentsError;
-          
-          // Delete all attachment files from storage
-          if (attachments && attachments.length > 0) {
-            for (const attachment of attachments) {
-              const filePath = `${attachment.order_id}/${attachment.file_name}`;
-              
-              const { error: storageError } = await supabase.storage
-                .from('order-attachments')
-                .remove([filePath]);
-              
-              if (storageError) console.error("Error removing file from storage:", storageError);
-            }
-            
-            // Delete attachment records
-            const { error: deleteAttachmentsError } = await supabase
-              .from('order_attachments')
-              .delete()
-              .eq('order_id', order.id);
-            
-            if (deleteAttachmentsError && deleteAttachmentsError.code !== '42P01') throw deleteAttachmentsError;
-          }
-        }
-        
-        // Delete orders
-        const { error: deleteOrdersError } = await supabase
-          .from('orders')
-          .delete()
-          .eq('project_id', id);
-        
-        if (deleteOrdersError) throw deleteOrdersError;
-      }
-      
-      // Finally delete the project itself
-      const { error } = await supabase
-        .from('projects')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-    } catch (error) {
-      console.error("Error deleting project:", error);
-      throw error;
-    }
-  }
-};
-
-// Phase service functions
-export const phaseService = {
-  async getByProject(projectId: string): Promise<Phase[]> {
-    const { data, error } = await supabase
-      .from('phases')
-      .select('*')
-      .eq('project_id', projectId)
-      .order('start_date', { ascending: true });
-    
-    if (error) throw error;
-    return data as Phase[] || [];
-  },
-  
-  async create(phase: Omit<Phase, 'id' | 'created_at' | 'updated_at'>): Promise<Phase> {
-    // Ensure the phase name meets any constraints
-    const { data, error } = await supabase
-      .from('phases')
-      .insert([phase])
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('Phase creation error:', error);
-      throw error;
-    }
-    
-    return data as Phase;
-  },
-  
-  async update(id: string, phase: Partial<Phase>): Promise<Phase> {
-    const { data, error } = await supabase
-      .from('phases')
-      .update(phase)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data as Phase;
-  }
-};
-
-// Task service functions
-export const taskService = {
+export class TaskService {
   async getAll(): Promise<Task[]> {
     const { data, error } = await supabase
       .from('tasks')
       .select('*')
-      .order('due_date', { ascending: true });
-    
-    if (error) throw error;
-    return data as Task[] || [];
-  },
+      .order('created_at', { ascending: false });
 
-  async getByPhase(phaseId: string): Promise<Task[]> {
-    const { data: tasks, error } = await supabase
+    if (error) {
+      console.error('Error in getAll:', error);
+      throw new Error(`Failed to fetch tasks: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  async getById(id: string): Promise<Task | null> {
+    const { data, error } = await supabase
       .from('tasks')
-      .select(`
-        *,
-        phases!inner(project_id)
-      `)
-      .eq('phase_id', phaseId)
-      .order('due_date', { ascending: true });
-    
-    if (error) throw error;
-    
-    // Process tasks to check limit phases and update status if needed
-    const processedTasks = await Promise.all(
-      (tasks || []).map(async (task) => {
-        if (task.standard_task_id && task.status === 'TODO') {
-          const projectId = (task as any).phases.project_id;
-          const limitPhasesCompleted = await standardTasksService.checkLimitPhasesCompleted(
-            task.standard_task_id, 
-            projectId
-          );
-          
-          if (!limitPhasesCompleted) {
-            // Update task status to HOLD
-            await this.update(task.id, { status: 'HOLD' });
-            task.status = 'HOLD';
-          }
-        }
-        
-        // Remove the phases object from the returned task
-        const { phases, ...cleanTask } = task as any;
-        return cleanTask as Task;
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error('Error in getById:', error);
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      throw new Error(`Failed to fetch task: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async create(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): Promise<Task> {
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert([{
+        ...task,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error in create:', error);
+      throw new Error(`Failed to create task: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async update(id: string, updates: Partial<Task>): Promise<Task> {
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
       })
-    );
-    
-    return processedTasks;
-  },
-  
-  async getByWorkstation(workstation: string): Promise<Task[]> {
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error in update:', error);
+      throw new Error(`Failed to update task: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error in delete:', error);
+      throw new Error(`Failed to delete task: ${error.message}`);
+    }
+  }
+
+  async getByWorkstation(workstationName: string): Promise<Task[]> {
     try {
-      // First get the workstation ID
+      console.log('Getting tasks for workstation:', workstationName);
+      
+      // Get workstation ID by name
       const { data: workstationData, error: workstationError } = await supabase
         .from('workstations')
         .select('id')
-        .eq('name', workstation)
-        .maybeSingle();
-      
-      if (workstationError) throw workstationError;
-      
+        .eq('name', workstationName)
+        .single();
+
+      if (workstationError) {
+        console.error('Error fetching workstation:', workstationError);
+        throw new Error(`Failed to fetch workstation: ${workstationError.message}`);
+      }
+
       if (!workstationData) {
-        console.warn(`No workstation found with name: ${workstation}`);
+        console.log('No workstation found with name:', workstationName);
         return [];
       }
-      
+
       return await this.getByWorkstationId(workstationData.id);
     } catch (error) {
       console.error('Error in getByWorkstation:', error);
       throw error;
     }
-  },
+  }
 
   async getByWorkstationId(workstationId: string): Promise<Task[]> {
     try {
-      // Get tasks linked to this workstation
-      const { data, error } = await supabase
-        .from('task_workstation_links')
-        .select(`
-          task_id,
-          tasks (*)
-        `)
+      console.log('Getting tasks for workstation ID:', workstationId);
+      
+      // Get standard tasks linked to this workstation
+      const { data: standardTaskLinks, error: linksError } = await supabase
+        .from('standard_task_workstation_links')
+        .select('standard_task_id')
         .eq('workstation_id', workstationId);
-      
-      if (error) throw error;
-      
-      // Check if data exists and has tasks property
-      if (!data || data.length === 0) {
+
+      if (linksError) {
+        console.error('Error fetching standard task links:', linksError);
+        throw new Error(`Failed to fetch standard task links: ${linksError.message}`);
+      }
+
+      if (!standardTaskLinks || standardTaskLinks.length === 0) {
+        console.log('No standard tasks linked to workstation:', workstationId);
         return [];
       }
-      
-      // Process tasks to check limit phases and update status if needed
-      const processedTasks = await Promise.all(
-        data
-          .filter(item => item.tasks !== null) // Filter out any null tasks
-          .map(async (item) => {
-            const task = item.tasks as any;
-            
-            if (task.standard_task_id && task.status === 'TODO') {
-              const projectId = (task as any).phases.project_id;
-              const limitPhasesCompleted = await standardTasksService.checkLimitPhasesCompleted(
-                task.standard_task_id, 
-                projectId
-              );
-              
-              if (!limitPhasesCompleted) {
-                // Update task status to HOLD
-                await this.update(task.id, { status: 'HOLD' });
-                task.status = 'HOLD';
-              }
+
+      const standardTaskIds = standardTaskLinks.map(link => link.standard_task_id);
+      console.log('Found standard task IDs:', standardTaskIds);
+
+      // Get tasks that use these standard tasks
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*')
+        .in('standard_task_id', standardTaskIds);
+
+      if (tasksError) {
+        console.error('Error fetching tasks:', tasksError);
+        throw new Error(`Failed to fetch tasks: ${tasksError.message}`);
+      }
+
+      if (!tasksData || tasksData.length === 0) {
+        console.log('No tasks found for standard task IDs:', standardTaskIds);
+        return [];
+      }
+
+      console.log('Found tasks:', tasksData.length);
+
+      // Get project information for each task
+      const tasksWithProjectInfo = await Promise.all(
+        tasksData.map(async (task) => {
+          try {
+            // Get phase information
+            const { data: phaseData, error: phaseError } = await supabase
+              .from('phases')
+              .select('project_id, name')
+              .eq('id', task.phase_id)
+              .maybeSingle();
+
+            if (phaseError) {
+              console.error('Error fetching phase for task:', task.id, phaseError);
+              return {
+                ...task,
+                project_name: 'Unknown Project',
+                project_id: null
+              };
             }
-            
-            // Remove the phases object from the returned task
-            const { phases, ...cleanTask } = task;
-            return cleanTask as Task;
-          })
+
+            if (!phaseData) {
+              console.log('No phase found for task:', task.id);
+              return {
+                ...task,
+                project_name: 'Unknown Project',
+                project_id: null
+              };
+            }
+
+            // Get project information
+            const { data: projectData, error: projectError } = await supabase
+              .from('projects')
+              .select('name')
+              .eq('id', phaseData.project_id)
+              .maybeSingle();
+
+            if (projectError) {
+              console.error('Error fetching project for phase:', phaseData.project_id, projectError);
+              return {
+                ...task,
+                project_name: 'Unknown Project',
+                project_id: phaseData.project_id
+              };
+            }
+
+            return {
+              ...task,
+              project_name: projectData?.name || 'Unknown Project',
+              project_id: phaseData.project_id
+            };
+          } catch (error) {
+            console.error('Error processing task:', task.id, error);
+            return {
+              ...task,
+              project_name: 'Unknown Project',
+              project_id: null
+            };
+          }
+        })
       );
-      
-      return processedTasks;
+
+      console.log('Tasks with project info:', tasksWithProjectInfo.length);
+      return tasksWithProjectInfo;
     } catch (error) {
       console.error('Error in getByWorkstationId:', error);
       throw error;
     }
-  },
-  
-  async getTodaysTasks(): Promise<Task[]> {
-    const today = new Date().toISOString().split('T')[0];
-    
+  }
+
+  async getByPhase(phaseId: string): Promise<Task[]> {
     const { data, error } = await supabase
       .from('tasks')
       .select('*')
-      .eq('due_date', today)
-      .order('priority', { ascending: false });
-    
-    if (error) throw error;
-    return data as Task[] || [];
-  },
-  
-  async getByDueDate(dueDate: string): Promise<Task[]> {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('due_date', dueDate)
-      .order('priority', { ascending: false });
-    
-    if (error) throw error;
-    return data as Task[] || [];
-  },
-  
-  async getOpenTasksByEmployeeOrWorkstation(employeeId: string, workstation: string | null): Promise<Task[]> {
-    // Get tasks assigned to an employee
-    if (employeeId) {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('assignee_id', employeeId)
-        .in('status', ['TODO', 'IN_PROGRESS'])
-        .order('priority', { ascending: false });
-      
-      if (error) throw error;
-      return data as Task[] || [];
-    } 
-    // Get tasks for a workstation
-    else if (workstation) {
-      // First get the workstation ID
-      const { data: workstationData, error: workstationError } = await supabase
-        .from('workstations')
-        .select('id')
-        .eq('name', workstation)
-        .single();
-      
-      if (workstationError) throw workstationError;
-      
-      // Get tasks linked to this workstation
-      const { data, error } = await supabase
-        .from('task_workstation_links')
-        .select(`
-          task_id,
-          tasks (*)
-        `)
-        .eq('workstation_id', workstationData.id);
-      
-      if (error) throw error;
-      
-      // Extract tasks from the joined data and filter for open tasks
-      const tasks = data.map(item => item.tasks) as Task[] || [];
-      return tasks.filter(task => task.status === 'TODO' || task.status === 'IN_PROGRESS');
+      .eq('phase_id', phaseId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error in getByPhase:', error);
+      throw new Error(`Failed to fetch tasks: ${error.message}`);
     }
-    
-    return [];
-  },
-  
-  async create(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): Promise<Task> {
+
+    return data || [];
+  }
+
+  async getByProject(projectId: string): Promise<Task[]> {
     const { data, error } = await supabase
       .from('tasks')
-      .insert([task])
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data as Task;
-  },
-  
-  async update(id: string, task: Partial<Task>): Promise<Task> {
-    // Update status_changed_at when status is being changed
-    if (task.status) {
-      task.status_changed_at = new Date().toISOString();
-      
-      // If status is being changed from HOLD to TODO, check limit phases first
-      if (task.status === 'TODO') {
-        const { data: currentTask, error: fetchError } = await supabase
-          .from('tasks')
-          .select(`
-            *,
-            phases!inner(project_id)
-          `)
-          .eq('id', id)
-          .single();
-        
-        if (fetchError) throw fetchError;
-        
-        if (currentTask.standard_task_id) {
-          const limitPhasesCompleted = await standardTasksService.checkLimitPhasesCompleted(
-            currentTask.standard_task_id,
-            (currentTask as any).phases.project_id
-          );
-          
-          if (!limitPhasesCompleted) {
-            task.status = 'HOLD';
-          }
-        }
-        
-        // Clear completion data when resetting to TODO
-        task.completed_at = null;
-        task.completed_by = null;
-      }
-      
-      // If the status is changed to IN_PROGRESS, make sure assignee_id is set
-      if (task.status === 'IN_PROGRESS' && !task.assignee_id) {
-        // Check if user info is available (ideally this would be the current user)
-        console.warn('Setting task to IN_PROGRESS without specifying an assignee');
-      }
-      
-      // If task is being completed, set completion timestamp
-      if (task.status === 'COMPLETED') {
-        task.completed_at = new Date().toISOString();
-      }
+      .select(`
+        *,
+        phases!inner(project_id)
+      `)
+      .eq('phases.project_id', projectId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error in getByProject:', error);
+      throw new Error(`Failed to fetch tasks: ${error.message}`);
     }
-    
-    const { data, error } = await supabase
-      .from('tasks')
-      .update(task)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    // If task was completed, trigger comprehensive HOLD task checking
-    if (task.status === 'COMPLETED') {
-      // Get the current task to find its project
-      const { data: currentTask, error: fetchError } = await supabase
+
+    return data || [];
+  }
+
+  async updateTasksOnHoldToTodo(projectId: string): Promise<void> {
+    try {
+      console.log('Checking ON HOLD tasks for project:', projectId);
+      
+      // Get all ON HOLD tasks in the project
+      const { data: holdTasks, error: holdError } = await supabase
         .from('tasks')
         .select(`
           *,
           phases!inner(project_id)
         `)
-        .eq('id', id)
-        .single();
-      
-      if (!fetchError && currentTask) {
-        const projectId = (currentTask as any).phases.project_id;
-        // Don't await this - let it run in background
-        this.processAllHoldTasksInProject(projectId);
-      }
-    }
-    
-    return data as Task;
-  },
-  
-  // Comprehensive method to check and update ALL HOLD tasks in a project
-  async processAllHoldTasksInProject(projectId: string): Promise<void> {
-    try {
-      console.log(`Starting comprehensive HOLD task processing for project ${projectId}`);
-      
-      // Get ALL HOLD tasks in the project that have standard_task_id
-      const { data: holdTasks, error } = await supabase
-        .from('tasks')
-        .select(`
-          id,
-          standard_task_id,
-          phases!inner(project_id)
-        `)
         .eq('phases.project_id', projectId)
         .eq('status', 'HOLD')
         .not('standard_task_id', 'is', null);
-      
-      if (error) {
-        console.error('Error fetching HOLD tasks:', error);
+
+      if (holdError) {
+        console.error('Error fetching ON HOLD tasks:', holdError);
         return;
       }
-      
+
       if (!holdTasks || holdTasks.length === 0) {
-        console.log('No HOLD tasks found in project');
+        console.log('No ON HOLD tasks found for project:', projectId);
         return;
       }
-      
-      console.log(`Found ${holdTasks.length} HOLD tasks to check in project`);
-      
-      // Check each HOLD task individually and collect those that can be released
-      const tasksToUpdate = [];
+
+      console.log('Found ON HOLD tasks to check:', holdTasks.length);
+
+      // Check each ON HOLD task
       for (const holdTask of holdTasks) {
-        try {
-          console.log(`Checking limit phases for HOLD task ${holdTask.id} with standard_task_id ${holdTask.standard_task_id}`);
+        if (holdTask.standard_task_id) {
+          console.log('Checking limit phases for task:', holdTask.id, 'standard_task_id:', holdTask.standard_task_id);
           
-          const limitPhasesCompleted = await standardTasksService.checkLimitPhasesCompleted(
-            holdTask.standard_task_id!,
-            projectId
-          );
-          
-          console.log(`Limit phases completed for task ${holdTask.id}: ${limitPhasesCompleted}`);
-          
-          if (limitPhasesCompleted) {
-            tasksToUpdate.push(holdTask.id);
-            console.log(`Task ${holdTask.id} can be released from HOLD`);
+          // Get the standard task to check its limit phases
+          const { data: standardTask, error: standardTaskError } = await supabase
+            .from('standard_tasks')
+            .select('limit_phases')
+            .eq('id', holdTask.standard_task_id)
+            .single();
+
+          if (standardTaskError) {
+            console.error('Error fetching standard task:', standardTaskError);
+            continue;
           }
-        } catch (error) {
-          console.error(`Error checking limit phases for task ${holdTask.id}:`, error);
+
+          if (!standardTask || !standardTask.limit_phases || standardTask.limit_phases.length === 0) {
+            console.log('No limit phases for standard task:', holdTask.standard_task_id);
+            continue;
+          }
+
+          console.log('Limit phases to check:', standardTask.limit_phases);
+
+          // Check if all limit phases are completed
+          let allLimitPhasesCompleted = true;
+          
+          for (const limitPhaseId of standardTask.limit_phases) {
+            // Get all tasks in this limit phase for the same project
+            const { data: limitPhaseTasks, error: limitPhaseError } = await supabase
+              .from('tasks')
+              .select(`
+                *,
+                phases!inner(project_id)
+              `)
+              .eq('phases.project_id', projectId)
+              .eq('phase_id', limitPhaseId);
+
+            if (limitPhaseError) {
+              console.error('Error fetching limit phase tasks:', limitPhaseError);
+              allLimitPhasesCompleted = false;
+              break;
+            }
+
+            if (!limitPhaseTasks || limitPhaseTasks.length === 0) {
+              console.log('No tasks found in limit phase:', limitPhaseId);
+              continue;
+            }
+
+            // Check if all tasks in this limit phase are completed
+            const incompleteTasks = limitPhaseTasks.filter(task => task.status !== 'COMPLETED');
+            if (incompleteTasks.length > 0) {
+              console.log('Found incomplete tasks in limit phase:', limitPhaseId, 'count:', incompleteTasks.length);
+              allLimitPhasesCompleted = false;
+              break;
+            }
+          }
+
+          if (allLimitPhasesCompleted) {
+            console.log('All limit phases completed for task:', holdTask.id, 'updating to TODO');
+            
+            // Update the task status to TODO
+            const { error: updateError } = await supabase
+              .from('tasks')
+              .update({ 
+                status: 'TODO',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', holdTask.id);
+
+            if (updateError) {
+              console.error('Error updating task status:', updateError);
+            } else {
+              console.log('Successfully updated task', holdTask.id, 'from HOLD to TODO');
+            }
+          } else {
+            console.log('Not all limit phases completed for task:', holdTask.id);
+          }
         }
-      }
-      
-      // Batch update all tasks that can be released from HOLD
-      if (tasksToUpdate.length > 0) {
-        console.log(`Updating ${tasksToUpdate.length} tasks from HOLD to TODO`);
-        
-        const { error: updateError } = await supabase
-          .from('tasks')
-          .update({ 
-            status: 'TODO',
-            status_changed_at: new Date().toISOString()
-          })
-          .in('id', tasksToUpdate);
-        
-        if (updateError) {
-          console.error('Error updating tasks from HOLD to TODO:', updateError);
-        } else {
-          console.log(`Successfully updated ${tasksToUpdate.length} tasks from HOLD to TODO`);
-        }
-      } else {
-        console.log('No HOLD tasks are ready to be released to TODO');
       }
     } catch (error) {
-      console.error('Error in processAllHoldTasksInProject:', error);
+      console.error('Error in updateTasksOnHoldToTodo:', error);
     }
-  },
-  
-  // Legacy method kept for compatibility - now calls the comprehensive version
-  async processHoldTasksAsync(projectId: string): Promise<void> {
-    return this.processAllHoldTasksInProject(projectId);
-  },
-  
-  // Legacy method kept for compatibility - now calls the async version
-  async checkAndUpdateHoldTasks(projectId: string): Promise<void> {
-    return this.processAllHoldTasksInProject(projectId);
-  },
-  
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('tasks')
-      .delete()
-      .eq('id', id);
-    
-    if (error) throw error;
   }
-};
+}
 
-// Employee service functions
-export const employeeService = {
-  async getAll(): Promise<Employee[]> {
-    const { data, error } = await supabase
-      .from('employees')
-      .select('*')
-      .order('name');
-    
-    if (error) throw error;
-    return data as Employee[] || [];
-  },
-  
-  async create(employee: { 
-    name: string; 
-    email?: string | null; 
-    password: string; 
-    role: string; 
-    workstation?: string;
-  }): Promise<Employee> {
-    const { data, error } = await supabase
-      .from('employees')
-      .insert([employee])
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data as Employee;
-  },
-
-  async update(id: string, employee: Partial<Omit<Employee, 'id' | 'created_at'>>): Promise<Employee> {
-    const { data, error } = await supabase
-      .from('employees')
-      .update(employee)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as Employee;
-  },
-
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('employees')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-  }
-};
-
-// Work hours service
-export const workHoursService = {
-  async getAll(): Promise<any[]> {
-    const { data, error } = await supabase
-      .from('work_hours')
-      .select('*')
-      .order('day_of_week', { ascending: true })
-      .order('start_time', { ascending: true });
-    
-    if (error) throw error;
-    return data || [];
-  },
-  
-  async getByDayOfWeek(dayOfWeek: number): Promise<any[]> {
-    const { data, error } = await supabase
-      .from('work_hours')
-      .select('*')
-      .eq('day_of_week', dayOfWeek)
-      .order('start_time', { ascending: true });
-    
-    if (error) throw error;
-    return data || [];
-  },
-  
-  async update(id: string, workHours: Partial<any>): Promise<any> {
-    const { data, error } = await supabase
-      .from('work_hours')
-      .update(workHours)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
-  }
-};
-
-// Insert initial employee data if needed
-export const seedInitialData = async () => {
-  const { data } = await supabase.from('employees').select('id');
-  
-  // Only seed if no employees exist
-  if (data && data.length === 0) {
-    await supabase.from('employees').insert([
-      {
-        name: 'Matthias Huenaerts',
-        email: null,
-        password: 'mh310801',
-        role: 'admin'
-      },
-      {
-        name: 'Manager User',
-        email: 'manager@kitchenpro.com',
-        password: 'manager123',
-        role: 'manager'
-      },
-      {
-        name: 'Worker 1',
-        email: 'worker1@kitchenpro.com',
-        password: 'worker123',
-        role: 'worker'
-      },
-      {
-        name: 'Worker 2',
-        email: 'worker2@kitchenpro.com',
-        password: 'worker123',
-        role: 'worker'
-      }
-    ]);
-  }
-};
+export const taskService = new TaskService();
