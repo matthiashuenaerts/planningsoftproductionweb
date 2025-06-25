@@ -15,11 +15,10 @@ export class ProjectService {
       throw error;
     }
     
-    // Cast the status to the correct union type and add end_date
+    // Cast the status to the correct union type
     return {
       ...data,
-      status: data.status as "planned" | "in_progress" | "completed" | "on_hold",
-      end_date: data.installation_date // Use installation_date as end_date
+      status: data.status as "planned" | "in_progress" | "completed" | "on_hold"
     };
   }
 }

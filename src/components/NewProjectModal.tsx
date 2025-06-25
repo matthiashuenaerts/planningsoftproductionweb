@@ -242,8 +242,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       const phase = await phaseService.create({
         project_id: newProject.id,
         name: 'Project Tasks',
-        start_date: format(data.start_date, 'yyyy-MM-dd'),
-        end_date: format(data.installation_date, 'yyyy-MM-dd'),
+        order_index: 1,
         progress: 0
       });
       
