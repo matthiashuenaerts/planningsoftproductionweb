@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import PlanningTaskManager from '@/components/PlanningTaskManager';
+import TaskConflictResolver from '@/components/TaskConflictResolver';
 import { supabase } from '@/integrations/supabase/client';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -92,6 +93,8 @@ const Planning = () => {
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
   const [showTaskManager, setShowTaskManager] = useState(false);
   const [editingScheduleItem, setEditingScheduleItem] = useState<ScheduleItem | null>(null);
+  const [showConflictResolver, setShowConflictResolver] = useState(false);
+  const [taskConflicts, setTaskConflicts] = useState<any[]>([]);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const isAdmin = currentEmployee?.role === 'admin';
@@ -263,6 +266,90 @@ const Planning = () => {
     }
   };
 
+  const detectTaskConflicts = (schedules: any[]) => {
+    const taskAssignments: Record<string, Array<{ userId: string; userName: string; scheduleItems: any[] }>> = {};
+    
+    // Group schedule items by task_id
+    schedules.forEach(schedule => {
+      schedule.schedule.forEach((item: any) => {
+        if (item.task_id) {
+          if (!taskAssignments[item.task_id]) {
+            taskAssignments[item.task_id] = [];
+          }
+          
+          const existingUser = taskAssignments[item.task_id].find(u => u.userId === schedule.employee.id);
+          if (existingUser) {
+            existingUser.scheduleItems.push(item);
+          } else {
+            taskAssignments[item.task_id].push({
+              userId: schedule.employee.id,
+              userName: schedule.employee.name,
+              scheduleItems: [item]
+            });
+          }
+        }
+      });
+    });
+
+    // Find conflicts (tasks assigned to multiple users)
+    const conflicts: any[] = [];
+    for (const [taskId, assignments] of Object.entries(taskAssignments)) {
+      if (assignments.length > 1) {
+        // Get task details from the first assignment
+        const firstItem = assignments[0].scheduleItems[0];
+        if (firstItem.task) {
+          conflicts.push({
+            taskId,
+            taskTitle: firstItem.task.title,
+            taskDescription: firstItem.task.description,
+            priority: firstItem.task.priority || 'Medium',
+            duration: firstItem.task.duration || 60,
+            assignedUsers: assignments
+          });
+        }
+      }
+    }
+
+    return conflicts;
+  };
+
+  const resolveTaskConflicts = async (resolutions: Record<string, string>) => {
+    try {
+      // For each resolution, remove the task from users who weren't selected
+      for (const [taskId, selectedUserId] of Object.entries(resolutions)) {
+        const conflict = taskConflicts.find(c => c.taskId === taskId);
+        if (!conflict) continue;
+
+        // Remove schedule items from non-selected users
+        for (const user of conflict.assignedUsers) {
+          if (user.userId !== selectedUserId) {
+            for (const scheduleItem of user.scheduleItems) {
+              await supabase
+                .from('schedules')
+                .delete()
+                .eq('id', scheduleItem.id);
+            }
+          }
+        }
+      }
+
+      // Refresh the data to show updated schedules
+      await fetchAllData();
+      
+      toast({
+        title: "Conflicts Resolved",
+        description: "Task assignment conflicts have been resolved successfully.",
+      });
+    } catch (error: any) {
+      console.error('Error resolving conflicts:', error);
+      toast({
+        title: "Error",
+        description: `Failed to resolve conflicts: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
   const generateDailySchedule = async (workerId: string) => {
     try {
       setGeneratingSchedule(true);
@@ -411,10 +498,17 @@ const Planning = () => {
         await generateDailySchedule(workerSchedule.employee.id);
       }
       
-      toast({
-        title: "All Schedules Generated",
-        description: "Generated schedules for all workers",
-      });
+      // After generating all schedules, check for conflicts
+      const conflicts = detectTaskConflicts(workerSchedules);
+      if (conflicts.length > 0) {
+        setTaskConflicts(conflicts);
+        setShowConflictResolver(true);
+      } else {
+        toast({
+          title: "All Schedules Generated",
+          description: "Generated schedules for all workers with no conflicts",
+        });
+      }
     } catch (error: any) {
       console.error('Error generating all schedules:', error);
       toast({
@@ -1179,6 +1273,13 @@ const Planning = () => {
                 setShowTaskManager(false);
                 setEditingScheduleItem(null);
               }}
+            />
+
+            <TaskConflictResolver
+              isOpen={showConflictResolver}
+              onClose={() => setShowConflictResolver(false)}
+              conflicts={taskConflicts}
+              onResolve={resolveTaskConflicts}
             />
           </div>
         </div>
