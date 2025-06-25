@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TaskList from './TaskList';
 import { Task } from '@/services/dataService';
@@ -37,7 +37,7 @@ interface ExtendedTask extends Task {
   active_workers?: number;
   project_id?: string;
   is_workstation_task?: boolean;
-  isCompleting?: boolean; // Add optimistic state
+  isCompleting?: boolean;
 }
 
 const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, workstationId, onBack, is_workstation_task }) => {
@@ -51,7 +51,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const [showPartsListDialog, setShowPartsListDialog] = useState(false);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
   const [standardTasks, setStandardTasks] = useState<Record<string, any>>({});
-  const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set()); // Track completing tasks
+  const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const queryClient = useQueryClient();
@@ -100,170 +100,165 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     }
   };
 
-  const { data: fetchedTasks = [], isLoading: loading, error: queryError, refetch: loadTasks } = useQuery<ExtendedTask[], Error>({
-    queryKey: ['workstationTasks', actualWorkstationName],
-    queryFn: async () => {
-      if (!actualWorkstationName) return [];
-      
-      const regularTasks = await taskService.getByWorkstation(actualWorkstationName);
-      const activeTasks = regularTasks.filter(task => task.status === 'TODO' || task.status === 'IN_PROGRESS');
-      
-      const tasksWithProjectInfo = await Promise.all(
-        activeTasks.map(async (task) => {
-          try {
-            const { data: phaseData, error: phaseError } = await supabase
-              .from('phases')
-              .select('project_id, name')
-              .eq('id', task.phase_id)
-              .single();
-            
-            if (phaseError) throw phaseError;
-            
-            const { data: projectData, error: projectError } = await supabase
-              .from('projects')
+  const fetchWorkstationTasks = useCallback(async (): Promise<ExtendedTask[]> => {
+    if (!actualWorkstationName) return [];
+    
+    const regularTasks = await taskService.getByWorkstation(actualWorkstationName);
+    const activeTasks = regularTasks.filter(task => task.status === 'TODO' || task.status === 'IN_PROGRESS');
+    
+    const tasksWithProjectInfo = await Promise.all(
+      activeTasks.map(async (task) => {
+        try {
+          const { data: phaseData, error: phaseError } = await supabase
+            .from('phases')
+            .select('project_id, name')
+            .eq('id', task.phase_id)
+            .single();
+          
+          if (phaseError) throw phaseError;
+          
+          const { data: projectData, error: projectError } = await supabase
+            .from('projects')
+            .select('name')
+            .eq('id', phaseData.project_id)
+            .single();
+          
+          if (projectError) throw projectError;
+
+          let assigneeName = null;
+          if (task.status === 'IN_PROGRESS' && task.assignee_id) {
+            const { data: employeeData, error: employeeError } = await supabase
+              .from('employees')
               .select('name')
-              .eq('id', phaseData.project_id)
+              .eq('id', task.assignee_id)
               .single();
             
-            if (projectError) throw projectError;
-
-            let assigneeName = null;
-            if (task.status === 'IN_PROGRESS' && task.assignee_id) {
-              const { data: employeeData, error: employeeError } = await supabase
-                .from('employees')
-                .select('name')
-                .eq('id', task.assignee_id)
-                .single();
-              
-              if (!employeeError && employeeData) {
-                assigneeName = employeeData.name;
-              }
+            if (!employeeError && employeeData) {
+              assigneeName = employeeData.name;
             }
-
-            let activeWorkers = 0;
-            if (task.status === 'IN_PROGRESS') {
-              const { data: activeRegistrations, error: regError } = await supabase
-                .from('time_registrations')
-                .select('id')
-                .eq('task_id', task.id)
-                .eq('is_active', true);
-              
-              if (!regError && activeRegistrations) {
-                activeWorkers = activeRegistrations.length;
-              }
-            }
-            
-            return {
-              ...task,
-              project_name: projectData.name,
-              project_id: phaseData.project_id,
-              assignee_name: assigneeName,
-              active_workers: activeWorkers,
-              is_workstation_task: false
-            } as ExtendedTask;
-          } catch (error) {
-            console.error('Error fetching project info for task:', error);
-            return {
-              ...task,
-              project_name: 'Unknown Project',
-              project_id: '',
-              active_workers: 0,
-              is_workstation_task: false
-            } as ExtendedTask;
           }
-        })
-      );
+
+          let activeWorkers = 0;
+          if (task.status === 'IN_PROGRESS') {
+            const { data: activeRegistrations, error: regError } = await supabase
+              .from('time_registrations')
+              .select('id')
+              .eq('task_id', task.id)
+              .eq('is_active', true);
+            
+            if (!regError && activeRegistrations) {
+              activeWorkers = activeRegistrations.length;
+            }
+          }
+          
+          return {
+            ...task,
+            project_name: projectData.name,
+            project_id: phaseData.project_id,
+            assignee_name: assigneeName,
+            active_workers: activeWorkers,
+            is_workstation_task: false
+          } as ExtendedTask;
+        } catch (error) {
+          console.error('Error fetching project info for task:', error);
+          return {
+            ...task,
+            project_name: 'Unknown Project',
+            project_id: '',
+            active_workers: 0,
+            is_workstation_task: false
+          } as ExtendedTask;
+        }
+      })
+    );
+    
+    let workstationDbId = workstationId;
+    if (!workstationDbId && actualWorkstationName) {
+      const { data: workstationData, error: workstationError } = await supabase
+        .from('workstations')
+        .select('id')
+        .eq('name', actualWorkstationName)
+        .single();
       
-      let workstationDbId = workstationId;
-      if (!workstationDbId && actualWorkstationName) {
-        const { data: workstationData, error: workstationError } = await supabase
-          .from('workstations')
-          .select('id')
-          .eq('name', actualWorkstationName)
-          .single();
-        
-        if (workstationError) throw workstationError;
-        workstationDbId = workstationData.id;
-      }
+      if (workstationError) throw workstationError;
+      workstationDbId = workstationData.id;
+    }
+    
+    let allTasks = [...tasksWithProjectInfo];
+    
+    if (workstationDbId) {
+      const rushOrders = await rushOrderService.getRushOrdersForWorkstation(workstationDbId);
       
-      let allTasks = [...tasksWithProjectInfo];
-      
-      if (workstationDbId) {
-        const rushOrders = await rushOrderService.getRushOrdersForWorkstation(workstationDbId);
-        
-        if (rushOrders.length > 0) {
-          for (const rushOrder of rushOrders) {
-            if (rushOrder.tasks && rushOrder.tasks.length > 0) {
-              const tasksWithRushOrderInfo = await Promise.all(
-                rushOrder.tasks.map(async (taskLink: any) => {
-                  try {
-                    const { data: task, error: taskError } = await supabase
-                      .from('tasks')
-                      .select('*')
-                      .eq('id', taskLink.standard_task_id)
-                      .single();
-                    
-                    if (taskError) throw taskError;
-                    
-                    const { data: rushOrderInfo, error: rushOrderError } = await supabase
-                      .from('rush_orders')
-                      .select('title')
-                      .eq('id', taskLink.rush_order_id)
-                      .neq('status', 'completed')
-                      .single();
-                    
-                    if (rushOrderError) {
-                      return null;
-                    }
-                    
-                    const validateTaskStatus = (status: string): "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD" => {
-                      if (['TODO', 'IN_PROGRESS', 'COMPLETED', 'HOLD'].includes(status)) {
-                        return status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD";
-                      }
-                      return 'TODO';
-                    };
-                    
-                    const status = validateTaskStatus(task.status);
-                    
-                    if (status !== 'TODO' && status !== 'IN_PROGRESS') {
-                      return null;
-                    }
-                    
-                    return {
-                      ...task,
-                      status,
-                      is_rush_order: true,
-                      rush_order_id: taskLink.rush_order_id,
-                      title: task.title,
-                      project_name: rushOrderInfo.title,
-                      active_workers: 0,
-                      is_workstation_task: false
-                    } as ExtendedTask;
-                  } catch (error) {
-                    console.error('Error processing rush order task:', error);
+      if (rushOrders.length > 0) {
+        for (const rushOrder of rushOrders) {
+          if (rushOrder.tasks && rushOrder.tasks.length > 0) {
+            const tasksWithRushOrderInfo = await Promise.all(
+              rushOrder.tasks.map(async (taskLink: any) => {
+                try {
+                  const { data: task, error: taskError } = await supabase
+                    .from('tasks')
+                    .select('*')
+                    .eq('id', taskLink.standard_task_id)
+                    .single();
+                  
+                  if (taskError) throw taskError;
+                  
+                  const { data: rushOrderInfo, error: rushOrderError } = await supabase
+                    .from('rush_orders')
+                    .select('title')
+                    .eq('id', taskLink.rush_order_id)
+                    .neq('status', 'completed')
+                    .single();
+                  
+                  if (rushOrderError) {
                     return null;
                   }
-                })
-              );
-              
-              const validRushOrderTasks = tasksWithRushOrderInfo.filter(task => task !== null) as ExtendedTask[];
-              allTasks = [...allTasks, ...validRushOrderTasks];
-            }
+                  
+                  const validateTaskStatus = (status: string): "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD" => {
+                    if (['TODO', 'IN_PROGRESS', 'COMPLETED', 'HOLD'].includes(status)) {
+                      return status as "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD";
+                    }
+                    return 'TODO';
+                  };
+                  
+                  const status = validateTaskStatus(task.status);
+                  
+                  if (status !== 'TODO' && status !== 'IN_PROGRESS') {
+                    return null;
+                  }
+                  
+                  return {
+                    ...task,
+                    status,
+                    is_rush_order: true,
+                    rush_order_id: taskLink.rush_order_id,
+                    title: task.title,
+                    project_name: rushOrderInfo.title,
+                    active_workers: 0,
+                    is_workstation_task: false
+                  } as ExtendedTask;
+                } catch (error) {
+                  console.error('Error processing rush order task:', error);
+                  return null;
+                }
+              })
+            );
+            
+            const validRushOrderTasks = tasksWithRushOrderInfo.filter(task => task !== null) as ExtendedTask[];
+            allTasks = [...allTasks, ...validRushOrderTasks];
           }
         }
       }
-      
-      return allTasks;
-    },
+    }
+    
+    return allTasks;
+  }, [actualWorkstationName, workstationId]);
+
+  const { data: tasks = [], isLoading: loading, error: queryError, refetch: loadTasks } = useQuery<ExtendedTask[], Error>({
+    queryKey: ['workstationTasks', actualWorkstationName],
+    queryFn: fetchWorkstationTasks,
     enabled: !!actualWorkstationName,
   });
-
-  const [tasks, setTasks] = useState<ExtendedTask[]>([]);
-  useEffect(() => {
-    if (fetchedTasks) {
-      setTasks(fetchedTasks);
-    }
-  }, [fetchedTasks]);
 
   const queryErrorMessage = queryError ? t('failed_to_load_projects', { message: '' }) : null;
   const error = componentError || queryErrorMessage;
@@ -289,45 +284,48 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     }
   });
 
+  // Timer update effect - separate from tasks state management
   useEffect(() => {
     const timer = setInterval(() => {
-      setTasks(prevTasks => prevTasks.map(task => {
-        if (task.status === 'IN_PROGRESS' && task.status_changed_at && task.duration !== null && task.duration !== undefined) {
-          const startTime = new Date(task.status_changed_at);
-          const now = new Date();
-          const elapsedMs = now.getTime() - startTime.getTime();
-          const durationMs = task.duration * 60 * 1000;
-          const remainingMs = durationMs - elapsedMs;
-          
-          if (remainingMs > 0) {
-            const hours = Math.floor(remainingMs / (1000 * 60 * 60));
-            const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
-            
-            return {
-              ...task,
-              timeRemaining: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
-              isOvertime: false
-            };
-          } else {
-            const overtimeMs = Math.abs(remainingMs);
-            const hours = Math.floor(overtimeMs / (1000 * 60 * 60));
-            const minutes = Math.floor((overtimeMs % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((overtimeMs % (1000 * 60)) / 1000);
-            
-            return {
-              ...task,
-              timeRemaining: `-${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
-              isOvertime: true
-            };
-          }
-        }
-        return task;
-      }));
+      // This will trigger a re-render with updated time calculations
+      // The time calculations are done in the render phase, not here
     }, 1000);
 
     return () => clearInterval(timer);
   }, []);
+
+  // Helper function to calculate time remaining for a task
+  const calculateTimeRemaining = (task: ExtendedTask) => {
+    if (task.status === 'IN_PROGRESS' && task.status_changed_at && task.duration !== null && task.duration !== undefined) {
+      const startTime = new Date(task.status_changed_at);
+      const now = new Date();
+      const elapsedMs = now.getTime() - startTime.getTime();
+      const durationMs = task.duration * 60 * 1000;
+      const remainingMs = durationMs - elapsedMs;
+      
+      if (remainingMs > 0) {
+        const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+        const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
+        
+        return {
+          timeRemaining: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
+          isOvertime: false
+        };
+      } else {
+        const overtimeMs = Math.abs(remainingMs);
+        const hours = Math.floor(overtimeMs / (1000 * 60 * 60));
+        const minutes = Math.floor((overtimeMs % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((overtimeMs % (1000 * 60)) / 1000);
+        
+        return {
+          timeRemaining: `-${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`,
+          isOvertime: true
+        };
+      }
+    }
+    return { timeRemaining: null, isOvertime: false };
+  };
 
   useEffect(() => {
     const resolveWorkstationName = async () => {
@@ -410,20 +408,16 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
   const handleTaskUpdate = async (taskId: string, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     try {
       if (newStatus === 'COMPLETED') {
-        // Add optimistic update - immediately mark task as completing and remove from UI
         setCompletingTasks(prev => new Set(prev).add(taskId));
-        setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
         
-        // Show immediate feedback
         toast({
           title: t('success'),
           description: t('task_completed_successfully'),
         });
         
-        // Perform the actual completion in background
         await timeRegistrationService.completeTask(taskId);
         
-        const completedTask = fetchedTasks.find(task => task.id === taskId);
+        const completedTask = tasks.find(task => task.id === taskId);
         
         if (completedTask) {
           await checkAndUpdateLimitPhases(completedTask);
@@ -431,7 +425,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
           await loadTasks();
         }
         
-        // Remove from completing set
         setCompletingTasks(prev => {
           const newSet = new Set(prev);
           newSet.delete(taskId);
@@ -443,7 +436,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
       
       if (newStatus === 'IN_PROGRESS') {
         if (currentEmployee) {
-          const currentTask = fetchedTasks.find(task => task.id === taskId);
+          const currentTask = tasks.find(task => task.id === taskId);
           const remainingDuration = currentTask?.duration;
           
           startTimerMutation.mutate({
@@ -466,14 +459,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
         
       if (error) throw error;
       
-      setTasks(prevTasks => 
-        prevTasks.map(task => 
-          task.id === taskId 
-            ? { ...task, status: newStatus }
-            : task
-        )
-      );
-      
       toast({
         title: t('success'),
         description: t('task_updated'),
@@ -481,14 +466,13 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
     } catch (error) {
       console.error('Error updating task:', error);
       
-      // If completion failed, restore the task in UI
       if (newStatus === 'COMPLETED') {
         setCompletingTasks(prev => {
           const newSet = new Set(prev);
           newSet.delete(taskId);
           return newSet;
         });
-        await loadTasks(); // Reload to restore correct state
+        await loadTasks();
       }
       
       toast({
@@ -675,6 +659,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                   const urgency = task.due_date ? getUrgencyClass(task.due_date) : null;
                   const taskColor = getTaskColor(task);
                   const isCompleting = completingTasks.has(task.id);
+                  const timeInfo = calculateTimeRemaining(task);
                   
                   return (
                     <div 
@@ -706,9 +691,9 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({ workstationName, work
                               )}
                             </div>
                           )}
-                          {task.timeRemaining && (
-                            <p className={`text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-green-600'}`}>
-                              {t('time_remaining_label', { time: task.timeRemaining })}
+                          {timeInfo.timeRemaining && (
+                            <p className={`text-sm font-mono ${timeInfo.isOvertime ? 'text-red-600' : 'text-green-600'}`}>
+                              {t('time_remaining_label', { time: timeInfo.timeRemaining })}
                             </p>
                           )}
                         </div>
