@@ -142,7 +142,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
 
       if (overlappingTasks.length > 0 || tasksToMove.length > 0) {
         const worker = workers.find(w => w.id === workerId);
-        warnings.push(`${worker?.name}: Schedule will be automatically adjusted to accommodate the standard task. Existing tasks will be split and rescheduled as needed.`);
+        warnings.push(`${worker?.name}: Schedule will be automatically adjusted to accommodate the standard task. Overlapping tasks will be split and moved to later times, with only the last tasks potentially shortened if needed.`);
       }
     }
 
@@ -236,10 +236,10 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
 
     console.log(`Processing ${existingSchedule?.length || 0} existing tasks for worker ${workerId}`);
 
-    // Find tasks that need to be modified or moved
-    const tasksToProcess: (ScheduleItem & { duration: number })[] = [];
+    // Separate tasks into different categories
     const tasksToDelete: string[] = [];
-    const newTasks: any[] = [];
+    const tasksBeforeStandard: any[] = [];
+    const tasksToReschedule: (ScheduleItem & { duration: number })[] = [];
 
     // Process each existing task
     for (const task of existingSchedule || []) {
@@ -249,38 +249,38 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
 
       // Check if task overlaps with standard task
       if (standardTaskStart < taskEnd && standardTaskEnd > taskStart) {
-        console.log(`Task "${task.title}" overlaps with standard task, splitting...`);
+        console.log(`Task "${task.title}" overlaps with standard task, processing...`);
         
-        // Delete the original task
+        // Delete the original overlapping task
         tasksToDelete.push(task.id);
 
-        // Split the task if necessary
+        // If task starts before standard task, keep the part before
         if (taskStart < standardTaskStart) {
-          // Create first part (before standard task)
-          const firstPartEnd = new Date(standardTaskStart);
-          newTasks.push({
+          const beforePartEnd = new Date(standardTaskStart);
+          tasksBeforeStandard.push({
             employee_id: workerId,
             task_id: task.task_id,
             title: `${task.title} (Part 1)`,
             description: task.description,
             start_time: taskStart.toISOString(),
-            end_time: firstPartEnd.toISOString(),
+            end_time: beforePartEnd.toISOString(),
             is_auto_generated: task.is_auto_generated
           });
         }
 
+        // If task extends beyond standard task, schedule the remainder for later
         if (taskEnd > standardTaskEnd) {
-          // Create second part (after standard task) - to be rescheduled
-          const secondPartDuration = (taskEnd.getTime() - Math.max(taskStart.getTime(), standardTaskEnd.getTime())) / (1000 * 60);
-          tasksToProcess.push({
+          const remainingDuration = (taskEnd.getTime() - Math.max(taskStart.getTime(), standardTaskEnd.getTime())) / (1000 * 60);
+          tasksToReschedule.push({
             ...task,
             title: taskStart < standardTaskStart ? `${task.title} (Part 2)` : task.title,
-            duration: secondPartDuration
+            duration: remainingDuration
           });
         }
       } else if (taskStart >= standardTaskEnd) {
         // Task starts after standard task - needs rescheduling
-        tasksToProcess.push({
+        console.log(`Task "${task.title}" needs to be moved after standard task`);
+        tasksToReschedule.push({
           ...task,
           duration: taskDuration
         });
@@ -288,12 +288,19 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
       }
     }
 
-    // Delete overlapping tasks
+    // Delete overlapping and moved tasks
     if (tasksToDelete.length > 0) {
       await supabase
         .from('schedules')
         .delete()
         .in('id', tasksToDelete);
+    }
+
+    // Insert tasks that come before the standard task
+    if (tasksBeforeStandard.length > 0) {
+      await supabase
+        .from('schedules')
+        .insert(tasksBeforeStandard);
     }
 
     // Insert the standard task
@@ -308,15 +315,8 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
         is_auto_generated: false
       });
 
-    // Insert first parts of split tasks
-    if (newTasks.length > 0) {
-      await supabase
-        .from('schedules')
-        .insert(newTasks);
-    }
-
     // Reschedule tasks that come after the standard task
-    await rescheduleTasksAfterStandardTask(workerId, standardTaskEnd, tasksToProcess);
+    await rescheduleTasksAfterStandardTask(workerId, standardTaskEnd, tasksToReschedule);
   };
 
   const rescheduleTasksAfterStandardTask = async (
@@ -331,9 +331,12 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
     // Start rescheduling immediately after the standard task
     let currentTime = new Date(startFromTime);
     
-    for (const task of tasksToReschedule) {
-      // Find the next available slot that can accommodate this task
-      const nextSlot = findNextAvailableSlotConnected(currentTime, task.duration);
+    for (let i = 0; i < tasksToReschedule.length; i++) {
+      const task = tasksToReschedule[i];
+      const isLastTask = i === tasksToReschedule.length - 1;
+      
+      // Find the next available slot for this task
+      const nextSlot = findNextAvailableSlotWithShortening(currentTime, task.duration, isLastTask);
       
       if (!nextSlot) {
         console.warn(`Could not reschedule task "${task.title}" - no available slot`);
@@ -342,34 +345,35 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
 
       const newStartTime = nextSlot.start;
       const newEndTime = nextSlot.end;
+      const actualDuration = (newEndTime.getTime() - newStartTime.getTime()) / (1000 * 60);
 
-      console.log(`Rescheduling "${task.title}" to ${newStartTime.toISOString()} - ${newEndTime.toISOString()}`);
+      console.log(`Rescheduling "${task.title}" to ${newStartTime.toISOString()} - ${newEndTime.toISOString()} (${actualDuration}min)`);
 
       await supabase
         .from('schedules')
         .insert({
           employee_id: workerId,
           task_id: task.task_id,
-          title: task.title,
+          title: actualDuration < task.duration ? `${task.title} (Shortened)` : task.title,
           description: task.description,
           start_time: newStartTime.toISOString(),
           end_time: newEndTime.toISOString(),
           is_auto_generated: task.is_auto_generated
         });
 
-      // Update current time to end of this task for next task (no gaps)
+      // Update current time to end of this task for next task (connected scheduling)
       currentTime = new Date(newEndTime);
     }
   };
 
-  const findNextAvailableSlotConnected = (
+  const findNextAvailableSlotWithShortening = (
     startSearchFrom: Date, 
-    durationMinutes: number
+    durationMinutes: number,
+    canShorten: boolean = false
   ): { start: Date; end: Date } | null => {
     let searchTime = new Date(startSearchFrom);
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     
-    // Don't add buffer - we want tasks to be connected
     while (searchTime.getHours() < 16) {
       // Find which working period this time falls into
       const currentHour = searchTime.getHours();
@@ -408,21 +412,31 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
       const proposedEndTime = new Date(searchTime.getTime() + durationMinutes * 60 * 1000);
       
       if (proposedEndTime <= periodEndTime) {
-        // Task fits in current period
+        // Task fits completely in current period
         return { start: searchTime, end: proposedEndTime };
       } else {
         // Task doesn't fit completely in current period
-        // Calculate remaining time in current period
         const remainingTimeInPeriod = (periodEndTime.getTime() - searchTime.getTime()) / (1000 * 60);
         
-        if (remainingTimeInPeriod >= 5) { // Only split if meaningful time remains
-          // Use remaining time in current period
-          const partialEndTime = new Date(periodEndTime);
-          return { start: searchTime, end: partialEndTime };
+        // If this is the last task and we can shorten it, use remaining time
+        if (canShorten && remainingTimeInPeriod >= 5) {
+          console.log(`Shortening last task to fit in remaining time: ${remainingTimeInPeriod}min`);
+          return { start: searchTime, end: new Date(periodEndTime) };
+        }
+        
+        // If we have meaningful time remaining (at least 5 minutes), use it
+        if (remainingTimeInPeriod >= 5) {
+          return { start: searchTime, end: new Date(periodEndTime) };
         } else {
           // Move to next period
           const nextPeriodIndex = workingHours.indexOf(currentPeriod) + 1;
-          if (nextPeriodIndex >= workingHours.length) break; // No more periods
+          if (nextPeriodIndex >= workingHours.length) {
+            // No more periods - if we can shorten, use what's left
+            if (canShorten && remainingTimeInPeriod > 0) {
+              return { start: searchTime, end: new Date(periodEndTime) };
+            }
+            break;
+          }
           
           const nextPeriod = workingHours[nextPeriodIndex];
           searchTime = new Date(selectedDate);
