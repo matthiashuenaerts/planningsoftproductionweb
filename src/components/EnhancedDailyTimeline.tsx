@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -107,6 +106,16 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
     return title.substring(0, maxLength) + '...';
   };
 
+  const handleStartTask = (taskId: string) => {
+    console.log('Starting task:', taskId);
+    onStartTask?.(taskId);
+  };
+
+  const handleCompleteTask = (taskId: string) => {
+    console.log('Completing task:', taskId);
+    onCompleteTask?.(taskId);
+  };
+
   if (tasks.length === 0) {
     return (
       <Card>
@@ -169,15 +178,15 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                   <CardHeader className={`${isSmallTask ? 'py-3 pb-2' : 'pb-3'}`}>
                     <div className="flex justify-between items-start gap-3">
                       <div className="flex-1 min-w-0">
-                        <CardTitle className={`${isSmallTask ? 'text-base' : 'text-lg'} leading-tight`}>
+                        <CardTitle className={`${isSmallTask ? 'text-base' : 'text-lg'} leading-tight mb-1`}>
                           {truncateTitle(task.title, isSmallTask ? 40 : 60)}
                         </CardTitle>
-                        <CardDescription className="text-sm font-medium text-blue-600 mt-1">
+                        <CardDescription className="text-sm font-medium text-blue-600 mb-2">
                           {task.project_name}
                         </CardDescription>
                         
                         {/* Time range */}
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
                           <span>{formatTime(task.start_time)} - {formatTime(task.end_time)}</span>
                           {task.workstation && (
@@ -247,11 +256,11 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
 
                       {/* Task control buttons */}
                       <div className="flex gap-1 ml-auto">
-                        {task.status === 'todo' && !task.isActive && (
+                        {(task.status === 'todo' || task.status === 'scheduled') && !task.isActive && (
                           <Button
                             size="sm"
                             className="h-7 px-3 text-xs"
-                            onClick={() => onStartTask?.(task.id)}
+                            onClick={() => handleStartTask(task.id)}
                           >
                             <Play className="h-3 w-3 mr-1" />
                             Start
@@ -263,7 +272,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                             size="sm"
                             variant="outline"
                             className="h-7 px-3 text-xs"
-                            onClick={() => onStartTask?.(task.id)}
+                            onClick={() => handleStartTask(task.id)}
                           >
                             <Square className="h-3 w-3 mr-1" />
                             Pause
@@ -274,7 +283,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           <Button
                             size="sm"
                             className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700"
-                            onClick={() => onCompleteTask?.(task.id)}
+                            onClick={() => handleCompleteTask(task.id)}
                           >
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Complete
