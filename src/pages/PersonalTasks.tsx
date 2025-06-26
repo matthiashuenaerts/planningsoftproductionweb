@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar } from 'lucide-react';
@@ -53,6 +53,7 @@ const PersonalTasks = () => {
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -260,6 +261,14 @@ const PersonalTasks = () => {
     }
   };
 
+  const handleShowOrders = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task && task.phases.projects.id) {
+      // Navigate to project orders page
+      navigate(`/projects/${task.phases.projects.id}/orders`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex">
@@ -300,6 +309,7 @@ const PersonalTasks = () => {
               const task = tasks.find(t => t.id === taskId);
               if (task) setShowBarcodeDialog(task.phases.projects.id);
             }}
+            onShowOrders={handleShowOrders}
           />
         </div>
 

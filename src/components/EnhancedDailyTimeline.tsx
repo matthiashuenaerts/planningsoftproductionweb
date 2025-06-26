@@ -12,6 +12,7 @@ import {
   FileText, 
   Package2, 
   QrCode, 
+  ShoppingCart,
   ExternalLink 
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -37,6 +38,7 @@ interface EnhancedDailyTimelineProps {
   onShowFiles?: (projectId: string) => void;
   onShowParts?: (projectId: string) => void;
   onShowBarcode?: (projectId: string) => void;
+  onShowOrders?: (projectId: string) => void;
 }
 
 const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
@@ -45,7 +47,8 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
   onCompleteTask,
   onShowFiles,
   onShowParts,
-  onShowBarcode
+  onShowBarcode,
+  onShowOrders
 }) => {
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -115,8 +118,6 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
 
   const handlePauseTask = (taskId: string) => {
     console.log('Pausing task:', taskId);
-    // For pause functionality, we call the same handler but the parent component
-    // should handle it as a toggle (if active, pause it)
     if (onStartTask) {
       onStartTask(taskId);
     }
@@ -147,6 +148,13 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
     console.log('Show barcode for task:', taskId);
     if (onShowBarcode) {
       onShowBarcode(taskId);
+    }
+  };
+
+  const handleShowOrders = (taskId: string) => {
+    console.log('Show orders for task:', taskId);
+    if (onShowOrders) {
+      onShowOrders(taskId);
     }
   };
 
@@ -269,6 +277,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                             e.stopPropagation();
                             handleShowFiles(task.id);
                           }}
+                          title="Project Files"
                         >
                           <FileText className="h-3 w-3" />
                         </Button>
@@ -280,8 +289,23 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
+                            handleShowOrders(task.id);
+                          }}
+                          title="Project Orders"
+                        >
+                          <ShoppingCart className="h-3 w-3" />
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             handleShowParts(task.id);
                           }}
+                          title="Parts List"
                         >
                           <Package2 className="h-3 w-3" />
                         </Button>
@@ -295,6 +319,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                             e.stopPropagation();
                             handleShowBarcode(task.id);
                           }}
+                          title="Project Barcode"
                         >
                           <QrCode className="h-3 w-3" />
                         </Button>
