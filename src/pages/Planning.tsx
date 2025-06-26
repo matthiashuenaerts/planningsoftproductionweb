@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { format, startOfDay } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
@@ -20,6 +21,7 @@ import {
   Trash2,
   RefreshCw,
   Zap,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Navbar from '@/components/Navbar';
@@ -37,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import PlanningTaskManager from '@/components/PlanningTaskManager';
 import TaskConflictResolver from '@/components/TaskConflictResolver';
+import StandardTaskAssignment from '@/components/StandardTaskAssignment';
 import { supabase } from '@/integrations/supabase/client';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -96,6 +99,7 @@ const Planning = () => {
   const [showConflictResolver, setShowConflictResolver] = useState(false);
   const [taskConflicts, setTaskConflicts] = useState<any[]>([]);
   const [excludedTasksPerUser, setExcludedTasksPerUser] = useState<Record<string, string[]>>({});
+  const [showStandardTaskAssignment, setShowStandardTaskAssignment] = useState(false);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const isAdmin = currentEmployee?.role === 'admin';
@@ -962,6 +966,14 @@ const Planning = () => {
                 {isAdmin && (
                   <div className="flex space-x-2">
                     <Button
+                      onClick={() => setShowStandardTaskAssignment(true)}
+                      variant="outline"
+                      className="whitespace-nowrap"
+                    >
+                      <Settings className="mr-2 h-4 w-4" />
+                      Add Standard Task
+                    </Button>
+                    <Button
                       onClick={generateAllSchedules}
                       disabled={generatingSchedule}
                       className="whitespace-nowrap"
@@ -1371,6 +1383,17 @@ const Planning = () => {
               onClose={() => setShowConflictResolver(false)}
               conflicts={taskConflicts}
               onResolve={resolveTaskConflicts}
+            />
+
+            <StandardTaskAssignment
+              isOpen={showStandardTaskAssignment}
+              onClose={() => setShowStandardTaskAssignment(false)}
+              selectedDate={selectedDate}
+              workers={workers}
+              onSave={() => {
+                fetchAllData();
+                setShowStandardTaskAssignment(false);
+              }}
             />
           </div>
         </div>
