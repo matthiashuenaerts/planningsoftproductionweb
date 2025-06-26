@@ -343,14 +343,17 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
     let currentTime = new Date(startFromTime);
     const tasksToInsert: any[] = [];
     
-    // Schedule all tasks with their ORIGINAL duration, connecting them without gaps
+    // Schedule all tasks consecutively, connecting them without gaps
     for (const task of tasksToReschedule) {
       console.log(`Scheduling "${task.title}" with original duration: ${task.originalDuration}min`);
       
-      const nextSlot = findNextAvailableSlot(currentTime, task.originalDuration);
+      // Find the next available slot starting from currentTime
+      const nextSlot = findNextAvailableSlotConsecutive(currentTime, task.originalDuration);
       
       if (nextSlot) {
         console.log(`Scheduling "${task.title}" from ${nextSlot.start.toISOString()} with duration ${task.originalDuration}min`);
+        
+        const taskEndTime = new Date(nextSlot.start.getTime() + task.originalDuration * 60 * 1000);
         
         tasksToInsert.push({
           employee_id: workerId,
@@ -358,14 +361,14 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
           title: task.title,
           description: task.description,
           start_time: nextSlot.start.toISOString(),
-          end_time: new Date(nextSlot.start.getTime() + task.originalDuration * 60 * 1000).toISOString(),
+          end_time: taskEndTime.toISOString(),
           is_auto_generated: task.is_auto_generated
         });
         
-        // Update current time to end of this task (connected scheduling)
-        currentTime = new Date(nextSlot.start.getTime() + task.originalDuration * 60 * 1000);
+        // Update current time to end of this task for consecutive scheduling
+        currentTime = new Date(taskEndTime);
       } else {
-        // If can't fit with original duration, try to find any available space
+        // If can't fit with original duration, try to find available space with shortening
         console.log(`Cannot fit "${task.title}" with original duration, looking for available space...`);
         
         const availableSlot = findNextAvailableSlotWithShortening(currentTime, task.originalDuration);
@@ -406,7 +409,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
     }
   };
 
-  const findNextAvailableSlot = (
+  const findNextAvailableSlotConsecutive = (
     startSearchFrom: Date, 
     durationMinutes: number
   ): { start: Date; end: Date } | null => {
