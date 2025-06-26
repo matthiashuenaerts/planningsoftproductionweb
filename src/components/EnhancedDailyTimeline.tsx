@@ -24,19 +24,17 @@ interface EnhancedTimelineTask {
   end_time: string;
   description: string;
   status: string;
-  projectName: string;
-  projectId?: string;
-  taskId?: string;
-  priority?: string;
-  workstation?: string;
-  isActive?: boolean;
-  canStart?: boolean;
-  canComplete?: boolean;
+  project_name: string;
+  workstation: string;
+  priority: string;
+  canComplete: boolean;
+  isActive: boolean;
 }
 
 interface EnhancedDailyTimelineProps {
   tasks: EnhancedTimelineTask[];
-  onTaskAction?: (taskId: string, action: string) => void;
+  onStartTask?: (taskId: string) => void;
+  onCompleteTask?: (taskId: string) => void;
   onShowFiles?: (projectId: string) => void;
   onShowParts?: (projectId: string) => void;
   onShowBarcode?: (projectId: string) => void;
@@ -44,7 +42,8 @@ interface EnhancedDailyTimelineProps {
 
 const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
   tasks,
-  onTaskAction,
+  onStartTask,
+  onCompleteTask,
   onShowFiles,
   onShowParts,
   onShowBarcode
@@ -54,23 +53,26 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
       'scheduled': { color: 'bg-blue-100 text-blue-800 border-blue-300', label: 'Scheduled' },
       'in_progress': { color: 'bg-amber-100 text-amber-800 border-amber-300', label: 'In Progress' },
       'completed': { color: 'bg-green-100 text-green-800 border-green-300', label: 'Completed' },
+      'todo': { color: 'bg-gray-100 text-gray-800 border-gray-300', label: 'To Do' },
       'hold': { color: 'bg-red-100 text-red-800 border-red-300', label: 'On Hold' }
     };
     
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig['scheduled'];
-    return <Badge className={config.color}>{config.label}</Badge>;
+    return <Badge className={`${config.color} text-xs font-medium`}>{config.label}</Badge>;
   };
 
   const getPriorityBadge = (priority: string) => {
     switch (priority?.toLowerCase()) {
+      case 'urgent':
+        return <Badge className="bg-red-100 text-red-800 border-red-300 text-xs">Urgent</Badge>;
       case 'high':
-        return <Badge className="bg-red-100 text-red-800 border-red-300">High</Badge>;
+        return <Badge className="bg-orange-100 text-orange-800 border-orange-300 text-xs">High</Badge>;
       case 'medium':
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Medium</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 text-xs">Medium</Badge>;
       case 'low':
-        return <Badge className="bg-green-100 text-green-800 border-green-300">Low</Badge>;
+        return <Badge className="bg-green-100 text-green-800 border-green-300 text-xs">Low</Badge>;
       default:
-        return <Badge>{priority || 'Medium'}</Badge>;
+        return <Badge className="text-xs">{priority || 'Medium'}</Badge>;
     }
   };
 
@@ -82,12 +84,27 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
     }
   };
 
-  const formatDate = (timeString: string) => {
+  const calculateDuration = (startTime: string, endTime: string) => {
     try {
-      return format(parseISO(timeString), 'MMM dd, yyyy');
+      const start = parseISO(startTime);
+      const end = parseISO(endTime);
+      const diffMinutes = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+      
+      if (diffMinutes < 60) {
+        return `${diffMinutes}min`;
+      } else {
+        const hours = Math.floor(diffMinutes / 60);
+        const minutes = diffMinutes % 60;
+        return minutes > 0 ? `${hours}h ${minutes}min` : `${hours}h`;
+      }
     } catch {
-      return timeString;
+      return '';
     }
+  };
+
+  const truncateTitle = (title: string, maxLength: number = 60) => {
+    if (title.length <= maxLength) return title;
+    return title.substring(0, maxLength) + '...';
   };
 
   if (tasks.length === 0) {
@@ -101,135 +118,176 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
     );
   }
 
+  // Sort tasks by start time
+  const sortedTasks = [...tasks].sort((a, b) => 
+    new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+  );
+
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold">Daily Timeline</h2>
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-        {tasks.map((task) => (
-          <Card key={task.id} className="h-fit">
-            <CardHeader className="pb-3">
-              <div className="flex justify-between items-start mb-2">
-                <div className="flex-1">
-                  <CardTitle className="text-lg mb-1">{task.projectName}</CardTitle>
-                  <CardDescription className="text-base font-medium">
-                    {task.title}
-                  </CardDescription>
+    <div className="space-y-3">
+      <h2 className="text-xl font-semibold mb-4">Daily Timeline</h2>
+      
+      {/* Timeline container with time markers */}
+      <div className="relative">
+        {/* Time line */}
+        <div className="absolute left-16 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+        
+        {sortedTasks.map((task, index) => {
+          const duration = calculateDuration(task.start_time, task.end_time);
+          const isSmallTask = duration && (duration.includes('min') && !duration.includes('h'));
+          
+          return (
+            <div key={task.id} className="relative flex items-start mb-4">
+              {/* Time marker */}
+              <div className="flex-shrink-0 w-14 text-right pr-4">
+                <div className="text-sm font-medium text-gray-600">
+                  {formatTime(task.start_time)}
                 </div>
-                {task.isActive && (
-                  <div className="flex items-center gap-1 text-green-600">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="text-xs font-medium">Active</span>
-                  </div>
-                )}
+                <div className="text-xs text-gray-400">
+                  {duration}
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                <span>{formatTime(task.start_time)} - {formatTime(task.end_time)}</span>
-                <Calendar className="h-4 w-4 ml-2" />
-                <span>{formatDate(task.start_time)}</span>
+              
+              {/* Timeline dot */}
+              <div className="relative flex-shrink-0">
+                <div className={`w-3 h-3 rounded-full border-2 ${
+                  task.isActive 
+                    ? 'bg-green-500 border-green-500 animate-pulse' 
+                    : task.status === 'completed'
+                    ? 'bg-green-500 border-green-500'
+                    : task.status === 'in_progress'
+                    ? 'bg-amber-500 border-amber-500'
+                    : 'bg-white border-gray-300'
+                }`}></div>
               </div>
-            </CardHeader>
-            
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                {getStatusBadge(task.status)}
-                {task.priority && getPriorityBadge(task.priority)}
+              
+              {/* Task card */}
+              <div className="flex-1 ml-4">
+                <Card className={`transition-all hover:shadow-md ${
+                  task.isActive ? 'ring-2 ring-green-500 ring-opacity-50' : ''
+                } ${isSmallTask ? 'py-2' : ''}`}>
+                  <CardHeader className={`${isSmallTask ? 'py-3 pb-2' : 'pb-3'}`}>
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className={`${isSmallTask ? 'text-base' : 'text-lg'} leading-tight`}>
+                          {truncateTitle(task.title, isSmallTask ? 40 : 60)}
+                        </CardTitle>
+                        <CardDescription className="text-sm font-medium text-blue-600 mt-1">
+                          {task.project_name}
+                        </CardDescription>
+                        
+                        {/* Time range */}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                          <Clock className="h-3 w-3" />
+                          <span>{formatTime(task.start_time)} - {formatTime(task.end_time)}</span>
+                          {task.workstation && (
+                            <>
+                              <User className="h-3 w-3 ml-2" />
+                              <span>{task.workstation}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Status indicator */}
+                      {task.isActive && (
+                        <div className="flex items-center gap-1 text-green-600 flex-shrink-0">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                          <span className="text-xs font-medium">Active</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent className={`space-y-3 ${isSmallTask ? 'py-2 pt-0' : 'pt-0'}`}>
+                    {/* Badges */}
+                    <div className="flex flex-wrap gap-2">
+                      {getStatusBadge(task.status)}
+                      {task.priority && getPriorityBadge(task.priority)}
+                    </div>
+
+                    {/* Description for larger tasks */}
+                    {!isSmallTask && task.description && (
+                      <p className="text-sm text-muted-foreground">
+                        {truncateTitle(task.description, 100)}
+                      </p>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      {/* Quick action buttons */}
+                      <div className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => onShowFiles?.(task.id)}
+                        >
+                          <FileText className="h-3 w-3" />
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => onShowParts?.(task.id)}
+                        >
+                          <Package2 className="h-3 w-3" />
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => onShowBarcode?.(task.id)}
+                        >
+                          <QrCode className="h-3 w-3" />
+                        </Button>
+                      </div>
+
+                      {/* Task control buttons */}
+                      <div className="flex gap-1 ml-auto">
+                        {task.status === 'todo' && !task.isActive && (
+                          <Button
+                            size="sm"
+                            className="h-7 px-3 text-xs"
+                            onClick={() => onStartTask?.(task.id)}
+                          >
+                            <Play className="h-3 w-3 mr-1" />
+                            Start
+                          </Button>
+                        )}
+                        
+                        {task.isActive && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-3 text-xs"
+                            onClick={() => onStartTask?.(task.id)}
+                          >
+                            <Square className="h-3 w-3 mr-1" />
+                            Pause
+                          </Button>
+                        )}
+                        
+                        {task.canComplete && (
+                          <Button
+                            size="sm"
+                            className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700"
+                            onClick={() => onCompleteTask?.(task.id)}
+                          >
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Complete
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-
-              {task.workstation && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <User className="h-4 w-4" />
-                  <span>Workstation: {task.workstation}</span>
-                </div>
-              )}
-
-              {task.description && (
-                <p className="text-sm text-muted-foreground">{task.description}</p>
-              )}
-
-              {/* Action Buttons */}
-              {task.projectId && (
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onShowFiles?.(task.projectId!)}
-                  >
-                    <FileText className="h-4 w-4 mr-1" />
-                    Files
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onShowParts?.(task.projectId!)}
-                  >
-                    <Package2 className="h-4 w-4 mr-1" />
-                    Parts
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onShowBarcode?.(task.projectId!)}
-                  >
-                    <QrCode className="h-4 w-4 mr-1" />
-                    Barcode
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(`/projects/${task.projectId}`, '_blank')}
-                  >
-                    <ExternalLink className="h-4 w-4 mr-1" />
-                    Project
-                  </Button>
-                </div>
-              )}
-
-              {/* Task Control Buttons */}
-              {task.taskId && onTaskAction && (
-                <div className="flex gap-2 pt-2 border-t">
-                  {task.canStart && (
-                    <Button
-                      size="sm"
-                      onClick={() => onTaskAction(task.taskId!, 'IN_PROGRESS')}
-                      className="flex-1"
-                    >
-                      <Play className="h-4 w-4 mr-1" />
-                      Start
-                    </Button>
-                  )}
-                  
-                  {task.isActive && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onTaskAction(task.taskId!, 'TODO')}
-                      className="flex-1"
-                    >
-                      <Square className="h-4 w-4 mr-1" />
-                      Pause
-                    </Button>
-                  )}
-                  
-                  {task.canComplete && (
-                    <Button
-                      size="sm"
-                      onClick={() => onTaskAction(task.taskId!, 'COMPLETED')}
-                      className="flex-1"
-                      variant="default"
-                    >
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Complete
-                    </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

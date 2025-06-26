@@ -11,12 +11,11 @@ import { supabase } from '@/integrations/supabase/client';
 import Navbar from '@/components/Navbar';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import TaskTimer from '@/components/TaskTimer';
-import DailyTimeline from '@/components/DailyTimeline';
+import EnhancedDailyTimeline from '@/components/EnhancedDailyTimeline';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
-import EnhancedTaskCard from '@/components/EnhancedTaskCard';
-import { startOfDay, endOfDay, isToday } from 'date-fns';
+import { startOfDay, endOfDay, isToday, format, parseISO } from 'date-fns';
 
 interface Task {
   id: string;
@@ -218,7 +217,6 @@ const PersonalTasks = () => {
 
   const dailyTasks = tasks.filter(task => {
     const isScheduledForToday = scheduledTaskIds.includes(task.id);
-    // Appending T00:00:00 to treat date as local, not UTC
     const isDueToday = isToday(new Date(`${task.due_date}T00:00:00`));
     return isScheduledForToday || isDueToday;
   });
@@ -236,20 +234,20 @@ const PersonalTasks = () => {
     return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
   });
 
-  // Convert schedules to timeline format for DailyTimeline component
-  const timelineTasks = schedules.map(schedule => {
+  // Enhanced timeline data with better formatting
+  const enhancedTimelineData = schedules.map(schedule => {
     const associatedTask = schedule.task_id ? tasks.find(t => t.id === schedule.task_id) : undefined;
 
     if (associatedTask) {
       return {
-        id: associatedTask.id, // Use task id
+        id: associatedTask.id,
         title: associatedTask.title,
         start_time: schedule.start_time,
         end_time: schedule.end_time,
-        description: associatedTask.description || schedule.description,
+        description: associatedTask.description || schedule.description || '',
         status: associatedTask.status.toLowerCase(),
         project_name: associatedTask.phases.projects.name,
-        workstation: associatedTask.workstation,
+        workstation: associatedTask.workstation || '',
         priority: associatedTask.priority,
         canComplete: canCompleteTask(associatedTask),
         isActive: isTaskActive(associatedTask.id)
@@ -261,7 +259,7 @@ const PersonalTasks = () => {
       title: schedule.title,
       start_time: schedule.start_time,
       end_time: schedule.end_time,
-      description: schedule.description,
+      description: schedule.description || '',
       status: 'scheduled',
       project_name: schedule.title,
       workstation: '',
@@ -271,25 +269,170 @@ const PersonalTasks = () => {
     };
   });
 
-  // Add actual tasks to timeline with proper project information
-  const taskTimelineItems = tasks
-    .filter(task => !scheduledTaskIds.includes(task.id))
-    .map(task => ({
-      id: task.id,
-      title: task.title,
-      start_time: new Date().toISOString(),
-      end_time: new Date(Date.now() + (task.duration || 1) * 60 * 60 * 1000).toISOString(),
-      description: task.description || '',
-      status: task.status.toLowerCase(),
-      project_name: task.phases.projects.name,
-      workstation: task.workstation,
-      priority: task.priority,
-      canComplete: canCompleteTask(task),
-      isActive: isTaskActive(task.id)
-    }));
+  // Enhanced task card component for tile view
+  const TaskTile = ({ task, scheduledTime }: { task: Task; scheduledTime?: string }) => {
+    const formatTime = (timeString: string) => {
+      try {
+        return format(parseISO(timeString), 'HH:mm');
+      } catch {
+        return timeString;
+      }
+    };
 
-  // Combine schedules and tasks for timeline
-  const allTimelineTasks = [...timelineTasks, ...taskTimelineItems];
+    const getStatusColor = (status: string) => {
+      switch (status) {
+        case 'TODO': return 'bg-gray-100 text-gray-800 border-gray-300';
+        case 'IN_PROGRESS': return 'bg-amber-100 text-amber-800 border-amber-300';
+        case 'COMPLETED': return 'bg-green-100 text-green-800 border-green-300';
+        case 'HOLD': return 'bg-red-100 text-red-800 border-red-300';
+        default: return 'bg-gray-100 text-gray-800 border-gray-300';
+      }
+    };
+
+    const getPriorityColor = (priority: string) => {
+      switch (priority?.toLowerCase()) {
+        case 'urgent': return 'bg-red-100 text-red-800 border-red-300';
+        case 'high': return 'bg-orange-100 text-orange-800 border-orange-300';
+        case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+        case 'low': return 'bg-green-100 text-green-800 border-green-300';
+        default: return 'bg-gray-100 text-gray-800 border-gray-300';
+      }
+    };
+
+    return (
+      <Card className={`transition-all hover:shadow-md ${isTaskActive(task.id) ? 'ring-2 ring-green-500 ring-opacity-50' : ''}`}>
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-start gap-3">
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-lg leading-tight mb-2">{task.title}</CardTitle>
+              <CardDescription className="text-sm font-medium text-blue-600 mb-2">
+                {task.phases.projects.name}
+              </CardDescription>
+              
+              {/* Time and workstation info */}
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                {scheduledTime && (
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    <span>{formatTime(scheduledTime)}</span>
+                  </div>
+                )}
+                {task.workstation && (
+                  <div className="flex items-center gap-1">
+                    <User className="h-4 w-4" />
+                    <span>{task.workstation}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  <span>{format(new Date(task.due_date), 'MMM dd')}</span>
+                </div>
+              </div>
+            </div>
+            
+            {isTaskActive(task.id) && (
+              <div className="flex items-center gap-1 text-green-600 flex-shrink-0">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-xs font-medium">Active</span>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        
+        <CardContent className="space-y-4">
+          {/* Status and Priority badges */}
+          <div className="flex flex-wrap gap-2">
+            <Badge className={`${getStatusColor(task.status)} text-xs font-medium`}>
+              {task.status.replace('_', ' ')}
+            </Badge>
+            <Badge className={`${getPriorityColor(task.priority)} text-xs font-medium`}>
+              {task.priority}
+            </Badge>
+          </div>
+
+          {/* Description */}
+          {task.description && (
+            <p className="text-sm text-muted-foreground line-clamp-2">
+              {task.description}
+            </p>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap gap-2">
+            {/* Project action buttons */}
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs"
+                onClick={() => setShowFilesPopup(task.phases.projects.id)}
+              >
+                <FileText className="h-3 w-3 mr-1" />
+                Files
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs"
+                onClick={() => setShowPartsDialog(task.phases.projects.id)}
+              >
+                <Package2 className="h-3 w-3 mr-1" />
+                Parts
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs"
+                onClick={() => setShowBarcodeDialog(task.phases.projects.id)}
+              >
+                <QrCode className="h-3 w-3 mr-1" />
+                Barcode
+              </Button>
+            </div>
+
+            {/* Task control buttons */}
+            <div className="flex gap-1 ml-auto">
+              {task.status === 'TODO' && !isTaskActive(task.id) && (
+                <Button
+                  size="sm"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => handleTaskStatusChange(task.id, 'IN_PROGRESS')}
+                >
+                  <Play className="h-3 w-3 mr-1" />
+                  Start
+                </Button>
+              )}
+              
+              {isTaskActive(task.id) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => handleTaskStatusChange(task.id, 'TODO')}
+                >
+                  <Square className="h-3 w-3 mr-1" />
+                  Pause
+                </Button>
+              )}
+              
+              {canCompleteTask(task) && (
+                <Button
+                  size="sm"
+                  className="h-8 px-3 text-xs bg-green-600 hover:bg-green-700"
+                  onClick={() => handleTaskStatusChange(task.id, 'COMPLETED')}
+                >
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Complete
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   const handleTimelineStartTask = (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -383,18 +526,12 @@ const PersonalTasks = () => {
           </TabsList>
 
           <TabsContent value="tasks" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+            <div className="space-y-4">
               {sortedTasksForTab.map((task) => (
-                <EnhancedTaskCard
+                <TaskTile
                   key={task.id}
                   task={task}
-                  isActive={isTaskActive(task.id)}
-                  canComplete={canCompleteTask(task)}
                   scheduledTime={scheduleTimeMap.get(task.id)}
-                  onStatusChange={handleTaskStatusChange}
-                  onShowFiles={(projectId) => setShowFilesPopup(task.phases.projects.id)}
-                  onShowParts={(projectId) => setShowPartsDialog(task.phases.projects.id)}
-                  onShowBarcode={(projectId) => setShowBarcodeDialog(task.phases.projects.id)}
                 />
               ))}
             </div>
@@ -419,22 +556,22 @@ const PersonalTasks = () => {
           </TabsContent>
 
           <TabsContent value="timeline" className="space-y-4">
-            <DailyTimeline 
-              tasks={allTimelineTasks}
-              onShowFiles={(projectId) => {
-                const task = tasks.find(t => t.phases.projects.id === projectId || t.id === projectId);
-                if (task) setShowFilesPopup(task.phases.projects.id);
-              }}
-              onShowParts={(projectId) => {
-                const task = tasks.find(t => t.phases.projects.id === projectId || t.id === projectId);
-                if (task) setShowPartsDialog(task.phases.projects.id);
-              }}
-              onShowBarcode={(projectId) => {
-                const task = tasks.find(t => t.phases.projects.id === projectId || t.id === projectId);
-                if (task) setShowBarcodeDialog(task.phases.projects.id);
-              }}
+            <EnhancedDailyTimeline 
+              tasks={enhancedTimelineData}
               onStartTask={handleTimelineStartTask}
               onCompleteTask={handleTimelineCompleteTask}
+              onShowFiles={(taskId) => {
+                const task = tasks.find(t => t.id === taskId);
+                if (task) setShowFilesPopup(task.phases.projects.id);
+              }}
+              onShowParts={(taskId) => {
+                const task = tasks.find(t => t.id === taskId);
+                if (task) setShowPartsDialog(task.phases.projects.id);
+              }}
+              onShowBarcode={(taskId) => {
+                const task = tasks.find(t => t.id === taskId);
+                if (task) setShowBarcodeDialog(task.phases.projects.id);
+              }}
             />
           </TabsContent>
         </Tabs>
