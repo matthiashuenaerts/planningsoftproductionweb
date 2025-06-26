@@ -265,7 +265,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
     console.log(`Processing ${existingSchedule?.length || 0} existing tasks for worker ${workerId}`);
 
     // Find tasks that need to be modified or moved
-    const tasksToProcess: ScheduleItem[] = [];
+    const tasksToProcess: (ScheduleItem & { duration: number })[] = [];
     const tasksToDelete: string[] = [];
     const newTasks: any[] = [];
 
@@ -303,14 +303,15 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
             ...task,
             title: taskStart < standardTaskStart ? `${task.title} (Part 2)` : task.title,
             duration: secondPartDuration / (1000 * 60) // duration in minutes
-          } as ScheduleItem & { duration: number });
+          });
         }
       } else if (taskStart >= standardTaskEnd) {
         // Task starts after standard task - needs rescheduling
+        const taskDuration = (taskEnd.getTime() - taskStart.getTime()) / (1000 * 60);
         tasksToProcess.push({
           ...task,
-          duration: (taskEnd.getTime() - taskStart.getTime()) / (1000 * 60)
-        } as ScheduleItem & { duration: number });
+          duration: taskDuration
+        });
         tasksToDelete.push(task.id);
       }
     }
