@@ -216,7 +216,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           {truncateTitle(task.title, isSmallTask ? 40 : 60)}
                         </CardTitle>
                         <CardDescription className="text-sm font-medium text-blue-600 mb-2">
-                          {task.project_name}
+                          {task.project_name || 'No Project'}
                         </CardDescription>
                         
                         {/* Time range */}
