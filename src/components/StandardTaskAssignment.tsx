@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Clock, Users, AlertTriangle } from 'lucide-react';
+import { Clock, Users, AlertTriangle, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -65,7 +65,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
   const [startTime, setStartTime] = useState('09:00');
   const [duration, setDuration] = useState(60);
   const [loading, setLoading] = useState(false);
-  const [conflicts, setConflicts] = useState<string[]>([]);
+  const [scheduleWarnings, setScheduleWarnings] = useState<string[]>([]);
   const { toast } = useToast();
 
   // Working hours configuration - matches Planning.tsx
@@ -83,15 +83,15 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
       setSelectedWorkers([]);
       setStartTime('09:00');
       setDuration(60);
-      setConflicts([]);
+      setScheduleWarnings([]);
     }
   }, [isOpen]);
 
   useEffect(() => {
     if (selectedWorkers.length > 0 && startTime && duration) {
-      checkForConflicts();
+      checkForScheduleChanges();
     } else {
-      setConflicts([]);
+      setScheduleWarnings([]);
     }
   }, [selectedWorkers, startTime, duration]);
 
@@ -109,12 +109,12 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
     }
   };
 
-  const checkForConflicts = async () => {
+  const checkForScheduleChanges = async () => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const standardTaskStart = new Date(`${dateStr}T${startTime}:00`);
     const standardTaskEnd = new Date(standardTaskStart.getTime() + (duration * 60 * 1000));
 
-    const conflictingWorkers: string[] = [];
+    const warnings: string[] = [];
 
     for (const workerId of selectedWorkers) {
       // Get existing schedule for this worker
@@ -128,27 +128,39 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
 
       if (error) continue;
 
-      // Check if standard task fits within working hours and doesn't overlap with breaks
+      // Check if standard task fits within working hours
       const isValidTime = isTimeSlotValid(standardTaskStart, standardTaskEnd);
       if (!isValidTime) {
-        conflictingWorkers.push(`${workers.find(w => w.id === workerId)?.name}: Task spans break time or outside working hours`);
+        warnings.push(`${workers.find(w => w.id === workerId)?.name}: Task time spans break periods - will be adjusted to fit working hours`);
         continue;
       }
 
       // Check for overlaps with existing tasks
-      const hasOverlap = scheduleItems?.some(item => {
+      const overlappingTasks = scheduleItems?.filter(item => {
         const itemStart = new Date(item.start_time);
         const itemEnd = new Date(item.end_time);
         return standardTaskStart < itemEnd && standardTaskEnd > itemStart;
-      });
+      }) || [];
 
-      if (hasOverlap) {
+      if (overlappingTasks.length > 0) {
         const worker = workers.find(w => w.id === workerId);
-        conflictingWorkers.push(`${worker?.name}: Overlaps with existing tasks`);
+        const taskTitles = overlappingTasks.map(t => t.title).join(', ');
+        warnings.push(`${worker?.name}: Existing tasks (${taskTitles}) will be split and rescheduled to accommodate the standard task`);
+      }
+
+      // Check for tasks that need to be moved
+      const tasksToMove = scheduleItems?.filter(item => {
+        const itemStart = new Date(item.start_time);
+        return itemStart >= standardTaskEnd;
+      }) || [];
+
+      if (tasksToMove.length > 0) {
+        const worker = workers.find(w => w.id === workerId);
+        warnings.push(`${worker?.name}: ${tasksToMove.length} task(s) will be rescheduled to later time slots`);
       }
     }
 
-    setConflicts(conflictingWorkers);
+    setScheduleWarnings(warnings);
   };
 
   const isTimeSlotValid = (startTime: Date, endTime: Date): boolean => {
@@ -195,15 +207,6 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
       return;
     }
 
-    if (conflicts.length > 0) {
-      toast({
-        title: 'Cannot Add Task',
-        description: 'Please resolve conflicts first by adjusting time or workers',
-        variant: 'destructive'
-      });
-      return;
-    }
-
     try {
       setLoading(true);
       const selectedTask = workstationTasks.find(t => t.id === selectedTaskId);
@@ -226,7 +229,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
 
       toast({
         title: 'Success',
-        description: `Standard task assigned to ${selectedWorkers.length} worker(s) with automatic rescheduling`,
+        description: `Standard task assigned to ${selectedWorkers.length} worker(s) with automatic schedule adjustments`,
       });
 
       onSave();
@@ -276,7 +279,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
 
       // Check if task overlaps with standard task
       if (standardTaskStart < taskEnd && standardTaskEnd > taskStart) {
-        console.log(`Task "${task.title}" overlaps with standard task, processing...`);
+        console.log(`Task "${task.title}" overlaps with standard task, splitting...`);
         
         // Delete the original task
         tasksToDelete.push(task.id);
@@ -560,38 +563,38 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
             </Card>
           </div>
 
-          {conflicts.length > 0 && (
-            <Card className="border-amber-200 bg-amber-50">
+          {scheduleWarnings.length > 0 && (
+            <Card className="border-blue-200 bg-blue-50">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center text-amber-700">
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  Conflicts Detected
+                <CardTitle className="text-sm flex items-center text-blue-700">
+                  <Info className="h-4 w-4 mr-2" />
+                  Schedule Changes Required
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-1 text-sm text-amber-700">
-                  {conflicts.map((conflict, index) => (
-                    <li key={index}>• {conflict}</li>
+                <ul className="space-y-1 text-sm text-blue-700">
+                  {scheduleWarnings.map((warning, index) => (
+                    <li key={index}>• {warning}</li>
                   ))}
                 </ul>
-                <p className="text-xs text-amber-600 mt-2">
-                  Please adjust the time or worker selection to resolve conflicts.
+                <p className="text-xs text-blue-600 mt-2">
+                  The standard task will be implemented and existing schedules will be automatically adjusted to accommodate it.
                 </p>
               </CardContent>
             </Card>
           )}
 
-          {selectedWorkers.length > 0 && conflicts.length === 0 && (
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <div className="flex items-center text-sm text-blue-700">
+          {selectedWorkers.length > 0 && (
+            <div className="bg-green-50 p-3 rounded-lg">
+              <div className="flex items-center text-sm text-green-700">
                 <Clock className="h-4 w-4 mr-2" />
                 <span>
-                  Task will be scheduled from {startTime} for {duration} minutes
+                  Standard task will be scheduled from {startTime} for {duration} minutes
                   {selectedWorkers.length > 1 && ` for ${selectedWorkers.length} workers`}
                 </span>
               </div>
-              <p className="text-xs text-blue-600 mt-1">
-                Overlapping tasks will be split and rescheduled automatically while maintaining working hours and breaks.
+              <p className="text-xs text-green-600 mt-1">
+                Tasks will be split and rescheduled automatically while maintaining working hours and breaks.
               </p>
             </div>
           )}
@@ -603,7 +606,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
           </Button>
           <Button 
             onClick={handleSave} 
-            disabled={loading || conflicts.length > 0}
+            disabled={loading}
           >
             {loading ? 'Assigning...' : 'Assign Task'}
           </Button>
