@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -213,7 +212,7 @@ const PersonalTasks = () => {
     }
   });
 
-  // Enhanced timeline data with better formatting and project info
+  // Enhanced timeline data with better formatting
   const enhancedTimelineData = schedules.map(schedule => {
     const associatedTask = schedule.task_id ? tasks.find(t => t.id === schedule.task_id) : undefined;
 
@@ -226,7 +225,6 @@ const PersonalTasks = () => {
         description: associatedTask.description || schedule.description || '',
         status: associatedTask.status.toLowerCase(),
         project_name: associatedTask.phases.projects.name,
-        project_id: associatedTask.phases.projects.id, // Add project_id here
         workstation: associatedTask.workstation || '',
         priority: associatedTask.priority,
         canComplete: canCompleteTask(associatedTask),
@@ -242,7 +240,6 @@ const PersonalTasks = () => {
       description: schedule.description || '',
       status: 'scheduled',
       project_name: schedule.title,
-      project_id: null, // No project for non-task schedules
       workstation: '',
       priority: 'medium',
       canComplete: false,
@@ -264,31 +261,11 @@ const PersonalTasks = () => {
     }
   };
 
-  const handleShowFiles = (projectId: string) => {
-    console.log('Opening files for project:', projectId);
-    if (projectId) {
-      setShowFilesPopup(projectId);
-    }
-  };
-
-  const handleShowParts = (projectId: string) => {
-    console.log('Opening parts for project:', projectId);
-    if (projectId) {
-      setShowPartsDialog(projectId);
-    }
-  };
-
-  const handleShowBarcode = (projectId: string) => {
-    console.log('Opening barcode for project:', projectId);
-    if (projectId) {
-      setShowBarcodeDialog(projectId);
-    }
-  };
-
-  const handleShowOrders = (projectId: string) => {
-    console.log('Opening orders for project:', projectId);
-    if (projectId) {
-      navigate(`/projects/${projectId}/orders`);
+  const handleShowOrders = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task && task.phases.projects.id) {
+      // Navigate to project orders page
+      navigate(`/projects/${task.phases.projects.id}/orders`);
     }
   };
 
@@ -320,9 +297,18 @@ const PersonalTasks = () => {
             tasks={enhancedTimelineData}
             onStartTask={handleTimelineStartTask}
             onCompleteTask={handleTimelineCompleteTask}
-            onShowFiles={handleShowFiles}
-            onShowParts={handleShowParts}
-            onShowBarcode={handleShowBarcode}
+            onShowFiles={(taskId) => {
+              const task = tasks.find(t => t.id === taskId);
+              if (task) setShowFilesPopup(task.phases.projects.id);
+            }}
+            onShowParts={(taskId) => {
+              const task = tasks.find(t => t.id === taskId);
+              if (task) setShowPartsDialog(task.phases.projects.id);
+            }}
+            onShowBarcode={(taskId) => {
+              const task = tasks.find(t => t.id === taskId);
+              if (task) setShowBarcodeDialog(task.phases.projects.id);
+            }}
             onShowOrders={handleShowOrders}
           />
         </div>
