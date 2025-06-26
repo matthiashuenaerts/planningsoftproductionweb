@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Clock, Users, AlertTriangle, Info } from 'lucide-react';
+import { Clock, Users, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -128,13 +127,6 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
 
       if (error) continue;
 
-      // Check if standard task fits within working hours
-      const isValidTime = isTimeSlotValid(standardTaskStart, standardTaskEnd);
-      if (!isValidTime) {
-        warnings.push(`${workers.find(w => w.id === workerId)?.name}: Task time spans break periods - will be adjusted to fit working hours`);
-        continue;
-      }
-
       // Check for overlaps with existing tasks
       const overlappingTasks = scheduleItems?.filter(item => {
         const itemStart = new Date(item.start_time);
@@ -142,42 +134,19 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
         return standardTaskStart < itemEnd && standardTaskEnd > itemStart;
       }) || [];
 
-      if (overlappingTasks.length > 0) {
-        const worker = workers.find(w => w.id === workerId);
-        const taskTitles = overlappingTasks.map(t => t.title).join(', ');
-        warnings.push(`${worker?.name}: Existing tasks (${taskTitles}) will be split and rescheduled to accommodate the standard task`);
-      }
-
       // Check for tasks that need to be moved
       const tasksToMove = scheduleItems?.filter(item => {
         const itemStart = new Date(item.start_time);
         return itemStart >= standardTaskEnd;
       }) || [];
 
-      if (tasksToMove.length > 0) {
+      if (overlappingTasks.length > 0 || tasksToMove.length > 0) {
         const worker = workers.find(w => w.id === workerId);
-        warnings.push(`${worker?.name}: ${tasksToMove.length} task(s) will be rescheduled to later time slots`);
+        warnings.push(`${worker?.name}: Schedule will be automatically adjusted to accommodate the standard task. Existing tasks will be split and rescheduled as needed.`);
       }
     }
 
     setScheduleWarnings(warnings);
-  };
-
-  const isTimeSlotValid = (startTime: Date, endTime: Date): boolean => {
-    const timeStart = startTime.getHours() * 60 + startTime.getMinutes();
-    const timeEnd = endTime.getHours() * 60 + endTime.getMinutes();
-
-    // Check if it fits within any working period
-    for (const period of workingHours) {
-      const periodStart = parseInt(period.start.split(':')[0]) * 60 + parseInt(period.start.split(':')[1]);
-      const periodEnd = parseInt(period.end.split(':')[0]) * 60 + parseInt(period.end.split(':')[1]);
-      
-      if (timeStart >= periodStart && timeEnd <= periodEnd) {
-        return true;
-      }
-    }
-
-    return false;
   };
 
   const handleWorkerToggle = (workerId: string) => {
@@ -276,6 +245,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
     for (const task of existingSchedule || []) {
       const taskStart = new Date(task.start_time);
       const taskEnd = new Date(task.end_time);
+      const taskDuration = (taskEnd.getTime() - taskStart.getTime()) / (1000 * 60);
 
       // Check if task overlaps with standard task
       if (standardTaskStart < taskEnd && standardTaskEnd > taskStart) {
@@ -301,16 +271,15 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
 
         if (taskEnd > standardTaskEnd) {
           // Create second part (after standard task) - to be rescheduled
-          const secondPartDuration = taskEnd.getTime() - Math.max(taskStart.getTime(), standardTaskEnd.getTime());
+          const secondPartDuration = (taskEnd.getTime() - Math.max(taskStart.getTime(), standardTaskEnd.getTime())) / (1000 * 60);
           tasksToProcess.push({
             ...task,
             title: taskStart < standardTaskStart ? `${task.title} (Part 2)` : task.title,
-            duration: secondPartDuration / (1000 * 60) // duration in minutes
+            duration: secondPartDuration
           });
         }
       } else if (taskStart >= standardTaskEnd) {
         // Task starts after standard task - needs rescheduling
-        const taskDuration = (taskEnd.getTime() - taskStart.getTime()) / (1000 * 60);
         tasksToProcess.push({
           ...task,
           duration: taskDuration
@@ -359,13 +328,12 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
 
     console.log(`Rescheduling ${tasksToReschedule.length} tasks after standard task`);
 
+    // Start rescheduling immediately after the standard task
     let currentTime = new Date(startFromTime);
-    const dayEnd = new Date(selectedDate);
-    dayEnd.setHours(16, 0, 0, 0); // End of working day
-
+    
     for (const task of tasksToReschedule) {
-      // Find next available slot that fits the task
-      const nextSlot = findNextAvailableSlot(currentTime, task.duration, dayEnd);
+      // Find the next available slot that can accommodate this task
+      const nextSlot = findNextAvailableSlotConnected(currentTime, task.duration);
       
       if (!nextSlot) {
         console.warn(`Could not reschedule task "${task.title}" - no available slot`);
@@ -389,22 +357,20 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
           is_auto_generated: task.is_auto_generated
         });
 
-      // Update current time for next task (with 5-minute buffer)
-      currentTime = new Date(newEndTime.getTime() + 5 * 60 * 1000);
+      // Update current time to end of this task for next task (no gaps)
+      currentTime = new Date(newEndTime);
     }
   };
 
-  const findNextAvailableSlot = (
+  const findNextAvailableSlotConnected = (
     startSearchFrom: Date, 
-    durationMinutes: number, 
-    dayEnd: Date
+    durationMinutes: number
   ): { start: Date; end: Date } | null => {
     let searchTime = new Date(startSearchFrom);
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
     
-    // Add 5-minute buffer
-    searchTime.setMinutes(searchTime.getMinutes() + 5);
-
-    while (searchTime < dayEnd) {
+    // Don't add buffer - we want tasks to be connected
+    while (searchTime.getHours() < 16) {
       // Find which working period this time falls into
       const currentHour = searchTime.getHours();
       const currentMinute = searchTime.getMinutes();
@@ -445,13 +411,23 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
         // Task fits in current period
         return { start: searchTime, end: proposedEndTime };
       } else {
-        // Task doesn't fit, try next period
-        const nextPeriodIndex = workingHours.indexOf(currentPeriod) + 1;
-        if (nextPeriodIndex >= workingHours.length) break; // No more periods
+        // Task doesn't fit completely in current period
+        // Calculate remaining time in current period
+        const remainingTimeInPeriod = (periodEndTime.getTime() - searchTime.getTime()) / (1000 * 60);
         
-        const nextPeriod = workingHours[nextPeriodIndex];
-        searchTime = new Date(selectedDate);
-        searchTime.setHours(parseInt(nextPeriod.start.split(':')[0]), parseInt(nextPeriod.start.split(':')[1]), 0, 0);
+        if (remainingTimeInPeriod >= 5) { // Only split if meaningful time remains
+          // Use remaining time in current period
+          const partialEndTime = new Date(periodEndTime);
+          return { start: searchTime, end: partialEndTime };
+        } else {
+          // Move to next period
+          const nextPeriodIndex = workingHours.indexOf(currentPeriod) + 1;
+          if (nextPeriodIndex >= workingHours.length) break; // No more periods
+          
+          const nextPeriod = workingHours[nextPeriodIndex];
+          searchTime = new Date(selectedDate);
+          searchTime.setHours(parseInt(nextPeriod.start.split(':')[0]), parseInt(nextPeriod.start.split(':')[1]), 0, 0);
+        }
       }
     }
 
@@ -568,7 +544,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center text-blue-700">
                   <Info className="h-4 w-4 mr-2" />
-                  Schedule Changes Required
+                  Schedule Adjustments
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -578,7 +554,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
                   ))}
                 </ul>
                 <p className="text-xs text-blue-600 mt-2">
-                  The standard task will be implemented and existing schedules will be automatically adjusted to accommodate it.
+                  Tasks will be rescheduled to maintain proper working hours and breaks while ensuring no gaps between tasks.
                 </p>
               </CardContent>
             </Card>
@@ -594,7 +570,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
                 </span>
               </div>
               <p className="text-xs text-green-600 mt-1">
-                Tasks will be split and rescheduled automatically while maintaining working hours and breaks.
+                Existing tasks will be connected without gaps while maintaining designated break times.
               </p>
             </div>
           )}
