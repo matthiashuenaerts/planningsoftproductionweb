@@ -339,62 +339,79 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
 
     console.log(`Rescheduling ${tasksToReschedule.length} tasks after standard task`);
 
-    // Start rescheduling immediately after the standard task
     let currentTime = new Date(startFromTime);
     const tasksToInsert: any[] = [];
     
-    // Schedule all tasks consecutively, respecting working hours
+    // Schedule all tasks consecutively, respecting working hours and breaks
     for (const task of tasksToReschedule) {
       console.log(`Scheduling "${task.title}" with original duration: ${task.originalDuration}min`);
       
-      // Find the next available slot that can fit the task completely
-      const nextSlot = findNextAvailableSlotRespectingBreaks(currentTime, task.originalDuration);
+      let remainingDuration = task.originalDuration;
+      let taskPartNumber = task.splitPart === 'after' ? 2 : 1;
+      const baseTitle = task.title.replace(' (Part 1)', '').replace(' (Part 2)', '').replace(' (Shortened)', '');
       
-      if (nextSlot) {
-        console.log(`Scheduling "${task.title}" from ${nextSlot.start.toISOString()} to ${nextSlot.end.toISOString()}`);
+      // Continue scheduling until all duration is allocated
+      while (remainingDuration > 0) {
+        const currentWorkingPeriod = findCurrentWorkingPeriod(currentTime);
+        
+        if (!currentWorkingPeriod) {
+          // We're in a break, jump to next working period
+          console.log(`Currently in break at ${currentTime.toISOString()}, moving to next period`);
+          const nextPeriod = findNextWorkingPeriod(currentTime);
+          if (!nextPeriod) {
+            console.log('No more working periods available, dropping remaining task duration');
+            break;
+          }
+          
+          currentTime = new Date(nextPeriod.start);
+          console.log(`Moved to next working period: ${currentTime.toISOString()}`);
+          continue;
+        }
+
+        // Calculate available time in current working period
+        const availableTimeInPeriod = (currentWorkingPeriod.end.getTime() - currentTime.getTime()) / (1000 * 60);
+        console.log(`Available time in current period: ${availableTimeInPeriod}min (need ${remainingDuration}min)`);
+        
+        if (availableTimeInPeriod <= 0) {
+          // No time left in this period, move to next
+          const nextPeriod = findNextWorkingPeriod(currentWorkingPeriod.end);
+          if (!nextPeriod) {
+            console.log('No more working periods available');
+            break;
+          }
+          
+          currentTime = new Date(nextPeriod.start);
+          continue;
+        }
+
+        // Determine how much time to allocate in this period
+        const timeToAllocate = Math.min(remainingDuration, availableTimeInPeriod);
+        const endTime = new Date(currentTime.getTime() + timeToAllocate * 60 * 1000);
+        
+        // Create task title with appropriate part numbering
+        let taskTitle = baseTitle;
+        if (task.originalDuration > availableTimeInPeriod || taskPartNumber > 1) {
+          taskTitle = `${baseTitle} (Part ${taskPartNumber})`;
+        }
+        
+        console.log(`Scheduling part "${taskTitle}" from ${currentTime.toISOString()} to ${endTime.toISOString()} (${timeToAllocate}min)`);
         
         tasksToInsert.push({
           employee_id: workerId,
           task_id: task.task_id,
-          title: task.title,
+          title: taskTitle,
           description: task.description,
-          start_time: nextSlot.start.toISOString(),
-          end_time: nextSlot.end.toISOString(),
+          start_time: currentTime.toISOString(),
+          end_time: endTime.toISOString(),
           is_auto_generated: task.is_auto_generated
         });
         
-        // Update current time to end of this task for consecutive scheduling
-        currentTime = new Date(nextSlot.end);
-      } else {
-        // If can't fit with original duration, try to find available space with shortening
-        console.log(`Cannot fit "${task.title}" with original duration, looking for available space...`);
+        // Update remaining duration and current time
+        remainingDuration -= timeToAllocate;
+        currentTime = new Date(endTime);
+        taskPartNumber++;
         
-        const availableSlot = findNextAvailableSlotWithShortening(currentTime, task.originalDuration);
-        
-        if (availableSlot) {
-          const actualDuration = (availableSlot.end.getTime() - availableSlot.start.getTime()) / (1000 * 60);
-          
-          if (actualDuration >= 5) { // Minimum 5 minutes to be worth scheduling
-            const finalTitle = actualDuration < task.originalDuration ? `${task.title} (Shortened)` : task.title;
-            console.log(`Scheduling shortened task "${finalTitle}" from ${task.originalDuration}min to ${actualDuration}min`);
-            
-            tasksToInsert.push({
-              employee_id: workerId,
-              task_id: task.task_id,
-              title: finalTitle,
-              description: task.description,
-              start_time: availableSlot.start.toISOString(),
-              end_time: availableSlot.end.toISOString(),
-              is_auto_generated: task.is_auto_generated
-            });
-            
-            currentTime = new Date(availableSlot.end);
-          } else {
-            console.log(`Dropping task "${task.title}" - insufficient time remaining`);
-          }
-        } else {
-          console.log(`Dropping task "${task.title}" - no available time slot`);
-        }
+        console.log(`Remaining duration: ${remainingDuration}min, next start time: ${currentTime.toISOString()}`);
       }
     }
 
