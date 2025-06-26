@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -212,7 +213,7 @@ const PersonalTasks = () => {
     }
   });
 
-  // Enhanced timeline data with proper project information
+  // Enhanced timeline data with better formatting and project info
   const enhancedTimelineData = schedules.map(schedule => {
     const associatedTask = schedule.task_id ? tasks.find(t => t.id === schedule.task_id) : undefined;
 
@@ -225,7 +226,7 @@ const PersonalTasks = () => {
         description: associatedTask.description || schedule.description || '',
         status: associatedTask.status.toLowerCase(),
         project_name: associatedTask.phases.projects.name,
-        project_id: associatedTask.phases.projects.id,
+        project_id: associatedTask.phases.projects.id, // Add project_id here
         workstation: associatedTask.workstation || '',
         priority: associatedTask.priority,
         canComplete: canCompleteTask(associatedTask),
@@ -241,7 +242,7 @@ const PersonalTasks = () => {
       description: schedule.description || '',
       status: 'scheduled',
       project_name: schedule.title,
-      project_id: null,
+      project_id: null, // No project for non-task schedules
       workstation: '',
       priority: 'medium',
       canComplete: false,
@@ -263,31 +264,31 @@ const PersonalTasks = () => {
     }
   };
 
-  const handleShowOrders = (taskId: string) => {
-    const timelineItem = enhancedTimelineData.find(item => item.id === taskId);
-    if (timelineItem && timelineItem.project_id) {
-      navigate(`/projects/${timelineItem.project_id}/orders`);
+  const handleShowFiles = (projectId: string) => {
+    console.log('Opening files for project:', projectId);
+    if (projectId) {
+      setShowFilesPopup(projectId);
     }
   };
 
-  const handleShowFiles = (taskId: string) => {
-    const timelineItem = enhancedTimelineData.find(item => item.id === taskId);
-    if (timelineItem && timelineItem.project_id) {
-      setShowFilesPopup(timelineItem.project_id);
+  const handleShowParts = (projectId: string) => {
+    console.log('Opening parts for project:', projectId);
+    if (projectId) {
+      setShowPartsDialog(projectId);
     }
   };
 
-  const handleShowParts = (taskId: string) => {
-    const timelineItem = enhancedTimelineData.find(item => item.id === taskId);
-    if (timelineItem && timelineItem.project_id) {
-      setShowPartsDialog(timelineItem.project_id);
+  const handleShowBarcode = (projectId: string) => {
+    console.log('Opening barcode for project:', projectId);
+    if (projectId) {
+      setShowBarcodeDialog(projectId);
     }
   };
 
-  const handleShowBarcode = (taskId: string) => {
-    const timelineItem = enhancedTimelineData.find(item => item.id === taskId);
-    if (timelineItem && timelineItem.project_id) {
-      setShowBarcodeDialog(timelineItem.project_id);
+  const handleShowOrders = (projectId: string) => {
+    console.log('Opening orders for project:', projectId);
+    if (projectId) {
+      navigate(`/projects/${projectId}/orders`);
     }
   };
 
@@ -330,7 +331,7 @@ const PersonalTasks = () => {
         {showFilesPopup && (
           <ProjectFilesPopup
             projectId={showFilesPopup}
-            projectName={enhancedTimelineData.find(item => item.project_id === showFilesPopup)?.project_name || "Unknown Project"}
+            projectName={tasks.find(task => task.phases.projects.id === showFilesPopup)?.phases.projects.name || "Unknown Project"}
             isOpen={true}
             onClose={() => setShowFilesPopup(null)}
           />
@@ -355,7 +356,7 @@ const PersonalTasks = () => {
             isOpen={true}
             onClose={() => setShowBarcodeDialog(null)}
             projectId={showBarcodeDialog}
-            projectName={enhancedTimelineData.find(item => item.project_id === showBarcodeDialog)?.project_name || "Unknown Project"}
+            projectName={tasks.find(task => task.phases.projects.id === showBarcodeDialog)?.phases.projects.name || "Unknown Project"}
           />
         )}
       </div>

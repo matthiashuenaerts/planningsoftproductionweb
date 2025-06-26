@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +26,7 @@ interface EnhancedTimelineTask {
   description: string;
   status: string;
   project_name: string;
-  project_id: string | null;
+  project_id: string | null; // Add project_id to the interface
   workstation: string;
   priority: string;
   canComplete: boolean;
@@ -36,10 +37,10 @@ interface EnhancedDailyTimelineProps {
   tasks: EnhancedTimelineTask[];
   onStartTask?: (taskId: string) => void;
   onCompleteTask?: (taskId: string) => void;
-  onShowFiles?: (taskId: string) => void;
-  onShowParts?: (taskId: string) => void;
-  onShowBarcode?: (taskId: string) => void;
-  onShowOrders?: (taskId: string) => void;
+  onShowFiles?: (projectId: string) => void;
+  onShowParts?: (projectId: string) => void;
+  onShowBarcode?: (projectId: string) => void;
+  onShowOrders?: (projectId: string) => void;
 }
 
 const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
@@ -131,31 +132,31 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
     }
   };
 
-  const handleShowFiles = (taskId: string) => {
-    console.log('Show files for task:', taskId);
-    if (onShowFiles) {
-      onShowFiles(taskId);
+  const handleShowFiles = (projectId: string) => {
+    console.log('Show files for project:', projectId);
+    if (onShowFiles && projectId) {
+      onShowFiles(projectId);
     }
   };
 
-  const handleShowParts = (taskId: string) => {
-    console.log('Show parts for task:', taskId);
-    if (onShowParts) {
-      onShowParts(taskId);
+  const handleShowParts = (projectId: string) => {
+    console.log('Show parts for project:', projectId);
+    if (onShowParts && projectId) {
+      onShowParts(projectId);
     }
   };
 
-  const handleShowBarcode = (taskId: string) => {
-    console.log('Show barcode for task:', taskId);
-    if (onShowBarcode) {
-      onShowBarcode(taskId);
+  const handleShowBarcode = (projectId: string) => {
+    console.log('Show barcode for project:', projectId);
+    if (onShowBarcode && projectId) {
+      onShowBarcode(projectId);
     }
   };
 
-  const handleShowOrders = (taskId: string) => {
-    console.log('Show orders for task:', taskId);
-    if (onShowOrders) {
-      onShowOrders(taskId);
+  const handleShowOrders = (projectId: string) => {
+    console.log('Show orders for project:', projectId);
+    if (onShowOrders && projectId) {
+      onShowOrders(projectId);
     }
   };
 
@@ -225,7 +226,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           {truncateTitle(task.title, isSmallTask ? 40 : 60)}
                         </CardTitle>
                         <CardDescription className="text-sm font-medium text-blue-600 mb-2">
-                          {task.project_name}
+                          {task.project_name || 'No Project'}
                         </CardDescription>
                         
                         {/* Time range */}
@@ -267,64 +268,66 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
 
                     {/* Action Buttons */}
                     <div className="flex flex-wrap gap-2">
-                      {/* Quick action buttons */}
-                      <div className="flex gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleShowFiles(task.id);
-                          }}
-                          title="Project Files"
-                        >
-                          <FileText className="h-3 w-3" />
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleShowOrders(task.id);
-                          }}
-                          title="Project Orders"
-                        >
-                          <ShoppingCart className="h-3 w-3" />
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleShowParts(task.id);
-                          }}
-                          title="Parts List"
-                        >
-                          <Package2 className="h-3 w-3" />
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleShowBarcode(task.id);
-                          }}
-                          title="Project Barcode"
-                        >
-                          <QrCode className="h-3 w-3" />
-                        </Button>
-                      </div>
+                      {/* Quick action buttons - only show if project_id exists */}
+                      {task.project_id && (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleShowFiles(task.project_id!);
+                            }}
+                            title="Project Files"
+                          >
+                            <FileText className="h-3 w-3" />
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleShowOrders(task.project_id!);
+                            }}
+                            title="Project Orders"
+                          >
+                            <ShoppingCart className="h-3 w-3" />
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleShowParts(task.project_id!);
+                            }}
+                            title="Parts List"
+                          >
+                            <Package2 className="h-3 w-3" />
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleShowBarcode(task.project_id!);
+                            }}
+                            title="Project Barcode"
+                          >
+                            <QrCode className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
 
                       {/* Task control buttons */}
                       <div className="flex gap-1 ml-auto">
