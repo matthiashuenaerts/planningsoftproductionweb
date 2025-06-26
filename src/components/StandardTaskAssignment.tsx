@@ -239,61 +239,61 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
     // Separate tasks into different categories
     const tasksToDelete: string[] = [];
     const tasksBeforeStandard: any[] = [];
-    const tasksToReschedule: (ScheduleItem & { duration: number; originalStart: Date; originalEnd: Date })[] = [];
+    const tasksToReschedule: (ScheduleItem & { originalDuration: number; splitPart?: 'before' | 'after' })[] = [];
 
     // Process each existing task
     for (const task of existingSchedule || []) {
       const taskStart = new Date(task.start_time);
       const taskEnd = new Date(task.end_time);
-      const taskDuration = (taskEnd.getTime() - taskStart.getTime()) / (1000 * 60);
+      const originalTaskDuration = (taskEnd.getTime() - taskStart.getTime()) / (1000 * 60);
 
       // Check if task overlaps with standard task
       if (standardTaskStart < taskEnd && standardTaskEnd > taskStart) {
-        console.log(`Task "${task.title}" overlaps with standard task, processing...`);
+        console.log(`Task "${task.title}" overlaps with standard task, splitting...`);
         
         // Delete the original overlapping task
         tasksToDelete.push(task.id);
 
-        // If task starts before standard task, keep the part before
+        // If task starts before standard task, create the "before" part
         if (taskStart < standardTaskStart) {
-          const beforePartEnd = new Date(standardTaskStart);
-          const beforePartDuration = (beforePartEnd.getTime() - taskStart.getTime()) / (1000 * 60);
+          const beforePartDuration = (standardTaskStart.getTime() - taskStart.getTime()) / (1000 * 60);
           tasksBeforeStandard.push({
             employee_id: workerId,
             task_id: task.task_id,
-            title: `${task.title} (Part 1)`,
+            title: `${task.title.replace(' (Part 1)', '').replace(' (Part 2)', '')} (Part 1)`,
             description: task.description,
             start_time: taskStart.toISOString(),
-            end_time: beforePartEnd.toISOString(),
+            end_time: standardTaskStart.toISOString(),
             is_auto_generated: task.is_auto_generated
           });
-          console.log(`Keeping part before standard task: ${beforePartDuration}min`);
+          console.log(`Created before part with duration: ${beforePartDuration}min`);
         }
 
-        // If task extends beyond standard task, schedule the remainder for later
-        // Keep the FULL remaining duration of the original task
+        // If task extends beyond standard task, create the "after" part with remaining duration
         if (taskEnd > standardTaskEnd) {
-          const remainingDuration = taskStart < standardTaskStart 
-            ? (taskEnd.getTime() - standardTaskEnd.getTime()) / (1000 * 60)
-            : taskDuration; // Full duration if task starts after standard task start
+          const beforePartDuration = taskStart < standardTaskStart 
+            ? (standardTaskStart.getTime() - taskStart.getTime()) / (1000 * 60)
+            : 0;
+          
+          // Calculate remaining duration to preserve total original duration
+          const remainingDuration = originalTaskDuration - beforePartDuration;
+          
+          const partLabel = taskStart < standardTaskStart ? ' (Part 2)' : '';
           
           tasksToReschedule.push({
             ...task,
-            title: taskStart < standardTaskStart ? `${task.title} (Part 2)` : task.title,
-            duration: remainingDuration,
-            originalStart: taskStart,
-            originalEnd: taskEnd
+            title: `${task.title.replace(' (Part 1)', '').replace(' (Part 2)', '')}${partLabel}`,
+            originalDuration: remainingDuration, // Use remaining duration to preserve total
+            splitPart: 'after'
           });
-          console.log(`Scheduling remainder with duration: ${remainingDuration}min`);
+          console.log(`Scheduling after part with remaining duration: ${remainingDuration}min (original: ${originalTaskDuration}min, before: ${beforePartDuration}min)`);
         }
       } else if (taskStart >= standardTaskEnd) {
-        // Task starts after standard task - needs rescheduling with full duration
-        console.log(`Task "${task.title}" needs to be moved after standard task with full duration: ${taskDuration}min`);
+        // Task starts after standard task - needs rescheduling with full original duration
+        console.log(`Task "${task.title}" needs to be moved after standard task with full duration: ${originalTaskDuration}min`);
         tasksToReschedule.push({
           ...task,
-          duration: taskDuration,
-          originalStart: taskStart,
-          originalEnd: taskEnd
+          originalDuration: originalTaskDuration
         });
         tasksToDelete.push(task.id);
       }
@@ -333,7 +333,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
   const rescheduleTasksAfterStandardTask = async (
     workerId: string,
     startFromTime: Date,
-    tasksToReschedule: (ScheduleItem & { duration: number; originalStart: Date; originalEnd: Date })[]
+    tasksToReschedule: (ScheduleItem & { originalDuration: number; splitPart?: 'before' | 'after' })[]
   ) => {
     if (tasksToReschedule.length === 0) return;
 
@@ -342,75 +342,58 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
     // Start rescheduling immediately after the standard task
     let currentTime = new Date(startFromTime);
     const tasksToInsert: any[] = [];
-    const tasksForFinalProcessing: typeof tasksToReschedule = [];
     
-    // First pass: schedule all tasks with their FULL duration if possible
+    // Schedule all tasks with their ORIGINAL duration, connecting them without gaps
     for (const task of tasksToReschedule) {
-      console.log(`Attempting to schedule "${task.title}" with full duration: ${task.duration}min`);
+      console.log(`Scheduling "${task.title}" with original duration: ${task.originalDuration}min`);
       
-      const nextSlot = findNextAvailableSlot(currentTime, task.duration);
+      const nextSlot = findNextAvailableSlot(currentTime, task.originalDuration);
       
       if (nextSlot) {
-        const actualDuration = (nextSlot.end.getTime() - nextSlot.start.getTime()) / (1000 * 60);
+        console.log(`Scheduling "${task.title}" from ${nextSlot.start.toISOString()} with duration ${task.originalDuration}min`);
         
-        if (actualDuration >= task.duration) {
-          // Perfect fit - schedule with full duration
-          console.log(`Perfect fit for "${task.title}": ${nextSlot.start.toISOString()} - ${nextSlot.end.toISOString()}`);
-          
-          tasksToInsert.push({
-            employee_id: workerId,
-            task_id: task.task_id,
-            title: task.title,
-            description: task.description,
-            start_time: nextSlot.start.toISOString(),
-            end_time: new Date(nextSlot.start.getTime() + task.duration * 60 * 1000).toISOString(),
-            is_auto_generated: task.is_auto_generated
-          });
-          
-          // Update current time to end of this task (connected scheduling)
-          currentTime = new Date(nextSlot.start.getTime() + task.duration * 60 * 1000);
-        } else {
-          // This task needs to be handled in final processing (potential shortening)
-          console.log(`Task "${task.title}" doesn't fit with full duration, adding to final processing`);
-          tasksForFinalProcessing.push(task);
-        }
-      } else {
-        // No slot found - add to final processing
-        console.log(`No slot found for "${task.title}", adding to final processing`);
-        tasksForFinalProcessing.push(task);
-      }
-    }
-
-    // Handle remaining tasks - these are the LAST tasks that may need shortening or dropping
-    for (const task of tasksForFinalProcessing) {
-      console.log(`Final processing for "${task.title}"`);
-      
-      // Try to find any remaining time slot
-      const availableSlot = findNextAvailableSlotWithShortening(currentTime, task.duration);
-      
-      if (availableSlot) {
-        const actualDuration = (availableSlot.end.getTime() - availableSlot.start.getTime()) / (1000 * 60);
+        tasksToInsert.push({
+          employee_id: workerId,
+          task_id: task.task_id,
+          title: task.title,
+          description: task.description,
+          start_time: nextSlot.start.toISOString(),
+          end_time: new Date(nextSlot.start.getTime() + task.originalDuration * 60 * 1000).toISOString(),
+          is_auto_generated: task.is_auto_generated
+        });
         
-        if (actualDuration >= 5) { // Minimum 5 minutes to be worth scheduling
-          const finalTitle = actualDuration < task.duration ? `${task.title} (Shortened)` : task.title;
-          console.log(`Scheduling final task "${finalTitle}" from ${task.duration}min to ${actualDuration}min`);
-          
-          tasksToInsert.push({
-            employee_id: workerId,
-            task_id: task.task_id,
-            title: finalTitle,
-            description: task.description,
-            start_time: availableSlot.start.toISOString(),
-            end_time: availableSlot.end.toISOString(),
-            is_auto_generated: task.is_auto_generated
-          });
-          
-          currentTime = new Date(availableSlot.end);
-        } else {
-          console.log(`Dropping final task "${task.title}" - insufficient time remaining`);
-        }
+        // Update current time to end of this task (connected scheduling)
+        currentTime = new Date(nextSlot.start.getTime() + task.originalDuration * 60 * 1000);
       } else {
-        console.log(`Dropping final task "${task.title}" - no available time slot`);
+        // If can't fit with original duration, try to find any available space
+        console.log(`Cannot fit "${task.title}" with original duration, looking for available space...`);
+        
+        const availableSlot = findNextAvailableSlotWithShortening(currentTime, task.originalDuration);
+        
+        if (availableSlot) {
+          const actualDuration = (availableSlot.end.getTime() - availableSlot.start.getTime()) / (1000 * 60);
+          
+          if (actualDuration >= 5) { // Minimum 5 minutes to be worth scheduling
+            const finalTitle = actualDuration < task.originalDuration ? `${task.title} (Shortened)` : task.title;
+            console.log(`Scheduling shortened task "${finalTitle}" from ${task.originalDuration}min to ${actualDuration}min`);
+            
+            tasksToInsert.push({
+              employee_id: workerId,
+              task_id: task.task_id,
+              title: finalTitle,
+              description: task.description,
+              start_time: availableSlot.start.toISOString(),
+              end_time: availableSlot.end.toISOString(),
+              is_auto_generated: task.is_auto_generated
+            });
+            
+            currentTime = new Date(availableSlot.end);
+          } else {
+            console.log(`Dropping task "${task.title}" - insufficient time remaining`);
+          }
+        } else {
+          console.log(`Dropping task "${task.title}" - no available time slot`);
+        }
       }
     }
 
@@ -662,7 +645,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
                   ))}
                 </ul>
                 <p className="text-xs text-blue-600 mt-2">
-                  Tasks will be rescheduled to maintain proper working hours and breaks while ensuring no gaps between tasks.
+                  Tasks will be properly split and rescheduled to maintain their original duration while accommodating the standard task.
                 </p>
               </CardContent>
             </Card>
@@ -678,7 +661,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
                 </span>
               </div>
               <p className="text-xs text-green-600 mt-1">
-                Existing tasks will be connected without gaps while maintaining designated break times.
+                Overlapping tasks will be split while preserving their original total duration.
               </p>
             </div>
           )}
