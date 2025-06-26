@@ -113,6 +113,15 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
     }
   };
 
+  const handlePauseTask = (taskId: string) => {
+    console.log('Pausing task:', taskId);
+    // For pause functionality, we call the same handler but the parent component
+    // should handle it as a toggle (if active, pause it)
+    if (onStartTask) {
+      onStartTask(taskId);
+    }
+  };
+
   const handleCompleteTask = (taskId: string) => {
     console.log('Completing task:', taskId);
     if (onCompleteTask) {
@@ -255,7 +264,11 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           variant="outline"
                           size="sm"
                           className="h-7 px-2 text-xs"
-                          onClick={() => handleShowFiles(task.id)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleShowFiles(task.id);
+                          }}
                         >
                           <FileText className="h-3 w-3" />
                         </Button>
@@ -264,7 +277,11 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           variant="outline"
                           size="sm"
                           className="h-7 px-2 text-xs"
-                          onClick={() => handleShowParts(task.id)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleShowParts(task.id);
+                          }}
                         >
                           <Package2 className="h-3 w-3" />
                         </Button>
@@ -273,7 +290,11 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           variant="outline"
                           size="sm"
                           className="h-7 px-2 text-xs"
-                          onClick={() => handleShowBarcode(task.id)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleShowBarcode(task.id);
+                          }}
                         >
                           <QrCode className="h-3 w-3" />
                         </Button>
@@ -285,7 +306,11 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           <Button
                             size="sm"
                             className="h-7 px-3 text-xs"
-                            onClick={() => handleStartTask(task.id)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleStartTask(task.id);
+                            }}
                           >
                             <Play className="h-3 w-3 mr-1" />
                             Start
@@ -297,7 +322,11 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                             size="sm"
                             variant="outline"
                             className="h-7 px-3 text-xs"
-                            onClick={() => handleStartTask(task.id)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handlePauseTask(task.id);
+                            }}
                           >
                             <Square className="h-3 w-3 mr-1" />
                             Pause
@@ -308,7 +337,11 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           <Button
                             size="sm"
                             className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700"
-                            onClick={() => handleCompleteTask(task.id)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleCompleteTask(task.id);
+                            }}
                           >
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Complete
