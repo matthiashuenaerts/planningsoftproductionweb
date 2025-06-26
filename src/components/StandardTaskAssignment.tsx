@@ -343,17 +343,15 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
     let currentTime = new Date(startFromTime);
     const tasksToInsert: any[] = [];
     
-    // Schedule all tasks consecutively, connecting them without gaps
+    // Schedule all tasks consecutively, respecting working hours
     for (const task of tasksToReschedule) {
       console.log(`Scheduling "${task.title}" with original duration: ${task.originalDuration}min`);
       
-      // Find the next available slot starting from currentTime
-      const nextSlot = findNextAvailableSlotConsecutive(currentTime, task.originalDuration);
+      // Find the next available slot that can fit the task completely
+      const nextSlot = findNextAvailableSlotRespectingBreaks(currentTime, task.originalDuration);
       
       if (nextSlot) {
-        console.log(`Scheduling "${task.title}" from ${nextSlot.start.toISOString()} with duration ${task.originalDuration}min`);
-        
-        const taskEndTime = new Date(nextSlot.start.getTime() + task.originalDuration * 60 * 1000);
+        console.log(`Scheduling "${task.title}" from ${nextSlot.start.toISOString()} to ${nextSlot.end.toISOString()}`);
         
         tasksToInsert.push({
           employee_id: workerId,
@@ -361,12 +359,12 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
           title: task.title,
           description: task.description,
           start_time: nextSlot.start.toISOString(),
-          end_time: taskEndTime.toISOString(),
+          end_time: nextSlot.end.toISOString(),
           is_auto_generated: task.is_auto_generated
         });
         
         // Update current time to end of this task for consecutive scheduling
-        currentTime = new Date(taskEndTime);
+        currentTime = new Date(nextSlot.end);
       } else {
         // If can't fit with original duration, try to find available space with shortening
         console.log(`Cannot fit "${task.title}" with original duration, looking for available space...`);
@@ -409,7 +407,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
     }
   };
 
-  const findNextAvailableSlotConsecutive = (
+  const findNextAvailableSlotRespectingBreaks = (
     startSearchFrom: Date, 
     durationMinutes: number
   ): { start: Date; end: Date } | null => {
@@ -417,34 +415,58 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
     const endOfDay = new Date(selectedDate);
     endOfDay.setHours(16, 0, 0, 0); // End of working day
     
+    console.log(`Looking for ${durationMinutes}min slot starting from ${searchTime.toISOString()}`);
+    
     while (searchTime < endOfDay) {
-      const currentTimeSlot = findCurrentWorkingPeriod(searchTime);
+      const currentWorkingPeriod = findCurrentWorkingPeriod(searchTime);
       
-      if (!currentTimeSlot) {
+      if (!currentWorkingPeriod) {
         // We're in a break, jump to next working period
+        console.log(`Currently in break at ${searchTime.toISOString()}, moving to next period`);
         const nextPeriod = findNextWorkingPeriod(searchTime);
-        if (!nextPeriod) break;
+        if (!nextPeriod) {
+          console.log('No more working periods available');
+          break;
+        }
         
-        searchTime = nextPeriod.start;
+        searchTime = new Date(nextPeriod.start);
+        console.log(`Moved to next working period: ${searchTime.toISOString()}`);
         continue;
       }
 
-      // Check if task fits completely in current period
-      const proposedEndTime = new Date(searchTime.getTime() + durationMinutes * 60 * 1000);
+      // Calculate available time in current working period
+      const availableTimeInPeriod = (currentWorkingPeriod.end.getTime() - searchTime.getTime()) / (1000 * 60);
+      console.log(`Available time in current period: ${availableTimeInPeriod}min (need ${durationMinutes}min)`);
       
-      if (proposedEndTime <= currentTimeSlot.end) {
+      if (availableTimeInPeriod >= durationMinutes) {
         // Task fits completely in current period
+        const proposedEndTime = new Date(searchTime.getTime() + durationMinutes * 60 * 1000);
+        console.log(`Task fits! Scheduling from ${searchTime.toISOString()} to ${proposedEndTime.toISOString()}`);
         return { start: new Date(searchTime), end: proposedEndTime };
       } else {
         // Task doesn't fit in current period, move to next period
-        const nextPeriod = findNextWorkingPeriod(currentTimeSlot.end);
-        if (!nextPeriod) break;
+        console.log(`Task doesn't fit in current period, moving to next period`);
+        const nextPeriod = findNextWorkingPeriod(currentWorkingPeriod.end);
+        if (!nextPeriod) {
+          console.log('No more working periods available');
+          break;
+        }
         
-        searchTime = nextPeriod.start;
+        searchTime = new Date(nextPeriod.start);
+        console.log(`Moved to next working period: ${searchTime.toISOString()}`);
       }
     }
 
+    console.log('No suitable slot found');
     return null;
+  };
+
+  const findNextAvailableSlotConsecutive = (
+    startSearchFrom: Date, 
+    durationMinutes: number
+  ): { start: Date; end: Date } | null => {
+    // Use the same logic as the breaks-respecting function
+    return findNextAvailableSlotRespectingBreaks(startSearchFrom, durationMinutes);
   };
 
   const findNextAvailableSlotWithShortening = (
