@@ -25,6 +25,7 @@ interface EnhancedTimelineTask {
   description: string;
   status: string;
   project_name: string;
+  project_id: string | null;
   workstation: string;
   priority: string;
   canComplete: boolean;
@@ -35,10 +36,10 @@ interface EnhancedDailyTimelineProps {
   tasks: EnhancedTimelineTask[];
   onStartTask?: (taskId: string) => void;
   onCompleteTask?: (taskId: string) => void;
-  onShowFiles?: (projectId: string) => void;
-  onShowParts?: (projectId: string) => void;
-  onShowBarcode?: (projectId: string) => void;
-  onShowOrders?: (projectId: string) => void;
+  onShowFiles?: (taskId: string) => void;
+  onShowParts?: (taskId: string) => void;
+  onShowBarcode?: (taskId: string) => void;
+  onShowOrders?: (taskId: string) => void;
 }
 
 const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
@@ -224,7 +225,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           {truncateTitle(task.title, isSmallTask ? 40 : 60)}
                         </CardTitle>
                         <CardDescription className="text-sm font-medium text-blue-600 mb-2">
-                          {task.project_name || 'No Project'}
+                          {task.project_name}
                         </CardDescription>
                         
                         {/* Time range */}

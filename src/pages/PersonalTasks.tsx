@@ -212,7 +212,7 @@ const PersonalTasks = () => {
     }
   });
 
-  // Enhanced timeline data with better formatting
+  // Enhanced timeline data with proper project information
   const enhancedTimelineData = schedules.map(schedule => {
     const associatedTask = schedule.task_id ? tasks.find(t => t.id === schedule.task_id) : undefined;
 
@@ -225,6 +225,7 @@ const PersonalTasks = () => {
         description: associatedTask.description || schedule.description || '',
         status: associatedTask.status.toLowerCase(),
         project_name: associatedTask.phases.projects.name,
+        project_id: associatedTask.phases.projects.id,
         workstation: associatedTask.workstation || '',
         priority: associatedTask.priority,
         canComplete: canCompleteTask(associatedTask),
@@ -240,6 +241,7 @@ const PersonalTasks = () => {
       description: schedule.description || '',
       status: 'scheduled',
       project_name: schedule.title,
+      project_id: null,
       workstation: '',
       priority: 'medium',
       canComplete: false,
@@ -262,10 +264,30 @@ const PersonalTasks = () => {
   };
 
   const handleShowOrders = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (task && task.phases.projects.id) {
-      // Navigate to project orders page
-      navigate(`/projects/${task.phases.projects.id}/orders`);
+    const timelineItem = enhancedTimelineData.find(item => item.id === taskId);
+    if (timelineItem && timelineItem.project_id) {
+      navigate(`/projects/${timelineItem.project_id}/orders`);
+    }
+  };
+
+  const handleShowFiles = (taskId: string) => {
+    const timelineItem = enhancedTimelineData.find(item => item.id === taskId);
+    if (timelineItem && timelineItem.project_id) {
+      setShowFilesPopup(timelineItem.project_id);
+    }
+  };
+
+  const handleShowParts = (taskId: string) => {
+    const timelineItem = enhancedTimelineData.find(item => item.id === taskId);
+    if (timelineItem && timelineItem.project_id) {
+      setShowPartsDialog(timelineItem.project_id);
+    }
+  };
+
+  const handleShowBarcode = (taskId: string) => {
+    const timelineItem = enhancedTimelineData.find(item => item.id === taskId);
+    if (timelineItem && timelineItem.project_id) {
+      setShowBarcodeDialog(timelineItem.project_id);
     }
   };
 
@@ -297,18 +319,9 @@ const PersonalTasks = () => {
             tasks={enhancedTimelineData}
             onStartTask={handleTimelineStartTask}
             onCompleteTask={handleTimelineCompleteTask}
-            onShowFiles={(taskId) => {
-              const task = tasks.find(t => t.id === taskId);
-              if (task) setShowFilesPopup(task.phases.projects.id);
-            }}
-            onShowParts={(taskId) => {
-              const task = tasks.find(t => t.id === taskId);
-              if (task) setShowPartsDialog(task.phases.projects.id);
-            }}
-            onShowBarcode={(taskId) => {
-              const task = tasks.find(t => t.id === taskId);
-              if (task) setShowBarcodeDialog(task.phases.projects.id);
-            }}
+            onShowFiles={handleShowFiles}
+            onShowParts={handleShowParts}
+            onShowBarcode={handleShowBarcode}
             onShowOrders={handleShowOrders}
           />
         </div>
@@ -317,7 +330,7 @@ const PersonalTasks = () => {
         {showFilesPopup && (
           <ProjectFilesPopup
             projectId={showFilesPopup}
-            projectName={tasks.find(task => task.phases.projects.id === showFilesPopup)?.phases.projects.name || "Unknown Project"}
+            projectName={enhancedTimelineData.find(item => item.project_id === showFilesPopup)?.project_name || "Unknown Project"}
             isOpen={true}
             onClose={() => setShowFilesPopup(null)}
           />
@@ -342,7 +355,7 @@ const PersonalTasks = () => {
             isOpen={true}
             onClose={() => setShowBarcodeDialog(null)}
             projectId={showBarcodeDialog}
-            projectName={tasks.find(task => task.phases.projects.id === showBarcodeDialog)?.phases.projects.name || "Unknown Project"}
+            projectName={enhancedTimelineData.find(item => item.project_id === showBarcodeDialog)?.project_name || "Unknown Project"}
           />
         )}
       </div>
