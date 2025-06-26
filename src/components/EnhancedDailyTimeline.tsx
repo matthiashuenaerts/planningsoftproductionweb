@@ -108,12 +108,37 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
 
   const handleStartTask = (taskId: string) => {
     console.log('Starting task:', taskId);
-    onStartTask?.(taskId);
+    if (onStartTask) {
+      onStartTask(taskId);
+    }
   };
 
   const handleCompleteTask = (taskId: string) => {
     console.log('Completing task:', taskId);
-    onCompleteTask?.(taskId);
+    if (onCompleteTask) {
+      onCompleteTask(taskId);
+    }
+  };
+
+  const handleShowFiles = (taskId: string) => {
+    console.log('Show files for task:', taskId);
+    if (onShowFiles) {
+      onShowFiles(taskId);
+    }
+  };
+
+  const handleShowParts = (taskId: string) => {
+    console.log('Show parts for task:', taskId);
+    if (onShowParts) {
+      onShowParts(taskId);
+    }
+  };
+
+  const handleShowBarcode = (taskId: string) => {
+    console.log('Show barcode for task:', taskId);
+    if (onShowBarcode) {
+      onShowBarcode(taskId);
+    }
   };
 
   if (tasks.length === 0) {
@@ -230,7 +255,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           variant="outline"
                           size="sm"
                           className="h-7 px-2 text-xs"
-                          onClick={() => onShowFiles?.(task.id)}
+                          onClick={() => handleShowFiles(task.id)}
                         >
                           <FileText className="h-3 w-3" />
                         </Button>
@@ -239,7 +264,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           variant="outline"
                           size="sm"
                           className="h-7 px-2 text-xs"
-                          onClick={() => onShowParts?.(task.id)}
+                          onClick={() => handleShowParts(task.id)}
                         >
                           <Package2 className="h-3 w-3" />
                         </Button>
@@ -248,7 +273,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           variant="outline"
                           size="sm"
                           className="h-7 px-2 text-xs"
-                          onClick={() => onShowBarcode?.(task.id)}
+                          onClick={() => handleShowBarcode(task.id)}
                         >
                           <QrCode className="h-3 w-3" />
                         </Button>
