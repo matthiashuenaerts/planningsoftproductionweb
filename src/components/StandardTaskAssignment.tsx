@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -105,8 +104,17 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
       setLoading(true);
       const selectedTask = workstationTasks.find(t => t.id === selectedTaskId);
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const startDateTime = `${dateStr}T${startTime}:00`;
-      const endDateTime = new Date(new Date(startDateTime).getTime() + (duration * 60 * 1000)).toISOString();
+      
+      // Create proper start and end times using the selected start time
+      const startDateTime = new Date(`${dateStr}T${startTime}:00`);
+      const endDateTime = new Date(startDateTime.getTime() + (duration * 60 * 1000));
+
+      console.log('Creating standard task:', {
+        startTime: startDateTime.toISOString(),
+        endTime: endDateTime.toISOString(),
+        duration,
+        selectedWorkers: selectedWorkers.length
+      });
 
       // Create schedule entries for each selected worker
       const schedulePromises = selectedWorkers.map(workerId => {
@@ -116,8 +124,8 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
             employee_id: workerId,
             title: selectedTask.task_name,
             description: selectedTask.description || '',
-            start_time: startDateTime,
-            end_time: endDateTime,
+            start_time: startDateTime.toISOString(),
+            end_time: endDateTime.toISOString(),
             is_auto_generated: false
           });
       });
@@ -148,41 +156,65 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
     }
   };
 
-  const reorganizeWorkerSchedule = async (workerId: string, newTaskStart: string, newTaskEnd: string) => {
+  const reorganizeWorkerSchedule = async (workerId: string, newTaskStart: Date, newTaskEnd: Date) => {
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
-      // Get all existing schedule items for this worker on this date
+      // Get all existing schedule items for this worker on this date, excluding the one we just created
       const { data: scheduleItems, error } = await supabase
         .from('schedules')
         .select('*')
         .eq('employee_id', workerId)
         .gte('start_time', `${dateStr}T00:00:00`)
         .lte('start_time', `${dateStr}T23:59:59`)
+        .neq('start_time', newTaskStart.toISOString())
         .order('start_time', { ascending: true });
 
       if (error) throw error;
 
-      const newTaskStartTime = new Date(newTaskStart);
-      const newTaskEndTime = new Date(newTaskEnd);
+      console.log(`Reorganizing ${scheduleItems?.length || 0} existing items for worker ${workerId}`);
 
-      // Find overlapping tasks and adjust them
-      const overlappingTasks = scheduleItems?.filter(item => {
+      // Find overlapping tasks and tasks that come after the new task
+      const overlappingAndLaterTasks = scheduleItems?.filter(item => {
         const itemStart = new Date(item.start_time);
         const itemEnd = new Date(item.end_time);
-        return (itemStart < newTaskEndTime && itemEnd > newTaskStartTime);
+        
+        // Include tasks that overlap or start after the new task start time
+        return itemStart < newTaskEnd;
       }) || [];
 
-      // Move overlapping tasks to after the new task
-      for (const overlappingTask of overlappingTasks) {
-        if (overlappingTask.start_time === newTaskStart && overlappingTask.end_time === newTaskEnd) {
-          // Skip the task we just inserted
-          continue;
+      console.log(`Found ${overlappingAndLaterTasks.length} tasks that need rescheduling`);
+
+      // Sort tasks by original start time to maintain order
+      overlappingAndLaterTasks.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+      // Reschedule overlapping and later tasks to start after the new task
+      let nextAvailableTime = new Date(newTaskEnd);
+
+      for (const task of overlappingAndLaterTasks) {
+        const taskDuration = new Date(task.end_time).getTime() - new Date(task.start_time).getTime();
+        const newStartTime = new Date(nextAvailableTime);
+        let newEndTime = new Date(newStartTime.getTime() + taskDuration);
+
+        // Check if the new end time goes beyond working hours (16:00)
+        const dayEnd = new Date(selectedDate);
+        dayEnd.setHours(16, 0, 0, 0);
+        
+        if (newEndTime > dayEnd) {
+          // If it goes beyond working hours, move to next day or truncate
+          console.log(`Task ${task.title} would extend beyond working hours, keeping within day limits`);
+          newEndTime = new Date(dayEnd);
+          
+          // If the task becomes too short, keep minimum 15 minutes
+          if (newEndTime.getTime() - newStartTime.getTime() < 15 * 60 * 1000) {
+            const minimumEnd = new Date(newStartTime.getTime() + 15 * 60 * 1000);
+            if (minimumEnd <= dayEnd) {
+              newEndTime = minimumEnd;
+            }
+          }
         }
 
-        const taskDuration = new Date(overlappingTask.end_time).getTime() - new Date(overlappingTask.start_time).getTime();
-        const newStartTime = new Date(newTaskEndTime);
-        const newEndTime = new Date(newStartTime.getTime() + taskDuration);
+        console.log(`Rescheduling task ${task.title} from ${task.start_time} to ${newStartTime.toISOString()}`);
 
         await supabase
           .from('schedules')
@@ -190,7 +222,10 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
             start_time: newStartTime.toISOString(),
             end_time: newEndTime.toISOString()
           })
-          .eq('id', overlappingTask.id);
+          .eq('id', task.id);
+
+        // Update next available time for the following task
+        nextAvailableTime = new Date(newEndTime.getTime() + 5 * 60 * 1000); // 5 minute buffer
       }
     } catch (error: any) {
       console.error('Error reorganizing schedule:', error);
