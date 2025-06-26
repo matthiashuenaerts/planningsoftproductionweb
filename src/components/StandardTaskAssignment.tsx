@@ -239,7 +239,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
     // Separate tasks into different categories
     const tasksToDelete: string[] = [];
     const tasksBeforeStandard: any[] = [];
-    const tasksToReschedule: (ScheduleItem & { duration: number })[] = [];
+    const tasksToReschedule: (ScheduleItem & { duration: number; originalStart: Date; originalEnd: Date })[] = [];
 
     // Process each existing task
     for (const task of existingSchedule || []) {
@@ -269,20 +269,25 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
         }
 
         // If task extends beyond standard task, schedule the remainder for later
+        // IMPORTANT: Keep the FULL remaining duration, don't shorten it here
         if (taskEnd > standardTaskEnd) {
           const remainingDuration = (taskEnd.getTime() - Math.max(taskStart.getTime(), standardTaskEnd.getTime())) / (1000 * 60);
           tasksToReschedule.push({
             ...task,
             title: taskStart < standardTaskStart ? `${task.title} (Part 2)` : task.title,
-            duration: remainingDuration
+            duration: remainingDuration,
+            originalStart: taskStart,
+            originalEnd: taskEnd
           });
         }
       } else if (taskStart >= standardTaskEnd) {
-        // Task starts after standard task - needs rescheduling
+        // Task starts after standard task - needs rescheduling with full duration
         console.log(`Task "${task.title}" needs to be moved after standard task`);
         tasksToReschedule.push({
           ...task,
-          duration: taskDuration
+          duration: taskDuration,
+          originalStart: taskStart,
+          originalEnd: taskEnd
         });
         tasksToDelete.push(task.id);
       }
@@ -322,7 +327,7 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
   const rescheduleTasksAfterStandardTask = async (
     workerId: string,
     startFromTime: Date,
-    tasksToReschedule: (ScheduleItem & { duration: number })[]
+    tasksToReschedule: (ScheduleItem & { duration: number; originalStart: Date; originalEnd: Date })[]
   ) => {
     if (tasksToReschedule.length === 0) return;
 
@@ -330,16 +335,18 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
 
     // Start rescheduling immediately after the standard task
     let currentTime = new Date(startFromTime);
+    const tasksToInsert: any[] = [];
     
+    // First pass: schedule all tasks with their full duration
     for (let i = 0; i < tasksToReschedule.length; i++) {
       const task = tasksToReschedule[i];
-      const isLastTask = i === tasksToReschedule.length - 1;
       
-      // Find the next available slot for this task
-      const nextSlot = findNextAvailableSlotWithShortening(currentTime, task.duration, isLastTask);
+      // Find the next available slot for this task with its full duration
+      const nextSlot = findNextAvailableSlot(currentTime, task.duration);
       
       if (!nextSlot) {
-        console.warn(`Could not reschedule task "${task.title}" - no available slot`);
+        console.log(`Task "${task.title}" cannot fit with full duration, will be handled in final adjustment`);
+        // Add to tasks that need final adjustment (shortening/dropping)
         continue;
       }
 
@@ -347,23 +354,119 @@ const StandardTaskAssignment: React.FC<StandardTaskAssignmentProps> = ({
       const newEndTime = nextSlot.end;
       const actualDuration = (newEndTime.getTime() - newStartTime.getTime()) / (1000 * 60);
 
-      console.log(`Rescheduling "${task.title}" to ${newStartTime.toISOString()} - ${newEndTime.toISOString()} (${actualDuration}min)`);
+      console.log(`Scheduling "${task.title}" to ${newStartTime.toISOString()} - ${newEndTime.toISOString()} (${actualDuration}min)`);
 
-      await supabase
-        .from('schedules')
-        .insert({
-          employee_id: workerId,
-          task_id: task.task_id,
-          title: actualDuration < task.duration ? `${task.title} (Shortened)` : task.title,
-          description: task.description,
-          start_time: newStartTime.toISOString(),
-          end_time: newEndTime.toISOString(),
-          is_auto_generated: task.is_auto_generated
-        });
+      tasksToInsert.push({
+        employee_id: workerId,
+        task_id: task.task_id,
+        title: task.title,
+        description: task.description,
+        start_time: newStartTime.toISOString(),
+        end_time: newEndTime.toISOString(),
+        is_auto_generated: task.is_auto_generated
+      });
 
       // Update current time to end of this task for next task (connected scheduling)
       currentTime = new Date(newEndTime);
     }
+
+    // Handle tasks that couldn't fit with full duration - these are the LAST tasks
+    const remainingTasks = tasksToReschedule.slice(tasksToInsert.length);
+    
+    for (const task of remainingTasks) {
+      // Try to fit with shortened duration, only for the final tasks
+      const availableSlot = findNextAvailableSlotWithShortening(currentTime, task.duration, true);
+      
+      if (availableSlot) {
+        const actualDuration = (availableSlot.end.getTime() - availableSlot.start.getTime()) / (1000 * 60);
+        console.log(`Shortening final task "${task.title}" from ${task.duration}min to ${actualDuration}min`);
+        
+        tasksToInsert.push({
+          employee_id: workerId,
+          task_id: task.task_id,
+          title: `${task.title} (Shortened)`,
+          description: task.description,
+          start_time: availableSlot.start.toISOString(),
+          end_time: availableSlot.end.toISOString(),
+          is_auto_generated: task.is_auto_generated
+        });
+        
+        currentTime = new Date(availableSlot.end);
+      } else {
+        console.log(`Dropping final task "${task.title}" - no available time slot`);
+        // Task is dropped - this only happens to the very last tasks
+      }
+    }
+
+    // Insert all scheduled tasks
+    if (tasksToInsert.length > 0) {
+      await supabase
+        .from('schedules')
+        .insert(tasksToInsert);
+    }
+  };
+
+  const findNextAvailableSlot = (
+    startSearchFrom: Date, 
+    durationMinutes: number
+  ): { start: Date; end: Date } | null => {
+    let searchTime = new Date(startSearchFrom);
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    
+    while (searchTime.getHours() < 16) {
+      // Find which working period this time falls into
+      const currentHour = searchTime.getHours();
+      const currentMinute = searchTime.getMinutes();
+      const currentTimeMinutes = currentHour * 60 + currentMinute;
+
+      let currentPeriod = null;
+      for (const period of workingHours) {
+        const periodStart = parseInt(period.start.split(':')[0]) * 60 + parseInt(period.start.split(':')[1]);
+        const periodEnd = parseInt(period.end.split(':')[0]) * 60 + parseInt(period.end.split(':')[1]);
+        
+        if (currentTimeMinutes >= periodStart && currentTimeMinutes < periodEnd) {
+          currentPeriod = period;
+          break;
+        }
+      }
+
+      if (!currentPeriod) {
+        // We're in a break, jump to next working period
+        const nextPeriod = workingHours.find(period => {
+          const periodStart = parseInt(period.start.split(':')[0]) * 60 + parseInt(period.start.split(':')[1]);
+          return periodStart > currentTimeMinutes;
+        });
+        
+        if (!nextPeriod) break; // No more working periods today
+        
+        searchTime = new Date(selectedDate);
+        searchTime.setHours(parseInt(nextPeriod.start.split(':')[0]), parseInt(nextPeriod.start.split(':')[1]), 0, 0);
+        continue;
+      }
+
+      // Check if task fits completely in current period
+      const periodEndTime = new Date(selectedDate);
+      periodEndTime.setHours(parseInt(currentPeriod.end.split(':')[0]), parseInt(currentPeriod.end.split(':')[1]), 0, 0);
+      
+      const proposedEndTime = new Date(searchTime.getTime() + durationMinutes * 60 * 1000);
+      
+      if (proposedEndTime <= periodEndTime) {
+        // Task fits completely in current period
+        return { start: searchTime, end: proposedEndTime };
+      } else {
+        // Task doesn't fit in current period, move to next period
+        const nextPeriodIndex = workingHours.indexOf(currentPeriod) + 1;
+        if (nextPeriodIndex >= workingHours.length) {
+          break; // No more periods
+        }
+        
+        const nextPeriod = workingHours[nextPeriodIndex];
+        searchTime = new Date(selectedDate);
+        searchTime.setHours(parseInt(nextPeriod.start.split(':')[0]), parseInt(nextPeriod.start.split(':')[1]), 0, 0);
+      }
+    }
+
+    return null; // No available slot found
   };
 
   const findNextAvailableSlotWithShortening = (
