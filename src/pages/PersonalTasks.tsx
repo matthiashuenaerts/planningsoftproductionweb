@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -170,10 +169,16 @@ const PersonalTasks = () => {
     if (!currentEmployee) return;
 
     try {
+      console.log('Handling task status change:', { taskId, newStatus, currentEmployee: currentEmployee.id });
+      
       if (newStatus === 'IN_PROGRESS') {
+        console.log('Starting task and time registration for:', taskId);
         await timeRegistrationService.startTask(currentEmployee.id, taskId);
+        
+        // Refresh active time registrations immediately
         await fetchActiveTimeRegistrations();
         
+        // Invalidate queries to refresh UI components
         await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
         await queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
         
@@ -182,6 +187,7 @@ const PersonalTasks = () => {
           description: "Task has been started and time registration created.",
         });
       } else if (newStatus === 'COMPLETED') {
+        console.log('Completing task:', taskId);
         await timeRegistrationService.completeTask(taskId);
         await fetchActiveTimeRegistrations();
         
@@ -193,6 +199,7 @@ const PersonalTasks = () => {
           description: "Task has been completed and time registration ended.",
         });
       } else if (newStatus === 'TODO' && isTaskActive(taskId)) {
+        console.log('Pausing task:', taskId);
         await timeRegistrationService.stopActiveRegistrations(currentEmployee.id);
         await fetchActiveTimeRegistrations();
         
@@ -205,6 +212,7 @@ const PersonalTasks = () => {
         });
       } else {
         // Regular status update
+        console.log('Regular status update:', { taskId, newStatus });
         const { error } = await supabase
           .from('tasks')
           .update({ 
@@ -216,9 +224,10 @@ const PersonalTasks = () => {
         if (error) throw error;
       }
 
-      // Refresh tasks
+      // Refresh tasks data
       await fetchPersonalData();
     } catch (error: any) {
+      console.error('Error updating task status:', error);
       toast({
         title: "Error",
         description: `Failed to update task: ${error.message}`,
@@ -294,7 +303,9 @@ const PersonalTasks = () => {
       taskId,
       projectName,
       projectId,
-      taskTitle
+      taskTitle,
+      taskStatus,
+      isActive
     });
 
     return {
@@ -314,10 +325,8 @@ const PersonalTasks = () => {
   });
 
   const handleTimelineStartTask = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-      handleTaskStatusChange(taskId, 'IN_PROGRESS');
-    }
+    console.log('Starting task from timeline:', taskId);
+    handleTaskStatusChange(taskId, 'IN_PROGRESS');
   };
 
   const handleTimelineCompleteTask = (taskId: string) => {

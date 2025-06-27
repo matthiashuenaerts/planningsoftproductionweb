@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -112,7 +111,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
   };
 
   const handleStartTask = (taskId: string) => {
-    console.log('Starting task:', taskId);
+    console.log('Starting task from timeline:', taskId);
     if (onStartTask) {
       onStartTask(taskId);
     }
@@ -180,7 +179,9 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
     id: task.id,
     title: task.title,
     project_name: task.project_name,
-    project_id: task.project_id
+    project_id: task.project_id,
+    status: task.status,
+    isActive: task.isActive
   })));
 
   return (
