@@ -176,6 +176,13 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
     new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
   );
 
+  console.log('Rendering timeline with tasks:', sortedTasks.map(task => ({
+    id: task.id,
+    title: task.title,
+    project_name: task.project_name,
+    project_id: task.project_id
+  })));
+
   return (
     <div className="space-y-3">
       <h2 className="text-xl font-semibold mb-4">Daily Timeline</h2>
@@ -226,7 +233,12 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           {truncateTitle(task.title, isSmallTask ? 40 : 60)}
                         </CardTitle>
                         <CardDescription className="text-sm font-medium text-blue-600 mb-2">
-                          {task.project_name || 'No Project'}
+                          {task.project_name && task.project_name !== 'No Project' ? task.project_name : 'No Project Assigned'}
+                          {task.project_id && (
+                            <span className="text-xs text-gray-400 ml-2">
+                              (ID: {task.project_id.substring(0, 8)}...)
+                            </span>
+                          )}
                         </CardDescription>
                         
                         {/* Time range */}
@@ -269,7 +281,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                     {/* Action Buttons */}
                     <div className="flex flex-wrap gap-2">
                       {/* Quick action buttons - only show if project_id exists */}
-                      {task.project_id && (
+                      {task.project_id && task.project_id !== null && (
                         <div className="flex gap-1">
                           <Button
                             variant="outline"
@@ -278,6 +290,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
+                              console.log('Files button clicked for project:', task.project_id);
                               handleShowFiles(task.project_id!);
                             }}
                             title="Project Files"
@@ -292,6 +305,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
+                              console.log('Orders button clicked for project:', task.project_id);
                               handleShowOrders(task.project_id!);
                             }}
                             title="Project Orders"
@@ -306,6 +320,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
+                              console.log('Parts button clicked for project:', task.project_id);
                               handleShowParts(task.project_id!);
                             }}
                             title="Parts List"
@@ -320,6 +335,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
+                              console.log('Barcode button clicked for project:', task.project_id);
                               handleShowBarcode(task.project_id!);
                             }}
                             title="Project Barcode"
@@ -338,6 +354,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
+                              console.log('Start button clicked for task:', task.id);
                               handleStartTask(task.id);
                             }}
                           >
@@ -354,6 +371,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
+                              console.log('Pause button clicked for task:', task.id);
                               handlePauseTask(task.id);
                             }}
                           >
@@ -369,6 +387,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
+                              console.log('Complete button clicked for task:', task.id);
                               handleCompleteTask(task.id);
                             }}
                           >

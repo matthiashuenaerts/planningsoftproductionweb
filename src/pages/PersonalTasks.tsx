@@ -76,7 +76,7 @@ const PersonalTasks = () => {
     try {
       setLoading(true);
       
-      // Fetch assigned tasks
+      // Fetch assigned tasks with enhanced project info
       const { data: tasksData, error: tasksError } = await supabase
         .from('tasks')
         .select(`
@@ -93,19 +93,47 @@ const PersonalTasks = () => {
         .eq('assignee_id', currentEmployee.id)
         .order('due_date', { ascending: true });
 
-      if (tasksError) throw tasksError;
+      if (tasksError) {
+        console.error('Tasks fetch error:', tasksError);
+        throw tasksError;
+      }
 
-      // Fetch personal schedule for today
+      console.log('Fetched tasks with project data:', tasksData);
+
+      // Fetch personal schedule for today with enhanced query to include task and project info
       const today = new Date();
       const { data: schedulesData, error: schedulesError } = await supabase
         .from('schedules')
-        .select('*')
+        .select(`
+          *,
+          tasks(
+            id,
+            title,
+            description,
+            status,
+            priority,
+            workstation,
+            phases(
+              name,
+              projects(
+                id,
+                name,
+                client
+              )
+            )
+          )
+        `)
         .eq('employee_id', currentEmployee.id)
         .gte('start_time', startOfDay(today).toISOString())
         .lte('start_time', endOfDay(today).toISOString())
         .order('start_time', { ascending: true });
 
-      if (schedulesError) throw schedulesError;
+      if (schedulesError) {
+        console.error('Schedules fetch error:', schedulesError);
+        throw schedulesError;
+      }
+
+      console.log('Fetched schedules with project data:', schedulesData);
 
       // Type cast the tasks data to ensure proper typing
       const typedTasks: Task[] = (tasksData || []).map(task => ({
@@ -116,6 +144,7 @@ const PersonalTasks = () => {
       setTasks(typedTasks);
       setSchedules(schedulesData || []);
     } catch (error: any) {
+      console.error('Error in fetchPersonalData:', error);
       toast({
         title: "Error",
         description: `Failed to load personal data: ${error.message}`,
@@ -215,38 +244,72 @@ const PersonalTasks = () => {
 
   // Enhanced timeline data with better formatting and project info
   const enhancedTimelineData = schedules.map(schedule => {
-    const associatedTask = schedule.task_id ? tasks.find(t => t.id === schedule.task_id) : undefined;
+    let projectName = 'No Project';
+    let projectId = null;
+    let taskTitle = schedule.title;
+    let taskDescription = schedule.description || '';
+    let taskStatus = 'scheduled';
+    let taskWorkstation = '';
+    let taskPriority = 'medium';
+    let taskId = schedule.id;
+    let canComplete = false;
+    let isActive = false;
 
-    if (associatedTask) {
-      return {
-        id: associatedTask.id,
-        title: associatedTask.title,
-        start_time: schedule.start_time,
-        end_time: schedule.end_time,
-        description: associatedTask.description || schedule.description || '',
-        status: associatedTask.status.toLowerCase(),
-        project_name: associatedTask.phases.projects.name,
-        project_id: associatedTask.phases.projects.id, // Add project_id here
-        workstation: associatedTask.workstation || '',
-        priority: associatedTask.priority,
-        canComplete: canCompleteTask(associatedTask),
-        isActive: isTaskActive(associatedTask.id)
-      };
+    // Check if schedule is linked to a task and has project info
+    if (schedule.tasks && schedule.tasks.phases && schedule.tasks.phases.projects) {
+      projectName = schedule.tasks.phases.projects.name;
+      projectId = schedule.tasks.phases.projects.id;
+      taskTitle = schedule.tasks.title;
+      taskDescription = schedule.tasks.description || schedule.description || '';
+      taskStatus = schedule.tasks.status ? schedule.tasks.status.toLowerCase() : 'scheduled';
+      taskWorkstation = schedule.tasks.workstation || '';
+      taskPriority = schedule.tasks.priority || 'medium';
+      taskId = schedule.tasks.id;
+      
+      // Find the full task data for completion checks
+      const fullTask = tasks.find(t => t.id === schedule.tasks?.id);
+      if (fullTask) {
+        canComplete = canCompleteTask(fullTask);
+        isActive = isTaskActive(fullTask.id);
+      }
+    } else if (schedule.task_id) {
+      // Fallback: try to find task in the tasks array
+      const associatedTask = tasks.find(t => t.id === schedule.task_id);
+      if (associatedTask) {
+        projectName = associatedTask.phases.projects.name;
+        projectId = associatedTask.phases.projects.id;
+        taskTitle = associatedTask.title;
+        taskDescription = associatedTask.description || schedule.description || '';
+        taskStatus = associatedTask.status.toLowerCase();
+        taskWorkstation = associatedTask.workstation || '';
+        taskPriority = associatedTask.priority;
+        taskId = associatedTask.id;
+        canComplete = canCompleteTask(associatedTask);
+        isActive = isTaskActive(associatedTask.id);
+      }
     }
 
+    console.log('Enhanced timeline item:', {
+      scheduleId: schedule.id,
+      taskId,
+      projectName,
+      projectId,
+      taskTitle
+    });
+
     return {
-      id: schedule.id,
-      title: schedule.title,
+      id: taskId,
+      title: taskTitle,
       start_time: schedule.start_time,
       end_time: schedule.end_time,
-      description: schedule.description || '',
-      status: 'scheduled',
-      project_name: schedule.title,
-      project_id: null, // No project for non-task schedules
-      workstation: '',
-      priority: 'medium',
-      canComplete: false,
-      isActive: false
+      description: taskDescription,
+      status: taskStatus,
+      project_name: projectName,
+      project_id: projectId,
+      workstation: taskWorkstation,
+      priority: taskPriority,
+      canComplete,
+      isActive
     };
   });
 
