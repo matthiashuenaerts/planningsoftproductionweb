@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -37,7 +38,7 @@ interface Task {
   };
 }
 
-interface Schedule {
+interface ScheduleWithTask {
   id: string;
   title: string;
   description: string;
@@ -47,6 +48,22 @@ interface Schedule {
   phase_id?: string;
   employee_id: string;
   is_auto_generated: boolean;
+  tasks?: {
+    id: string;
+    title: string;
+    description: string;
+    status: string;
+    priority: string;
+    workstation: string;
+    phases: {
+      name: string;
+      projects: {
+        id: string;
+        name: string;
+        client: string;
+      };
+    };
+  };
 }
 
 const PersonalTasks = () => {
@@ -55,7 +72,7 @@ const PersonalTasks = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [schedules, setSchedules] = useState<ScheduleWithTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTimeRegistrations, setActiveTimeRegistrations] = useState<any[]>([]);
   const [showFilesPopup, setShowFilesPopup] = useState<string | null>(null);
