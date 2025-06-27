@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -307,11 +308,14 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                               e.preventDefault();
                               e.stopPropagation();
                               console.log('Orders button clicked for project:', task.project_id);
-                              handleShowOrders(task.project_id!);
+                              if (task.project_id) {
+                                window.open(`/projects/${task.project_id}/orders`, '_blank');
+                              }
                             }}
                             title="Project Orders"
                           >
                             <ShoppingCart className="h-3 w-3" />
+                            <ExternalLink className="h-2 w-2 ml-1" />
                           </Button>
                           
                           <Button

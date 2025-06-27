@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -84,6 +83,34 @@ const PersonalTasks = () => {
       fetchPersonalData();
       fetchActiveTimeRegistrations();
     }
+  }, [currentEmployee]);
+
+  // Set up real-time listener for time registrations to update UI when TaskTimer changes
+  useEffect(() => {
+    if (!currentEmployee) return;
+
+    const channel = supabase
+      .channel('time-registrations-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'time_registrations',
+          filter: `employee_id=eq.${currentEmployee.id}`
+        },
+        (payload) => {
+          console.log('Time registration changed:', payload);
+          // Refresh data when time registrations change
+          fetchPersonalData();
+          fetchActiveTimeRegistrations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [currentEmployee]);
 
   const fetchPersonalData = async () => {
