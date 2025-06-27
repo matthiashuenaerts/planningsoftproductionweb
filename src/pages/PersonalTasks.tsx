@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar } from 'lucide-react';
@@ -70,6 +70,7 @@ const PersonalTasks = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [schedules, setSchedules] = useState<ScheduleWithTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,6 +113,36 @@ const PersonalTasks = () => {
       supabase.removeChannel(channel);
     };
   }, [currentEmployee]);
+
+  // Set up real-time listener for task status changes to refresh when TaskTimer stops a task
+  useEffect(() => {
+    if (!currentEmployee) return;
+
+    const channel = supabase
+      .channel('task-status-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'tasks',
+          filter: `assignee_id=eq.${currentEmployee.id}`
+        },
+        (payload) => {
+          console.log('Task status changed:', payload);
+          // Only refresh if we're on the personal tasks page
+          if (location.pathname.includes('personal-tasks')) {
+            fetchPersonalData();
+            fetchActiveTimeRegistrations();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentEmployee, location.pathname]);
 
   const fetchPersonalData = async () => {
     if (!currentEmployee) return;

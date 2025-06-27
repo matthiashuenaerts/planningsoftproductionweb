@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,9 +13,11 @@ import {
   Package2, 
   QrCode, 
   ShoppingCart,
-  ExternalLink 
+  ExternalLink
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { useLanguage } from '@/context/LanguageContext';
+import { useNavigate } from 'react-router-dom';
 
 interface EnhancedTimelineTask {
   id: string;
@@ -26,7 +27,7 @@ interface EnhancedTimelineTask {
   description: string;
   status: string;
   project_name: string;
-  project_id: string | null; // Add project_id to the interface
+  project_id: string | null;
   workstation: string;
   priority: string;
   canComplete: boolean;
@@ -52,6 +53,9 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
   onShowBarcode,
   onShowOrders
 }) => {
+  const { createLocalizedPath } = useLanguage();
+  const navigate = useNavigate();
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       'scheduled': { color: 'bg-blue-100 text-blue-800 border-blue-300', label: 'Scheduled' },
@@ -155,8 +159,9 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
 
   const handleShowOrders = (projectId: string) => {
     console.log('Show orders for project:', projectId);
-    if (onShowOrders && projectId) {
-      onShowOrders(projectId);
+    if (projectId) {
+      const ordersPath = createLocalizedPath(`/projects/${projectId}/orders`);
+      navigate(ordersPath);
     }
   };
 
@@ -308,9 +313,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                               e.preventDefault();
                               e.stopPropagation();
                               console.log('Orders button clicked for project:', task.project_id);
-                              if (task.project_id) {
-                                window.open(`/projects/${task.project_id}/orders`, '_blank');
-                              }
+                              handleShowOrders(task.project_id!);
                             }}
                             title="Project Orders"
                           >
