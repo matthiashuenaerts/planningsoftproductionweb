@@ -6,6 +6,7 @@ import { Clock, User, Calendar, Play, Square, CheckCircle, FileText, Package2, Q
 import { format, parseISO } from 'date-fns';
 import { useLanguage } from '@/context/LanguageContext';
 import { useNavigate } from 'react-router-dom';
+
 interface EnhancedTimelineTask {
   id: string;
   title: string;
@@ -105,6 +106,28 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
       return '';
     }
   };
+  const calculateTimeProgress = (startTime: string, endTime: string) => {
+    try {
+      const now = new Date();
+      const start = parseISO(startTime);
+      const end = parseISO(endTime);
+      
+      // If current time is before start time, progress is 0%
+      if (now < start) return 0;
+      
+      // If current time is after end time, progress is 100%
+      if (now > end) return 100;
+      
+      // Calculate progress between start and end time
+      const totalDuration = end.getTime() - start.getTime();
+      const elapsed = now.getTime() - start.getTime();
+      const progress = (elapsed / totalDuration) * 100;
+      
+      return Math.max(0, Math.min(100, progress));
+    } catch {
+      return 0;
+    }
+  };
   const truncateTitle = (title: string, maxLength: number = 60) => {
     if (title.length <= maxLength) return title;
     return title.substring(0, maxLength) + '...';
@@ -182,6 +205,8 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
         {sortedTasks.map((task, index) => {
         const duration = calculateDuration(task.start_time, task.end_time);
         const isSmallTask = duration && duration.includes('min') && !duration.includes('h');
+        const timeProgress = calculateTimeProgress(task.start_time, task.end_time);
+        
         return <div key={task.id} className="relative flex items-start mb-4">
               {/* Time marker */}
               <div className="flex-shrink-0 w-14 text-right pr-4">
@@ -200,8 +225,17 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
               
               {/* Task card */}
               <div className="flex-1 ml-4">
-                <Card className={`transition-all hover:shadow-md ${task.isActive ? 'ring-2 ring-green-500 ring-opacity-50' : ''} ${isSmallTask ? 'py-2' : ''}`}>
-                  <CardHeader className={`${isSmallTask ? 'py-3 pb-2' : 'pb-3'}`}>
+                <Card className={`relative overflow-hidden transition-all hover:shadow-md ${task.isActive ? 'ring-2 ring-green-500 ring-opacity-50' : ''} ${isSmallTask ? 'py-2' : ''}`}>
+                  {/* Progress bar background */}
+                  <div 
+                    className="absolute inset-0 bg-green-500 opacity-10 transition-all duration-1000 ease-out"
+                    style={{ 
+                      width: `${timeProgress}%`,
+                      background: 'linear-gradient(90deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%)'
+                    }}
+                  />
+                  
+                  <CardHeader className={`relative z-10 ${isSmallTask ? 'py-3 pb-2' : 'pb-3'}`}>
                     <div className="flex justify-between items-start gap-3">
                       <div className="flex-1 min-w-0">
                         <CardTitle className={`${isSmallTask ? 'text-base' : 'text-lg'} leading-tight mb-1`}>
@@ -233,7 +267,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                     </div>
                   </CardHeader>
                   
-                  <CardContent className={`space-y-3 ${isSmallTask ? 'py-2 pt-0' : 'pt-0'}`}>
+                  <CardContent className={`relative z-10 space-y-3 ${isSmallTask ? 'py-2 pt-0' : 'pt-0'}`}>
                     {/* Badges */}
                     <div className="flex flex-wrap gap-2">
                       {getStatusBadge(task.status)}
