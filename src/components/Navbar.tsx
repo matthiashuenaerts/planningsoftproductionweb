@@ -1,234 +1,122 @@
-import React, { useEffect } from 'react';
+import React from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { Home, Calendar, Users, Settings, ListChecks, KanbanSquare } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { rushOrderService } from '@/services/rushOrderService';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { Drawer, DrawerClose, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
-import { useLanguage } from '@/context/LanguageContext';
-import { cn } from '@/lib/utils';
 
-const NavbarContent = ({
-  onItemClick
-}: {
-  onItemClick?: () => void;
-}) => {
-  const {
-    currentEmployee,
-    logout
-  } = useAuth();
-  const { t, lang, changeLang, createLocalizedPath } = useLanguage();
+import UserMenu from './UserMenu';
 
-  // Allow admin, manager, installation_team, and worker roles to see the Rush Orders menu
-  const canSeeRushOrders = currentEmployee && ['admin', 'manager', 'installation_team', 'worker'].includes(currentEmployee.role);
+interface NavItemProps {
+  to: string;
+  children: React.ReactNode;
+  exact?: boolean;
+}
 
-  // Allow admin and manager to see time registrations
-  const canSeeTimeRegistrations = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
+const NavItem: React.FC<NavItemProps> = ({ to, children, exact }) => {
+  const location = useLocation();
+  const isActive = exact ? location.pathname === to : location.pathname.startsWith(to);
 
-  // Query rush orders to get counts for pending orders and unread messages
-  const {
-    data: rushOrders,
-    isLoading
-  } = useQuery({
-    queryKey: ['rushOrders', 'navbar'],
-    queryFn: rushOrderService.getAllRushOrders,
-    enabled: !!canSeeRushOrders,
-    refetchInterval: 30000 // Refetch every 30 seconds
-  });
-
-  // Calculate counts
-  const pendingOrdersCount = rushOrders?.filter(order => order.status === 'pending').length || 0;
-
-  // Calculate total unread messages across all rush orders
-  const totalUnreadMessages = rushOrders?.reduce((total, order) => {
-    return total + (order.unread_messages_count || 0);
-  }, 0) || 0;
-  const handleItemClick = () => {
-    if (onItemClick) {
-      onItemClick();
-    }
-  };
-  return <div className="h-full px-3 py-4 overflow-y-auto bg-sky-800 text-white flex flex-col">
-      <div className="flex flex-col h-full justify-between">
-        <div>
-          <h2 className="px-2 py-3 text-lg font-semibold mb-2">{t('demo_account')}</h2>
-          <ul className="space-y-2 font-medium">
-            <li>
-              <NavLink to={createLocalizedPath("/")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
-                <Home className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">{t('dashboard')}</span>
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to={createLocalizedPath("/projects")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
-                <LayoutDashboard className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">{t('projects')}</span>
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to={createLocalizedPath("/workstations")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
-                <Truck className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">{t('workstations')}</span>
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to={createLocalizedPath("/broken-parts")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
-                <AlertTriangle className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">{t('broken_parts')}</span>
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to={createLocalizedPath("/personal-tasks")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
-                <ListChecks className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">{t('personal_tasks')}</span>
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to={createLocalizedPath("/daily-tasks")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
-                <ListChecks className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">{t('installation_planning')}</span>
-              </NavLink>
-            </li>
-            {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader'].includes(currentEmployee.role) && <li>
-                <NavLink to={createLocalizedPath("/planning")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
-                  <Users className="w-5 h-5 text-white group-hover:text-white" />
-                  <span className="ml-3">{t('planning')}</span>
-                </NavLink>
-              </li>}
-            {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader', 'preparater'].includes(currentEmployee.role) && <li>
-                <NavLink to={createLocalizedPath("/orders")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
-                  <PackagePlus className="w-5 h-5 text-white group-hover:text-white" />
-                  <span className="ml-3">{t('orders')}</span>
-                </NavLink>
-              </li>}
-            {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader', 'preparater'].includes(currentEmployee.role) && <li>
-                <NavLink to={createLocalizedPath("/logistics")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
-                  <Truck className="w-5 h-5 text-white group-hover:text-white" />
-                  <span className="ml-3">{t('logistics')}</span>
-                </NavLink>
-              </li>}
-            {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader', 'preparater'].includes(currentEmployee.role) && <li>
-                <NavLink to={createLocalizedPath("/logistics-out")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
-                  <Truck className="w-5 h-5 text-white group-hover:text-white" />
-                  <span className="ml-3">{t('logistics_out')}</span>
-                </NavLink>
-              </li>}
-            {canSeeRushOrders && <li>
-                <NavLink to={createLocalizedPath("/rush-orders")} className="flex items-center justify-between p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
-                  <div className="flex items-center">
-                    <PackagePlus className="w-5 h-5 text-white group-hover:text-white" />
-                    <span className="ml-3">{t('rush_orders')}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {pendingOrdersCount > 0 && <Badge variant="outline" className="bg-yellow-500 text-white border-0 font-medium">
-                        {pendingOrdersCount}
-                      </Badge>}
-                    {totalUnreadMessages > 0 && <Badge variant="outline" className="bg-red-500 text-white border-0 font-medium">
-                        {totalUnreadMessages}
-                      </Badge>}
-                  </div>
-                </NavLink>
-              </li>}
-            {canSeeTimeRegistrations && <li>
-                <NavLink to={createLocalizedPath("/time-registrations")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
-                  <Clock className="w-5 h-5 text-white group-hover:text-white" />
-                  <span className="ml-3">{t('time_registrations')}</span>
-                </NavLink>
-              </li>}
-            {currentEmployee?.role === 'admin' && (
-              <li>
-                <NavLink to={createLocalizedPath("/settings")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
-                  <Settings className="w-5 h-5 text-white group-hover:text-white" />
-                  <span className="ml-3">{t('settings')}</span>
-                </NavLink>
-              </li>
-            )}
-          </ul>
-        </div>
-        
-        {/* User profile and language switcher at bottom */}
-        <div className="mt-auto pt-2">
-            <div className="flex justify-center items-center gap-2 mb-2 p-2 border-t border-b border-blue-600">
-                <Button 
-                  size="sm" 
-                  variant={lang === 'nl' ? 'default' : 'ghost'} 
-                  className={cn(
-                    "text-sm font-medium",
-                    lang === 'nl' 
-                      ? 'bg-white text-sky-800 hover:bg-gray-100' 
-                      : 'text-white hover:bg-sky-700 hover:text-white'
-                  )}
-                  onClick={() => changeLang('nl')}
-                >
-                  NL
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant={lang === 'en' ? 'default' : 'ghost'} 
-                  className={cn(
-                    "text-sm font-medium",
-                    lang === 'en' 
-                      ? 'bg-white text-sky-800 hover:bg-gray-100' 
-                      : 'text-white hover:bg-sky-700 hover:text-white'
-                  )}
-                  onClick={() => changeLang('en')}
-                >
-                  EN
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant={lang === 'fr' ? 'default' : 'ghost'} 
-                  className={cn(
-                    "text-sm font-medium",
-                    lang === 'fr' 
-                      ? 'bg-white text-sky-800 hover:bg-gray-100' 
-                      : 'text-white hover:bg-sky-700 hover:text-white'
-                  )}
-                  onClick={() => changeLang('fr')}
-                >
-                  FR
-                </Button>
-            </div>
-          {currentEmployee && <div className="flex items-center p-2 mb-2">
-              <User className="w-5 h-5 text-white" />
-              <span className="ml-3 text-sm">{currentEmployee.name}</span>
-            </div>}
-          <button onClick={() => {
-          logout();
-          handleItemClick();
-        }} className="flex w-full items-center p-2 rounded-lg hover:bg-sky-700 group text-white">
-            <LogOut className="w-5 h-5 text-white" />
-            <span className="ml-3">{t('logout')}</span>
-          </button>
-        </div>
-      </div>
-    </div>;
+  return (
+    <NavLink
+      to={to}
+      className={`flex items-center space-x-2 px-4 py-2 rounded-md transition-colors
+        hover:bg-sidebar-hover hover:text-sidebar-foreground
+        ${isActive ? 'bg-sidebar-hover text-sidebar-foreground' : 'text-sidebar-foreground/80'}`}
+    >
+      {children}
+    </NavLink>
+  );
 };
 
-const Navbar = () => {
-  const isMobile = useIsMobile();
-  if (isMobile) {
-    return <Drawer direction="left">
-        <DrawerTrigger asChild>
-          <Button variant="outline" size="icon" className="fixed top-4 left-4 z-50 bg-sky-800 border-sky-600 text-white hover:bg-sky-700">
-            <Menu className="h-4 w-4" />
-          </Button>
-        </DrawerTrigger>
-        <DrawerContent className="h-full w-64 mt-0 rounded-none">
-          <DrawerClose asChild>
-            <div className="h-full">
-              <NavbarContent onItemClick={() => {}} />
-            </div>
-          </DrawerClose>
-        </DrawerContent>
-      </Drawer>;
-  }
-  return <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-      <NavbarContent />
-    </div>;
+const Navbar: React.FC = () => {
+  const { currentEmployee } = useAuth();
+
+  return (
+    <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
+      {/* Header with logo and user menu */}
+      <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
+        <div className="flex items-center space-x-3">
+          <h1 className="text-xl font-bold">KitchenPro</h1>
+        </div>
+        <UserMenu />
+      </div>
+
+      {/* Navigation Menu */}
+      <nav className="flex-1 overflow-y-auto">
+        <NavItem to="/" exact>
+          <Home className="w-4 h-4" />
+          <span>Dashboard</span>
+        </NavItem>
+        <NavItem to="/projects">
+          <ListChecks className="w-4 h-4" />
+          <span>Projects</span>
+        </NavItem>
+        <NavItem to="/tasks">
+          <KanbanSquare className="w-4 h-4" />
+          <span>Tasks</span>
+        </NavItem>
+        {currentEmployee?.role === 'admin' && (
+          <NavItem to="/employees">
+            <Users className="w-4 h-4" />
+            <span>Employees</span>
+          </NavItem>
+        )}
+        {currentEmployee?.role === 'admin' && (
+          <NavItem to="/settings">
+            <Settings className="w-4 h-4" />
+            <span>Settings</span>
+          </NavItem>
+        )}
+        {currentEmployee?.role === 'manager' && (
+          <NavItem to="/employees">
+            <Users className="w-4 h-4" />
+            <span>Employees</span>
+          </NavItem>
+        )}
+        {currentEmployee?.role === 'manager' && (
+          <NavItem to="/settings">
+            <Settings className="w-4 h-4" />
+            <span>Settings</span>
+          </NavItem>
+        )}
+        {currentEmployee?.role === 'teamleader' && (
+          <NavItem to="/tasks">
+            <KanbanSquare className="w-4 h-4" />
+            <span>Tasks</span>
+          </NavItem>
+        )}
+        {currentEmployee?.role === 'installation_team' && (
+          <NavItem to="/tasks">
+            <KanbanSquare className="w-4 h-4" />
+            <span>Tasks</span>
+          </NavItem>
+        )}
+        {currentEmployee?.role === 'workstation' && (
+          <NavItem to="/tasks">
+            <KanbanSquare className="w-4 h-4" />
+            <span>Tasks</span>
+          </NavItem>
+        )}
+        {currentEmployee?.role === 'worker' && (
+          <NavItem to="/tasks">
+            <KanbanSquare className="w-4 h-4" />
+            <span>Tasks</span>
+          </NavItem>
+        )}
+        <NavItem to="/calendar">
+          <Calendar className="w-4 h-4" />
+          <span>Calendar</span>
+        </NavItem>
+      </nav>
+
+      {/* User info at bottom */}
+      <div className="p-4 border-t border-sidebar-border bg-sidebar-accent">
+        <div className="text-sm">
+          <p className="font-medium">{currentEmployee?.name}</p>
+          <p className="text-sidebar-foreground/70 capitalize">{currentEmployee?.role}</p>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default Navbar;
