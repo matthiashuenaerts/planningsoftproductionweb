@@ -24,6 +24,19 @@ export const holidayRequestService = {
     reason?: string;
   }) {
     console.log('Creating holiday request:', request);
+    
+    // First check if the employee exists
+    const { data: employee, error: employeeError } = await supabase
+      .from('employees')
+      .select('id')
+      .eq('id', request.user_id)
+      .single();
+
+    if (employeeError || !employee) {
+      console.error('Employee not found:', employeeError);
+      throw new Error('Employee not found');
+    }
+
     const { data, error } = await supabase
       .from('holiday_requests')
       .insert([request])
@@ -51,7 +64,7 @@ export const holidayRequestService = {
       throw error;
     }
     console.log('User requests fetched:', data);
-    return data;
+    return data || [];
   },
 
   async getAllRequests() {
@@ -66,7 +79,7 @@ export const holidayRequestService = {
       throw error;
     }
     console.log('All requests fetched:', data);
-    return data;
+    return data || [];
   },
 
   async updateRequestStatus(id: string, status: 'approved' | 'rejected', adminNotes?: string, approvedBy?: string) {

@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { holidayRequestService, HolidayRequest } from '@/services/holidayRequestService';
-import { CalendarDays, Clock, User, CheckCircle, XCircle } from 'lucide-react';
+import { CalendarDays, Clock, User, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
@@ -33,7 +33,10 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
   }, [currentEmployee, showAllRequests]);
 
   const fetchRequests = async () => {
-    if (!currentEmployee) return;
+    if (!currentEmployee) {
+      setLoading(false);
+      return;
+    }
     
     try {
       setLoading(true);
@@ -45,6 +48,7 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
         data = await holidayRequestService.getUserRequests(currentEmployee.id);
       }
       
+      console.log('Fetched holiday requests:', data);
       setRequests(data);
     } catch (error) {
       console.error('Error fetching holiday requests:', error);
@@ -53,6 +57,7 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
         description: "Failed to load holiday requests",
         variant: "destructive"
       });
+      setRequests([]);
     } finally {
       setLoading(false);
     }
@@ -130,96 +135,97 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
     );
   }
 
-  if (requests.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarDays className="h-5 w-5" />
-            {showAllRequests ? 'All Holiday Requests' : 'My Holiday Requests'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-gray-500">
-            <CalendarDays className="mx-auto h-12 w-12 mb-4 opacity-30" />
-            <p>No holiday requests found</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarDays className="h-5 w-5" />
-            {showAllRequests ? 'All Holiday Requests' : 'My Holiday Requests'}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5" />
+              {showAllRequests ? 'All Holiday Requests' : 'My Holiday Requests'}
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchRequests}
+              disabled={loading}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {requests.map((request) => (
-              <div
-                key={request.id}
-                className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <User className="h-5 w-5 text-gray-500" />
-                    <div>
-                      <p className="font-medium">{request.employee_name}</p>
-                      <p className="text-sm text-gray-500">
-                        {format(parseISO(request.start_date), 'MMM dd')} - {format(parseISO(request.end_date), 'MMM dd, yyyy')}
-                      </p>
+          {requests.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <CalendarDays className="mx-auto h-12 w-12 mb-4 opacity-30" />
+              <p>No holiday requests found</p>
+              {!showAllRequests && (
+                <p className="text-sm mt-2">Submit your first holiday request to see it here</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {requests.map((request) => (
+                <div
+                  key={request.id}
+                  className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <User className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <p className="font-medium">{request.employee_name}</p>
+                        <p className="text-sm text-gray-500">
+                          {format(parseISO(request.start_date), 'MMM dd')} - {format(parseISO(request.end_date), 'MMM dd, yyyy')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={getStatusBadgeVariant(request.status)} className="flex items-center gap-1">
+                        {getStatusIcon(request.status)}
+                        {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                      </Badge>
+                      {canManageRequests && showAllRequests && request.status === 'pending' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedRequest(request);
+                            setAdminNotes('');
+                          }}
+                        >
+                          Review
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={getStatusBadgeVariant(request.status)} className="flex items-center gap-1">
-                      {getStatusIcon(request.status)}
-                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                    </Badge>
-                    {canManageRequests && showAllRequests && request.status === 'pending' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedRequest(request);
-                          setAdminNotes('');
-                        }}
-                      >
-                        Review
-                      </Button>
+                  
+                  {request.reason && (
+                    <div className="mb-2">
+                      <p className="text-sm text-gray-600">
+                        <strong>Reason:</strong> {request.reason}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {request.admin_notes && (
+                    <div className="bg-blue-50 p-3 rounded border-l-4 border-blue-400">
+                      <p className="text-sm text-blue-800">
+                        <strong>Admin Notes:</strong> {request.admin_notes}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between text-xs text-gray-500 mt-2">
+                    <span>Requested: {format(parseISO(request.created_at), 'MMM dd, yyyy HH:mm')}</span>
+                    {request.updated_at !== request.created_at && (
+                      <span>Updated: {format(parseISO(request.updated_at), 'MMM dd, yyyy HH:mm')}</span>
                     )}
                   </div>
                 </div>
-                
-                {request.reason && (
-                  <div className="mb-2">
-                    <p className="text-sm text-gray-600">
-                      <strong>Reason:</strong> {request.reason}
-                    </p>
-                  </div>
-                )}
-                
-                {request.admin_notes && (
-                  <div className="bg-blue-50 p-3 rounded border-l-4 border-blue-400">
-                    <p className="text-sm text-blue-800">
-                      <strong>Admin Notes:</strong> {request.admin_notes}
-                    </p>
-                  </div>
-                )}
-                
-                <div className="flex justify-between text-xs text-gray-500 mt-2">
-                  <span>Requested: {format(parseISO(request.created_at), 'MMM dd, yyyy HH:mm')}</span>
-                  {request.updated_at !== request.created_at && (
-                    <span>Updated: {format(parseISO(request.updated_at), 'MMM dd, yyyy HH:mm')}</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

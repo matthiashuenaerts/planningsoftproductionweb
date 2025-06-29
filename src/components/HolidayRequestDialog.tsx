@@ -12,6 +12,7 @@ import { CalendarDays, Clock, User, FileText } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { DateRange } from 'react-day-picker';
 
 interface HolidayRequestDialogProps {
   children: React.ReactNode;
@@ -19,20 +20,19 @@ interface HolidayRequestDialogProps {
 
 const HolidayRequestDialog: React.FC<HolidayRequestDialogProps> = ({ children }) => {
   const [open, setOpen] = useState(false);
-  const [startDate, setStartDate] = useState<Date | undefined>();
-  const [endDate, setEndDate] = useState<Date | undefined>();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
 
   const calculateDaysRequested = () => {
-    if (!startDate || !endDate) return 0;
-    return differenceInDays(endDate, startDate) + 1;
+    if (!dateRange?.from || !dateRange?.to) return 0;
+    return differenceInDays(dateRange.to, dateRange.from) + 1;
   };
 
   const handleSubmit = async () => {
-    if (!startDate || !endDate || !currentEmployee) {
+    if (!dateRange?.from || !dateRange?.to || !currentEmployee) {
       toast({
         title: "Error",
         description: "Please select both start and end dates",
@@ -41,7 +41,7 @@ const HolidayRequestDialog: React.FC<HolidayRequestDialogProps> = ({ children })
       return;
     }
 
-    if (startDate > endDate) {
+    if (dateRange.from > dateRange.to) {
       toast({
         title: "Error",
         description: "Start date cannot be after end date",
@@ -55,8 +55,8 @@ const HolidayRequestDialog: React.FC<HolidayRequestDialogProps> = ({ children })
       await holidayRequestService.createRequest({
         user_id: currentEmployee.id,
         employee_name: currentEmployee.name,
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0],
+        start_date: dateRange.from.toISOString().split('T')[0],
+        end_date: dateRange.to.toISOString().split('T')[0],
         reason: reason.trim() || undefined
       });
 
@@ -66,8 +66,7 @@ const HolidayRequestDialog: React.FC<HolidayRequestDialogProps> = ({ children })
       });
 
       // Reset form
-      setStartDate(undefined);
-      setEndDate(undefined);
+      setDateRange(undefined);
       setReason('');
       setOpen(false);
     } catch (error) {
@@ -87,7 +86,7 @@ const HolidayRequestDialog: React.FC<HolidayRequestDialogProps> = ({ children })
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <CalendarDays className="h-6 w-6 text-blue-600" />
@@ -127,48 +126,36 @@ const HolidayRequestDialog: React.FC<HolidayRequestDialogProps> = ({ children })
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <Label className="text-base font-medium">Start Date</Label>
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <Calendar
-                      mode="single"
-                      selected={startDate}
-                      onSelect={setStartDate}
-                      disabled={(date) => date < new Date()}
-                      className="w-full"
-                    />
-                  </div>
-                  {startDate && (
-                    <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-2 rounded">
-                      <CalendarDays className="h-4 w-4" />
-                      Start: {format(startDate, 'EEEE, MMMM do, yyyy')}
-                    </div>
-                  )}
+              <div className="flex flex-col items-center space-y-4">
+                <div className="border rounded-lg p-3 bg-gray-50">
+                  <Calendar
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    disabled={(date) => date < new Date()}
+                    className="w-full"
+                    numberOfMonths={1}
+                  />
                 </div>
                 
-                <div className="space-y-3">
-                  <Label className="text-base font-medium">End Date</Label>
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <Calendar
-                      mode="single"
-                      selected={endDate}
-                      onSelect={setEndDate}
-                      disabled={(date) => date < new Date() || (startDate && date < startDate)}
-                      className="w-full"
-                    />
-                  </div>
-                  {endDate && (
-                    <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 p-2 rounded">
+                {dateRange?.from && (
+                  <div className="w-full space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-2 rounded">
                       <CalendarDays className="h-4 w-4" />
-                      End: {format(endDate, 'EEEE, MMMM do, yyyy')}
+                      Start: {format(dateRange.from, 'EEEE, MMMM do, yyyy')}
                     </div>
-                  )}
-                </div>
+                    {dateRange?.to && (
+                      <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 p-2 rounded">
+                        <CalendarDays className="h-4 w-4" />
+                        End: {format(dateRange.to, 'EEEE, MMMM do, yyyy')}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Duration Summary */}
-              {startDate && endDate && (
+              {dateRange?.from && dateRange?.to && (
                 <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
                     <Clock className="h-5 w-5 text-blue-600" />
@@ -226,7 +213,7 @@ const HolidayRequestDialog: React.FC<HolidayRequestDialogProps> = ({ children })
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || !startDate || !endDate}
+              disabled={isSubmitting || !dateRange?.from || !dateRange?.to}
               className="min-w-32"
             >
               {isSubmitting ? (
