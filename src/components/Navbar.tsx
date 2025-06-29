@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock } from 'lucide-react';
@@ -57,7 +58,6 @@ const NavbarContent = ({
         <div>
           <div className="flex items-center justify-between px-2 py-3 mb-2">
             <h2 className="text-lg font-semibold">{t('demo_account')}</h2>
-            <UserMenu />
           </div>
           <ul className="space-y-2 font-medium">
             <li>
@@ -196,9 +196,12 @@ const NavbarContent = ({
                   FR
                 </Button>
             </div>
-          {currentEmployee && <div className="flex items-center p-2 mb-2">
-              <User className="w-5 h-5 text-white" />
-              <span className="ml-3 text-sm">{currentEmployee.name}</span>
+          {currentEmployee && <div className="flex items-center justify-between p-2 mb-2">
+              <div className="flex items-center">
+                <User className="w-5 h-5 text-white" />
+                <span className="ml-3 text-sm">{currentEmployee.name}</span>
+              </div>
+              <UserMenu />
             </div>}
           <button onClick={() => {
           logout();

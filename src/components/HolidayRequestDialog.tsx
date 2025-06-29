@@ -8,8 +8,10 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { holidayRequestService } from '@/services/holidayRequestService';
-import { CalendarDays } from 'lucide-react';
-import { format } from 'date-fns';
+import { CalendarDays, Clock, User, FileText } from 'lucide-react';
+import { format, differenceInDays } from 'date-fns';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface HolidayRequestDialogProps {
   children: React.ReactNode;
@@ -23,6 +25,11 @@ const HolidayRequestDialog: React.FC<HolidayRequestDialogProps> = ({ children })
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
+
+  const calculateDaysRequested = () => {
+    if (!startDate || !endDate) return 0;
+    return differenceInDays(endDate, startDate) + 1;
+  };
 
   const handleSubmit = async () => {
     if (!startDate || !endDate || !currentEmployee) {
@@ -80,77 +87,156 @@ const HolidayRequestDialog: React.FC<HolidayRequestDialogProps> = ({ children })
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CalendarDays className="h-5 w-5" />
-            Request Holiday
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <CalendarDays className="h-6 w-6 text-blue-600" />
+            Request Holiday Leave
           </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <Label>Start Date</Label>
-              <div className="border rounded-md p-3">
-                <Calendar
-                  mode="single"
-                  selected={startDate}
-                  onSelect={setStartDate}
-                  disabled={(date) => date < new Date()}
-                  className="w-full"
-                />
+          {/* Employee Info Card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <User className="h-5 w-5" />
+                Employee Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">{currentEmployee?.name}</p>
+                  <p className="text-sm text-gray-600">{currentEmployee?.role}</p>
+                </div>
+                <Badge variant="secondary">Active Employee</Badge>
               </div>
-              {startDate && (
-                <p className="text-sm text-gray-600">
-                  Selected: {format(startDate, 'PPP')}
-                </p>
-              )}
-            </div>
-            
-            <div className="space-y-3">
-              <Label>End Date</Label>
-              <div className="border rounded-md p-3">
-                <Calendar
-                  mode="single"
-                  selected={endDate}
-                  onSelect={setEndDate}
-                  disabled={(date) => date < new Date() || (startDate && date < startDate)}
-                  className="w-full"
-                />
+            </CardContent>
+          </Card>
+
+          {/* Date Selection */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <CalendarDays className="h-5 w-5" />
+                Select Dates
+              </CardTitle>
+              <CardDescription>
+                Choose your holiday start and end dates
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">Start Date</Label>
+                  <div className="border rounded-lg p-3 bg-gray-50">
+                    <Calendar
+                      mode="single"
+                      selected={startDate}
+                      onSelect={setStartDate}
+                      disabled={(date) => date < new Date()}
+                      className="w-full"
+                    />
+                  </div>
+                  {startDate && (
+                    <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-2 rounded">
+                      <CalendarDays className="h-4 w-4" />
+                      Start: {format(startDate, 'EEEE, MMMM do, yyyy')}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">End Date</Label>
+                  <div className="border rounded-lg p-3 bg-gray-50">
+                    <Calendar
+                      mode="single"
+                      selected={endDate}
+                      onSelect={setEndDate}
+                      disabled={(date) => date < new Date() || (startDate && date < startDate)}
+                      className="w-full"
+                    />
+                  </div>
+                  {endDate && (
+                    <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 p-2 rounded">
+                      <CalendarDays className="h-4 w-4" />
+                      End: {format(endDate, 'EEEE, MMMM do, yyyy')}
+                    </div>
+                  )}
+                </div>
               </div>
-              {endDate && (
-                <p className="text-sm text-gray-600">
-                  Selected: {format(endDate, 'PPP')}
-                </p>
+
+              {/* Duration Summary */}
+              {startDate && endDate && (
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-5 w-5 text-blue-600" />
+                    <span className="font-medium text-blue-900">Duration Summary</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">Total Days:</span>
+                      <span className="ml-2 font-semibold text-blue-700">{calculateDaysRequested()} days</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Status:</span>
+                      <Badge variant="outline" className="ml-2">Pending Approval</Badge>
+                    </div>
+                  </div>
+                </div>
               )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="space-y-3">
-            <Label htmlFor="reason">Reason (Optional)</Label>
-            <Textarea
-              id="reason"
-              placeholder="Enter the reason for your holiday request..."
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={3}
-            />
-          </div>
+          {/* Reason Section */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <FileText className="h-5 w-5" />
+                Reason for Leave
+              </CardTitle>
+              <CardDescription>
+                Optional: Provide additional details about your holiday request
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                placeholder="Enter the reason for your holiday request (vacation, personal, family time, etc.)..."
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={4}
+                className="resize-none"
+              />
+              <p className="text-sm text-gray-500 mt-2">
+                {reason.length}/500 characters
+              </p>
+            </CardContent>
+          </Card>
 
-          <div className="flex justify-end gap-3">
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <Button
               variant="outline"
               onClick={() => setOpen(false)}
               disabled={isSubmitting}
+              className="min-w-24"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting || !startDate || !endDate}
+              className="min-w-32"
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Request'}
+              {isSubmitting ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Submitting...
+                </div>
+              ) : (
+                'Submit Request'
+              )}
             </Button>
           </div>
         </div>
