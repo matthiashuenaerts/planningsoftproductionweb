@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import ProjectCard from './ProjectCard';
 import TaskList from './TaskList';
 import SeedDataButton from './SeedDataButton';
+import HolidayRequestsList from './HolidayRequestsList';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { projectService, taskService, Project, Task } from '@/services/dataService';
 import { useToast } from '@/hooks/use-toast';
@@ -185,6 +185,10 @@ const Dashboard: React.FC = () => {
     'In Progress': '#f59e0b',
     'Completed': '#4ade80'
   };
+
+  const canManageRequests = currentEmployee?.role === 'admin' || 
+                           currentEmployee?.role === 'teamleader' || 
+                           currentEmployee?.role === 'manager';
 
   if (loading) {
     return (
@@ -409,6 +413,11 @@ const Dashboard: React.FC = () => {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Holiday Requests Section */}
+      <div className="mb-6">
+        <HolidayRequestsList showAllRequests={canManageRequests} />
       </div>
 
       <div className="mb-6">
