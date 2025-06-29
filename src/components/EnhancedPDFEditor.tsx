@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +28,8 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Textbox, FabricImage, Path } from 'fabric';
-import { PDFEditorProps, PDFDocument } from '@/types/pdf';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { PDFEditorProps, PDFDocument as PDFJSDocument } from '@/types/pdf';
 
 const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({ 
   pdfUrl, 
@@ -43,7 +43,9 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   const fabricCanvasRef = useRef<FabricCanvas | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [pdfDoc, setPdfDoc] = useState<PDFDocument | null>(null);
+  const [pdfDoc, setPdfDoc] = useState<PDFJSDocument | null>(null);
+  const [pdfLibDoc, setPdfLibDoc] = useState<PDFDocument | null>(null);
+  const [originalPdfBytes, setOriginalPdfBytes] = useState<Uint8Array | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.2);
@@ -56,6 +58,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   const [fillColor, setFillColor] = useState('transparent');
   const [canvasHistory, setCanvasHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [pageAnnotations, setPageAnnotations] = useState<Map<number, any[]>>(new Map());
 
   // Initialize PDF and Fabric canvas
   useEffect(() => {
@@ -112,9 +115,20 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
 
   const loadPDF = async () => {
     try {
+      // Fetch the PDF bytes
+      const response = await fetch(pdfUrl);
+      const pdfBytes = new Uint8Array(await response.arrayBuffer());
+      setOriginalPdfBytes(pdfBytes);
+
+      // Load with PDF.js for rendering
       const pdf = await window.pdfjsLib.getDocument(pdfUrl).promise;
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
+
+      // Load with pdf-lib for editing
+      const pdfLibDocument = await PDFDocument.load(pdfBytes);
+      setPdfLibDoc(pdfLibDocument);
+
       setLoading(false);
     } catch (error) {
       console.error('Error loading PDF:', error);
@@ -155,6 +169,9 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     fabricCanvas.on('object:modified', handleObjectModified);
     fabricCanvas.on('object:removed', handleObjectRemoved);
 
+    // Load annotations for current page
+    loadPageAnnotations(currentPage);
+    
     // Save initial state
     saveCanvasState();
   };
@@ -194,6 +211,9 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
           if (fabricCanvasRef.current) {
             fabricCanvasRef.current.backgroundImage = img;
             fabricCanvasRef.current.renderAll();
+            
+            // Load annotations for this page
+            loadPageAnnotations(pageNum);
           }
         });
       }
@@ -205,6 +225,89 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
         variant: "destructive"
       });
     }
+  };
+
+  const savePageAnnotations = (pageNum: number) => {
+    if (!fabricCanvasRef.current) return;
+
+    const objects = fabricCanvasRef.current.getObjects();
+    const annotations = objects.map(obj => ({
+      type: obj.type,
+      left: obj.left,
+      top: obj.top,
+      width: obj.width,
+      height: obj.height,
+      fill: obj.fill,
+      stroke: obj.stroke,
+      strokeWidth: obj.strokeWidth,
+      text: obj.type === 'textbox' ? (obj as any).text : undefined,
+      fontSize: obj.type === 'textbox' ? (obj as any).fontSize : undefined,
+      path: obj.type === 'path' ? (obj as any).path : undefined,
+      radius: obj.type === 'circle' ? (obj as any).radius : undefined
+    }));
+
+    setPageAnnotations(prev => new Map(prev).set(pageNum, annotations));
+  };
+
+  const loadPageAnnotations = (pageNum: number) => {
+    if (!fabricCanvasRef.current) return;
+
+    // Clear current objects (except background)
+    const objects = fabricCanvasRef.current.getObjects();
+    objects.forEach(obj => fabricCanvasRef.current?.remove(obj));
+
+    // Load annotations for this page
+    const annotations = pageAnnotations.get(pageNum) || [];
+    annotations.forEach(annotation => {
+      let obj;
+      switch (annotation.type) {
+        case 'rect':
+          obj = new Rect({
+            left: annotation.left,
+            top: annotation.top,
+            width: annotation.width,
+            height: annotation.height,
+            fill: annotation.fill,
+            stroke: annotation.stroke,
+            strokeWidth: annotation.strokeWidth
+          });
+          break;
+        case 'circle':
+          obj = new FabricCircle({
+            left: annotation.left,
+            top: annotation.top,
+            radius: annotation.radius,
+            fill: annotation.fill,
+            stroke: annotation.stroke,
+            strokeWidth: annotation.strokeWidth
+          });
+          break;
+        case 'textbox':
+          obj = new Textbox(annotation.text, {
+            left: annotation.left,
+            top: annotation.top,
+            fontSize: annotation.fontSize,
+            fill: annotation.fill
+          });
+          break;
+        case 'path':
+          if (annotation.path) {
+            obj = new Path(annotation.path, {
+              left: annotation.left,
+              top: annotation.top,
+              stroke: annotation.stroke,
+              strokeWidth: annotation.strokeWidth,
+              fill: 'transparent'
+            });
+          }
+          break;
+      }
+      if (obj) {
+        fabricCanvasRef.current?.add(obj);
+      }
+    });
+
+    fabricCanvasRef.current.renderAll();
   };
 
   const saveCanvasState = () => {
@@ -219,6 +322,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
 
   const handleDrawingCreated = () => {
     saveCanvasState();
+    savePageAnnotations(currentPage);
     autoSaveToPDF();
   };
 
@@ -230,11 +334,13 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
 
   const handleObjectModified = () => {
     saveCanvasState();
+    savePageAnnotations(currentPage);
     autoSaveToPDF();
   };
 
   const handleObjectRemoved = () => {
     saveCanvasState();
+    savePageAnnotations(currentPage);
     autoSaveToPDF();
   };
 
@@ -417,43 +523,105 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   };
 
   const autoSaveToPDF = async () => {
-    if (!fabricCanvasRef.current) return;
-
-    setSaving(true);
-    try {
-      const canvas = fabricCanvasRef.current.getElement();
-      const annotatedImageData = canvas.toDataURL('image/png', 1.0);
-      
-      const response = await fetch(annotatedImageData);
-      const blob = await response.blob();
-      
-      const annotatedFileName = `${fileName.replace('.pdf', '')}_page_${currentPage}_annotated.png`;
-      const filePath = `${projectId}/${annotatedFileName}`;
-      
-      const { error } = await supabase
-        .storage
-        .from('project_files')
-        .upload(filePath, blob, { upsert: true });
-
-      if (error) throw error;
-
-      onSave?.();
-    } catch (error) {
-      console.error('Error auto-saving to PDF:', error);
-    } finally {
-      setSaving(false);
-    }
+    if (!pdfLibDoc || !originalPdfBytes) return;
+    
+    console.log('Auto-saving annotations to PDF...');
+    // The actual saving will happen when user clicks "Save to PDF"
   };
 
   const saveToPDF = async () => {
+    if (!pdfLibDoc || !originalPdfBytes) {
+      toast({
+        title: "Error",
+        description: "PDF not loaded properly",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setSaving(true);
     try {
-      await autoSaveToPDF();
+      // Create a new PDF document from the original
+      const newPdfDoc = await PDFDocument.load(originalPdfBytes);
+      const font = await newPdfDoc.embedFont(StandardFonts.Helvetica);
+
+      // Apply annotations to each page
+      for (const [pageNum, annotations] of pageAnnotations.entries()) {
+        const page = newPdfDoc.getPage(pageNum - 1); // PDF-lib uses 0-based indexing
+        const { width, height } = page.getSize();
+        
+        // Scale factor to convert canvas coordinates to PDF coordinates
+        const scaleX = width / (fabricCanvasRef.current?.width || 800);
+        const scaleY = height / (fabricCanvasRef.current?.height || 600);
+
+        for (const annotation of annotations) {
+          const x = annotation.left * scaleX;
+          const y = height - (annotation.top * scaleY); // PDF coordinates are bottom-up
+
+          switch (annotation.type) {
+            case 'textbox':
+              if (annotation.text) {
+                const fontSize = (annotation.fontSize || 18) * scaleX;
+                const colorArray = hexToRgb(annotation.fill || '#000000');
+                page.drawText(annotation.text, {
+                  x,
+                  y,
+                  size: fontSize,
+                  font,
+                  color: rgb(colorArray.r / 255, colorArray.g / 255, colorArray.b / 255),
+                });
+              }
+              break;
+            case 'rect':
+              const rectWidth = annotation.width * scaleX;
+              const rectHeight = annotation.height * scaleY;
+              const rectColorArray = hexToRgb(annotation.stroke || '#000000');
+              page.drawRectangle({
+                x,
+                y: y - rectHeight,
+                width: rectWidth,
+                height: rectHeight,
+                borderColor: rgb(rectColorArray.r / 255, rectColorArray.g / 255, rectColorArray.b / 255),
+                borderWidth: annotation.strokeWidth || 1,
+              });
+              break;
+            case 'circle':
+              const radius = annotation.radius * scaleX;
+              const circleColorArray = hexToRgb(annotation.stroke || '#000000');
+              page.drawCircle({
+                x: x + radius,
+                y: y - radius,
+                size: radius,
+                borderColor: rgb(circleColorArray.r / 255, circleColorArray.g / 255, circleColorArray.b / 255),
+                borderWidth: annotation.strokeWidth || 1,
+              });
+              break;
+          }
+        }
+      }
+
+      // Save the modified PDF
+      const pdfBytes = await newPdfDoc.save();
+      
+      // Upload the modified PDF back to Supabase
+      const filePath = `${projectId}/${fileName}`;
+      const { error } = await supabase
+        .storage
+        .from('project_files')
+        .upload(filePath, new Blob([pdfBytes], { type: 'application/pdf' }), { 
+          upsert: true 
+        });
+
+      if (error) throw error;
+
       toast({
         title: "Success",
-        description: "PDF annotations saved successfully",
+        description: "PDF annotations saved successfully to the original file",
       });
+      
+      onSave?.();
     } catch (error) {
+      console.error('Error saving PDF:', error);
       toast({
         title: "Error",
         description: "Failed to save PDF annotations",
@@ -464,8 +632,20 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     }
   };
 
+  // Helper function to convert hex color to RGB
+  const hexToRgb = (hex: string) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : { r: 0, g: 0, b: 0 };
+  };
+
   const changePage = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
+      // Save current page annotations before changing
+      savePageAnnotations(currentPage);
       setCurrentPage(newPage);
     }
   };
@@ -477,22 +657,84 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   };
 
   const exportAnnotatedPDF = async () => {
-    if (!fabricCanvasRef.current || !pdfDoc) return;
+    if (!pdfLibDoc || !originalPdfBytes) return;
 
     try {
       setSaving(true);
       
-      const canvas = fabricCanvasRef.current.getElement();
-      const dataURL = canvas.toDataURL('image/png', 1.0);
+      // Create the annotated PDF
+      const newPdfDoc = await PDFDocument.load(originalPdfBytes);
+      const font = await newPdfDoc.embedFont(StandardFonts.Helvetica);
+
+      // Apply annotations to each page
+      for (const [pageNum, annotations] of pageAnnotations.entries()) {
+        const page = newPdfDoc.getPage(pageNum - 1);
+        const { width, height } = page.getSize();
+        
+        const scaleX = width / (fabricCanvasRef.current?.width || 800);
+        const scaleY = height / (fabricCanvasRef.current?.height || 600);
+
+        for (const annotation of annotations) {
+          const x = annotation.left * scaleX;
+          const y = height - (annotation.top * scaleY);
+
+          switch (annotation.type) {
+            case 'textbox':
+              if (annotation.text) {
+                const fontSize = (annotation.fontSize || 18) * scaleX;
+                const colorArray = hexToRgb(annotation.fill || '#000000');
+                page.drawText(annotation.text, {
+                  x,
+                  y,
+                  size: fontSize,
+                  font,
+                  color: rgb(colorArray.r / 255, colorArray.g / 255, colorArray.b / 255),
+                });
+              }
+              break;
+            case 'rect':
+              const rectWidth = annotation.width * scaleX;
+              const rectHeight = annotation.height * scaleY;
+              const rectColorArray = hexToRgb(annotation.stroke || '#000000');
+              page.drawRectangle({
+                x,
+                y: y - rectHeight,
+                width: rectWidth,
+                height: rectHeight,
+                borderColor: rgb(rectColorArray.r / 255, rectColorArray.g / 255, rectColorArray.b / 255),
+                borderWidth: annotation.strokeWidth || 1,
+              });
+              break;
+            case 'circle':
+              const radius = annotation.radius * scaleX;
+              const circleColorArray = hexToRgb(annotation.stroke || '#000000');
+              page.drawCircle({
+                x: x + radius,
+                y: y - radius,
+                size: radius,
+                borderColor: rgb(circleColorArray.r / 255, circleColorArray.g / 255, circleColorArray.b / 255),
+                borderWidth: annotation.strokeWidth || 1,
+              });
+              break;
+          }
+        }
+      }
+
+      // Download the annotated PDF
+      const pdfBytes = await newPdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
       
       const link = document.createElement('a');
-      link.download = `${fileName}_page_${currentPage}_annotated.png`;
-      link.href = dataURL;
+      link.download = `${fileName}_annotated.pdf`;
+      link.href = url;
       link.click();
+      
+      URL.revokeObjectURL(url);
       
       toast({
         title: "Export Complete",
-        description: "Annotated PDF page exported successfully",
+        description: "Annotated PDF exported successfully",
       });
     } catch (error) {
       console.error('Error exporting PDF:', error);
@@ -775,7 +1017,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
                 className="w-full bg-green-600 hover:bg-green-700"
               >
                 <Save className="h-4 w-4 mr-2" />
-                {saving ? 'Saving to PDF...' : 'Save to PDF'}
+                {saving ? 'Saving to PDF...' : 'Save to Original PDF'}
               </Button>
               
               <Button
@@ -785,7 +1027,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
                 className="w-full"
               >
                 <Download className="h-4 w-4 mr-2" />
-                Export Page
+                Export Annotated PDF
               </Button>
             </div>
           </CardContent>
