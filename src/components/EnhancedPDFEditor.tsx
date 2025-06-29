@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,6 +55,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   const [fillColor, setFillColor] = useState('transparent');
   const [canvasHistory, setCanvasHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [isDrawing, setIsDrawing] = useState(false);
 
   // Initialize PDF and Fabric canvas
   useEffect(() => {
@@ -140,20 +140,49 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
 
     fabricCanvasRef.current = fabricCanvas;
 
-    // Set up drawing mode
-    fabricCanvas.isDrawingMode = false;
-    
-    // Configure free drawing brush
-    if (fabricCanvas.freeDrawingBrush) {
-      fabricCanvas.freeDrawingBrush.color = drawingColor;
-      fabricCanvas.freeDrawingBrush.width = strokeWidth;
-    }
+    // Configure free drawing brush properly
+    fabricCanvas.freeDrawingBrush.color = drawingColor;
+    fabricCanvas.freeDrawingBrush.width = strokeWidth;
 
-    // Handle canvas events
-    fabricCanvas.on('path:created', handleDrawingCreated);
-    fabricCanvas.on('object:added', handleObjectAdded);
-    fabricCanvas.on('object:modified', handleObjectModified);
-    fabricCanvas.on('object:removed', handleObjectRemoved);
+    // Handle canvas events for drawing and modifications
+    fabricCanvas.on('path:created', (e) => {
+      console.log('Path created:', e);
+      saveCanvasState();
+      autoSaveToPDF();
+    });
+
+    fabricCanvas.on('object:added', (e) => {
+      fabricCanvas.renderAll();
+    });
+
+    fabricCanvas.on('object:modified', (e) => {
+      console.log('Object modified:', e);
+      saveCanvasState();
+      autoSaveToPDF();
+    });
+
+    fabricCanvas.on('object:removed', (e) => {
+      console.log('Object removed:', e);
+      saveCanvasState();
+      autoSaveToPDF();
+    });
+
+    // Mouse event handlers for better drawing control
+    fabricCanvas.on('mouse:down', (e) => {
+      if (activeTool === 'draw') {
+        setIsDrawing(true);
+      } else if (activeTool === 'erase' && e.target) {
+        fabricCanvas.remove(e.target);
+        saveCanvasState();
+        autoSaveToPDF();
+      }
+    });
+
+    fabricCanvas.on('mouse:up', (e) => {
+      if (activeTool === 'draw') {
+        setIsDrawing(false);
+      }
+    });
 
     // Save initial state
     saveCanvasState();
@@ -207,37 +236,6 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     }
   };
 
-  const saveCanvasState = () => {
-    if (!fabricCanvasRef.current) return;
-    
-    const state = JSON.stringify(fabricCanvasRef.current.toJSON());
-    const newHistory = canvasHistory.slice(0, historyIndex + 1);
-    newHistory.push(state);
-    setCanvasHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  };
-
-  const handleDrawingCreated = () => {
-    saveCanvasState();
-    autoSaveToPDF();
-  };
-
-  const handleObjectAdded = () => {
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.renderAll();
-    }
-  };
-
-  const handleObjectModified = () => {
-    saveCanvasState();
-    autoSaveToPDF();
-  };
-
-  const handleObjectRemoved = () => {
-    saveCanvasState();
-    autoSaveToPDF();
-  };
-
   const handleToolChange = (tool: typeof activeTool) => {
     setActiveTool(tool);
     
@@ -252,10 +250,10 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
         fabricCanvasRef.current.isDrawingMode = true;
         fabricCanvasRef.current.selection = false;
         
-        if (fabricCanvasRef.current.freeDrawingBrush) {
-          fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
-          fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
-        }
+        // Ensure brush is properly configured
+        fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
+        fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
+        console.log('Drawing mode enabled with color:', drawingColor, 'width:', strokeWidth);
         break;
       case 'text':
         addTextbox();
@@ -272,7 +270,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
         }
         break;
       case 'erase':
-        enableEraseMode();
+        fabricCanvasRef.current.selection = false;
         break;
       case 'select':
         fabricCanvasRef.current.selection = true;
@@ -370,19 +368,89 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const enableEraseMode = () => {
+  const autoSaveToPDF = async () => {
+    if (!fabricCanvasRef.current) return;
+
+    setSaving(true);
+    try {
+      // Get the current canvas state with all annotations
+      const canvasData = fabricCanvasRef.current.toJSON();
+      
+      // Save canvas data as JSON for this specific page
+      const annotationKey = `${projectId}/${fileName}_page_${currentPage}_canvas.json`;
+      const canvasBlob = new Blob([JSON.stringify(canvasData, null, 2)], { 
+        type: 'application/json' 
+      });
+      
+      await supabase
+        .storage
+        .from('project_files')
+        .upload(annotationKey, canvasBlob, { upsert: true });
+
+      // Also save as image for preview
+      const canvas = fabricCanvasRef.current.getElement();
+      const annotatedImageData = canvas.toDataURL('image/png', 1.0);
+      
+      const response = await fetch(annotatedImageData);
+      const imageBlob = await response.blob();
+      
+      const imageKey = `${projectId}/${fileName}_page_${currentPage}_annotated.png`;
+      
+      await supabase
+        .storage
+        .from('project_files')
+        .upload(imageKey, imageBlob, { upsert: true });
+
+      console.log('Auto-saved canvas data and image for page', currentPage);
+      onSave?.();
+    } catch (error) {
+      console.error('Error auto-saving to PDF:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadCanvasState = async (pageNum: number) => {
+    if (!fabricCanvasRef.current) return;
+
+    try {
+      const annotationKey = `${projectId}/${fileName}_page_${pageNum}_canvas.json`;
+      const { data, error } = await supabase
+        .storage
+        .from('project_files')
+        .download(annotationKey);
+
+      if (!error && data) {
+        const text = await data.text();
+        const canvasData = JSON.parse(text);
+        
+        fabricCanvasRef.current.loadFromJSON(canvasData, () => {
+          fabricCanvasRef.current?.renderAll();
+          console.log('Loaded canvas state for page', pageNum);
+        });
+      }
+    } catch (error) {
+      console.log('No existing canvas state for page', pageNum);
+    }
+  };
+
+  // Update the changePage function to load canvas state
+  const changePage = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
+      setCurrentPage(newPage);
+      // Load canvas state for new page after a short delay
+      setTimeout(() => loadCanvasState(newPage), 500);
+    }
+  };
+
+  const saveCanvasState = () => {
     if (!fabricCanvasRef.current) return;
     
-    fabricCanvasRef.current.selection = false;
-    fabricCanvasRef.current.isDrawingMode = false;
-    
-    // Add click event to remove objects
-    fabricCanvasRef.current.on('mouse:down', (e) => {
-      if (activeTool === 'erase' && e.target) {
-        fabricCanvasRef.current?.remove(e.target);
-        saveCanvasState();
-      }
-    });
+    const state = JSON.stringify(fabricCanvasRef.current.toJSON());
+    const newHistory = canvasHistory.slice(0, historyIndex + 1);
+    newHistory.push(state);
+    setCanvasHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
   };
 
   const undo = () => {
@@ -416,42 +484,13 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     saveCanvasState();
   };
 
-  const autoSaveToPDF = async () => {
-    if (!fabricCanvasRef.current) return;
-
-    setSaving(true);
-    try {
-      const canvas = fabricCanvasRef.current.getElement();
-      const annotatedImageData = canvas.toDataURL('image/png', 1.0);
-      
-      const response = await fetch(annotatedImageData);
-      const blob = await response.blob();
-      
-      const annotatedFileName = `${fileName.replace('.pdf', '')}_page_${currentPage}_annotated.png`;
-      const filePath = `${projectId}/${annotatedFileName}`;
-      
-      const { error } = await supabase
-        .storage
-        .from('project_files')
-        .upload(filePath, blob, { upsert: true });
-
-      if (error) throw error;
-
-      onSave?.();
-    } catch (error) {
-      console.error('Error auto-saving to PDF:', error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const saveToPDF = async () => {
     setSaving(true);
     try {
       await autoSaveToPDF();
       toast({
         title: "Success",
-        description: "PDF annotations saved successfully",
+        description: "PDF annotations saved to the document successfully",
       });
     } catch (error) {
       toast({
@@ -461,12 +500,6 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const changePage = (newPage: number) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setCurrentPage(newPage);
     }
   };
 
@@ -511,8 +544,16 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     if (fabricCanvasRef.current && fabricCanvasRef.current.freeDrawingBrush) {
       fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
       fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
+      console.log('Updated brush - color:', drawingColor, 'width:', strokeWidth);
     }
   }, [drawingColor, strokeWidth]);
+
+  // Load canvas state when page changes
+  useEffect(() => {
+    if (fabricCanvasRef.current && !loading && initialized && currentPage > 0) {
+      setTimeout(() => loadCanvasState(currentPage), 100);
+    }
+  }, [currentPage, initialized, loading]);
 
   if (loading) {
     return (
@@ -581,7 +622,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
             {saving && (
               <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-3 py-1 rounded">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                <span className="text-sm">Saving...</span>
+                <span className="text-sm">Saving to document...</span>
               </div>
             )}
           </div>
@@ -674,6 +715,13 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
                 <span className="text-xs">Image</span>
               </Button>
             </div>
+            
+            {activeTool === 'draw' && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700 font-medium mb-1">Drawing Mode Active</p>
+                <p className="text-xs text-blue-600">Click and drag on the PDF to draw freely</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -775,7 +823,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
                 className="w-full bg-green-600 hover:bg-green-700"
               >
                 <Save className="h-4 w-4 mr-2" />
-                {saving ? 'Saving to PDF...' : 'Save to PDF'}
+                {saving ? 'Saving to Document...' : 'Save to Document'}
               </Button>
               
               <Button
@@ -785,7 +833,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
                 className="w-full"
               >
                 <Download className="h-4 w-4 mr-2" />
-                Export Page
+                Export Page as Image
               </Button>
             </div>
           </CardContent>
