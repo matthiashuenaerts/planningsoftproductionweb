@@ -23,38 +23,54 @@ export const holidayRequestService = {
     end_date: string;
     reason?: string;
   }) {
+    console.log('Creating holiday request:', request);
     const { data, error } = await supabase
       .from('holiday_requests')
       .insert([request])
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error creating holiday request:', error);
+      throw error;
+    }
+    console.log('Holiday request created successfully:', data);
     return data;
   },
 
   async getUserRequests(userId: string) {
+    console.log('Fetching requests for user:', userId);
     const { data, error } = await supabase
       .from('holiday_requests')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching user requests:', error);
+      throw error;
+    }
+    console.log('User requests fetched:', data);
     return data;
   },
 
   async getAllRequests() {
+    console.log('Fetching all holiday requests');
     const { data, error } = await supabase
       .from('holiday_requests')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching all requests:', error);
+      throw error;
+    }
+    console.log('All requests fetched:', data);
     return data;
   },
 
   async updateRequestStatus(id: string, status: 'approved' | 'rejected', adminNotes?: string, approvedBy?: string) {
+    console.log('Updating request status:', { id, status, adminNotes, approvedBy });
     const { data, error } = await supabase
       .from('holiday_requests')
       .update({ 
@@ -67,7 +83,11 @@ export const holidayRequestService = {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error updating request status:', error);
+      throw error;
+    }
+    console.log('Request status updated successfully:', data);
     return data;
   }
 };
