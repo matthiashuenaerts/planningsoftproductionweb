@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/context/AuthContext';
@@ -9,7 +10,6 @@ import StandardTasksSettings from '@/components/settings/StandardTasksSettings';
 import HolidayPlanner from '@/components/settings/HolidayPlanner';
 import { Button } from '@/components/ui/button';
 import { Settings as SettingsIcon } from 'lucide-react';
-import HolidayRequestsAdmin from '@/components/HolidayRequestsAdmin';
 
 const Settings: React.FC = () => {
   const { currentEmployee } = useAuth();
@@ -82,7 +82,6 @@ const Settings: React.FC = () => {
               <TabsTrigger value="employees">Employees</TabsTrigger>
               <TabsTrigger value="standard-tasks">Standard Tasks</TabsTrigger>
               <TabsTrigger value="holiday-planner">Holiday Planner</TabsTrigger>
-              <TabsTrigger value="holiday-requests">Holiday Requests</TabsTrigger>
             </TabsList>
             
             <TabsContent value="workstations">
@@ -99,10 +98,6 @@ const Settings: React.FC = () => {
 
             <TabsContent value="holiday-planner">
               <HolidayPlanner />
-            </TabsContent>
-
-            <TabsContent value="holiday-requests">
-              <HolidayRequestsAdmin />
             </TabsContent>
           </Tabs>
         </div>

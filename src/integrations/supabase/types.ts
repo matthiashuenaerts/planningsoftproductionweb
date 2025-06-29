@@ -255,48 +255,6 @@ export type Database = {
         }
         Relationships: []
       }
-      holiday_requests: {
-        Row: {
-          admin_notes: string | null
-          approved_by: string | null
-          created_at: string
-          employee_name: string
-          end_date: string
-          id: string
-          reason: string | null
-          start_date: string
-          status: Database["public"]["Enums"]["holiday_request_status"]
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          admin_notes?: string | null
-          approved_by?: string | null
-          created_at?: string
-          employee_name: string
-          end_date: string
-          id?: string
-          reason?: string | null
-          start_date: string
-          status?: Database["public"]["Enums"]["holiday_request_status"]
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          admin_notes?: string | null
-          approved_by?: string | null
-          created_at?: string
-          employee_name?: string
-          end_date?: string
-          id?: string
-          reason?: string | null
-          start_date?: string
-          status?: Database["public"]["Enums"]["holiday_request_status"]
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       holidays: {
         Row: {
           created_at: string
@@ -1742,7 +1700,6 @@ export type Database = {
         | "workstation"
         | "installation_team"
         | "preparater"
-      holiday_request_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1866,7 +1823,6 @@ export const Constants = {
         "installation_team",
         "preparater",
       ],
-      holiday_request_status: ["pending", "approved", "rejected"],
     },
   },
 } as const
