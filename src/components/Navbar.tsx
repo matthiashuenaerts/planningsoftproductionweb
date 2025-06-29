@@ -10,6 +10,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Drawer, DrawerClose, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
+import UserMenu from './UserMenu';
 
 const NavbarContent = ({
   onItemClick
@@ -54,7 +55,10 @@ const NavbarContent = ({
   return <div className="h-full px-3 py-4 overflow-y-auto bg-sky-800 text-white flex flex-col">
       <div className="flex flex-col h-full justify-between">
         <div>
-          <h2 className="px-2 py-3 text-lg font-semibold mb-2">{t('demo_account')}</h2>
+          <div className="flex items-center justify-between px-2 py-3 mb-2">
+            <h2 className="text-lg font-semibold">{t('demo_account')}</h2>
+            <UserMenu />
+          </div>
           <ul className="space-y-2 font-medium">
             <li>
               <NavLink to={createLocalizedPath("/")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
