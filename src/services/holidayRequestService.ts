@@ -53,6 +53,12 @@ export const holidayRequestService = {
 
   async getUserRequests(userId: string) {
     console.log('Fetching requests for user:', userId);
+    
+    if (!userId) {
+      console.error('No user ID provided');
+      throw new Error('User ID is required');
+    }
+
     const { data, error } = await supabase
       .from('holiday_requests')
       .select('*')
@@ -63,7 +69,8 @@ export const holidayRequestService = {
       console.error('Error fetching user requests:', error);
       throw error;
     }
-    console.log('User requests fetched:', data);
+    
+    console.log('User requests fetched successfully:', data?.length || 0, 'requests');
     return data || [];
   },
 
@@ -78,7 +85,7 @@ export const holidayRequestService = {
       console.error('Error fetching all requests:', error);
       throw error;
     }
-    console.log('All requests fetched:', data);
+    console.log('All requests fetched successfully:', data?.length || 0, 'requests');
     return data || [];
   },
 

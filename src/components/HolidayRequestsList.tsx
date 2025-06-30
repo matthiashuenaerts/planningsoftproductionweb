@@ -9,7 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { holidayRequestService, HolidayRequest } from '@/services/holidayRequestService';
 import { CalendarDays, Clock, User, CheckCircle, XCircle, RefreshCw, Eye } from 'lucide-react';
-import { format, parseISO, isAfter, startOfToday } from 'date-fns';
+import { format, parseISO, isAfter, startOfToday, isBefore, isToday } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 interface HolidayRequestsListProps {
@@ -35,27 +35,38 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
 
   const fetchRequests = async () => {
     if (!currentEmployee) {
+      console.log('No current employee, skipping fetch');
       setLoading(false);
       return;
     }
     
     try {
       setLoading(true);
+      console.log('Fetching requests for user:', currentEmployee.id, 'showAllRequests:', showAllRequests);
+      
       let data: HolidayRequest[];
       
       if (showAllRequests && canManageRequests) {
+        console.log('Fetching all requests for admin/manager');
         data = await holidayRequestService.getAllRequests();
       } else {
+        console.log('Fetching user requests for:', currentEmployee.id);
         data = await holidayRequestService.getUserRequests(currentEmployee.id);
       }
       
       console.log('Fetched holiday requests:', data);
-      setRequests(data);
+      
+      // Sort requests by creation date (newest first)
+      const sortedData = data.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      
+      setRequests(sortedData);
     } catch (error) {
       console.error('Error fetching holiday requests:', error);
       toast({
         title: "Error",
-        description: "Failed to load holiday requests",
+        description: "Failed to load holiday requests. Please try again.",
         variant: "destructive"
       });
       setRequests([]);
@@ -119,12 +130,21 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
   };
 
   const today = startOfToday();
-  const upcomingRequests = requests.filter(request => 
-    isAfter(parseISO(request.start_date), today) || request.status === 'pending'
-  );
-  const pastRequests = requests.filter(request => 
-    !isAfter(parseISO(request.start_date), today) && request.status !== 'pending'
-  );
+  
+  // Filter requests more carefully
+  const upcomingRequests = requests.filter(request => {
+    const startDate = parseISO(request.start_date);
+    // Include requests that start today or in the future, or are still pending
+    return isAfter(startDate, today) || isToday(startDate) || request.status === 'pending';
+  });
+  
+  const pastRequests = requests.filter(request => {
+    const startDate = parseISO(request.start_date);
+    // Include requests that started before today and are not pending
+    return isBefore(startDate, today) && request.status !== 'pending';
+  });
+
+  console.log('Filtered requests - Upcoming:', upcomingRequests.length, 'Past:', pastRequests.length);
 
   const renderRequestCard = (request: HolidayRequest) => (
     <div
@@ -158,55 +178,57 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
               Review
             </Button>
           )}
-          {!showAllRequests && (
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Eye className="h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Request Details</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Eye className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Request Details</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Employee</label>
+                  <p className="text-sm text-gray-600">{request.employee_name}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Dates</label>
+                  <p className="text-sm text-gray-600">
+                    {format(parseISO(request.start_date), 'MMMM dd, yyyy')} - {format(parseISO(request.end_date), 'MMMM dd, yyyy')}
+                  </p>
+                </div>
+                {request.reason && (
                   <div>
-                    <label className="text-sm font-medium">Dates</label>
-                    <p className="text-sm text-gray-600">
-                      {format(parseISO(request.start_date), 'MMMM dd, yyyy')} - {format(parseISO(request.end_date), 'MMMM dd, yyyy')}
-                    </p>
+                    <label className="text-sm font-medium">Reason</label>
+                    <p className="text-sm text-gray-600">{request.reason}</p>
                   </div>
-                  {request.reason && (
-                    <div>
-                      <label className="text-sm font-medium">Reason</label>
-                      <p className="text-sm text-gray-600">{request.reason}</p>
-                    </div>
-                  )}
-                  <div>
-                    <label className="text-sm font-medium">Status</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant={getStatusBadgeVariant(request.status)} className="flex items-center gap-1">
-                        {getStatusIcon(request.status)}
-                        {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                      </Badge>
-                    </div>
-                  </div>
-                  {request.admin_notes && (
-                    <div>
-                      <label className="text-sm font-medium">Admin Notes</label>
-                      <p className="text-sm text-gray-600 bg-blue-50 p-2 rounded">{request.admin_notes}</p>
-                    </div>
-                  )}
-                  <div className="text-xs text-gray-500">
-                    <p>Submitted: {format(parseISO(request.created_at), 'MMM dd, yyyy HH:mm')}</p>
-                    {request.updated_at !== request.created_at && (
-                      <p>Updated: {format(parseISO(request.updated_at), 'MMM dd, yyyy HH:mm')}</p>
-                    )}
+                )}
+                <div>
+                  <label className="text-sm font-medium">Status</label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge variant={getStatusBadgeVariant(request.status)} className="flex items-center gap-1">
+                      {getStatusIcon(request.status)}
+                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                    </Badge>
                   </div>
                 </div>
-              </DialogContent>
-            </Dialog>
-          )}
+                {request.admin_notes && (
+                  <div>
+                    <label className="text-sm font-medium">Admin Notes</label>
+                    <p className="text-sm text-gray-600 bg-blue-50 p-2 rounded">{request.admin_notes}</p>
+                  </div>
+                )}
+                <div className="text-xs text-gray-500">
+                  <p>Submitted: {format(parseISO(request.created_at), 'MMM dd, yyyy HH:mm')}</p>
+                  {request.updated_at !== request.created_at && (
+                    <p>Updated: {format(parseISO(request.updated_at), 'MMM dd, yyyy HH:mm')}</p>
+                  )}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
       
