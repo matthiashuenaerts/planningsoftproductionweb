@@ -85,13 +85,12 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
 
     setProcessingId(requestId);
     try {
-      console.log('Updating request status:', { requestId, status, adminNotes: adminNotes.trim(), approvedBy: currentEmployee.id });
+      console.log('Updating request status:', { requestId, status, adminNotes: adminNotes.trim() });
       
       await holidayRequestService.updateRequestStatus(
         requestId,
         status,
-        adminNotes.trim() || undefined,
-        currentEmployee.id
+        adminNotes.trim() || undefined
       );
 
       toast({

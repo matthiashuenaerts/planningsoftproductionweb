@@ -132,14 +132,13 @@ export const holidayRequestService = {
     return data || [];
   },
 
-  async updateRequestStatus(id: string, status: 'approved' | 'rejected', adminNotes?: string, approvedBy?: string) {
-    console.log('Updating request status:', { id, status, adminNotes, approvedBy });
+  async updateRequestStatus(id: string, status: 'approved' | 'rejected', adminNotes?: string) {
+    console.log('Updating request status:', { id, status, adminNotes });
     const { data, error } = await supabase
       .from('holiday_requests')
       .update({ 
         status, 
         admin_notes: adminNotes,
-        approved_by: approvedBy,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
