@@ -151,5 +151,28 @@ export const holidayRequestService = {
     }
     console.log('Request status updated successfully:', data);
     return data;
+  },
+
+  async cleanupOldRequests() {
+    console.log('Cleaning up old holiday requests...');
+    
+    // Calculate the cutoff date (30 days before today)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const cutoffDate = thirtyDaysAgo.toISOString().split('T')[0];
+    
+    const { data, error } = await supabase
+      .from('holiday_requests')
+      .delete()
+      .lt('end_date', cutoffDate)
+      .select();
+
+    if (error) {
+      console.error('Error cleaning up old requests:', error);
+      throw error;
+    }
+    
+    console.log(`Cleaned up ${data?.length || 0} old holiday requests`);
+    return data?.length || 0;
   }
 };

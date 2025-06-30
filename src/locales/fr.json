@@ -1,3 +1,4 @@
+
 {
   "login_title": "PlanningSoftProduction",
   "login_description": "Logiciel de planification pour environnement de production",
@@ -16,11 +17,11 @@
   "workstations": "Postes de travail",
   "broken_parts": "Pièces défectueuses",
   "personal_tasks": "Tâches personnelles",
-  "installation_planning": "Planification d'installation",
+  "installation_planning": "Planification d'installation", 
   "planning": "Planification",
   "orders": "Commandes",
   "logistics": "Logistique",
-  "logistics_out": "Logistique sortante",
+  "logistics_out": "Logistique Sortante",
   "rush_orders": "Commandes urgentes",
   "time_registrations": "Enregistrements de temps",
   "settings": "Paramètres",
