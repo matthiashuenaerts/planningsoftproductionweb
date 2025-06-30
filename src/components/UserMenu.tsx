@@ -1,14 +1,42 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { MoreVertical, CalendarDays, Plus } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { MoreVertical, CalendarDays, Plus, Users } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { holidayRequestService } from '@/services/holidayRequestService';
 import HolidayRequestDialog from './HolidayRequestDialog';
 import HolidayRequestsList from './HolidayRequestsList';
 
 const UserMenu: React.FC = () => {
   const [showHolidayModal, setShowHolidayModal] = useState(false);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const { currentEmployee } = useAuth();
+
+  const canManageRequests = currentEmployee?.role === 'admin' || 
+                           currentEmployee?.role === 'teamleader' || 
+                           currentEmployee?.role === 'manager';
+
+  useEffect(() => {
+    const fetchPendingCount = async () => {
+      if (!canManageRequests) return;
+      
+      try {
+        const allRequests = await holidayRequestService.getAllRequests();
+        const pending = allRequests.filter(request => request.status === 'pending');
+        setPendingCount(pending.length);
+      } catch (error) {
+        console.error('Error fetching pending requests count:', error);
+      }
+    };
+
+    if (canManageRequests) {
+      fetchPendingCount();
+    }
+  }, [canManageRequests]);
 
   return (
     <>
@@ -23,6 +51,21 @@ const UserMenu: React.FC = () => {
             <CalendarDays className="mr-2 h-4 w-4" />
             Holiday
           </DropdownMenuItem>
+          {canManageRequests && (
+            <DropdownMenuItem onSelect={() => setShowAdminModal(true)}>
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center">
+                  <Users className="mr-2 h-4 w-4" />
+                  Manage Requests
+                </div>
+                {pendingCount > 0 && (
+                  <Badge variant="destructive" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
+                    {pendingCount}
+                  </Badge>
+                )}
+              </div>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -36,10 +79,8 @@ const UserMenu: React.FC = () => {
           </DialogHeader>
           
           <div className="space-y-6">
-            {/* Holiday Requests List */}
             <HolidayRequestsList showAllRequests={false} />
             
-            {/* Add New Request Button */}
             <div className="flex justify-center pt-4 border-t">
               <HolidayRequestDialog>
                 <Button className="flex items-center gap-2">
@@ -51,6 +92,28 @@ const UserMenu: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {canManageRequests && (
+        <Dialog open={showAdminModal} onOpenChange={setShowAdminModal}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Manage Holiday Requests
+                {pendingCount > 0 && (
+                  <Badge variant="destructive" className="ml-2">
+                    {pendingCount} pending
+                  </Badge>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              <HolidayRequestsList showAllRequests={true} />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 };

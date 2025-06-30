@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -56,7 +55,6 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
       
       console.log('Fetched holiday requests:', data);
       
-      // Sort requests by creation date (newest first)
       const sortedData = data.sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
@@ -76,10 +74,19 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
   };
 
   const handleStatusUpdate = async (requestId: string, status: 'approved' | 'rejected') => {
-    if (!currentEmployee || !canManageRequests) return;
+    if (!currentEmployee || !canManageRequests) {
+      toast({
+        title: "Error",
+        description: "You don't have permission to update request status",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setProcessingId(requestId);
     try {
+      console.log('Updating request status:', { requestId, status, adminNotes: adminNotes.trim(), approvedBy: currentEmployee.id });
+      
       await holidayRequestService.updateRequestStatus(
         requestId,
         status,
@@ -99,7 +106,7 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
       console.error('Error updating request status:', error);
       toast({
         title: "Error",
-        description: "Failed to update request status",
+        description: "Failed to update request status. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -131,20 +138,15 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
 
   const today = startOfToday();
   
-  // Filter requests more carefully
   const upcomingRequests = requests.filter(request => {
     const startDate = parseISO(request.start_date);
-    // Include requests that start today or in the future, or are still pending
     return isAfter(startDate, today) || isToday(startDate) || request.status === 'pending';
   });
   
   const pastRequests = requests.filter(request => {
     const startDate = parseISO(request.start_date);
-    // Include requests that started before today and are not pending
     return isBefore(startDate, today) && request.status !== 'pending';
   });
-
-  console.log('Filtered requests - Upcoming:', upcomingRequests.length, 'Past:', pastRequests.length);
 
   const renderRequestCard = (request: HolidayRequest) => (
     <div
@@ -340,7 +342,6 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
         </CardContent>
       </Card>
 
-      {/* Review Dialog */}
       {selectedRequest && (
         <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
           <DialogContent className="max-w-2xl">

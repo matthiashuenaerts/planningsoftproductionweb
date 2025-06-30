@@ -15,6 +15,39 @@ export interface HolidayRequest {
   updated_at: string;
 }
 
+const sendHolidayRequestEmail = async (request: {
+  employeeName: string;
+  startDate: string;
+  endDate: string;
+  reason?: string;
+  requestId: string;
+}) => {
+  try {
+    const response = await fetch('/functions/v1/send-holiday-request-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        employeeName: request.employeeName,
+        startDate: request.startDate,
+        endDate: request.endDate,
+        reason: request.reason,
+        requestId: request.requestId,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to send email');
+    }
+
+    console.log('Holiday request email sent successfully');
+  } catch (error) {
+    console.error('Error sending holiday request email:', error);
+    // Don't throw error here to prevent blocking the request creation
+  }
+};
+
 export const holidayRequestService = {
   async createRequest(request: {
     user_id: string;
@@ -25,7 +58,6 @@ export const holidayRequestService = {
   }) {
     console.log('Creating holiday request:', request);
     
-    // First check if the employee exists
     const { data: employee, error: employeeError } = await supabase
       .from('employees')
       .select('id')
@@ -47,7 +79,18 @@ export const holidayRequestService = {
       console.error('Error creating holiday request:', error);
       throw error;
     }
+
     console.log('Holiday request created successfully:', data);
+
+    // Send email notification
+    await sendHolidayRequestEmail({
+      employeeName: request.employee_name,
+      startDate: request.start_date,
+      endDate: request.end_date,
+      reason: request.reason,
+      requestId: data.id,
+    });
+
     return data;
   },
 
