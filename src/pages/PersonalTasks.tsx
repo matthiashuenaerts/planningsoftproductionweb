@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -67,6 +69,7 @@ interface ScheduleWithTask {
 
 const PersonalTasks = () => {
   const { currentEmployee } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -258,8 +261,8 @@ const PersonalTasks = () => {
         await queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
         
         toast({
-          title: "Task Started",
-          description: "Task has been started and time registration created.",
+          title: t("task_started"),
+          description: t("task_started_desc"),
         });
       } else if (newStatus === 'COMPLETED') {
         console.log('Completing task:', taskId);
@@ -270,8 +273,8 @@ const PersonalTasks = () => {
         await queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
         
         toast({
-          title: "Task Completed",
-          description: "Task has been completed and time registration ended.",
+          title: t("task_completed"),
+          description: t("task_completed_desc"),
         });
       } else if (newStatus === 'TODO' && isTaskActive(taskId)) {
         console.log('Pausing task:', taskId);
@@ -282,8 +285,8 @@ const PersonalTasks = () => {
         await queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
 
         toast({
-          title: "Task Paused",
-          description: "Time registration has been stopped.",
+          title: t("task_updated"),
+          description: t("task_updated_desc", { status: newStatus }),
         });
       } else {
         // Regular status update
@@ -304,8 +307,8 @@ const PersonalTasks = () => {
     } catch (error: any) {
       console.error('Error updating task status:', error);
       toast({
-        title: "Error",
-        description: `Failed to update task: ${error.message}`,
+        title: t("error"),
+        description: t("task_status_update_error", { message: error.message }),
         variant: "destructive"
       });
     }
@@ -458,8 +461,8 @@ const PersonalTasks = () => {
       <div className="flex-1 ml-64 p-6 max-w-none">
         <TaskTimer />
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Daily Timeline</h1>
-          <p className="text-gray-600 mt-2">Your scheduled tasks for today</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t("daily_timeline")}</h1>
+          <p className="text-gray-600 mt-2">{t("daily_timeline_description")}</p>
         </div>
 
         <div className="space-y-4">
@@ -478,7 +481,7 @@ const PersonalTasks = () => {
         {showFilesPopup && (
           <ProjectFilesPopup
             projectId={showFilesPopup}
-            projectName={tasks.find(task => task.phases.projects.id === showFilesPopup)?.phases.projects.name || "Unknown Project"}
+            projectName={tasks.find(task => task.phases.projects.id === showFilesPopup)?.phases.projects.name || t("unknown_project")}
             isOpen={true}
             onClose={() => setShowFilesPopup(null)}
           />
@@ -491,8 +494,8 @@ const PersonalTasks = () => {
             projectId={showPartsDialog}
             onImportComplete={() => {
               toast({
-                title: "Success",
-                description: "Parts list imported successfully",
+                title: t("success"),
+                description: t("parts_list_imported_successfully"),
               });
             }}
           />
@@ -503,7 +506,7 @@ const PersonalTasks = () => {
             isOpen={true}
             onClose={() => setShowBarcodeDialog(null)}
             projectId={showBarcodeDialog}
-            projectName={tasks.find(task => task.phases.projects.id === showBarcodeDialog)?.phases.projects.name || "Unknown Project"}
+            projectName={tasks.find(task => task.phases.projects.id === showBarcodeDialog)?.phases.projects.name || t("unknown_project")}
           />
         )}
       </div>

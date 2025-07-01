@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
+import { useLanguage } from '@/context/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -17,6 +18,7 @@ import { format, parseISO } from 'date-fns';
 
 const TimeRegistrations = () => {
   const { currentEmployee } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState({
@@ -188,14 +190,14 @@ const TimeRegistrations = () => {
   const exportToCSV = () => {
     try {
       const headers = [
-        'Employee',
-        'Project',
-        'Task',
-        'Start Time',
-        'End Time',
-        'Duration (minutes)',
-        'Cost (EUR)',
-        'Status'
+        t("employee"),
+        t("project"),
+        t("task"),
+        t("start_time"),
+        t("end_time"),
+        t("duration_hours"),
+        t("cost"),
+        t("status")
       ];
 
       const csvData = filteredRegistrations.map((reg: any) => {
@@ -207,19 +209,15 @@ const TimeRegistrations = () => {
         }
         
         const rowData = [
-          reg.employees?.name || (currentEmployee?.name ||'Unknown Employee'),
-          reg.tasks?.phases?.projects?.name || (reg.workstation_tasks?.workstations ? `Workstation: ${reg.workstation_tasks.workstations.name}` : 'Unknown Project'),
-          reg.tasks?.title || reg.workstation_tasks?.task_name || 'Unknown Task',
+          reg.employees?.name || (currentEmployee?.name || t("unknown_employee")),
+          reg.tasks?.phases?.projects?.name || (reg.workstation_tasks?.workstations ? `${t("workstation_prefix")}${reg.workstation_tasks.workstations.name}` : t("unknown_project")),
+          reg.tasks?.title || reg.workstation_tasks?.task_name || t("unknown_task"),
           formatDateTime(reg.start_time),
           reg.end_time ? formatDateTime(reg.end_time) : '',
           reg.duration_minutes || 0,
           cost,
-          reg.is_active ? 'Active' : 'Completed'
+          reg.is_active ? t("active") : t("completed")
         ];
-
-        // For non-admin view, the 'Employee' column is not in the table, but we want it in the CSV.
-        // We'll remove it from the headers if not admin, for visual consistency with table.
-        // Oh wait, the user wants it in the CSV for both. I'll just keep it.
 
         if(!canViewAllRegistrations){
           return rowData.slice(1); // remove employee from personal view
@@ -245,13 +243,13 @@ const TimeRegistrations = () => {
       document.body.removeChild(link);
 
       toast({
-        title: "Success",
-        description: "Time registrations exported successfully",
+        title: t("success"),
+        description: t("export_success"),
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to export data",
+        title: t("error"),
+        description: t("export_failed"),
         variant: "destructive"
       });
     }
@@ -262,7 +260,7 @@ const TimeRegistrations = () => {
       <div className="min-h-screen bg-gray-50 flex">
         <Navbar />
         <div className="flex-1 ml-64 p-6">
-          <div>Loading...</div>
+          <div>{t("loading")}</div>
         </div>
       </div>
     );
@@ -274,14 +272,14 @@ const TimeRegistrations = () => {
         <Navbar />
         <div className="flex-1 ml-64 p-6">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">My Time Registrations</h1>
-            <p className="text-gray-600 mt-2">View and filter your personal time tracking history</p>
+            <h1 className="text-3xl font-bold text-gray-900">{t("my_time_registrations")}</h1>
+            <p className="text-gray-600 mt-2">{t("my_time_registrations_description")}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Sessions (Filtered)</CardTitle>
+                <CardTitle className="text-sm font-medium">{t("total_sessions_filtered")}</CardTitle>
                 <Clock className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -291,7 +289,7 @@ const TimeRegistrations = () => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Time (Filtered)</CardTitle>
+                <CardTitle className="text-sm font-medium">{t("total_time_filtered")}</CardTitle>
                 <BarChart3 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -303,7 +301,7 @@ const TimeRegistrations = () => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Cost (Filtered)</CardTitle>
+                <CardTitle className="text-sm font-medium">{t("total_cost_filtered")}</CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -315,7 +313,7 @@ const TimeRegistrations = () => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
+                <CardTitle className="text-sm font-medium">{t("active_sessions")}</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -330,13 +328,13 @@ const TimeRegistrations = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Filter className="h-5 w-5" />
-                Filters
+                {t("filter")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="start-date">Start Date</Label>
+                  <Label htmlFor="start-date">{t("filter_by_date")} ({t("start_time")})</Label>
                   <Input
                     id="start-date"
                     type="date"
@@ -345,7 +343,7 @@ const TimeRegistrations = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="end-date">End Date</Label>
+                  <Label htmlFor="end-date">{t("filter_by_date")} ({t("end_time")})</Label>
                   <Input
                     id="end-date"
                     type="date"
@@ -354,13 +352,13 @@ const TimeRegistrations = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="project-filter">Project</Label>
+                  <Label htmlFor="project-filter">{t("filter_by_project")}</Label>
                   <Select value={projectFilter} onValueChange={setProjectFilter}>
                     <SelectTrigger>
-                      <SelectValue placeholder="All Projects" />
+                      <SelectValue placeholder={t("all_projects")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Projects</SelectItem>
+                      <SelectItem value="all">{t("all_projects")}</SelectItem>
                       {getUniqueProjects(myRegistrations).map((project: any) => (
                         <SelectItem key={project.id} value={project.id}>
                           {project.name}
@@ -370,13 +368,13 @@ const TimeRegistrations = () => {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="task-filter">Task</Label>
+                  <Label htmlFor="task-filter">{t("filter_by_task")}</Label>
                   <Select value={taskFilter} onValueChange={setTaskFilter}>
                     <SelectTrigger>
-                      <SelectValue placeholder="All Tasks" />
+                      <SelectValue placeholder={t("all_tasks")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Tasks</SelectItem>
+                      <SelectItem value="all">{t("all_tasks")}</SelectItem>
                       {getUniqueTasks(myRegistrations).map((task: any) => (
                         <SelectItem key={task.id} value={task.id}>
                           {task.name}
@@ -395,7 +393,7 @@ const TimeRegistrations = () => {
                     setTaskFilter('all');
                   }}
                 >
-                  Clear Filters
+                  {t("clear_filters")}
                 </Button>
               </div>
             </CardContent>
@@ -404,17 +402,17 @@ const TimeRegistrations = () => {
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle>My Registration History</CardTitle>
+                <CardTitle>{t("time_registration_history")}</CardTitle>
                 <Button onClick={exportToCSV} variant="outline" size="sm">
                   <Download className="h-4 w-4 mr-2" />
-                  Export CSV
+                  {t("export_timesheet")}
                 </Button>
               </div>
               <CardDescription>
-                Showing {filteredRegistrations.length} registration(s)
+                {t("showing_sessions", { count: filteredRegistrations.length })}
                 {!isFilterActive && myRegistrations.length > 50 && (
                   <span className="text-muted-foreground ml-2">
-                    (Showing the 50 most recent. Use filters to see more.)
+                    {t("showing_recent")}
                   </span>
                 )}
               </CardDescription>
@@ -423,13 +421,13 @@ const TimeRegistrations = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Task</TableHead>
-                    <TableHead>Start Time</TableHead>
-                    <TableHead>End Time</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Cost</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>{t("project")}</TableHead>
+                    <TableHead>{t("task")}</TableHead>
+                    <TableHead>{t("start_time")}</TableHead>
+                    <TableHead>{t("end_time")}</TableHead>
+                    <TableHead>{t("duration")}</TableHead>
+                    <TableHead>{t("cost")}</TableHead>
+                    <TableHead>{t("status")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -443,9 +441,9 @@ const TimeRegistrations = () => {
                     return (
                     <TableRow key={registration.id}>
                       <TableCell className="font-medium">
-                        {registration.tasks?.phases?.projects?.name || (registration.workstation_tasks?.workstations ? `Workstation: ${registration.workstation_tasks.workstations.name}` : 'Unknown Project')}
+                        {registration.tasks?.phases?.projects?.name || (registration.workstation_tasks?.workstations ? `${t("workstation_prefix")}${registration.workstation_tasks.workstations.name}` : t("unknown_project"))}
                       </TableCell>
-                      <TableCell>{registration.tasks?.title || registration.workstation_tasks?.task_name || 'Unknown Task'}</TableCell>
+                      <TableCell>{registration.tasks?.title || registration.workstation_tasks?.task_name || t("unknown_task")}</TableCell>
                       <TableCell>{formatDateTime(registration.start_time)}</TableCell>
                       <TableCell>
                         {registration.end_time ? formatDateTime(registration.end_time) : '-'}
@@ -454,7 +452,7 @@ const TimeRegistrations = () => {
                       <TableCell>{formatCurrency(cost)}</TableCell>
                       <TableCell>
                         <Badge variant={registration.is_active ? 'default' : 'secondary'}>
-                          {registration.is_active ? 'Active' : 'Completed'}
+                          {registration.is_active ? t("active") : t("completed")}
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -474,73 +472,73 @@ const TimeRegistrations = () => {
       <Navbar />
       <div className="flex-1 ml-64 p-6">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Time Registration Dashboard</h1>
-          <p className="text-gray-600 mt-2">Monitor time tracking across all employees</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t("time_registration_dashboard")}</h1>
+          <p className="text-gray-600 mt-2">{t("time_registration_dashboard_description")}</p>
         </div>
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Hours</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("today_hours")}</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatDuration(totalMinutesToday)}</div>
               <p className="text-xs text-muted-foreground">
-                {todayRegistrations.length} sessions
+                {t("in_sessions", { count: todayRegistrations.length })}
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("active_sessions")}</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{activeRegistrations.length}</div>
               <p className="text-xs text-muted-foreground">
-                Currently tracking
+                {t("currently_tracking")}
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("total_employees")}</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{getUniqueEmployees(allRegistrations).length}</div>
               <p className="text-xs text-muted-foreground">
-                With registrations
+                {t("with_registrations")}
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Time (Filtered)</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("total_time_filtered")}</CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatDuration(totalFilteredMinutes)}</div>
               <p className="text-xs text-muted-foreground">
-                in {filteredRegistrations.length} sessions
+                {t("in_sessions", { count: filteredRegistrations.length })}
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Cost (Filtered)</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("total_cost_filtered")}</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatCurrency(totalCost)}</div>
               <p className="text-xs text-muted-foreground">
-                based on standard task cost
+                {t("based_on_standard_task_cost")}
               </p>
             </CardContent>
           </Card>
@@ -551,19 +549,19 @@ const TimeRegistrations = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Filter className="h-5 w-5" />
-              Filters
+              {t("filter")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="employee-filter">Employee</Label>
+                <Label htmlFor="employee-filter">{t("employee")}</Label>
                 <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
                   <SelectTrigger>
-                    <SelectValue placeholder="All Employees" />
+                    <SelectValue placeholder={t("all_employees")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Employees</SelectItem>
+                    <SelectItem value="all">{t("all_employees")}</SelectItem>
                     {getUniqueEmployees(allRegistrations).map((employee: any) => (
                       <SelectItem key={employee.id} value={employee.id}>
                         {employee.name}
@@ -574,7 +572,7 @@ const TimeRegistrations = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="start-date">Start Date</Label>
+                <Label htmlFor="start-date">{t("filter_by_date")} ({t("start_time")})</Label>
                 <Input
                   id="start-date"
                   type="date"
@@ -584,7 +582,7 @@ const TimeRegistrations = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="end-date">End Date</Label>
+                <Label htmlFor="end-date">{t("filter_by_date")} ({t("end_time")})</Label>
                 <Input
                   id="end-date"
                   type="date"
@@ -594,13 +592,13 @@ const TimeRegistrations = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="project-filter">Project</Label>
+                <Label htmlFor="project-filter">{t("filter_by_project")}</Label>
                 <Select value={projectFilter} onValueChange={setProjectFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="All Projects" />
+                    <SelectValue placeholder={t("all_projects")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Projects</SelectItem>
+                    <SelectItem value="all">{t("all_projects")}</SelectItem>
                     {getUniqueProjects(allRegistrations).map((project: any) => (
                       <SelectItem key={project.id} value={project.id}>
                         {project.name}
@@ -610,13 +608,13 @@ const TimeRegistrations = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                  <Label htmlFor="task-filter">Task</Label>
+                  <Label htmlFor="task-filter">{t("filter_by_task")}</Label>
                   <Select value={taskFilter} onValueChange={setTaskFilter}>
                     <SelectTrigger>
-                      <SelectValue placeholder="All Tasks" />
+                      <SelectValue placeholder={t("all_tasks")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Tasks</SelectItem>
+                      <SelectItem value="all">{t("all_tasks")}</SelectItem>
                       {getUniqueTasks(allRegistrations).map((task: any) => (
                         <SelectItem key={task.id} value={task.id}>
                           {task.name}
@@ -637,11 +635,11 @@ const TimeRegistrations = () => {
                   setTaskFilter('all');
                 }}
               >
-                Clear Filters
+                {t("clear_filters")}
               </Button>
               <Button onClick={exportToCSV} variant="outline">
                 <Download className="h-4 w-4 mr-2" />
-                Export Filtered Data
+                {t("export_filtered_data")}
               </Button>
             </div>
           </CardContent>
@@ -650,12 +648,12 @@ const TimeRegistrations = () => {
         {/* Registration History */}
         <Card>
           <CardHeader>
-            <CardTitle>Time Registration History</CardTitle>
+            <CardTitle>{t("time_registration_history")}</CardTitle>
             <CardDescription>
-              Showing {filteredRegistrations.length} registration(s)
+              {t("showing_sessions", { count: filteredRegistrations.length })}
               {!isFilterActive && allRegistrations.length > 50 && (
                   <span className="text-muted-foreground ml-2">
-                    (Showing the 50 most recent. Use filters to see more.)
+                    {t("showing_recent")}
                   </span>
                 )}
             </CardDescription>
@@ -664,14 +662,14 @@ const TimeRegistrations = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Task</TableHead>
-                  <TableHead>Start Time</TableHead>
-                  <TableHead>End Time</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Cost</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{t("employee")}</TableHead>
+                  <TableHead>{t("project")}</TableHead>
+                  <TableHead>{t("task")}</TableHead>
+                  <TableHead>{t("start_time")}</TableHead>
+                  <TableHead>{t("end_time")}</TableHead>
+                  <TableHead>{t("duration")}</TableHead>
+                  <TableHead>{t("cost")}</TableHead>
+                  <TableHead>{t("status")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -685,12 +683,12 @@ const TimeRegistrations = () => {
                   return (
                   <TableRow key={registration.id}>
                     <TableCell className="font-medium">
-                      {registration.employees?.name || 'Unknown Employee'}
+                      {registration.employees?.name || t("unknown_employee")}
                     </TableCell>
                     <TableCell>
-                      {registration.tasks?.phases?.projects?.name || (registration.workstation_tasks?.workstations ? `Workstation: ${registration.workstation_tasks.workstations.name}` : 'Unknown Project')}
+                      {registration.tasks?.phases?.projects?.name || (registration.workstation_tasks?.workstations ? `${t("workstation_prefix")}${registration.workstation_tasks.workstations.name}` : t("unknown_project"))}
                     </TableCell>
-                    <TableCell>{registration.tasks?.title || registration.workstation_tasks?.task_name || 'Unknown Task'}</TableCell>
+                    <TableCell>{registration.tasks?.title || registration.workstation_tasks?.task_name || t("unknown_task")}</TableCell>
                     <TableCell>{formatDateTime(registration.start_time)}</TableCell>
                     <TableCell>
                       {registration.end_time ? formatDateTime(registration.end_time) : '-'}
@@ -699,7 +697,7 @@ const TimeRegistrations = () => {
                     <TableCell>{formatCurrency(cost)}</TableCell>
                     <TableCell>
                       <Badge variant={registration.is_active ? 'default' : 'secondary'}>
-                        {registration.is_active ? 'Active' : 'Completed'}
+                        {registration.is_active ? t("active") : t("completed")}
                       </Badge>
                     </TableCell>
                   </TableRow>
