@@ -283,15 +283,15 @@ const NavbarContent = ({
           )}
         </div>
         
-        {/* Bottom Section - Always Visible */}
+        {/* Bottom Section - Compact Version */}
         <div className="mt-auto border-t border-gray-100 bg-gray-50">
-          {/* Language Switcher */}
-          <div className="flex justify-center items-center gap-2 p-4">
+          {/* Language Switcher - Reduced padding */}
+          <div className="flex justify-center items-center gap-1 p-2">
             <Button 
               size="sm" 
               variant={lang === 'nl' ? 'default' : 'ghost'} 
               className={cn(
-                "text-sm font-medium",
+                "text-xs font-medium h-7 px-2",
                 lang === 'nl' 
                   ? 'bg-blue-500 text-white hover:bg-blue-600' 
                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -304,7 +304,7 @@ const NavbarContent = ({
               size="sm" 
               variant={lang === 'en' ? 'default' : 'ghost'} 
               className={cn(
-                "text-sm font-medium",
+                "text-xs font-medium h-7 px-2",
                 lang === 'en' 
                   ? 'bg-blue-500 text-white hover:bg-blue-600' 
                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -317,7 +317,7 @@ const NavbarContent = ({
               size="sm" 
               variant={lang === 'fr' ? 'default' : 'ghost'} 
               className={cn(
-                "text-sm font-medium",
+                "text-xs font-medium h-7 px-2",
                 lang === 'fr' 
                   ? 'bg-blue-500 text-white hover:bg-blue-600' 
                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -328,30 +328,30 @@ const NavbarContent = ({
             </Button>
           </div>
 
-          {/* User Profile */}
+          {/* User Profile - Reduced padding and margins */}
           {currentEmployee && (
-            <div className="flex items-center justify-between p-4 hover:bg-gray-100 transition-colors duration-200 rounded-lg mx-3 mb-2">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
+            <div className="flex items-center justify-between p-2 hover:bg-gray-100 transition-colors duration-200 rounded-lg mx-2 mb-1">
+              <div className="flex items-center space-x-2">
+                <div className="w-7 h-7 bg-green-500 rounded-full flex items-center justify-center">
+                  <User className="w-3 h-3 text-white" />
                 </div>
-                <span className="text-sm font-medium text-gray-700">{currentEmployee.name}</span>
+                <span className="text-xs font-medium text-gray-700">{currentEmployee.name}</span>
               </div>
               <UserMenu />
             </div>
           )}
 
-          {/* Logout Button */}
-          <div className="p-3">
+          {/* Logout Button - Reduced padding */}
+          <div className="p-2">
             <button 
               onClick={() => {
                 logout();
                 handleItemClick();
               }} 
-              className="flex w-full items-center px-4 py-3 rounded-lg hover:bg-red-50 hover:text-red-600 transition-all duration-200 group text-gray-600"
+              className="flex w-full items-center px-3 py-2 rounded-lg hover:bg-red-50 hover:text-red-600 transition-all duration-200 group text-gray-600"
             >
-              <LogOut className="w-5 h-5 mr-3" />
-              <span className="font-medium">{t('logout')}</span>
+              <LogOut className="w-4 h-4 mr-2" />
+              <span className="font-medium text-sm">{t('logout')}</span>
             </button>
           </div>
         </div>
