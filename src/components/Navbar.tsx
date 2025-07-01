@@ -1,5 +1,4 @@
-
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
@@ -12,6 +11,7 @@ import { Drawer, DrawerClose, DrawerContent, DrawerTrigger } from '@/components/
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 import UserMenu from './UserMenu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const NavbarContent = ({
   onItemClick
@@ -53,12 +53,16 @@ const NavbarContent = ({
       onItemClick();
     }
   };
-  return <div className="h-full px-3 py-4 overflow-y-auto bg-sky-800 text-white flex flex-col">
-      <div className="flex flex-col h-full justify-between">
-        <div>
-          <div className="flex items-center justify-between px-2 py-3 mb-2">
-            <h2 className="text-lg font-semibold">{t('demo_account')}</h2>
-          </div>
+  return (
+    <div className="h-full flex flex-col bg-sky-800 text-white">
+      <div className="flex flex-col h-full">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 mb-2 border-b border-sky-600">
+          <h2 className="text-lg font-semibold">{t('demo_account')}</h2>
+        </div>
+        
+        {/* Scrollable Menu Content */}
+        <ScrollArea className="flex-1 px-3">
           <ul className="space-y-2 font-medium">
             <li>
               <NavLink to={createLocalizedPath("/")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
@@ -151,74 +155,87 @@ const NavbarContent = ({
               </li>
             )}
           </ul>
-        </div>
+        </ScrollArea>
         
-        {/* User profile and language switcher at bottom */}
-        <div className="mt-auto pt-2">
-            <div className="flex justify-center items-center gap-2 mb-2 p-2 border-t border-b border-blue-600">
-                <Button 
-                  size="sm" 
-                  variant={lang === 'nl' ? 'default' : 'ghost'} 
-                  className={cn(
-                    "text-sm font-medium",
-                    lang === 'nl' 
-                      ? 'bg-white text-sky-800 hover:bg-gray-100' 
-                      : 'text-white hover:bg-sky-700 hover:text-white'
-                  )}
-                  onClick={() => changeLang('nl')}
-                >
-                  NL
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant={lang === 'en' ? 'default' : 'ghost'} 
-                  className={cn(
-                    "text-sm font-medium",
-                    lang === 'en' 
-                      ? 'bg-white text-sky-800 hover:bg-gray-100' 
-                      : 'text-white hover:bg-sky-700 hover:text-white'
-                  )}
-                  onClick={() => changeLang('en')}
-                >
-                  EN
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant={lang === 'fr' ? 'default' : 'ghost'} 
-                  className={cn(
-                    "text-sm font-medium",
-                    lang === 'fr' 
-                      ? 'bg-white text-sky-800 hover:bg-gray-100' 
-                      : 'text-white hover:bg-sky-700 hover:text-white'
-                  )}
-                  onClick={() => changeLang('fr')}
-                >
-                  FR
-                </Button>
-            </div>
-          {currentEmployee && <div className="flex items-center justify-between p-2 mb-2">
+        {/* Fixed Bottom Section */}
+        <div className="mt-auto pt-2 border-t border-sky-600">
+          {/* Language Switcher */}
+          <div className="flex justify-center items-center gap-2 mb-2 p-2">
+            <Button 
+              size="sm" 
+              variant={lang === 'nl' ? 'default' : 'ghost'} 
+              className={cn(
+                "text-sm font-medium",
+                lang === 'nl' 
+                  ? 'bg-white text-sky-800 hover:bg-gray-100' 
+                  : 'text-white hover:bg-sky-700 hover:text-white'
+              )}
+              onClick={() => changeLang('nl')}
+            >
+              NL
+            </Button>
+            <Button 
+              size="sm" 
+              variant={lang === 'en' ? 'default' : 'ghost'} 
+              className={cn(
+                "text-sm font-medium",
+                lang === 'en' 
+                  ? 'bg-white text-sky-800 hover:bg-gray-100' 
+                  : 'text-white hover:bg-sky-700 hover:text-white'
+              )}
+              onClick={() => changeLang('en')}
+            >
+              EN
+            </Button>
+            <Button 
+              size="sm" 
+              variant={lang === 'fr' ? 'default' : 'ghost'} 
+              className={cn(
+                "text-sm font-medium",
+                lang === 'fr' 
+                  ? 'bg-white text-sky-800 hover:bg-gray-100' 
+                  : 'text-white hover:bg-sky-700 hover:text-white'
+              )}
+              onClick={() => changeLang('fr')}
+            >
+              FR
+            </Button>
+          </div>
+
+          {/* User Info */}
+          {currentEmployee && (
+            <div className="flex items-center justify-between p-2 mb-2">
               <div className="flex items-center">
                 <User className="w-5 h-5 text-white" />
                 <span className="ml-3 text-sm">{currentEmployee.name}</span>
               </div>
               <UserMenu />
-            </div>}
-          <button onClick={() => {
-          logout();
-          handleItemClick();
-        }} className="flex w-full items-center p-2 rounded-lg hover:bg-sky-700 group text-white">
+            </div>
+          )}
+
+          {/* Logout */}
+          <button 
+            onClick={() => {
+              logout();
+              handleItemClick();
+            }} 
+            className="flex w-full items-center p-2 rounded-lg hover:bg-sky-700 group text-white"
+          >
             <LogOut className="w-5 h-5 text-white" />
             <span className="ml-3">{t('logout')}</span>
           </button>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };
 
 const Navbar = () => {
   const isMobile = useIsMobile();
+  
   if (isMobile) {
-    return <Drawer direction="left">
+    return (
+      <Drawer direction="left">
         <DrawerTrigger asChild>
           <Button variant="outline" size="icon" className="fixed top-4 left-4 z-50 bg-sky-800 border-sky-600 text-white hover:bg-sky-700">
             <Menu className="h-4 w-4" />
@@ -231,11 +248,12 @@ const Navbar = () => {
             </div>
           </DrawerClose>
         </DrawerContent>
-      </Drawer>;
+      </Drawer>
+    );
   }
-  return <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-      <NavbarContent />
-    </div>;
+
+  // For desktop, we now use the AppSidebar within each page's SidebarProvider
+  return null;
 };
 
 export default Navbar;
