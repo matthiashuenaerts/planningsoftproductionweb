@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
@@ -409,7 +410,7 @@ const TimeRegistrations = () => {
                 </Button>
               </div>
               <CardDescription>
-                {t("showing_sessions", { count: filteredRegistrations.length })}
+                {t("showing_sessions", { count: filteredRegistrations.length.toString() })}
                 {!isFilterActive && myRegistrations.length > 50 && (
                   <span className="text-muted-foreground ml-2">
                     {t("showing_recent")}
@@ -486,7 +487,7 @@ const TimeRegistrations = () => {
             <CardContent>
               <div className="text-2xl font-bold">{formatDuration(totalMinutesToday)}</div>
               <p className="text-xs text-muted-foreground">
-                {t("in_sessions", { count: todayRegistrations.length })}
+                {t("in_sessions", { count: todayRegistrations.length.toString() })}
               </p>
             </CardContent>
           </Card>
@@ -525,7 +526,7 @@ const TimeRegistrations = () => {
             <CardContent>
               <div className="text-2xl font-bold">{formatDuration(totalFilteredMinutes)}</div>
               <p className="text-xs text-muted-foreground">
-                {t("in_sessions", { count: filteredRegistrations.length })}
+                {t("in_sessions", { count: filteredRegistrations.length.toString() })}
               </p>
             </CardContent>
           </Card>
@@ -650,7 +651,7 @@ const TimeRegistrations = () => {
           <CardHeader>
             <CardTitle>{t("time_registration_history")}</CardTitle>
             <CardDescription>
-              {t("showing_sessions", { count: filteredRegistrations.length })}
+              {t("showing_sessions", { count: filteredRegistrations.length.toString() })}
               {!isFilterActive && allRegistrations.length > 50 && (
                   <span className="text-muted-foreground ml-2">
                     {t("showing_recent")}
