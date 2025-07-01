@@ -10,8 +10,11 @@ import { UpcomingDeliveries } from '@/components/logistics/UpcomingDeliveries';
 import { BackorderDeliveries } from '@/components/logistics/BackorderDeliveries';
 import { Truck, Calendar, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useLanguage } from '@/context/LanguageContext';
 
 const Logistics = () => {
+  const { t } = useLanguage();
+  
   const {
     data: rawOrders = [],
     isLoading,
@@ -90,7 +93,7 @@ const Logistics = () => {
       <div className="min-h-screen bg-gray-50 flex">
         <Navbar />
         <div className="flex-1 ml-64 p-6">
-          <div>Loading...</div>
+          <div>{t("loading")}</div>
         </div>
       </div>
     );
@@ -101,46 +104,46 @@ const Logistics = () => {
       <Navbar />
       <div className="flex-1 ml-64 p-6 max-w-none">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Logistics</h1>
-          <p className="text-gray-600 mt-2">Manage deliveries and order logistics</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t("logistics_title")}</h1>
+          <p className="text-gray-600 mt-2">{t("logistics_description")}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Deliveries</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("todays_deliveries")}</CardTitle>
               <Truck className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{todaysDeliveries.length}</div>
               <p className="text-xs text-muted-foreground">
-                Orders expected today
+                {t("orders_expected_today")}
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("upcoming_deliveries")}</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{upcomingDeliveries.length}</div>
               <p className="text-xs text-muted-foreground">
-                Future deliveries
+                {t("future_deliveries")}
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Backorders</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("backorder_deliveries")}</CardTitle>
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{backorderDeliveries.length}</div>
               <p className="text-xs text-muted-foreground">
-                Overdue deliveries
+                {t("overdue_deliveries")}
               </p>
             </CardContent>
           </Card>
@@ -148,9 +151,9 @@ const Logistics = () => {
 
         <Tabs defaultValue="today" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="today">Today's Deliveries</TabsTrigger>
-            <TabsTrigger value="upcoming">Upcoming Deliveries</TabsTrigger>
-            <TabsTrigger value="backorders">Backorders</TabsTrigger>
+            <TabsTrigger value="today">{t("todays_deliveries")}</TabsTrigger>
+            <TabsTrigger value="upcoming">{t("upcoming_deliveries")}</TabsTrigger>
+            <TabsTrigger value="backorders">{t("backorder_deliveries")}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="today" className="space-y-4">

@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListDialog } from '@/components/PartsListDialog';
+import { useLanguage } from '@/context/LanguageContext';
 
 type LogisticsOutOrder = Order & { 
   project_name: string;
@@ -37,6 +38,7 @@ type CalendarEvent = {
 const LogisticsOut: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<LogisticsOutOrder[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
@@ -91,8 +93,8 @@ const LogisticsOut: React.FC = () => {
         generateCalendarEvents(filteredOrders);
       } catch (error: any) {
         toast({
-          title: "Error",
-          description: `Failed to load logistics out orders: ${error.message}`,
+          title: t("error"),
+          description: `${t("failed_to_load_projects", { message: error.message })}`,
           variant: "destructive"
         });
       } finally {
@@ -101,7 +103,7 @@ const LogisticsOut: React.FC = () => {
     };
     
     loadLogisticsOutOrders();
-  }, [toast]);
+  }, [toast, t]);
 
   const generateCalendarEvents = (orders: LogisticsOutOrder[]) => {
     const events: CalendarEvent[] = [];
@@ -117,7 +119,7 @@ const LogisticsOut: React.FC = () => {
             type: 'start',
             order,
             step,
-            title: `Start: ${step.name}`,
+            title: `${t("start_event")}: ${step.name}`,
             description: `${order.project_name} - ${step.supplier}`
           });
           
@@ -130,7 +132,7 @@ const LogisticsOut: React.FC = () => {
               type: 'return',
               order,
               step,
-              title: `Return: ${step.name}`,
+              title: `${t("return_event")}: ${step.name}`,
               description: `${order.project_name} - ${step.supplier}`,
               expectedReturnDate: returnDateStr
             });
@@ -237,15 +239,15 @@ const LogisticsOut: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold">Logistics Out</h1>
-              <p className="text-gray-600 mt-1">External processing & return tracking</p>
+              <h1 className="text-3xl font-bold">{t("logistics_out_title")}</h1>
+              <p className="text-gray-600 mt-1">{t("logistics_out_description")}</p>
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="px-3 py-1">
-                {filteredOrders.length} Orders
+                {t("orders_count", { count: filteredOrders.length.toString() })}
               </Badge>
               <Badge variant="outline" className="px-3 py-1">
-                {calendarEvents.length} Events
+                {t("events_count", { count: calendarEvents.length.toString() })}
               </Badge>
             </div>
           </div>
@@ -258,7 +260,7 @@ const LogisticsOut: React.FC = () => {
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                     <Input
-                      placeholder="Search projects, suppliers..."
+                      placeholder={t("search_projects_suppliers")}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10"
@@ -269,14 +271,14 @@ const LogisticsOut: React.FC = () => {
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger>
                       <Filter className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Filter status" />
+                      <SelectValue placeholder={t("filter_status")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="delivered">Delivered</SelectItem>
-                      <SelectItem value="delayed">Delayed</SelectItem>
-                      <SelectItem value="canceled">Canceled</SelectItem>
+                      <SelectItem value="all">{t("all_status")}</SelectItem>
+                      <SelectItem value="pending">{t("pending")}</SelectItem>
+                      <SelectItem value="delivered">{t("delivered")}</SelectItem>
+                      <SelectItem value="delayed">{t("status_delayed")}</SelectItem>
+                      <SelectItem value="canceled">{t("status_canceled")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -290,7 +292,7 @@ const LogisticsOut: React.FC = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CalendarIcon className="h-5 w-5" />
-                  External Processing Timeline
+                  {t("external_processing_timeline")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
@@ -313,7 +315,7 @@ const LogisticsOut: React.FC = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Package className="h-5 w-5" />
-                  {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : 'Select a date'}
+                  {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : t("select_date")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -329,7 +331,7 @@ const LogisticsOut: React.FC = () => {
                       >
                         <div className="flex items-start justify-between mb-2">
                           <Badge variant="outline" className="mb-1 bg-white/90 text-gray-800 border-white">
-                            {event.type === 'start' ? 'Start' : 'Return'}
+                            {event.type === 'start' ? t("start_event") : t("return_event")}
                           </Badge>
                           {getEventPriority(event) === 'urgent' && (
                             <AlertTriangle className="h-4 w-4 text-red-500" />
@@ -347,7 +349,7 @@ const LogisticsOut: React.FC = () => {
                             </Badge>
                             {event.step.expected_duration_days && (
                               <span className="text-xs opacity-75">
-                                {event.step.expected_duration_days} days
+                                {t("days_duration", { days: event.step.expected_duration_days.toString() })}
                               </span>
                             )}
                           </div>
@@ -392,7 +394,7 @@ const LogisticsOut: React.FC = () => {
                 ) : (
                   <div className="text-center py-6 text-gray-500">
                     <CalendarIcon className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                    <p>No external processing events for this day</p>
+                    <p>{t("no_external_processing_events")}</p>
                   </div>
                 )}
               </CardContent>
@@ -405,7 +407,7 @@ const LogisticsOut: React.FC = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Clock className="h-5 w-5" />
-                  Upcoming External Processing Events ({upcomingEvents.length})
+                  {t("upcoming_external_processing_events", { count: upcomingEvents.length.toString() })}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -421,7 +423,7 @@ const LogisticsOut: React.FC = () => {
                       >
                         <div className="flex items-center justify-between mb-2">
                           <Badge variant="outline" className="text-xs bg-white/90 text-gray-800 border-white">
-                            {event.type === 'start' ? 'Start' : 'Return'}
+                            {event.type === 'start' ? t("start_event") : t("return_event")}
                           </Badge>
                           <span className="text-xs font-medium">
                             {format(new Date(event.date), 'MMM d')}
@@ -473,7 +475,7 @@ const LogisticsOut: React.FC = () => {
                 ) : (
                   <div className="text-center py-6 text-gray-500">
                     <Clock className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                    <p>No upcoming external processing events</p>
+                    <p>{t("no_upcoming_external_processing_events")}</p>
                   </div>
                 )}
               </CardContent>
@@ -486,7 +488,7 @@ const LogisticsOut: React.FC = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Package className="h-5 w-5" />
-                  External Processing Orders Summary
+                  {t("external_processing_orders_summary")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -505,7 +507,7 @@ const LogisticsOut: React.FC = () => {
                       <p className="text-sm text-gray-600 mb-2">{order.supplier}</p>
                       {order.processing_steps && order.processing_steps.length > 0 && (
                         <div className="space-y-1 mb-3">
-                          <div className="text-xs font-medium text-gray-700">External Steps:</div>
+                          <div className="text-xs font-medium text-gray-700">{t("external_steps")}</div>
                           {order.processing_steps.slice(0, 2).map(step => (
                             <div key={step.id} className="flex items-center gap-2 text-xs">
                               <div className={cn(
@@ -520,7 +522,7 @@ const LogisticsOut: React.FC = () => {
                           ))}
                           {order.processing_steps.length > 2 && (
                             <div className="text-xs text-gray-500">
-                              +{order.processing_steps.length - 2} more steps
+                              {t("more_steps", { count: (order.processing_steps.length - 2).toString() })}
                             </div>
                           )}
                         </div>
@@ -533,7 +535,7 @@ const LogisticsOut: React.FC = () => {
                           className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
                         >
                           <ExternalLink className="h-3 w-3 mr-1" />
-                          Project
+                          {t("project_button")}
                         </Button>
                         <Button 
                           size="sm" 
@@ -542,7 +544,7 @@ const LogisticsOut: React.FC = () => {
                           className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
                         >
                           <FileText className="h-3 w-3 mr-1" />
-                          Files
+                          {t("files_button")}
                         </Button>
                         <Button 
                           size="sm" 
@@ -551,7 +553,7 @@ const LogisticsOut: React.FC = () => {
                           className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
                         >
                           <Barcode className="h-3 w-3 mr-1" />
-                          Code
+                          {t("code_button")}
                         </Button>
                         <Button 
                           size="sm" 
@@ -560,7 +562,7 @@ const LogisticsOut: React.FC = () => {
                           className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
                         >
                           <List className="h-3 w-3 mr-1" />
-                          Parts
+                          {t("parts_button")}
                         </Button>
                       </div>
                     </div>
