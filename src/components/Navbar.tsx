@@ -56,29 +56,29 @@ const NavbarContent = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-white border-r border-gray-200 shadow-sm">
+    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 to-blue-50/30 border-r border-slate-200/80 shadow-sm">
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-100">
+        <div className="px-6 py-5 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 border-b border-slate-200/60">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
               <LayoutDashboard className="w-4 h-4 text-white" />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-slate-800">
               {t('demo_account')}
             </h2>
           </div>
         </div>
 
         {/* Navigation Menu */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
           <NavLink 
             to={createLocalizedPath("/")} 
             className={({ isActive }) => cn(
-              "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
+              "flex items-center px-4 py-3 rounded-xl transition-all duration-200 group",
               isActive 
-                ? "bg-blue-50 text-blue-700 font-medium" 
-                : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                ? "bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-medium shadow-sm border border-blue-100" 
+                : "hover:bg-slate-50/80 text-slate-700 hover:text-slate-900"
             )} 
             onClick={handleItemClick}
           >
@@ -89,10 +89,10 @@ const NavbarContent = ({
           <NavLink 
             to={createLocalizedPath("/projects")} 
             className={({ isActive }) => cn(
-              "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
+              "flex items-center px-4 py-3 rounded-xl transition-all duration-200 group",
               isActive 
-                ? "bg-blue-50 text-blue-700 font-medium" 
-                : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                ? "bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-medium shadow-sm border border-blue-100" 
+                : "hover:bg-slate-50/80 text-slate-700 hover:text-slate-900"
             )} 
             onClick={handleItemClick}
           >
@@ -103,10 +103,10 @@ const NavbarContent = ({
           <NavLink 
             to={createLocalizedPath("/workstations")} 
             className={({ isActive }) => cn(
-              "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
+              "flex items-center px-4 py-3 rounded-xl transition-all duration-200 group",
               isActive 
-                ? "bg-blue-50 text-blue-700 font-medium" 
-                : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                ? "bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 font-medium shadow-sm border border-emerald-100" 
+                : "hover:bg-slate-50/80 text-slate-700 hover:text-slate-900"
             )} 
             onClick={handleItemClick}
           >
@@ -117,10 +117,10 @@ const NavbarContent = ({
           <NavLink 
             to={createLocalizedPath("/broken-parts")} 
             className={({ isActive }) => cn(
-              "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
+              "flex items-center px-4 py-3 rounded-xl transition-all duration-200 group",
               isActive 
-                ? "bg-blue-50 text-blue-700 font-medium" 
-                : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                ? "bg-gradient-to-r from-orange-50 to-amber-50 text-orange-700 font-medium shadow-sm border border-orange-100" 
+                : "hover:bg-slate-50/80 text-slate-700 hover:text-slate-900"
             )} 
             onClick={handleItemClick}
           >
@@ -131,10 +131,10 @@ const NavbarContent = ({
           <NavLink 
             to={createLocalizedPath("/personal-tasks")} 
             className={({ isActive }) => cn(
-              "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
+              "flex items-center px-4 py-3 rounded-xl transition-all duration-200 group",
               isActive 
-                ? "bg-blue-50 text-blue-700 font-medium" 
-                : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                ? "bg-gradient-to-r from-violet-50 to-purple-50 text-violet-700 font-medium shadow-sm border border-violet-100" 
+                : "hover:bg-slate-50/80 text-slate-700 hover:text-slate-900"
             )} 
             onClick={handleItemClick}
           >
@@ -145,10 +145,10 @@ const NavbarContent = ({
           <NavLink 
             to={createLocalizedPath("/daily-tasks")} 
             className={({ isActive }) => cn(
-              "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
+              "flex items-center px-4 py-3 rounded-xl transition-all duration-200 group",
               isActive 
-                ? "bg-blue-50 text-blue-700 font-medium" 
-                : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                ? "bg-gradient-to-r from-violet-50 to-purple-50 text-violet-700 font-medium shadow-sm border border-violet-100" 
+                : "hover:bg-slate-50/80 text-slate-700 hover:text-slate-900"
             )} 
             onClick={handleItemClick}
           >
@@ -160,10 +160,10 @@ const NavbarContent = ({
             <NavLink 
               to={createLocalizedPath("/planning")} 
               className={({ isActive }) => cn(
-                "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
+                "flex items-center px-4 py-3 rounded-xl transition-all duration-200 group",
                 isActive 
-                  ? "bg-blue-50 text-blue-700 font-medium" 
-                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                  ? "bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 font-medium shadow-sm border border-teal-100" 
+                  : "hover:bg-slate-50/80 text-slate-700 hover:text-slate-900"
               )} 
               onClick={handleItemClick}
             >
@@ -176,10 +176,10 @@ const NavbarContent = ({
             <NavLink 
               to={createLocalizedPath("/orders")} 
               className={({ isActive }) => cn(
-                "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
+                "flex items-center px-4 py-3 rounded-xl transition-all duration-200 group",
                 isActive 
-                  ? "bg-blue-50 text-blue-700 font-medium" 
-                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                  ? "bg-gradient-to-r from-emerald-50 to-green-50 text-emerald-700 font-medium shadow-sm border border-emerald-100" 
+                  : "hover:bg-slate-50/80 text-slate-700 hover:text-slate-900"
               )} 
               onClick={handleItemClick}
             >
@@ -192,10 +192,10 @@ const NavbarContent = ({
             <NavLink 
               to={createLocalizedPath("/logistics")} 
               className={({ isActive }) => cn(
-                "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
+                "flex items-center px-4 py-3 rounded-xl transition-all duration-200 group",
                 isActive 
-                  ? "bg-blue-50 text-blue-700 font-medium" 
-                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                  ? "bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 font-medium shadow-sm border border-emerald-100" 
+                  : "hover:bg-slate-50/80 text-slate-700 hover:text-slate-900"
               )} 
               onClick={handleItemClick}
             >
@@ -208,10 +208,10 @@ const NavbarContent = ({
             <NavLink 
               to={createLocalizedPath("/logistics-out")} 
               className={({ isActive }) => cn(
-                "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
+                "flex items-center px-4 py-3 rounded-xl transition-all duration-200 group",
                 isActive 
-                  ? "bg-blue-50 text-blue-700 font-medium" 
-                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                  ? "bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 font-medium shadow-sm border border-emerald-100" 
+                  : "hover:bg-slate-50/80 text-slate-700 hover:text-slate-900"
               )} 
               onClick={handleItemClick}
             >
@@ -224,10 +224,10 @@ const NavbarContent = ({
             <NavLink 
               to={createLocalizedPath("/rush-orders")} 
               className={({ isActive }) => cn(
-                "flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200 group",
+                "flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group",
                 isActive 
-                  ? "bg-blue-50 text-blue-700 font-medium" 
-                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                  ? "bg-gradient-to-r from-red-50 to-pink-50 text-red-700 font-medium shadow-sm border border-red-100" 
+                  : "hover:bg-slate-50/80 text-slate-700 hover:text-slate-900"
               )} 
               onClick={handleItemClick}
             >
@@ -237,12 +237,12 @@ const NavbarContent = ({
               </div>
               <div className="flex items-center space-x-2">
                 {pendingOrdersCount > 0 && (
-                  <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200 text-xs">
+                  <Badge variant="outline" className="bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 border-orange-200 text-xs shadow-sm">
                     {pendingOrdersCount}
                   </Badge>
                 )}
                 {totalUnreadMessages > 0 && (
-                  <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200 text-xs">
+                  <Badge variant="outline" className="bg-gradient-to-r from-red-100 to-pink-100 text-red-700 border-red-200 text-xs shadow-sm">
                     {totalUnreadMessages}
                   </Badge>
                 )}
@@ -254,10 +254,10 @@ const NavbarContent = ({
             <NavLink 
               to={createLocalizedPath("/time-registrations")} 
               className={({ isActive }) => cn(
-                "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
+                "flex items-center px-4 py-3 rounded-xl transition-all duration-200 group",
                 isActive 
-                  ? "bg-blue-50 text-blue-700 font-medium" 
-                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                  ? "bg-gradient-to-r from-indigo-50 to-blue-50 text-indigo-700 font-medium shadow-sm border border-indigo-100" 
+                  : "hover:bg-slate-50/80 text-slate-700 hover:text-slate-900"
               )} 
               onClick={handleItemClick}
             >
@@ -270,10 +270,10 @@ const NavbarContent = ({
             <NavLink 
               to={createLocalizedPath("/settings")} 
               className={({ isActive }) => cn(
-                "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
+                "flex items-center px-4 py-3 rounded-xl transition-all duration-200 group",
                 isActive 
-                  ? "bg-blue-50 text-blue-700 font-medium" 
-                  : "hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                  ? "bg-gradient-to-r from-slate-50 to-gray-50 text-slate-700 font-medium shadow-sm border border-slate-200" 
+                  : "hover:bg-slate-50/80 text-slate-700 hover:text-slate-900"
               )} 
               onClick={handleItemClick}
             >
@@ -284,17 +284,17 @@ const NavbarContent = ({
         </div>
         
         {/* Bottom Section - Always Visible */}
-        <div className="mt-auto border-t border-gray-100 bg-gray-50">
+        <div className="mt-auto border-t border-slate-200/60 bg-gradient-to-r from-slate-50/50 to-blue-50/30">
           {/* Language Switcher */}
           <div className="flex justify-center items-center gap-2 p-4">
             <Button 
               size="sm" 
               variant={lang === 'nl' ? 'default' : 'ghost'} 
               className={cn(
-                "text-sm font-medium",
+                "text-sm font-medium transition-all duration-200",
                 lang === 'nl' 
-                  ? 'bg-blue-500 text-white hover:bg-blue-600' 
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-sm' 
+                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
               )}
               onClick={() => changeLang('nl')}
             >
@@ -304,10 +304,10 @@ const NavbarContent = ({
               size="sm" 
               variant={lang === 'en' ? 'default' : 'ghost'} 
               className={cn(
-                "text-sm font-medium",
+                "text-sm font-medium transition-all duration-200",
                 lang === 'en' 
-                  ? 'bg-blue-500 text-white hover:bg-blue-600' 
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-sm' 
+                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
               )}
               onClick={() => changeLang('en')}
             >
@@ -317,10 +317,10 @@ const NavbarContent = ({
               size="sm" 
               variant={lang === 'fr' ? 'default' : 'ghost'} 
               className={cn(
-                "text-sm font-medium",
+                "text-sm font-medium transition-all duration-200",
                 lang === 'fr' 
-                  ? 'bg-blue-500 text-white hover:bg-blue-600' 
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-sm' 
+                  : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
               )}
               onClick={() => changeLang('fr')}
             >
@@ -330,12 +330,12 @@ const NavbarContent = ({
 
           {/* User Profile */}
           {currentEmployee && (
-            <div className="flex items-center justify-between p-4 hover:bg-gray-100 transition-colors duration-200 rounded-lg mx-3 mb-2">
+            <div className="flex items-center justify-between p-4 hover:bg-slate-100/60 transition-colors duration-200 rounded-lg mx-3 mb-2">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center shadow-sm">
                   <User className="w-4 h-4 text-white" />
                 </div>
-                <span className="text-sm font-medium text-gray-700">{currentEmployee.name}</span>
+                <span className="text-sm font-medium text-slate-700">{currentEmployee.name}</span>
               </div>
               <UserMenu />
             </div>
@@ -348,7 +348,7 @@ const NavbarContent = ({
                 logout();
                 handleItemClick();
               }} 
-              className="flex w-full items-center px-4 py-3 rounded-lg hover:bg-red-50 hover:text-red-600 transition-all duration-200 group text-gray-600"
+              className="flex w-full items-center px-4 py-3 rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 hover:text-red-600 hover:border hover:border-red-100 transition-all duration-200 group text-slate-600"
             >
               <LogOut className="w-5 h-5 mr-3" />
               <span className="font-medium">{t('logout')}</span>
