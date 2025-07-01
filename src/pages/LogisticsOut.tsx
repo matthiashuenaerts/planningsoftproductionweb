@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Navbar from '@/components/Navbar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
@@ -17,8 +19,6 @@ import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { useLanguage } from '@/context/LanguageContext';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import { AppSidebar } from '@/components/AppSidebar';
 
 type LogisticsOutOrder = Order & { 
   project_name: string;
@@ -219,373 +219,359 @@ const LogisticsOut: React.FC = () => {
 
   if (loading) {
     return (
-      <SidebarProvider>
-        <div className="flex h-screen w-full">
-          <AppSidebar />
-          <SidebarInset className="flex flex-col">
-            <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-              <SidebarTrigger className="-ml-1" />
-              <div className="flex-1">
-                <h1 className="text-lg font-semibold">{t("logistics_out_title")}</h1>
-              </div>
-            </header>
-            <div className="flex-1 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-            </div>
-          </SidebarInset>
+      <div className="flex min-h-screen">
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
         </div>
-      </SidebarProvider>
+        <div className="ml-64 w-full p-6 flex justify-center items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full">
-        <AppSidebar />
-        <SidebarInset className="flex flex-col">
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-            <div className="flex-1">
-              <h1 className="text-xl font-semibold text-gray-900">{t("logistics_out_title")}</h1>
-              <p className="text-sm text-gray-600">{t("logistics_out_description")}</p>
+    <div className="flex min-h-screen">
+      <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+        <Navbar />
+      </div>
+      <div className="ml-64 w-full p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold">{t("logistics_out_title")}</h1>
+              <p className="text-gray-600 mt-1">{t("logistics_out_description")}</p>
             </div>
-          </header>
-          
-          <div className="flex-1 overflow-auto p-6 bg-gray-50">
-            <div className="max-w-7xl mx-auto">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="px-3 py-1">
-                    {t("orders_count", { count: filteredOrders.length.toString() })}
-                  </Badge>
-                  <Badge variant="outline" className="px-3 py-1">
-                    {t("events_count", { count: calendarEvents.length.toString() })}
-                  </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="px-3 py-1">
+                {t("orders_count", { count: filteredOrders.length.toString() })}
+              </Badge>
+              <Badge variant="outline" className="px-3 py-1">
+                {t("events_count", { count: calendarEvents.length.toString() })}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <Card className="mb-6">
+            <CardContent className="p-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder={t("search_projects_suppliers")}
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="md:w-48">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger>
+                      <Filter className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder={t("filter_status")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("all_status")}</SelectItem>
+                      <SelectItem value="pending">{t("pending")}</SelectItem>
+                      <SelectItem value="delivered">{t("delivered")}</SelectItem>
+                      <SelectItem value="delayed">{t("status_delayed")}</SelectItem>
+                      <SelectItem value="canceled">{t("status_canceled")}</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
-              {/* Filters */}
-              <Card className="mb-6">
-                <CardContent className="p-4">
-                  <div className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                        <Input
-                          placeholder={t("search_projects_suppliers")}
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10"
-                        />
-                      </div>
-                    </div>
-                    <div className="md:w-48">
-                      <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger>
-                          <Filter className="h-4 w-4 mr-2" />
-                          <SelectValue placeholder={t("filter_status")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">{t("all_status")}</SelectItem>
-                          <SelectItem value="pending">{t("pending")}</SelectItem>
-                          <SelectItem value="delivered">{t("delivered")}</SelectItem>
-                          <SelectItem value="delayed">{t("status_delayed")}</SelectItem>
-                          <SelectItem value="canceled">{t("status_canceled")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Calendar */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarIcon className="h-5 w-5" />
+                  {t("external_processing_timeline")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  className="p-3"
+                  modifiers={{ event: eventDays }}
+                  modifiersClassNames={{
+                    event: 'bg-sky-100 text-sky-800 rounded-md font-bold relative',
+                  }}
+                  weekStartsOn={1}
+                />
+              </CardContent>
+            </Card>
 
-              <div className="grid lg:grid-cols-3 gap-6">
-                {/* Calendar */}
-                <Card className="lg:col-span-2">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <CalendarIcon className="h-5 w-5" />
-                      {t("external_processing_timeline")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      className="p-3"
-                      modifiers={{ event: eventDays }}
-                      modifiersClassNames={{
-                        event: 'bg-sky-100 text-sky-800 rounded-md font-bold relative',
-                      }}
-                      weekStartsOn={1}
-                    />
-                  </CardContent>
-                </Card>
-
-                {/* Selected Day Details */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Package className="h-5 w-5" />
-                      {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : t("select_date")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {selectedDayEvents && selectedDayEvents.length > 0 ? (
-                      <div className="space-y-3">
-                        {selectedDayEvents.map((event, index) => (
-                          <div
-                            key={`${event.order.id}-${index}`}
-                            className={cn(
-                              "p-3 rounded-lg border",
-                              getEventColor(event)
-                            )}
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <Badge variant="outline" className="mb-1 bg-white/90 text-gray-800 border-white">
-                                {event.type === 'start' ? t("start_event") : t("return_event")}
-                              </Badge>
-                              {getEventPriority(event) === 'urgent' && (
-                                <AlertTriangle className="h-4 w-4 text-red-500" />
-                              )}
-                            </div>
-                            <h4 className="font-medium mb-1">{event.title}</h4>
-                            <p className="text-sm opacity-90">{event.description}</p>
-                            <div className="mt-2 pt-2 border-t border-current/20">
-                              <div className="flex items-center gap-2 text-xs">
-                                <Badge 
-                                  variant={event.step.status === 'completed' ? 'default' : 'secondary'}
-                                  className="text-xs bg-white/90 text-gray-800"
-                                >
-                                  {event.step.status}
-                                </Badge>
-                                {event.step.expected_duration_days && (
-                                  <span className="text-xs opacity-75">
-                                    {t("days_duration", { days: event.step.expected_duration_days.toString() })}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex gap-1 mt-2">
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => handleProjectNavigation(event.order.project_id)}
-                                  className="text-xs h-6 px-2 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => handleShowFiles(event.order.project_id, event.order.project_name)}
-                                  className="text-xs h-6 px-2 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
-                                >
-                                  <FileText className="h-3 w-3" />
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => handleShowBarcode(event.order.project_id, event.order.project_name)}
-                                  className="text-xs h-6 px-2 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
-                                >
-                                  <Barcode className="h-3 w-3" />
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => handleShowParts(event.order.project_id, event.order.project_name)}
-                                  className="text-xs h-6 px-2 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
-                                >
-                                  <List className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-6 text-gray-500">
-                        <CalendarIcon className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                        <p>{t("no_external_processing_events")}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Upcoming Events */}
-              <div className="mt-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Clock className="h-5 w-5" />
-                      {t("upcoming_external_processing_events", { count: upcomingEvents.length.toString() })}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {upcomingEvents.length > 0 ? (
-                      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {upcomingEvents.map((event, index) => (
-                          <div
-                            key={`${event.order.id}-${index}`}
-                            className={cn(
-                              "p-4 rounded-lg border",
-                              getEventColor(event)
-                            )}
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <Badge variant="outline" className="text-xs bg-white/90 text-gray-800 border-white">
-                                {event.type === 'start' ? t("start_event") : t("return_event")}
-                              </Badge>
-                              <span className="text-xs font-medium">
-                                {format(new Date(event.date), 'MMM d')}
-                              </span>
-                            </div>
-                            <h4 className="font-medium text-sm mb-1 truncate">{event.title}</h4>
-                            <p className="text-xs opacity-90 line-clamp-2">{event.description}</p>
-                            <div className="mt-2 flex items-center gap-2">
-                              <Truck className="h-3 w-3" />
-                              <span className="text-xs truncate">{event.step.supplier}</span>
-                            </div>
-                            <div className="flex gap-1 mt-2">
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => handleProjectNavigation(event.order.project_id)}
-                                className="text-xs h-6 px-2 flex-1 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => handleShowFiles(event.order.project_id, event.order.project_name)}
-                                className="text-xs h-6 px-2 flex-1 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
-                              >
-                                <FileText className="h-3 w-3" />
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => handleShowBarcode(event.order.project_id, event.order.project_name)}
-                                className="text-xs h-6 px-2 flex-1 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
-                              >
-                                <Barcode className="h-3 w-3" />
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => handleShowParts(event.order.project_id, event.order.project_name)}
-                                className="text-xs h-6 px-2 flex-1 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
-                              >
-                                <List className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-6 text-gray-500">
-                        <Clock className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                        <p>{t("no_upcoming_external_processing_events")}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Orders Summary */}
-              <div className="mt-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Package className="h-5 w-5" />
-                      {t("external_processing_orders_summary")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredOrders.map(order => (
-                        <div key={order.id} className="p-4 border rounded-lg bg-white">
-                          <div className="flex items-center justify-between mb-2">
-                            <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'}>
-                              {order.status}
-                            </Badge>
-                            <span className="text-xs text-gray-500">
-                              {format(new Date(order.expected_delivery), 'MMM d')}
-                            </span>
-                          </div>
-                          <h4 className="font-medium mb-1 truncate">{order.project_name}</h4>
-                          <p className="text-sm text-gray-600 mb-2">{order.supplier}</p>
-                          {order.processing_steps && order.processing_steps.length > 0 && (
-                            <div className="space-y-1 mb-3">
-                              <div className="text-xs font-medium text-gray-700">{t("external_steps")}</div>
-                              {order.processing_steps.slice(0, 2).map(step => (
-                                <div key={step.id} className="flex items-center gap-2 text-xs">
-                                  <div className={cn(
-                                    "w-2 h-2 rounded-full",
-                                    step.status === 'completed' ? 'bg-green-500' :
-                                    step.status === 'in_progress' ? 'bg-blue-500' :
-                                    step.status === 'delayed' ? 'bg-red-500' : 'bg-gray-400'
-                                  )} />
-                                  <span className="truncate">{step.name}</span>
-                                  <span className="text-gray-500">({step.supplier})</span>
-                                </div>
-                              ))}
-                              {order.processing_steps.length > 2 && (
-                                <div className="text-xs text-gray-500">
-                                  {t("more_steps", { count: (order.processing_steps.length - 2).toString() })}
-                                </div>
-                              )}
-                            </div>
+            {/* Selected Day Details */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : t("select_date")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {selectedDayEvents && selectedDayEvents.length > 0 ? (
+                  <div className="space-y-3">
+                    {selectedDayEvents.map((event, index) => (
+                      <div
+                        key={`${event.order.id}-${index}`}
+                        className={cn(
+                          "p-3 rounded-lg border",
+                          getEventColor(event)
+                        )}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <Badge variant="outline" className="mb-1 bg-white/90 text-gray-800 border-white">
+                            {event.type === 'start' ? t("start_event") : t("return_event")}
+                          </Badge>
+                          {getEventPriority(event) === 'urgent' && (
+                            <AlertTriangle className="h-4 w-4 text-red-500" />
                           )}
-                          <div className="flex gap-1">
+                        </div>
+                        <h4 className="font-medium mb-1">{event.title}</h4>
+                        <p className="text-sm opacity-90">{event.description}</p>
+                        <div className="mt-2 pt-2 border-t border-current/20">
+                          <div className="flex items-center gap-2 text-xs">
+                            <Badge 
+                              variant={event.step.status === 'completed' ? 'default' : 'secondary'}
+                              className="text-xs bg-white/90 text-gray-800"
+                            >
+                              {event.step.status}
+                            </Badge>
+                            {event.step.expected_duration_days && (
+                              <span className="text-xs opacity-75">
+                                {t("days_duration", { days: event.step.expected_duration_days.toString() })}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex gap-1 mt-2">
                             <Button 
                               size="sm" 
                               variant="outline"
-                              onClick={() => handleProjectNavigation(order.project_id)}
-                              className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
+                              onClick={() => handleProjectNavigation(event.order.project_id)}
+                              className="text-xs h-6 px-2 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
                             >
-                              <ExternalLink className="h-3 w-3 mr-1" />
-                              {t("project_button")}
+                              <ExternalLink className="h-3 w-3" />
                             </Button>
                             <Button 
                               size="sm" 
                               variant="outline"
-                              onClick={() => handleShowFiles(order.project_id, order.project_name)}
-                              className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
+                              onClick={() => handleShowFiles(event.order.project_id, event.order.project_name)}
+                              className="text-xs h-6 px-2 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
                             >
-                              <FileText className="h-3 w-3 mr-1" />
-                              {t("files_button")}
+                              <FileText className="h-3 w-3" />
                             </Button>
                             <Button 
                               size="sm" 
                               variant="outline"
-                              onClick={() => handleShowBarcode(order.project_id, order.project_name)}
-                              className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
+                              onClick={() => handleShowBarcode(event.order.project_id, event.order.project_name)}
+                              className="text-xs h-6 px-2 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
                             >
-                              <Barcode className="h-3 w-3 mr-1" />
-                              {t("code_button")}
+                              <Barcode className="h-3 w-3" />
                             </Button>
                             <Button 
                               size="sm" 
                               variant="outline"
-                              onClick={() => handleShowParts(order.project_id, order.project_name)}
-                              className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
+                              onClick={() => handleShowParts(event.order.project_id, event.order.project_name)}
+                              className="text-xs h-6 px-2 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
                             >
-                              <List className="h-3 w-3 mr-1" />
-                              {t("parts_button")}
+                              <List className="h-3 w-3" />
                             </Button>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-gray-500">
+                    <CalendarIcon className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                    <p>{t("no_external_processing_events")}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        </SidebarInset>
+
+          {/* Upcoming Events */}
+          <div className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  {t("upcoming_external_processing_events", { count: upcomingEvents.length.toString() })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {upcomingEvents.length > 0 ? (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {upcomingEvents.map((event, index) => (
+                      <div
+                        key={`${event.order.id}-${index}`}
+                        className={cn(
+                          "p-4 rounded-lg border",
+                          getEventColor(event)
+                        )}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <Badge variant="outline" className="text-xs bg-white/90 text-gray-800 border-white">
+                            {event.type === 'start' ? t("start_event") : t("return_event")}
+                          </Badge>
+                          <span className="text-xs font-medium">
+                            {format(new Date(event.date), 'MMM d')}
+                          </span>
+                        </div>
+                        <h4 className="font-medium text-sm mb-1 truncate">{event.title}</h4>
+                        <p className="text-xs opacity-90 line-clamp-2">{event.description}</p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <Truck className="h-3 w-3" />
+                          <span className="text-xs truncate">{event.step.supplier}</span>
+                        </div>
+                        <div className="flex gap-1 mt-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleProjectNavigation(event.order.project_id)}
+                            className="text-xs h-6 px-2 flex-1 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleShowFiles(event.order.project_id, event.order.project_name)}
+                            className="text-xs h-6 px-2 flex-1 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
+                          >
+                            <FileText className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleShowBarcode(event.order.project_id, event.order.project_name)}
+                            className="text-xs h-6 px-2 flex-1 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
+                          >
+                            <Barcode className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleShowParts(event.order.project_id, event.order.project_name)}
+                            className="text-xs h-6 px-2 flex-1 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
+                          >
+                            <List className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-gray-500">
+                    <Clock className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                    <p>{t("no_upcoming_external_processing_events")}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Orders Summary */}
+          <div className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  {t("external_processing_orders_summary")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredOrders.map(order => (
+                    <div key={order.id} className="p-4 border rounded-lg bg-white">
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'}>
+                          {order.status}
+                        </Badge>
+                        <span className="text-xs text-gray-500">
+                          {format(new Date(order.expected_delivery), 'MMM d')}
+                        </span>
+                      </div>
+                      <h4 className="font-medium mb-1 truncate">{order.project_name}</h4>
+                      <p className="text-sm text-gray-600 mb-2">{order.supplier}</p>
+                      {order.processing_steps && order.processing_steps.length > 0 && (
+                        <div className="space-y-1 mb-3">
+                          <div className="text-xs font-medium text-gray-700">{t("external_steps")}</div>
+                          {order.processing_steps.slice(0, 2).map(step => (
+                            <div key={step.id} className="flex items-center gap-2 text-xs">
+                              <div className={cn(
+                                "w-2 h-2 rounded-full",
+                                step.status === 'completed' ? 'bg-green-500' :
+                                step.status === 'in_progress' ? 'bg-blue-500' :
+                                step.status === 'delayed' ? 'bg-red-500' : 'bg-gray-400'
+                              )} />
+                              <span className="truncate">{step.name}</span>
+                              <span className="text-gray-500">({step.supplier})</span>
+                            </div>
+                          ))}
+                          {order.processing_steps.length > 2 && (
+                            <div className="text-xs text-gray-500">
+                              {t("more_steps", { count: (order.processing_steps.length - 2).toString() })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <div className="flex gap-1">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleProjectNavigation(order.project_id)}
+                          className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          {t("project_button")}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleShowFiles(order.project_id, order.project_name)}
+                          className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
+                        >
+                          <FileText className="h-3 w-3 mr-1" />
+                          {t("files_button")}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleShowBarcode(order.project_id, order.project_name)}
+                          className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
+                        >
+                          <Barcode className="h-3 w-3 mr-1" />
+                          {t("code_button")}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleShowParts(order.project_id, order.project_name)}
+                          className="text-xs h-7 px-2 flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
+                        >
+                          <List className="h-3 w-3 mr-1" />
+                          {t("parts_button")}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
 
       {/* Dialogs */}
@@ -612,7 +598,7 @@ const LogisticsOut: React.FC = () => {
           />
         </>
       )}
-    </SidebarProvider>
+    </div>
   );
 };
 
