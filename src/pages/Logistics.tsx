@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import AppLayout from '@/components/AppLayout';
+import Navbar from '@/components/Navbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { orderService } from '@/services/orderService';
@@ -90,15 +90,19 @@ const Logistics = () => {
 
   if (isLoading) {
     return (
-      <AppLayout>
-        <div>{t("loading")}</div>
-      </AppLayout>
+      <div className="min-h-screen bg-gray-50 flex">
+        <Navbar />
+        <div className="flex-1 ml-64 p-6">
+          <div>{t("loading")}</div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <AppLayout>
-      <div className="max-w-none">
+    <div className="min-h-screen bg-gray-50 flex">
+      <Navbar />
+      <div className="flex-1 ml-64 p-6 max-w-none">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">{t("logistics_title")}</h1>
           <p className="text-gray-600 mt-2">{t("logistics_description")}</p>
@@ -165,7 +169,7 @@ const Logistics = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </AppLayout>
+    </div>
   );
 };
 
