@@ -1,72 +1,104 @@
+
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, Plus, Trash2, User, CalendarDays } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 interface Holiday {
   id: string;
-  date: string;
-  team: string;
-  created_at: string;
+  employee_id: string;
+  start_date: string;
+  end_date: string;
+  reason: string | null;
+  approved: boolean;
+  employee?: {
+    name: string;
+  };
 }
 
 interface Employee {
   id: string;
   name: string;
-  role: string;
 }
 
 const HolidayManagement: React.FC = () => {
-  const [selectedDate, setSelectedDate] = useState<Date>();
-  const [selectedTeam, setSelectedTeam] = useState<string>('');
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<string>('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [reason, setReason] = useState('');
+  const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch existing holidays from the holidays table (team holidays)
-  const { data: holidays, isLoading: loadingHolidays } = useQuery({
-    queryKey: ['holidays'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('holidays')
-        .select('*')
-        .order('date', { ascending: false });
-      
-      if (error) throw error;
-      return data as Holiday[];
-    }
-  });
-
-  // Fetch employees for team selection
-  const { data: employees } = useQuery({
+  // Fetch employees
+  const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ['employees'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('employees')
-        .select('id, name, role')
+        .select('id, name')
         .order('name');
       
       if (error) throw error;
-      return data as Employee[];
+      return data;
     }
   });
 
-  // Get unique teams/roles
-  const teams = employees ? [...new Set(employees.map(emp => emp.role))] : [];
+  // Fetch holidays
+  const { data: holidays = [], isLoading } = useQuery<Holiday[]>({
+    queryKey: ['holidays'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employee_holidays')
+        .select(`
+          id,
+          employee_id,
+          start_date,
+          end_date,
+          reason,
+          approved,
+          employee:employees(name)
+        `)
+        .order('start_date', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
 
   // Add holiday mutation
   const addHolidayMutation = useMutation({
-    mutationFn: async ({ date, team }: { date: string; team: string }) => {
+    mutationFn: async (holidayData: {
+      employee_id: string;
+      start_date: string;
+      end_date: string;
+      reason: string;
+    }) => {
       const { data, error } = await supabase
-        .from('holidays')
-        .insert([{ date, team }])
+        .from('employee_holidays')
+        .insert([holidayData])
         .select()
         .single();
       
@@ -75,13 +107,19 @@ const HolidayManagement: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['holidays'] });
-      toast.success('Holiday added successfully');
-      setSelectedDate(undefined);
-      setSelectedTeam('');
+      toast({
+        title: 'Success',
+        description: 'Holiday added successfully'
+      });
+      setShowAddDialog(false);
+      resetForm();
     },
-    onError: (error) => {
-      console.error('Error adding holiday:', error);
-      toast.error('Failed to add holiday');
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: `Failed to add holiday: ${error.message}`,
+        variant: 'destructive'
+      });
     }
   });
 
@@ -89,7 +127,7 @@ const HolidayManagement: React.FC = () => {
   const deleteHolidayMutation = useMutation({
     mutationFn: async (holidayId: string) => {
       const { error } = await supabase
-        .from('holidays')
+        .from('employee_holidays')
         .delete()
         .eq('id', holidayId);
       
@@ -97,122 +135,234 @@ const HolidayManagement: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['holidays'] });
-      toast.success('Holiday deleted successfully');
+      toast({
+        title: 'Success',
+        description: 'Holiday deleted successfully'
+      });
     },
-    onError: (error) => {
-      console.error('Error deleting holiday:', error);
-      toast.error('Failed to delete holiday');
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: `Failed to delete holiday: ${error.message}`,
+        variant: 'destructive'
+      });
     }
   });
 
+  // Toggle approval mutation
+  const toggleApprovalMutation = useMutation({
+    mutationFn: async ({ holidayId, approved }: { holidayId: string; approved: boolean }) => {
+      const { error } = await supabase
+        .from('employee_holidays')
+        .update({ approved })
+        .eq('id', holidayId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['holidays'] });
+      toast({
+        title: 'Success',
+        description: 'Holiday approval status updated'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: `Failed to update approval status: ${error.message}`,
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const resetForm = () => {
+    setSelectedEmployee('');
+    setStartDate('');
+    setEndDate('');
+    setReason('');
+  };
+
   const handleAddHoliday = () => {
-    if (!selectedDate || !selectedTeam) {
-      toast.error('Please select both date and team');
+    if (!selectedEmployee || !startDate || !endDate) {
+      toast({
+        title: 'Error',
+        description: 'Please fill in all required fields',
+        variant: 'destructive'
+      });
       return;
     }
 
-    const dateString = format(selectedDate, 'yyyy-MM-dd');
-    addHolidayMutation.mutate({ date: dateString, team: selectedTeam });
+    if (new Date(startDate) > new Date(endDate)) {
+      toast({
+        title: 'Error',
+        description: 'Start date cannot be after end date',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    addHolidayMutation.mutate({
+      employee_id: selectedEmployee,
+      start_date: startDate,
+      end_date: endDate,
+      reason: reason || ''
+    });
   };
 
   const handleDeleteHoliday = (holidayId: string) => {
-    deleteHolidayMutation.mutate(holidayId);
+    if (window.confirm('Are you sure you want to delete this holiday?')) {
+      deleteHolidayMutation.mutate(holidayId);
+    }
   };
+
+  const handleToggleApproval = (holidayId: string, currentApproval: boolean) => {
+    toggleApprovalMutation.mutate({
+      holidayId,
+      approved: !currentApproval
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Add Holiday Form */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Holiday Management</h2>
+        <Button onClick={() => setShowAddDialog(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Holiday
+        </Button>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>Add Team Holiday</CardTitle>
-          <CardDescription>
-            Add a holiday for a specific team. This will prevent scheduling for that team on the selected date.
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5" />
+            Employee Holidays
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {selectedDate ? format(selectedDate, 'PPP') : 'Select date'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+        <CardContent>
+          {holidays.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">No holidays scheduled</p>
+          ) : (
+            <div className="space-y-4">
+              {holidays.map((holiday) => (
+                <div
+                  key={holiday.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <User className="h-4 w-4" />
+                      <span className="font-medium">{holiday.employee?.name}</span>
+                      <Badge variant={holiday.approved ? 'default' : 'secondary'}>
+                        {holiday.approved ? 'Approved' : 'Pending'}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Calendar className="h-4 w-4" />
+                      <span>
+                        {format(new Date(holiday.start_date), 'MMM dd, yyyy')} - {format(new Date(holiday.end_date), 'MMM dd, yyyy')}
+                      </span>
+                    </div>
+                    {holiday.reason && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        Reason: {holiday.reason}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={holiday.approved ? 'outline' : 'default'}
+                      size="sm"
+                      onClick={() => handleToggleApproval(holiday.id, holiday.approved)}
+                    >
+                      {holiday.approved ? 'Unapprove' : 'Approve'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteHoliday(holiday.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
+          )}
+        </CardContent>
+      </Card>
 
-            <div className="space-y-2">
-              <Label>Team</Label>
-              <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+      {/* Add Holiday Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Employee Holiday</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="employee">Employee</Label>
+              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select team" />
+                  <SelectValue placeholder="Select an employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  {teams.map((team) => (
-                    <SelectItem key={team} value={team}>
-                      {team}
+                  {employees.map((employee) => (
+                    <SelectItem key={employee.id} value={employee.id}>
+                      {employee.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <Button 
-            onClick={handleAddHoliday}
-            disabled={addHolidayMutation.isPending || !selectedDate || !selectedTeam}
-            className="w-full"
-          >
-            {addHolidayMutation.isPending ? 'Adding...' : 'Add Holiday'}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Existing Holidays List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Existing Team Holidays</CardTitle>
-          <CardDescription>
-            Manage existing team holidays. Individual employee holidays are managed through holiday requests.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loadingHolidays ? (
-            <p>Loading holidays...</p>
-          ) : holidays && holidays.length > 0 ? (
-            <div className="space-y-2">
-              {holidays.map((holiday) => (
-                <div key={holiday.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <span className="font-medium">{format(new Date(holiday.date), 'PPP')}</span>
-                    <span className="ml-3 text-sm text-gray-600">Team: {holiday.team}</span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeleteHoliday(holiday.id)}
-                    disabled={deleteHolidayMutation.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+            <div>
+              <Label htmlFor="start-date">Start Date</Label>
+              <Input
+                id="start-date"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
             </div>
-          ) : (
-            <p className="text-gray-500">No team holidays configured.</p>
-          )}
-        </CardContent>
-      </Card>
+            <div>
+              <Label htmlFor="end-date">End Date</Label>
+              <Input
+                id="end-date"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="reason">Reason (Optional)</Label>
+              <Textarea
+                id="reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Enter reason for holiday..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddHoliday}
+              disabled={addHolidayMutation.isPending}
+            >
+              {addHolidayMutation.isPending ? 'Adding...' : 'Add Holiday'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
