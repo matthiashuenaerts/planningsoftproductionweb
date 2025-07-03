@@ -450,21 +450,21 @@ const Planning = () => {
       console.log(`Generating schedule for ${worker.employee.name}`);
       console.log(`Excluded task IDs: ${excludedTaskIds.join(', ')}`);
 
-      if (worker.assignedWorkstations.length === 0) {
+      // CRITICAL: Check if employee is on holiday for this date FIRST
+      const isOnHoliday = await planningService.isEmployeeOnHoliday(workerId, selectedDate);
+      if (isOnHoliday) {
         toast({
-          title: "No Workstations Assigned",
-          description: "This worker has no workstations assigned. Please assign workstations first.",
+          title: "Employee on Approved Holiday",
+          description: `${worker.employee.name} has an approved holiday request and cannot be scheduled.`,
           variant: "destructive"
         });
         return;
       }
 
-      // Check if employee is on holiday for this date
-      const isOnHoliday = await planningService.isEmployeeOnHoliday(workerId, selectedDate);
-      if (isOnHoliday) {
+      if (worker.assignedWorkstations.length === 0) {
         toast({
-          title: "Employee on Holiday",
-          description: `${worker.employee.name} is on holiday and cannot be scheduled.`,
+          title: "No Workstations Assigned",
+          description: "This worker has no workstations assigned. Please assign workstations first.",
           variant: "destructive"
         });
         return;
@@ -596,15 +596,20 @@ const Planning = () => {
       // Clear excluded tasks when generating all schedules fresh
       setExcludedTasksPerUser({});
       
+      let skippedOnHoliday = 0;
+      let successfullyGenerated = 0;
+      
       for (const workerSchedule of workerSchedules) {
-        // Check if employee is on holiday before generating schedule
+        // CRITICAL: Check if employee is on holiday before generating schedule
         const isOnHoliday = await planningService.isEmployeeOnHoliday(workerSchedule.employee.id, selectedDate);
         if (isOnHoliday) {
-          console.log(`Skipping schedule generation for ${workerSchedule.employee.name} - on holiday`);
+          console.log(`Skipping schedule generation for ${workerSchedule.employee.name} - on approved holiday`);
+          skippedOnHoliday++;
           continue;
         }
         
         await generateDailySchedule(workerSchedule.employee.id);
+        successfullyGenerated++;
       }
       
       // Refresh data after generating all schedules
@@ -616,9 +621,14 @@ const Planning = () => {
         setTaskConflicts(conflicts);
         setShowConflictResolver(true);
       } else {
+        let message = `Generated schedules for ${successfullyGenerated} workers`;
+        if (skippedOnHoliday > 0) {
+          message += ` (${skippedOnHoliday} workers skipped due to approved holidays)`;
+        }
+        
         toast({
-          title: "All Schedules Generated",
-          description: "Generated schedules for all workers with no conflicts",
+          title: "Schedules Generated",
+          description: message,
         });
       }
     } catch (error: any) {

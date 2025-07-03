@@ -168,26 +168,44 @@ export const planningService = {
     }
   },
   
-  // Check if an employee is on holiday for a specific date
+  // Check if an employee is on holiday for a specific date using the database function
   async isEmployeeOnHoliday(employeeId: string, date: Date): Promise<boolean> {
     try {
       const dateStr = format(date, 'yyyy-MM-dd');
       
+      console.log(`Checking if employee ${employeeId} is on holiday on ${dateStr}`);
+      
+      // Use the database function to check for approved holiday requests
       const { data, error } = await supabase
-        .from('employee_holidays')
-        .select('id')
-        .eq('employee_id', employeeId)
-        .lte('start_date', dateStr)
-        .gte('end_date', dateStr)
-        .eq('approved', true)
-        .limit(1);
+        .rpc('is_employee_on_holiday', {
+          emp_id: employeeId,
+          check_date: dateStr
+        });
       
       if (error) {
-        console.error('Error checking employee holiday:', error);
-        return false;
+        console.error('Error checking employee holiday using database function:', error);
+        // Fallback to direct query if function fails
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('holiday_requests')
+          .select('id')
+          .eq('user_id', employeeId)
+          .lte('start_date', dateStr)
+          .gte('end_date', dateStr)
+          .eq('status', 'approved')
+          .limit(1);
+        
+        if (fallbackError) {
+          console.error('Error in fallback holiday check:', fallbackError);
+          return false;
+        }
+        
+        const isOnHoliday = fallbackData && fallbackData.length > 0;
+        console.log(`Employee ${employeeId} holiday status (fallback): ${isOnHoliday}`);
+        return isOnHoliday;
       }
       
-      return data && data.length > 0;
+      console.log(`Employee ${employeeId} holiday status: ${data}`);
+      return data || false;
     } catch (error) {
       console.error('Error in isEmployeeOnHoliday:', error);
       return false;
@@ -279,10 +297,10 @@ export const planningService = {
 
         for (const period of dailyWorkPeriods) {
           for (const employee of employees) {
-            // Check if employee is on holiday for this date
+            // CRITICAL: Check if employee is on holiday for this date
             const isOnHoliday = await this.isEmployeeOnHoliday(employee.id, currentDate);
             if (isOnHoliday) {
-              console.log(`Employee ${employee.name} is on holiday on ${dateStr}, skipping scheduling.`);
+              console.log(`Employee ${employee.name} is on approved holiday on ${dateStr}, skipping scheduling.`);
               continue;
             }
             
@@ -343,10 +361,10 @@ export const planningService = {
       throw new Error('Invalid date provided');
     }
     
-    // Check if employee is on holiday for this date
+    // CRITICAL: Check if employee is on holiday for this date FIRST
     const isOnHoliday = await this.isEmployeeOnHoliday(employeeId, date);
     if (isOnHoliday) {
-      throw new Error('Cannot generate plan for employee on holiday');
+      throw new Error('Cannot generate plan for employee on approved holiday');
     }
     
     const dateStr = format(date, 'yyyy-MM-dd');
