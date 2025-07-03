@@ -189,47 +189,6 @@ export type Database = {
         }
         Relationships: []
       }
-      employee_holidays: {
-        Row: {
-          approved: boolean | null
-          created_at: string | null
-          employee_id: string
-          end_date: string
-          id: string
-          reason: string | null
-          start_date: string
-          updated_at: string | null
-        }
-        Insert: {
-          approved?: boolean | null
-          created_at?: string | null
-          employee_id: string
-          end_date: string
-          id?: string
-          reason?: string | null
-          start_date: string
-          updated_at?: string | null
-        }
-        Update: {
-          approved?: boolean | null
-          created_at?: string | null
-          employee_id?: string
-          end_date?: string
-          id?: string
-          reason?: string | null
-          start_date?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "employee_holidays_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       employee_workstation_links: {
         Row: {
           created_at: string
