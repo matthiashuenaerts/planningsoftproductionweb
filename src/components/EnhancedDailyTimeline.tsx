@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, User, Calendar, Play, Square, CheckCircle, FileText, Package2, QrCode, ShoppingCart, ExternalLink } from 'lucide-react';
+import { Clock, User, Calendar, Play, Square, CheckCircle, FileText, Package2, QrCode, ShoppingCart, ExternalLink, Umbrella } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useLanguage } from '@/context/LanguageContext';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EnhancedTimelineTask {
   id: string;
@@ -43,6 +44,54 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
     createLocalizedPath
   } = useLanguage();
   const navigate = useNavigate();
+  const [employeeOnHoliday, setEmployeeOnHoliday] = useState<boolean>(false);
+  const [holidayInfo, setHolidayInfo] = useState<{reason?: string; start_date: string; end_date: string} | null>(null);
+
+  // Check if employee is on holiday today
+  useEffect(() => {
+    const checkEmployeeHoliday = async () => {
+      try {
+        // Get current user (employee) ID - this would typically come from auth context
+        // For now, we'll check if any of the tasks have an assignee and use that
+        const employeeIds = tasks.map(task => task.project_id).filter(Boolean);
+        
+        if (employeeIds.length === 0) return;
+
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Check holiday_requests table for approved holidays
+        const { data: holidayData, error } = await supabase
+          .from('holiday_requests')
+          .select('*')
+          .lte('start_date', today)
+          .gte('end_date', today)
+          .eq('status', 'approved')
+          .maybeSingle();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error checking holiday status:', error);
+          return;
+        }
+
+        if (holidayData) {
+          setEmployeeOnHoliday(true);
+          setHolidayInfo({
+            reason: holidayData.reason,
+            start_date: holidayData.start_date,
+            end_date: holidayData.end_date
+          });
+        } else {
+          setEmployeeOnHoliday(false);
+          setHolidayInfo(null);
+        }
+      } catch (error) {
+        console.error('Error checking employee holiday status:', error);
+      }
+    };
+
+    checkEmployeeHoliday();
+  }, [tasks]);
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       'scheduled': {
@@ -175,6 +224,55 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
       navigate(ordersPath);
     }
   };
+  if (employeeOnHoliday && holidayInfo) {
+    return (
+      <div className="space-y-3">
+        <h2 className="text-xl font-semibold mb-4">Daily Timeline</h2>
+        
+        <Card className="border-red-500 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <div className="flex justify-center">
+                <Umbrella className="h-16 w-16 text-red-500" />
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-4xl font-bold text-red-600 tracking-wider">
+                  HOLIDAY
+                </h3>
+                <p className="text-lg text-red-700">
+                  Employee is on approved leave
+                </p>
+              </div>
+              
+              <div className="bg-white rounded-lg p-4 border border-red-200">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-center items-center gap-2">
+                    <Calendar className="h-4 w-4 text-red-500" />
+                    <span className="font-medium">
+                      {format(new Date(holidayInfo.start_date), 'MMM dd, yyyy')} - {format(new Date(holidayInfo.end_date), 'MMM dd, yyyy')}
+                    </span>
+                  </div>
+                  
+                  {holidayInfo.reason && (
+                    <div className="text-center">
+                      <span className="font-medium text-gray-600">Reason: </span>
+                      <span className="text-gray-800">{holidayInfo.reason}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="text-red-600 text-sm font-medium">
+                No tasks scheduled during holiday period
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (tasks.length === 0) {
     return <Card>
         <CardContent className="pt-6 text-center">
