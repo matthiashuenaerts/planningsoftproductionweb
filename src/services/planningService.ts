@@ -167,6 +167,32 @@ export const planningService = {
     }
   },
   
+  // Check if an employee is on holiday for a specific date
+  async isEmployeeOnHoliday(employeeId: string, date: Date): Promise<boolean> {
+    try {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      
+      const { data, error } = await supabase
+        .from('employee_holidays')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .lte('start_date', dateStr)
+        .gte('end_date', dateStr)
+        .eq('approved', true)
+        .limit(1);
+      
+      if (error) {
+        console.error('Error checking employee holiday:', error);
+        return false;
+      }
+      
+      return data && data.length > 0;
+    } catch (error) {
+      console.error('Error in isEmployeeOnHoliday:', error);
+      return false;
+    }
+  },
+  
   // Generate a daily plan based on available tasks and employees
   async generateDailyPlan(date: Date): Promise<void> {
     if (!(date instanceof Date) || isNaN(date.getTime())) {
@@ -252,6 +278,13 @@ export const planningService = {
 
         for (const period of dailyWorkPeriods) {
           for (const employee of employees) {
+            // Check if employee is on holiday for this date
+            const isOnHoliday = await this.isEmployeeOnHoliday(employee.id, currentDate);
+            if (isOnHoliday) {
+              console.log(`Employee ${employee.name} is on holiday on ${dateStr}, skipping scheduling.`);
+              continue;
+            }
+            
             const startTimeForPeriod = new Date(`${dateStr}T${period.start_time}`);
             const isEmployeeScheduled = schedulesToInsert.some(s =>
               s.employee_id === employee.id &&
@@ -307,6 +340,12 @@ export const planningService = {
     if (!(date instanceof Date) || isNaN(date.getTime())) {
       console.error('Invalid date provided for generating plan:', date);
       throw new Error('Invalid date provided');
+    }
+    
+    // Check if employee is on holiday for this date
+    const isOnHoliday = await this.isEmployeeOnHoliday(employeeId, date);
+    if (isOnHoliday) {
+      throw new Error('Cannot generate plan for employee on holiday');
     }
     
     const dateStr = format(date, 'yyyy-MM-dd');

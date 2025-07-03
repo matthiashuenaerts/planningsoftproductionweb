@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Clock, User, Wand2, AlertCircle } from 'lucide-react';
+import { Clock, User, Wand2, AlertCircle, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { planningService } from '@/services/planningService';
 import { format } from 'date-fns';
@@ -33,13 +33,36 @@ const PersonalPlanningGenerator: React.FC<PersonalPlanningGeneratorProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [preview, setPreview] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [isOnHoliday, setIsOnHoliday] = useState(false);
   const { toast } = useToast();
+
+  const checkHolidayStatus = async (employeeId: string) => {
+    try {
+      const holidayStatus = await planningService.isEmployeeOnHoliday(employeeId, selectedDate);
+      setIsOnHoliday(holidayStatus);
+      return holidayStatus;
+    } catch (error) {
+      console.error('Error checking holiday status:', error);
+      return false;
+    }
+  };
 
   const generatePersonalPlan = async () => {
     if (!selectedEmployee) {
       toast({
         title: 'Employee Required',
         description: 'Please select an employee to create a plan',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Check if employee is on holiday
+    const holidayStatus = await checkHolidayStatus(selectedEmployee);
+    if (holidayStatus) {
+      toast({
+        title: 'Employee on Holiday',
+        description: 'Cannot generate plan for employee who is on holiday',
         variant: 'destructive'
       });
       return;
@@ -75,6 +98,14 @@ const PersonalPlanningGenerator: React.FC<PersonalPlanningGeneratorProps> = ({
   const generatePreview = async () => {
     if (!selectedEmployee) return;
 
+    // Check holiday status first
+    const holidayStatus = await checkHolidayStatus(selectedEmployee);
+    if (holidayStatus) {
+      setPreview([]);
+      setShowPreview(true);
+      return;
+    }
+
     try {
       // Get employee's urgent tasks for preview
       const tasks = await planningService.getAvailableTasksForPlanning();
@@ -87,6 +118,14 @@ const PersonalPlanningGenerator: React.FC<PersonalPlanningGeneratorProps> = ({
     } catch (error) {
       console.error('Error generating preview:', error);
     }
+  };
+
+  const handleEmployeeChange = async (employeeId: string) => {
+    onEmployeeChange(employeeId);
+    // Check holiday status when employee changes
+    await checkHolidayStatus(employeeId);
+    setShowPreview(false);
+    setPreview([]);
   };
 
   const getPriorityColor = (priority: string) => {
@@ -122,7 +161,7 @@ const PersonalPlanningGenerator: React.FC<PersonalPlanningGeneratorProps> = ({
           <div className="flex-1">
             <Select
               value={selectedEmployee || ""}
-              onValueChange={onEmployeeChange}
+              onValueChange={handleEmployeeChange}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select employee for personal planning" />
@@ -149,13 +188,13 @@ const PersonalPlanningGenerator: React.FC<PersonalPlanningGeneratorProps> = ({
             <Button
               variant="outline"
               onClick={generatePreview}
-              disabled={!selectedEmployee}
+              disabled={!selectedEmployee || isOnHoliday}
             >
               Preview Tasks
             </Button>
             <Button
               onClick={generatePersonalPlan}
-              disabled={isGenerating || !selectedEmployee}
+              disabled={isGenerating || !selectedEmployee || isOnHoliday}
             >
               {isGenerating ? (
                 <>
@@ -173,8 +212,8 @@ const PersonalPlanningGenerator: React.FC<PersonalPlanningGeneratorProps> = ({
         </div>
 
         {selectedEmployeeData && (
-          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="flex items-center text-sm text-blue-800">
+          <div className={`p-3 rounded-lg border ${isOnHoliday ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-200'}`}>
+            <div className={`flex items-center text-sm ${isOnHoliday ? 'text-orange-800' : 'text-blue-800'}`}>
               <User className="h-4 w-4 mr-2" />
               <span className="font-medium">{selectedEmployeeData.name}</span>
               {selectedEmployeeData.workstation && (
@@ -185,11 +224,27 @@ const PersonalPlanningGenerator: React.FC<PersonalPlanningGeneratorProps> = ({
               )}
               <span className="mx-2">•</span>
               <span>Date: {format(selectedDate, 'MMM dd, yyyy')}</span>
+              {isOnHoliday && (
+                <>
+                  <span className="mx-2">•</span>
+                  <div className="flex items-center">
+                    <Calendar className="h-4 w-4 mr-1" />
+                    <span className="font-medium">On Holiday</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
 
-        {showPreview && preview.length > 0 && (
+        {isOnHoliday && (
+          <div className="flex items-center justify-center p-4 text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            This employee is on holiday and cannot be scheduled for work
+          </div>
+        )}
+
+        {showPreview && !isOnHoliday && preview.length > 0 && (
           <div className="space-y-2">
             <h4 className="font-medium text-sm text-muted-foreground">Preview - Most Urgent Tasks:</h4>
             <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -214,7 +269,7 @@ const PersonalPlanningGenerator: React.FC<PersonalPlanningGeneratorProps> = ({
           </div>
         )}
 
-        {showPreview && preview.length === 0 && (
+        {showPreview && !isOnHoliday && preview.length === 0 && (
           <div className="flex items-center justify-center p-4 text-sm text-muted-foreground border border-dashed rounded">
             <AlertCircle className="h-4 w-4 mr-2" />
             No tasks available for this employee
