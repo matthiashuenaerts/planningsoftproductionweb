@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, User, Calendar, Play, Square, CheckCircle, FileText, Package2, QrCode, ShoppingCart, ExternalLink, Umbrella } from 'lucide-react';
+import { Clock, User, Calendar, Play, Square, CheckCircle, FileText, Package2, QrCode, ShoppingCart, ExternalLink, Plane } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useLanguage } from '@/context/LanguageContext';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 
 interface EnhancedTimelineTask {
   id: string;
@@ -21,7 +20,11 @@ interface EnhancedTimelineTask {
   priority: string;
   canComplete: boolean;
   isActive: boolean;
+  employee_name?: string;
+  employee_id?: string;
+  is_on_holiday?: boolean;
 }
+
 interface EnhancedDailyTimelineProps {
   tasks: EnhancedTimelineTask[];
   onStartTask?: (taskId: string) => void;
@@ -31,6 +34,7 @@ interface EnhancedDailyTimelineProps {
   onShowBarcode?: (projectId: string) => void;
   onShowOrders?: (projectId: string) => void;
 }
+
 const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
   tasks,
   onStartTask,
@@ -40,59 +44,18 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
   onShowBarcode,
   onShowOrders
 }) => {
-  const {
-    createLocalizedPath
-  } = useLanguage();
+  const { createLocalizedPath } = useLanguage();
   const navigate = useNavigate();
-  const [employeeOnHoliday, setEmployeeOnHoliday] = useState<boolean>(false);
-  const [holidayInfo, setHolidayInfo] = useState<{reason?: string; start_date: string; end_date: string} | null>(null);
 
-  // Check if employee is on holiday today
-  useEffect(() => {
-    const checkEmployeeHoliday = async () => {
-      try {
-        // Get current user (employee) ID - this would typically come from auth context
-        // For now, we'll check if any of the tasks have an assignee and use that
-        const employeeIds = tasks.map(task => task.project_id).filter(Boolean);
-        
-        if (employeeIds.length === 0) return;
+  const getStatusBadge = (status: string, isOnHoliday?: boolean) => {
+    // If employee is on holiday, show holiday badge instead
+    if (isOnHoliday) {
+      return <Badge className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
+        <Plane className="h-3 w-3 mr-1" />
+        On Holiday
+      </Badge>;
+    }
 
-        const today = new Date().toISOString().split('T')[0];
-        
-        // Check holiday_requests table for approved holidays
-        const { data: holidayData, error } = await supabase
-          .from('holiday_requests')
-          .select('*')
-          .lte('start_date', today)
-          .gte('end_date', today)
-          .eq('status', 'approved')
-          .maybeSingle();
-
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error checking holiday status:', error);
-          return;
-        }
-
-        if (holidayData) {
-          setEmployeeOnHoliday(true);
-          setHolidayInfo({
-            reason: holidayData.reason,
-            start_date: holidayData.start_date,
-            end_date: holidayData.end_date
-          });
-        } else {
-          setEmployeeOnHoliday(false);
-          setHolidayInfo(null);
-        }
-      } catch (error) {
-        console.error('Error checking employee holiday status:', error);
-      }
-    };
-
-    checkEmployeeHoliday();
-  }, [tasks]);
-
-  const getStatusBadge = (status: string) => {
     const statusConfig = {
       'scheduled': {
         color: 'bg-blue-100 text-blue-800 border-blue-300',
@@ -118,6 +81,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig['scheduled'];
     return <Badge className={`${config.color} text-xs font-medium`}>{config.label}</Badge>;
   };
+
   const getPriorityBadge = (priority: string) => {
     switch (priority?.toLowerCase()) {
       case 'urgent':
@@ -132,6 +96,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
         return <Badge className="text-xs">{priority || 'Medium'}</Badge>;
     }
   };
+
   const formatTime = (timeString: string) => {
     try {
       return format(parseISO(timeString), 'HH:mm');
@@ -139,6 +104,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
       return timeString;
     }
   };
+
   const calculateDuration = (startTime: string, endTime: string) => {
     try {
       const start = parseISO(startTime);
@@ -155,19 +121,16 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
       return '';
     }
   };
+
   const calculateTimeProgress = (startTime: string, endTime: string) => {
     try {
       const now = new Date();
       const start = parseISO(startTime);
       const end = parseISO(endTime);
       
-      // If current time is before start time, progress is 0%
       if (now < start) return 0;
-      
-      // If current time is after end time, progress is 100%
       if (now > end) return 100;
       
-      // Calculate progress between start and end time
       const totalDuration = end.getTime() - start.getTime();
       const elapsed = now.getTime() - start.getTime();
       const progress = (elapsed / totalDuration) * 100;
@@ -177,46 +140,54 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
       return 0;
     }
   };
+
   const truncateTitle = (title: string, maxLength: number = 60) => {
     if (title.length <= maxLength) return title;
     return title.substring(0, maxLength) + '...';
   };
+
   const handleStartTask = (taskId: string) => {
     console.log('Starting task from timeline:', taskId);
     if (onStartTask) {
       onStartTask(taskId);
     }
   };
+
   const handlePauseTask = (taskId: string) => {
     console.log('Pausing task:', taskId);
     if (onStartTask) {
       onStartTask(taskId);
     }
   };
+
   const handleCompleteTask = (taskId: string) => {
     console.log('Completing task:', taskId);
     if (onCompleteTask) {
       onCompleteTask(taskId);
     }
   };
+
   const handleShowFiles = (projectId: string) => {
     console.log('Show files for project:', projectId);
     if (onShowFiles && projectId) {
       onShowFiles(projectId);
     }
   };
+
   const handleShowParts = (projectId: string) => {
     console.log('Show parts for project:', projectId);
     if (onShowParts && projectId) {
       onShowParts(projectId);
     }
   };
+
   const handleShowBarcode = (projectId: string) => {
     console.log('Show barcode for project:', projectId);
     if (onShowBarcode && projectId) {
       onShowBarcode(projectId);
     }
   };
+
   const handleShowOrders = (projectId: string) => {
     console.log('Show orders for project:', projectId);
     if (projectId) {
@@ -224,240 +195,235 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
       navigate(ordersPath);
     }
   };
-  if (employeeOnHoliday && holidayInfo) {
-    return (
-      <div className="space-y-3">
-        <h2 className="text-xl font-semibold mb-4">Daily Timeline</h2>
-        
-        <Card className="border-red-500 bg-red-50">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <div className="flex justify-center">
-                <Umbrella className="h-16 w-16 text-red-500" />
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="text-4xl font-bold text-red-600 tracking-wider">
-                  HOLIDAY
-                </h3>
-                <p className="text-lg text-red-700">
-                  Employee is on approved leave
-                </p>
-              </div>
-              
-              <div className="bg-white rounded-lg p-4 border border-red-200">
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-center items-center gap-2">
-                    <Calendar className="h-4 w-4 text-red-500" />
-                    <span className="font-medium">
-                      {format(new Date(holidayInfo.start_date), 'MMM dd, yyyy')} - {format(new Date(holidayInfo.end_date), 'MMM dd, yyyy')}
-                    </span>
-                  </div>
-                  
-                  {holidayInfo.reason && (
-                    <div className="text-center">
-                      <span className="font-medium text-gray-600">Reason: </span>
-                      <span className="text-gray-800">{holidayInfo.reason}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="text-red-600 text-sm font-medium">
-                No tasks scheduled during holiday period
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   if (tasks.length === 0) {
     return <Card>
-        <CardContent className="pt-6 text-center">
-          <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">No scheduled tasks for today.</p>
-        </CardContent>
-      </Card>;
+      <CardContent className="pt-6 text-center">
+        <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+        <p className="text-gray-500">No scheduled tasks for today.</p>
+      </CardContent>
+    </Card>;
   }
 
   // Sort tasks by start time
   const sortedTasks = [...tasks].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
   console.log('Rendering timeline with tasks:', sortedTasks.map(task => ({
     id: task.id,
     title: task.title,
     project_name: task.project_name,
     project_id: task.project_id,
     status: task.status,
-    isActive: task.isActive
+    isActive: task.isActive,
+    is_on_holiday: task.is_on_holiday,
+    employee_name: task.employee_name
   })));
+
   return <div className="space-y-3">
-      <h2 className="text-xl font-semibold mb-4">Daily Timeline</h2>
+    <h2 className="text-xl font-semibold mb-4">Daily Timeline</h2>
+    
+    {/* Timeline container with time markers */}
+    <div className="relative">
+      {/* Time line */}
+      <div className="absolute left-16 top-0 bottom-0 w-0.5 bg-gray-200"></div>
       
-      {/* Timeline container with time markers */}
-      <div className="relative">
-        {/* Time line */}
-        <div className="absolute left-16 top-0 bottom-0 w-0.5 bg-gray-200"></div>
-        
-        {sortedTasks.map((task, index) => {
+      {sortedTasks.map((task, index) => {
         const duration = calculateDuration(task.start_time, task.end_time);
         const isSmallTask = duration && duration.includes('min') && !duration.includes('h');
         const timeProgress = calculateTimeProgress(task.start_time, task.end_time);
+        const isOnHoliday = task.is_on_holiday;
         
         return <div key={task.id} className="relative flex items-start mb-4">
-              {/* Time marker */}
-              <div className="flex-shrink-0 w-14 text-right pr-4">
-                <div className="text-sm font-medium text-gray-600">
-                  {formatTime(task.start_time)}
-                </div>
-                <div className="text-xs text-gray-400">
-                  {duration}
-                </div>
-              </div>
+          {/* Time marker */}
+          <div className="flex-shrink-0 w-14 text-right pr-4">
+            <div className="text-sm font-medium text-gray-600">
+              {formatTime(task.start_time)}
+            </div>
+            <div className="text-xs text-gray-400">
+              {duration}
+            </div>
+          </div>
+          
+          {/* Timeline dot */}
+          <div className="relative flex-shrink-0">
+            <div className={`w-3 h-3 rounded-full border-2 ${
+              isOnHoliday 
+                ? 'bg-blue-500 border-blue-500' 
+                : task.isActive 
+                  ? 'bg-green-500 border-green-500 animate-pulse' 
+                  : task.status === 'completed' 
+                    ? 'bg-green-500 border-green-500' 
+                    : task.status === 'in_progress' 
+                      ? 'bg-amber-500 border-amber-500' 
+                      : 'bg-white border-gray-300'
+            }`}></div>
+          </div>
+          
+          {/* Task card */}
+          <div className="flex-1 ml-4">
+            <Card className={`relative overflow-hidden transition-all hover:shadow-md ${
+              isOnHoliday 
+                ? 'ring-2 ring-blue-500 ring-opacity-50 bg-blue-50' 
+                : task.isActive 
+                  ? 'ring-2 ring-green-500 ring-opacity-50' 
+                  : ''
+            } ${isSmallTask ? 'py-2' : ''}`}>
               
-              {/* Timeline dot */}
-              <div className="relative flex-shrink-0">
-                <div className={`w-3 h-3 rounded-full border-2 ${task.isActive ? 'bg-green-500 border-green-500 animate-pulse' : task.status === 'completed' ? 'bg-green-500 border-green-500' : task.status === 'in_progress' ? 'bg-amber-500 border-amber-500' : 'bg-white border-gray-300'}`}></div>
-              </div>
+              {/* Progress bar background - disabled when on holiday */}
+              {!isOnHoliday && (
+                <div 
+                  className="absolute inset-0 bg-green-500 opacity-10 transition-all duration-1000 ease-out"
+                  style={{ 
+                    width: `${timeProgress}%`,
+                    background: 'linear-gradient(90deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%)'
+                  }}
+                />
+              )}
               
-              {/* Task card */}
-              <div className="flex-1 ml-4">
-                <Card className={`relative overflow-hidden transition-all hover:shadow-md ${task.isActive ? 'ring-2 ring-green-500 ring-opacity-50' : ''} ${isSmallTask ? 'py-2' : ''}`}>
-                  {/* Progress bar background */}
-                  <div 
-                    className="absolute inset-0 bg-green-500 opacity-10 transition-all duration-1000 ease-out"
-                    style={{ 
-                      width: `${timeProgress}%`,
-                      background: 'linear-gradient(90deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%)'
-                    }}
-                  />
+              <CardHeader className={`relative z-10 ${isSmallTask ? 'py-3 pb-2' : 'pb-3'}`}>
+                <div className="flex justify-between items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className={`${isSmallTask ? 'text-base' : 'text-lg'} leading-tight mb-1 ${isOnHoliday ? 'text-blue-800' : ''}`}>
+                      {isOnHoliday ? `${task.employee_name || 'Employee'} - On Approved Holiday` : truncateTitle(task.title, isSmallTask ? 40 : 60)}
+                    </CardTitle>
+                    
+                    {!isOnHoliday && (
+                      <CardDescription className="text-sm font-medium text-blue-600 mb-2">
+                        {task.project_name && task.project_name !== 'No Project' ? task.project_name : 'No Project Assigned'}
+                        {task.project_id && <span className="text-xs text-gray-400 ml-2">
+                          (ID: {task.project_id.substring(0, 8)}...)
+                        </span>}
+                      </CardDescription>
+                    )}
+                    
+                    {/* Time range */}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      <span>{formatTime(task.start_time)} - {formatTime(task.end_time)}</span>
+                      {task.workstation && !isOnHoliday && <>
+                        <span className="mx-1">•</span>
+                        <span>{task.workstation}</span>
+                      </>}
+                    </div>
+                  </div>
                   
-                  <CardHeader className={`relative z-10 ${isSmallTask ? 'py-3 pb-2' : 'pb-3'}`}>
-                    <div className="flex justify-between items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className={`${isSmallTask ? 'text-base' : 'text-lg'} leading-tight mb-1`}>
-                          {truncateTitle(task.title, isSmallTask ? 40 : 60)}
-                        </CardTitle>
-                        <CardDescription className="text-sm font-medium text-blue-600 mb-2">
-                          {task.project_name && task.project_name !== 'No Project' ? task.project_name : 'No Project Assigned'}
-                          {task.project_id && <span className="text-xs text-gray-400 ml-2">
-                              (ID: {task.project_id.substring(0, 8)}...)
-                            </span>}
-                        </CardDescription>
-                        
-                        {/* Time range */}
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          <span>{formatTime(task.start_time)} - {formatTime(task.end_time)}</span>
-                          {task.workstation && <>
-                              
-                              
-                            </>}
-                        </div>
-                      </div>
+                  {/* Status indicator */}
+                  {task.isActive && !isOnHoliday && <div className="flex items-center gap-1 text-green-600 flex-shrink-0">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-xs font-medium">Active</span>
+                  </div>}
+                </div>
+              </CardHeader>
+              
+              <CardContent className={`relative z-10 space-y-3 ${isSmallTask ? 'py-2 pt-0' : 'pt-0'}`}>
+                {/* Badges */}
+                <div className="flex flex-wrap gap-2">
+                  {getStatusBadge(task.status, isOnHoliday)}
+                  {task.priority && !isOnHoliday && getPriorityBadge(task.priority)}
+                </div>
+
+                {/* Description for larger tasks - not shown when on holiday */}
+                {!isSmallTask && !isOnHoliday && task.description && <p className="text-sm text-muted-foreground">
+                  {truncateTitle(task.description, 100)}
+                </p>}
+
+                {/* Holiday message */}
+                {isOnHoliday && (
+                  <div className="bg-blue-100 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-blue-800">
+                      <Plane className="h-4 w-4" />
+                      <span className="font-medium">Employee is on approved holiday</span>
+                    </div>
+                    <p className="text-sm text-blue-700 mt-1">
+                      This scheduled task cannot be completed as the assigned employee has an approved holiday request for this date.
+                    </p>
+                  </div>
+                )}
+
+                {/* Action Buttons - disabled when on holiday */}
+                {!isOnHoliday && (
+                  <div className="flex flex-wrap gap-2">
+                    {/* Quick action buttons - only show if project_id exists */}
+                    {task.project_id && task.project_id !== null && <div className="flex gap-1">
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Files button clicked for project:', task.project_id);
+                        handleShowFiles(task.project_id!);
+                      }} title="Project Files">
+                        <FileText className="h-3 w-3" />
+                      </Button>
                       
-                      {/* Status indicator */}
-                      {task.isActive && <div className="flex items-center gap-1 text-green-600 flex-shrink-0">
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                          <span className="text-xs font-medium">Active</span>
-                        </div>}
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent className={`relative z-10 space-y-3 ${isSmallTask ? 'py-2 pt-0' : 'pt-0'}`}>
-                    {/* Badges */}
-                    <div className="flex flex-wrap gap-2">
-                      {getStatusBadge(task.status)}
-                      {task.priority && getPriorityBadge(task.priority)}
-                    </div>
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Orders button clicked for project:', task.project_id);
+                        handleShowOrders(task.project_id!);
+                      }} title="Project Orders">
+                        <ShoppingCart className="h-3 w-3" />
+                        <ExternalLink className="h-2 w-2 ml-1" />
+                      </Button>
+                      
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Parts button clicked for project:', task.project_id);
+                        handleShowParts(task.project_id!);
+                      }} title="Parts List">
+                        <Package2 className="h-3 w-3" />
+                      </Button>
+                      
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Barcode button clicked for project:', task.project_id);
+                        handleShowBarcode(task.project_id!);
+                      }} title="Project Barcode">
+                        <QrCode className="h-3 w-3" />
+                      </Button>
+                    </div>}
 
-                    {/* Description for larger tasks */}
-                    {!isSmallTask && task.description && <p className="text-sm text-muted-foreground">
-                        {truncateTitle(task.description, 100)}
-                      </p>}
-
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-2">
-                      {/* Quick action buttons - only show if project_id exists */}
-                      {task.project_id && task.project_id !== null && <div className="flex gap-1">
-                          <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('Files button clicked for project:', task.project_id);
-                      handleShowFiles(task.project_id!);
-                    }} title="Project Files">
-                            <FileText className="h-3 w-3" />
-                          </Button>
-                          
-                          <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('Orders button clicked for project:', task.project_id);
-                      handleShowOrders(task.project_id!);
-                    }} title="Project Orders">
-                            <ShoppingCart className="h-3 w-3" />
-                            <ExternalLink className="h-2 w-2 ml-1" />
-                          </Button>
-                          
-                          <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('Parts button clicked for project:', task.project_id);
-                      handleShowParts(task.project_id!);
-                    }} title="Parts List">
-                            <Package2 className="h-3 w-3" />
-                          </Button>
-                          
-                          <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('Barcode button clicked for project:', task.project_id);
-                      handleShowBarcode(task.project_id!);
-                    }} title="Project Barcode">
-                            <QrCode className="h-3 w-3" />
-                          </Button>
-                        </div>}
-
-                      {/* Task control buttons */}
-                      <div className="flex gap-1 ml-auto">
-                        {(task.status === 'todo' || task.status === 'scheduled') && !task.isActive && <Button size="sm" className="h-7 px-3 text-xs" onClick={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('Start button clicked for task:', task.id);
-                      handleStartTask(task.id);
-                    }}>
-                            <Play className="h-3 w-3 mr-1" />
-                            Start
-                          </Button>}
-                        
-                        {task.isActive && <Button size="sm" variant="outline" className="h-7 px-3 text-xs" onClick={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('Pause button clicked for task:', task.id);
-                      handlePauseTask(task.id);
-                    }}>
-                            <Square className="h-3 w-3 mr-1" />
-                            Pause
-                          </Button>}
-                        
-                        {task.canComplete && <Button size="sm" className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700" onClick={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('Complete button clicked for task:', task.id);
-                      handleCompleteTask(task.id);
-                    }}>
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Complete
-                          </Button>}
-                      </div>
+                    {/* Task control buttons */}
+                    <div className="flex gap-1 ml-auto">
+                      {(task.status === 'todo' || task.status === 'scheduled') && !task.isActive && <Button size="sm" className="h-7 px-3 text-xs" onClick={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Start button clicked for task:', task.id);
+                        handleStartTask(task.id);
+                      }}>
+                        <Play className="h-3 w-3 mr-1" />
+                        Start
+                      </Button>}
+                      
+                      {task.isActive && <Button size="sm" variant="outline" className="h-7 px-3 text-xs" onClick={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Pause button clicked for task:', task.id);
+                        handlePauseTask(task.id);
+                      }}>
+                        <Square className="h-3 w-3 mr-1" />
+                        Pause
+                      </Button>}
+                      
+                      {task.canComplete && <Button size="sm" className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700" onClick={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Complete button clicked for task:', task.id);
+                        handleCompleteTask(task.id);
+                      }}>
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Complete
+                      </Button>}
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>;
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>;
       })}
-      </div>
-    </div>;
+    </div>
+  </div>;
 };
+
 export default EnhancedDailyTimeline;
