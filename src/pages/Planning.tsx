@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { format, startOfDay } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
@@ -460,6 +459,17 @@ const Planning = () => {
         return;
       }
 
+      // Check if employee is on holiday for this date
+      const isOnHoliday = await planningService.isEmployeeOnHoliday(workerId, selectedDate);
+      if (isOnHoliday) {
+        toast({
+          title: "Employee on Holiday",
+          description: `${worker.employee.name} is on holiday and cannot be scheduled.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Clear existing auto-generated schedules for this worker and date
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       await supabase
@@ -587,6 +597,13 @@ const Planning = () => {
       setExcludedTasksPerUser({});
       
       for (const workerSchedule of workerSchedules) {
+        // Check if employee is on holiday before generating schedule
+        const isOnHoliday = await planningService.isEmployeeOnHoliday(workerSchedule.employee.id, selectedDate);
+        if (isOnHoliday) {
+          console.log(`Skipping schedule generation for ${workerSchedule.employee.name} - on holiday`);
+          continue;
+        }
+        
         await generateDailySchedule(workerSchedule.employee.id);
       }
       
