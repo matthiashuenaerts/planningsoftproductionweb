@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { format, startOfDay } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
@@ -40,6 +39,7 @@ import {
 import PlanningTaskManager from '@/components/PlanningTaskManager';
 import TaskConflictResolver from '@/components/TaskConflictResolver';
 import StandardTaskAssignment from '@/components/StandardTaskAssignment';
+import PersonalPlanningGenerator from '@/components/PersonalPlanningGenerator';
 import { supabase } from '@/integrations/supabase/client';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -451,6 +451,17 @@ const Planning = () => {
       console.log(`Generating schedule for ${worker.employee.name}`);
       console.log(`Excluded task IDs: ${excludedTaskIds.join(', ')}`);
 
+      // Check if employee is on holiday for this date FIRST
+      const isOnHoliday = await planningService.isEmployeeOnHoliday(workerId, selectedDate);
+      if (isOnHoliday) {
+        toast({
+          title: "Employee on Holiday",
+          description: `${worker.employee.name} is on holiday and cannot be scheduled for work on ${format(selectedDate, 'MMM dd, yyyy')}.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
       if (worker.assignedWorkstations.length === 0) {
         toast({
           title: "No Workstations Assigned",
@@ -586,8 +597,32 @@ const Planning = () => {
       // Clear excluded tasks when generating all schedules fresh
       setExcludedTasksPerUser({});
       
+      // Check for holidays before generating any schedules
+      const workersOnHoliday = [];
       for (const workerSchedule of workerSchedules) {
-        await generateDailySchedule(workerSchedule.employee.id);
+        const isOnHoliday = await planningService.isEmployeeOnHoliday(workerSchedule.employee.id, selectedDate);
+        if (isOnHoliday) {
+          workersOnHoliday.push(workerSchedule.employee.name);
+        }
+      }
+
+      // Show warning if any workers are on holiday
+      if (workersOnHoliday.length > 0) {
+        toast({
+          title: "Workers on Holiday",
+          description: `The following workers are on holiday and will be skipped: ${workersOnHoliday.join(', ')}`,
+          variant: "default"
+        });
+      }
+      
+      // Generate schedules only for workers not on holiday
+      for (const workerSchedule of workerSchedules) {
+        const isOnHoliday = await planningService.isEmployeeOnHoliday(workerSchedule.employee.id, selectedDate);
+        if (!isOnHoliday) {
+          await generateDailySchedule(workerSchedule.employee.id);
+        } else {
+          console.log(`Skipping ${workerSchedule.employee.name} - on holiday`);
+        }
       }
       
       // Refresh data after generating all schedules
@@ -599,9 +634,10 @@ const Planning = () => {
         setTaskConflicts(conflicts);
         setShowConflictResolver(true);
       } else {
+        const availableWorkersCount = workerSchedules.length - workersOnHoliday.length;
         toast({
           title: "All Schedules Generated",
-          description: "Generated schedules for all workers with no conflicts",
+          description: `Generated schedules for ${availableWorkersCount} available workers with no conflicts${workersOnHoliday.length > 0 ? ` (${workersOnHoliday.length} workers on holiday were skipped)` : ''}`,
         });
       }
     } catch (error: any) {
@@ -996,6 +1032,15 @@ const Planning = () => {
               </Alert>
             ) : (
               <div className="space-y-6">
+                {/* Personal Planning Generator Component */}
+                <PersonalPlanningGenerator
+                  selectedDate={selectedDate}
+                  employees={workers}
+                  selectedEmployee={selectedWorker}
+                  onEmployeeChange={setSelectedWorker}
+                  onPlanGenerated={fetchAllData}
+                />
+
                 {/* Worker Selection */}
                 <div className="flex items-center justify-between">
                   <div className="w-64">

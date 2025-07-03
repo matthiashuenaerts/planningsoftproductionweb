@@ -172,9 +172,11 @@ export const planningService = {
     try {
       const dateStr = format(date, 'yyyy-MM-dd');
       
+      console.log(`Checking holiday status for employee ${employeeId} on ${dateStr}`);
+      
       const { data, error } = await supabase
         .from('employee_holidays')
-        .select('id')
+        .select('id, start_date, end_date, reason')
         .eq('employee_id', employeeId)
         .lte('start_date', dateStr)
         .gte('end_date', dateStr)
@@ -186,7 +188,12 @@ export const planningService = {
         return false;
       }
       
-      return data && data.length > 0;
+      const isOnHoliday = data && data.length > 0;
+      if (isOnHoliday) {
+        console.log(`Employee ${employeeId} is on holiday on ${dateStr}:`, data[0]);
+      }
+      
+      return isOnHoliday;
     } catch (error) {
       console.error('Error in isEmployeeOnHoliday:', error);
       return false;
@@ -278,7 +285,7 @@ export const planningService = {
 
         for (const period of dailyWorkPeriods) {
           for (const employee of employees) {
-            // Check if employee is on holiday for this date
+            // Check if employee is on holiday for this date - CRITICAL CHECK
             const isOnHoliday = await this.isEmployeeOnHoliday(employee.id, currentDate);
             if (isOnHoliday) {
               console.log(`Employee ${employee.name} is on holiday on ${dateStr}, skipping scheduling.`);
@@ -342,7 +349,7 @@ export const planningService = {
       throw new Error('Invalid date provided');
     }
     
-    // Check if employee is on holiday for this date
+    // Check if employee is on holiday for this date - FIRST AND MOST IMPORTANT CHECK
     const isOnHoliday = await this.isEmployeeOnHoliday(employeeId, date);
     if (isOnHoliday) {
       throw new Error('Cannot generate plan for employee on holiday');
@@ -587,56 +594,20 @@ export const planningService = {
   // Get employee workstation assignments
   async getEmployeeWorkstations(employeeId: string): Promise<string[]> {
     try {
-      // First check if workstation is directly assigned
-      const { data: employeeData, error: employeeError } = await supabase
-        .from('employees')
-        .select('workstation')
-        .eq('id', employeeId)
-        .single();
-      
-      if (employeeError && employeeError.code !== 'PGRST116') {
-        console.error('Error fetching employee workstation:', employeeError);
-        throw employeeError;
-      }
-      
-      const workstations = [];
-      
-      if (employeeData?.workstation) {
-        // Get workstation ID if it's a legacy workstation name
-        const { data: workstationData } = await supabase
-          .from('workstations')
-          .select('id')
-          .eq('name', employeeData.workstation)
-          .single();
-          
-        if (workstationData?.id) {
-          workstations.push(workstationData.id);
-        }
-      }
-      
-      // Also check for workstation links
-      const { data: links, error: linksError } = await supabase
+      const { data: workstationLinks, error } = await supabase
         .from('employee_workstation_links')
         .select('workstation_id')
         .eq('employee_id', employeeId);
       
-      if (linksError) {
-        console.error('Error fetching workstation links:', linksError);
-        throw linksError;
+      if (error) {
+        console.error('Error fetching employee workstations:', error);
+        return [];
       }
       
-      if (links && links.length > 0) {
-        links.forEach(link => {
-          if (!workstations.includes(link.workstation_id)) {
-            workstations.push(link.workstation_id);
-          }
-        });
-      }
-      
-      return workstations;
+      return workstationLinks?.map(link => link.workstation_id) || [];
     } catch (error) {
       console.error('Error in getEmployeeWorkstations:', error);
-      throw error;
+      return [];
     }
   }
 };
