@@ -647,7 +647,7 @@ const Planning = () => {
     try {
       setGeneratingSchedule(true);
       
-      // Get all schedules for the selected date with employee information
+      // Get all schedules for the selected date with employee information and task workstation links
       const { data: userSchedules, error: schedulesError } = await supabase
         .from('schedules')
         .select(`
@@ -661,24 +661,23 @@ const Planning = () => {
           employee:employees(name),
           task:tasks(
             id,
-            workstation,
             title,
+            task_workstation_links!inner(
+              workstation:workstations(
+                id,
+                name
+              )
+            ),
             phase:phases(
               project:projects(name)
             )
           )
         `)
         .gte('start_time', format(selectedDate, 'yyyy-MM-dd'))
-        .lt('start_time', format(addDays(selectedDate, 1), 'yyyy-MM-dd'));
+        .lt('start_time', format(addDays(selectedDate, 1), 'yyyy-MM-dd'))
+        .not('task_id', 'is', null); // Only get schedules that have actual tasks
 
       if (schedulesError) throw schedulesError;
-
-      // Get all workstations
-      const { data: workstations, error: workstationsError } = await supabase
-        .from('workstations')
-        .select('id, name');
-
-      if (workstationsError) throw workstationsError;
 
       // Delete existing workstation schedules for the selected date
       const { error: deleteError } = await supabase
@@ -694,66 +693,51 @@ const Planning = () => {
       }
 
       console.log('User schedules found:', userSchedules?.length || 0);
-      console.log('Workstations available:', workstations?.map(w => w.name));
 
       let createdSchedules = 0;
       const workstationSchedulesToCreate = [];
 
       // Process each user schedule
       for (const schedule of userSchedules || []) {
-        const workstationName = schedule.task?.workstation;
         const employeeName = schedule.employee?.name || 'Unknown User';
         
-        console.log(`Processing schedule for ${employeeName}, workstation: ${workstationName}, task: ${schedule.title}`);
+        // Get workstation info from task_workstation_links
+        const taskWorkstationLinks = schedule.task?.task_workstation_links || [];
         
-        if (!workstationName) {
-          console.log('No workstation name found, skipping...');
+        console.log(`Processing schedule for ${employeeName}, task: ${schedule.title}, workstation links: ${taskWorkstationLinks.length}`);
+        
+        if (taskWorkstationLinks.length === 0) {
+          console.log('No workstation links found, skipping...');
           continue;
         }
 
-        // Find the workstation - try exact match first, then partial match
-        let workstation = workstations?.find(w => w.name === workstationName);
-        
-        if (!workstation) {
-          // Try to find workstation by mapping common workstation names
-          const workstationMappings: Record<string, string[]> = {
-            'CUTTING': ['Opdeelzaag', 'CNC'],
-            'ASSEMBLY': ['Montage', 'Afwerking'],
-            'PREPARATION': ['Productievoorbereiding'],
-            'FINISHING': ['Afwerking', 'Controle'],
-            'EDGE_BANDING': ['Afplakken']
-          };
+        // Process each workstation linked to this task
+        for (const link of taskWorkstationLinks) {
+          const workstation = link.workstation;
           
-          for (const [key, patterns] of Object.entries(workstationMappings)) {
-            if (workstationName === key) {
-              workstation = workstations?.find(w => 
-                patterns.some(pattern => w.name.includes(pattern))
-              );
-              if (workstation) break;
-            }
+          if (!workstation) {
+            console.log('No workstation found in link, skipping...');
+            continue;
           }
-        }
-        
-        if (!workstation) {
-          console.log(`No workstation found for ${workstationName}, skipping...`);
-          continue;
-        }
 
-        const projectName = schedule.task?.phase?.project?.name || 'No Project';
-        
-        // Create workstation schedule entry with exact timing
-        const workstationSchedule = {
-          employee_id: workstation.id, // Use workstation ID as employee_id for workstation schedules
-          title: `Workstation: ${workstationName} - ${employeeName}`,
-          description: `Task: ${schedule.title}\nProject: ${projectName}\nUser: ${employeeName}\nOriginal Task: ${schedule.task?.title || schedule.title}${schedule.description ? '\nNotes: ' + schedule.description : ''}`,
-          start_time: schedule.start_time,
-          end_time: schedule.end_time,
-          task_id: null, // Null to distinguish from user schedules
-          phase_id: null,
-          is_auto_generated: true
-        };
+          console.log(`Creating workstation schedule for ${workstation.name}`);
 
-        workstationSchedulesToCreate.push(workstationSchedule);
+          const projectName = schedule.task?.phase?.project?.name || 'No Project';
+          
+          // Create workstation schedule entry with exact timing
+          const workstationSchedule = {
+            employee_id: workstation.id, // Use workstation ID as employee_id for workstation schedules
+            title: `Workstation: ${workstation.name} - ${employeeName}`,
+            description: `Task: ${schedule.title}\nProject: ${projectName}\nUser: ${employeeName}\nOriginal Task: ${schedule.task?.title || schedule.title}${schedule.description ? '\nNotes: ' + schedule.description : ''}`,
+            start_time: schedule.start_time,
+            end_time: schedule.end_time,
+            task_id: null, // Null to distinguish from user schedules
+            phase_id: null,
+            is_auto_generated: true
+          };
+
+          workstationSchedulesToCreate.push(workstationSchedule);
+        }
       }
 
       // Insert all workstation schedules
@@ -771,8 +755,8 @@ const Planning = () => {
         createdSchedules = insertedSchedules?.length || 0;
       }
 
-      // Also create workstation tasks for reference
-      await createWorkstationTasks(userSchedules || [], workstations || []);
+      // Also create workstation tasks for reference  
+      await createWorkstationTasks(userSchedules || []);
 
       toast({
         title: "Workstation Schedules Generated",
@@ -792,7 +776,7 @@ const Planning = () => {
   };
 
   // Helper function to create workstation tasks
-  const createWorkstationTasks = async (userSchedules: any[], workstations: any[]) => {
+  const createWorkstationTasks = async (userSchedules: any[]) => {
     try {
       // Delete existing workstation tasks for the selected date
       await supabase
@@ -807,23 +791,30 @@ const Planning = () => {
       const workstationGroups: { [key: string]: any[] } = {};
       
       userSchedules.forEach(schedule => {
-        const workstationName = schedule.task?.workstation;
-        if (workstationName) {
-          const key = `${workstationName}_${schedule.start_time}_${schedule.end_time}`;
-          if (!workstationGroups[key]) {
-            workstationGroups[key] = [];
+        const taskWorkstationLinks = schedule.task?.task_workstation_links || [];
+        
+        taskWorkstationLinks.forEach((link: any) => {
+          const workstation = link.workstation;
+          if (workstation) {
+            const key = `${workstation.id}_${schedule.start_time}_${schedule.end_time}`;
+            if (!workstationGroups[key]) {
+              workstationGroups[key] = [];
+            }
+            workstationGroups[key].push({
+              ...schedule,
+              workstation: workstation
+            });
           }
-          workstationGroups[key].push(schedule);
-        }
+        });
       });
 
       // Create workstation tasks for each group
       for (const [key, schedules] of Object.entries(workstationGroups)) {
-        const [workstationName] = key.split('_');
-        const workstation = workstations.find(w => w.name === workstationName);
+        const firstSchedule = schedules[0];
+        const workstation = firstSchedule.workstation;
+        
         if (!workstation) continue;
 
-        const firstSchedule = schedules[0];
         const userNames = schedules.map(s => s.employee?.name || 'Unknown').join(', ');
         const taskTitles = schedules.map(s => s.title).join(' | ');
         const projectNames = schedules.map(s => s.task?.phase?.project?.name || 'No Project').join(', ');
