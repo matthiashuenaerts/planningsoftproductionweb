@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { format, startOfDay } from 'date-fns';
+import { format, startOfDay, addDays, parseISO } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from "@/components/ui/button";
@@ -643,6 +643,114 @@ const Planning = () => {
     }
   };
 
+  const generateWorkstationSchedules = async () => {
+    try {
+      setGeneratingSchedule(true);
+      
+      // Get all schedules for the selected date
+      const { data: userSchedules, error: schedulesError } = await supabase
+        .from('schedules')
+        .select(`
+          id,
+          employee_id,
+          title,
+          description,
+          start_time,
+          end_time,
+          task_id,
+          task:tasks(
+            id,
+            workstation,
+            title,
+            phase:phases(
+              project:projects(name)
+            )
+          )
+        `)
+        .gte('start_time', format(selectedDate, 'yyyy-MM-dd'))
+        .lt('start_time', format(addDays(selectedDate, 1), 'yyyy-MM-dd'));
+
+      if (schedulesError) throw schedulesError;
+
+      // Get all workstations
+      const { data: workstations, error: workstationsError } = await supabase
+        .from('workstations')
+        .select('id, name');
+
+      if (workstationsError) throw workstationsError;
+
+      // Group schedules by workstation
+      const workstationSchedules: { [key: string]: any[] } = {};
+      
+      userSchedules?.forEach(schedule => {
+        const workstation = schedule.task?.workstation;
+        if (workstation) {
+          if (!workstationSchedules[workstation]) {
+            workstationSchedules[workstation] = [];
+          }
+          workstationSchedules[workstation].push(schedule);
+        }
+      });
+
+      // Delete existing workstation tasks for the selected date
+      await supabase
+        .from('workstation_tasks')
+        .delete()
+        .gte('created_at', format(selectedDate, 'yyyy-MM-dd'))
+        .lt('created_at', format(addDays(selectedDate, 1), 'yyyy-MM-dd'));
+
+      let createdTasks = 0;
+
+      // Create workstation tasks for each workstation
+      for (const [workstationName, schedules] of Object.entries(workstationSchedules)) {
+        const workstation = workstations?.find(w => w.name === workstationName);
+        if (!workstation) continue;
+
+        // Group overlapping schedules
+        const sortedSchedules = schedules.sort((a, b) => 
+          new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+        );
+
+        for (const schedule of sortedSchedules) {
+          const projectName = schedule.task?.phase?.project?.name || 'No Project';
+          const taskTitle = `${schedule.title} - ${projectName}`;
+          
+          // Create workstation task
+          const { error: insertError } = await supabase
+            .from('workstation_tasks')
+            .insert({
+              workstation_id: workstation.id,
+              task_name: taskTitle,
+              description: `${schedule.description || ''}\nAssigned from: ${schedule.task?.title || schedule.title}\nTime: ${format(parseISO(schedule.start_time), 'HH:mm')} - ${format(parseISO(schedule.end_time), 'HH:mm')}`,
+              priority: 'medium',
+              duration: Math.round((parseISO(schedule.end_time).getTime() - parseISO(schedule.start_time).getTime()) / (1000 * 60)) // duration in minutes
+            });
+
+          if (insertError) {
+            console.error('Error creating workstation task:', insertError);
+          } else {
+            createdTasks++;
+          }
+        }
+      }
+
+      toast({
+        title: "Workstation Schedules Generated",
+        description: `Created ${createdTasks} workstation tasks from user schedules`,
+      });
+
+    } catch (error: any) {
+      console.error('Error generating workstation schedules:', error);
+      toast({
+        title: "Error",
+        description: `Failed to generate workstation schedules: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setGeneratingSchedule(false);
+    }
+  };
+
   const deleteScheduleItem = async (scheduleId: string) => {
     try {
       await supabase
@@ -1007,6 +1115,15 @@ const Planning = () => {
                     >
                       <Zap className="mr-2 h-4 w-4" />
                       {generatingSchedule ? 'Generating...' : 'Generate All Schedules'}
+                    </Button>
+                    <Button
+                      onClick={generateWorkstationSchedules}
+                      disabled={generatingSchedule}
+                      className="whitespace-nowrap"
+                      variant="outline"
+                    >
+                      <Settings className="mr-2 h-4 w-4" />
+                      {generatingSchedule ? 'Generating...' : 'Generate Workstation Schedules'}
                     </Button>
                   </div>
                 )}
