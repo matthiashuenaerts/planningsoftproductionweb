@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useLocation } from 'react-router-dom';
 import { Play, Pause, Clock, Timer } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -13,9 +14,10 @@ const TaskTimer = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const location = useLocation();
 
-  // Don't render for workstation users
-  if (currentEmployee?.role === 'workstation') {
+  // Don't render for workstation users or on general schedule page
+  if (currentEmployee?.role === 'workstation' || location.pathname.includes('/general-schedule')) {
     return null;
   }
 
