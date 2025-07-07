@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 interface Employee {
   id: string;
   name: string;
+  role: string;
 }
 
 interface Schedule {
@@ -49,18 +50,38 @@ const GeneralSchedule: React.FC = () => {
   // Users per page
   const USERS_PER_PAGE = 6;
 
-  // Fetch all employees
-  const { data: employees = [] } = useQuery<Employee[]>({
-    queryKey: ['employees'],
+  // Fetch all employees (excluding admins and managers)
+  const { data: allEmployees = [] } = useQuery<Employee[]>({
+    queryKey: ['employees-filtered'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('employees')
-        .select('id, name')
+        .select('id, name, role')
+        .not('role', 'in', '("admin","manager")')
         .order('name');
       
       if (error) throw error;
       return data;
     }
+  });
+
+  // Sort employees by role priority: workers first, then workstations, then others
+  const employees = allEmployees.sort((a, b) => {
+    const getRolePriority = (role: string) => {
+      if (role === 'worker') return 1;
+      if (role === 'installation_team') return 2; // workstations
+      return 3; // others
+    };
+
+    const priorityA = getRolePriority(a.role);
+    const priorityB = getRolePriority(b.role);
+
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+    
+    // If same priority, sort by name
+    return a.name.localeCompare(b.name);
   });
 
   // Fetch schedules for today
