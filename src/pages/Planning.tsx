@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Calendar, Users, Settings, Play, User } from 'lucide-react';
@@ -243,7 +244,7 @@ const Planning = () => {
             </CardHeader>
             <CardContent>
               <DailyTimeline
-                tasks={formatSchedulesForTimeline(schedules)}
+                schedules={formatSchedulesForTimeline(schedules)}
                 selectedDate={selectedDate}
                 onScheduleUpdate={fetchSchedules}
               />
@@ -261,7 +262,7 @@ const Planning = () => {
             </CardHeader>
             <CardContent>
               <DailyTimeline
-                tasks={formatSchedulesForTimeline(schedules)}
+                schedules={formatSchedulesForTimeline(schedules)}
                 selectedDate={selectedDate}
                 onScheduleUpdate={fetchSchedules}
               />
@@ -288,10 +289,10 @@ const Planning = () => {
                 <Settings className="h-5 w-5" />
                 Workstation Assignments
               </CardTitle>
-            </CardHeader>
+            </CardContent>
             <CardContent>
               <DailyTimeline
-                tasks={formatWorkstationSchedulesForTimeline(workstationSchedules)}
+                schedules={formatWorkstationSchedulesForTimeline(workstationSchedules)}
                 selectedDate={selectedDate}
                 onScheduleUpdate={fetchWorkstationSchedules}
               />

@@ -18,15 +18,18 @@ import { format } from 'date-fns';
 interface PersonalPlanningGeneratorProps {
   selectedDate: Date;
   employees: any[];
-  onScheduleGenerated: () => void;
+  selectedEmployee: string | null;
+  onEmployeeChange: (employeeId: string) => void;
+  onPlanGenerated: () => void;
 }
 
 const PersonalPlanningGenerator: React.FC<PersonalPlanningGeneratorProps> = ({
   selectedDate,
   employees,
-  onScheduleGenerated
+  selectedEmployee,
+  onEmployeeChange,
+  onPlanGenerated
 }) => {
-  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [preview, setPreview] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
@@ -79,7 +82,7 @@ const PersonalPlanningGenerator: React.FC<PersonalPlanningGeneratorProps> = ({
         description: `Personal plan generated for ${employeeName}`,
       });
 
-      onScheduleGenerated();
+      onPlanGenerated();
     } catch (error: any) {
       console.error('Generate personal plan error:', error);
       toast({
@@ -118,7 +121,7 @@ const PersonalPlanningGenerator: React.FC<PersonalPlanningGeneratorProps> = ({
   };
 
   const handleEmployeeChange = async (employeeId: string) => {
-    setSelectedEmployee(employeeId);
+    onEmployeeChange(employeeId);
     // Check holiday status when employee changes
     await checkHolidayStatus(employeeId);
     setShowPreview(false);
