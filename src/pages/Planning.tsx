@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Calendar, Users, Settings, Play, User } from 'lucide-react';
@@ -289,7 +288,7 @@ const Planning = () => {
                 <Settings className="h-5 w-5" />
                 Workstation Assignments
               </CardTitle>
-            </CardContent>
+            </CardHeader>
             <CardContent>
               <DailyTimeline
                 schedules={formatWorkstationSchedulesForTimeline(workstationSchedules)}
