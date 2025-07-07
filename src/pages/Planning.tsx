@@ -642,21 +642,15 @@ const Planning = () => {
   };
 
   const generateWorkstationSchedules = async () => {
+    if (!selectedDate) return;
+
     try {
-      setGeneratingSchedule(true);
-      
-      // Get all schedules for the selected date with employee information and task workstation links
+      // Get all user schedules for the selected date with their task-workstation links
       const { data: userSchedules, error: schedulesError } = await supabase
         .from('schedules')
         .select(`
-          id,
-          employee_id,
-          title,
-          description,
-          start_time,
-          end_time,
-          task_id,
-          employee:employees(name),
+          *,
+          employee:employees(id, name, role, workstation),
           task:tasks(
             id,
             title,
@@ -668,144 +662,61 @@ const Planning = () => {
             )
           )
         `)
-        .gte('start_time', format(selectedDate, 'yyyy-MM-dd'))
-        .lt('start_time', format(addDays(selectedDate, 1), 'yyyy-MM-dd'))
+        .gte('start_time', format(selectedDate, 'yyyy-MM-dd') + 'T00:00:00')
+        .lte('start_time', format(selectedDate, 'yyyy-MM-dd') + 'T23:59:59')
         .not('task_id', 'is', null); // Only get schedules that have actual tasks
 
       if (schedulesError) throw schedulesError;
 
       console.log('User schedules found:', userSchedules?.length || 0);
 
-      // Delete existing workstation schedules for the selected date
+      // Delete existing workstation tasks for the selected date
       const { error: deleteError } = await supabase
-        .from('schedules')
+        .from('workstation_tasks')
         .delete()
-        .gte('start_time', format(selectedDate, 'yyyy-MM-dd'))
-        .lt('start_time', format(addDays(selectedDate, 1), 'yyyy-MM-dd'))
-        .is('task_id', null) // Only delete workstation schedules (those without task_id)
-        .like('title', 'Workstation:%');
+        .in('workstation_id', 
+          userSchedules?.flatMap(schedule => 
+            schedule.task?.task_workstation_links?.map(link => link.workstation?.id).filter(Boolean) || []
+          ) || []
+        );
 
       if (deleteError) {
-        console.error('Error deleting existing workstation schedules:', deleteError);
+        console.error('Error deleting existing workstation tasks:', deleteError);
       }
 
-      const workstationSchedulesToCreate = [];
+      const workstationTasksToCreate = [];
 
-      // Process each user schedule and create corresponding workstation schedules
+      // Process each user schedule and create corresponding workstation tasks
       for (const schedule of userSchedules || []) {
         const taskWorkstationLinks = schedule.task?.task_workstation_links || [];
         const userName = schedule.employee?.name || 'Unknown User';
+        const startTime = new Date(schedule.start_time);
+        const endTime = new Date(schedule.end_time);
+        const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
         
-        console.log(`Processing schedule for ${userName}: ${schedule.title}`);
+        console.log(`Processing schedule for ${userName}: ${schedule.title} (${durationMinutes} min)`);
         console.log(`Task workstation links:`, taskWorkstationLinks);
         
-        // Create a workstation schedule entry for each linked workstation
+        // Create a workstation task for each linked workstation
         for (const link of taskWorkstationLinks) {
           const workstation = link.workstation;
           if (workstation) {
             console.log(`Creating workstation schedule for workstation: ${workstation.name}`);
             
-            workstationSchedulesToCreate.push({
-              employee_id: workstation.id, // Using workstation ID as employee_id for workstation schedules
-              title: `Workstation: ${workstation.name} - ${schedule.title}`,
-              description: `User: ${userName}\nOriginal Task: ${schedule.title}${schedule.description ? `\nDescription: ${schedule.description}` : ''}`,
-              start_time: schedule.start_time,
-              end_time: schedule.end_time,
-              is_auto_generated: true
+            workstationTasksToCreate.push({
+              workstation_id: workstation.id,
+              task_name: `${schedule.title} - ${userName}`,
+              description: `Assigned to: ${userName}\nScheduled: ${format(startTime, 'HH:mm')} - ${format(endTime, 'HH:mm')}\nOriginal Task: ${schedule.title}${schedule.description ? `\nDescription: ${schedule.description}` : ''}`,
+              duration: durationMinutes,
+              priority: 'medium'
             });
           }
         }
       }
 
-      console.log(`Creating ${workstationSchedulesToCreate.length} workstation schedules`);
+      console.log(`Creating ${workstationTasksToCreate.length} workstation tasks`);
 
-      // Insert workstation schedules
-      if (workstationSchedulesToCreate.length > 0) {
-        const { error: insertError } = await supabase
-          .from('schedules')
-          .insert(workstationSchedulesToCreate);
-
-        if (insertError) {
-          console.error('Error creating workstation schedules:', insertError);
-          throw insertError;
-        }
-      }
-
-      // Also create workstation tasks for better tracking
-      await createWorkstationTasks(userSchedules || []);
-
-      toast({
-        title: "Workstation Schedules Generated",
-        description: `Created ${workstationSchedulesToCreate.length} workstation schedule entries`,
-      });
-
-    } catch (error: any) {
-      console.error('Error generating workstation schedules:', error);
-      toast({
-        title: "Error",
-        description: `Failed to generate workstation schedules: ${error.message}`,
-        variant: "destructive"
-      });
-    } finally {
-      setGeneratingSchedule(false);
-    }
-  };
-
-  // Helper function to create workstation tasks
-  const createWorkstationTasks = async (userSchedules: any[]) => {
-    try {
-      // Delete existing workstation tasks for the selected date
-      await supabase
-        .from('workstation_tasks')
-        .delete()
-        .gte('created_at', format(selectedDate, 'yyyy-MM-dd'))
-        .lt('created_at', format(addDays(selectedDate, 1), 'yyyy-MM-dd'));
-
-      const workstationTasksToCreate = [];
-
-      // Group schedules by workstation and time
-      const workstationGroups: { [key: string]: any[] } = {};
-      
-      userSchedules.forEach(schedule => {
-        const taskWorkstationLinks = schedule.task?.task_workstation_links || [];
-        
-        taskWorkstationLinks.forEach((link: any) => {
-          const workstation = link.workstation;
-          if (workstation) {
-            const key = `${workstation.id}_${schedule.start_time}_${schedule.end_time}`;
-            if (!workstationGroups[key]) {
-              workstationGroups[key] = [];
-            }
-            workstationGroups[key].push({
-              ...schedule,
-              workstation: workstation
-            });
-          }
-        });
-      });
-
-      // Create workstation tasks for each group
-      for (const [key, schedules] of Object.entries(workstationGroups)) {
-        const firstSchedule = schedules[0];
-        const workstation = firstSchedule.workstation;
-        
-        if (!workstation) continue;
-
-        const userNames = schedules.map(s => s.employee?.name || 'Unknown').join(', ');
-        const taskTitles = schedules.map(s => s.title).join(' | ');
-        const projectNames = schedules.map(s => s.task?.phase?.project?.name || 'No Project').join(', ');
-
-        const workstationTask = {
-          workstation_id: workstation.id,
-          task_name: `${taskTitles} (Users: ${userNames})`,
-          description: `Projects: ${projectNames}\nTime: ${format(parseISO(firstSchedule.start_time), 'HH:mm')} - ${format(parseISO(firstSchedule.end_time), 'HH:mm')}\nAssigned Users: ${userNames}${schedules.map(s => s.description ? `\n${s.employee?.name}: ${s.description}` : '').join('')}`,
-          priority: 'medium',
-          duration: Math.round((parseISO(firstSchedule.end_time).getTime() - parseISO(firstSchedule.start_time).getTime()) / (1000 * 60))
-        };
-
-        workstationTasksToCreate.push(workstationTask);
-      }
-
+      // Insert workstation tasks
       if (workstationTasksToCreate.length > 0) {
         const { error: insertError } = await supabase
           .from('workstation_tasks')
@@ -813,11 +724,22 @@ const Planning = () => {
 
         if (insertError) {
           console.error('Error creating workstation tasks:', insertError);
+          throw insertError;
         }
       }
 
-    } catch (error) {
-      console.error('Error creating workstation tasks:', error);
+      toast({
+        title: "Workstation Schedules Generated",
+        description: `Created ${workstationTasksToCreate.length} workstation task assignments with user names and exact timing`,
+      });
+
+    } catch (error: any) {
+      console.error('Error generating workstation schedules:', error);
+      toast({
+        title: "Error",
+        description: `Failed to generate workstation schedules: ${error.message}`,
+        variant: "destructive",
+      });
     }
   };
 
