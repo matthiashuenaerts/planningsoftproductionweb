@@ -28,6 +28,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import EditProject from '@/pages/EditProject';
 import GlobalComponents from './components/GlobalComponents';
 import { Toaster } from '@/components/ui/toaster';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 
 // Create a QueryClient instance
 const queryClient = new QueryClient({
@@ -42,41 +44,43 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
-        <AuthProvider>
-          <LanguageProvider>
-            <GlobalComponents />
-            <Routes>
-              <Route path="/" element={<Navigate to="/nl/" replace />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/:lang/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-              <Route path="/:lang/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
-              <Route path="/:lang/projects/:projectId" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
-              <Route path="/:lang/projects/:projectId/orders" element={<ProtectedRoute><ProjectOrders /></ProtectedRoute>} />
-              <Route path="/:lang/projects/:projectId/edit" element={<ProtectedRoute><EditProject /></ProtectedRoute>} />
-              <Route path="/:lang/workstations" element={<ProtectedRoute><Workstations /></ProtectedRoute>} />
-              <Route path="/:lang/broken-parts" element={<ProtectedRoute><BrokenParts /></ProtectedRoute>} />
-              <Route path="/:lang/broken-parts/summary" element={<ProtectedRoute><BrokenPartsSummary /></ProtectedRoute>} />
-              <Route path="/:lang/broken-parts/new" element={<ProtectedRoute><NewBrokenPart /></ProtectedRoute>} />
-              <Route path="/:lang/personal-tasks" element={<ProtectedRoute><PersonalTasks /></ProtectedRoute>} />
-              <Route path="/:lang/daily-tasks" element={<ProtectedRoute><DailyTasks /></ProtectedRoute>} />
-              <Route path="/:lang/planning" element={<ProtectedRoute><Planning /></ProtectedRoute>} />
-              <Route path="/:lang/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-              <Route path="/:lang/orders/new" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-              <Route path="/:lang/orders/:orderId" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-              <Route path="/:lang/orders/:orderId/edit" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-              <Route path="/:lang/logistics" element={<ProtectedRoute><Logistics /></ProtectedRoute>} />
-              <Route path="/:lang/logistics-out" element={<ProtectedRoute><LogisticsOut /></ProtectedRoute>} />
-              <Route path="/:lang/rush-orders" element={<ProtectedRoute><RushOrders /></ProtectedRoute>} />
-              <Route path="/:lang/rush-orders/:rushOrderId" element={<ProtectedRoute><RushOrderDetails /></ProtectedRoute>} />
-              <Route path="/:lang/time-registrations" element={<ProtectedRoute><TimeRegistrations /></ProtectedRoute>} />
-              <Route path="/:lang/general-schedule" element={<ProtectedRoute><GeneralSchedule /></ProtectedRoute>} />
-              <Route path="/:lang/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            </Routes>
-            <Toaster />
-          </LanguageProvider>
-        </AuthProvider>
-      </Router>
+      <DndProvider backend={HTML5Backend}>
+        <Router>
+          <AuthProvider>
+            <LanguageProvider>
+              <GlobalComponents />
+              <Routes>
+                <Route path="/" element={<Navigate to="/nl/" replace />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/:lang/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                <Route path="/:lang/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+                <Route path="/:lang/projects/:projectId" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
+                <Route path="/:lang/projects/:projectId/orders" element={<ProtectedRoute><ProjectOrders /></ProtectedRoute>} />
+                <Route path="/:lang/projects/:projectId/edit" element={<ProtectedRoute><EditProject /></ProtectedRoute>} />
+                <Route path="/:lang/workstations" element={<ProtectedRoute><Workstations /></ProtectedRoute>} />
+                <Route path="/:lang/broken-parts" element={<ProtectedRoute><BrokenParts /></ProtectedRoute>} />
+                <Route path="/:lang/broken-parts/summary" element={<ProtectedRoute><BrokenPartsSummary /></ProtectedRoute>} />
+                <Route path="/:lang/broken-parts/new" element={<ProtectedRoute><NewBrokenPart /></ProtectedRoute>} />
+                <Route path="/:lang/personal-tasks" element={<ProtectedRoute><PersonalTasks /></ProtectedRoute>} />
+                <Route path="/:lang/daily-tasks" element={<ProtectedRoute><DailyTasks /></ProtectedRoute>} />
+                <Route path="/:lang/planning" element={<ProtectedRoute><Planning /></ProtectedRoute>} />
+                <Route path="/:lang/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+                <Route path="/:lang/orders/new" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+                <Route path="/:lang/orders/:orderId" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+                <Route path="/:lang/orders/:orderId/edit" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+                <Route path="/:lang/logistics" element={<ProtectedRoute><Logistics /></ProtectedRoute>} />
+                <Route path="/:lang/logistics-out" element={<ProtectedRoute><LogisticsOut /></ProtectedRoute>} />
+                <Route path="/:lang/rush-orders" element={<ProtectedRoute><RushOrders /></ProtectedRoute>} />
+                <Route path="/:lang/rush-orders/:rushOrderId" element={<ProtectedRoute><RushOrderDetails /></ProtectedRoute>} />
+                <Route path="/:lang/time-registrations" element={<ProtectedRoute><TimeRegistrations /></ProtectedRoute>} />
+                <Route path="/:lang/general-schedule" element={<ProtectedRoute><GeneralSchedule /></ProtectedRoute>} />
+                <Route path="/:lang/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              </Routes>
+              <Toaster />
+            </LanguageProvider>
+          </AuthProvider>
+        </Router>
+      </DndProvider>
     </QueryClientProvider>
   );
 }

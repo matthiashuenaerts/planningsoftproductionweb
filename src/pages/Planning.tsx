@@ -40,8 +40,6 @@ import PlanningTaskManager from '@/components/PlanningTaskManager';
 import TaskConflictResolver from '@/components/TaskConflictResolver';
 import StandardTaskAssignment from '@/components/StandardTaskAssignment';
 import { supabase } from '@/integrations/supabase/client';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
 import DraggableScheduleItem from '@/components/DraggableScheduleItem';
 
 interface WorkerTask {
@@ -695,72 +693,16 @@ const Planning = () => {
       console.log('User schedules found:', userSchedules?.length || 0);
 
       let createdSchedules = 0;
-      const workstationSchedulesToCreate = [];
 
-      // Process each user schedule
-      for (const schedule of userSchedules || []) {
-        const employeeName = schedule.employee?.name || 'Unknown User';
-        
-        // Get workstation info from task_workstation_links
-        const taskWorkstationLinks = schedule.task?.task_workstation_links || [];
-        
-        console.log(`Processing schedule for ${employeeName}, task: ${schedule.title}, workstation links: ${taskWorkstationLinks.length}`);
-        
-        if (taskWorkstationLinks.length === 0) {
-          console.log('No workstation links found, skipping...');
-          continue;
-        }
+      // Create workstation tasks instead of invalid schedule entries
+      await createWorkstationTasks(userSchedules || []);
 
-        // Process each workstation linked to this task
-        for (const link of taskWorkstationLinks) {
-          const workstation = link.workstation;
-          
-          if (!workstation) {
-            console.log('No workstation found in link, skipping...');
-            continue;
-          }
-
-          console.log(`Creating workstation schedule for ${workstation.name}`);
-
-          const projectName = schedule.task?.phase?.project?.name || 'No Project';
-          
-          // Create workstation schedule entry with exact timing
-          const workstationSchedule = {
-            employee_id: workstation.id, // Use workstation ID as employee_id for workstation schedules
-            title: `Workstation: ${workstation.name} - ${employeeName}`,
-            description: `Task: ${schedule.title}\nProject: ${projectName}\nUser: ${employeeName}\nOriginal Task: ${schedule.task?.title || schedule.title}${schedule.description ? '\nNotes: ' + schedule.description : ''}`,
-            start_time: schedule.start_time,
-            end_time: schedule.end_time,
-            task_id: null, // Null to distinguish from user schedules
-            phase_id: null,
-            is_auto_generated: true
-          };
-
-          workstationSchedulesToCreate.push(workstationSchedule);
-        }
-      }
-
-      // Insert all workstation schedules
-      if (workstationSchedulesToCreate.length > 0) {
-        const { data: insertedSchedules, error: insertError } = await supabase
-          .from('schedules')
-          .insert(workstationSchedulesToCreate)
-          .select();
-
-        if (insertError) {
-          console.error('Error creating workstation schedules:', insertError);
-          throw insertError;
-        }
-
-        createdSchedules = insertedSchedules?.length || 0;
-      }
-
-      // Also create workstation tasks for reference  
+      // Create workstation tasks instead of invalid schedule entries
       await createWorkstationTasks(userSchedules || []);
 
       toast({
         title: "Workstation Schedules Generated",
-        description: `Created ${createdSchedules} workstation schedule entries with exact timing and user assignments`,
+        description: `Created workstation task assignments based on user schedules`,
       });
 
     } catch (error: any) {
@@ -1143,7 +1085,7 @@ const Planning = () => {
   }
 
   return (
-    <DndProvider backend={HTML5Backend}>
+    <div className="flex min-h-screen">
       <div className="flex min-h-screen">
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
@@ -1636,7 +1578,7 @@ const Planning = () => {
           </div>
         </div>
       </div>
-    </DndProvider>
+    </div>
   );
 };
 
