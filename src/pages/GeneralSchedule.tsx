@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Clock, User } from 'lucide-react';
+import { Calendar, Clock, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, startOfDay, endOfDay, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 
@@ -30,20 +30,24 @@ interface HolidayRequest {
 }
 
 const GeneralSchedule: React.FC = () => {
+  const [currentUserGroup, setCurrentUserGroup] = useState(0);
   const today = new Date();
   const todayStart = startOfDay(today);
   const todayEnd = endOfDay(today);
 
-  // Generate hour markers for the day (8 AM to 6 PM)
+  // Generate hour markers for the day (7 AM to 6 PM)
   const hourMarkers = [];
-  for (let hour = 8; hour <= 18; hour++) {
+  for (let hour = 7; hour <= 18; hour++) {
     const time = new Date(today);
     time.setHours(hour, 0, 0, 0);
     hourMarkers.push(time);
   }
 
-  // Timeline height calculation (10 hours * 60px per hour)
-  const timelineHeight = (18 - 8) * 60; // 600px total
+  // Timeline height calculation (11 hours * 60px per hour)
+  const timelineHeight = (18 - 7) * 60; // 660px total
+
+  // Users per page
+  const USERS_PER_PAGE = 6;
 
   // Fetch all employees
   const { data: employees = [] } = useQuery<Employee[]>({
@@ -114,9 +118,9 @@ const GeneralSchedule: React.FC = () => {
     const start = parseISO(startTime);
     const end = parseISO(endTime);
     
-    // Calculate minutes from 8 AM
-    const startMinutes = (start.getHours() - 8) * 60 + start.getMinutes();
-    const endMinutes = (end.getHours() - 8) * 60 + end.getMinutes();
+    // Calculate minutes from 7 AM
+    const startMinutes = (start.getHours() - 7) * 60 + start.getMinutes();
+    const endMinutes = (end.getHours() - 7) * 60 + end.getMinutes();
     
     const top = startMinutes; // 1px per minute
     const height = Math.max(endMinutes - startMinutes, 15); // Minimum 15px height
@@ -124,10 +128,33 @@ const GeneralSchedule: React.FC = () => {
     return { top, height };
   };
 
+  // Get current page of employees
+  const getCurrentEmployees = () => {
+    const startIndex = currentUserGroup * USERS_PER_PAGE;
+    return employees.slice(startIndex, startIndex + USERS_PER_PAGE);
+  };
+
+  // Auto-cycle through user groups every 10 seconds
+  useEffect(() => {
+    if (employees.length <= USERS_PER_PAGE) return;
+
+    const interval = setInterval(() => {
+      setCurrentUserGroup(prev => {
+        const totalGroups = Math.ceil(employees.length / USERS_PER_PAGE);
+        return (prev + 1) % totalGroups;
+      });
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, [employees.length, USERS_PER_PAGE]);
+
   // Get holiday info for employee
   const getHolidayInfo = (employeeId: string) => {
     return holidays.find(holiday => holiday.user_id === employeeId);
   };
+
+  const currentEmployees = getCurrentEmployees();
+  const totalGroups = Math.ceil(employees.length / USERS_PER_PAGE);
 
   if (isLoading) {
     return (
@@ -138,17 +165,34 @@ const GeneralSchedule: React.FC = () => {
   }
 
   return (
-    <div className="p-4 space-y-4 max-w-full overflow-x-auto animate-fade-in">
+    <div className="p-4 space-y-4 h-screen flex flex-col animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Calendar className="h-5 w-5 text-primary" />
-        <h1 className="text-xl font-bold">General Schedule - {format(today, 'EEEE, MMM dd, yyyy')}</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Calendar className="h-5 w-5 text-primary" />
+          <h1 className="text-xl font-bold">General Schedule - {format(today, 'EEEE, MMM dd, yyyy')}</h1>
+        </div>
+        {totalGroups > 1 && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Group {currentUserGroup + 1} of {totalGroups}</span>
+            <div className="flex gap-1">
+              {Array.from({ length: totalGroups }).map((_, index) => (
+                <div
+                  key={index}
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    index === currentUserGroup ? 'bg-primary' : 'bg-muted'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Schedule Grid */}
-      <div className="flex gap-3 min-w-fit">
+      <div className="flex gap-3 flex-1 overflow-hidden">
         {/* Time Column */}
-        <div className="flex flex-col min-w-[80px]">
+        <div className="flex flex-col min-w-[80px] flex-shrink-0">
           <div className="h-10 flex items-center justify-center bg-muted rounded-md font-medium text-sm">
             <Clock className="h-3 w-3 mr-1" />
             Time
@@ -169,13 +213,13 @@ const GeneralSchedule: React.FC = () => {
         </div>
 
         {/* Employee Columns */}
-        {employees.map((employee) => {
+        {currentEmployees.map((employee, index) => {
           const isOnHoliday = isEmployeeOnHoliday(employee.id);
           const holidayInfo = getHolidayInfo(employee.id);
           const employeeSchedules = getSchedulesForEmployee(employee.id);
 
           return (
-            <div key={employee.id} className="flex flex-col min-w-[160px] hover-scale">
+            <div key={employee.id} className="flex flex-col flex-1 hover-scale animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
               {/* Employee Header */}
               <Card className="h-10">
                 <CardContent className="p-2 flex items-center justify-center">
@@ -244,7 +288,7 @@ const GeneralSchedule: React.FC = () => {
 
                 {/* Free time indicator */}
                 {!isOnHoliday && employeeSchedules.length === 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-md">
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-md opacity-50">
                     <span className="text-xs text-muted-foreground">Free</span>
                   </div>
                 )}
