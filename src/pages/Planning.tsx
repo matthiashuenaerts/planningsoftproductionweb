@@ -693,6 +693,9 @@ const Planning = () => {
         console.error('Error deleting existing workstation schedules:', deleteError);
       }
 
+      console.log('User schedules found:', userSchedules?.length || 0);
+      console.log('Workstations available:', workstations?.map(w => w.name));
+
       let createdSchedules = 0;
       const workstationSchedulesToCreate = [];
 
@@ -701,11 +704,40 @@ const Planning = () => {
         const workstationName = schedule.task?.workstation;
         const employeeName = schedule.employee?.name || 'Unknown User';
         
-        if (!workstationName) continue;
+        console.log(`Processing schedule for ${employeeName}, workstation: ${workstationName}, task: ${schedule.title}`);
+        
+        if (!workstationName) {
+          console.log('No workstation name found, skipping...');
+          continue;
+        }
 
-        // Find the workstation
-        const workstation = workstations?.find(w => w.name === workstationName);
-        if (!workstation) continue;
+        // Find the workstation - try exact match first, then partial match
+        let workstation = workstations?.find(w => w.name === workstationName);
+        
+        if (!workstation) {
+          // Try to find workstation by mapping common workstation names
+          const workstationMappings: Record<string, string[]> = {
+            'CUTTING': ['Opdeelzaag', 'CNC'],
+            'ASSEMBLY': ['Montage', 'Afwerking'],
+            'PREPARATION': ['Productievoorbereiding'],
+            'FINISHING': ['Afwerking', 'Controle'],
+            'EDGE_BANDING': ['Afplakken']
+          };
+          
+          for (const [key, patterns] of Object.entries(workstationMappings)) {
+            if (workstationName === key) {
+              workstation = workstations?.find(w => 
+                patterns.some(pattern => w.name.includes(pattern))
+              );
+              if (workstation) break;
+            }
+          }
+        }
+        
+        if (!workstation) {
+          console.log(`No workstation found for ${workstationName}, skipping...`);
+          continue;
+        }
 
         const projectName = schedule.task?.phase?.project?.name || 'No Project';
         
