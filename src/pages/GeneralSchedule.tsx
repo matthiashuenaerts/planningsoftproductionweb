@@ -36,16 +36,17 @@ const GeneralSchedule: React.FC = () => {
   const todayStart = startOfDay(today);
   const todayEnd = endOfDay(today);
 
-  // Generate hour markers for the day (7 AM to 6 PM)
+  // Generate hour markers for the day (7 AM to 5 PM)
   const hourMarkers = [];
-  for (let hour = 7; hour <= 18; hour++) {
+  for (let hour = 7; hour <= 17; hour++) {
     const time = new Date(today);
     time.setHours(hour, 0, 0, 0);
     hourMarkers.push(time);
   }
 
-  // Timeline height calculation (11 hours * 60px per hour)
-  const timelineHeight = (18 - 7) * 60; // 660px total
+  // Timeline height calculation (10 hours * flexible height)
+  // Use calc to fill remaining space after header
+  const timelineHeight = 'calc(100vh - 120px)'; // Dynamic height
 
   // Users per page
   const USERS_PER_PAGE = 6;
@@ -143,10 +144,12 @@ const GeneralSchedule: React.FC = () => {
     const startMinutes = (start.getHours() - 7) * 60 + start.getMinutes();
     const endMinutes = (end.getHours() - 7) * 60 + end.getMinutes();
     
-    const top = startMinutes; // 1px per minute
-    const height = Math.max(endMinutes - startMinutes, 15); // Minimum 15px height
+    // Calculate as percentage of total timeline (10 hours = 600 minutes)
+    const totalMinutes = (17 - 7) * 60; // 600 minutes
+    const topPercent = (startMinutes / totalMinutes) * 100;
+    const heightPercent = Math.max(((endMinutes - startMinutes) / totalMinutes) * 100, 2.5); // Minimum 2.5% height
     
-    return { top, height };
+    return { top: `${topPercent}%`, height: `${heightPercent}%` };
   };
 
   // Get current page of employees
@@ -218,13 +221,13 @@ const GeneralSchedule: React.FC = () => {
             <Clock className="h-3 w-3 mr-1" />
             Time
           </div>
-          <div className="relative mt-2" style={{ height: `${timelineHeight}px` }}>
+          <div className="relative mt-2 flex-1" style={{ height: timelineHeight }}>
             {/* Hour markers */}
             {hourMarkers.map((hour, index) => (
               <div
                 key={hour.toISOString()}
                 className="absolute left-0 right-0 flex items-center text-xs font-medium text-muted-foreground"
-                style={{ top: `${index * 60}px` }}
+                style={{ top: `${(index / (hourMarkers.length - 1)) * 100}%` }}
               >
                 <span className="bg-background px-1">{format(hour, 'HH:mm')}</span>
                 <div className="flex-1 h-px bg-border ml-2"></div>
@@ -252,13 +255,13 @@ const GeneralSchedule: React.FC = () => {
               </Card>
 
               {/* Timeline Container */}
-              <div className="relative mt-2" style={{ height: `${timelineHeight}px` }}>
+              <div className="relative mt-2 flex-1" style={{ height: timelineHeight }}>
                 {/* Background grid lines */}
                 {hourMarkers.map((_, index) => (
                   <div
                     key={index}
                     className="absolute left-0 right-0 h-px bg-border opacity-30"
-                    style={{ top: `${index * 60}px` }}
+                    style={{ top: `${(index / (hourMarkers.length - 1)) * 100}%` }}
                   ></div>
                 ))}
 
@@ -285,8 +288,8 @@ const GeneralSchedule: React.FC = () => {
                       key={schedule.id}
                       className="absolute left-0 right-0 bg-blue-100 border border-blue-300 rounded-md p-1 overflow-hidden hover:bg-blue-200 transition-colors cursor-pointer"
                       style={{ 
-                        top: `${position.top}px`, 
-                        height: `${position.height}px`,
+                        top: position.top, 
+                        height: position.height,
                         marginRight: '2px'
                       }}
                       title={`${schedule.title}\n${format(parseISO(schedule.start_time), 'HH:mm')} - ${format(parseISO(schedule.end_time), 'HH:mm')}\n${schedule.description || ''}`}
@@ -298,7 +301,7 @@ const GeneralSchedule: React.FC = () => {
                         {format(parseISO(schedule.start_time), 'HH:mm')} - 
                         {format(parseISO(schedule.end_time), 'HH:mm')}
                       </div>
-                      {schedule.description && position.height > 30 && (
+                      {schedule.description && parseFloat(position.height) > 5 && (
                         <div className="text-xs text-blue-500 line-clamp-1 mt-1">
                           {schedule.description}
                         </div>
