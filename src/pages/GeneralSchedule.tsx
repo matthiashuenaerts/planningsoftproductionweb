@@ -34,15 +34,16 @@ const GeneralSchedule: React.FC = () => {
   const todayStart = startOfDay(today);
   const todayEnd = endOfDay(today);
 
-  // Generate time slots for the day (8 AM to 6 PM in 30-minute intervals)
-  const timeSlots = [];
+  // Generate hour markers for the day (8 AM to 6 PM)
+  const hourMarkers = [];
   for (let hour = 8; hour <= 18; hour++) {
-    for (let minute = 0; minute < 60; minute += 30) {
-      const time = new Date(today);
-      time.setHours(hour, minute, 0, 0);
-      timeSlots.push(time);
-    }
+    const time = new Date(today);
+    time.setHours(hour, 0, 0, 0);
+    hourMarkers.push(time);
   }
+
+  // Timeline height calculation (10 hours * 60px per hour)
+  const timelineHeight = (18 - 8) * 60; // 600px total
 
   // Fetch all employees
   const { data: employees = [] } = useQuery<Employee[]>({
@@ -103,15 +104,24 @@ const GeneralSchedule: React.FC = () => {
     return holidays.some(holiday => holiday.user_id === employeeId);
   };
 
-  // Get schedules for a specific employee and time slot
-  const getScheduleForEmployeeAtTime = (employeeId: string, timeSlot: Date) => {
-    return schedules.find(schedule => {
-      const scheduleStart = parseISO(schedule.start_time);
-      const scheduleEnd = parseISO(schedule.end_time);
-      return schedule.employee_id === employeeId &&
-             scheduleStart <= timeSlot &&
-             scheduleEnd > timeSlot;
-    });
+  // Get schedules for a specific employee
+  const getSchedulesForEmployee = (employeeId: string) => {
+    return schedules.filter(schedule => schedule.employee_id === employeeId);
+  };
+
+  // Calculate position and height for a schedule block
+  const getSchedulePosition = (startTime: string, endTime: string) => {
+    const start = parseISO(startTime);
+    const end = parseISO(endTime);
+    
+    // Calculate minutes from 8 AM
+    const startMinutes = (start.getHours() - 8) * 60 + start.getMinutes();
+    const endMinutes = (end.getHours() - 8) * 60 + end.getMinutes();
+    
+    const top = startMinutes; // 1px per minute
+    const height = Math.max(endMinutes - startMinutes, 15); // Minimum 15px height
+    
+    return { top, height };
   };
 
   // Get holiday info for employee
@@ -121,98 +131,124 @@ const GeneralSchedule: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      <div className="flex justify-center items-center h-32">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-full overflow-x-auto">
+    <div className="p-4 space-y-4 max-w-full overflow-x-auto animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Calendar className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">General Schedule - {format(today, 'EEEE, MMMM dd, yyyy')}</h1>
+      <div className="flex items-center gap-3">
+        <Calendar className="h-5 w-5 text-primary" />
+        <h1 className="text-xl font-bold">General Schedule - {format(today, 'EEEE, MMM dd, yyyy')}</h1>
       </div>
 
       {/* Schedule Grid */}
-      <div className="flex gap-4 min-w-fit">
+      <div className="flex gap-3 min-w-fit">
         {/* Time Column */}
-        <div className="flex flex-col gap-2 min-w-[100px]">
-          <div className="h-12 flex items-center justify-center bg-muted rounded-md font-medium">
-            <Clock className="h-4 w-4 mr-2" />
+        <div className="flex flex-col min-w-[80px]">
+          <div className="h-10 flex items-center justify-center bg-muted rounded-md font-medium text-sm">
+            <Clock className="h-3 w-3 mr-1" />
             Time
           </div>
-          {timeSlots.map((timeSlot) => (
-            <div
-              key={timeSlot.toISOString()}
-              className="h-16 flex items-center justify-center text-sm font-medium text-muted-foreground border-r border-border"
-            >
-              {format(timeSlot, 'HH:mm')}
-            </div>
-          ))}
+          <div className="relative mt-2" style={{ height: `${timelineHeight}px` }}>
+            {/* Hour markers */}
+            {hourMarkers.map((hour, index) => (
+              <div
+                key={hour.toISOString()}
+                className="absolute left-0 right-0 flex items-center text-xs font-medium text-muted-foreground"
+                style={{ top: `${index * 60}px` }}
+              >
+                <span className="bg-background px-1">{format(hour, 'HH:mm')}</span>
+                <div className="flex-1 h-px bg-border ml-2"></div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Employee Columns */}
         {employees.map((employee) => {
           const isOnHoliday = isEmployeeOnHoliday(employee.id);
           const holidayInfo = getHolidayInfo(employee.id);
+          const employeeSchedules = getSchedulesForEmployee(employee.id);
 
           return (
-            <div key={employee.id} className="flex flex-col gap-2 min-w-[200px]">
+            <div key={employee.id} className="flex flex-col min-w-[160px] hover-scale">
               {/* Employee Header */}
-              <Card className="h-12">
-                <CardContent className="p-3 flex items-center justify-center">
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    <span className="text-sm font-medium">{employee.name}</span>
+              <Card className="h-10">
+                <CardContent className="p-2 flex items-center justify-center">
+                  <div className="flex items-center gap-1">
+                    <User className="h-3 w-3" />
+                    <span className="text-sm font-medium truncate">{employee.name}</span>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Time Slots */}
-              {timeSlots.map((timeSlot) => {
-                const schedule = getScheduleForEmployeeAtTime(employee.id, timeSlot);
-
-                return (
+              {/* Timeline Container */}
+              <div className="relative mt-2" style={{ height: `${timelineHeight}px` }}>
+                {/* Background grid lines */}
+                {hourMarkers.map((_, index) => (
                   <div
-                    key={`${employee.id}-${timeSlot.toISOString()}`}
-                    className="h-16 border border-border rounded-md"
-                  >
-                    {isOnHoliday ? (
-                      <div className="h-full flex flex-col items-center justify-center bg-red-50 border-red-200 border rounded-md">
-                        <Badge variant="destructive" className="text-xs px-1 mb-1">
-                          HOLIDAY
-                        </Badge>
-                        {holidayInfo?.reason && (
-                          <span className="text-xs text-red-600 text-center px-1 line-clamp-1">
-                            {holidayInfo.reason}
-                          </span>
-                        )}
-                      </div>
-                    ) : schedule ? (
-                      <div className="h-full bg-blue-50 border-blue-200 border rounded-md p-2 flex flex-col justify-center">
-                        <div className="text-xs font-medium text-blue-800 line-clamp-1 mb-1">
-                          {schedule.title}
-                        </div>
-                        <div className="text-xs text-blue-600 line-clamp-1">
-                          {format(parseISO(schedule.start_time), 'HH:mm')} - 
-                          {format(parseISO(schedule.end_time), 'HH:mm')}
-                        </div>
-                        {schedule.description && (
-                          <div className="text-xs text-blue-500 line-clamp-1 mt-1">
-                            {schedule.description}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="h-full flex items-center justify-center bg-gray-50 rounded-md">
-                        <span className="text-xs text-muted-foreground">Free</span>
-                      </div>
+                    key={index}
+                    className="absolute left-0 right-0 h-px bg-border opacity-30"
+                    style={{ top: `${index * 60}px` }}
+                  ></div>
+                ))}
+
+                {/* Holiday overlay */}
+                {isOnHoliday && (
+                  <div className="absolute inset-0 bg-red-50 border-2 border-red-200 border-dashed rounded-md flex flex-col items-center justify-center">
+                    <Badge variant="destructive" className="text-xs px-2 mb-1">
+                      HOLIDAY
+                    </Badge>
+                    {holidayInfo?.reason && (
+                      <span className="text-xs text-red-600 text-center px-2 line-clamp-2">
+                        {holidayInfo.reason}
+                      </span>
                     )}
                   </div>
-                );
-              })}
+                )}
+
+                {/* Schedule blocks */}
+                {!isOnHoliday && employeeSchedules.map((schedule) => {
+                  const position = getSchedulePosition(schedule.start_time, schedule.end_time);
+                  
+                  return (
+                    <div
+                      key={schedule.id}
+                      className="absolute left-0 right-0 bg-blue-100 border border-blue-300 rounded-md p-1 overflow-hidden hover:bg-blue-200 transition-colors cursor-pointer"
+                      style={{ 
+                        top: `${position.top}px`, 
+                        height: `${position.height}px`,
+                        marginRight: '2px'
+                      }}
+                      title={`${schedule.title}\n${format(parseISO(schedule.start_time), 'HH:mm')} - ${format(parseISO(schedule.end_time), 'HH:mm')}\n${schedule.description || ''}`}
+                    >
+                      <div className="text-xs font-medium text-blue-800 line-clamp-1">
+                        {schedule.title}
+                      </div>
+                      <div className="text-xs text-blue-600 line-clamp-1">
+                        {format(parseISO(schedule.start_time), 'HH:mm')} - 
+                        {format(parseISO(schedule.end_time), 'HH:mm')}
+                      </div>
+                      {schedule.description && position.height > 30 && (
+                        <div className="text-xs text-blue-500 line-clamp-1 mt-1">
+                          {schedule.description}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Free time indicator */}
+                {!isOnHoliday && employeeSchedules.length === 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-md">
+                    <span className="text-xs text-muted-foreground">Free</span>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
