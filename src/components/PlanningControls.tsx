@@ -5,12 +5,14 @@ import { Loader2, Wand2 } from 'lucide-react';
 
 interface PlanningControlsProps {
   selectedDate: Date;
+  onDateChange: (date: Date) => void;
   onGeneratePlan: () => Promise<void>;
   isGenerating: boolean;
 }
 
 const PlanningControls: React.FC<PlanningControlsProps> = ({
   selectedDate,
+  onDateChange,
   onGeneratePlan,
   isGenerating
 }) => {

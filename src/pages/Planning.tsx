@@ -243,7 +243,7 @@ const Planning = () => {
             </CardHeader>
             <CardContent>
               <DailyTimeline
-                schedules={formatSchedulesForTimeline(schedules)}
+                tasks={formatSchedulesForTimeline(schedules)}
                 selectedDate={selectedDate}
                 onScheduleUpdate={fetchSchedules}
               />
@@ -261,7 +261,7 @@ const Planning = () => {
             </CardHeader>
             <CardContent>
               <DailyTimeline
-                schedules={formatSchedulesForTimeline(schedules)}
+                tasks={formatSchedulesForTimeline(schedules)}
                 selectedDate={selectedDate}
                 onScheduleUpdate={fetchSchedules}
               />
@@ -291,7 +291,7 @@ const Planning = () => {
             </CardHeader>
             <CardContent>
               <DailyTimeline
-                schedules={formatWorkstationSchedulesForTimeline(workstationSchedules)}
+                tasks={formatWorkstationSchedulesForTimeline(workstationSchedules)}
                 selectedDate={selectedDate}
                 onScheduleUpdate={fetchWorkstationSchedules}
               />
