@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays, startOfWeek, endOfWeek } from 'date-fns';
 import type { Task } from './dataService';
@@ -29,10 +28,31 @@ export interface CreateScheduleInput {
   is_auto_generated: boolean;
 }
 
+// Workstation Schedule Type
+export interface WorkstationSchedule {
+  id: string;
+  workstation_id: string;
+  task_id?: string;
+  task_title: string;
+  user_name: string;
+  start_time: string;
+  end_time: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateWorkstationScheduleInput {
+  workstation_id: string;
+  task_id?: string;
+  task_title: string;
+  user_name: string;
+  start_time: string;
+  end_time: string;
+}
+
 export const planningService = {
   // Get schedules for a specific date
   async getSchedulesByDate(date: Date): Promise<Schedule[]> {
-    // Ensure date is a valid Date object
     if (!(date instanceof Date) || isNaN(date.getTime())) {
       console.error('Invalid date provided:', date);
       throw new Error('Invalid date provided');
@@ -106,6 +126,44 @@ export const planningService = {
       throw error;
     }
   },
+
+  // Get workstation schedules for a specific date
+  async getWorkstationSchedulesByDate(date: Date): Promise<WorkstationSchedule[]> {
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+      console.error('Invalid date provided:', date);
+      throw new Error('Invalid date provided');
+    }
+
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const startOfDay = `${dateStr}T00:00:00`;
+    const endOfDay = `${dateStr}T23:59:59`;
+    
+    console.log('Fetching workstation schedules between:', startOfDay, 'and', endOfDay);
+    
+    try {
+      const { data, error } = await supabase
+        .from('workstation_schedules')
+        .select(`
+          *,
+          workstation:workstations(id, name, description),
+          task:tasks(id, title, description, priority, status)
+        `)
+        .gte('start_time', startOfDay)
+        .lte('start_time', endOfDay)
+        .order('start_time');
+      
+      if (error) {
+        console.error('Supabase error fetching workstation schedules:', error);
+        throw error;
+      }
+      
+      console.log('Workstation schedules fetched:', data?.length || 0, 'records');
+      return (data || []) as WorkstationSchedule[];
+    } catch (error) {
+      console.error('Error in getWorkstationSchedulesByDate:', error);
+      throw error;
+    }
+  },
   
   // Create a new schedule
   async createSchedule(schedule: CreateScheduleInput): Promise<Schedule> {
@@ -124,6 +182,27 @@ export const planningService = {
       return data as Schedule;
     } catch (error) {
       console.error('Error in createSchedule:', error);
+      throw error;
+    }
+  },
+
+  // Create a new workstation schedule
+  async createWorkstationSchedule(schedule: CreateWorkstationScheduleInput): Promise<WorkstationSchedule> {
+    try {
+      const { data, error } = await supabase
+        .from('workstation_schedules')
+        .insert([schedule])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Supabase error creating workstation schedule:', error);
+        throw error;
+      }
+      
+      return data as WorkstationSchedule;
+    } catch (error) {
+      console.error('Error in createWorkstationSchedule:', error);
       throw error;
     }
   },
@@ -164,6 +243,29 @@ export const planningService = {
       }
     } catch (error) {
       console.error('Error in deleteSchedule:', error);
+      throw error;
+    }
+  },
+
+  // Delete workstation schedules for a specific date
+  async deleteWorkstationSchedulesForDate(date: Date): Promise<void> {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const startOfDay = `${dateStr}T00:00:00`;
+    const endOfDay = `${dateStr}T23:59:59`;
+    
+    try {
+      const { error } = await supabase
+        .from('workstation_schedules')
+        .delete()
+        .gte('start_time', startOfDay)
+        .lte('start_time', endOfDay);
+      
+      if (error) {
+        console.error('Supabase error deleting workstation schedules:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error in deleteWorkstationSchedulesForDate:', error);
       throw error;
     }
   },
@@ -351,6 +453,95 @@ export const planningService = {
     } catch (error: any) {
       console.error('Error in generateWeeklyPlan:', error);
       throw new Error(`Failed to generate plan: ${error.message || 'Unknown error'}`);
+    }
+  },
+
+  // Generate workstation schedules for a specific date
+  async generateWorkstationSchedulesForDate(date: Date): Promise<void> {
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+      console.error('Invalid date provided for generating workstation schedules:', date);
+      throw new Error('Invalid date provided');
+    }
+
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const dayOfWeek = date.getDay();
+
+    try {
+      // Get work periods for this day
+      const { data: workPeriods, error: workPeriodsError } = await supabase
+        .from('work_hours')
+        .select('*')
+        .eq('day_of_week', dayOfWeek)
+        .order('start_time');
+
+      if (workPeriodsError) throw workPeriodsError;
+      if (!workPeriods?.length) {
+        throw new Error(`No work periods defined for ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek]}`);
+      }
+
+      // Get all workstations
+      const { data: workstations, error: workstationsError } = await supabase
+        .from('workstations')
+        .select('*');
+
+      if (workstationsError) throw workstationsError;
+      if (!workstations?.length) {
+        throw new Error('No workstations found');
+      }
+
+      // Get tasks that need to be scheduled for workstations
+      const { data: tasks, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*, phases!inner(project_id)')
+        .neq('status', 'COMPLETED')
+        .in('status', ['TODO', 'IN_PROGRESS']);
+
+      if (tasksError) throw tasksError;
+
+      // Clear existing workstation schedules for this date
+      await this.deleteWorkstationSchedulesForDate(date);
+
+      const workstationSchedulesToInsert: CreateWorkstationScheduleInput[] = [];
+
+      // Distribute tasks across workstations and time periods
+      let taskIndex = 0;
+      for (const period of workPeriods) {
+        for (const workstation of workstations) {
+          if (taskIndex >= (tasks || []).length) break;
+
+          const task = tasks![taskIndex];
+          const startTime = new Date(`${dateStr}T${period.start_time}`);
+          const endTime = new Date(`${dateStr}T${period.end_time}`);
+
+          workstationSchedulesToInsert.push({
+            workstation_id: workstation.id,
+            task_id: task.id,
+            task_title: task.title,
+            user_name: workstation.name, // Using workstation name as user for now
+            start_time: startTime.toISOString(),
+            end_time: endTime.toISOString()
+          });
+
+          taskIndex++;
+        }
+      }
+
+      if (workstationSchedulesToInsert.length > 0) {
+        console.log(`Inserting ${workstationSchedulesToInsert.length} workstation schedule entries.`);
+        const { error: insertError } = await supabase
+          .from('workstation_schedules')
+          .insert(workstationSchedulesToInsert);
+
+        if (insertError) {
+          console.error('Error inserting workstation schedules:', insertError);
+          throw insertError;
+        }
+      } else {
+        console.log('No workstation schedules to generate for this date.');
+      }
+    } catch (error: any) {
+      console.error('Error in generateWorkstationSchedulesForDate:', error);
+      throw new Error(`Failed to generate workstation schedules: ${error.message || 'Unknown error'}`);
     }
   },
   

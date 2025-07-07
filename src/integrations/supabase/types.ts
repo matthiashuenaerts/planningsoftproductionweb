@@ -1644,6 +1644,57 @@ export type Database = {
         }
         Relationships: []
       }
+      workstation_schedules: {
+        Row: {
+          created_at: string
+          end_time: string
+          id: string
+          start_time: string
+          task_id: string | null
+          task_title: string
+          updated_at: string
+          user_name: string
+          workstation_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_time: string
+          id?: string
+          start_time: string
+          task_id?: string | null
+          task_title: string
+          updated_at?: string
+          user_name: string
+          workstation_id: string
+        }
+        Update: {
+          created_at?: string
+          end_time?: string
+          id?: string
+          start_time?: string
+          task_id?: string | null
+          task_title?: string
+          updated_at?: string
+          user_name?: string
+          workstation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workstation_schedules_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workstation_schedules_workstation_id_fkey"
+            columns: ["workstation_id"]
+            isOneToOne: false
+            referencedRelation: "workstations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workstation_tasks: {
         Row: {
           created_at: string
