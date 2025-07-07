@@ -9,14 +9,16 @@ import { useAuth } from '@/context/AuthContext';
 import { holidayRequestService } from '@/services/holidayRequestService';
 import HolidayRequestDialog from './HolidayRequestDialog';
 import HolidayRequestsList from './HolidayRequestsList';
-import GeneralScheduleView from './GeneralScheduleView';
+import { useLanguage } from '@/context/LanguageContext';
+import { useNavigate } from 'react-router-dom';
 
 const UserMenu: React.FC = () => {
   const [showHolidayModal, setShowHolidayModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const { currentEmployee } = useAuth();
+  const { createLocalizedPath } = useLanguage();
+  const navigate = useNavigate();
 
   const canManageRequests = currentEmployee?.role === 'admin' || 
                            currentEmployee?.role === 'teamleader' || 
@@ -53,7 +55,7 @@ const UserMenu: React.FC = () => {
             <CalendarDays className="mr-2 h-4 w-4" />
             Holiday
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setShowScheduleModal(true)}>
+          <DropdownMenuItem onSelect={() => navigate(createLocalizedPath('/general-schedule'))}>
             <Calendar className="mr-2 h-4 w-4" />
             General Schedule
           </DropdownMenuItem>
@@ -120,13 +122,6 @@ const UserMenu: React.FC = () => {
           </DialogContent>
         </Dialog>
       )}
-
-      {/* General Schedule Modal */}
-      <Dialog open={showScheduleModal} onOpenChange={setShowScheduleModal}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full">
-          <GeneralScheduleView />
-        </DialogContent>
-      </Dialog>
     </>
   );
 };

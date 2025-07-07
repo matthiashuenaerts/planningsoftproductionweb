@@ -19,6 +19,7 @@ import LogisticsOut from './pages/LogisticsOut';
 import RushOrders from './pages/RushOrders';
 import RushOrderDetails from './pages/RushOrderDetails';
 import TimeRegistrations from './pages/TimeRegistrations';
+import GeneralSchedule from './pages/GeneralSchedule';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import { AuthProvider } from './context/AuthContext';
@@ -69,6 +70,7 @@ function App() {
               <Route path="/:lang/rush-orders" element={<ProtectedRoute><RushOrders /></ProtectedRoute>} />
               <Route path="/:lang/rush-orders/:rushOrderId" element={<ProtectedRoute><RushOrderDetails /></ProtectedRoute>} />
               <Route path="/:lang/time-registrations" element={<ProtectedRoute><TimeRegistrations /></ProtectedRoute>} />
+              <Route path="/:lang/general-schedule" element={<ProtectedRoute><GeneralSchedule /></ProtectedRoute>} />
               <Route path="/:lang/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             </Routes>
             <Toaster />
