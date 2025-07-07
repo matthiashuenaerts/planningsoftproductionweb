@@ -4,15 +4,17 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { MoreVertical, CalendarDays, Plus, Users } from 'lucide-react';
+import { MoreVertical, CalendarDays, Plus, Users, Calendar } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { holidayRequestService } from '@/services/holidayRequestService';
 import HolidayRequestDialog from './HolidayRequestDialog';
 import HolidayRequestsList from './HolidayRequestsList';
+import GeneralScheduleView from './GeneralScheduleView';
 
 const UserMenu: React.FC = () => {
   const [showHolidayModal, setShowHolidayModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const { currentEmployee } = useAuth();
 
@@ -50,6 +52,10 @@ const UserMenu: React.FC = () => {
           <DropdownMenuItem onSelect={() => setShowHolidayModal(true)}>
             <CalendarDays className="mr-2 h-4 w-4" />
             Holiday
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setShowScheduleModal(true)}>
+            <Calendar className="mr-2 h-4 w-4" />
+            General Schedule
           </DropdownMenuItem>
           {canManageRequests && (
             <DropdownMenuItem onSelect={() => setShowAdminModal(true)}>
@@ -114,6 +120,13 @@ const UserMenu: React.FC = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* General Schedule Modal */}
+      <Dialog open={showScheduleModal} onOpenChange={setShowScheduleModal}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full">
+          <GeneralScheduleView />
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

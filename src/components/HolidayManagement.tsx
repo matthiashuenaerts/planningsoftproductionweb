@@ -71,20 +71,20 @@ const HolidayManagement: React.FC = () => {
     queryKey: ['holidays'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('employee_holidays')
-        .select(`
-          id,
-          employee_id,
-          start_date,
-          end_date,
-          reason,
-          approved,
-          employee:employees(name)
-        `)
+        .from('holiday_requests')
+        .select('id, user_id, start_date, end_date, reason, status, employee_name')
         .order('start_date', { ascending: false });
       
       if (error) throw error;
-      return data;
+      return data.map(item => ({
+        id: item.id,
+        employee_id: item.user_id,
+        start_date: item.start_date,
+        end_date: item.end_date,
+        reason: item.reason,
+        approved: item.status === 'approved',
+        employee: { name: item.employee_name }
+      }));
     }
   });
 
@@ -97,8 +97,13 @@ const HolidayManagement: React.FC = () => {
       reason: string;
     }) => {
       const { data, error } = await supabase
-        .from('employee_holidays')
-        .insert([holidayData])
+        .from('holiday_requests')
+        .insert([{
+          ...holidayData,
+          user_id: holidayData.employee_id,
+          employee_name: employees.find(e => e.id === holidayData.employee_id)?.name || '',
+          status: 'approved'
+        }])
         .select()
         .single();
       
@@ -127,7 +132,7 @@ const HolidayManagement: React.FC = () => {
   const deleteHolidayMutation = useMutation({
     mutationFn: async (holidayId: string) => {
       const { error } = await supabase
-        .from('employee_holidays')
+        .from('holiday_requests')
         .delete()
         .eq('id', holidayId);
       
@@ -153,8 +158,8 @@ const HolidayManagement: React.FC = () => {
   const toggleApprovalMutation = useMutation({
     mutationFn: async ({ holidayId, approved }: { holidayId: string; approved: boolean }) => {
       const { error } = await supabase
-        .from('employee_holidays')
-        .update({ approved })
+        .from('holiday_requests')
+        .update({ status: approved ? 'approved' : 'pending' })
         .eq('id', holidayId);
       
       if (error) throw error;
