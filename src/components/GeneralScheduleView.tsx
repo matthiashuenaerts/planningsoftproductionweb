@@ -1,13 +1,20 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, User, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, User, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, parseISO, isSameDay, addDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Employee {
+  id: string;
+  name: string;
+}
+
+interface Workstation {
   id: string;
   name: string;
 }
@@ -20,6 +27,16 @@ interface Schedule {
   start_time: string;
   end_time: string;
   employee: { name: string };
+}
+
+interface WorkstationSchedule {
+  id: string;
+  workstation_id: string;
+  task_title: string;
+  user_name: string;
+  start_time: string;
+  end_time: string;
+  workstation: { name: string };
 }
 
 interface HolidayRequest {
@@ -51,6 +68,20 @@ const GeneralScheduleView: React.FC = () => {
     }
   });
 
+  // Fetch all workstations
+  const { data: workstations = [] } = useQuery<Workstation[]>({
+    queryKey: ['workstations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('workstations')
+        .select('id, name')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
   // Fetch schedules for the current week
   const { data: schedules = [], isLoading } = useQuery<Schedule[]>({
     queryKey: ['schedules', weekStart.toISOString(), weekEnd.toISOString()],
@@ -65,6 +96,30 @@ const GeneralScheduleView: React.FC = () => {
           start_time,
           end_time,
           employee:employees(name)
+        `)
+        .gte('start_time', weekStart.toISOString())
+        .lte('end_time', weekEnd.toISOString())
+        .order('start_time');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch workstation schedules for the current week
+  const { data: workstationSchedules = [] } = useQuery<WorkstationSchedule[]>({
+    queryKey: ['workstation-schedules', weekStart.toISOString(), weekEnd.toISOString()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('workstation_schedules')
+        .select(`
+          id,
+          workstation_id,
+          task_title,
+          user_name,
+          start_time,
+          end_time,
+          workstation:workstations(name)
         `)
         .gte('start_time', weekStart.toISOString())
         .lte('end_time', weekEnd.toISOString())
@@ -114,6 +169,14 @@ const GeneralScheduleView: React.FC = () => {
     );
   };
 
+  // Get workstation schedules for a specific workstation and date
+  const getWorkstationSchedulesForDate = (workstationId: string, date: Date) => {
+    return workstationSchedules.filter(schedule => 
+      schedule.workstation_id === workstationId &&
+      isSameDay(parseISO(schedule.start_time), date)
+    );
+  };
+
   // Get holiday info for employee and date
   const getHolidayInfo = (employeeId: string, date: Date) => {
     return holidays.find(holiday => 
@@ -157,90 +220,174 @@ const GeneralScheduleView: React.FC = () => {
         </div>
       </div>
 
-      {/* Schedule Grid */}
-      <div className="grid grid-cols-8 gap-2 h-[calc(100vh-200px)]">
-        {/* Employee Names Column */}
-        <div className="space-y-2">
-          <div className="h-12 flex items-center justify-center bg-muted rounded-md font-medium">
-            <User className="h-4 w-4 mr-2" />
-            Employee
-          </div>
-          {employees.map((employee) => (
-            <Card key={employee.id} className="h-24">
-              <CardContent className="p-3 flex items-center justify-center text-center">
-                <span className="text-sm font-medium text-muted-foreground">
-                  {employee.name}
-                </span>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      {/* Schedule Tabs */}
+      <Tabs defaultValue="employees" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="employees">Employee Schedules</TabsTrigger>
+          <TabsTrigger value="workstations">Workstation Schedules</TabsTrigger>
+        </TabsList>
 
-        {/* Days Columns */}
-        {weekDays.map((day) => (
-          <div key={day.toISOString()} className="space-y-2">
-            {/* Day Header */}
-            <div className="h-12 flex flex-col items-center justify-center bg-muted rounded-md">
-              <div className="text-xs font-medium text-muted-foreground">
-                {format(day, 'EEE')}
+        <TabsContent value="employees" className="space-y-4">
+          {/* Employee Schedule Grid */}
+          <div className="grid grid-cols-8 gap-2 h-[calc(100vh-300px)]">
+            {/* Employee Names Column */}
+            <div className="space-y-2">
+              <div className="h-12 flex items-center justify-center bg-muted rounded-md font-medium">
+                <User className="h-4 w-4 mr-2" />
+                Employee
               </div>
-              <div className="text-sm font-bold">
-                {format(day, 'dd')}
-              </div>
-            </div>
-
-            {/* Employee Schedules */}
-            {employees.map((employee) => {
-              const isOnHoliday = isEmployeeOnHoliday(employee.id, day);
-              const employeeSchedules = getSchedulesForEmployeeAndDate(employee.id, day);
-              const holidayInfo = getHolidayInfo(employee.id, day);
-
-              return (
-                <Card key={`${employee.id}-${day.toISOString()}`} className="h-24">
-                  <CardContent className="p-2 space-y-1">
-                    {isOnHoliday ? (
-                      <div className="flex flex-col items-center justify-center h-full bg-red-50 rounded border-red-200 border">
-                        <Badge variant="destructive" className="text-xs px-1">
-                          HOLIDAY
-                        </Badge>
-                        {holidayInfo?.reason && (
-                          <span className="text-xs text-red-600 text-center line-clamp-2">
-                            {holidayInfo.reason}
-                          </span>
-                        )}
-                      </div>
-                    ) : employeeSchedules.length > 0 ? (
-                      <div className="space-y-1 overflow-y-auto h-full">
-                        {employeeSchedules.map((schedule) => (
-                          <div
-                            key={schedule.id}
-                            className="bg-blue-50 border border-blue-200 rounded p-1"
-                          >
-                            <div className="text-xs font-medium text-blue-800 line-clamp-1">
-                              {schedule.title}
-                            </div>
-                            <div className="flex items-center gap-1 text-xs text-blue-600">
-                              <Clock className="h-3 w-3" />
-                              <span>
-                                {format(parseISO(schedule.start_time), 'HH:mm')} - 
-                                {format(parseISO(schedule.end_time), 'HH:mm')}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground">
-                        <span className="text-xs">No schedule</span>
-                      </div>
-                    )}
+              {employees.map((employee) => (
+                <Card key={employee.id} className="h-24">
+                  <CardContent className="p-3 flex items-center justify-center text-center">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {employee.name}
+                    </span>
                   </CardContent>
                 </Card>
-              );
-            })}
+              ))}
+            </div>
+
+            {/* Days Columns */}
+            {weekDays.map((day) => (
+              <div key={day.toISOString()} className="space-y-2">
+                {/* Day Header */}
+                <div className="h-12 flex flex-col items-center justify-center bg-muted rounded-md">
+                  <div className="text-xs font-medium text-muted-foreground">
+                    {format(day, 'EEE')}
+                  </div>
+                  <div className="text-sm font-bold">
+                    {format(day, 'dd')}
+                  </div>
+                </div>
+
+                {/* Employee Schedules */}
+                {employees.map((employee) => {
+                  const isOnHoliday = isEmployeeOnHoliday(employee.id, day);
+                  const employeeSchedules = getSchedulesForEmployeeAndDate(employee.id, day);
+                  const holidayInfo = getHolidayInfo(employee.id, day);
+
+                  return (
+                    <Card key={`${employee.id}-${day.toISOString()}`} className="h-24">
+                      <CardContent className="p-2 space-y-1">
+                        {isOnHoliday ? (
+                          <div className="flex flex-col items-center justify-center h-full bg-red-50 rounded border-red-200 border">
+                            <Badge variant="destructive" className="text-xs px-1">
+                              HOLIDAY
+                            </Badge>
+                            {holidayInfo?.reason && (
+                              <span className="text-xs text-red-600 text-center line-clamp-2">
+                                {holidayInfo.reason}
+                              </span>
+                            )}
+                          </div>
+                        ) : employeeSchedules.length > 0 ? (
+                          <div className="space-y-1 overflow-y-auto h-full">
+                            {employeeSchedules.map((schedule) => (
+                              <div
+                                key={schedule.id}
+                                className="bg-blue-50 border border-blue-200 rounded p-1"
+                              >
+                                <div className="text-xs font-medium text-blue-800 line-clamp-1">
+                                  {schedule.title}
+                                </div>
+                                <div className="flex items-center gap-1 text-xs text-blue-600">
+                                  <Clock className="h-3 w-3" />
+                                  <span>
+                                    {format(parseISO(schedule.start_time), 'HH:mm')} - 
+                                    {format(parseISO(schedule.end_time), 'HH:mm')}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-muted-foreground">
+                            <span className="text-xs">No schedule</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </TabsContent>
+
+        <TabsContent value="workstations" className="space-y-4">
+          {/* Workstation Schedule Grid */}
+          <div className="grid grid-cols-8 gap-2 h-[calc(100vh-300px)]">
+            {/* Workstation Names Column */}
+            <div className="space-y-2">
+              <div className="h-12 flex items-center justify-center bg-muted rounded-md font-medium">
+                <Settings className="h-4 w-4 mr-2" />
+                Workstation
+              </div>
+              {workstations.map((workstation) => (
+                <Card key={workstation.id} className="h-24">
+                  <CardContent className="p-3 flex items-center justify-center text-center">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {workstation.name}
+                    </span>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Days Columns */}
+            {weekDays.map((day) => (
+              <div key={day.toISOString()} className="space-y-2">
+                {/* Day Header */}
+                <div className="h-12 flex flex-col items-center justify-center bg-muted rounded-md">
+                  <div className="text-xs font-medium text-muted-foreground">
+                    {format(day, 'EEE')}
+                  </div>
+                  <div className="text-sm font-bold">
+                    {format(day, 'dd')}
+                  </div>
+                </div>
+
+                {/* Workstation Schedules */}
+                {workstations.map((workstation) => {
+                  const workstationSchedulesForDay = getWorkstationSchedulesForDate(workstation.id, day);
+
+                  return (
+                    <Card key={`${workstation.id}-${day.toISOString()}`} className="h-24">
+                      <CardContent className="p-2 space-y-1">
+                        {workstationSchedulesForDay.length > 0 ? (
+                          <div className="space-y-1 overflow-y-auto h-full">
+                            {workstationSchedulesForDay.map((schedule) => (
+                              <div
+                                key={schedule.id}
+                                className="bg-green-50 border border-green-200 rounded p-1"
+                              >
+                                <div className="text-xs font-medium text-green-800 line-clamp-1">
+                                  {schedule.task_title}
+                                </div>
+                                <div className="flex items-center gap-1 text-xs text-green-600">
+                                  <Clock className="h-3 w-3" />
+                                  <span>
+                                    {format(parseISO(schedule.start_time), 'HH:mm')} - 
+                                    {format(parseISO(schedule.end_time), 'HH:mm')}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-muted-foreground">
+                            <span className="text-xs">No schedule</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

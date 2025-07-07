@@ -492,24 +492,75 @@ export const planningService = {
       // Get tasks that need to be scheduled for workstations
       const { data: tasks, error: tasksError } = await supabase
         .from('tasks')
-        .select('*, phases!inner(project_id)')
+        .select(`
+          *,
+          phases!inner(project_id),
+          task_workstation_links(workstation_id)
+        `)
         .neq('status', 'COMPLETED')
         .in('status', ['TODO', 'IN_PROGRESS']);
 
       if (tasksError) throw tasksError;
+
+      // Also get tasks linked through standard task workstation links
+      const { data: standardTaskLinks, error: standardLinksError } = await supabase
+        .from('standard_task_workstation_links')
+        .select(`
+          workstation_id,
+          standard_task_id,
+          standard_tasks(task_name, task_number)
+        `);
+
+      if (standardLinksError) throw standardLinksError;
 
       // Clear existing workstation schedules for this date
       await this.deleteWorkstationSchedulesForDate(date);
 
       const workstationSchedulesToInsert: CreateWorkstationScheduleInput[] = [];
 
-      // Distribute tasks across workstations and time periods
-      let taskIndex = 0;
-      for (const period of workPeriods) {
-        for (const workstation of workstations) {
-          if (taskIndex >= (tasks || []).length) break;
+      // Process each workstation
+      for (const workstation of workstations) {
+        // Find tasks directly linked to this workstation
+        const directlyLinkedTasks = (tasks || []).filter(task => 
+          task.task_workstation_links?.some((link: any) => link.workstation_id === workstation.id)
+        );
 
-          const task = tasks![taskIndex];
+        // Find tasks linked through standard tasks
+        const standardLinkedTasks = (tasks || []).filter(task => {
+          if (!task.standard_task_id) return false;
+          return (standardTaskLinks || []).some(link => 
+            link.standard_task_id === task.standard_task_id && 
+            link.workstation_id === workstation.id
+          );
+        });
+
+        // Combine all tasks for this workstation
+        const workstationTasks = [...directlyLinkedTasks, ...standardLinkedTasks];
+        
+        // Remove duplicates
+        const uniqueTasks = Array.from(
+          new Map(workstationTasks.map(task => [task.id, task])).values()
+        );
+
+        // Sort by priority and due date
+        const priorityOrder = { 'Urgent': 0, 'High': 1, 'Medium': 2, 'Low': 3 };
+        uniqueTasks.sort((a, b) => {
+          const priorityA = priorityOrder[a.priority as keyof typeof priorityOrder] || 4;
+          const priorityB = priorityOrder[b.priority as keyof typeof priorityOrder] || 4;
+          
+          if (priorityA !== priorityB) return priorityA - priorityB;
+          
+          const dateA = new Date(a.due_date || '9999-12-31');
+          const dateB = new Date(b.due_date || '9999-12-31');
+          return dateA.getTime() - dateB.getTime();
+        });
+
+        // Assign tasks to work periods for this workstation
+        let taskIndex = 0;
+        for (const period of workPeriods) {
+          if (taskIndex >= uniqueTasks.length) break;
+
+          const task = uniqueTasks[taskIndex];
           const startTime = new Date(`${dateStr}T${period.start_time}`);
           const endTime = new Date(`${dateStr}T${period.end_time}`);
 
@@ -517,7 +568,7 @@ export const planningService = {
             workstation_id: workstation.id,
             task_id: task.id,
             task_title: task.title,
-            user_name: workstation.name, // Using workstation name as user for now
+            user_name: workstation.name,
             start_time: startTime.toISOString(),
             end_time: endTime.toISOString()
           });
