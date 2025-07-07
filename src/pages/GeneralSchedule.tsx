@@ -20,6 +20,13 @@ interface Schedule {
   start_time: string;
   end_time: string;
   employee: { name: string };
+  task?: {
+    phase?: {
+      project?: {
+        name: string;
+      };
+    };
+  };
 }
 
 interface HolidayRequest {
@@ -98,7 +105,12 @@ const GeneralSchedule: React.FC = () => {
           description,
           start_time,
           end_time,
-          employee:employees(name)
+          employee:employees(name),
+          task:tasks(
+            phase:phases(
+              project:projects(name)
+            )
+          )
         `)
         .gte('start_time', todayStart.toISOString())
         .lte('end_time', todayEnd.toISOString())
@@ -297,6 +309,11 @@ const GeneralSchedule: React.FC = () => {
                       <div className="text-xs font-medium text-blue-800 line-clamp-1">
                         {schedule.title}
                       </div>
+                      {schedule.task?.phase?.project?.name && (
+                        <div className="text-xs text-blue-700 line-clamp-1 font-medium">
+                          {schedule.task.phase.project.name}
+                        </div>
+                      )}
                       <div className="text-xs text-blue-600 line-clamp-1">
                         {format(parseISO(schedule.start_time), 'HH:mm')} - 
                         {format(parseISO(schedule.end_time), 'HH:mm')}
