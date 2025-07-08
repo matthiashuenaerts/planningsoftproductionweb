@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
-import { Calendar } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import Navbar from '@/components/Navbar';
@@ -15,7 +15,7 @@ import EnhancedDailyTimeline from '@/components/EnhancedDailyTimeline';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
-import { startOfDay, endOfDay, format, parseISO } from 'date-fns';
+import { startOfDay, endOfDay, format, parseISO, addDays, isToday, isTomorrow } from 'date-fns';
 
 interface Task {
   id: string;
@@ -81,13 +81,28 @@ const PersonalTasks = () => {
   const [showFilesPopup, setShowFilesPopup] = useState<string | null>(null);
   const [showPartsDialog, setShowPartsDialog] = useState<string | null>(null);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+
+  // Helper function to get next workday (skip weekends)
+  const getNextWorkday = (date: Date) => {
+    let nextDay = addDays(date, 1);
+    // Skip weekends
+    while (nextDay.getDay() === 0 || nextDay.getDay() === 6) {
+      nextDay = addDays(nextDay, 1);
+    }
+    return nextDay;
+  };
+
+  const nextWorkday = getNextWorkday(new Date());
+  const isViewingToday = isToday(selectedDate);
+  const isViewingTomorrow = isTomorrow(selectedDate);
 
   useEffect(() => {
     if (currentEmployee) {
       fetchPersonalData();
       fetchActiveTimeRegistrations();
     }
-  }, [currentEmployee]);
+  }, [currentEmployee, selectedDate]);
 
   // Set up real-time listener for time registrations to update UI when TaskTimer changes
   useEffect(() => {
@@ -177,8 +192,7 @@ const PersonalTasks = () => {
 
       console.log('Fetched tasks with project data:', tasksData);
 
-      // Fetch personal schedule for today with enhanced query to include task and project info
-      const today = new Date();
+      // Fetch personal schedule for selected date with enhanced query to include task and project info
       const { data: schedulesData, error: schedulesError } = await supabase
         .from('schedules')
         .select(`
@@ -201,8 +215,8 @@ const PersonalTasks = () => {
           )
         `)
         .eq('employee_id', currentEmployee.id)
-        .gte('start_time', startOfDay(today).toISOString())
-        .lte('start_time', endOfDay(today).toISOString())
+        .gte('start_time', startOfDay(selectedDate).toISOString())
+        .lte('start_time', endOfDay(selectedDate).toISOString())
         .order('start_time', { ascending: true });
 
       if (schedulesError) {
@@ -442,6 +456,14 @@ const PersonalTasks = () => {
     }
   };
 
+  const handleDateNavigation = (direction: 'today' | 'next') => {
+    if (direction === 'today') {
+      setSelectedDate(new Date());
+    } else {
+      setSelectedDate(nextWorkday);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex">
@@ -460,9 +482,59 @@ const PersonalTasks = () => {
       <Navbar />
       <div className="flex-1 ml-64 p-6 max-w-none">
         <TaskTimer />
+        
+        {/* Date Navigation Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">{t("daily_timeline")}</h1>
-          <p className="text-gray-600 mt-2">{t("daily_timeline_description")}</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{t("daily_timeline")}</h1>
+              <div className="flex items-center gap-2 mt-2">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <span className="text-gray-600">
+                  {format(selectedDate, 'EEEE, MMMM dd, yyyy')}
+                </span>
+                {!isViewingToday && (
+                  <div className="flex items-center gap-2 ml-4">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                    <span className="text-sm text-orange-600 font-medium">
+                      {isViewingTomorrow ? 'Tomorrow' : 'Future Date'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button
+                variant={isViewingToday ? "default" : "outline"}
+                onClick={() => handleDateNavigation('today')}
+                className="flex items-center gap-2"
+              >
+                Today
+              </Button>
+              <Button
+                variant={!isViewingToday ? "default" : "outline"}
+                onClick={() => handleDateNavigation('next')}
+                className="flex items-center gap-2"
+              >
+                <ChevronRight className="h-4 w-4" />
+                Next Workday
+              </Button>
+            </div>
+          </div>
+          
+          {!isViewingToday && (
+            <Card className="mt-4 bg-orange-50 border-orange-200">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 text-orange-800">
+                  <Calendar className="h-4 w-4" />
+                  <span className="text-sm font-medium">
+                    You are viewing the planning for {format(selectedDate, 'EEEE, MMMM dd, yyyy')}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-4">
