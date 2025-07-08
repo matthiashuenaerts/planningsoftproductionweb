@@ -625,6 +625,7 @@ const Planning = () => {
       }
       
       // Step 4: Generate workstation schedules based on worker schedules
+      console.log('Generating workstation schedules from worker schedules...');
       await generateWorkstationSchedulesFromWorkerSchedules();
       
       let message = `Generated schedules for ${successfullyGenerated} workers and their workstation assignments`;
