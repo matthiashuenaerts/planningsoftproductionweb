@@ -41,6 +41,7 @@ import TaskConflictResolver from '@/components/TaskConflictResolver';
 import StandardTaskAssignment from '@/components/StandardTaskAssignment';
 import { supabase } from '@/integrations/supabase/client';
 import DraggableScheduleItem from '@/components/DraggableScheduleItem';
+import WorkstationScheduleView from '@/components/WorkstationScheduleView';
 
 interface WorkerTask {
   id: string;
@@ -97,6 +98,7 @@ const Planning = () => {
   const [taskConflicts, setTaskConflicts] = useState<any[]>([]);
   const [excludedTasksPerUser, setExcludedTasksPerUser] = useState<Record<string, string[]>>({});
   const [showStandardTaskAssignment, setShowStandardTaskAssignment] = useState(false);
+  const [showWorkstationView, setShowWorkstationView] = useState(false);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const isAdmin = currentEmployee?.role === 'admin';
@@ -645,6 +647,8 @@ const Planning = () => {
     if (!selectedDate) return;
 
     try {
+      setGeneratingSchedule(true);
+
       // Get all user schedules for the selected date with their task-workstation links
       const { data: userSchedules, error: schedulesError } = await supabase
         .from('schedules')
@@ -654,6 +658,8 @@ const Planning = () => {
           task:tasks(
             id,
             title,
+            description,
+            priority,
             task_workstation_links(
               workstation:workstations(
                 id,
@@ -670,23 +676,28 @@ const Planning = () => {
 
       console.log('User schedules found:', userSchedules?.length || 0);
 
-      // Delete existing workstation tasks for the selected date
+      // Get all workstations
+      const { data: workstations, error: workstationsError } = await supabase
+        .from('workstations')
+        .select('*');
+
+      if (workstationsError) throw workstationsError;
+
+      // Delete existing workstation schedules for the selected date
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const { error: deleteError } = await supabase
-        .from('workstation_tasks')
+        .from('workstation_schedules')
         .delete()
-        .in('workstation_id', 
-          userSchedules?.flatMap(schedule => 
-            schedule.task?.task_workstation_links?.map(link => link.workstation?.id).filter(Boolean) || []
-          ) || []
-        );
+        .gte('start_time', `${dateStr}T00:00:00`)
+        .lte('start_time', `${dateStr}T23:59:59`);
 
       if (deleteError) {
-        console.error('Error deleting existing workstation tasks:', deleteError);
+        console.error('Error deleting existing workstation schedules:', deleteError);
       }
 
-      const workstationTasksToCreate = [];
+      const workstationSchedulesToCreate = [];
 
-      // Process each user schedule and create corresponding workstation tasks
+      // Process each user schedule and create corresponding workstation schedules
       for (const schedule of userSchedules || []) {
         const taskWorkstationLinks = schedule.task?.task_workstation_links || [];
         const userName = schedule.employee?.name || 'Unknown User';
@@ -697,40 +708,46 @@ const Planning = () => {
         console.log(`Processing schedule for ${userName}: ${schedule.title} (${durationMinutes} min)`);
         console.log(`Task workstation links:`, taskWorkstationLinks);
         
-        // Create a workstation task for each linked workstation
-        for (const link of taskWorkstationLinks) {
-          const workstation = link.workstation;
-          if (workstation) {
-            console.log(`Creating workstation schedule for workstation: ${workstation.name}`);
-            
-            workstationTasksToCreate.push({
-              workstation_id: workstation.id,
-              task_name: `${schedule.title} - ${userName}`,
-              description: `Assigned to: ${userName}\nScheduled: ${format(startTime, 'HH:mm')} - ${format(endTime, 'HH:mm')}\nOriginal Task: ${schedule.title}${schedule.description ? `\nDescription: ${schedule.description}` : ''}`,
-              duration: durationMinutes,
-              priority: 'medium'
-            });
+        // Only create workstation schedules for tasks that have workstation links
+        if (taskWorkstationLinks && taskWorkstationLinks.length > 0) {
+          // Create a workstation schedule for each linked workstation
+          for (const link of taskWorkstationLinks) {
+            const workstation = link.workstation;
+            if (workstation) {
+              console.log(`Creating workstation schedule for workstation: ${workstation.name}`);
+              
+              workstationSchedulesToCreate.push({
+                workstation_id: workstation.id,
+                task_id: schedule.task_id,
+                task_title: schedule.title,
+                user_name: userName,
+                start_time: startTime.toISOString(),
+                end_time: endTime.toISOString()
+              });
+            }
           }
+        } else {
+          console.log(`No workstation links found for task: ${schedule.title}`);
         }
       }
 
-      console.log(`Creating ${workstationTasksToCreate.length} workstation tasks`);
+      console.log(`Creating ${workstationSchedulesToCreate.length} workstation schedules`);
 
-      // Insert workstation tasks
-      if (workstationTasksToCreate.length > 0) {
+      // Insert workstation schedules
+      if (workstationSchedulesToCreate.length > 0) {
         const { error: insertError } = await supabase
-          .from('workstation_tasks')
-          .insert(workstationTasksToCreate);
+          .from('workstation_schedules')
+          .insert(workstationSchedulesToCreate);
 
         if (insertError) {
-          console.error('Error creating workstation tasks:', insertError);
+          console.error('Error creating workstation schedules:', insertError);
           throw insertError;
         }
       }
 
       toast({
         title: "Workstation Schedules Generated",
-        description: `Created ${workstationTasksToCreate.length} workstation task assignments with user names and exact timing`,
+        description: `Created ${workstationSchedulesToCreate.length} workstation schedule assignments based on task-workstation links`,
       });
 
     } catch (error: any) {
@@ -740,6 +757,8 @@ const Planning = () => {
         description: `Failed to generate workstation schedules: ${error.message}`,
         variant: "destructive",
       });
+    } finally {
+      setGeneratingSchedule(false);
     }
   };
 
@@ -1122,380 +1141,406 @@ const Planning = () => {
               </div>
             </div>
 
-            {workers.length === 0 ? (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>No Workers Found</AlertTitle>
-                <AlertDescription>
-                  No employees with the 'worker' role were found. Please ensure workers are properly configured in the system.
-                </AlertDescription>
-              </Alert>
+            {/* View Toggle */}
+            <div className="mb-6">
+              <div className="flex space-x-2">
+                <Button
+                  onClick={() => setShowWorkstationView(false)}
+                  variant={!showWorkstationView ? "default" : "outline"}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Worker Schedules
+                </Button>
+                <Button
+                  onClick={() => setShowWorkstationView(true)}
+                  variant={showWorkstationView ? "default" : "outline"}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Workstation Schedules
+                </Button>
+              </div>
+            </div>
+
+            {showWorkstationView ? (
+              <WorkstationScheduleView selectedDate={selectedDate} />
             ) : (
-              <div className="space-y-6">
-                {/* Worker Selection */}
-                <div className="flex items-center justify-between">
-                  <div className="w-64">
-                    <Select value={selectedWorker || ''} onValueChange={setSelectedWorker}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a worker" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {workers.map((worker) => (
-                          <SelectItem key={worker.id} value={worker.id}>
-                            <div className="flex items-center justify-between w-full">
-                              <span>{worker.name}</span>
-                              {(worker as any).workstation && (
-                                <Badge variant="outline" className="ml-2">
-                                  {(worker as any).workstation}
-                                </Badge>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {isAdmin && selectedWorker && (
-                    <div className="flex space-x-2">
-                      <Button
-                        onClick={() => generateDailySchedule(selectedWorker)}
-                        disabled={generatingSchedule}
-                        variant="outline"
-                      >
-                        <Zap className="mr-2 h-4 w-4" />
-                        Generate Schedule
-                      </Button>
-                      <Button
-                        onClick={() => setShowTaskManager(true)}
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Task
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Worker Overview */}
-                {selectedWorkerSchedule && (
-                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">TODO Tasks</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">{selectedWorkerSchedule.tasks.length}</div>
-                        <p className="text-xs text-muted-foreground">Ready to schedule</p>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Workstations</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">{selectedWorkerSchedule.assignedWorkstations.length}</div>
-                        <p className="text-xs text-muted-foreground">{selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None assigned'}</p>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Total Duration</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">{Math.round(selectedWorkerSchedule.totalDuration / 60)}h</div>
-                        <p className="text-xs text-muted-foreground">Of TODO tasks</p>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Working Hours</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">{Math.round(totalWorkingMinutes / 60)}h</div>
-                        <p className="text-xs text-muted-foreground">Daily capacity</p>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Scheduled Items</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">{selectedWorkerSchedule.schedule.length}</div>
-                        <p className="text-xs text-muted-foreground">Today's schedule</p>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Efficiency</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">{calculateScheduleEfficiency(selectedWorkerSchedule.schedule)}%</div>
-                        <p className="text-xs text-muted-foreground">Time utilization</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
-
-                {/* Worker Schedule */}
-                {selectedWorkerSchedule && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <Users className="h-5 w-5 mr-2" />
-                          {selectedWorkerSchedule.employee.name} - Daily Schedule
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {selectedWorkerSchedule.assignedWorkstations.map(ws => (
-                            <Badge key={ws} variant="outline">{ws}</Badge>
-                          ))}
-                        </div>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {selectedWorkerSchedule.schedule.length > 0 ? (
-                        <div className="flex">
-                          {/* Timeline Axis */}
-                          <div className="w-16 text-right pr-4 flex-shrink-0">
-                            {Array.from({ length: TIMELINE_END_HOUR - TIMELINE_START_HOUR + 1 }).map((_, i) => {
-                              const hour = TIMELINE_START_HOUR + i;
-                              return (
-                                <div
-                                  key={hour}
-                                  style={{ height: `${60 * MINUTE_TO_PIXEL_SCALE}px` }}
-                                  className="relative border-t border-gray-200 first:border-t-0 -mr-4"
-                                >
-                                  <p className="text-xs text-gray-500 absolute -top-2 right-2">{`${hour.toString().padStart(2, '0')}:00`}</p>
+              <>
+                {workers.length === 0 ? (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>No Workers Found</AlertTitle>
+                    <AlertDescription>
+                      No employees with the 'worker' role were found. Please ensure workers are properly configured in the system.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Worker Selection */}
+                    <div className="flex items-center justify-between">
+                      <div className="w-64">
+                        <Select value={selectedWorker || ''} onValueChange={setSelectedWorker}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a worker" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {workers.map((worker) => (
+                              <SelectItem key={worker.id} value={worker.id}>
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{worker.name}</span>
+                                  {(worker as any).workstation && (
+                                    <Badge variant="outline" className="ml-2">
+                                      {(worker as any).workstation}
+                                    </Badge>
+                                  )}
                                 </div>
-                              );
-                            })}
-                          </div>
-                          {/* Schedule container */}
-                          <div className="relative flex-1 border-l border-gray-200">
-                            {/* Hour lines */}
-                            {Array.from({ length: TIMELINE_END_HOUR - TIMELINE_START_HOUR }).map((_, i) => (
-                                <div
-                                  key={`line-${i}`}
-                                  className="absolute w-full h-px bg-gray-200"
-                                  style={{ top: `${(i + 1) * 60 * MINUTE_TO_PIXEL_SCALE}px` }}
-                                />
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {isAdmin && selectedWorker && (
+                        <div className="flex space-x-2">
+                          <Button
+                            onClick={() => generateDailySchedule(selectedWorker)}
+                            disabled={generatingSchedule}
+                            variant="outline"
+                          >
+                            <Zap className="mr-2 h-4 w-4" />
+                            Generate Schedule
+                          </Button>
+                          <Button
+                            onClick={() => setShowTaskManager(true)}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Task
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Worker Overview */}
+                    {selectedWorkerSchedule && (
+                      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">TODO Tasks</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold">{selectedWorkerSchedule.tasks.length}</div>
+                            <p className="text-xs text-muted-foreground">Ready to schedule</p>
+                          </CardContent>
+                        </Card>
+                        
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Workstations</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold">{selectedWorkerSchedule.assignedWorkstations.length}</div>
+                            <p className="text-xs text-muted-foreground">{selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None assigned'}</p>
+                          </CardContent>
+                        </Card>
+                        
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Total Duration</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold">{Math.round(selectedWorkerSchedule.totalDuration / 60)}h</div>
+                            <p className="text-xs text-muted-foreground">Of TODO tasks</p>
+                          </CardContent>
+                        </Card>
+                        
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Working Hours</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold">{Math.round(totalWorkingMinutes / 60)}h</div>
+                            <p className="text-xs text-muted-foreground">Daily capacity</p>
+                          </CardContent>
+                        </Card>
+                        
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Scheduled Items</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold">{selectedWorkerSchedule.schedule.length}</div>
+                            <p className="text-xs text-muted-foreground">Today's schedule</p>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Efficiency</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold">{calculateScheduleEfficiency(selectedWorkerSchedule.schedule)}%</div>
+                            <p className="text-xs text-muted-foreground">Time utilization</p>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    )}
+
+                    {/* Worker Schedule */}
+                    {selectedWorkerSchedule && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <Users className="h-5 w-5 mr-2" />
+                              {selectedWorkerSchedule.employee.name} - Daily Schedule
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              {selectedWorkerSchedule.assignedWorkstations.map(ws => (
+                                <Badge key={ws} variant="outline">{ws}</Badge>
                               ))}
-
-                            {/* Breaks */}
-                            <div
-                              className="absolute w-full flex items-center justify-center bg-gray-100 border-y border-dashed border-gray-300 z-0"
-                              style={{
-                                top: `${getMinutesFromTimelineStart(new Date(selectedDate).setHours(10, 0, 0, 0)) * MINUTE_TO_PIXEL_SCALE}px`,
-                                height: `${15 * MINUTE_TO_PIXEL_SCALE}px`,
-                              }}
-                            >
-                              <p className="text-xs text-gray-500">Break</p>
                             </div>
-                            <div
-                              className="absolute w-full flex items-center justify-center bg-gray-100 border-y border-dashed border-gray-300 z-0"
-                              style={{
-                                top: `${getMinutesFromTimelineStart(new Date(selectedDate).setHours(12, 30, 0, 0)) * MINUTE_TO_PIXEL_SCALE}px`,
-                                height: `${30 * MINUTE_TO_PIXEL_SCALE}px`,
-                              }}
-                            >
-                              <p className="text-xs text-gray-500">Lunch</p>
-                            </div>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {selectedWorkerSchedule.schedule.length > 0 ? (
+                            <div className="flex">
+                              {/* Timeline Axis */}
+                              <div className="w-16 text-right pr-4 flex-shrink-0">
+                                {Array.from({ length: TIMELINE_END_HOUR - TIMELINE_START_HOUR + 1 }).map((_, i) => {
+                                  const hour = TIMELINE_START_HOUR + i;
+                                  return (
+                                    <div
+                                      key={hour}
+                                      style={{ height: `${60 * MINUTE_TO_PIXEL_SCALE}px` }}
+                                      className="relative border-t border-gray-200 first:border-t-0 -mr-4"
+                                    >
+                                      <p className="text-xs text-gray-500 absolute -top-2 right-2">{`${hour.toString().padStart(2, '0')}:00`}</p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              {/* Schedule container */}
+                              <div className="relative flex-1 border-l border-gray-200">
+                                {/* Hour lines */}
+                                {Array.from({ length: TIMELINE_END_HOUR - TIMELINE_START_HOUR }).map((_, i) => (
+                                    <div
+                                      key={`line-${i}`}
+                                      className="absolute w-full h-px bg-gray-200"
+                                      style={{ top: `${(i + 1) * 60 * MINUTE_TO_PIXEL_SCALE}px` }}
+                                    />
+                                  ))}
 
-                            {/* Schedule Items */}
-                            {selectedWorkerSchedule.schedule.map((item) => {
-                              const itemDuration = Math.round((new Date(item.end_time).getTime() - new Date(item.start_time).getTime()) / (1000 * 60));
-                              const top = getMinutesFromTimelineStart(item.start_time) * MINUTE_TO_PIXEL_SCALE;
-                              const height = itemDuration * MINUTE_TO_PIXEL_SCALE;
-                              
-                              return (
+                                {/* Breaks */}
                                 <div
-                                  key={item.id}
-                                  className="absolute left-2 right-2 z-10"
+                                  className="absolute w-full flex items-center justify-center bg-gray-100 border-y border-dashed border-gray-300 z-0"
                                   style={{
-                                    top: `${top}px`,
-                                    height: `${height}px`,
+                                    top: `${getMinutesFromTimelineStart(new Date(selectedDate).setHours(10, 0, 0, 0)) * MINUTE_TO_PIXEL_SCALE}px`,
+                                    height: `${15 * MINUTE_TO_PIXEL_SCALE}px`,
                                   }}
                                 >
-                                  <DraggableScheduleItem
-                                    item={item}
-                                    onMove={handleMoveTask}
-                                    onResize={handleResizeTask}
-                                    isAdmin={isAdmin}
-                                    MINUTE_TO_PIXEL_SCALE={MINUTE_TO_PIXEL_SCALE}
-                                    formatTime={formatTime}
-                                  >
-                                    <div className={cn(
-                                        "relative h-full overflow-hidden rounded border p-2",
-                                        getPriorityColor(item.task?.priority || '')
-                                      )}>
-                                      <div className="flex justify-between h-full">
-                                        <div className="flex-1 pr-2 overflow-hidden">
-                                          <h5 className="font-medium text-sm truncate" title={item.title}>{item.title}</h5>
-                                          {item.task?.phases?.projects?.name && (
-                                            <p className="text-xs text-blue-700 truncate" title={item.task.phases.projects.name}>
-                                              {item.task.phases.projects.name}
-                                            </p>
-                                          )}
-                                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                                            <span className="flex items-center">
-                                              <Clock className="mr-1 h-3 w-3" />
-                                              {formatTime(item.start_time)} - {formatTime(item.end_time)} ({itemDuration}m)
-                                            </span>
-                                            {item.is_auto_generated && (
-                                              <Badge variant="outline" className="py-0 px-1 text-[10px] bg-white/50">Auto</Badge>
+                                  <p className="text-xs text-gray-500">Break</p>
+                                </div>
+                                <div
+                                  className="absolute w-full flex items-center justify-center bg-gray-100 border-y border-dashed border-gray-300 z-0"
+                                  style={{
+                                    top: `${getMinutesFromTimelineStart(new Date(selectedDate).setHours(12, 30, 0, 0)) * MINUTE_TO_PIXEL_SCALE}px`,
+                                    height: `${30 * MINUTE_TO_PIXEL_SCALE}px`,
+                                  }}
+                                >
+                                  <p className="text-xs text-gray-500">Lunch</p>
+                                </div>
+
+                                {/* Schedule Items */}
+                                {selectedWorkerSchedule.schedule.map((item) => {
+                                  const itemDuration = Math.round((new Date(item.end_time).getTime() - new Date(item.start_time).getTime()) / (1000 * 60));
+                                  const top = getMinutesFromTimelineStart(item.start_time) * MINUTE_TO_PIXEL_SCALE;
+                                  const height = itemDuration * MINUTE_TO_PIXEL_SCALE;
+                                  
+                                  return (
+                                    <div
+                                      key={item.id}
+                                      className="absolute left-2 right-2 z-10"
+                                      style={{
+                                        top: `${top}px`,
+                                        height: `${height}px`,
+                                      }}
+                                    >
+                                      <DraggableScheduleItem
+                                        item={item}
+                                        onMove={handleMoveTask}
+                                        onResize={handleResizeTask}
+                                        isAdmin={isAdmin}
+                                        MINUTE_TO_PIXEL_SCALE={MINUTE_TO_PIXEL_SCALE}
+                                        formatTime={formatTime}
+                                      >
+                                        <div className={cn(
+                                            "relative h-full overflow-hidden rounded border p-2",
+                                            getPriorityColor(item.task?.priority || '')
+                                          )}>
+                                          <div className="flex justify-between h-full">
+                                            <div className="flex-1 pr-2 overflow-hidden">
+                                              <h5 className="font-medium text-sm truncate" title={item.title}>{item.title}</h5>
+                                              {item.task?.phases?.projects?.name && (
+                                                <p className="text-xs text-blue-700 truncate" title={item.task.phases.projects.name}>
+                                                  {item.task.phases.projects.name}
+                                                </p>
+                                              )}
+                                              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                                                <span className="flex items-center">
+                                                  <Clock className="mr-1 h-3 w-3" />
+                                                  {formatTime(item.start_time)} - {formatTime(item.end_time)} ({itemDuration}m)
+                                                </span>
+                                                {item.is_auto_generated && (
+                                                  <Badge variant="outline" className="py-0 px-1 text-[10px] bg-white/50">Auto</Badge>
+                                                )}
+                                              </div>
+                                            </div>
+                                            
+                                            {isAdmin && (
+                                              <div className="flex flex-col items-center justify-center space-y-1 bg-white/30 backdrop-blur-sm p-1 rounded">
+                                                <Button
+                                                  size="icon"
+                                                  variant="ghost"
+                                                  onClick={() => markTaskCompleted(item)}
+                                                  className="text-green-700 hover:bg-green-200 h-6 w-6"
+                                                  title="Mark as completed"
+                                                >
+                                                  <CheckCircle className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                  size="icon"
+                                                  variant="ghost"
+                                                  onClick={() => {
+                                                    setEditingScheduleItem(item);
+                                                    setShowTaskManager(true);
+                                                  }}
+                                                  className="hover:bg-gray-200 h-6 w-6"
+                                                  title="Edit task"
+                                                >
+                                                  <Edit className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                  size="icon"
+                                                  variant="ghost"
+                                                  onClick={() => deleteScheduleItem(item.id)}
+                                                  className="text-red-700 hover:bg-red-200 h-6 w-6"
+                                                  title="Delete task"
+                                                >
+                                                  <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                              </div>
                                             )}
                                           </div>
                                         </div>
-                                        
-                                        {isAdmin && (
-                                          <div className="flex flex-col items-center justify-center space-y-1 bg-white/30 backdrop-blur-sm p-1 rounded">
-                                            <Button
-                                              size="icon"
-                                              variant="ghost"
-                                              onClick={() => markTaskCompleted(item)}
-                                              className="text-green-700 hover:bg-green-200 h-6 w-6"
-                                              title="Mark as completed"
-                                            >
-                                              <CheckCircle className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                              size="icon"
-                                              variant="ghost"
-                                              onClick={() => {
-                                                setEditingScheduleItem(item);
-                                                setShowTaskManager(true);
-                                              }}
-                                              className="hover:bg-gray-200 h-6 w-6"
-                                              title="Edit task"
-                                            >
-                                              <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                              size="icon"
-                                              variant="ghost"
-                                              onClick={() => deleteScheduleItem(item.id)}
-                                              className="text-red-700 hover:bg-red-200 h-6 w-6"
-                                              title="Delete task"
-                                            >
-                                              <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                          </div>
-                                        )}
-                                      </div>
+                                      </DraggableScheduleItem>
                                     </div>
-                                  </DraggableScheduleItem>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="rounded border-2 border-dashed border-gray-200 py-8 text-center text-gray-500">
-                          <Clock className="mx-auto mb-2 h-8 w-8 text-gray-400" />
-                          <p>No tasks scheduled for this day</p>
-                          {isAdmin && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setShowTaskManager(true)}
-                              className="mt-2"
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add Task
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Available Tasks */}
-                {selectedWorkerSchedule && selectedWorkerSchedule.tasks.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Available TODO Tasks for {selectedWorkerSchedule.employee.name}</CardTitle>
-                      <p className="text-sm text-gray-600">
-                        Tasks from assigned workstations: {selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None'}
-                      </p>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {selectedWorkerSchedule.tasks.slice(0, 10).map((task) => (
-                          <div key={task.id} className="flex items-center justify-between p-3 border rounded">
-                            <div className="flex-1">
-                              <h5 className="font-medium">{task.title}</h5>
-                              {task.phases && (
-                                <p className="text-sm text-blue-600">Project: {task.phases.projects.name}</p>
-                              )}
-                              {task.description && (
-                                <p className="text-sm text-gray-600">{task.description}</p>
-                              )}
-                              <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
-                                <span>Duration: {task.duration || 60} min</span>
-                                <span>Due: {format(new Date(task.due_date), 'MMM dd')}</span>
-                                <span>Workstations: {task.workstations?.map(ws => ws.name).join(', ') || 'None'}</span>
-                                {task.assignee_id === selectedWorkerSchedule.employee.id && (
-                                  <Badge variant="secondary">Directly Assigned</Badge>
-                                )}
+                                  );
+                                })}
                               </div>
                             </div>
-                            
-                            <div className="flex items-center space-x-2">
-                              <Badge className={getPriorityColor(task.priority)}>
-                                {task.priority}
-                              </Badge>
-                              <Badge variant="outline">
-                                {task.status}
-                              </Badge>
+                          ) : (
+                            <div className="rounded border-2 border-dashed border-gray-200 py-8 text-center text-gray-500">
+                              <Clock className="mx-auto mb-2 h-8 w-8 text-gray-400" />
+                              <p>No tasks scheduled for this day</p>
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setShowTaskManager(true)}
+                                  className="mt-2"
+                                >
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Add Task
+                                </Button>
+                              )}
                             </div>
-                          </div>
-                        ))}
-                        
-                        {selectedWorkerSchedule.tasks.length > 10 && (
-                          <div className="text-center py-4 text-sm text-gray-500">
-                            ... and {selectedWorkerSchedule.tasks.length - 10} more TODO tasks
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
 
-                {/* Show message when no TODO tasks available */}
-                {selectedWorkerSchedule && selectedWorkerSchedule.tasks.length === 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>No TODO Tasks Available</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-center py-8">
-                        <AlertCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                        <p className="text-gray-600 mb-2">
-                          No TODO tasks found for {selectedWorkerSchedule.employee.name}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Assigned workstations: {selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None assigned'}
-                        </p>
-                        {isAdmin && (
-                          <Button
-                            onClick={() => setShowTaskManager(true)}
-                            className="mt-4"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add New Task
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
+                    {/* Available Tasks */}
+                    {selectedWorkerSchedule && selectedWorkerSchedule.tasks.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Available TODO Tasks for {selectedWorkerSchedule.employee.name}</CardTitle>
+                          <p className="text-sm text-gray-600">
+                            Tasks from assigned workstations: {selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None'}
+                          </p>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {selectedWorkerSchedule.tasks.slice(0, 10).map((task) => (
+                              <div key={task.id} className="flex items-center justify-between p-3 border rounded">
+                                <div className="flex-1">
+                                  <h5 className="font-medium">{task.title}</h5>
+                                  {task.phases && (
+                                    <p className="text-sm text-blue-600">Project: {task.phases.projects.name}</p>
+                                  )}
+                                  {task.description && (
+                                    <p className="text-sm text-gray-600">{task.description}</p>
+                                  )}
+                                  <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                                    <span>Duration: {task.duration || 60} min</span>
+                                    <span>Due: {format(new Date(task.due_date), 'MMM dd')}</span>
+                                    <span>Workstations: {task.workstations?.map(ws => ws.name).join(', ') || 'None'}</span>
+                                    {task.assignee_id === selectedWorkerSchedule.employee.id && (
+                                      <Badge variant="secondary">Directly Assigned</Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center space-x-2">
+                                  <Badge className={getPriorityColor(task.priority)}>
+                                    {task.priority}
+                                  </Badge>
+                                  <Badge variant="outline">
+                                    {task.status}
+                                  </Badge>
+                                </div>
+                              </div>
+                            ))}
+                            
+                            {selectedWorkerSchedule.tasks.length > 10 && (
+                              <div className="text-center py-4 text-sm text-gray-500">
+                                ... and {selectedWorkerSchedule.tasks.length - 10} more TODO tasks
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Show message when no TODO tasks available */}
+                    {selectedWorkerSchedule && selectedWorkerSchedule.tasks.length === 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>No TODO Tasks Available</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-center py-8">
+                            <AlertCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                            <p className="text-gray-600 mb-2">
+                              No TODO tasks found for {selectedWorkerSchedule.employee.name}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              Assigned workstations: {selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None assigned'}
+                            </p>
+                            {isAdmin && (
+                              <Button
+                                onClick={() => setShowTaskManager(true)}
+                                className="mt-4"
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add New Task
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
                 )}
-              </div>
+              </>
             )}
 
             <PlanningTaskManager
