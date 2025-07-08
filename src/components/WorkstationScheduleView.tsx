@@ -211,8 +211,8 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
                               <h5 className="font-medium text-sm truncate" title={schedule.task_title}>
                                 {schedule.task_title}
                               </h5>
-                              <p className="text-xs text-gray-600 truncate" title={schedule.user_name}>
-                                Assigned to: {schedule.user_name}
+                              <p className="text-xs text-gray-600 truncate font-medium" title={schedule.user_name}>
+                                👤 {schedule.user_name}
                               </p>
                               <div className="mt-1 flex items-center gap-2 text-xs">
                                 <span className="flex items-center">
