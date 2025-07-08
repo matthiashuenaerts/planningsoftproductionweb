@@ -599,6 +599,7 @@ const Planning = () => {
       let skippedOnHoliday = 0;
       let successfullyGenerated = 0;
       
+      // Step 1: Generate worker schedules
       for (const workerSchedule of workerSchedules) {
         // CRITICAL: Check if employee is on holiday before generating schedule
         const isOnHoliday = await planningService.isEmployeeOnHoliday(workerSchedule.employee.id, selectedDate);
@@ -612,25 +613,29 @@ const Planning = () => {
         successfullyGenerated++;
       }
       
-      // Refresh data after generating all schedules
+      // Step 2: Refresh data after generating all worker schedules
       await fetchAllData();
       
-      // After generating all schedules, check for conflicts
+      // Step 3: Check for conflicts
       const conflicts = detectTaskConflicts(workerSchedules);
       if (conflicts.length > 0) {
         setTaskConflicts(conflicts);
         setShowConflictResolver(true);
-      } else {
-        let message = `Generated schedules for ${successfullyGenerated} workers`;
-        if (skippedOnHoliday > 0) {
-          message += ` (${skippedOnHoliday} workers skipped due to approved holidays)`;
-        }
-        
-        toast({
-          title: "Schedules Generated",
-          description: message,
-        });
+        return; // Stop here if there are conflicts to resolve
       }
+      
+      // Step 4: Generate workstation schedules based on worker schedules
+      await generateWorkstationSchedulesFromWorkerSchedules();
+      
+      let message = `Generated schedules for ${successfullyGenerated} workers and their workstation assignments`;
+      if (skippedOnHoliday > 0) {
+        message += ` (${skippedOnHoliday} workers skipped due to approved holidays)`;
+      }
+      
+      toast({
+        title: "All Schedules Generated",
+        description: message,
+      });
     } catch (error: any) {
       console.error('Error generating all schedules:', error);
       toast({
@@ -643,14 +648,14 @@ const Planning = () => {
     }
   };
 
-  const generateWorkstationSchedules = async () => {
+  const generateWorkstationSchedulesFromWorkerSchedules = async () => {
     if (!selectedDate) return;
 
     try {
-      setGeneratingSchedule(true);
+      console.log('Generating workstation schedules from worker schedules...');
 
-      // Get all user schedules for the selected date with their task-workstation links
-      const { data: userSchedules, error: schedulesError } = await supabase
+      // Get all worker schedules for the selected date with their task-workstation links
+      const { data: workerSchedulesData, error: schedulesError } = await supabase
         .from('schedules')
         .select(`
           *,
@@ -674,14 +679,7 @@ const Planning = () => {
 
       if (schedulesError) throw schedulesError;
 
-      console.log('User schedules found:', userSchedules?.length || 0);
-
-      // Get all workstations
-      const { data: workstations, error: workstationsError } = await supabase
-        .from('workstations')
-        .select('*');
-
-      if (workstationsError) throw workstationsError;
+      console.log('Worker schedules found:', workerSchedulesData?.length || 0);
 
       // Delete existing workstation schedules for the selected date
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -697,15 +695,14 @@ const Planning = () => {
 
       const workstationSchedulesToCreate = [];
 
-      // Process each user schedule and create corresponding workstation schedules
-      for (const schedule of userSchedules || []) {
+      // Process each worker schedule and create corresponding workstation schedules
+      for (const schedule of workerSchedulesData || []) {
         const taskWorkstationLinks = schedule.task?.task_workstation_links || [];
         const userName = schedule.employee?.name || 'Unknown User';
         const startTime = new Date(schedule.start_time);
         const endTime = new Date(schedule.end_time);
-        const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
         
-        console.log(`Processing schedule for ${userName}: ${schedule.title} (${durationMinutes} min)`);
+        console.log(`Processing schedule for ${userName}: ${schedule.title}`);
         console.log(`Task workstation links:`, taskWorkstationLinks);
         
         // Only create workstation schedules for tasks that have workstation links
@@ -745,9 +742,24 @@ const Planning = () => {
         }
       }
 
+      console.log(`Successfully created ${workstationSchedulesToCreate.length} workstation schedule assignments`);
+
+    } catch (error: any) {
+      console.error('Error generating workstation schedules from worker schedules:', error);
+      throw error;
+    }
+  };
+
+  const generateWorkstationSchedules = async () => {
+    if (!selectedDate) return;
+
+    try {
+      setGeneratingSchedule(true);
+      await generateWorkstationSchedulesFromWorkerSchedules();
+      
       toast({
         title: "Workstation Schedules Generated",
-        description: `Created ${workstationSchedulesToCreate.length} workstation schedule assignments based on task-workstation links`,
+        description: "Generated workstation schedules based on current worker schedules",
       });
 
     } catch (error: any) {
@@ -1126,15 +1138,6 @@ const Planning = () => {
                     >
                       <Zap className="mr-2 h-4 w-4" />
                       {generatingSchedule ? 'Generating...' : 'Generate All Schedules'}
-                    </Button>
-                    <Button
-                      onClick={generateWorkstationSchedules}
-                      disabled={generatingSchedule}
-                      className="whitespace-nowrap"
-                      variant="outline"
-                    >
-                      <Settings className="mr-2 h-4 w-4" />
-                      {generatingSchedule ? 'Generating...' : 'Generate Workstation Schedules'}
                     </Button>
                   </div>
                 )}
