@@ -2,9 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Settings } from 'lucide-react';
+import { Clock, Settings, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface WorkstationScheduleViewProps {
@@ -40,6 +41,7 @@ interface WorkstationSchedule {
 const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selectedDate }) => {
   const [workstationSchedules, setWorkstationSchedules] = useState<WorkstationSchedule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generatingSchedule, setGeneratingSchedule] = useState(false);
   const { toast } = useToast();
 
   const TIMELINE_START_HOUR = 7;
@@ -118,6 +120,123 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
     }
   };
 
+  const generateWorkstationSchedules = async () => {
+    if (!selectedDate) return;
+
+    try {
+      setGeneratingSchedule(true);
+      console.log('Generating workstation schedules from worker schedules...');
+
+      // Get all worker schedules for the selected date with their task-workstation links
+      const { data: workerSchedulesData, error: schedulesError } = await supabase
+        .from('schedules')
+        .select(`
+          *,
+          employee:employees(id, name, role, workstation),
+          task:tasks(
+            id,
+            title,
+            description,
+            priority,
+            task_workstation_links(
+              workstation:workstations(
+                id,
+                name
+              )
+            )
+          )
+        `)
+        .gte('start_time', format(selectedDate, 'yyyy-MM-dd') + 'T00:00:00')
+        .lte('start_time', format(selectedDate, 'yyyy-MM-dd') + 'T23:59:59')
+        .not('task_id', 'is', null); // Only get schedules that have actual tasks
+
+      if (schedulesError) throw schedulesError;
+
+      console.log('Worker schedules found:', workerSchedulesData?.length || 0);
+
+      // Delete existing workstation schedules for the selected date
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const { error: deleteError } = await supabase
+        .from('workstation_schedules')
+        .delete()
+        .gte('start_time', `${dateStr}T00:00:00`)
+        .lte('start_time', `${dateStr}T23:59:59`);
+
+      if (deleteError) {
+        console.error('Error deleting existing workstation schedules:', deleteError);
+      }
+
+      const workstationSchedulesToCreate = [];
+
+      // Process each worker schedule and create corresponding workstation schedules
+      for (const schedule of workerSchedulesData || []) {
+        const taskWorkstationLinks = schedule.task?.task_workstation_links || [];
+        const userName = schedule.employee?.name || 'Unknown User';
+        const startTime = new Date(schedule.start_time);
+        const endTime = new Date(schedule.end_time);
+        
+        console.log(`Processing schedule for ${userName}: ${schedule.title}`);
+        console.log(`Task workstation links:`, taskWorkstationLinks);
+        
+        // Only create workstation schedules for tasks that have workstation links
+        if (taskWorkstationLinks && taskWorkstationLinks.length > 0) {
+          // Create a workstation schedule for each linked workstation
+          for (const link of taskWorkstationLinks) {
+            const workstation = link.workstation;
+            if (workstation) {
+              console.log(`Creating workstation schedule for workstation: ${workstation.name}`);
+              
+              workstationSchedulesToCreate.push({
+                workstation_id: workstation.id,
+                task_id: schedule.task_id,
+                task_title: schedule.title,
+                user_name: userName,
+                start_time: startTime.toISOString(),
+                end_time: endTime.toISOString()
+              });
+            }
+          }
+        } else {
+          console.log(`No workstation links found for task: ${schedule.title}`);
+        }
+      }
+
+      console.log(`Creating ${workstationSchedulesToCreate.length} workstation schedules`);
+
+      // Insert workstation schedules
+      if (workstationSchedulesToCreate.length > 0) {
+        const { error: insertError } = await supabase
+          .from('workstation_schedules')
+          .insert(workstationSchedulesToCreate);
+
+        if (insertError) {
+          console.error('Error creating workstation schedules:', insertError);
+          throw insertError;
+        }
+      }
+
+      console.log(`Successfully created ${workstationSchedulesToCreate.length} workstation schedule assignments`);
+      
+      // Refresh the data to show updated schedules
+      await fetchWorkstationSchedules();
+      
+      toast({
+        title: "Workstation Schedules Generated",
+        description: `Generated ${workstationSchedulesToCreate.length} workstation schedules based on worker schedules`,
+      });
+
+    } catch (error: any) {
+      console.error('Error generating workstation schedules:', error);
+      toast({
+        title: "Error",
+        description: `Failed to generate workstation schedules: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingSchedule(false);
+    }
+  };
+
   // Group schedules by workstation
   const groupedSchedules = workstationSchedules.reduce((acc, schedule) => {
     const workstationId = schedule.workstation_id;
@@ -141,12 +260,25 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
 
   return (
     <div className="space-y-6">
+      {/* Generate Button */}
+      <div className="flex justify-end">
+        <Button
+          onClick={generateWorkstationSchedules}
+          disabled={generatingSchedule}
+          className="flex items-center gap-2"
+        >
+          <Zap className="h-4 w-4" />
+          {generatingSchedule ? 'Generating...' : 'Generate Workstation Schedules'}
+        </Button>
+      </div>
+
       {Object.keys(groupedSchedules).length === 0 ? (
         <Card>
           <CardContent className="py-8">
             <div className="text-center text-gray-500">
               <Settings className="mx-auto mb-2 h-8 w-8 text-gray-400" />
               <p>No workstation schedules found for this date</p>
+              <p className="text-xs mt-1">Generate workstation schedules from worker schedules using the button above</p>
             </div>
           </CardContent>
         </Card>
