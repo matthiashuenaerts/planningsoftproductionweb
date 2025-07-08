@@ -184,7 +184,7 @@ const GeneralSchedule: React.FC = () => {
         const totalGroups = Math.ceil(employees.length / USERS_PER_PAGE);
         return (prev + 1) % totalGroups;
       });
-    }, 10000); // 10 seconds
+    }, 15000); // 10 seconds
 
     return () => clearInterval(interval);
   }, [employees.length, USERS_PER_PAGE]);
