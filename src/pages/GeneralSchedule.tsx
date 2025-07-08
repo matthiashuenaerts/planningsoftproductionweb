@@ -21,6 +21,10 @@ interface Schedule {
   end_time: string;
   employee: { name: string };
   task?: {
+    assignee?: {
+      id: string;
+      name: string;
+    };
     phase?: {
       project?: {
         name: string;
@@ -107,6 +111,7 @@ const GeneralSchedule: React.FC = () => {
           end_time,
           employee:employees(name),
           task:tasks(
+            assignee:employees!tasks_assignee_id_fkey(id, name),
             phase:phases(
               project:projects(name)
             )
@@ -294,6 +299,7 @@ const GeneralSchedule: React.FC = () => {
                 {/* Schedule blocks */}
                 {!isOnHoliday && employeeSchedules.map((schedule) => {
                   const position = getSchedulePosition(schedule.start_time, schedule.end_time);
+                  const assignedUserName = schedule.task?.assignee?.name || schedule.employee.name;
                   
                   return (
                     <div
@@ -304,11 +310,16 @@ const GeneralSchedule: React.FC = () => {
                         height: position.height,
                         marginRight: '2px'
                       }}
-                      title={`${schedule.title}\n${format(parseISO(schedule.start_time), 'HH:mm')} - ${format(parseISO(schedule.end_time), 'HH:mm')}\n${schedule.description || ''}`}
+                      title={`${schedule.title}\n${format(parseISO(schedule.start_time), 'HH:mm')} - ${format(parseISO(schedule.end_time), 'HH:mm')}\nAssigned to: ${assignedUserName}\n${schedule.description || ''}`}
                     >
                       <div className="text-xs font-medium text-blue-800 line-clamp-1">
                         {schedule.title}
                       </div>
+                      {schedule.task?.assignee && (
+                        <div className="text-xs text-blue-700 line-clamp-1 font-medium">
+                          👤 {schedule.task.assignee.name}
+                        </div>
+                      )}
                       {schedule.task?.phase?.project?.name && (
                         <div className="text-xs text-blue-700 line-clamp-1 font-medium">
                           {schedule.task.phase.project.name}
