@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,6 +21,27 @@ interface Schedule {
   start_time: string;
   end_time: string;
   employee: { name: string };
+  task?: {
+    assignee?: {
+      id: string;
+      name: string;
+    };
+    phase?: {
+      project?: {
+        name: string;
+      };
+    };
+  };
+}
+
+interface WorkstationSchedule {
+  id: string;
+  workstation_id: string;
+  task_title: string;
+  user_name: string;
+  start_time: string;
+  end_time: string;
+  workstation: { name: string };
   task?: {
     assignee?: {
       id: string;
@@ -126,6 +148,36 @@ const GeneralSchedule: React.FC = () => {
     }
   });
 
+  // Fetch workstation schedules for today
+  const { data: workstationSchedules = [] } = useQuery<WorkstationSchedule[]>({
+    queryKey: ['workstation-schedules', todayStart.toISOString(), todayEnd.toISOString()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('workstation_schedules')
+        .select(`
+          id,
+          workstation_id,
+          task_title,
+          user_name,
+          start_time,
+          end_time,
+          workstation:workstations(name),
+          task:tasks(
+            assignee:employees!tasks_assignee_id_fkey(id, name),
+            phase:phases(
+              project:projects(name)
+            )
+          )
+        `)
+        .gte('start_time', todayStart.toISOString())
+        .lte('end_time', todayEnd.toISOString())
+        .order('start_time');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
   // Fetch holiday requests for today
   const { data: holidays = [] } = useQuery<HolidayRequest[]>({
     queryKey: ['holidays', format(today, 'yyyy-MM-dd')],
@@ -147,9 +199,28 @@ const GeneralSchedule: React.FC = () => {
     return holidays.some(holiday => holiday.user_id === employeeId);
   };
 
-  // Get schedules for a specific employee
+  // Get schedules for a specific employee (including workstation schedules)
   const getSchedulesForEmployee = (employeeId: string) => {
-    return schedules.filter(schedule => schedule.employee_id === employeeId);
+    const regularSchedules = schedules.filter(schedule => schedule.employee_id === employeeId);
+    
+    // Find workstation schedules for this employee based on user_name
+    const employee = employees.find(emp => emp.id === employeeId);
+    const employeeWorkstationSchedules = workstationSchedules
+      .filter(ws => ws.user_name === employee?.name)
+      .map(ws => ({
+        id: ws.id,
+        employee_id: employeeId,
+        title: ws.task_title,
+        description: null,
+        start_time: ws.start_time,
+        end_time: ws.end_time,
+        employee: { name: ws.user_name },
+        task: ws.task,
+        isWorkstationSchedule: true,
+        workstation: ws.workstation
+      }));
+
+    return [...regularSchedules, ...employeeWorkstationSchedules];
   };
 
   // Calculate position and height for a schedule block
@@ -300,37 +371,47 @@ const GeneralSchedule: React.FC = () => {
                 {!isOnHoliday && employeeSchedules.map((schedule) => {
                   const position = getSchedulePosition(schedule.start_time, schedule.end_time);
                   const assignedUserName = schedule.task?.assignee?.name || schedule.employee.name;
+                  // Determine if this is a workstation schedule
+                  const isWorkstationSchedule = 'isWorkstationSchedule' in schedule && schedule.isWorkstationSchedule;
+                  const bgColor = isWorkstationSchedule ? 'bg-green-100 border-green-300' : 'bg-blue-100 border-blue-300';
+                  const textColor = isWorkstationSchedule ? 'text-green-800' : 'text-blue-800';
+                  const hoverColor = isWorkstationSchedule ? 'hover:bg-green-200' : 'hover:bg-blue-200';
                   
                   return (
                     <div
                       key={schedule.id}
-                      className="absolute left-0 right-0 bg-blue-100 border border-blue-300 rounded-md p-1 overflow-hidden hover:bg-blue-200 transition-colors cursor-pointer"
+                      className={`absolute left-0 right-0 ${bgColor} border rounded-md p-1 overflow-hidden ${hoverColor} transition-colors cursor-pointer`}
                       style={{ 
                         top: position.top, 
                         height: position.height,
                         marginRight: '2px'
                       }}
-                      title={`${schedule.title}\n${format(parseISO(schedule.start_time), 'HH:mm')} - ${format(parseISO(schedule.end_time), 'HH:mm')}\nAssigned to: ${assignedUserName}\n${schedule.description || ''}`}
+                      title={`${schedule.title}\n${format(parseISO(schedule.start_time), 'HH:mm')} - ${format(parseISO(schedule.end_time), 'HH:mm')}\nAssigned to: ${assignedUserName}${isWorkstationSchedule ? `\nWorkstation: ${schedule.workstation?.name}` : ''}\n${schedule.description || ''}`}
                     >
-                      <div className="text-xs font-medium text-blue-800 line-clamp-1">
+                      <div className={`text-xs font-medium ${textColor} line-clamp-1`}>
                         {schedule.title}
                       </div>
                       {schedule.task?.assignee && (
-                        <div className="text-xs text-blue-700 line-clamp-1 font-medium">
+                        <div className={`text-xs ${isWorkstationSchedule ? 'text-green-700' : 'text-blue-700'} line-clamp-1 font-medium`}>
                           👤 {schedule.task.assignee.name}
                         </div>
                       )}
+                      {isWorkstationSchedule && 'workstation' in schedule && schedule.workstation && (
+                        <div className={`text-xs ${isWorkstationSchedule ? 'text-green-700' : 'text-blue-700'} line-clamp-1 font-medium`}>
+                          🔧 {schedule.workstation.name}
+                        </div>
+                      )}
                       {schedule.task?.phase?.project?.name && (
-                        <div className="text-xs text-blue-700 line-clamp-1 font-medium">
+                        <div className={`text-xs ${isWorkstationSchedule ? 'text-green-700' : 'text-blue-700'} line-clamp-1 font-medium`}>
                           {schedule.task.phase.project.name}
                         </div>
                       )}
-                      <div className="text-xs text-blue-600 line-clamp-1">
+                      <div className={`text-xs ${isWorkstationSchedule ? 'text-green-600' : 'text-blue-600'} line-clamp-1`}>
                         {format(parseISO(schedule.start_time), 'HH:mm')} - 
                         {format(parseISO(schedule.end_time), 'HH:mm')}
                       </div>
                       {schedule.description && parseFloat(position.height) > 5 && (
-                        <div className="text-xs text-blue-500 line-clamp-1 mt-1">
+                        <div className={`text-xs ${isWorkstationSchedule ? 'text-green-500' : 'text-blue-500'} line-clamp-1 mt-1`}>
                           {schedule.description}
                         </div>
                       )}
