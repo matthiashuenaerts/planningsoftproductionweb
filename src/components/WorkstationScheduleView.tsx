@@ -30,6 +30,10 @@ interface WorkstationSchedule {
     description?: string;
     priority: string;
     status: string;
+    assignee?: {
+      id: string;
+      name: string;
+    };
   };
 }
 
@@ -85,7 +89,14 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
         .select(`
           *,
           workstation:workstations(id, name, description),
-          task:tasks(id, title, description, priority, status)
+          task:tasks(
+            id, 
+            title, 
+            description, 
+            priority, 
+            status,
+            assignee:employees!tasks_assignee_id_fkey(id, name)
+          )
         `)
         .gte('start_time', startOfDay)
         .lte('start_time', endOfDay)
@@ -93,6 +104,7 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
 
       if (error) throw error;
 
+      console.log('Workstation schedules data:', data);
       setWorkstationSchedules(data || []);
     } catch (error: any) {
       console.error('Error fetching workstation schedules:', error);
@@ -194,6 +206,9 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
                     const top = getMinutesFromTimelineStart(schedule.start_time) * MINUTE_TO_PIXEL_SCALE;
                     const height = duration * MINUTE_TO_PIXEL_SCALE;
 
+                    // Get the assigned user name - prioritize task assignee, fall back to user_name
+                    const assignedUserName = schedule.task?.assignee?.name || schedule.user_name;
+
                     return (
                       <div
                         key={schedule.id}
@@ -211,8 +226,8 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
                               <h5 className="font-medium text-sm truncate" title={schedule.task_title}>
                                 {schedule.task_title}
                               </h5>
-                              <p className="text-xs text-gray-600 truncate font-medium" title={schedule.user_name}>
-                                👤 {schedule.user_name}
+                              <p className="text-xs text-gray-600 truncate font-medium" title={assignedUserName}>
+                                👤 {assignedUserName}
                               </p>
                               <div className="mt-1 flex items-center gap-2 text-xs">
                                 <span className="flex items-center">
@@ -225,6 +240,11 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
                                   </Badge>
                                 )}
                               </div>
+                              {schedule.task?.description && height > 80 && (
+                                <p className="text-xs text-gray-500 mt-1 line-clamp-2" title={schedule.task.description}>
+                                  {schedule.task.description}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>
