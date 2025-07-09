@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Clock, User, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, startOfDay, endOfDay, parseISO } from 'date-fns';
+import { Calendar, Clock, User, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
+import { format, startOfDay, endOfDay, parseISO, addDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 
 interface Employee {
@@ -33,6 +34,32 @@ interface Schedule {
   };
 }
 
+interface WorkstationSchedule {
+  id: string;
+  workstation_id: string;
+  task_id?: string;
+  task_title: string;
+  user_name: string;
+  start_time: string;
+  end_time: string;
+  workstation?: {
+    id: string;
+    name: string;
+    description?: string;
+  };
+  task?: {
+    id: string;
+    title: string;
+    description?: string;
+    priority: string;
+    status: string;
+    assignee?: {
+      id: string;
+      name: string;
+    };
+  };
+}
+
 interface HolidayRequest {
   user_id: string;
   start_date: string;
@@ -43,24 +70,41 @@ interface HolidayRequest {
 
 const GeneralSchedule: React.FC = () => {
   const [currentUserGroup, setCurrentUserGroup] = useState(0);
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const today = new Date();
-  const todayStart = startOfDay(today);
-  const todayEnd = endOfDay(today);
+  const selectedDateStart = startOfDay(selectedDate);
+  const selectedDateEnd = endOfDay(selectedDate);
+  const isToday = format(selectedDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+
+  // Timeline constants
+  const TIMELINE_START_HOUR = 7;
+  const TIMELINE_END_HOUR = 17;
+  const MINUTE_TO_PIXEL_SCALE = 2;
 
   // Generate hour markers for the day (7 AM to 5 PM)
   const hourMarkers = [];
   for (let hour = 7; hour <= 17; hour++) {
-    const time = new Date(today);
+    const time = new Date(selectedDate);
     time.setHours(hour, 0, 0, 0);
     hourMarkers.push(time);
   }
 
-  // Timeline height calculation (10 hours * flexible height)
-  // Use calc to fill remaining space after header
-  const timelineHeight = 'calc(100vh - 120px)'; // Dynamic height
+  // Timeline height calculation
+  const timelineHeight = 'calc(100vh - 120px)';
 
   // Users per page
   const USERS_PER_PAGE = 6;
+
+  // Helper function to get next workday (skip weekends)
+  const getNextWorkday = (date: Date) => {
+    let nextDay = addDays(date, 1);
+    while (nextDay.getDay() === 0 || nextDay.getDay() === 6) {
+      nextDay = addDays(nextDay, 1);
+    }
+    return nextDay;
+  };
+
+  const nextWorkday = getNextWorkday(new Date());
 
   // Fetch all employees (excluding admins and managers)
   const { data: allEmployees = [] } = useQuery<Employee[]>({
@@ -77,12 +121,12 @@ const GeneralSchedule: React.FC = () => {
     }
   });
 
-  // Sort employees by role priority: workers first, then workstations, then others
+  // Sort employees by role priority
   const employees = allEmployees.sort((a, b) => {
     const getRolePriority = (role: string) => {
       if (role === 'worker') return 1;
-      if (role === 'installation_team') return 2; // workstations
-      return 3; // others
+      if (role === 'installation_team') return 2;
+      return 3;
     };
 
     const priorityA = getRolePriority(a.role);
@@ -92,13 +136,12 @@ const GeneralSchedule: React.FC = () => {
       return priorityA - priorityB;
     }
     
-    // If same priority, sort by name
     return a.name.localeCompare(b.name);
   });
 
-  // Fetch schedules for today
+  // Fetch schedules for selected date
   const { data: schedules = [], isLoading } = useQuery<Schedule[]>({
-    queryKey: ['schedules', todayStart.toISOString(), todayEnd.toISOString()],
+    queryKey: ['schedules', selectedDateStart.toISOString(), selectedDateEnd.toISOString()],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('schedules')
@@ -117,8 +160,8 @@ const GeneralSchedule: React.FC = () => {
             )
           )
         `)
-        .gte('start_time', todayStart.toISOString())
-        .lte('end_time', todayEnd.toISOString())
+        .gte('start_time', selectedDateStart.toISOString())
+        .lte('end_time', selectedDateEnd.toISOString())
         .order('start_time');
       
       if (error) throw error;
@@ -126,56 +169,113 @@ const GeneralSchedule: React.FC = () => {
     }
   });
 
-  // Fetch holiday requests for today
+  // Fetch workstation schedules for selected date
+  const { data: workstationSchedules = [] } = useQuery<WorkstationSchedule[]>({
+    queryKey: ['workstation-schedules', format(selectedDate, 'yyyy-MM-dd')],
+    queryFn: async () => {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const startOfDay = `${dateStr}T00:00:00`;
+      const endOfDay = `${dateStr}T23:59:59`;
+
+      const { data, error } = await supabase
+        .from('workstation_schedules')
+        .select(`
+          *,
+          workstation:workstations(id, name, description),
+          task:tasks(
+            id, 
+            title, 
+            description, 
+            priority, 
+            status,
+            assignee:employees!tasks_assignee_id_fkey(id, name)
+          )
+        `)
+        .gte('start_time', startOfDay)
+        .lte('start_time', endOfDay)
+        .order('start_time');
+
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  // Fetch holiday requests for selected date
   const { data: holidays = [] } = useQuery<HolidayRequest[]>({
-    queryKey: ['holidays', format(today, 'yyyy-MM-dd')],
+    queryKey: ['holidays', format(selectedDate, 'yyyy-MM-dd')],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('holiday_requests')
         .select('user_id, start_date, end_date, reason, employee_name')
         .eq('status', 'approved')
-        .lte('start_date', format(today, 'yyyy-MM-dd'))
-        .gte('end_date', format(today, 'yyyy-MM-dd'));
+        .lte('start_date', format(selectedDate, 'yyyy-MM-dd'))
+        .gte('end_date', format(selectedDate, 'yyyy-MM-dd'));
       
       if (error) throw error;
       return data;
     }
   });
 
-  // Check if employee is on holiday today
+  // Helper functions
   const isEmployeeOnHoliday = (employeeId: string) => {
     return holidays.some(holiday => holiday.user_id === employeeId);
   };
 
-  // Get schedules for a specific employee
   const getSchedulesForEmployee = (employeeId: string) => {
     return schedules.filter(schedule => schedule.employee_id === employeeId);
   };
 
-  // Calculate position and height for a schedule block
+  const getMinutesFromTimelineStart = (time: string | Date): number => {
+    const date = new Date(time);
+    const timelineStartDate = new Date(date);
+    timelineStartDate.setHours(TIMELINE_START_HOUR, 0, 0, 0);
+    const diff = (date.getTime() - timelineStartDate.getTime()) / (1000 * 60);
+    return Math.max(0, diff);
+  };
+
+  const formatTime = (timeStr: string) => {
+    return format(new Date(timeStr), 'HH:mm');
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority?.toLowerCase()) {
+      case 'urgent':
+        return 'bg-red-100 text-red-800 border-red-300';
+      case 'high':
+        return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'low':
+        return 'bg-green-100 text-green-800 border-green-300';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
   const getSchedulePosition = (startTime: string, endTime: string) => {
     const start = parseISO(startTime);
     const end = parseISO(endTime);
     
-    // Calculate minutes from 7 AM
     const startMinutes = (start.getHours() - 7) * 60 + start.getMinutes();
     const endMinutes = (end.getHours() - 7) * 60 + end.getMinutes();
     
-    // Calculate as percentage of total timeline (10 hours = 600 minutes)
-    const totalMinutes = (17 - 7) * 60; // 600 minutes
+    const totalMinutes = (17 - 7) * 60;
     const topPercent = (startMinutes / totalMinutes) * 100;
-    const heightPercent = Math.max(((endMinutes - startMinutes) / totalMinutes) * 100, 2.5); // Minimum 2.5% height
+    const heightPercent = Math.max(((endMinutes - startMinutes) / totalMinutes) * 100, 2.5);
     
     return { top: `${topPercent}%`, height: `${heightPercent}%` };
   };
 
-  // Get current page of employees
   const getCurrentEmployees = () => {
     const startIndex = currentUserGroup * USERS_PER_PAGE;
     return employees.slice(startIndex, startIndex + USERS_PER_PAGE);
   };
 
-  // Auto-cycle through user groups every 10 seconds
+  const getHolidayInfo = (employeeId: string) => {
+    return holidays.find(holiday => holiday.user_id === employeeId);
+  };
+
+  // Auto-cycle through user groups
   useEffect(() => {
     if (employees.length <= USERS_PER_PAGE) return;
 
@@ -184,15 +284,23 @@ const GeneralSchedule: React.FC = () => {
         const totalGroups = Math.ceil(employees.length / USERS_PER_PAGE);
         return (prev + 1) % totalGroups;
       });
-    }, 15000); // 10 seconds
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [employees.length, USERS_PER_PAGE]);
 
-  // Get holiday info for employee
-  const getHolidayInfo = (employeeId: string) => {
-    return holidays.find(holiday => holiday.user_id === employeeId);
-  };
+  // Group workstation schedules by workstation
+  const groupedWorkstationSchedules = workstationSchedules.reduce((acc, schedule) => {
+    const workstationId = schedule.workstation_id;
+    if (!acc[workstationId]) {
+      acc[workstationId] = {
+        workstation: schedule.workstation,
+        schedules: []
+      };
+    }
+    acc[workstationId].schedules.push(schedule);
+    return acc;
+  }, {} as Record<string, { workstation: any; schedules: WorkstationSchedule[] }>);
 
   const currentEmployees = getCurrentEmployees();
   const totalGroups = Math.ceil(employees.length / USERS_PER_PAGE);
@@ -211,143 +319,192 @@ const GeneralSchedule: React.FC = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Calendar className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-bold">General Schedule - {format(today, 'EEEE, MMM dd, yyyy')}</h1>
-        </div>
-        {totalGroups > 1 && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Group {currentUserGroup + 1} of {totalGroups}</span>
-            <div className="flex gap-1">
-              {Array.from({ length: totalGroups }).map((_, index) => (
-                <div
-                  key={index}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    index === currentUserGroup ? 'bg-primary' : 'bg-muted'
-                  }`}
-                />
-              ))}
+          <h1 className="text-xl font-bold">General Schedule - {format(selectedDate, 'EEEE, MMM dd, yyyy')}</h1>
+          {!isToday && (
+            <div className="flex items-center gap-2 ml-4">
+              <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+              <span className="text-sm text-orange-600 font-medium">
+                {format(selectedDate, 'yyyy-MM-dd') === format(nextWorkday, 'yyyy-MM-dd') ? 'Next Workday' : 'Future Date'}
+              </span>
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* Schedule Grid */}
-      <div className="flex gap-3 flex-1 overflow-hidden">
-        {/* Time Column */}
-        <div className="flex flex-col min-w-[80px] flex-shrink-0">
-          <div className="h-10 flex items-center justify-center bg-muted rounded-md font-medium text-sm">
-            <Clock className="h-3 w-3 mr-1" />
-            Time
-          </div>
-          <div className="relative mt-2 flex-1" style={{ height: timelineHeight }}>
-            {/* Hour markers */}
-            {hourMarkers.map((hour, index) => (
-              <div
-                key={hour.toISOString()}
-                className="absolute left-0 right-0 flex items-center text-xs font-medium text-muted-foreground"
-                style={{ top: `${(index / (hourMarkers.length - 1)) * 100}%` }}
-              >
-                <span className="bg-background px-1">{format(hour, 'HH:mm')}</span>
-                <div className="flex-1 h-px bg-border ml-2"></div>
-              </div>
-            ))}
-          </div>
+          )}
         </div>
+        
+        <div className="flex items-center gap-4">
+          {/* Date Navigation */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSelectedDate(new Date())}
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                isToday 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              }`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setSelectedDate(nextWorkday)}
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                !isToday && format(selectedDate, 'yyyy-MM-dd') === format(nextWorkday, 'yyyy-MM-dd')
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              }`}
+            >
+              Next Workday
+            </button>
+          </div>
 
-        {/* Employee Columns */}
-        {currentEmployees.map((employee, index) => {
-          const isOnHoliday = isEmployeeOnHoliday(employee.id);
-          const holidayInfo = getHolidayInfo(employee.id);
-          const employeeSchedules = getSchedulesForEmployee(employee.id);
-
-          return (
-            <div key={employee.id} className="flex flex-col flex-1 hover-scale animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-              {/* Employee Header */}
-              <Card className="h-10">
-                <CardContent className="p-2 flex items-center justify-center">
-                  <div className="flex items-center gap-1">
-                    <User className="h-3 w-3" />
-                    <span className="text-sm font-medium truncate">{employee.name}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Timeline Container */}
-              <div className="relative mt-2 flex-1" style={{ height: timelineHeight }}>
-                {/* Background grid lines */}
-                {hourMarkers.map((_, index) => (
+          {/* Employee Group Pagination */}
+          {totalGroups > 1 && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Group {currentUserGroup + 1} of {totalGroups}</span>
+              <div className="flex gap-1">
+                {Array.from({ length: totalGroups }).map((_, index) => (
                   <div
                     key={index}
-                    className="absolute left-0 right-0 h-px bg-border opacity-30"
-                    style={{ top: `${(index / (hourMarkers.length - 1)) * 100}%` }}
-                  ></div>
+                    className={`w-2 h-2 rounded-full transition-all ${
+                      index === currentUserGroup ? 'bg-primary' : 'bg-muted'
+                    }`}
+                  />
                 ))}
-
-                {/* Holiday overlay */}
-                {isOnHoliday && (
-                  <div className="absolute inset-0 bg-red-50 border-2 border-red-200 border-dashed rounded-md flex flex-col items-center justify-center">
-                    <Badge variant="destructive" className="text-xs px-2 mb-1">
-                      HOLIDAY
-                    </Badge>
-                    {holidayInfo?.reason && (
-                      <span className="text-xs text-red-600 text-center px-2 line-clamp-2">
-                        {holidayInfo.reason}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Schedule blocks */}
-                {!isOnHoliday && employeeSchedules.map((schedule) => {
-                  const position = getSchedulePosition(schedule.start_time, schedule.end_time);
-                  const assignedUserName = schedule.task?.assignee?.name || schedule.employee.name;
-                  
-                  return (
-                    <div
-                      key={schedule.id}
-                      className="absolute left-0 right-0 bg-blue-100 border border-blue-300 rounded-md p-1 overflow-hidden hover:bg-blue-200 transition-colors cursor-pointer"
-                      style={{ 
-                        top: position.top, 
-                        height: position.height,
-                        marginRight: '2px'
-                      }}
-                      title={`${schedule.title}\n${format(parseISO(schedule.start_time), 'HH:mm')} - ${format(parseISO(schedule.end_time), 'HH:mm')}\nAssigned to: ${assignedUserName}\n${schedule.description || ''}`}
-                    >
-                      <div className="text-xs font-medium text-blue-800 line-clamp-1">
-                        {schedule.title}
-                      </div>
-                      {schedule.task?.assignee && (
-                        <div className="text-xs text-blue-700 line-clamp-1 font-medium">
-                          👤 {schedule.task.assignee.name}
-                        </div>
-                      )}
-                      {schedule.task?.phase?.project?.name && (
-                        <div className="text-xs text-blue-700 line-clamp-1 font-medium">
-                          {schedule.task.phase.project.name}
-                        </div>
-                      )}
-                      <div className="text-xs text-blue-600 line-clamp-1">
-                        {format(parseISO(schedule.start_time), 'HH:mm')} - 
-                        {format(parseISO(schedule.end_time), 'HH:mm')}
-                      </div>
-                      {schedule.description && parseFloat(position.height) > 5 && (
-                        <div className="text-xs text-blue-500 line-clamp-1 mt-1">
-                          {schedule.description}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* Free time indicator */}
-                {!isOnHoliday && employeeSchedules.length === 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-md opacity-50">
-                    <span className="text-xs text-muted-foreground">Free</span>
-                  </div>
-                )}
               </div>
             </div>
-          );
-        })}
+          )}
+        </div>
+      </div>
+
+      {/* Date Indicator */}
+      {!isToday && (
+        <Card className="bg-orange-50 border-orange-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-orange-800">
+              <Calendar className="h-4 w-4" />
+              <span className="text-sm font-medium">
+                You are viewing the schedule for {format(selectedDate, 'EEEE, MMMM dd, yyyy')}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Workstation Schedules */}
+      <div className="space-y-6 flex-1 overflow-y-auto">
+        {Object.keys(groupedWorkstationSchedules).length === 0 ? (
+          <Card>
+            <CardContent className="py-8">
+              <div className="text-center text-gray-500">
+                <Settings className="mx-auto mb-2 h-8 w-8 text-gray-400" />
+                <p>No workstation schedules found for this date</p>
+                <p className="text-xs mt-1">Workstation schedules are generated from the planning page</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          Object.entries(groupedWorkstationSchedules).map(([workstationId, { workstation, schedules }]) => (
+            <Card key={workstationId}>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Settings className="h-5 w-5 mr-2" />
+                    {workstation?.name || 'Unknown Workstation'}
+                  </div>
+                  <Badge variant="outline">
+                    {schedules.length} task{schedules.length !== 1 ? 's' : ''}
+                  </Badge>
+                </CardTitle>
+                {workstation?.description && (
+                  <p className="text-sm text-gray-600">{workstation.description}</p>
+                )}
+              </CardHeader>
+              <CardContent>
+                <div className="flex">
+                  {/* Timeline Axis */}
+                  <div className="w-16 text-right pr-4 flex-shrink-0">
+                    {Array.from({ length: TIMELINE_END_HOUR - TIMELINE_START_HOUR + 1 }).map((_, i) => {
+                      const hour = TIMELINE_START_HOUR + i;
+                      return (
+                        <div
+                          key={hour}
+                          style={{ height: `${60 * MINUTE_TO_PIXEL_SCALE}px` }}
+                          className="relative border-t border-gray-200 first:border-t-0 -mr-4"
+                        >
+                          <p className="text-xs text-gray-500 absolute -top-2 right-2">
+                            {`${hour.toString().padStart(2, '0')}:00`}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Schedule container */}
+                  <div className="relative flex-1 border-l border-gray-200">
+                    {/* Hour lines */}
+                    {Array.from({ length: TIMELINE_END_HOUR - TIMELINE_START_HOUR }).map((_, i) => (
+                      <div
+                        key={`line-${i}`}
+                        className="absolute w-full h-px bg-gray-200"
+                        style={{ top: `${(i + 1) * 60 * MINUTE_TO_PIXEL_SCALE}px` }}
+                      />
+                    ))}
+
+                    {/* Schedule Items */}
+                    {schedules.map((schedule) => {
+                      const duration = Math.round(
+                        (new Date(schedule.end_time).getTime() - new Date(schedule.start_time).getTime()) / (1000 * 60)
+                      );
+                      const top = getMinutesFromTimelineStart(schedule.start_time) * MINUTE_TO_PIXEL_SCALE;
+                      const height = duration * MINUTE_TO_PIXEL_SCALE;
+                      const assignedUserName = schedule.task?.assignee?.name || schedule.user_name;
+
+                      return (
+                        <div
+                          key={schedule.id}
+                          className="absolute left-2 right-2 z-10"
+                          style={{
+                            top: `${top}px`,
+                            height: `${height}px`,
+                          }}
+                        >
+                          <div className={`relative h-full overflow-hidden rounded border p-2 ${
+                            schedule.task?.priority ? getPriorityColor(schedule.task.priority) : 'bg-blue-100 text-blue-800 border-blue-300'
+                          }`}>
+                            <div className="flex justify-between h-full">
+                              <div className="flex-1 overflow-hidden">
+                                <h5 className="font-medium text-sm truncate" title={schedule.task_title}>
+                                  {schedule.task_title}
+                                </h5>
+                                <p className="text-xs text-gray-600 truncate font-medium" title={assignedUserName}>
+                                  👤 {assignedUserName}
+                                </p>
+                                <div className="mt-1 flex items-center gap-2 text-xs">
+                                  <span className="flex items-center">
+                                    <Clock className="mr-1 h-3 w-3" />
+                                    {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)} ({duration}m)
+                                  </span>
+                                  {schedule.task?.priority && (
+                                    <Badge variant="outline" className="py-0 px-1 text-[10px]">
+                                      {schedule.task.priority}
+                                    </Badge>
+                                  )}
+                                </div>
+                                {schedule.task?.description && height > 80 && (
+                                  <p className="text-xs text-gray-500 mt-1 line-clamp-2" title={schedule.task.description}>
+                                    {schedule.task.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
