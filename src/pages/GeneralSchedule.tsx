@@ -1,36 +1,27 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Clock, User, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, User, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
 import { format, startOfDay, endOfDay, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 
-interface Employee {
+interface Workstation {
   id: string;
   name: string;
-  role: string;
+  description: string | null;
 }
 
-interface Schedule {
+interface WorkstationSchedule {
   id: string;
-  employee_id: string;
-  title: string;
-  description: string | null;
+  workstation_id: string;
+  task_id: string | null;
+  task_title: string;
+  user_name: string;
   start_time: string;
   end_time: string;
-  employee: { name: string };
-  task?: {
-    assignee?: {
-      id: string;
-      name: string;
-    };
-    phase?: {
-      project?: {
-        name: string;
-      };
-    };
-  };
+  workstation: { name: string };
 }
 
 interface HolidayRequest {
@@ -42,7 +33,7 @@ interface HolidayRequest {
 }
 
 const GeneralSchedule: React.FC = () => {
-  const [currentUserGroup, setCurrentUserGroup] = useState(0);
+  const [currentWorkstationGroup, setCurrentWorkstationGroup] = useState(0);
   const today = new Date();
   const todayStart = startOfDay(today);
   const todayEnd = endOfDay(today);
@@ -56,20 +47,18 @@ const GeneralSchedule: React.FC = () => {
   }
 
   // Timeline height calculation (10 hours * flexible height)
-  // Use calc to fill remaining space after header
-  const timelineHeight = 'calc(100vh - 120px)'; // Dynamic height
+  const timelineHeight = 'calc(100vh - 120px)';
 
-  // Users per page
-  const USERS_PER_PAGE = 6;
+  // Workstations per page
+  const WORKSTATIONS_PER_PAGE = 6;
 
-  // Fetch all employees (excluding admins and managers)
-  const { data: allEmployees = [] } = useQuery<Employee[]>({
-    queryKey: ['employees-filtered'],
+  // Fetch all workstations
+  const { data: allWorkstations = [] } = useQuery<Workstation[]>({
+    queryKey: ['workstations'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('employees')
-        .select('id, name, role')
-        .not('role', 'in', '("admin","manager")')
+        .from('workstations')
+        .select('id, name, description')
         .order('name');
       
       if (error) throw error;
@@ -77,45 +66,21 @@ const GeneralSchedule: React.FC = () => {
     }
   });
 
-  // Sort employees by role priority: workers first, then workstations, then others
-  const employees = allEmployees.sort((a, b) => {
-    const getRolePriority = (role: string) => {
-      if (role === 'worker') return 1;
-      if (role === 'installation_team') return 2; // workstations
-      return 3; // others
-    };
-
-    const priorityA = getRolePriority(a.role);
-    const priorityB = getRolePriority(b.role);
-
-    if (priorityA !== priorityB) {
-      return priorityA - priorityB;
-    }
-    
-    // If same priority, sort by name
-    return a.name.localeCompare(b.name);
-  });
-
-  // Fetch schedules for today
-  const { data: schedules = [], isLoading } = useQuery<Schedule[]>({
-    queryKey: ['schedules', todayStart.toISOString(), todayEnd.toISOString()],
+  // Fetch workstation schedules for today
+  const { data: workstationSchedules = [], isLoading } = useQuery<WorkstationSchedule[]>({
+    queryKey: ['workstation-schedules', todayStart.toISOString(), todayEnd.toISOString()],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('schedules')
+        .from('workstation_schedules')
         .select(`
           id,
-          employee_id,
-          title,
-          description,
+          workstation_id,
+          task_id,
+          task_title,
+          user_name,
           start_time,
           end_time,
-          employee:employees(name),
-          task:tasks(
-            assignee:employees!tasks_assignee_id_fkey(id, name),
-            phase:phases(
-              project:projects(name)
-            )
-          )
+          workstation:workstations(name)
         `)
         .gte('start_time', todayStart.toISOString())
         .lte('end_time', todayEnd.toISOString())
@@ -142,14 +107,14 @@ const GeneralSchedule: React.FC = () => {
     }
   });
 
-  // Check if employee is on holiday today
-  const isEmployeeOnHoliday = (employeeId: string) => {
-    return holidays.some(holiday => holiday.user_id === employeeId);
+  // Check if user is on holiday today
+  const isUserOnHoliday = (userName: string) => {
+    return holidays.some(holiday => holiday.employee_name === userName);
   };
 
-  // Get schedules for a specific employee
-  const getSchedulesForEmployee = (employeeId: string) => {
-    return schedules.filter(schedule => schedule.employee_id === employeeId);
+  // Get schedules for a specific workstation
+  const getSchedulesForWorkstation = (workstationId: string) => {
+    return workstationSchedules.filter(schedule => schedule.workstation_id === workstationId);
   };
 
   // Calculate position and height for a schedule block
@@ -169,33 +134,33 @@ const GeneralSchedule: React.FC = () => {
     return { top: `${topPercent}%`, height: `${heightPercent}%` };
   };
 
-  // Get current page of employees
-  const getCurrentEmployees = () => {
-    const startIndex = currentUserGroup * USERS_PER_PAGE;
-    return employees.slice(startIndex, startIndex + USERS_PER_PAGE);
+  // Get current page of workstations
+  const getCurrentWorkstations = () => {
+    const startIndex = currentWorkstationGroup * WORKSTATIONS_PER_PAGE;
+    return allWorkstations.slice(startIndex, startIndex + WORKSTATIONS_PER_PAGE);
   };
 
-  // Auto-cycle through user groups every 10 seconds
+  // Auto-cycle through workstation groups every 15 seconds
   useEffect(() => {
-    if (employees.length <= USERS_PER_PAGE) return;
+    if (allWorkstations.length <= WORKSTATIONS_PER_PAGE) return;
 
     const interval = setInterval(() => {
-      setCurrentUserGroup(prev => {
-        const totalGroups = Math.ceil(employees.length / USERS_PER_PAGE);
+      setCurrentWorkstationGroup(prev => {
+        const totalGroups = Math.ceil(allWorkstations.length / WORKSTATIONS_PER_PAGE);
         return (prev + 1) % totalGroups;
       });
-    }, 15000); // 10 seconds
+    }, 15000);
 
     return () => clearInterval(interval);
-  }, [employees.length, USERS_PER_PAGE]);
+  }, [allWorkstations.length, WORKSTATIONS_PER_PAGE]);
 
-  // Get holiday info for employee
-  const getHolidayInfo = (employeeId: string) => {
-    return holidays.find(holiday => holiday.user_id === employeeId);
+  // Get holiday info for user
+  const getHolidayInfo = (userName: string) => {
+    return holidays.find(holiday => holiday.employee_name === userName);
   };
 
-  const currentEmployees = getCurrentEmployees();
-  const totalGroups = Math.ceil(employees.length / USERS_PER_PAGE);
+  const currentWorkstations = getCurrentWorkstations();
+  const totalGroups = Math.ceil(allWorkstations.length / WORKSTATIONS_PER_PAGE);
 
   if (isLoading) {
     return (
@@ -211,17 +176,17 @@ const GeneralSchedule: React.FC = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Calendar className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-bold">General Schedule - {format(today, 'EEEE, MMM dd, yyyy')}</h1>
+          <h1 className="text-xl font-bold">Workstation Schedule - {format(today, 'EEEE, MMM dd, yyyy')}</h1>
         </div>
         {totalGroups > 1 && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Group {currentUserGroup + 1} of {totalGroups}</span>
+            <span>Group {currentWorkstationGroup + 1} of {totalGroups}</span>
             <div className="flex gap-1">
               {Array.from({ length: totalGroups }).map((_, index) => (
                 <div
                   key={index}
                   className={`w-2 h-2 rounded-full transition-all ${
-                    index === currentUserGroup ? 'bg-primary' : 'bg-muted'
+                    index === currentWorkstationGroup ? 'bg-primary' : 'bg-muted'
                   }`}
                 />
               ))}
@@ -253,20 +218,18 @@ const GeneralSchedule: React.FC = () => {
           </div>
         </div>
 
-        {/* Employee Columns */}
-        {currentEmployees.map((employee, index) => {
-          const isOnHoliday = isEmployeeOnHoliday(employee.id);
-          const holidayInfo = getHolidayInfo(employee.id);
-          const employeeSchedules = getSchedulesForEmployee(employee.id);
+        {/* Workstation Columns */}
+        {currentWorkstations.map((workstation, index) => {
+          const workstationScheduleItems = getSchedulesForWorkstation(workstation.id);
 
           return (
-            <div key={employee.id} className="flex flex-col flex-1 hover-scale animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-              {/* Employee Header */}
+            <div key={workstation.id} className="flex flex-col flex-1 hover-scale animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+              {/* Workstation Header */}
               <Card className="h-10">
                 <CardContent className="p-2 flex items-center justify-center">
                   <div className="flex items-center gap-1">
-                    <User className="h-3 w-3" />
-                    <span className="text-sm font-medium truncate">{employee.name}</span>
+                    <Settings className="h-3 w-3" />
+                    <span className="text-sm font-medium truncate">{workstation.name}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -282,66 +245,63 @@ const GeneralSchedule: React.FC = () => {
                   ></div>
                 ))}
 
-                {/* Holiday overlay */}
-                {isOnHoliday && (
-                  <div className="absolute inset-0 bg-red-50 border-2 border-red-200 border-dashed rounded-md flex flex-col items-center justify-center">
-                    <Badge variant="destructive" className="text-xs px-2 mb-1">
-                      HOLIDAY
-                    </Badge>
-                    {holidayInfo?.reason && (
-                      <span className="text-xs text-red-600 text-center px-2 line-clamp-2">
-                        {holidayInfo.reason}
-                      </span>
-                    )}
-                  </div>
-                )}
-
                 {/* Schedule blocks */}
-                {!isOnHoliday && employeeSchedules.map((schedule) => {
+                {workstationScheduleItems.map((schedule) => {
                   const position = getSchedulePosition(schedule.start_time, schedule.end_time);
-                  const assignedUserName = schedule.task?.assignee?.name || schedule.employee.name;
+                  const isOnHoliday = isUserOnHoliday(schedule.user_name);
+                  const holidayInfo = getHolidayInfo(schedule.user_name);
                   
                   return (
                     <div
                       key={schedule.id}
-                      className="absolute left-0 right-0 bg-blue-100 border border-blue-300 rounded-md p-1 overflow-hidden hover:bg-blue-200 transition-colors cursor-pointer"
+                      className={`absolute left-0 right-0 rounded-md p-1 overflow-hidden transition-colors cursor-pointer ${
+                        isOnHoliday 
+                          ? 'bg-red-100 border border-red-300' 
+                          : 'bg-green-100 border border-green-300 hover:bg-green-200'
+                      }`}
                       style={{ 
                         top: position.top, 
                         height: position.height,
                         marginRight: '2px'
                       }}
-                      title={`${schedule.title}\n${format(parseISO(schedule.start_time), 'HH:mm')} - ${format(parseISO(schedule.end_time), 'HH:mm')}\nAssigned to: ${assignedUserName}\n${schedule.description || ''}`}
+                      title={`${schedule.task_title}\n${format(parseISO(schedule.start_time), 'HH:mm')} - ${format(parseISO(schedule.end_time), 'HH:mm')}\nAssigned to: ${schedule.user_name}${isOnHoliday ? '\n⚠️ User is on holiday' : ''}`}
                     >
-                      <div className="text-xs font-medium text-blue-800 line-clamp-1">
-                        {schedule.title}
-                      </div>
-                      {schedule.task?.assignee && (
-                        <div className="text-xs text-blue-700 line-clamp-1 font-medium">
-                          👤 {schedule.task.assignee.name}
+                      {isOnHoliday ? (
+                        <div className="flex flex-col items-center justify-center h-full">
+                          <Badge variant="destructive" className="text-xs px-1 mb-1">
+                            HOLIDAY
+                          </Badge>
+                          <div className="text-xs text-red-800 font-medium line-clamp-1">
+                            {schedule.user_name}
+                          </div>
+                          {holidayInfo?.reason && (
+                            <div className="text-xs text-red-600 text-center line-clamp-1">
+                              {holidayInfo.reason}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {schedule.task?.phase?.project?.name && (
-                        <div className="text-xs text-blue-700 line-clamp-1 font-medium">
-                          {schedule.task.phase.project.name}
-                        </div>
-                      )}
-                      <div className="text-xs text-blue-600 line-clamp-1">
-                        {format(parseISO(schedule.start_time), 'HH:mm')} - 
-                        {format(parseISO(schedule.end_time), 'HH:mm')}
-                      </div>
-                      {schedule.description && parseFloat(position.height) > 5 && (
-                        <div className="text-xs text-blue-500 line-clamp-1 mt-1">
-                          {schedule.description}
-                        </div>
+                      ) : (
+                        <>
+                          <div className="text-xs font-medium text-green-800 line-clamp-1">
+                            {schedule.task_title}
+                          </div>
+                          <div className="text-xs text-green-700 line-clamp-1 font-medium">
+                            👤 {schedule.user_name}
+                          </div>
+                          <div className="text-xs text-green-600 line-clamp-1">
+                            {format(parseISO(schedule.start_time), 'HH:mm')} - 
+                            {format(parseISO(schedule.end_time), 'HH:mm')}
+                          </div>
+                        </>
                       )}
                     </div>
                   );
                 })}
 
                 {/* Free time indicator */}
-                {!isOnHoliday && employeeSchedules.length === 0 && (
+                {workstationScheduleItems.length === 0 && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-md opacity-50">
-                    <span className="text-xs text-muted-foreground">Free</span>
+                    <span className="text-xs text-muted-foreground">No Tasks</span>
                   </div>
                 )}
               </div>
