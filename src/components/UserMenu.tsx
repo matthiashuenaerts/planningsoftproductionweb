@@ -24,6 +24,10 @@ const UserMenu: React.FC = () => {
                            currentEmployee?.role === 'teamleader' || 
                            currentEmployee?.role === 'manager';
 
+  const canViewGeneralSchedule = currentEmployee?.role === 'admin' || 
+                                currentEmployee?.role === 'teamleader' || 
+                                currentEmployee?.role === 'manager';
+
   useEffect(() => {
     const fetchPendingCount = async () => {
       if (!canManageRequests) return;
@@ -55,10 +59,12 @@ const UserMenu: React.FC = () => {
             <CalendarDays className="mr-2 h-4 w-4" />
             Holiday
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => navigate(createLocalizedPath('/general-schedule'))}>
-            <Calendar className="mr-2 h-4 w-4" />
-            General Schedule
-          </DropdownMenuItem>
+          {canViewGeneralSchedule && (
+            <DropdownMenuItem onSelect={() => navigate(createLocalizedPath('/general-schedule'))}>
+              <Calendar className="mr-2 h-4 w-4" />
+              General Schedule
+            </DropdownMenuItem>
+          )}
           {canManageRequests && (
             <DropdownMenuItem onSelect={() => setShowAdminModal(true)}>
               <div className="flex items-center justify-between w-full">
