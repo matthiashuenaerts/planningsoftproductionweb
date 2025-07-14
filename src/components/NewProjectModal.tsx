@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import { projectService, phaseService, taskService, Task } from '@/services/dataService';
 import { workstationService } from '@/services/workstationService';
 import { standardTasksService, StandardTask } from '@/services/standardTasksService';
@@ -34,6 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from './ui/scroll-area';
 import { Checkbox } from './ui/checkbox';
 import { Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 // Add the missing interface
 interface NewProjectModalProps {
@@ -43,14 +45,15 @@ interface NewProjectModalProps {
 }
 
 const formSchema = z.object({
-  name: z.string().min(1, { message: 'Project name is required' }),
+  project_name: z.string().min(1, { message: 'Project name is required' }),
   client: z.string().min(1, { message: 'Client name is required' }),
   description: z.string().optional(),
   start_date: z.date({ required_error: 'Start date is required' }),
   installation_date: z.date({ required_error: 'Installation date is required' }),
   project_value: z.number()
     .min(1, { message: 'Project value must be at least 1' })
-    .max(100, { message: 'Project value must be at most 100' })
+    .max(100, { message: 'Project value must be at most 100' }),
+  is_after_sales: z.boolean()
 }).refine(
   (data) => {
     return data.installation_date >= data.start_date;
@@ -86,7 +89,82 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskWorkstation, setNewTaskWorkstation] = useState('');
   const [workstations, setWorkstations] = useState<{id: string, name: string}[]>([]);
+  const [projectCode, setProjectCode] = useState('');
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      project_name: '',
+      client: '',
+      description: '',
+      start_date: new Date(),
+      installation_date: new Date(),
+      project_value: 50,
+      is_after_sales: false,
+    },
+  });
+
+  // Generate project code based on project type
+  const generateProjectCode = async (isAfterSales: boolean) => {
+    setIsGeneratingCode(true);
+    try {
+      const currentYear = new Date().getFullYear();
+      const yearCode = currentYear.toString().slice(-2); // Last 2 digits of year
+      const projectType = isAfterSales ? '11' : '10'; // 10 for normal, 11 for after-sales
+      
+      // Get the next sequential number for this project type
+      const { data: existingProjects, error } = await supabase
+        .from('projects')
+        .select('name')
+        .like('name', `${yearCode}${projectType}%`)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching existing projects:', error);
+        throw error;
+      }
+
+      let nextNumber = 1;
+      
+      if (existingProjects && existingProjects.length > 0) {
+        // Extract the sequential numbers from existing project names
+        const existingNumbers = existingProjects
+          .map(project => {
+            const match = project.name.match(new RegExp(`^${yearCode}${projectType}(\\d{3})`));
+            return match ? parseInt(match[1], 10) : 0;
+          })
+          .filter(num => num > 0);
+        
+        if (existingNumbers.length > 0) {
+          nextNumber = Math.max(...existingNumbers) + 1;
+        }
+      }
+
+      const sequentialCode = nextNumber.toString().padStart(3, '0');
+      const generatedCode = `${yearCode}${projectType}${sequentialCode}`;
+      setProjectCode(generatedCode);
+      
+    } catch (error) {
+      console.error('Error generating project code:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate project code",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingCode(false);
+    }
+  };
+
+  // Generate project code when modal opens or project type changes
+  useEffect(() => {
+    if (open) {
+      const isAfterSales = form.watch('is_after_sales');
+      generateProjectCode(isAfterSales);
+    }
+  }, [open, form.watch('is_after_sales')]);
+
   // Fetch all workstations and standard tasks when component mounts
   useEffect(() => {
     const fetchData = async () => {
@@ -145,18 +223,6 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
     }
   }, [open, toast]);
   
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: '',
-      client: '',
-      description: '',
-      start_date: new Date(),
-      installation_date: new Date(),
-      project_value: 50,
-    },
-  });
-
   // Calculate task durations whenever project_value changes or when tasks are loaded/modified
   useEffect(() => {
     const projectValue = form.watch('project_value') || 50;
@@ -227,9 +293,12 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
   const onSubmit = async (data: FormValues) => {
     try {
+      // Create the full project name with code prefix
+      const fullProjectName = `${projectCode}_${data.project_name}`;
+      
       // First create the project
       const newProject = await projectService.create({
-        name: data.name,
+        name: fullProjectName,
         client: data.client,
         description: data.description || null,
         start_date: format(data.start_date, 'yyyy-MM-dd'),
@@ -326,6 +395,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       });
       
       form.reset();
+      setProjectCode('');
       onOpenChange(false);
       if (onSuccess) onSuccess();
     } catch (error: any) {
@@ -347,15 +417,57 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         <ScrollArea className="max-h-[70vh] pr-4">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+              
+              {/* Project Type Toggle */}
               <FormField
                 control={form.control}
-                name="name"
+                name="is_after_sales"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Project Type</FormLabel>
+                      <div className="text-sm text-muted-foreground">
+                        {field.value ? 'After-sales Service (11)' : 'Normal Project (10)'}
+                      </div>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={isGeneratingCode}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {/* Project Code Display */}
+              <div className="rounded-lg border p-4 bg-muted/50">
+                <div className="text-sm font-medium text-muted-foreground mb-1">Generated Project Code</div>
+                <div className="text-lg font-mono font-bold">
+                  {isGeneratingCode ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Generating...
+                    </div>
+                  ) : (
+                    projectCode || 'Error generating code'
+                  )}
+                </div>
+              </div>
+              
+              <FormField
+                control={form.control}
+                name="project_name"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Project Name</FormLabel>
                     <FormControl>
                       <Input placeholder="Kitchen Pro - Client XYZ" {...field} />
                     </FormControl>
+                    <div className="text-sm text-muted-foreground">
+                      Full name will be: <span className="font-mono">{projectCode}_</span><span className="font-medium">{field.value || 'Project Name'}</span>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -572,7 +684,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 <DialogClose asChild>
                   <Button type="button" variant="outline">Cancel</Button>
                 </DialogClose>
-                <Button type="submit">Create Project</Button>
+                <Button type="submit" disabled={isGeneratingCode}>
+                  {isGeneratingCode ? 'Generating Code...' : 'Create Project'}
+                </Button>
               </DialogFooter>
             </form>
           </Form>
