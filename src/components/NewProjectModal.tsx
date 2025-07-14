@@ -85,6 +85,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskWorkstation, setNewTaskWorkstation] = useState('');
@@ -292,6 +293,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
   };
 
   const onSubmit = async (data: FormValues) => {
+    if (submitting) return; // Prevent multiple submissions
+    
+    setSubmitting(true);
     try {
       // Create the full project name with code prefix
       const fullProjectName = `${projectCode}_${data.project_name}`;
@@ -404,6 +408,8 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         description: `Failed to create project: ${error.message}`,
         variant: "destructive",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -682,10 +688,21 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
               <DialogFooter className="pt-4">
                 <DialogClose asChild>
-                  <Button type="button" variant="outline">Cancel</Button>
+                  <Button type="button" variant="outline" disabled={submitting}>
+                    Cancel
+                  </Button>
                 </DialogClose>
-                <Button type="submit" disabled={isGeneratingCode}>
-                  {isGeneratingCode ? 'Generating Code...' : 'Create Project'}
+                <Button type="submit" disabled={isGeneratingCode || submitting}>
+                  {submitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating Project...
+                    </>
+                  ) : isGeneratingCode ? (
+                    'Generating Code...'
+                  ) : (
+                    'Create Project'
+                  )}
                 </Button>
               </DialogFooter>
             </form>
