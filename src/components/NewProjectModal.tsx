@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -409,24 +410,24 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>Create New Project</DialogTitle>
+      <DialogContent className="sm:max-w-[600px] max-h-[85vh] p-4">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="text-xl">Create New Project</DialogTitle>
         </DialogHeader>
         
-        <ScrollArea className="max-h-[70vh] pr-4">
+        <ScrollArea className="max-h-[70vh] pr-2">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
               
-              {/* Project Type Toggle */}
+              {/* Project Type Toggle - More compact */}
               <FormField
                 control={form.control}
                 name="is_after_sales"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
                     <div className="space-y-0.5">
-                      <FormLabel className="text-base">Project Type</FormLabel>
-                      <div className="text-sm text-muted-foreground">
+                      <FormLabel className="text-sm font-medium">Project Type</FormLabel>
+                      <div className="text-xs text-muted-foreground">
                         {field.value ? 'After-sales Service (11)' : 'Normal Project (10)'}
                       </div>
                     </div>
@@ -441,62 +442,65 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 )}
               />
 
-              {/* Project Code Display */}
-              <div className="rounded-lg border p-4 bg-muted/50">
-                <div className="text-sm font-medium text-muted-foreground mb-1">Generated Project Code</div>
-                <div className="text-lg font-mono font-bold">
+              {/* Project Code Display - More compact */}
+              <div className="rounded-lg border p-3 bg-muted/30">
+                <div className="text-xs font-medium text-muted-foreground mb-1">Generated Project Code</div>
+                <div className="text-base font-mono font-bold">
                   {isGeneratingCode ? (
                     <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating...
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span className="text-sm">Generating...</span>
                     </div>
                   ) : (
                     projectCode || 'Error generating code'
                   )}
                 </div>
               </div>
-              
-              <FormField
-                control={form.control}
-                name="project_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Project Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Kitchen Pro - Client XYZ" {...field} />
-                    </FormControl>
-                    <div className="text-sm text-muted-foreground">
-                      Full name will be: <span className="font-mono">{projectCode}_</span><span className="font-medium">{field.value || 'Project Name'}</span>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="client"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Client</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Client Name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
+              {/* Basic Info in Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="project_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">Project Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Kitchen Pro - Client XYZ" {...field} className="h-9" />
+                      </FormControl>
+                      <div className="text-xs text-muted-foreground">
+                        Full: <span className="font-mono">{projectCode}_</span><span className="font-medium">{field.value || 'Project Name'}</span>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="client"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">Client</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Client Name" {...field} className="h-9" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               
               <FormField
                 control={form.control}
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel className="text-sm">Description</FormLabel>
                     <FormControl>
                       <Textarea 
                         placeholder="Project details..." 
-                        className="resize-none" 
+                        className="resize-none h-16" 
                         {...field} 
                       />
                     </FormControl>
@@ -504,48 +508,29 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   </FormItem>
                 )}
               />
-              
-              <FormField
-                control={form.control}
-                name="project_value"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Project Value (1-100)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min="1" 
-                        max="100" 
-                        {...field} 
-                        onChange={e => field.onChange(parseInt(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              {/* Date and Value in Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <FormField
                   control={form.control}
                   name="start_date"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Start Date</FormLabel>
+                      <FormLabel className="text-sm">Start Date</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
                               variant={"outline"}
                               className={cn(
-                                "w-full pl-3 text-left font-normal",
+                                "w-full pl-3 text-left font-normal h-9",
                                 !field.value && "text-muted-foreground"
                               )}
                             >
                               {field.value ? (
-                                format(field.value, "PPP")
+                                format(field.value, "dd/MM/yy")
                               ) : (
-                                <span>Pick a date</span>
+                                <span>Pick date</span>
                               )}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
@@ -572,21 +557,21 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   name="installation_date"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Installation Date</FormLabel>
+                      <FormLabel className="text-sm">Installation Date</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
                               variant={"outline"}
                               className={cn(
-                                "w-full pl-3 text-left font-normal",
+                                "w-full pl-3 text-left font-normal h-9",
                                 !field.value && "text-muted-foreground"
                               )}
                             >
                               {field.value ? (
-                                format(field.value, "PPP")
+                                format(field.value, "dd/MM/yy")
                               ) : (
-                                <span>Pick a date</span>
+                                <span>Pick date</span>
                               )}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
@@ -610,35 +595,62 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="project_value"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm">Project Value (1-100)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="1" 
+                          max="100" 
+                          className="h-9"
+                          {...field} 
+                          onChange={e => field.onChange(parseInt(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
-              <div className="border rounded-md p-4">
-                <h3 className="font-medium mb-2">Project Tasks</h3>
+              {/* Tasks Section - More compact */}
+              <div className="border rounded-md p-3">
+                <h3 className="font-medium text-sm mb-2">Project Tasks</h3>
                 
                 {loading ? (
-                  <div className="flex justify-center p-4">
-                    <Loader2 className="h-8 w-8 animate-spin" />
+                  <div className="flex justify-center p-3">
+                    <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
                 ) : (
-                  <div className="space-y-2 mb-4 max-h-[300px] overflow-y-auto pr-2">
+                  <div className="space-y-1.5 mb-3 max-h-[200px] overflow-y-auto pr-1">
                     {tasks.map((task, index) => (
-                      <div key={index} className="flex items-center space-x-2">
+                      <div key={index} className="flex items-center space-x-2 text-sm">
                         <Checkbox 
                           id={`task-${index}`} 
                           checked={task.selected} 
                           onCheckedChange={() => handleToggleTask(index)} 
                         />
-                        <label htmlFor={`task-${index}`} className="text-sm flex-1 flex flex-wrap items-center">
-                          <span className="mr-1">{task.id} - {task.name}</span>
-                          {task.workstation && <span className="text-muted-foreground mr-2">({task.workstation})</span>}
+                        <label htmlFor={`task-${index}`} className="flex-1 flex flex-wrap items-center gap-1 cursor-pointer">
+                          <span className="font-medium">{task.id}</span>
+                          <span>{task.name}</span>
+                          {task.workstation && (
+                            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                              {task.workstation}
+                            </span>
+                          )}
                           {task.duration && (
-                            <span className="text-xs bg-muted px-2 py-0.5 rounded-full mr-2">
-                              {task.duration} min
+                            <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">
+                              {task.duration}min
                             </span>
                           )}
                           {task.day_counter !== undefined && (
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                              -{task.day_counter} days
+                            <span className="text-xs bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded">
+                              -{task.day_counter}d
                             </span>
                           )}
                         </label>
@@ -646,45 +658,46 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                           type="button" 
                           variant="ghost" 
                           size="icon" 
+                          className="h-7 w-7"
                           onClick={() => handleRemoveTask(index)}
                         >
-                          <Trash className="h-4 w-4" />
+                          <Trash className="h-3 w-3" />
                         </Button>
                       </div>
                     ))}
                   </div>
                 )}
                 
-                <div className="grid grid-cols-1 gap-2 mt-2">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="New task name"
-                      value={newTaskName}
-                      onChange={(e) => setNewTaskName(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Input
-                      placeholder="Workstation (optional)"
-                      value={newTaskWorkstation}
-                      onChange={(e) => setNewTaskWorkstation(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button 
-                      type="button" 
-                      size="icon" 
-                      onClick={handleAddCustomTask}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
+                {/* Add Custom Task - More compact */}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="New task name"
+                    value={newTaskName}
+                    onChange={(e) => setNewTaskName(e.target.value)}
+                    className="flex-1 h-8 text-sm"
+                  />
+                  <Input
+                    placeholder="Workstation"
+                    value={newTaskWorkstation}
+                    onChange={(e) => setNewTaskWorkstation(e.target.value)}
+                    className="flex-1 h-8 text-sm"
+                  />
+                  <Button 
+                    type="button" 
+                    size="icon" 
+                    className="h-8 w-8"
+                    onClick={handleAddCustomTask}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
                 </div>
               </div>
 
-              <DialogFooter className="pt-4">
+              <DialogFooter className="pt-3">
                 <DialogClose asChild>
-                  <Button type="button" variant="outline">Cancel</Button>
+                  <Button type="button" variant="outline" className="h-9">Cancel</Button>
                 </DialogClose>
-                <Button type="submit" disabled={isGeneratingCode}>
+                <Button type="submit" disabled={isGeneratingCode} className="h-9">
                   {isGeneratingCode ? 'Generating Code...' : 'Create Project'}
                 </Button>
               </DialogFooter>
