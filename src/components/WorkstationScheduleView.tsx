@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -38,6 +37,11 @@ interface WorkstationSchedule {
   };
 }
 
+interface PositionedSchedule extends WorkstationSchedule {
+  column: number;
+  totalColumns: number;
+}
+
 const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selectedDate }) => {
   const [workstationSchedules, setWorkstationSchedules] = useState<WorkstationSchedule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +77,62 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
       default:
         return 'bg-gray-100 text-gray-800 border-gray-300';
     }
+  };
+
+  // Function to detect and resolve overlapping schedules
+  const resolveOverlaps = (schedules: WorkstationSchedule[]): PositionedSchedule[] => {
+    const sortedSchedules = schedules.sort((a, b) => 
+      new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    );
+
+    const positionedSchedules: PositionedSchedule[] = [];
+    
+    for (const schedule of sortedSchedules) {
+      const startTime = new Date(schedule.start_time).getTime();
+      const endTime = new Date(schedule.end_time).getTime();
+      
+      // Find all overlapping schedules that are already positioned
+      const overlapping = positionedSchedules.filter(positioned => {
+        const posStartTime = new Date(positioned.start_time).getTime();
+        const posEndTime = new Date(positioned.end_time).getTime();
+        
+        // Check if there's any time overlap
+        return (startTime < posEndTime && endTime > posStartTime);
+      });
+
+      if (overlapping.length === 0) {
+        // No overlap, place in column 0
+        positionedSchedules.push({
+          ...schedule,
+          column: 0,
+          totalColumns: 1
+        });
+      } else {
+        // Find the first available column
+        const usedColumns = overlapping.map(o => o.column);
+        let column = 0;
+        while (usedColumns.includes(column)) {
+          column++;
+        }
+        
+        // Calculate total columns needed for this group
+        const maxColumn = Math.max(...usedColumns, column);
+        const totalColumns = maxColumn + 1;
+        
+        // Update totalColumns for all overlapping schedules
+        overlapping.forEach(positioned => {
+          positioned.totalColumns = totalColumns;
+        });
+        
+        positionedSchedules.push({
+          ...schedule,
+          column,
+          totalColumns
+        });
+      }
+    }
+    
+    return positionedSchedules;
   };
 
   useEffect(() => {
@@ -237,7 +297,7 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
     }
   };
 
-  // Group schedules by workstation
+  // Group schedules by workstation and resolve overlaps
   const groupedSchedules = workstationSchedules.reduce((acc, schedule) => {
     const workstationId = schedule.workstation_id;
     if (!acc[workstationId]) {
@@ -249,6 +309,16 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
     acc[workstationId].schedules.push(schedule);
     return acc;
   }, {} as Record<string, { workstation: any; schedules: WorkstationSchedule[] }>);
+
+  // Resolve overlaps for each workstation
+  const resolvedGroupedSchedules = Object.keys(groupedSchedules).reduce((acc, workstationId) => {
+    const group = groupedSchedules[workstationId];
+    acc[workstationId] = {
+      workstation: group.workstation,
+      schedules: resolveOverlaps(group.schedules)
+    };
+    return acc;
+  }, {} as Record<string, { workstation: any; schedules: PositionedSchedule[] }>);
 
   if (loading) {
     return (
@@ -272,7 +342,7 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
         </Button>
       </div>
 
-      {Object.keys(groupedSchedules).length === 0 ? (
+      {Object.keys(resolvedGroupedSchedules).length === 0 ? (
         <Card>
           <CardContent className="py-8">
             <div className="text-center text-gray-500">
@@ -283,7 +353,7 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
           </CardContent>
         </Card>
       ) : (
-        Object.entries(groupedSchedules).map(([workstationId, { workstation, schedules }]) => (
+        Object.entries(resolvedGroupedSchedules).map(([workstationId, { workstation, schedules }]) => (
           <Card key={workstationId}>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -338,16 +408,24 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
                     const top = getMinutesFromTimelineStart(schedule.start_time) * MINUTE_TO_PIXEL_SCALE;
                     const height = duration * MINUTE_TO_PIXEL_SCALE;
 
+                    // Calculate position and width based on overlap resolution
+                    const widthPercentage = 100 / schedule.totalColumns;
+                    const leftPercentage = (schedule.column * widthPercentage);
+
                     // Get the assigned user name - prioritize task assignee, fall back to user_name
                     const assignedUserName = schedule.task?.assignee?.name || schedule.user_name;
 
                     return (
                       <div
                         key={schedule.id}
-                        className="absolute left-2 right-2 z-10"
+                        className="absolute z-10"
                         style={{
                           top: `${top}px`,
                           height: `${height}px`,
+                          left: `${leftPercentage}%`,
+                          width: `${widthPercentage - 1}%`, // Subtract 1% for small gap between overlapping items
+                          marginLeft: '2px',
+                          marginRight: '2px'
                         }}
                       >
                         <div className={`relative h-full overflow-hidden rounded border p-2 ${
