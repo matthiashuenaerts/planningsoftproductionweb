@@ -34,6 +34,12 @@ interface WorkstationSchedule {
       id: string;
       name: string;
     };
+    phase?: {
+      project?: {
+        id: string;
+        name: string;
+      };
+    };
   };
 }
 
@@ -157,7 +163,10 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
             description, 
             priority, 
             status,
-            assignee:employees!tasks_assignee_id_fkey(id, name)
+            assignee:employees!tasks_assignee_id_fkey(id, name),
+            phase:phases(
+              project:projects(id, name)
+            )
           )
         `)
         .gte('start_time', startOfDay)
@@ -414,6 +423,7 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
 
                     // Get the assigned user name - prioritize task assignee, fall back to user_name
                     const assignedUserName = schedule.task?.assignee?.name || schedule.user_name;
+                    const projectName = schedule.task?.phase?.project?.name;
 
                     return (
                       <div
@@ -436,6 +446,11 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
                               <h5 className="font-medium text-sm truncate" title={schedule.task_title}>
                                 {schedule.task_title}
                               </h5>
+                              {projectName && (
+                                <p className="text-xs text-gray-600 truncate font-medium" title={projectName}>
+                                  📋 {projectName}
+                                </p>
+                              )}
                               <p className="text-xs text-gray-600 truncate font-medium" title={assignedUserName}>
                                 👤 {assignedUserName}
                               </p>
@@ -450,7 +465,7 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
                                   </Badge>
                                 )}
                               </div>
-                              {schedule.task?.description && height > 80 && (
+                              {schedule.task?.description && height > 100 && (
                                 <p className="text-xs text-gray-500 mt-1 line-clamp-2" title={schedule.task.description}>
                                   {schedule.task.description}
                                 </p>
