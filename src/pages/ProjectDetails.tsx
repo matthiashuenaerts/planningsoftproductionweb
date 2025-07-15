@@ -60,12 +60,23 @@ const ProjectDetails = () => {
   const calculateAndSaveTaskEfficiency = useCallback(async (completedTasks: TaskWithTimeData[]) => {
     if (!projectId || completedTasks.length === 0) return [];
 
-    console.log(`Processing ${completedTasks.length} completed tasks for efficiency calculation`);
+    // Filter out tasks that already have efficiency data calculated
+    const tasksNeedingCalculation = completedTasks.filter(task => 
+      task.actual_duration_minutes === null || task.actual_duration_minutes === undefined ||
+      task.efficiency_percentage === null || task.efficiency_percentage === undefined
+    );
+
+    if (tasksNeedingCalculation.length === 0) {
+      console.log('All completed tasks already have efficiency data - skipping calculation');
+      return completedTasks;
+    }
+
+    console.log(`Processing ${tasksNeedingCalculation.length} tasks that need efficiency calculation (skipping ${completedTasks.length - tasksNeedingCalculation.length} already calculated)`);
     
-    // Get all task IDs for batch query
-    const taskIds = completedTasks.map(task => task.id);
+    // Get all task IDs for batch query - only for tasks needing calculation
+    const taskIds = tasksNeedingCalculation.map(task => task.id);
     
-    // Batch fetch all time registrations for completed tasks
+    // Batch fetch all time registrations for tasks needing calculation
     const { data: allTimeRegs, error: timeRegsError } = await supabase
       .from('time_registrations')
       .select('task_id, duration_minutes')
@@ -87,10 +98,10 @@ const ProjectDetails = () => {
     let totalPlannedMinutes = 0;
     let totalActualMinutes = 0;
     const tasksToUpdate: { id: string; actual_duration_minutes: number; efficiency_percentage: number }[] = [];
-    const updatedTasks: TaskWithTimeData[] = [];
+    const updatedTasks: TaskWithTimeData[] = [...completedTasks];
 
-    // Process all tasks in memory
-    for (const task of completedTasks) {
+    // Process only tasks that need calculation
+    for (const task of tasksNeedingCalculation) {
       const actualMinutes = timeRegsByTask.get(task.id) || 0;
       const plannedMinutes = task.duration || 0;
 
@@ -108,22 +119,32 @@ const ProjectDetails = () => {
           efficiency_percentage: Math.round(efficiency)
         });
 
-        updatedTasks.push({
-          ...task,
-          actual_duration_minutes: actualMinutes,
-          efficiency_percentage: Math.round(efficiency)
-        });
+        // Update the task in the updatedTasks array
+        const taskIndex = updatedTasks.findIndex(t => t.id === task.id);
+        if (taskIndex !== -1) {
+          updatedTasks[taskIndex] = {
+            ...updatedTasks[taskIndex],
+            actual_duration_minutes: actualMinutes,
+            efficiency_percentage: Math.round(efficiency)
+          };
+        }
       } else {
         console.log(`Skipping task ${task.id}: plannedMinutes=${plannedMinutes}, actualMinutes=${actualMinutes}`);
-        updatedTasks.push(task);
       }
     }
 
-    // Batch update all tasks at once
+    // Include already calculated tasks in project efficiency calculation
+    completedTasks.forEach(task => {
+      if (task.actual_duration_minutes && task.duration && !tasksNeedingCalculation.includes(task)) {
+        totalPlannedMinutes += task.duration;
+        totalActualMinutes += task.actual_duration_minutes;
+      }
+    });
+
+    // Batch update only tasks that need updating
     if (tasksToUpdate.length > 0) {
       console.log(`Batch updating ${tasksToUpdate.length} tasks with efficiency data`);
       
-      // Use a transaction-like approach with multiple updates
       const updatePromises = tasksToUpdate.map(taskUpdate => 
         supabase
           .from('tasks')
@@ -195,40 +216,13 @@ const ProjectDetails = () => {
     console.log(`Found ${completedTasks.length} completed tasks`);
     
     if (completedTasks.length > 0) {
-      // Check if any completed task is missing efficiency data
-      const tasksNeedingUpdate = completedTasks.filter(task => 
-        task.actual_duration_minutes === null || task.actual_duration_minutes === undefined ||
-        task.efficiency_percentage === null || task.efficiency_percentage === undefined
-      );
+      const updatedCompletedTasks = await calculateAndSaveTaskEfficiency(completedTasks);
       
-      if (tasksNeedingUpdate.length > 0) {
-        console.log(`${tasksNeedingUpdate.length} tasks need efficiency calculation`);
-        const updatedCompletedTasks = await calculateAndSaveTaskEfficiency(tasksNeedingUpdate);
-        
-        // Replace tasks that were updated
-        allTasks = allTasks.map(task => {
-          const updatedTask = updatedCompletedTasks.find(ut => ut.id === task.id);
-          return updatedTask || task;
-        });
-      } else {
-        console.log('All completed tasks already have efficiency data');
-        
-        // Calculate project efficiency from existing data
-        let totalPlannedMinutes = 0;
-        let totalActualMinutes = 0;
-        
-        completedTasks.forEach(task => {
-          if (task.duration && task.actual_duration_minutes) {
-            totalPlannedMinutes += task.duration;
-            totalActualMinutes += task.actual_duration_minutes;
-          }
-        });
-        
-        if (totalPlannedMinutes > 0) {
-          const overallEfficiency = ((totalPlannedMinutes - totalActualMinutes) / totalPlannedMinutes) * 100;
-          setProjectEfficiency(Math.round(overallEfficiency));
-        }
-      }
+      // Replace tasks that were updated
+      allTasks = allTasks.map(task => {
+        const updatedTask = updatedCompletedTasks.find(ut => ut.id === task.id);
+        return updatedTask || task;
+      });
     }
     
     setTasks(allTasks);
