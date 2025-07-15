@@ -11,6 +11,7 @@ interface ExtendedTask extends Task {
   assignee_name?: string;
   actual_duration_minutes?: number;
   efficiency_percentage?: number;
+  total_duration?: number;
 }
 
 interface TaskListProps {
