@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +21,7 @@ interface TaskListProps {
   onTaskStatusChange?: (taskId: string, newStatus: Task['status']) => void;
   showCompleteButton?: boolean;
   showEfficiencyData?: boolean;
+  compact?: boolean;
 }
 
 const TaskList: React.FC<TaskListProps> = ({ 
@@ -29,7 +29,8 @@ const TaskList: React.FC<TaskListProps> = ({
   title, 
   onTaskStatusChange, 
   showCompleteButton = false,
-  showEfficiencyData = false
+  showEfficiencyData = false,
+  compact = false
 }) => {
   const { t } = useLanguage();
 
@@ -83,7 +84,7 @@ const TaskList: React.FC<TaskListProps> = ({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">{title}</CardTitle>
+          <CardTitle className={compact ? "text-sm" : "text-lg"}>{title}</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center py-4">{t('no_tasks_found')}</p>
@@ -95,29 +96,29 @@ const TaskList: React.FC<TaskListProps> = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">{title}</CardTitle>
+        <CardTitle className={compact ? "text-sm" : "text-lg"}>{title}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className={compact ? "space-y-2" : "space-y-4"}>
         {tasks.map((task) => (
-          <div key={task.id} className="border rounded-lg p-4 space-y-3">
+          <div key={task.id} className={`border rounded-lg ${compact ? "p-2" : "p-4"} ${compact ? "space-y-1" : "space-y-3"}`}>
             <div className="flex justify-between items-start">
               <div className="flex-1">
-                <h4 className="font-medium">{task.title}</h4>
-                {task.description && (
+                <h4 className={`font-medium ${compact ? "text-sm" : ""}`}>{task.title}</h4>
+                {task.description && !compact && (
                   <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
                 )}
               </div>
               <div className="flex gap-2 ml-4">
-                <Badge className={getPriorityColor(task.priority)}>
+                <Badge className={`${getPriorityColor(task.priority)} ${compact ? "text-xs px-1 py-0" : ""}`}>
                   {task.priority}
                 </Badge>
-                <Badge className={getStatusColor(task.status)}>
+                <Badge className={`${getStatusColor(task.status)} ${compact ? "text-xs px-1 py-0" : ""}`}>
                   {task.status}
                 </Badge>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div className={`grid grid-cols-1 ${compact ? "md:grid-cols-2" : "md:grid-cols-3"} gap-4 text-sm`}>
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
                 <span>{task.workstation}</span>
@@ -126,13 +127,15 @@ const TaskList: React.FC<TaskListProps> = ({
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span>{new Date(task.due_date).toLocaleDateString()}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>{t('duration')}: {formatDuration(task.total_duration || task.duration)}</span>
-              </div>
+              {!compact && (
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span>{t('duration')}: {formatDuration(task.total_duration || task.duration)}</span>
+                </div>
+              )}
             </div>
 
-            {showEfficiencyData && task.status === 'COMPLETED' && (
+            {showEfficiencyData && task.status === 'COMPLETED' && !compact && (
               <div className="bg-gray-50 p-3 rounded space-y-2">
                 <div className="flex items-center gap-2 text-sm">
                   <Clock className="h-4 w-4 text-gray-500" />
@@ -158,7 +161,7 @@ const TaskList: React.FC<TaskListProps> = ({
               </div>
             )}
 
-            {onTaskStatusChange && (
+            {onTaskStatusChange && !compact && (
               <div className="flex gap-2 pt-2">
                 {task.status === 'TODO' && (
                   <Button
