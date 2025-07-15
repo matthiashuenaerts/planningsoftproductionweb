@@ -66,6 +66,7 @@ const ProjectDetails = () => {
       const tasksWithEfficiency = [];
 
       for (const task of completedTasks) {
+        // Get time registrations for this task
         const { data: timeRegs, error } = await supabase
           .from('time_registrations')
           .select('duration_minutes')
@@ -164,11 +165,13 @@ const ProjectDetails = () => {
     const completedTasks = allTasks.filter(task => task.status === 'COMPLETED');
     
     if (completedTasks.length > 0) {
+      // Check which tasks need efficiency calculation
       const tasksNeedingEfficiency = completedTasks.filter(task => 
         task.actual_duration_minutes === undefined || task.efficiency_percentage === undefined
       );
 
       if (tasksNeedingEfficiency.length > 0) {
+        console.log(`Calculating efficiency for ${tasksNeedingEfficiency.length} completed tasks`);
         await calculateAndCacheEfficiency(tasksNeedingEfficiency);
       }
 
@@ -209,6 +212,7 @@ const ProjectDetails = () => {
         const projectData = await projectService.getById(projectId);
         setProject(projectData);
         
+        // Calculate efficiency for completed tasks
         await fetchAndSetSortedTasks(projectId);
 
         const accessoriesData = await accessoriesService.getByProject(projectId);
@@ -227,7 +231,7 @@ const ProjectDetails = () => {
         );
         setOrders(ordersWithDetails);
 
-        // Fetch project efficiency
+        // Fetch project efficiency from database
         try {
           const { data: projectWithEfficiency } = await supabase
             .from('projects')
@@ -400,6 +404,7 @@ const ProjectDetails = () => {
         await checkAndUpdateLimitPhases(taskId);
       }
 
+      // Recalculate efficiency when task is completed
       await fetchAndSetSortedTasks(projectId);
 
     } catch (error: any) {
@@ -652,7 +657,7 @@ const ProjectDetails = () => {
 
                   {projectEfficiency !== null && (
                     <div>
-                      <h4 className="text-sm font-medium mb-1">Efficiency</h4>
+                      <h4 className="text-sm font-medium mb-1">{t('project_efficiency') || 'Project Efficiency'}</h4>
                       <div className="flex items-center gap-2">
                         {projectEfficiency >= 0 ? (
                           <TrendingUp className="h-4 w-4 text-green-600" />
@@ -663,7 +668,7 @@ const ProjectDetails = () => {
                           {projectEfficiency >= 0 ? '+' : ''}{projectEfficiency}%
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {projectEfficiency >= 0 ? 'faster than planned' : 'slower than planned'}
+                          {projectEfficiency >= 0 ? (t('efficiency_faster') || 'faster than planned') : (t('efficiency_slower') || 'slower than planned')}
                         </span>
                       </div>
                     </div>
