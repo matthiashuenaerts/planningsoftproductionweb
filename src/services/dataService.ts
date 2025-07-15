@@ -48,6 +48,7 @@ export interface Task {
   rush_order_id?: string;
   standard_task_id?: string;
   duration?: number; // Task duration in minutes
+  total_duration?: number; // Total planned duration in minutes (same as duration initially)
 }
 
 // Employee Types
@@ -487,9 +488,15 @@ export const taskService = {
   },
   
   async create(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): Promise<Task> {
+    // Ensure total_duration is set to the same value as duration when creating a task
+    const taskWithTotalDuration = {
+      ...task,
+      total_duration: task.duration || 60 // Default to 60 minutes if duration is not provided
+    };
+    
     const { data, error } = await supabase
       .from('tasks')
-      .insert([task])
+      .insert([taskWithTotalDuration])
       .select()
       .single();
     
