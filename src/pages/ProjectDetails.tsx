@@ -83,21 +83,22 @@ const ProjectDetails = () => {
         if (plannedMinutes > 0) {
           const efficiency = ((plannedMinutes - actualMinutes) / plannedMinutes) * 100;
           
-          // Update task with efficiency data using raw SQL to handle new columns
-          await supabase.rpc('sql', {
-            query: `
-              UPDATE tasks 
-              SET actual_duration_minutes = $1, efficiency_percentage = $2 
-              WHERE id = $3
-            `,
-            params: [actualMinutes, Math.round(efficiency), task.id]
-          }).catch(async () => {
-            // Fallback: use direct SQL execution
-            await supabase.from('tasks').update({
-              actual_duration_minutes: actualMinutes,
-              efficiency_percentage: Math.round(efficiency)
-            } as any).eq('id', task.id);
-          });
+          // Update task with efficiency data using standard update
+          try {
+            const { error: updateError } = await supabase
+              .from('tasks')
+              .update({
+                actual_duration_minutes: actualMinutes,
+                efficiency_percentage: Math.round(efficiency)
+              })
+              .eq('id', task.id);
+
+            if (updateError) {
+              console.error('Error updating task efficiency:', updateError);
+            }
+          } catch (updateError) {
+            console.error('Error updating task:', updateError);
+          }
 
           totalPlannedMinutes += plannedMinutes;
           totalActualMinutes += actualMinutes;
@@ -114,16 +115,21 @@ const ProjectDetails = () => {
         const overallEfficiency = ((totalPlannedMinutes - totalActualMinutes) / totalPlannedMinutes) * 100;
         setProjectEfficiency(Math.round(overallEfficiency));
         
-        // Update project efficiency using raw SQL to handle new column
-        await supabase.rpc('sql', {
-          query: `UPDATE projects SET efficiency_percentage = $1 WHERE id = $2`,
-          params: [Math.round(overallEfficiency), projectId]
-        }).catch(async () => {
-          // Fallback: use direct SQL execution
-          await supabase.from('projects').update({
-            efficiency_percentage: Math.round(overallEfficiency)
-          } as any).eq('id', projectId);
-        });
+        // Update project efficiency using standard update
+        try {
+          const { error: projectUpdateError } = await supabase
+            .from('projects')
+            .update({
+              efficiency_percentage: Math.round(overallEfficiency)
+            })
+            .eq('id', projectId);
+
+          if (projectUpdateError) {
+            console.error('Error updating project efficiency:', projectUpdateError);
+          }
+        } catch (projectUpdateError) {
+          console.error('Error updating project:', projectUpdateError);
+        }
       }
 
       return tasksWithEfficiency;
