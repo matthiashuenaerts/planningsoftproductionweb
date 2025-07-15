@@ -62,65 +62,83 @@ const ProjectDetails = () => {
 
     console.log(`Processing ${completedTasks.length} completed tasks for efficiency calculation`);
     
+    // Get all task IDs for batch query
+    const taskIds = completedTasks.map(task => task.id);
+    
+    // Batch fetch all time registrations for completed tasks
+    const { data: allTimeRegs, error: timeRegsError } = await supabase
+      .from('time_registrations')
+      .select('task_id, duration_minutes')
+      .in('task_id', taskIds)
+      .not('duration_minutes', 'is', null);
+
+    if (timeRegsError) {
+      console.error('Error fetching time registrations:', timeRegsError);
+      return completedTasks;
+    }
+
+    // Group time registrations by task_id
+    const timeRegsByTask = new Map<string, number>();
+    allTimeRegs?.forEach(reg => {
+      const currentTotal = timeRegsByTask.get(reg.task_id) || 0;
+      timeRegsByTask.set(reg.task_id, currentTotal + (reg.duration_minutes || 0));
+    });
+
     let totalPlannedMinutes = 0;
     let totalActualMinutes = 0;
-    const updatedTasks = [];
+    const tasksToUpdate: { id: string; actual_duration_minutes: number; efficiency_percentage: number }[] = [];
+    const updatedTasks: TaskWithTimeData[] = [];
 
+    // Process all tasks in memory
     for (const task of completedTasks) {
-      try {
-        console.log(`Fetching time registrations for task: ${task.id}`);
+      const actualMinutes = timeRegsByTask.get(task.id) || 0;
+      const plannedMinutes = task.duration || 0;
+
+      console.log(`Task ${task.id}: Planned ${plannedMinutes}min, Actual ${actualMinutes}min`);
+
+      if (plannedMinutes > 0 && actualMinutes > 0) {
+        const efficiency = ((plannedMinutes - actualMinutes) / plannedMinutes) * 100;
         
-        // Get all time registrations for this specific task
-        const { data: timeRegs, error } = await supabase
-          .from('time_registrations')
-          .select('duration_minutes')
-          .eq('task_id', task.id)
-          .not('duration_minutes', 'is', null);
+        totalPlannedMinutes += plannedMinutes;
+        totalActualMinutes += actualMinutes;
 
-        if (error) {
-          console.error('Error fetching time registrations for task:', task.id, error);
-          continue;
-        }
+        tasksToUpdate.push({
+          id: task.id,
+          actual_duration_minutes: actualMinutes,
+          efficiency_percentage: Math.round(efficiency)
+        });
 
-        // Calculate total actual duration from all time registrations
-        const actualMinutes = timeRegs?.reduce((sum, reg) => sum + (reg.duration_minutes || 0), 0) || 0;
-        const plannedMinutes = task.duration || 0;
-
-        console.log(`Task ${task.id}: Planned ${plannedMinutes}min, Actual ${actualMinutes}min`);
-
-        if (plannedMinutes > 0 && actualMinutes > 0) {
-          const efficiency = ((plannedMinutes - actualMinutes) / plannedMinutes) * 100;
-          
-          // Update task in database with actual duration and efficiency
-          const { error: updateError } = await supabase
-            .from('tasks')
-            .update({
-              actual_duration_minutes: actualMinutes,
-              efficiency_percentage: Math.round(efficiency)
-            })
-            .eq('id', task.id);
-
-          if (updateError) {
-            console.error('Error updating task efficiency for task:', task.id, updateError);
-          } else {
-            console.log(`Updated task ${task.id} with efficiency: ${Math.round(efficiency)}%`);
-            
-            totalPlannedMinutes += plannedMinutes;
-            totalActualMinutes += actualMinutes;
-
-            updatedTasks.push({
-              ...task,
-              actual_duration_minutes: actualMinutes,
-              efficiency_percentage: Math.round(efficiency)
-            });
-          }
-        } else {
-          console.log(`Skipping task ${task.id}: plannedMinutes=${plannedMinutes}, actualMinutes=${actualMinutes}`);
-          updatedTasks.push(task);
-        }
-      } catch (error) {
-        console.error('Error processing task:', task.id, error);
+        updatedTasks.push({
+          ...task,
+          actual_duration_minutes: actualMinutes,
+          efficiency_percentage: Math.round(efficiency)
+        });
+      } else {
+        console.log(`Skipping task ${task.id}: plannedMinutes=${plannedMinutes}, actualMinutes=${actualMinutes}`);
         updatedTasks.push(task);
+      }
+    }
+
+    // Batch update all tasks at once
+    if (tasksToUpdate.length > 0) {
+      console.log(`Batch updating ${tasksToUpdate.length} tasks with efficiency data`);
+      
+      // Use a transaction-like approach with multiple updates
+      const updatePromises = tasksToUpdate.map(taskUpdate => 
+        supabase
+          .from('tasks')
+          .update({
+            actual_duration_minutes: taskUpdate.actual_duration_minutes,
+            efficiency_percentage: taskUpdate.efficiency_percentage
+          })
+          .eq('id', taskUpdate.id)
+      );
+
+      try {
+        await Promise.all(updatePromises);
+        console.log('Successfully batch updated all task efficiencies');
+      } catch (error) {
+        console.error('Error batch updating task efficiencies:', error);
       }
     }
 
@@ -132,18 +150,14 @@ const ProjectDetails = () => {
       console.log(`Project efficiency: ${Math.round(overallEfficiency)}% (${totalActualMinutes}min actual vs ${totalPlannedMinutes}min planned)`);
       
       try {
-        const { error: projectUpdateError } = await supabase
+        await supabase
           .from('projects')
           .update({
             efficiency_percentage: Math.round(overallEfficiency)
           })
           .eq('id', projectId);
 
-        if (projectUpdateError) {
-          console.error('Error updating project efficiency:', projectUpdateError);
-        } else {
-          console.log('Successfully updated project efficiency in database');
-        }
+        console.log('Successfully updated project efficiency in database');
       } catch (error) {
         console.error('Error updating project efficiency:', error);
       }
@@ -181,14 +195,40 @@ const ProjectDetails = () => {
     console.log(`Found ${completedTasks.length} completed tasks`);
     
     if (completedTasks.length > 0) {
-      // Always recalculate efficiency for completed tasks to ensure data is up to date
-      const updatedCompletedTasks = await calculateAndSaveTaskEfficiency(completedTasks);
+      // Check if any completed task is missing efficiency data
+      const tasksNeedingUpdate = completedTasks.filter(task => 
+        task.actual_duration_minutes === null || task.actual_duration_minutes === undefined ||
+        task.efficiency_percentage === null || task.efficiency_percentage === undefined
+      );
       
-      // Replace completed tasks with updated ones
-      allTasks = allTasks.map(task => {
-        const updatedTask = updatedCompletedTasks.find(ut => ut.id === task.id);
-        return updatedTask || task;
-      });
+      if (tasksNeedingUpdate.length > 0) {
+        console.log(`${tasksNeedingUpdate.length} tasks need efficiency calculation`);
+        const updatedCompletedTasks = await calculateAndSaveTaskEfficiency(tasksNeedingUpdate);
+        
+        // Replace tasks that were updated
+        allTasks = allTasks.map(task => {
+          const updatedTask = updatedCompletedTasks.find(ut => ut.id === task.id);
+          return updatedTask || task;
+        });
+      } else {
+        console.log('All completed tasks already have efficiency data');
+        
+        // Calculate project efficiency from existing data
+        let totalPlannedMinutes = 0;
+        let totalActualMinutes = 0;
+        
+        completedTasks.forEach(task => {
+          if (task.duration && task.actual_duration_minutes) {
+            totalPlannedMinutes += task.duration;
+            totalActualMinutes += task.actual_duration_minutes;
+          }
+        });
+        
+        if (totalPlannedMinutes > 0) {
+          const overallEfficiency = ((totalPlannedMinutes - totalActualMinutes) / totalPlannedMinutes) * 100;
+          setProjectEfficiency(Math.round(overallEfficiency));
+        }
+      }
     }
     
     setTasks(allTasks);
