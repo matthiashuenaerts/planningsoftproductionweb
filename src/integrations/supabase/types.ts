@@ -926,6 +926,7 @@ export type Database = {
           client: string
           created_at: string
           description: string | null
+          efficiency_percentage: number | null
           id: string
           installation_date: string
           name: string
@@ -938,6 +939,7 @@ export type Database = {
           client: string
           created_at?: string
           description?: string | null
+          efficiency_percentage?: number | null
           id?: string
           installation_date: string
           name: string
@@ -950,6 +952,7 @@ export type Database = {
           client?: string
           created_at?: string
           description?: string | null
+          efficiency_percentage?: number | null
           id?: string
           installation_date?: string
           name?: string
@@ -1389,6 +1392,7 @@ export type Database = {
       }
       tasks: {
         Row: {
+          actual_duration_minutes: number | null
           assignee_id: string | null
           completed_at: string | null
           completed_by: string | null
@@ -1396,6 +1400,7 @@ export type Database = {
           description: string | null
           due_date: string
           duration: number | null
+          efficiency_percentage: number | null
           id: string
           phase_id: string
           priority: string
@@ -1407,6 +1412,7 @@ export type Database = {
           workstation: string
         }
         Insert: {
+          actual_duration_minutes?: number | null
           assignee_id?: string | null
           completed_at?: string | null
           completed_by?: string | null
@@ -1414,6 +1420,7 @@ export type Database = {
           description?: string | null
           due_date: string
           duration?: number | null
+          efficiency_percentage?: number | null
           id?: string
           phase_id: string
           priority: string
@@ -1425,6 +1432,7 @@ export type Database = {
           workstation: string
         }
         Update: {
+          actual_duration_minutes?: number | null
           assignee_id?: string | null
           completed_at?: string | null
           completed_by?: string | null
@@ -1432,6 +1440,7 @@ export type Database = {
           description?: string | null
           due_date?: string
           duration?: number | null
+          efficiency_percentage?: number | null
           id?: string
           phase_id?: string
           priority?: string

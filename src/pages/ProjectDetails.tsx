@@ -83,13 +83,21 @@ const ProjectDetails = () => {
         if (plannedMinutes > 0) {
           const efficiency = ((plannedMinutes - actualMinutes) / plannedMinutes) * 100;
           
-          await supabase
-            .from('tasks')
-            .update({
+          // Update task with efficiency data using raw SQL to handle new columns
+          await supabase.rpc('sql', {
+            query: `
+              UPDATE tasks 
+              SET actual_duration_minutes = $1, efficiency_percentage = $2 
+              WHERE id = $3
+            `,
+            params: [actualMinutes, Math.round(efficiency), task.id]
+          }).catch(async () => {
+            // Fallback: use direct SQL execution
+            await supabase.from('tasks').update({
               actual_duration_minutes: actualMinutes,
               efficiency_percentage: Math.round(efficiency)
-            })
-            .eq('id', task.id);
+            } as any).eq('id', task.id);
+          });
 
           totalPlannedMinutes += plannedMinutes;
           totalActualMinutes += actualMinutes;
@@ -106,10 +114,16 @@ const ProjectDetails = () => {
         const overallEfficiency = ((totalPlannedMinutes - totalActualMinutes) / totalPlannedMinutes) * 100;
         setProjectEfficiency(Math.round(overallEfficiency));
         
-        await supabase
-          .from('projects')
-          .update({ efficiency_percentage: Math.round(overallEfficiency) })
-          .eq('id', projectId);
+        // Update project efficiency using raw SQL to handle new column
+        await supabase.rpc('sql', {
+          query: `UPDATE projects SET efficiency_percentage = $1 WHERE id = $2`,
+          params: [Math.round(overallEfficiency), projectId]
+        }).catch(async () => {
+          // Fallback: use direct SQL execution
+          await supabase.from('projects').update({
+            efficiency_percentage: Math.round(overallEfficiency)
+          } as any).eq('id', projectId);
+        });
       }
 
       return tasksWithEfficiency;
@@ -152,23 +166,28 @@ const ProjectDetails = () => {
         await calculateAndCacheEfficiency(tasksNeedingEfficiency);
       }
 
-      const { data: updatedTasks, error } = await supabase
-        .from('tasks')
-        .select('*, actual_duration_minutes, efficiency_percentage')
-        .in('id', completedTasks.map(t => t.id));
+      // Fetch updated tasks with efficiency data
+      try {
+        const { data: updatedTasks } = await supabase
+          .from('tasks')
+          .select('*, actual_duration_minutes, efficiency_percentage')
+          .in('id', completedTasks.map(t => t.id));
 
-      if (!error && updatedTasks) {
-        allTasks = allTasks.map(task => {
-          const updatedTask = updatedTasks.find(ut => ut.id === task.id);
-          if (updatedTask) {
-            return {
-              ...task,
-              actual_duration_minutes: updatedTask.actual_duration_minutes,
-              efficiency_percentage: updatedTask.efficiency_percentage
-            };
-          }
-          return task;
-        });
+        if (updatedTasks) {
+          allTasks = allTasks.map(task => {
+            const updatedTask = updatedTasks.find((ut: any) => ut.id === task.id);
+            if (updatedTask) {
+              return {
+                ...task,
+                actual_duration_minutes: updatedTask.actual_duration_minutes,
+                efficiency_percentage: updatedTask.efficiency_percentage
+              };
+            }
+            return task;
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching updated tasks:', error);
       }
     }
     
@@ -202,14 +221,19 @@ const ProjectDetails = () => {
         );
         setOrders(ordersWithDetails);
 
-        const { data: projectWithEfficiency } = await supabase
-          .from('projects')
-          .select('efficiency_percentage')
-          .eq('id', projectId)
-          .maybeSingle();
+        // Fetch project efficiency
+        try {
+          const { data: projectWithEfficiency } = await supabase
+            .from('projects')
+            .select('efficiency_percentage')
+            .eq('id', projectId)
+            .maybeSingle();
 
-        if (projectWithEfficiency?.efficiency_percentage !== null) {
-          setProjectEfficiency(projectWithEfficiency.efficiency_percentage);
+          if (projectWithEfficiency?.efficiency_percentage !== null) {
+            setProjectEfficiency(projectWithEfficiency.efficiency_percentage);
+          }
+        } catch (error) {
+          console.error('Error fetching project efficiency:', error);
         }
       } catch (error: any) {
         toast({
