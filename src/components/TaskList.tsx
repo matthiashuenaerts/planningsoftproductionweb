@@ -1,14 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Clock, User, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Task } from '@/services/dataService';
-import { useLanguage } from '@/context/LanguageContext';
+import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader, TrendingUp, TrendingDown } from 'lucide-react';
 
-interface TaskWithTimeData extends Task {
+interface ExtendedTask extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
   assignee_name?: string;
@@ -17,208 +15,325 @@ interface TaskWithTimeData extends Task {
 }
 
 interface TaskListProps {
-  tasks: TaskWithTimeData[];
-  title: string;
-  onTaskStatusChange?: (taskId: string, newStatus: Task['status']) => void;
+  tasks: ExtendedTask[];
+  onTaskUpdate?: (task: ExtendedTask) => void;
+  showRushOrderBadge?: boolean;
+  title?: string;
+  compact?: boolean;
+  showCountdownTimer?: boolean;
   showCompleteButton?: boolean;
   showEfficiencyData?: boolean;
+  onTaskStatusChange?: (taskId: string, status: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => Promise<void>;
 }
 
 const TaskList: React.FC<TaskListProps> = ({ 
   tasks, 
+  onTaskUpdate, 
+  showRushOrderBadge = false, 
   title, 
-  onTaskStatusChange, 
+  compact = false,
+  showCountdownTimer = false,
   showCompleteButton = false,
-  showEfficiencyData = false
+  showEfficiencyData = false,
+  onTaskStatusChange 
 }) => {
-  const { t } = useLanguage();
-
-  const formatDuration = (minutes?: number | null) => {
-    if (!minutes) return '0min';
-    if (minutes < 60) return `${minutes}min`;
-    
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    
-    if (remainingMinutes === 0) return `${hours}h`;
-    return `${hours}h ${remainingMinutes}min`;
-  };
-
-  const getStatusColor = (status: string) => {
-    const validStatuses = ['TODO', 'IN_PROGRESS', 'COMPLETED', 'HOLD'];
-    if (!validStatuses.includes(status)) {
-      return 'bg-gray-100 text-gray-800';
-    }
-    
-    switch (status) {
-      case 'TODO':
-        return 'bg-blue-100 text-blue-800';
-      case 'IN_PROGRESS':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'COMPLETED':
-        return 'bg-green-100 text-green-800';
-      case 'HOLD':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
+  const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
 
   const getPriorityColor = (priority: string) => {
     switch (priority.toLowerCase()) {
-      case 'urgent':
-        return 'bg-red-100 text-red-800 border-red-300';
-      case 'high':
-        return 'bg-orange-100 text-orange-800 border-orange-300';
-      case 'medium':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'low':
-        return 'bg-gray-100 text-gray-800 border-gray-300';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-300';
+      case 'urgent': return 'bg-red-500';
+      case 'high': return 'bg-orange-500';
+      case 'medium': return 'bg-yellow-500';
+      case 'low': return 'bg-green-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'TODO': return 'bg-blue-500';
+      case 'IN_PROGRESS': return 'bg-yellow-500';
+      case 'COMPLETED': return 'bg-green-500';
+      case 'HOLD': return 'bg-orange-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'TODO': return <Clock className="h-4 w-4" />;
+      case 'IN_PROGRESS': return <AlertCircle className="h-4 w-4" />;
+      case 'COMPLETED': return <CheckCircle className="h-4 w-4" />;
+      case 'HOLD': return <Pause className="h-4 w-4" />;
+      default: return <Clock className="h-4 w-4" />;
+    }
+  };
+
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
+  };
+
+  const handleStatusChange = async (task: ExtendedTask, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
+    if (newStatus === 'COMPLETED') {
+      setLoadingTasks(prev => new Set(prev).add(task.id));
+    }
+
+    try {
+      if (onTaskStatusChange) {
+        await onTaskStatusChange(task.id, newStatus);
+      } else if (onTaskUpdate) {
+        const updatedTask = { ...task, status: newStatus };
+        if (newStatus === 'COMPLETED') {
+          updatedTask.completed_at = new Date().toISOString();
+        }
+        onTaskUpdate(updatedTask);
+      }
+
+      if (newStatus === 'COMPLETED') {
+        // Show completion animation
+        setLoadingTasks(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(task.id);
+          return newSet;
+        });
+        setCompletingTasks(prev => new Set(prev).add(task.id));
+        
+        // Remove completion animation after 1 second
+        setTimeout(() => {
+          setCompletingTasks(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(task.id);
+            return newSet;
+          });
+        }, 1000);
+      }
+    } catch (error) {
+      // Remove loading state on error
+      if (newStatus === 'COMPLETED') {
+        setLoadingTasks(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(task.id);
+          return newSet;
+        });
+      }
+      throw error;
     }
   };
 
   if (tasks.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-center py-4">{t('no_tasks_found')}</p>
-        </CardContent>
-      </Card>
+      <div className="text-center text-gray-500 py-8">
+        No tasks found
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {tasks.map((task) => (
-          <div key={task.id} className="border rounded-lg p-4 space-y-3">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <h4 className="font-medium">{task.title}</h4>
-                {task.description && (
-                  <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
-                )}
-              </div>
-              <div className="flex gap-2 ml-4">
-                <Badge className={getPriorityColor(task.priority)}>
-                  {task.priority}
-                </Badge>
-                <Badge className={getStatusColor(task.status)}>
-                  {task.status}
-                </Badge>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span>{task.workstation}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>{new Date(task.due_date).toLocaleDateString()}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>{t('duration')}: {formatDuration(task.total_duration || task.duration)}</span>
-              </div>
-            </div>
-
-            {showEfficiencyData && task.status === 'COMPLETED' && (
-              <div className="bg-gray-50 p-3 rounded space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="h-4 w-4 text-gray-500" />
-                  <span className="text-gray-600">
-                    Actual: {formatDuration(task.actual_duration_minutes)}
-                    {task.total_duration && ` / Planned: ${formatDuration(task.total_duration)}`}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  {task.efficiency_percentage !== null && task.efficiency_percentage !== undefined && (
-                    <>
-                      {task.efficiency_percentage >= 0 ? (
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <TrendingDown className="h-4 w-4 text-red-600" />
-                      )}
-                      <span className={`font-medium ${task.efficiency_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {task.efficiency_percentage >= 0 ? '+' : ''}{task.efficiency_percentage}% efficiency
+    <div className="space-y-4">
+      {title && <h3 className="text-lg font-semibold">{title}</h3>}
+      {tasks.map((task) => {
+        const isLoading = loadingTasks.has(task.id);
+        const isCompleting = completingTasks.has(task.id);
+        
+        return (
+          <Card 
+            key={task.id} 
+            className={`
+              ${task.is_rush_order && showRushOrderBadge ? 'border-red-500 border-2' : ''} 
+              ${task.status === 'HOLD' ? 'border-orange-300' : ''} 
+              ${compact ? 'p-2' : ''}
+              ${isCompleting ? 'animate-pulse bg-green-50 border-green-300' : ''}
+              transition-all duration-300
+            `}
+          >
+            <CardHeader className={compact ? "pb-2" : "pb-3"}>
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  {task.project_name && (
+                    <CardTitle className={`${compact ? "text-lg" : "text-xl"} text-primary font-bold mb-1`}>
+                      {task.project_name}
+                    </CardTitle>
+                  )}
+                  <h4 className={`${compact ? "text-sm" : "text-base"} font-medium text-gray-700`}>
+                    {task.title}
+                  </h4>
+                  
+                  {/* Countdown Timer for IN_PROGRESS tasks */}
+                  {task.status === 'IN_PROGRESS' && task.timeRemaining && task.duration && (
+                    <div className={`mt-2 flex items-center gap-2 text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-blue-600'}`}>
+                      <Timer className="h-4 w-4" />
+                      <span className={task.isOvertime ? 'font-bold' : ''}>
+                        {task.isOvertime ? 'OVERTIME: ' : 'Time remaining: '}
+                        {task.timeRemaining}
                       </span>
-                    </>
+                    </div>
+                  )}
+
+                  {/* Efficiency data for completed tasks */}
+                  {showEfficiencyData && task.status === 'COMPLETED' && task.actual_duration_minutes !== undefined && task.efficiency_percentage !== undefined && (
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="h-4 w-4 text-gray-500" />
+                        <span className="text-gray-600">
+                          Planned: {formatDuration(task.actual_duration_minutes)}
+                          {task.duration && ` / Total: ${formatDuration(task.duration)}`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        {task.efficiency_percentage >= 0 ? (
+                          <TrendingUp className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <TrendingDown className="h-4 w-4 text-red-600" />
+                        )}
+                        <span className={`font-medium ${task.efficiency_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {task.efficiency_percentage >= 0 ? '+' : ''}{task.efficiency_percentage}% efficiency
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          ({task.efficiency_percentage >= 0 ? 'faster' : 'slower'} than planned)
+                        </span>
+                      </div>
+                    </div>
                   )}
                 </div>
-              </div>
-            )}
-
-            {onTaskStatusChange && (
-              <div className="flex gap-2 pt-2">
-                {task.status === 'TODO' && (
-                  <Button
-                    size="sm"
-                    onClick={() => onTaskStatusChange(task.id, 'IN_PROGRESS')}
+                <div className="flex gap-2">
+                  {task.is_rush_order && showRushOrderBadge && (
+                    <Badge variant="destructive" className="flex items-center gap-1">
+                      <Zap className="h-3 w-3" />
+                      Rush Order
+                    </Badge>
+                  )}
+                  <Badge 
+                    className={`${getPriorityColor(task.priority)} text-white`}
                   >
-                    {t('start_task')}
-                  </Button>
-                )}
-                {task.status === 'IN_PROGRESS' && (
-                  <>
-                    {showCompleteButton && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onTaskStatusChange(task.id, 'COMPLETED')}
+                    {task.priority}
+                  </Badge>
+                  <Badge 
+                    className={`${getStatusColor(task.status)} text-white flex items-center gap-1`}
+                  >
+                    {getStatusIcon(task.status)}
+                    {task.status === 'HOLD' ? 'On Hold' : task.status.replace('_', ' ')}
+                  </Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {task.description && !compact && (
+                <p className="text-gray-600 mb-4">{task.description}</p>
+              )}
+              
+              {task.status === 'HOLD' && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+                  <p className="text-orange-800 text-sm flex items-center gap-2">
+                    <Pause className="h-4 w-4" />
+                    This task is on hold because required limit phases are not yet completed.
+                  </p>
+                </div>
+              )}
+              
+              {!compact && (
+                <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-4 w-4" />
+                    <span>Due: {new Date(task.due_date).toLocaleDateString()}</span>
+                  </div>
+                  {task.status === 'IN_PROGRESS' && task.assignee_name && (
+                    <div className="flex items-center gap-1">
+                      <User className="h-4 w-4" />
+                      <span>Started by: {task.assignee_name}</span>
+                    </div>
+                  )}
+                  {task.duration && (
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      <span>Duration: {task.duration}min</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {(onTaskUpdate || onTaskStatusChange) && (
+                <div className="flex gap-2">
+                  {task.status === 'TODO' && (
+                    <>
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleStatusChange(task, 'IN_PROGRESS')}
                       >
-                        {t('complete')}
+                        Start Task
                       </Button>
-                    )}
-                    <Button
-                      size="sm"
+                      {showCompleteButton && (
+                        <Button 
+                          size="sm" 
+                          onClick={() => handleStatusChange(task, 'COMPLETED')}
+                          className="bg-green-600 hover:bg-green-700 relative"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <>
+                              <Loader className="h-4 w-4 animate-spin mr-2" />
+                              Processing...
+                            </>
+                          ) : (
+                            'Complete'
+                          )}
+                        </Button>
+                      )}
+                    </>
+                  )}
+                  {task.status === 'IN_PROGRESS' && (
+                    <>
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleStatusChange(task, 'COMPLETED')}
+                        className="bg-green-600 hover:bg-green-700 relative"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader className="h-4 w-4 animate-spin mr-2" />
+                            Processing...
+                          </>
+                        ) : (
+                          'Complete'
+                        )}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleStatusChange(task, 'TODO')}
+                      >
+                        Back to Todo
+                      </Button>
+                    </>
+                  )}
+                  {task.status === 'COMPLETED' && task.completed_at && (
+                    <div className="text-sm text-gray-500">
+                      Completed: {new Date(task.completed_at).toLocaleString()}
+                    </div>
+                  )}
+                  {task.status === 'HOLD' && (
+                    <Button 
+                      size="sm" 
                       variant="outline"
-                      onClick={() => onTaskStatusChange(task.id, 'TODO')}
+                      disabled
+                      className="opacity-50"
                     >
-                      {t('pause')}
+                      Waiting for Limit Phases
                     </Button>
-                  </>
-                )}
-                {task.status === 'HOLD' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onTaskStatusChange(task.id, 'TODO')}
-                  >
-                    {t('resume')}
-                  </Button>
-                )}
-                {task.status !== 'COMPLETED' && (
-                  <Select
-                    value={task.status}
-                    onValueChange={(value) => onTaskStatusChange(task.id, value as Task['status'])}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="TODO">{t('todo')}</SelectItem>
-                      <SelectItem value="IN_PROGRESS">{t('in_progress')}</SelectItem>
-                      <SelectItem value="COMPLETED">{t('completed')}</SelectItem>
-                      <SelectItem value="HOLD">{t('on_hold')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
   );
 };
 
