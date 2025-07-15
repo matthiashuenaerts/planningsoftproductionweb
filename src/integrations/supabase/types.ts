@@ -1408,6 +1408,7 @@ export type Database = {
           status: string
           status_changed_at: string | null
           title: string
+          total_duration: number | null
           updated_at: string
           workstation: string
         }
@@ -1428,6 +1429,7 @@ export type Database = {
           status: string
           status_changed_at?: string | null
           title: string
+          total_duration?: number | null
           updated_at?: string
           workstation: string
         }
@@ -1448,6 +1450,7 @@ export type Database = {
           status?: string
           status_changed_at?: string | null
           title?: string
+          total_duration?: number | null
           updated_at?: string
           workstation?: string
         }

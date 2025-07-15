@@ -165,7 +165,7 @@ const TaskList: React.FC<TaskListProps> = ({
                   </h4>
                   
                   {/* Countdown Timer for IN_PROGRESS tasks */}
-                  {task.status === 'IN_PROGRESS' && task.timeRemaining && task.duration && (
+                  {task.status === 'IN_PROGRESS' && task.timeRemaining && task.total_duration && (
                     <div className={`mt-2 flex items-center gap-2 text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-blue-600'}`}>
                       <Timer className="h-4 w-4" />
                       <span className={task.isOvertime ? 'font-bold' : ''}>
@@ -182,7 +182,7 @@ const TaskList: React.FC<TaskListProps> = ({
                         <Clock className="h-4 w-4 text-gray-500" />
                         <span className="text-gray-600">
                           Planned: {formatDuration(task.actual_duration_minutes)}
-                          {task.duration && ` / Total: ${formatDuration(task.duration)}`}
+                          {task.total_duration && ` / Total: ${formatDuration(task.total_duration)}`}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
@@ -248,10 +248,10 @@ const TaskList: React.FC<TaskListProps> = ({
                       <span>Started by: {task.assignee_name}</span>
                     </div>
                   )}
-                  {task.duration && (
+                  {task.total_duration && (
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      <span>Duration: {task.duration}min</span>
+                      <span>Duration: {task.total_duration}min</span>
                     </div>
                   )}
                 </div>
