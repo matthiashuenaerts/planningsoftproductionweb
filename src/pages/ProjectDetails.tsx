@@ -57,16 +57,20 @@ const ProjectDetails = () => {
   const { currentEmployee } = useAuth();
   const { t, lang, createLocalizedPath } = useLanguage();
 
-  const calculateAndCacheEfficiency = useCallback(async (completedTasks: TaskWithTimeData[]) => {
-    if (!projectId || completedTasks.length === 0) return;
+  const calculateAndSaveTaskEfficiency = useCallback(async (completedTasks: TaskWithTimeData[]) => {
+    if (!projectId || completedTasks.length === 0) return [];
 
-    try {
-      let totalPlannedMinutes = 0;
-      let totalActualMinutes = 0;
-      const tasksWithEfficiency = [];
+    console.log(`Processing ${completedTasks.length} completed tasks for efficiency calculation`);
+    
+    let totalPlannedMinutes = 0;
+    let totalActualMinutes = 0;
+    const updatedTasks = [];
 
-      for (const task of completedTasks) {
-        // Get time registrations for this task
+    for (const task of completedTasks) {
+      try {
+        console.log(`Fetching time registrations for task: ${task.id}`);
+        
+        // Get all time registrations for this specific task
         const { data: timeRegs, error } = await supabase
           .from('time_registrations')
           .select('duration_minutes')
@@ -74,72 +78,83 @@ const ProjectDetails = () => {
           .not('duration_minutes', 'is', null);
 
         if (error) {
-          console.error('Error fetching time registrations:', error);
+          console.error('Error fetching time registrations for task:', task.id, error);
           continue;
         }
 
+        // Calculate total actual duration from all time registrations
         const actualMinutes = timeRegs?.reduce((sum, reg) => sum + (reg.duration_minutes || 0), 0) || 0;
         const plannedMinutes = task.duration || 0;
 
-        if (plannedMinutes > 0) {
+        console.log(`Task ${task.id}: Planned ${plannedMinutes}min, Actual ${actualMinutes}min`);
+
+        if (plannedMinutes > 0 && actualMinutes > 0) {
           const efficiency = ((plannedMinutes - actualMinutes) / plannedMinutes) * 100;
           
-          // Update task with efficiency data using standard update
-          try {
-            const { error: updateError } = await supabase
-              .from('tasks')
-              .update({
-                actual_duration_minutes: actualMinutes,
-                efficiency_percentage: Math.round(efficiency)
-              })
-              .eq('id', task.id);
-
-            if (updateError) {
-              console.error('Error updating task efficiency:', updateError);
-            }
-          } catch (updateError) {
-            console.error('Error updating task:', updateError);
-          }
-
-          totalPlannedMinutes += plannedMinutes;
-          totalActualMinutes += actualMinutes;
-
-          tasksWithEfficiency.push({
-            ...task,
-            actual_duration_minutes: actualMinutes,
-            efficiency_percentage: Math.round(efficiency)
-          });
-        }
-      }
-
-      if (totalPlannedMinutes > 0) {
-        const overallEfficiency = ((totalPlannedMinutes - totalActualMinutes) / totalPlannedMinutes) * 100;
-        setProjectEfficiency(Math.round(overallEfficiency));
-        
-        // Update project efficiency using standard update
-        try {
-          const { error: projectUpdateError } = await supabase
-            .from('projects')
+          // Update task in database with actual duration and efficiency
+          const { error: updateError } = await supabase
+            .from('tasks')
             .update({
-              efficiency_percentage: Math.round(overallEfficiency)
+              actual_duration_minutes: actualMinutes,
+              efficiency_percentage: Math.round(efficiency)
             })
-            .eq('id', projectId);
+            .eq('id', task.id);
 
-          if (projectUpdateError) {
-            console.error('Error updating project efficiency:', projectUpdateError);
+          if (updateError) {
+            console.error('Error updating task efficiency for task:', task.id, updateError);
+          } else {
+            console.log(`Updated task ${task.id} with efficiency: ${Math.round(efficiency)}%`);
+            
+            totalPlannedMinutes += plannedMinutes;
+            totalActualMinutes += actualMinutes;
+
+            updatedTasks.push({
+              ...task,
+              actual_duration_minutes: actualMinutes,
+              efficiency_percentage: Math.round(efficiency)
+            });
           }
-        } catch (projectUpdateError) {
-          console.error('Error updating project:', projectUpdateError);
+        } else {
+          console.log(`Skipping task ${task.id}: plannedMinutes=${plannedMinutes}, actualMinutes=${actualMinutes}`);
+          updatedTasks.push(task);
         }
+      } catch (error) {
+        console.error('Error processing task:', task.id, error);
+        updatedTasks.push(task);
       }
-
-      return tasksWithEfficiency;
-    } catch (error) {
-      console.error('Error calculating efficiency:', error);
     }
+
+    // Calculate and save overall project efficiency
+    if (totalPlannedMinutes > 0) {
+      const overallEfficiency = ((totalPlannedMinutes - totalActualMinutes) / totalPlannedMinutes) * 100;
+      setProjectEfficiency(Math.round(overallEfficiency));
+      
+      console.log(`Project efficiency: ${Math.round(overallEfficiency)}% (${totalActualMinutes}min actual vs ${totalPlannedMinutes}min planned)`);
+      
+      try {
+        const { error: projectUpdateError } = await supabase
+          .from('projects')
+          .update({
+            efficiency_percentage: Math.round(overallEfficiency)
+          })
+          .eq('id', projectId);
+
+        if (projectUpdateError) {
+          console.error('Error updating project efficiency:', projectUpdateError);
+        } else {
+          console.log('Successfully updated project efficiency in database');
+        }
+      } catch (error) {
+        console.error('Error updating project efficiency:', error);
+      }
+    }
+
+    return updatedTasks;
   }, [projectId]);
 
   const fetchAndSetSortedTasks = useCallback(async (pId: string) => {
+    console.log('Fetching and sorting tasks for project:', pId);
+    
     const phaseData = await projectService.getProjectPhases(pId);
     const standardTasks = await standardTasksService.getAll();
     const standardTaskMap = new Map(standardTasks.map(st => [st.id, st.task_number]));
@@ -163,45 +178,21 @@ const ProjectDetails = () => {
     });
 
     const completedTasks = allTasks.filter(task => task.status === 'COMPLETED');
+    console.log(`Found ${completedTasks.length} completed tasks`);
     
     if (completedTasks.length > 0) {
-      // Check which tasks need efficiency calculation
-      const tasksNeedingEfficiency = completedTasks.filter(task => 
-        task.actual_duration_minutes === undefined || task.efficiency_percentage === undefined
-      );
-
-      if (tasksNeedingEfficiency.length > 0) {
-        console.log(`Calculating efficiency for ${tasksNeedingEfficiency.length} completed tasks`);
-        await calculateAndCacheEfficiency(tasksNeedingEfficiency);
-      }
-
-      // Fetch updated tasks with efficiency data
-      try {
-        const { data: updatedTasks } = await supabase
-          .from('tasks')
-          .select('*, actual_duration_minutes, efficiency_percentage')
-          .in('id', completedTasks.map(t => t.id));
-
-        if (updatedTasks) {
-          allTasks = allTasks.map(task => {
-            const updatedTask = updatedTasks.find((ut: any) => ut.id === task.id);
-            if (updatedTask) {
-              return {
-                ...task,
-                actual_duration_minutes: updatedTask.actual_duration_minutes,
-                efficiency_percentage: updatedTask.efficiency_percentage
-              };
-            }
-            return task;
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching updated tasks:', error);
-      }
+      // Always recalculate efficiency for completed tasks to ensure data is up to date
+      const updatedCompletedTasks = await calculateAndSaveTaskEfficiency(completedTasks);
+      
+      // Replace completed tasks with updated ones
+      allTasks = allTasks.map(task => {
+        const updatedTask = updatedCompletedTasks.find(ut => ut.id === task.id);
+        return updatedTask || task;
+      });
     }
     
     setTasks(allTasks);
-  }, [calculateAndCacheEfficiency]);
+  }, [calculateAndSaveTaskEfficiency]);
 
   useEffect(() => {
     const fetchProjectData = async () => {
@@ -209,10 +200,12 @@ const ProjectDetails = () => {
       
       try {
         setLoading(true);
+        console.log('Loading project data for:', projectId);
+        
         const projectData = await projectService.getById(projectId);
         setProject(projectData);
         
-        // Calculate efficiency for completed tasks
+        // Fetch and process tasks with time registration data
         await fetchAndSetSortedTasks(projectId);
 
         const accessoriesData = await accessoriesService.getByProject(projectId);
@@ -231,7 +224,7 @@ const ProjectDetails = () => {
         );
         setOrders(ordersWithDetails);
 
-        // Fetch project efficiency from database
+        // Fetch project efficiency from database (it should be updated by now)
         try {
           const { data: projectWithEfficiency } = await supabase
             .from('projects')
@@ -241,11 +234,13 @@ const ProjectDetails = () => {
 
           if (projectWithEfficiency?.efficiency_percentage !== null) {
             setProjectEfficiency(projectWithEfficiency.efficiency_percentage);
+            console.log('Loaded project efficiency from database:', projectWithEfficiency.efficiency_percentage);
           }
         } catch (error) {
           console.error('Error fetching project efficiency:', error);
         }
       } catch (error: any) {
+        console.error('Error loading project data:', error);
         toast({
           title: t('error'),
           description: t('failed_to_load_projects', { message: error.message }),
@@ -404,7 +399,7 @@ const ProjectDetails = () => {
         await checkAndUpdateLimitPhases(taskId);
       }
 
-      // Recalculate efficiency when task is completed
+      // Recalculate efficiency when task is completed or any status changes
       await fetchAndSetSortedTasks(projectId);
 
     } catch (error: any) {
