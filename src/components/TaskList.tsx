@@ -181,8 +181,8 @@ const TaskList: React.FC<TaskListProps> = ({
                       <div className="flex items-center gap-2 text-sm">
                         <Clock className="h-4 w-4 text-gray-500" />
                         <span className="text-gray-600">
-                          Actual: {formatDuration(task.actual_duration_minutes)}
-                          {task.duration && ` / Planned: ${formatDuration(task.duration)}`}
+                          Planned: {formatDuration(task.actual_duration_minutes)}
+                          {task.duration && ` / Total: ${formatDuration(task.duration)}`}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
