@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -31,12 +31,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 
+interface TaskWithTimeData extends Task {
+  timeRemaining?: string;
+  isOvertime?: boolean;
+  assignee_name?: string;
+  actual_duration_minutes?: number;
+  efficiency_percentage?: number;
+}
+
 const ProjectDetails = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [project, setProject] = useState<Project | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<TaskWithTimeData[]>([]);
   const [accessories, setAccessories] = useState<Accessory[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,15 +53,77 @@ const ProjectDetails = () => {
   const [showPartsListDialog, setShowPartsListDialog] = useState(false);
   const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
+  const [projectEfficiency, setProjectEfficiency] = useState<number | null>(null);
   const { currentEmployee } = useAuth();
   const { t, lang, createLocalizedPath } = useLanguage();
+
+  const calculateAndCacheEfficiency = useCallback(async (completedTasks: TaskWithTimeData[]) => {
+    if (!projectId || completedTasks.length === 0) return;
+
+    try {
+      let totalPlannedMinutes = 0;
+      let totalActualMinutes = 0;
+      const tasksWithEfficiency = [];
+
+      for (const task of completedTasks) {
+        const { data: timeRegs, error } = await supabase
+          .from('time_registrations')
+          .select('duration_minutes')
+          .eq('task_id', task.id)
+          .not('duration_minutes', 'is', null);
+
+        if (error) {
+          console.error('Error fetching time registrations:', error);
+          continue;
+        }
+
+        const actualMinutes = timeRegs?.reduce((sum, reg) => sum + (reg.duration_minutes || 0), 0) || 0;
+        const plannedMinutes = task.duration || 0;
+
+        if (plannedMinutes > 0) {
+          const efficiency = ((plannedMinutes - actualMinutes) / plannedMinutes) * 100;
+          
+          await supabase
+            .from('tasks')
+            .update({
+              actual_duration_minutes: actualMinutes,
+              efficiency_percentage: Math.round(efficiency)
+            })
+            .eq('id', task.id);
+
+          totalPlannedMinutes += plannedMinutes;
+          totalActualMinutes += actualMinutes;
+
+          tasksWithEfficiency.push({
+            ...task,
+            actual_duration_minutes: actualMinutes,
+            efficiency_percentage: Math.round(efficiency)
+          });
+        }
+      }
+
+      if (totalPlannedMinutes > 0) {
+        const overallEfficiency = ((totalPlannedMinutes - totalActualMinutes) / totalPlannedMinutes) * 100;
+        setProjectEfficiency(Math.round(overallEfficiency));
+        
+        await supabase
+          .from('projects')
+          .update({ efficiency_percentage: Math.round(overallEfficiency) })
+          .eq('id', projectId);
+      }
+
+      return tasksWithEfficiency;
+    } catch (error) {
+      console.error('Error calculating efficiency:', error);
+    }
+  }, [projectId]);
 
   const fetchAndSetSortedTasks = useCallback(async (pId: string) => {
     const phaseData = await projectService.getProjectPhases(pId);
     const standardTasks = await standardTasksService.getAll();
     const standardTaskMap = new Map(standardTasks.map(st => [st.id, st.task_number]));
 
-    let allTasks: Task[] = [];
+    let allTasks: TaskWithTimeData[] = [];
     for (const phase of phaseData) {
       const phaseTasks = await taskService.getByPhase(phase.id);
       allTasks = [...allTasks, ...phaseTasks];
@@ -70,9 +140,40 @@ const ProjectDetails = () => {
       if (taskB_number) return 1;
       return a.title.localeCompare(b.title);
     });
+
+    const completedTasks = allTasks.filter(task => task.status === 'COMPLETED');
+    
+    if (completedTasks.length > 0) {
+      const tasksNeedingEfficiency = completedTasks.filter(task => 
+        task.actual_duration_minutes === undefined || task.efficiency_percentage === undefined
+      );
+
+      if (tasksNeedingEfficiency.length > 0) {
+        await calculateAndCacheEfficiency(tasksNeedingEfficiency);
+      }
+
+      const { data: updatedTasks, error } = await supabase
+        .from('tasks')
+        .select('*, actual_duration_minutes, efficiency_percentage')
+        .in('id', completedTasks.map(t => t.id));
+
+      if (!error && updatedTasks) {
+        allTasks = allTasks.map(task => {
+          const updatedTask = updatedTasks.find(ut => ut.id === task.id);
+          if (updatedTask) {
+            return {
+              ...task,
+              actual_duration_minutes: updatedTask.actual_duration_minutes,
+              efficiency_percentage: updatedTask.efficiency_percentage
+            };
+          }
+          return task;
+        });
+      }
+    }
     
     setTasks(allTasks);
-  }, []);
+  }, [calculateAndCacheEfficiency]);
 
   useEffect(() => {
     const fetchProjectData = async () => {
@@ -85,7 +186,6 @@ const ProjectDetails = () => {
         
         await fetchAndSetSortedTasks(projectId);
 
-        // Fetch accessories and orders
         const accessoriesData = await accessoriesService.getByProject(projectId);
         setAccessories(accessoriesData);
 
@@ -101,6 +201,16 @@ const ProjectDetails = () => {
           })
         );
         setOrders(ordersWithDetails);
+
+        const { data: projectWithEfficiency } = await supabase
+          .from('projects')
+          .select('efficiency_percentage')
+          .eq('id', projectId)
+          .maybeSingle();
+
+        if (projectWithEfficiency?.efficiency_percentage !== null) {
+          setProjectEfficiency(projectWithEfficiency.efficiency_percentage);
+        }
       } catch (error: any) {
         toast({
           title: t('error'),
@@ -119,7 +229,6 @@ const ProjectDetails = () => {
     if (!projectId) return;
     
     try {
-      // Get all tasks in the project that are on HOLD and have standard_task_id
       const { data: holdTasks, error: holdError } = await supabase
         .from('tasks')
         .select(`
@@ -140,7 +249,6 @@ const ProjectDetails = () => {
         return;
       }
 
-      // Check each HOLD task to see if its limit phases are now satisfied
       const tasksToUpdate = [];
       for (const holdTask of holdTasks) {
         if (holdTask.standard_task_id) {
@@ -159,7 +267,6 @@ const ProjectDetails = () => {
         }
       }
 
-      // Update all eligible tasks from HOLD to TODO
       if (tasksToUpdate.length > 0) {
         console.log(`Updating ${tasksToUpdate.length} tasks from HOLD to TODO`);
         
@@ -173,8 +280,6 @@ const ProjectDetails = () => {
             .eq('id', task.id);
         }
         
-        // No longer refetching here, caller will handle it.
-
         toast({
           title: t('tasks_updated'),
           description: t('tasks_updated_desc', { count: tasksToUpdate.length.toString() }),
@@ -281,7 +386,6 @@ const ProjectDetails = () => {
       title: t('success'),
       description: t('order_created_successfully'),
     });
-    // Refresh orders data
     if (projectId) {
       orderService.getByProject(projectId).then(setOrders);
     }
@@ -372,16 +476,13 @@ const ProjectDetails = () => {
     return tasks.filter(task => task.status === status).length;
   };
 
-  // Group tasks by status - Fix the filtering logic
   const todoTasks = tasks.filter(task => task.status === 'TODO');
   const holdTasks = tasks.filter(task => task.status === 'HOLD');
   const inProgressTasks = tasks.filter(task => task.status === 'IN_PROGRESS');
   const completedTasks = tasks.filter(task => task.status === 'COMPLETED');
 
-  // Combine TODO and HOLD tasks for the "Open tasks" tab
   const openTasks = [...todoTasks, ...holdTasks];
 
-  // Calculate summary stats
   const openOrdersCount = orders.filter(order => order.status === 'pending').length;
   const undeliveredOrdersCount = orders.filter(order => order.status !== 'delivered').length;
   const allOrdersDelivered = orders.length > 0 && undeliveredOrdersCount === 0;
@@ -494,7 +595,6 @@ const ProjectDetails = () => {
             <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Project Summary Card */}
               <Card className="lg:col-span-1">
                 <CardHeader>
                   <CardTitle>{t('project_summary')}</CardTitle>
@@ -519,6 +619,25 @@ const ProjectDetails = () => {
                       </div>
                     </div>
                   </div>
+
+                  {projectEfficiency !== null && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">Efficiency</h4>
+                      <div className="flex items-center gap-2">
+                        {projectEfficiency >= 0 ? (
+                          <TrendingUp className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <TrendingDown className="h-4 w-4 text-red-600" />
+                        )}
+                        <span className={`font-medium ${projectEfficiency >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {projectEfficiency >= 0 ? '+' : ''}{projectEfficiency}%
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {projectEfficiency >= 0 ? 'faster than planned' : 'slower than planned'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <h4 className="text-sm font-medium">{t('project_barcode')}</h4>
@@ -600,7 +719,6 @@ const ProjectDetails = () => {
                 </CardContent>
               </Card>
               
-              {/* Project Tasks Card */}
               <Card className="lg:col-span-2">
                 <CardHeader>
                   <CardTitle>{t('project_tasks')}</CardTitle>
@@ -632,6 +750,7 @@ const ProjectDetails = () => {
                         tasks={completedTasks} 
                         title={t('completed_tasks_title')}
                         onTaskStatusChange={handleTaskStatusChange}
+                        showEfficiencyData={true}
                       />
                     </TabsContent>
                   </Tabs>
@@ -642,7 +761,6 @@ const ProjectDetails = () => {
         </div>
       </div>
 
-      {/* New Order Modal with Add Order button moved here */}
       <NewOrderModal
         open={showNewOrderModal}
         onOpenChange={setShowNewOrderModal}
@@ -653,7 +771,6 @@ const ProjectDetails = () => {
         installationDate={project?.installation_date}
       />
 
-      {/* Parts List Dialog */}
       <PartsListDialog
         isOpen={showPartsListDialog}
         onClose={() => setShowPartsListDialog(false)}
@@ -666,14 +783,12 @@ const ProjectDetails = () => {
         }}
       />
 
-      {/* Accessories Dialog */}
       <AccessoriesDialog
         open={showAccessoriesDialog}
         onOpenChange={setShowAccessoriesDialog}
         projectId={projectId!}
       />
 
-      {/* Project Barcode Dialog */}
       <ProjectBarcodeDialog
         isOpen={showBarcodeDialog}
         onClose={() => setShowBarcodeDialog(false)}

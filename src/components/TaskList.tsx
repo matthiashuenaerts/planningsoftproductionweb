@@ -4,12 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Task } from '@/services/dataService';
-import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader } from 'lucide-react';
+import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface ExtendedTask extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
-  assignee_name?: string; // Add assignee name for display
+  assignee_name?: string;
+  actual_duration_minutes?: number;
+  efficiency_percentage?: number;
 }
 
 interface TaskListProps {
@@ -20,6 +22,7 @@ interface TaskListProps {
   compact?: boolean;
   showCountdownTimer?: boolean;
   showCompleteButton?: boolean;
+  showEfficiencyData?: boolean;
   onTaskStatusChange?: (taskId: string, status: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => Promise<void>;
 }
 
@@ -31,6 +34,7 @@ const TaskList: React.FC<TaskListProps> = ({
   compact = false,
   showCountdownTimer = false,
   showCompleteButton = false,
+  showEfficiencyData = false,
   onTaskStatusChange 
 }) => {
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
@@ -64,6 +68,15 @@ const TaskList: React.FC<TaskListProps> = ({
       case 'HOLD': return <Pause className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
+  };
+
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
   };
 
   const handleStatusChange = async (task: ExtendedTask, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
@@ -159,6 +172,32 @@ const TaskList: React.FC<TaskListProps> = ({
                         {task.isOvertime ? 'OVERTIME: ' : 'Time remaining: '}
                         {task.timeRemaining}
                       </span>
+                    </div>
+                  )}
+
+                  {/* Efficiency data for completed tasks */}
+                  {showEfficiencyData && task.status === 'COMPLETED' && task.actual_duration_minutes !== undefined && task.efficiency_percentage !== undefined && (
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="h-4 w-4 text-gray-500" />
+                        <span className="text-gray-600">
+                          Actual: {formatDuration(task.actual_duration_minutes)}
+                          {task.duration && ` / Planned: ${formatDuration(task.duration)}`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        {task.efficiency_percentage >= 0 ? (
+                          <TrendingUp className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <TrendingDown className="h-4 w-4 text-red-600" />
+                        )}
+                        <span className={`font-medium ${task.efficiency_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {task.efficiency_percentage >= 0 ? '+' : ''}{task.efficiency_percentage}% efficiency
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          ({task.efficiency_percentage >= 0 ? 'faster' : 'slower'} than planned)
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
