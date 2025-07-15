@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -182,7 +181,7 @@ const TaskList: React.FC<TaskListProps> = ({
                         <Clock className="h-4 w-4 text-gray-500" />
                         <span className="text-gray-600">
                           Planned: {formatDuration(task.actual_duration_minutes)}
-                          {task.duration && ` / Total: ${formatDuration(task.duration)}`}
+                          {task.total_duration && ` / Total: ${formatDuration(task.total_duration)}`}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
