@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Users, X } from 'lucide-react';
+import { Users, X, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -163,7 +163,7 @@ const SharePersonalItemDialog: React.FC<SharePersonalItemDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
@@ -171,16 +171,16 @@ const SharePersonalItemDialog: React.FC<SharePersonalItemDialogProps> = ({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* Current shares */}
           {item.shares && item.shares.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label className="text-sm font-medium">Currently shared with:</Label>
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-32 overflow-y-auto">
                 {item.shares.map((share) => (
-                  <div key={share.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                  <div key={share.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm">{share.employee_name}</span>
+                      <span className="text-sm font-medium">{share.employee_name}</span>
                       {share.can_edit && (
                         <Badge variant="secondary" className="text-xs">
                           Can edit
@@ -191,9 +191,9 @@ const SharePersonalItemDialog: React.FC<SharePersonalItemDialogProps> = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleRemoveShare(share.id)}
-                      className="p-1 h-6 w-6 text-red-600"
+                      className="p-1 h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
-                      <X className="h-3 w-3" />
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
@@ -203,58 +203,66 @@ const SharePersonalItemDialog: React.FC<SharePersonalItemDialogProps> = ({
 
           {/* Add new share */}
           {availableEmployees.length > 0 && (
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">Share with:</Label>
+            <div className="space-y-4 border-t pt-4">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Share with additional users:
+              </Label>
               
-              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select an employee" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableEmployees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
-                      {employee.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-3">
+                <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an employee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableEmployees.map((employee) => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="can-edit"
-                  checked={canEdit}
-                  onCheckedChange={(checked) => setCanEdit(checked as boolean)}
-                />
-                <Label htmlFor="can-edit" className="text-sm">
-                  Allow editing
-                </Label>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="can-edit"
+                    checked={canEdit}
+                    onCheckedChange={(checked) => setCanEdit(checked as boolean)}
+                  />
+                  <Label htmlFor="can-edit" className="text-sm">
+                    Allow editing
+                  </Label>
+                </div>
+
+                <Button
+                  onClick={handleShare}
+                  disabled={!selectedEmployeeId || isSubmitting}
+                  className="w-full"
+                >
+                  {isSubmitting ? 'Sharing...' : 'Share with User'}
+                </Button>
               </div>
-
-              <Button
-                onClick={handleShare}
-                disabled={!selectedEmployeeId || isSubmitting}
-                className="w-full"
-              >
-                {isSubmitting ? 'Sharing...' : 'Share'}
-              </Button>
             </div>
           )}
 
           {availableEmployees.length === 0 && (!item.shares || item.shares.length === 0) && (
-            <p className="text-sm text-gray-500 text-center py-4">
-              No employees available to share with
-            </p>
+            <div className="text-center py-8">
+              <Users className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm text-gray-500">No employees available to share with</p>
+            </div>
           )}
 
           {availableEmployees.length === 0 && item.shares && item.shares.length > 0 && (
-            <p className="text-sm text-gray-500 text-center py-2">
-              Item is shared with all available employees
-            </p>
+            <div className="text-center py-4 border-t">
+              <p className="text-sm text-gray-500">
+                This item is shared with all available employees
+              </p>
+            </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex justify-end pt-4 border-t">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
+              Done
             </Button>
           </div>
         </div>
