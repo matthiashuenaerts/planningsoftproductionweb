@@ -176,7 +176,7 @@ const Planning = () => {
     try {
       setLoading(true);
       
-      // Fetch all workers
+      // Fetch all workers (exclude admins from schedule generation)
       const employeeData = await employeeService.getAll();
       const workerEmployees = employeeData.filter(emp => ['worker', 'preparater', 'teamleader'].includes(emp.role));
       setWorkers(workerEmployees);
