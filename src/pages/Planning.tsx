@@ -102,6 +102,8 @@ const Planning = () => {
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const isAdmin = currentEmployee?.role === 'admin';
+  const isTeamLeader = currentEmployee?.role === 'teamleader';
+  const canManageSchedules = isAdmin || isTeamLeader;
 
   // Working hours configuration
   const workingHours = [
@@ -1122,7 +1124,7 @@ const Planning = () => {
                   Refresh
                 </Button>
                 
-                {isAdmin && (
+                {canManageSchedules && (
                   <div className="flex space-x-2">
                     <Button
                       onClick={() => setShowStandardTaskAssignment(true)}
@@ -1203,7 +1205,7 @@ const Planning = () => {
                         </Select>
                       </div>
 
-                      {isAdmin && selectedWorker && (
+                      {canManageSchedules && selectedWorker && (
                         <div className="flex space-x-2">
                           <Button
                             onClick={() => generateDailySchedule(selectedWorker)}
@@ -1372,7 +1374,7 @@ const Planning = () => {
                                         item={item}
                                         onMove={handleMoveTask}
                                         onResize={handleResizeTask}
-                                        isAdmin={isAdmin}
+                                        isAdmin={canManageSchedules}
                                         MINUTE_TO_PIXEL_SCALE={MINUTE_TO_PIXEL_SCALE}
                                         formatTime={formatTime}
                                       >
@@ -1399,7 +1401,7 @@ const Planning = () => {
                                               </div>
                                             </div>
                                             
-                                            {isAdmin && (
+                                            {canManageSchedules && (
                                               <div className="flex flex-col items-center justify-center space-y-1 bg-white/30 backdrop-blur-sm p-1 rounded">
                                                 <Button
                                                   size="icon"
@@ -1445,7 +1447,7 @@ const Planning = () => {
                             <div className="rounded border-2 border-dashed border-gray-200 py-8 text-center text-gray-500">
                               <Clock className="mx-auto mb-2 h-8 w-8 text-gray-400" />
                               <p>No tasks scheduled for this day</p>
-                              {isAdmin && (
+                              {canManageSchedules && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -1529,7 +1531,7 @@ const Planning = () => {
                             <p className="text-sm text-gray-500">
                               Assigned workstations: {selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None assigned'}
                             </p>
-                            {isAdmin && (
+                            {canManageSchedules && (
                               <Button
                                 onClick={() => setShowTaskManager(true)}
                                 className="mt-4"
