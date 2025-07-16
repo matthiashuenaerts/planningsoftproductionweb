@@ -178,7 +178,7 @@ const Planning = () => {
       
       // Fetch all workers
       const employeeData = await employeeService.getAll();
-      const workerEmployees = employeeData.filter(emp => ['worker', 'preparater'].includes(emp.role));
+      const workerEmployees = employeeData.filter(emp => ['worker', 'preparater', 'teamleader'].includes(emp.role));
       setWorkers(workerEmployees);
 
       // Fetch all TODO tasks with workstation links
