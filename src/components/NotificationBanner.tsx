@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
@@ -58,9 +59,8 @@ const NotificationBanner = () => {
 
   const handleClick = () => {
     if (latestUnread) {
-      if (latestUnread.rush_order_id) {
-        navigate(createLocalizedPath(`/rush-orders/${latestUnread.rush_order_id}`));
-      }
+      // Navigate to notes and tasks page instead of rush orders
+      navigate(createLocalizedPath('/notes-and-tasks'));
       handleClose();
     }
   };
