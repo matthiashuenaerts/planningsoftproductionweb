@@ -102,7 +102,7 @@ const NavbarContent = ({
               <span className="ml-3">Notes & Tasks</span>
             </NavLink>
           </li>
-          {currentEmployee && currentEmployee.role !== 'worker' && (
+          {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader'].includes(currentEmployee.role) && (
             <li>
               <NavLink to={createLocalizedPath("/daily-tasks")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <ListChecks className="w-5 h-5 text-white group-hover:text-white" />
