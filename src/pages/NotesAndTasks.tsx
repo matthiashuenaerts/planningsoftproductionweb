@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Search, Filter } from 'lucide-react';
@@ -111,19 +110,39 @@ const NotesAndTasks = () => {
     return matchesSearch && matchesStatus && matchesPriority && matchesTab;
   });
 
-  const handleDeleteItem = async (itemId: string) => {
+  const handleDeleteItem = async (item: PersonalItem) => {
     try {
-      const { error } = await supabase
-        .from('personal_items')
-        .delete()
-        .eq('id', itemId);
+      // Check if the current user is the owner of the item
+      const isOwner = item.user_id === currentEmployee?.id;
+      
+      if (isOwner) {
+        // If owner, delete the entire item (this will cascade delete shares and attachments)
+        const { error } = await supabase
+          .from('personal_items')
+          .delete()
+          .eq('id', item.id);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Item deleted successfully",
-      });
+        toast({
+          title: "Success",
+          description: "Item deleted successfully",
+        });
+      } else {
+        // If not owner, just remove the sharing relationship
+        const { error } = await supabase
+          .from('personal_item_shares')
+          .delete()
+          .eq('personal_item_id', item.id)
+          .eq('shared_with_user_id', currentEmployee?.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Item removed from your shared items",
+        });
+      }
       
       refetch();
     } catch (error) {
@@ -254,7 +273,7 @@ const NotesAndTasks = () => {
                     key={item.id}
                     item={item}
                     onEdit={() => setEditingItem(item)}
-                    onDelete={() => handleDeleteItem(item.id)}
+                    onDelete={() => handleDeleteItem(item)}
                     onShare={() => setSharingItem(item)}
                     onToggleComplete={() => handleToggleComplete(item)}
                     refetch={refetch}
@@ -270,7 +289,7 @@ const NotesAndTasks = () => {
                     key={item.id}
                     item={item}
                     onEdit={() => setEditingItem(item)}
-                    onDelete={() => handleDeleteItem(item.id)}
+                    onDelete={() => handleDeleteItem(item)}
                     onShare={() => setSharingItem(item)}
                     onToggleComplete={() => handleToggleComplete(item)}
                     refetch={refetch}
@@ -286,7 +305,7 @@ const NotesAndTasks = () => {
                     key={item.id}
                     item={item}
                     onEdit={() => setEditingItem(item)}
-                    onDelete={() => handleDeleteItem(item.id)}
+                    onDelete={() => handleDeleteItem(item)}
                     onShare={() => setSharingItem(item)}
                     onToggleComplete={() => handleToggleComplete(item)}
                     refetch={refetch}

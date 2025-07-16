@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,12 +13,14 @@ import {
   Paperclip, 
   Users,
   Calendar,
-  Download
+  Download,
+  UserMinus
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { PersonalItem } from '@/pages/NotesAndTasks';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
 
 interface PersonalItemCardProps {
   item: PersonalItem;
@@ -39,7 +40,11 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
   refetch
 }) => {
   const { toast } = useToast();
+  const { currentEmployee } = useAuth();
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
+
+  // Check if current user is the owner
+  const isOwner = item.user_id === currentEmployee?.id;
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -136,6 +141,11 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
               Shared
             </Badge>
           )}
+          {!isOwner && (
+            <Badge variant="secondary">
+              Shared with you
+            </Badge>
+          )}
         </div>
       </CardHeader>
 
@@ -196,14 +206,35 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
           </span>
           
           <div className="flex gap-1">
-            <Button variant="ghost" size="sm" onClick={onEdit} className="p-1 h-6 w-6">
-              <Edit className="h-3 w-3" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onShare} className="p-1 h-6 w-6">
-              <Share2 className="h-3 w-3" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onDelete} className="p-1 h-6 w-6 text-red-600">
-              <Trash2 className="h-3 w-3" />
+            {/* Only show edit button for owners or shared items with edit permission */}
+            {(isOwner || item.shares?.some(share => 
+              share.shared_with_user_id === currentEmployee?.id && share.can_edit
+            )) && (
+              <Button variant="ghost" size="sm" onClick={onEdit} className="p-1 h-6 w-6">
+                <Edit className="h-3 w-3" />
+              </Button>
+            )}
+            
+            {/* Only show share button for owners */}
+            {isOwner && (
+              <Button variant="ghost" size="sm" onClick={onShare} className="p-1 h-6 w-6">
+                <Share2 className="h-3 w-3" />
+              </Button>
+            )}
+            
+            {/* Delete/Remove button with different icons and tooltips */}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onDelete} 
+              className="p-1 h-6 w-6 text-red-600"
+              title={isOwner ? "Delete item permanently" : "Remove from my shared items"}
+            >
+              {isOwner ? (
+                <Trash2 className="h-3 w-3" />
+              ) : (
+                <UserMinus className="h-3 w-3" />
+              )}
             </Button>
           </div>
         </div>
