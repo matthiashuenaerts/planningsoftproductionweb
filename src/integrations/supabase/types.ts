@@ -718,6 +718,143 @@ export type Database = {
           },
         ]
       }
+      personal_item_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string
+          id: string
+          personal_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string
+          id?: string
+          personal_item_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          file_type?: string
+          id?: string
+          personal_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_item_attachments_personal_item_id_fkey"
+            columns: ["personal_item_id"]
+            isOneToOne: false
+            referencedRelation: "personal_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      personal_item_shares: {
+        Row: {
+          can_edit: boolean | null
+          created_at: string
+          id: string
+          personal_item_id: string
+          shared_by_user_id: string
+          shared_with_user_id: string
+        }
+        Insert: {
+          can_edit?: boolean | null
+          created_at?: string
+          id?: string
+          personal_item_id: string
+          shared_by_user_id: string
+          shared_with_user_id: string
+        }
+        Update: {
+          can_edit?: boolean | null
+          created_at?: string
+          id?: string
+          personal_item_id?: string
+          shared_by_user_id?: string
+          shared_with_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_item_shares_personal_item_id_fkey"
+            columns: ["personal_item_id"]
+            isOneToOne: false
+            referencedRelation: "personal_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personal_item_shares_shared_by_user_id_fkey"
+            columns: ["shared_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personal_item_shares_shared_with_user_id_fkey"
+            columns: ["shared_with_user_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      personal_items: {
+        Row: {
+          content: string | null
+          created_at: string
+          due_date: string | null
+          id: string
+          is_shared: boolean | null
+          priority: string | null
+          status: string | null
+          title: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          is_shared?: boolean | null
+          priority?: string | null
+          status?: string | null
+          title: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          is_shared?: boolean | null
+          priority?: string | null
+          status?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_items_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       phase_offsets: {
         Row: {
           created_at: string

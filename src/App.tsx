@@ -22,6 +22,7 @@ import TimeRegistrations from './pages/TimeRegistrations';
 import GeneralSchedule from './pages/GeneralSchedule';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
+import NotesAndTasks from './pages/NotesAndTasks';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -62,6 +63,7 @@ function App() {
                 <Route path="/:lang/broken-parts/summary" element={<ProtectedRoute><BrokenPartsSummary /></ProtectedRoute>} />
                 <Route path="/:lang/broken-parts/new" element={<ProtectedRoute><NewBrokenPart /></ProtectedRoute>} />
                 <Route path="/:lang/personal-tasks" element={<ProtectedRoute><PersonalTasks /></ProtectedRoute>} />
+                <Route path="/:lang/notes-and-tasks" element={<ProtectedRoute><NotesAndTasks /></ProtectedRoute>} />
                 <Route path="/:lang/daily-tasks" element={<ProtectedRoute><DailyTasks /></ProtectedRoute>} />
                 <Route path="/:lang/planning" element={<ProtectedRoute><Planning /></ProtectedRoute>} />
                 <Route path="/:lang/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
