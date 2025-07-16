@@ -67,6 +67,23 @@ const SharePersonalItemDialog: React.FC<SharePersonalItemDialogProps> = ({
     );
   };
 
+  const createNotifications = async (employeeIds: string[], itemTitle: string, sharerName: string) => {
+    const notifications = employeeIds.map(employeeId => ({
+      user_id: employeeId,
+      message: `${sharerName} shared "${itemTitle}" with you`,
+      read: false
+    }));
+
+    const { error } = await supabase
+      .from('notifications')
+      .insert(notifications);
+
+    if (error) {
+      console.error('Error creating notifications:', error);
+      throw error;
+    }
+  };
+
   const handleShareWithSelected = async () => {
     if (selectedEmployeeIds.length === 0) return;
 
@@ -112,6 +129,9 @@ const SharePersonalItemDialog: React.FC<SharePersonalItemDialogProps> = ({
         .eq('id', item.id);
 
       if (updateError) throw updateError;
+
+      // Create notifications for the newly shared users
+      await createNotifications(newEmployeeIds, item.title, currentEmployee?.name || 'Someone');
 
       const sharedCount = newEmployeeIds.length;
       const skippedCount = alreadySharedWith.length;
