@@ -72,12 +72,15 @@ const NotesAndTasks = () => {
       
       return data.map(item => ({
         ...item,
+        type: item.type as 'note' | 'task',
+        status: item.status as 'active' | 'completed' | 'archived',
+        priority: item.priority as 'low' | 'medium' | 'high',
         attachments: item.personal_item_attachments || [],
         shares: (item.personal_item_shares || []).map(share => ({
           ...share,
           employee_name: share.employees?.name
         }))
-      }));
+      })) as PersonalItem[];
     },
     enabled: !!currentEmployee?.id,
   });
