@@ -1,7 +1,6 @@
-
 import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock } from 'lucide-react';
+import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock, FileText } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
@@ -48,6 +47,7 @@ const NavbarContent = ({
   const totalUnreadMessages = rushOrders?.reduce((total, order) => {
     return total + (order.unread_messages_count || 0);
   }, 0) || 0;
+
   const handleItemClick = () => {
     if (onItemClick) {
       onItemClick();
@@ -88,6 +88,12 @@ const NavbarContent = ({
               <NavLink to={createLocalizedPath("/personal-tasks")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <ListChecks className="w-5 h-5 text-white group-hover:text-white" />
                 <span className="ml-3">{t('personal_tasks')}</span>
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to={createLocalizedPath("/notes-and-tasks")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <FileText className="w-5 h-5 text-white group-hover:text-white" />
+                <span className="ml-3">Notes & Tasks</span>
               </NavLink>
             </li>
             <li>
