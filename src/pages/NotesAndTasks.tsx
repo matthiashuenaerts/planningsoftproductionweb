@@ -13,6 +13,7 @@ import PersonalItemCard from '@/components/personal-items/PersonalItemCard';
 import CreatePersonalItemDialog from '@/components/personal-items/CreatePersonalItemDialog';
 import EditPersonalItemDialog from '@/components/personal-items/EditPersonalItemDialog';
 import SharePersonalItemDialog from '@/components/personal-items/SharePersonalItemDialog';
+import Navbar from '@/components/Navbar';
 
 export interface PersonalItem {
   id: string;
@@ -56,6 +57,10 @@ const NotesAndTasks = () => {
   const { data: personalItems = [], isLoading, refetch } = useQuery({
     queryKey: ['personal-items', currentEmployee?.id],
     queryFn: async () => {
+      if (!currentEmployee?.id) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase
         .from('personal_items')
         .select(`
@@ -146,149 +151,172 @@ const NotesAndTasks = () => {
     }
   };
 
+  if (!currentEmployee) {
+    return (
+      <div className="flex min-h-screen">
+        <Navbar />
+        <div className="flex-1 ml-64">
+          <div className="flex items-center justify-center h-64">
+            <p className="text-gray-500">Please log in to access your notes and tasks.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      <div className="flex min-h-screen">
+        <Navbar />
+        <div className="flex-1 ml-64">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Notes & Tasks</h1>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create New
-        </Button>
-      </div>
+    <div className="flex min-h-screen">
+      <Navbar />
+      <div className="flex-1 ml-64">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold">Notes & Tasks</h1>
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create New
+            </Button>
+          </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search notes and tasks..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+          {/* Search and Filters */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search notes and tasks..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[150px]">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={filterPriority} onValueChange={setFilterPriority}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priority</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+            <TabsList>
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="note">Notes</TabsTrigger>
+              <TabsTrigger value="task">Tasks</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="all" className="mt-6">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredItems.map((item) => (
+                  <PersonalItemCard
+                    key={item.id}
+                    item={item}
+                    onEdit={() => setEditingItem(item)}
+                    onDelete={() => handleDeleteItem(item.id)}
+                    onShare={() => setSharingItem(item)}
+                    onToggleComplete={() => handleToggleComplete(item)}
+                    refetch={refetch}
+                  />
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="note" className="mt-6">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredItems.map((item) => (
+                  <PersonalItemCard
+                    key={item.id}
+                    item={item}
+                    onEdit={() => setEditingItem(item)}
+                    onDelete={() => handleDeleteItem(item.id)}
+                    onShare={() => setSharingItem(item)}
+                    onToggleComplete={() => handleToggleComplete(item)}
+                    refetch={refetch}
+                  />
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="task" className="mt-6">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredItems.map((item) => (
+                  <PersonalItemCard
+                    key={item.id}
+                    item={item}
+                    onEdit={() => setEditingItem(item)}
+                    onDelete={() => handleDeleteItem(item.id)}
+                    onShare={() => setSharingItem(item)}
+                    onToggleComplete={() => handleToggleComplete(item)}
+                    refetch={refetch}
+                  />
+                ))}
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          {filteredItems.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-gray-500">No items found. Create your first note or task!</p>
+            </div>
+          )}
+
+          {/* Dialogs */}
+          <CreatePersonalItemDialog
+            open={isCreateDialogOpen}
+            onOpenChange={setIsCreateDialogOpen}
+            onSuccess={refetch}
           />
-        </div>
-        <div className="flex gap-2">
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[150px]">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="archived">Archived</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterPriority} onValueChange={setFilterPriority}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priority</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-            </SelectContent>
-          </Select>
+
+          {editingItem && (
+            <EditPersonalItemDialog
+              item={editingItem}
+              open={!!editingItem}
+              onOpenChange={(open) => !open && setEditingItem(null)}
+              onSuccess={refetch}
+            />
+          )}
+
+          {sharingItem && (
+            <SharePersonalItemDialog
+              item={sharingItem}
+              open={!!sharingItem}
+              onOpenChange={(open) => !open && setSharingItem(null)}
+              onSuccess={refetch}
+            />
+          )}
         </div>
       </div>
-
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="note">Notes</TabsTrigger>
-          <TabsTrigger value="task">Tasks</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredItems.map((item) => (
-              <PersonalItemCard
-                key={item.id}
-                item={item}
-                onEdit={() => setEditingItem(item)}
-                onDelete={() => handleDeleteItem(item.id)}
-                onShare={() => setSharingItem(item)}
-                onToggleComplete={() => handleToggleComplete(item)}
-                refetch={refetch}
-              />
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="note" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredItems.map((item) => (
-              <PersonalItemCard
-                key={item.id}
-                item={item}
-                onEdit={() => setEditingItem(item)}
-                onDelete={() => handleDeleteItem(item.id)}
-                onShare={() => setSharingItem(item)}
-                onToggleComplete={() => handleToggleComplete(item)}
-                refetch={refetch}
-              />
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="task" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredItems.map((item) => (
-              <PersonalItemCard
-                key={item.id}
-                item={item}
-                onEdit={() => setEditingItem(item)}
-                onDelete={() => handleDeleteItem(item.id)}
-                onShare={() => setSharingItem(item)}
-                onToggleComplete={() => handleToggleComplete(item)}
-                refetch={refetch}
-              />
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {filteredItems.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-gray-500">No items found. Create your first note or task!</p>
-        </div>
-      )}
-
-      {/* Dialogs */}
-      <CreatePersonalItemDialog
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
-        onSuccess={refetch}
-      />
-
-      {editingItem && (
-        <EditPersonalItemDialog
-          item={editingItem}
-          open={!!editingItem}
-          onOpenChange={(open) => !open && setEditingItem(null)}
-          onSuccess={refetch}
-        />
-      )}
-
-      {sharingItem && (
-        <SharePersonalItemDialog
-          item={sharingItem}
-          open={!!sharingItem}
-          onOpenChange={(open) => !open && setSharingItem(null)}
-          onSuccess={refetch}
-        />
-      )}
     </div>
   );
 };

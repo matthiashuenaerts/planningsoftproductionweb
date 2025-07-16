@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -45,11 +44,21 @@ const CreatePersonalItemDialog: React.FC<CreatePersonalItemDialogProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentEmployee?.id) return;
+    if (!currentEmployee?.id) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to create items",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      // Create the personal item
+      console.log('Creating item for user:', currentEmployee.id);
+      console.log('Form data:', formData);
+
+      // Create the personal item with explicit user_id
       const { data: item, error: itemError } = await supabase
         .from('personal_items')
         .insert({
@@ -63,7 +72,12 @@ const CreatePersonalItemDialog: React.FC<CreatePersonalItemDialogProps> = ({
         .select()
         .single();
 
-      if (itemError) throw itemError;
+      if (itemError) {
+        console.error('Error creating item:', itemError);
+        throw itemError;
+      }
+
+      console.log('Item created successfully:', item);
 
       // Upload attachments if any
       if (attachments.length > 0) {
@@ -128,6 +142,10 @@ const CreatePersonalItemDialog: React.FC<CreatePersonalItemDialogProps> = ({
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
+
+  if (!currentEmployee) {
+    return null;
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
