@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Users, X, Plus } from 'lucide-react';
@@ -33,7 +32,7 @@ const SharePersonalItemDialog: React.FC<SharePersonalItemDialogProps> = ({
 }) => {
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [canEdit, setCanEdit] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -52,37 +51,57 @@ const SharePersonalItemDialog: React.FC<SharePersonalItemDialogProps> = ({
     enabled: open && !!currentEmployee?.id,
   });
 
-  const handleShare = async () => {
-    if (!selectedEmployeeId) return;
+  // Reset selected employees when dialog opens
+  useEffect(() => {
+    if (open) {
+      setSelectedEmployeeIds([]);
+      setCanEdit(false);
+    }
+  }, [open]);
+
+  const handleEmployeeToggle = (employeeId: string) => {
+    setSelectedEmployeeIds(prev => 
+      prev.includes(employeeId) 
+        ? prev.filter(id => id !== employeeId)
+        : [...prev, employeeId]
+    );
+  };
+
+  const handleShareWithSelected = async () => {
+    if (selectedEmployeeIds.length === 0) return;
 
     setIsSubmitting(true);
     try {
-      // Check if already shared with this user
-      const { data: existingShare } = await supabase
+      // Check for existing shares
+      const { data: existingShares } = await supabase
         .from('personal_item_shares')
-        .select('id')
+        .select('shared_with_user_id')
         .eq('personal_item_id', item.id)
-        .eq('shared_with_user_id', selectedEmployeeId)
-        .single();
+        .in('shared_with_user_id', selectedEmployeeIds);
 
-      if (existingShare) {
+      const alreadySharedWith = existingShares?.map(share => share.shared_with_user_id) || [];
+      const newEmployeeIds = selectedEmployeeIds.filter(id => !alreadySharedWith.includes(id));
+
+      if (newEmployeeIds.length === 0) {
         toast({
           title: "Already shared",
-          description: "This item is already shared with this user",
+          description: "This item is already shared with all selected users",
           variant: "destructive",
         });
         return;
       }
 
-      // Create the share
+      // Create new shares
+      const shareInserts = newEmployeeIds.map(employeeId => ({
+        personal_item_id: item.id,
+        shared_with_user_id: employeeId,
+        shared_by_user_id: currentEmployee?.id,
+        can_edit: canEdit,
+      }));
+
       const { error: shareError } = await supabase
         .from('personal_item_shares')
-        .insert({
-          personal_item_id: item.id,
-          shared_with_user_id: selectedEmployeeId,
-          shared_by_user_id: currentEmployee?.id,
-          can_edit: canEdit,
-        });
+        .insert(shareInserts);
 
       if (shareError) throw shareError;
 
@@ -94,12 +113,17 @@ const SharePersonalItemDialog: React.FC<SharePersonalItemDialogProps> = ({
 
       if (updateError) throw updateError;
 
+      const sharedCount = newEmployeeIds.length;
+      const skippedCount = alreadySharedWith.length;
+
       toast({
         title: "Success",
-        description: "Item shared successfully",
+        description: `Item shared with ${sharedCount} user${sharedCount > 1 ? 's' : ''}${
+          skippedCount > 0 ? ` (${skippedCount} already had access)` : ''
+        }`,
       });
 
-      setSelectedEmployeeId('');
+      setSelectedEmployeeIds([]);
       setCanEdit(false);
       onSuccess();
     } catch (error) {
@@ -201,7 +225,7 @@ const SharePersonalItemDialog: React.FC<SharePersonalItemDialogProps> = ({
             </div>
           )}
 
-          {/* Add new share */}
+          {/* Add new shares */}
           {availableEmployees.length > 0 && (
             <div className="space-y-4 border-t pt-4">
               <Label className="text-sm font-medium flex items-center gap-2">
@@ -210,18 +234,31 @@ const SharePersonalItemDialog: React.FC<SharePersonalItemDialogProps> = ({
               </Label>
               
               <div className="space-y-3">
-                <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an employee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableEmployees.map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id}>
+                {/* Employee selection with checkboxes */}
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-3">
+                  {availableEmployees.map((employee) => (
+                    <div key={employee.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`employee-${employee.id}`}
+                        checked={selectedEmployeeIds.includes(employee.id)}
+                        onCheckedChange={() => handleEmployeeToggle(employee.id)}
+                      />
+                      <Label 
+                        htmlFor={`employee-${employee.id}`} 
+                        className="text-sm font-normal cursor-pointer flex-1"
+                      >
                         {employee.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Selected employees count */}
+                {selectedEmployeeIds.length > 0 && (
+                  <div className="text-sm text-gray-600">
+                    {selectedEmployeeIds.length} user{selectedEmployeeIds.length > 1 ? 's' : ''} selected
+                  </div>
+                )}
 
                 <div className="flex items-center space-x-2">
                   <Checkbox
@@ -235,11 +272,14 @@ const SharePersonalItemDialog: React.FC<SharePersonalItemDialogProps> = ({
                 </div>
 
                 <Button
-                  onClick={handleShare}
-                  disabled={!selectedEmployeeId || isSubmitting}
+                  onClick={handleShareWithSelected}
+                  disabled={selectedEmployeeIds.length === 0 || isSubmitting}
                   className="w-full"
                 >
-                  {isSubmitting ? 'Sharing...' : 'Share with User'}
+                  {isSubmitting 
+                    ? 'Sharing...' 
+                    : `Share with ${selectedEmployeeIds.length} User${selectedEmployeeIds.length > 1 ? 's' : ''}`
+                  }
                 </Button>
               </div>
             </div>
