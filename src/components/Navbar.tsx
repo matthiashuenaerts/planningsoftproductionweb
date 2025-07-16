@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock, FileText } from 'lucide-react';
@@ -107,7 +108,7 @@ const NavbarContent = ({
               <span className="ml-3">{t('installation_planning')}</span>
             </NavLink>
           </li>
-          {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader', 'worker'].includes(currentEmployee.role) && (
+          {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader'].includes(currentEmployee.role) && (
             <li>
               <NavLink to={createLocalizedPath("/planning")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <Users className="w-5 h-5 text-white group-hover:text-white" />
