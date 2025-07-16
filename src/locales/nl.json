@@ -11,6 +11,8 @@
   "login_successful": "Inloggen gelukt",
   "welcome_message": "Welkom, {{name}}!",
   "login_failed": "Inloggen mislukt",
+  "Notes & Tasks": "Notities en taken",
+  "notes-and-tasks": "Notities en taken",
   
   "dashboard": "Dashboard",
   "projects": "Projecten",
