@@ -60,8 +60,8 @@ const NotesAndTasks = () => {
         throw new Error('User not authenticated');
       }
 
-      // Get items owned by the user OR shared with the user
-      const { data, error } = await supabase
+      // First, get items owned by the user
+      const { data: ownedItems, error: ownedError } = await supabase
         .from('personal_items')
         .select(`
           *,
@@ -71,21 +71,52 @@ const NotesAndTasks = () => {
             employees!personal_item_shares_shared_with_user_id_fkey(name)
           )
         `)
-        .or(`user_id.eq.${currentEmployee.id},id.in.(${
-          // Subquery to get items shared with this user
-          await supabase
-            .from('personal_item_shares')
-            .select('personal_item_id')
-            .eq('shared_with_user_id', currentEmployee.id)
-            .then(({ data: sharedItems }) => 
-              sharedItems?.map(item => item.personal_item_id).join(',') || 'null'
-            )
-        })`)
+        .eq('user_id', currentEmployee.id)
         .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+      if (ownedError) throw ownedError;
+
+      // Then, get items shared with the user
+      const { data: sharedItemIds, error: sharedIdsError } = await supabase
+        .from('personal_item_shares')
+        .select('personal_item_id')
+        .eq('shared_with_user_id', currentEmployee.id);
+
+      if (sharedIdsError) throw sharedIdsError;
+
+      let sharedItems = [];
+      if (sharedItemIds && sharedItemIds.length > 0) {
+        const { data: sharedItemsData, error: sharedError } = await supabase
+          .from('personal_items')
+          .select(`
+            *,
+            personal_item_attachments(*),
+            personal_item_shares(
+              *,
+              employees!personal_item_shares_shared_with_user_id_fkey(name)
+            )
+          `)
+          .in('id', sharedItemIds.map(item => item.personal_item_id))
+          .order('updated_at', { ascending: false });
+
+        if (sharedError) throw sharedError;
+        sharedItems = sharedItemsData || [];
+      }
+
+      // Combine owned and shared items, removing duplicates
+      const allItems = [...(ownedItems || [])];
       
-      return data.map(item => ({
+      // Add shared items that are not already owned
+      sharedItems.forEach(sharedItem => {
+        if (!allItems.find(item => item.id === sharedItem.id)) {
+          allItems.push(sharedItem);
+        }
+      });
+
+      // Sort by updated_at descending
+      allItems.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      
+      return allItems.map(item => ({
         ...item,
         type: item.type as 'note' | 'task',
         status: item.status as 'active' | 'completed' | 'archived',
