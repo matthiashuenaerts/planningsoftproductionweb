@@ -12,7 +12,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -54,6 +55,9 @@ const ProjectDetails = () => {
   const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
   const [projectEfficiency, setProjectEfficiency] = useState<number | null>(null);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedDescription, setEditedDescription] = useState('');
+  const [savingDescription, setSavingDescription] = useState(false);
   const { currentEmployee } = useAuth();
   const { t, lang, createLocalizedPath } = useLanguage();
 
@@ -455,6 +459,39 @@ const ProjectDetails = () => {
     }
   };
 
+  const handleEditDescription = () => {
+    setEditedDescription(project?.description || '');
+    setIsEditingDescription(true);
+  };
+
+  const handleSaveDescription = async () => {
+    if (!projectId || !project) return;
+
+    try {
+      setSavingDescription(true);
+      await projectService.update(projectId, { description: editedDescription });
+      setProject({ ...project, description: editedDescription });
+      setIsEditingDescription(false);
+      toast({
+        title: t('success'),
+        description: t('project_updated_successfully')
+      });
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: t('failed_to_update_project', { message: error.message }),
+        variant: "destructive"
+      });
+    } finally {
+      setSavingDescription(false);
+    }
+  };
+
+  const handleCancelEditDescription = () => {
+    setIsEditingDescription(false);
+    setEditedDescription('');
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen">
@@ -668,6 +705,56 @@ const ProjectDetails = () => {
                     <h4 className="text-sm font-medium mb-1">{t('status')}</h4>
                     <div>{project && getStatusBadge(project.status)}</div>
                   </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-medium">{t('description') || 'Description'}</h4>
+                      {!isEditingDescription && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleEditDescription}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                    {isEditingDescription ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={editedDescription}
+                          onChange={(e) => setEditedDescription(e.target.value)}
+                          placeholder={t('enter_project_description') || 'Enter project description...'}
+                          className="min-h-[80px] resize-none"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={handleSaveDescription}
+                            disabled={savingDescription}
+                          >
+                            <Save className="h-3 w-3 mr-1" />
+                            {savingDescription ? (t('saving') || 'Saving...') : (t('save') || 'Save')}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCancelEditDescription}
+                            disabled={savingDescription}
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            {t('cancel') || 'Cancel'}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        {project?.description || (t('no_description') || 'No description added yet.')}
+                      </div>
+                    )}
+                  </div>
+
                   <div>
                     <h4 className="text-sm font-medium mb-1">{t('project_progress')}</h4>
                     <div className="space-y-1.5">
