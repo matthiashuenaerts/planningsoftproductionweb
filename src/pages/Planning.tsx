@@ -103,6 +103,28 @@ const Planning = () => {
   const { toast } = useToast();
   const isAdmin = currentEmployee?.role === 'admin';
 
+  // Scroll position preservation
+  const scrollPositionRef = useRef<number>(0);
+  const mainContentRef = useRef<HTMLDivElement>(null);
+
+  // Save scroll position before updates
+  const saveScrollPosition = () => {
+    if (mainContentRef.current) {
+      scrollPositionRef.current = mainContentRef.current.scrollTop;
+    }
+  };
+
+  // Restore scroll position after updates
+  const restoreScrollPosition = () => {
+    if (mainContentRef.current && scrollPositionRef.current > 0) {
+      requestAnimationFrame(() => {
+        if (mainContentRef.current) {
+          mainContentRef.current.scrollTop = scrollPositionRef.current;
+        }
+      });
+    }
+  };
+
   // Working hours configuration
   const workingHours = [
     { name: 'Morning', start: '07:00', end: '10:00', duration: 180 },
@@ -175,6 +197,7 @@ const Planning = () => {
   const fetchAllData = async () => {
     try {
       setLoading(true);
+      saveScrollPosition(); // Save scroll position before data update
       
       // Fetch all workers (exclude admins from schedule generation)
       const employeeData = await employeeService.getAll();
@@ -267,6 +290,8 @@ const Planning = () => {
       });
     } finally {
       setLoading(false);
+      // Restore scroll position after data is loaded
+      setTimeout(restoreScrollPosition, 50);
     }
   };
 
@@ -441,6 +466,7 @@ const Planning = () => {
   const generateDailySchedule = async (workerId: string, excludedTaskIds: string[] = []) => {
     try {
       setGeneratingSchedule(true);
+      saveScrollPosition(); // Save scroll position before schedule generation
       
       const worker = workerSchedules.find(w => w.employee.id === workerId);
       if (!worker) {
@@ -592,6 +618,7 @@ const Planning = () => {
   const generateAllSchedules = async () => {
     try {
       setGeneratingSchedule(true);
+      saveScrollPosition(); // Save scroll position before generating all schedules
       
       // Clear excluded tasks when generating all schedules fresh
       setExcludedTasksPerUser({});
@@ -777,6 +804,8 @@ const Planning = () => {
 
   const deleteScheduleItem = async (scheduleId: string) => {
     try {
+      saveScrollPosition(); // Save scroll position before deletion
+      
       await supabase
         .from('schedules')
         .delete()
@@ -800,6 +829,8 @@ const Planning = () => {
 
   const markTaskCompleted = async (scheduleItem: ScheduleItem) => {
     try {
+      saveScrollPosition(); // Save scroll position before completion
+      
       // If linked to a task, update the task status
       if (scheduleItem.task_id) {
         await supabase
@@ -996,6 +1027,8 @@ const Planning = () => {
     }
 
     try {
+      saveScrollPosition(); // Save scroll position before move
+      
       await supabase
         .from('schedules')
         .update({
@@ -1044,6 +1077,8 @@ const Planning = () => {
     }
 
     try {
+      saveScrollPosition(); // Save scroll position before resize
+      
       await supabase
         .from('schedules')
         .update({ end_time: newEndTime.toISOString() })
@@ -1078,7 +1113,11 @@ const Planning = () => {
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
-        <div className="ml-64 w-full p-6">
+        <div 
+          ref={mainContentRef}
+          className="ml-64 w-full p-6 overflow-y-auto"
+          style={{ height: '100vh' }}
+        >
           <div className="max-w-7xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
               <div>
@@ -1557,6 +1596,7 @@ const Planning = () => {
               selectedEmployee={selectedWorker || ''}
               scheduleItem={editingScheduleItem}
               onSave={() => {
+                saveScrollPosition(); // Save scroll position before task manager save
                 fetchAllData();
                 setShowTaskManager(false);
                 setEditingScheduleItem(null);
@@ -1576,6 +1616,7 @@ const Planning = () => {
               selectedDate={selectedDate}
               workers={workers}
               onSave={() => {
+                saveScrollPosition(); // Save scroll position before standard task save
                 fetchAllData();
                 setShowStandardTaskAssignment(false);
               }}
