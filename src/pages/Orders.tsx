@@ -68,7 +68,7 @@ const Orders: React.FC = () => {
   const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   
-  const isAdmin = currentEmployee?.role === 'admin';
+  const isAdminOrTeamleader = currentEmployee?.role === 'admin' || currentEmployee?.role === 'teamleader';
   const canDeleteOrder = currentEmployee?.role && ['admin', 'manager', 'preparater', 'teamleader'].includes(currentEmployee.role);
   
   useEffect(() => {
@@ -594,7 +594,7 @@ const Orders: React.FC = () => {
                                   </AlertDialogContent>
                                 </AlertDialog>
                               )}
-                              {isAdmin && (
+                              {isAdminOrTeamleader && (
                                 <select 
                                   value={order.status}
                                   onChange={(e) => updateOrderStatus(order.id, e.target.value as Order['status'])}
