@@ -686,14 +686,23 @@ const Planning = () => {
       const today = startOfDay(new Date());
       const nextWorkingDay = getNextWorkingDay(today);
       
-      console.log('Generating schedule for next working day based on today\'s progress...');
+      console.log('Generating schedule for next working day based on today\'s tasks and limit dependencies...');
       
-      // Get today's schedules to understand what's planned
+      // Get today's schedules to understand what's completed/planned
       const { data: todaySchedules, error: todayError } = await supabase
         .from('schedules')
         .select(`
           *,
-          task:tasks(*)
+          task:tasks(
+            *,
+            standard_task_id,
+            phases (
+              name,
+              projects (
+                name
+              )
+            )
+          )
         `)
         .gte('start_time', format(today, 'yyyy-MM-dd') + 'T00:00:00')
         .lte('start_time', format(today, 'yyyy-MM-dd') + 'T23:59:59');
@@ -702,11 +711,37 @@ const Planning = () => {
 
       console.log(`Found ${todaySchedules?.length || 0} schedules for today`);
 
-      // Calculate remaining durations for tasks that are partially completed
+      // Get all standard task limit phases to understand task dependencies
+      const { data: limitPhases, error: limitError } = await supabase
+        .from('standard_task_limit_phases')
+        .select(`
+          *,
+          standard_task:standard_tasks!standard_task_id(
+            id,
+            task_name,
+            task_number
+          ),
+          limit_standard_task:standard_tasks!limit_standard_task_id(
+            id,
+            task_name,
+            task_number
+          )
+        `);
+
+      if (limitError) throw limitError;
+
+      console.log(`Found ${limitPhases?.length || 0} task limit dependencies`);
+
+      // Analyze today's tasks to determine which standard tasks are "completed" or will be completed
+      const todayStandardTaskIds = new Set();
       const taskRemainingDurations: Record<string, number> = {};
       
       if (todaySchedules) {
         for (const schedule of todaySchedules) {
+          if (schedule.task?.standard_task_id) {
+            todayStandardTaskIds.add(schedule.task.standard_task_id);
+          }
+          
           if (schedule.task_id && schedule.task) {
             const scheduledDuration = Math.round(
               (new Date(schedule.end_time).getTime() - new Date(schedule.start_time).getTime()) / (1000 * 60)
@@ -717,10 +752,7 @@ const Planning = () => {
               taskRemainingDurations[schedule.task_id] = originalTaskDuration;
             }
             
-            // Subtract the time already scheduled for this task
             taskRemainingDurations[schedule.task_id] -= scheduledDuration;
-            
-            // Ensure we don't go negative
             if (taskRemainingDurations[schedule.task_id] < 0) {
               taskRemainingDurations[schedule.task_id] = 0;
             }
@@ -728,7 +760,24 @@ const Planning = () => {
         }
       }
 
-      console.log('Task remaining durations:', taskRemainingDurations);
+      console.log('Standard tasks scheduled for today:', Array.from(todayStandardTaskIds));
+
+      // Determine which standard tasks are unlocked for tomorrow based on limit phases
+      const unlockedStandardTaskIds = new Set(todayStandardTaskIds); // Tasks that were worked on today are unlocked
+      
+      // Check limit phases to unlock dependent tasks
+      for (const limitPhase of limitPhases || []) {
+        const limitTaskId = limitPhase.limit_standard_task_id;
+        const dependentTaskId = limitPhase.standard_task_id;
+        
+        // If the limiting task was scheduled today, unlock the dependent task
+        if (todayStandardTaskIds.has(limitTaskId)) {
+          unlockedStandardTaskIds.add(dependentTaskId);
+          console.log(`Unlocked task ${limitPhase.standard_task?.task_name} because ${limitPhase.limit_standard_task?.task_name} was scheduled today`);
+        }
+      }
+
+      console.log('Unlocked standard tasks for tomorrow:', Array.from(unlockedStandardTaskIds));
 
       // Clear existing schedules for next working day
       const nextWorkingDayStr = format(nextWorkingDay, 'yyyy-MM-dd');
@@ -757,7 +806,7 @@ const Planning = () => {
           continue;
         }
 
-        // Get tasks that still have remaining duration or new TODO tasks
+        // Get tasks that still have remaining duration or new TODO tasks that are unlocked
         const availableTasks = [];
         
         // First, add tasks with remaining duration from today
@@ -765,7 +814,6 @@ const Planning = () => {
           if (remainingDuration > 0) {
             const task = workerSchedule.tasks.find(t => t.id === taskId);
             if (task) {
-              // Create a modified task with the remaining duration
               availableTasks.push({
                 ...task,
                 duration: remainingDuration,
@@ -776,12 +824,19 @@ const Planning = () => {
           }
         }
         
-        // Then add new TODO tasks that weren't scheduled today
+        // Then add new TODO tasks that are unlocked and weren't scheduled today
         const scheduledTaskIds = new Set(todaySchedules?.filter(s => s.task_id).map(s => s.task_id) || []);
-        const newTasks = workerSchedule.tasks.filter(task => !scheduledTaskIds.has(task.id));
-        availableTasks.push(...newTasks);
+        const unlockedTasks = workerSchedule.tasks.filter(task => {
+          // Skip if already scheduled today
+          if (scheduledTaskIds.has(task.id)) return false;
+          
+          // Include if no standard task (always available) or if standard task is unlocked
+          return !task.standard_task_id || unlockedStandardTaskIds.has(task.standard_task_id);
+        });
+        
+        availableTasks.push(...unlockedTasks);
 
-        console.log(`${workerSchedule.employee.name} has ${availableTasks.length} tasks available for next working day`);
+        console.log(`${workerSchedule.employee.name} has ${availableTasks.length} tasks available for next working day (${availableTasks.filter(t => t.isContinuation).length} continuations, ${unlockedTasks.length} new unlocked)`);
 
         if (availableTasks.length === 0) {
           console.log(`No tasks available for ${workerSchedule.employee.name} on next working day`);
@@ -874,13 +929,13 @@ const Planning = () => {
 
       await fetchAllData();
       
-      let message = `Generated schedule for the next working day (${format(nextWorkingDay, 'PPP')}) for ${successfullyGenerated} workers, building on today's progress`;
+      let message = `Generated intelligent schedule for the next working day (${format(nextWorkingDay, 'PPP')}) for ${successfullyGenerated} workers, analyzing task dependencies and continuations`;
       if (skippedOnHoliday > 0) {
         message += ` (${skippedOnHoliday} workers skipped due to approved holidays)`;
       }
       
       toast({
-        title: "Next Working Day Schedule Generated",
+        title: "Smart Next Working Day Schedule Generated",
         description: message,
       });
     } catch (error: any) {
@@ -1512,14 +1567,14 @@ const Planning = () => {
                   onClick={() => setShowWorkstationView(false)}
                   variant={!showWorkstationView ? "default" : "outline"}
                 >
-                  <Users className="mr-2 h-4 w-4" />
+                  <Users className="h-5 w-5 mr-2" />
                   Worker Schedules
                 </Button>
                 <Button
                   onClick={() => setShowWorkstationView(true)}
                   variant={showWorkstationView ? "default" : "outline"}
                 >
-                  <Settings className="mr-2 h-4 w-4" />
+                  <Settings className="h-5 w-5 mr-2" />
                   Workstation Schedules
                 </Button>
               </div>
