@@ -260,7 +260,7 @@ const Planning = () => {
       console.log("Active projects:", activeProjects);
 
       if (!activeProjects || activeProjects.length === 0) {
-        toast.info("No active projects found for scheduling");
+        toast("No active projects found for scheduling");
         return;
       }
 
@@ -300,7 +300,7 @@ const Planning = () => {
       console.log("Tasks to schedule:", tasksToSchedule);
 
       if (tasksToSchedule.length === 0) {
-        toast.info("No tasks available for scheduling tomorrow based on today's progress");
+        toast("No tasks available for scheduling tomorrow based on today's progress");
         return;
       }
 
