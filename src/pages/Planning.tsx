@@ -1,12 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
-import format from 'date-fns/format';
-import parse from 'date-fns/parse';
-import startOfWeek from 'date-fns/startOfWeek';
-import getDay from 'date-fns/getDay';
-import enUS from 'date-fns/locale/en-US';
+import { format, parse, startOfWeek, getDay } from 'date-fns';
+import { enUS } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../integrations/supabase/client';
 import { toast } from 'react-hot-toast';
 import { planningService } from '../services/planningService';
 import { useQuery } from '@tanstack/react-query';
@@ -40,6 +38,7 @@ interface Schedule {
   tasks?: {
     id: string;
     title: string;
+    standard_task_id?: string;
     standard_tasks?: {
       id: string;
       task_name: string;
@@ -87,6 +86,7 @@ const Planning = () => {
           tasks (
             id,
             title,
+            standard_task_id,
             standard_tasks (
               id,
               task_name,
@@ -223,14 +223,17 @@ const Planning = () => {
 
       console.log("Unlocked task IDs:", Array.from(unlockedTaskIds));
 
-      // Get all available workers
-      const workersResult = await planningService.getAvailableWorkers();
-      if (workersResult.error || !workersResult.data) {
+      // Get all available workers - using direct supabase query since planningService doesn't have this method
+      const { data: workers, error: workersError } = await supabase
+        .from('employees')
+        .select('*')
+        .in('role', ['worker', 'admin', 'manager']);
+
+      if (workersError || !workers) {
         toast.error("Failed to fetch available workers");
         return;
       }
 
-      const workers = workersResult.data;
       console.log("Available workers:", workers);
 
       // Get ongoing projects with active phases
@@ -272,7 +275,7 @@ const Planning = () => {
 
           // Find tasks that should continue from today or are newly unlocked
           phase.tasks.forEach((task: any) => {
-            const isUnlocked = unlockedTaskIds.has(task.standard_task_id);
+            const isUnlocked = task.standard_task_id && unlockedTaskIds.has(task.standard_task_id);
             const isContinuation = todaysTasks?.some(todayTask => 
               todayTask.standard_task_id === task.standard_task_id &&
               todayTask.status === 'IN_PROGRESS' &&
