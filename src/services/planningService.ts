@@ -456,6 +456,255 @@ export const planningService = {
     }
   },
 
+  // New method: Generate schedule for next working day based on today's tasks analysis
+  async generateScheduleForNextWorkingDay(todayDate: Date, nextWorkingDate: Date): Promise<void> {
+    if (!(todayDate instanceof Date) || isNaN(todayDate.getTime()) || 
+        !(nextWorkingDate instanceof Date) || isNaN(nextWorkingDate.getTime())) {
+      throw new Error('Invalid dates provided');
+    }
+
+    console.log(`Analyzing today's tasks (${format(todayDate, 'yyyy-MM-dd')}) to generate schedule for ${format(nextWorkingDate, 'yyyy-MM-dd')}`);
+
+    try {
+      // 1. Get today's scheduled tasks to analyze what will be "completed"
+      const todaysSchedules = await this.getSchedulesByDate(todayDate);
+      console.log(`Found ${todaysSchedules.length} scheduled tasks for today`);
+
+      // 2. Get all tasks with their limit phases and project info
+      const { data: allTasks, error: tasksError } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          phases!inner(project_id, name),
+          standard_task_limit_phases!tasks_standard_task_id_fkey(
+            limit_standard_task_id,
+            standard_tasks!standard_task_limit_phases_limit_standard_task_id_fkey(
+              task_name, task_number
+            )
+          )
+        `)
+        .neq('status', 'COMPLETED');
+
+      if (tasksError) throw tasksError;
+
+      // 3. Get employees and work periods
+      const { data: employees, error: employeesError } = await supabase.from('employees').select('*');
+      if (employeesError) throw employeesError;
+
+      const dayOfWeek = nextWorkingDate.getDay();
+      const { data: workPeriods, error: workPeriodsError } = await supabase
+        .from('work_hours')
+        .select('*')
+        .eq('day_of_week', dayOfWeek)
+        .order('start_time');
+
+      if (workPeriodsError) throw workPeriodsError;
+      if (!workPeriods?.length) {
+        throw new Error(`No work periods defined for the next working day`);
+      }
+
+      // 4. Clear existing schedules for tomorrow
+      const nextDateStr = format(nextWorkingDate, 'yyyy-MM-dd');
+      await supabase
+        .from('schedules')
+        .delete()
+        .gte('start_time', `${nextDateStr}T00:00:00`)
+        .lte('start_time', `${nextDateStr}T23:59:59`)
+        .eq('is_auto_generated', true);
+
+      // 5. Simulate completion of today's tasks and find newly available tasks
+      const simulatedCompletedTaskIds = new Set<string>();
+      const schedulesToInsert: CreateScheduleInput[] = [];
+
+      // Add today's scheduled task IDs to completed simulation
+      todaysSchedules.forEach(schedule => {
+        if (schedule.task_id) {
+          simulatedCompletedTaskIds.add(schedule.task_id);
+        }
+      });
+
+      console.log(`Simulating completion of ${simulatedCompletedTaskIds.size} tasks from today`);
+
+      // 6. Find tasks that become available after today's "completion"
+      const availableTasks = [];
+      
+      // First, add any unfinished tasks from today (continuation tasks)
+      for (const schedule of todaysSchedules) {
+        if (schedule.task_id) {
+          const task = allTasks?.find(t => t.id === schedule.task_id);
+          if (task && task.status !== 'COMPLETED') {
+            // Check if task needs more time (simplified - assume partial completion)
+            const estimatedDuration = task.duration || 480; // 8 hours default
+            const scheduledDuration = Math.round(
+              (new Date(schedule.end_time).getTime() - new Date(schedule.start_time).getTime()) / (1000 * 60)
+            );
+            
+            if (estimatedDuration > scheduledDuration) {
+              // Task needs continuation
+              availableTasks.push({
+                ...task,
+                title: `${task.title} (Continued)`,
+                description: `${task.description || ''} - Continuation from ${format(todayDate, 'yyyy-MM-dd')}`,
+                remainingDuration: estimatedDuration - scheduledDuration
+              });
+            }
+          }
+        }
+      }
+
+      // 7. Find tasks that are unlocked by today's completions
+      if (allTasks) {
+        for (const task of allTasks) {
+          // Skip if already scheduled or completed
+          if (simulatedCompletedTaskIds.has(task.id) || task.status === 'COMPLETED') continue;
+          
+          // Skip if already in available tasks (continuation)
+          if (availableTasks.some(t => t.id === task.id)) continue;
+
+          // Check if task is on HOLD and can be unlocked
+          if (task.status === 'HOLD' && task.standard_task_id && task.phases?.project_id) {
+            // Get limit phases for this task
+            const { data: limitPhases, error: limitError } = await supabase
+              .from('standard_task_limit_phases')
+              .select(`
+                limit_standard_task_id,
+                standard_tasks!standard_task_limit_phases_limit_standard_task_id_fkey(
+                  task_name, task_number
+                )
+              `)
+              .eq('standard_task_id', task.standard_task_id);
+
+            if (limitError) {
+              console.error('Error fetching limit phases:', limitError);
+              continue;
+            }
+
+            console.log(`Checking dependencies for task ${task.title}:`, limitPhases);
+
+            if (!limitPhases || limitPhases.length === 0) {
+              // No dependencies, task is available
+              availableTasks.push(task);
+              continue;
+            }
+
+            // Check if all dependencies are met
+            const projectId = task.phases.project_id;
+            let allDependenciesMet = true;
+
+            for (const limitPhase of limitPhases) {
+              // Find tasks in the same project that match the limiting standard task
+              const dependentTasks = allTasks.filter(t => 
+                t.standard_task_id === limitPhase.limit_standard_task_id && 
+                t.phases?.project_id === projectId
+              );
+
+              if (dependentTasks.length > 0) {
+                // Check if all dependent tasks are "completed" (scheduled for today)
+                const allDependentTasksCompleted = dependentTasks.every(dt => 
+                  simulatedCompletedTaskIds.has(dt.id) || dt.status === 'COMPLETED'
+                );
+
+                if (!allDependentTasksCompleted) {
+                  allDependenciesMet = false;
+                  break;
+                }
+              }
+            }
+
+            if (allDependenciesMet) {
+              console.log(`Task ${task.title} dependencies met, adding to available tasks`);
+              availableTasks.push(task);
+            } else {
+              console.log(`Task ${task.title} dependencies not yet met`);
+            }
+          } else if (task.status === 'TODO' || task.status === 'IN_PROGRESS') {
+            // Regular available tasks
+            availableTasks.push(task);
+          }
+        }
+      }
+
+      console.log(`Found ${availableTasks.length} tasks available for tomorrow`);
+
+      // 8. Sort available tasks by priority and due date
+      const priorityOrder = { 'Urgent': 0, 'High': 1, 'Medium': 2, 'Low': 3 };
+      availableTasks.sort((a, b) => {
+        const priorityA = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 4;
+        const priorityB = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 4;
+        if (priorityA !== priorityB) return priorityA - priorityB;
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      });
+
+      // 9. Schedule tasks for tomorrow
+      let taskIndex = 0;
+      for (const period of workPeriods) {
+        for (const employee of employees) {
+          // Check if employee is on holiday
+          const isOnHoliday = await this.isEmployeeOnHoliday(employee.id, nextWorkingDate);
+          if (isOnHoliday) {
+            console.log(`Employee ${employee.name} is on holiday on ${nextDateStr}, skipping`);
+            continue;
+          }
+
+          // Check if employee is already scheduled for this period
+          const startTimeForPeriod = new Date(`${nextDateStr}T${period.start_time}`);
+          const isEmployeeScheduled = schedulesToInsert.some(s =>
+            s.employee_id === employee.id &&
+            new Date(s.start_time).getTime() === startTimeForPeriod.getTime()
+          );
+          if (isEmployeeScheduled) continue;
+
+          // Find next available task for this employee
+          while (taskIndex < availableTasks.length) {
+            const task = availableTasks[taskIndex];
+            const workstationMatch = !task.workstation || !employee.workstation || task.workstation === employee.workstation;
+            
+            if (workstationMatch) {
+              const endTimeForPeriod = new Date(`${nextDateStr}T${period.end_time}`);
+
+              schedulesToInsert.push({
+                employee_id: employee.id,
+                task_id: task.id,
+                title: task.title,
+                description: task.description,
+                start_time: startTimeForPeriod.toISOString(),
+                end_time: endTimeForPeriod.toISOString(),
+                is_auto_generated: true
+              });
+
+              taskIndex++;
+              break;
+            } else {
+              taskIndex++;
+            }
+          }
+
+          if (taskIndex >= availableTasks.length) break;
+        }
+        if (taskIndex >= availableTasks.length) break;
+      }
+
+      // 10. Insert the schedules
+      if (schedulesToInsert.length > 0) {
+        console.log(`Inserting ${schedulesToInsert.length} schedule entries for tomorrow`);
+        const { error: insertError } = await supabase
+          .from('schedules')
+          .insert(schedulesToInsert);
+
+        if (insertError) {
+          console.error('Error inserting tomorrow schedules:', insertError);
+          throw insertError;
+        }
+      } else {
+        console.log('No tasks available to schedule for tomorrow');
+      }
+
+    } catch (error: any) {
+      console.error('Error in generateScheduleForNextWorkingDay:', error);
+      throw new Error(`Failed to generate schedule for next working day: ${error.message || 'Unknown error'}`);
+    }
+  },
+
   // Generate workstation schedules for a specific date
   async generateWorkstationSchedulesForDate(date: Date): Promise<void> {
     if (!(date instanceof Date) || isNaN(date.getTime())) {
