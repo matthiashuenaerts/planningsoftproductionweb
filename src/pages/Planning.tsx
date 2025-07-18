@@ -21,6 +21,7 @@ import {
   RefreshCw,
   Zap,
   Settings,
+  ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Navbar from '@/components/Navbar';
@@ -145,6 +146,20 @@ const Planning = () => {
     timelineStartDate.setHours(TIMELINE_START_HOUR, 0, 0, 0);
     const diff = (date.getTime() - timelineStartDate.getTime()) / (1000 * 60);
     return Math.max(0, diff);
+  };
+
+  // Check if today has schedules
+  const checkTodayHasSchedules = (): boolean => {
+    const today = startOfDay(new Date());
+    if (selectedDate.getTime() !== today.getTime()) return true; // Not today, so allow
+    
+    return workerSchedules.some(worker => worker.schedule.length > 0);
+  };
+
+  // Check if selected date is tomorrow
+  const isTomorrow = (): boolean => {
+    const tomorrow = addDays(startOfDay(new Date()), 1);
+    return selectedDate.getTime() === tomorrow.getTime();
   };
   
   useEffect(() => {
@@ -608,6 +623,223 @@ const Planning = () => {
       toast({
         title: "Error",
         description: `Failed to generate schedule: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setGeneratingSchedule(false);
+    }
+  };
+
+  const generateTomorrowSchedule = async () => {
+    try {
+      setGeneratingSchedule(true);
+      saveScrollPosition();
+      
+      const today = startOfDay(new Date());
+      const tomorrow = addDays(today, 1);
+      
+      console.log('Generating schedule for tomorrow based on today\'s progress...');
+      
+      // Get today's schedules to understand what's planned
+      const { data: todaySchedules, error: todayError } = await supabase
+        .from('schedules')
+        .select(`
+          *,
+          task:tasks(*)
+        `)
+        .gte('start_time', format(today, 'yyyy-MM-dd') + 'T00:00:00')
+        .lte('start_time', format(today, 'yyyy-MM-dd') + 'T23:59:59');
+
+      if (todayError) throw todayError;
+
+      console.log(`Found ${todaySchedules?.length || 0} schedules for today`);
+
+      // Calculate remaining durations for tasks that are partially completed
+      const taskRemainingDurations: Record<string, number> = {};
+      
+      if (todaySchedules) {
+        for (const schedule of todaySchedules) {
+          if (schedule.task_id && schedule.task) {
+            const scheduledDuration = Math.round(
+              (new Date(schedule.end_time).getTime() - new Date(schedule.start_time).getTime()) / (1000 * 60)
+            );
+            const originalTaskDuration = schedule.task.duration || 60;
+            
+            if (!taskRemainingDurations[schedule.task_id]) {
+              taskRemainingDurations[schedule.task_id] = originalTaskDuration;
+            }
+            
+            // Subtract the time already scheduled for this task
+            taskRemainingDurations[schedule.task_id] -= scheduledDuration;
+            
+            // Ensure we don't go negative
+            if (taskRemainingDurations[schedule.task_id] < 0) {
+              taskRemainingDurations[schedule.task_id] = 0;
+            }
+          }
+        }
+      }
+
+      console.log('Task remaining durations:', taskRemainingDurations);
+
+      // Clear existing schedules for tomorrow
+      const tomorrowDateStr = format(tomorrow, 'yyyy-MM-dd');
+      await supabase
+        .from('schedules')
+        .delete()
+        .gte('start_time', `${tomorrowDateStr}T00:00:00`)
+        .lte('start_time', `${tomorrowDateStr}T23:59:59`)
+        .eq('is_auto_generated', true);
+
+      let skippedOnHoliday = 0;
+      let successfullyGenerated = 0;
+
+      // Generate schedules for each worker
+      for (const workerSchedule of workerSchedules) {
+        // Check if employee is on holiday for tomorrow
+        const isOnHoliday = await planningService.isEmployeeOnHoliday(workerSchedule.employee.id, tomorrow);
+        if (isOnHoliday) {
+          console.log(`Skipping schedule generation for ${workerSchedule.employee.name} - on approved holiday tomorrow`);
+          skippedOnHoliday++;
+          continue;
+        }
+
+        if (workerSchedule.assignedWorkstations.length === 0) {
+          console.log(`Skipping ${workerSchedule.employee.name} - no workstations assigned`);
+          continue;
+        }
+
+        // Get tasks that still have remaining duration or new TODO tasks
+        const availableTasks = [];
+        
+        // First, add tasks with remaining duration from today
+        for (const [taskId, remainingDuration] of Object.entries(taskRemainingDurations)) {
+          if (remainingDuration > 0) {
+            const task = workerSchedule.tasks.find(t => t.id === taskId);
+            if (task) {
+              // Create a modified task with the remaining duration
+              availableTasks.push({
+                ...task,
+                duration: remainingDuration,
+                title: `${task.title} (Continued)`,
+                isContinuation: true
+              });
+            }
+          }
+        }
+        
+        // Then add new TODO tasks that weren't scheduled today
+        const scheduledTaskIds = new Set(todaySchedules?.filter(s => s.task_id).map(s => s.task_id) || []);
+        const newTasks = workerSchedule.tasks.filter(task => !scheduledTaskIds.has(task.id));
+        availableTasks.push(...newTasks);
+
+        console.log(`${workerSchedule.employee.name} has ${availableTasks.length} tasks available for tomorrow`);
+
+        if (availableTasks.length === 0) {
+          console.log(`No tasks available for ${workerSchedule.employee.name} tomorrow`);
+          continue;
+        }
+
+        // Sort tasks by priority (continuations first, then by priority and due date)
+        availableTasks.sort((a, b) => {
+          if (a.isContinuation && !b.isContinuation) return -1;
+          if (!a.isContinuation && b.isContinuation) return 1;
+          
+          const priorityOrder = { 'Urgent': 0, 'High': 1, 'Medium': 2, 'Low': 3 };
+          const priorityA = priorityOrder[a.priority as keyof typeof priorityOrder] || 4;
+          const priorityB = priorityOrder[b.priority as keyof typeof priorityOrder] || 4;
+          
+          if (priorityA !== priorityB) return priorityA - priorityB;
+          
+          const dateA = new Date(a.due_date);
+          const dateB = new Date(b.due_date);
+          return dateA.getTime() - dateB.getTime();
+        });
+
+        // Create schedules for tomorrow
+        const schedulesToInsert = [];
+        let currentTaskIndex = 0;
+        let remainingTaskDuration = availableTasks[currentTaskIndex]?.duration || 60;
+        let currentTask = availableTasks[currentTaskIndex];
+        let taskPartCounter = 1;
+
+        for (const period of workingHours) {
+          if (!currentTask) break;
+
+          const periodStartTime = new Date(`${tomorrowDateStr}T${period.start}:00`);
+          let periodRemainingMinutes = period.duration;
+          let periodCurrentTime = new Date(periodStartTime);
+
+          while (periodRemainingMinutes > 0 && currentTask) {
+            const timeToAllocate = Math.min(remainingTaskDuration, periodRemainingMinutes);
+            const endTime = new Date(periodCurrentTime.getTime() + (timeToAllocate * 60000));
+
+            let taskTitle = currentTask.title;
+            if (currentTask.isContinuation) {
+              taskTitle = currentTask.title; // Already includes "(Continued)"
+            } else {
+              const totalParts = Math.ceil((availableTasks[currentTaskIndex]?.duration || 60) / period.duration);
+              if (totalParts > 1) {
+                taskTitle = `${currentTask.title} (Part ${taskPartCounter})`;
+              }
+            }
+
+            schedulesToInsert.push({
+              employee_id: workerSchedule.employee.id,
+              task_id: currentTask.id,
+              title: taskTitle,
+              description: currentTask.description || '',
+              start_time: periodCurrentTime.toISOString(),
+              end_time: endTime.toISOString(),
+              is_auto_generated: true
+            });
+
+            // Update counters
+            remainingTaskDuration -= timeToAllocate;
+            periodRemainingMinutes -= timeToAllocate;
+            periodCurrentTime = new Date(endTime);
+
+            // If task is completed, move to next task
+            if (remainingTaskDuration <= 0) {
+              currentTaskIndex++;
+              currentTask = availableTasks[currentTaskIndex];
+              remainingTaskDuration = currentTask?.duration || 60;
+              taskPartCounter = 1;
+            } else {
+              taskPartCounter++;
+            }
+          }
+        }
+
+        console.log(`Schedules to insert for ${workerSchedule.employee.name}: ${schedulesToInsert.length}`);
+
+        // Insert schedules
+        if (schedulesToInsert.length > 0) {
+          const { error } = await supabase
+            .from('schedules')
+            .insert(schedulesToInsert);
+
+          if (error) throw error;
+          successfullyGenerated++;
+        }
+      }
+
+      await fetchAllData();
+      
+      let message = `Generated tomorrow's schedule for ${successfullyGenerated} workers, building on today's progress`;
+      if (skippedOnHoliday > 0) {
+        message += ` (${skippedOnHoliday} workers skipped due to approved holidays)`;
+      }
+      
+      toast({
+        title: "Tomorrow's Schedule Generated",
+        description: message,
+      });
+    } catch (error: any) {
+      console.error('Error generating tomorrow schedule:', error);
+      toast({
+        title: "Error",
+        description: `Failed to generate tomorrow's schedule: ${error.message}`,
         variant: "destructive"
       });
     } finally {
@@ -1179,10 +1411,30 @@ const Planning = () => {
                       <Zap className="mr-2 h-4 w-4" />
                       {generatingSchedule ? 'Generating...' : 'Generate All Schedules'}
                     </Button>
+                    <Button
+                      onClick={generateTomorrowSchedule}
+                      disabled={generatingSchedule || !checkTodayHasSchedules() || !isTomorrow()}
+                      variant="secondary"
+                      className="whitespace-nowrap"
+                    >
+                      <ArrowRight className="mr-2 h-4 w-4" />
+                      {generatingSchedule ? 'Generating...' : 'Generate Schedule Tomorrow'}
+                    </Button>
                   </div>
                 )}
               </div>
             </div>
+
+            {/* Show info message when tomorrow button is disabled */}
+            {isAdmin && isTomorrow() && !checkTodayHasSchedules() && (
+              <Alert className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Schedule Today First</AlertTitle>
+                <AlertDescription>
+                  You need to generate schedules for today before you can generate tomorrow's schedule.
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* View Toggle */}
             <div className="mb-6">
