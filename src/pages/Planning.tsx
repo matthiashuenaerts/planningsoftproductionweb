@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format, addDays, isWeekend } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
@@ -10,6 +11,7 @@ import { planningService } from '@/services/planningService';
 import { Schedule } from '@/services/planningService';
 import { WorkstationSchedule } from '@/services/planningService';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -38,7 +40,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer"
-import { Settings, Clock, Zap, Calendar } from 'lucide-react';
+import { Settings, Clock, Zap } from 'lucide-react';
 
 interface Holiday {
   date: string;
@@ -67,8 +69,8 @@ const Planning = () => {
 
   const fetchHolidays = async () => {
     try {
-      const { data, error } = await planningService.getAvailableTasksForPlanning();
-      if (error) throw error;
+      const holidaysData = await planningService.getHolidays();
+      setHolidays(holidaysData);
     } catch (error: any) {
       console.error("Error fetching holidays:", error);
       toast({
@@ -81,8 +83,8 @@ const Planning = () => {
 
   const fetchAvailableEmployees = async () => {
     try {
-      const { data, error } = await planningService.getAvailableTasksForPlanning();
-      if (error) throw error;
+      const employeesData = await planningService.getAvailableEmployees();
+      setAvailableEmployees(employeesData);
     } catch (error: any) {
       console.error("Error fetching available employees:", error);
       toast({
@@ -250,11 +252,19 @@ const Planning = () => {
     return holidays.some(holiday => holiday.date === dateStr);
   };
 
+  const isProductionTeamHoliday = (date: Date): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return holidays.some(holiday => 
+      holiday.date === dateStr && 
+      (holiday.description === 'Production Team' || holiday.description === 'Company Wide')
+    );
+  };
+
   const getNextNonHolidayWorkingDay = (date: Date): Date | null => {
     let nextDay = addDays(date, 1);
     let attempts = 0;
     
-    while ((isWeekend(nextDay) || isHoliday(nextDay)) && attempts < 365) {
+    while ((isWeekend(nextDay) || isProductionTeamHoliday(nextDay)) && attempts < 365) {
       nextDay = addDays(nextDay, 1);
       attempts++;
     }
@@ -263,14 +273,15 @@ const Planning = () => {
   };
 
   const getNextWorkingDayLabel = (): string => {
-    const nextWorkingDay = getNextNonHolidayWorkingDay(selectedDate);
+    const nextWorkingDay = getNextNonHolidayWorkingDay(new Date());
     if (nextWorkingDay) {
       return `for ${format(nextWorkingDay, 'EEE, MMM d')}`;
     }
     return "for Next Working Day";
   };
 
-  const hasTodaySchedule = schedules.length > 0;
+  const hasTodaySchedule = schedules.length > 0 && format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+  const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -306,9 +317,9 @@ const Planning = () => {
       <div className="flex gap-4 flex-wrap">
         <Button
           onClick={generateDailyPlan}
-          disabled={generatingSchedule || isHoliday(selectedDate)}
+          disabled={generatingSchedule || isProductionTeamHoliday(selectedDate)}
           className="flex items-center gap-2"
-          title={isHoliday(selectedDate) ? "Cannot generate schedule on holidays" : ""}
+          title={isProductionTeamHoliday(selectedDate) ? "Cannot generate schedule on production team holidays" : ""}
         >
           <Zap className="h-4 w-4" />
           {generatingSchedule ? 'Generating...' : 'Generate Schedule'}
@@ -316,25 +327,25 @@ const Planning = () => {
 
         <Button
           onClick={generateScheduleForNextWorkingDay}
-          disabled={generatingNextSchedule || !hasTodaySchedule || isHoliday(selectedDate)}
+          disabled={generatingNextSchedule || !isToday || !hasTodaySchedule}
           className="flex items-center gap-2"
           title={
-            isHoliday(selectedDate) 
-              ? "Cannot generate on holidays" 
+            !isToday 
+              ? "Only available for today" 
               : !hasTodaySchedule 
                 ? "Generate today's schedule first" 
                 : ""
           }
         >
-          <Calendar className="h-4 w-4" />
+          <CalendarIcon className="h-4 w-4" />
           {generatingNextSchedule ? 'Analyzing & Generating...' : `Generate Schedule ${getNextWorkingDayLabel()}`}
         </Button>
 
         <Button
           onClick={generateWorkstationSchedules}
-          disabled={generatingWorkstationSchedule || isHoliday(selectedDate)}
+          disabled={generatingWorkstationSchedule || isProductionTeamHoliday(selectedDate)}
           className="flex items-center gap-2"
-          title={isHoliday(selectedDate) ? "Cannot generate schedule on holidays" : ""}
+          title={isProductionTeamHoliday(selectedDate) ? "Cannot generate schedule on production team holidays" : ""}
         >
           <Settings className="h-4 w-4" />
           {generatingWorkstationSchedule ? 'Generating...' : 'Generate Workstation Schedules'}
@@ -379,7 +390,7 @@ const Planning = () => {
             <DrawerFooter>
               <Button
                 onClick={generatePersonalPlan}
-                disabled={generatingPersonalSchedule || isHoliday(selectedDate) || !employeeId}
+                disabled={generatingPersonalSchedule || isProductionTeamHoliday(selectedDate) || !employeeId}
                 className="flex items-center gap-2"
               >
                 {generatingPersonalSchedule ? 'Generating...' : 'Generate Personal Plan'}
