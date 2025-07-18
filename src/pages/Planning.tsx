@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import Navbar from '@/components/Navbar';
 import { employeeService } from '@/services/dataService';
 import { planningService } from '@/services/planningService';
+import { holidayService } from '@/services/holidayService';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -100,6 +101,7 @@ const Planning = () => {
   const [excludedTasksPerUser, setExcludedTasksPerUser] = useState<Record<string, string[]>>({});
   const [showStandardTaskAssignment, setShowStandardTaskAssignment] = useState(false);
   const [showWorkstationView, setShowWorkstationView] = useState(false);
+  const [holidays, setHolidays] = useState<any[]>([]);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const isAdmin = currentEmployee?.role === 'admin';
@@ -148,6 +150,36 @@ const Planning = () => {
     return Math.max(0, diff);
   };
 
+  // Load holidays
+  useEffect(() => {
+    const loadHolidays = async () => {
+      try {
+        const holidayData = await holidayService.getHolidays();
+        setHolidays(holidayData);
+      } catch (error) {
+        console.error('Error loading holidays:', error);
+      }
+    };
+    loadHolidays();
+  }, []);
+
+  // Check if a date is a production team holiday
+  const isProductionHoliday = (date: Date): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return holidays.some(holiday => 
+      holiday.date === dateStr && holiday.team === 'production'
+    );
+  };
+
+  // Get next non-holiday working day
+  const getNextWorkingDay = (fromDate: Date): Date => {
+    let nextDay = addDays(fromDate, 1);
+    while (isProductionHoliday(nextDay)) {
+      nextDay = addDays(nextDay, 1);
+    }
+    return nextDay;
+  };
+
   // Check if today has schedules
   const checkTodayHasSchedules = (): boolean => {
     const today = startOfDay(new Date());
@@ -156,10 +188,16 @@ const Planning = () => {
     return workerSchedules.some(worker => worker.schedule.length > 0);
   };
 
-  // Check if selected date is tomorrow
-  const isTomorrow = (): boolean => {
-    const tomorrow = addDays(startOfDay(new Date()), 1);
-    return selectedDate.getTime() === tomorrow.getTime();
+  // Check if selected date is the next working day
+  const isNextWorkingDay = (): boolean => {
+    const today = startOfDay(new Date());
+    const nextWorkingDay = getNextWorkingDay(today);
+    return selectedDate.getTime() === nextWorkingDay.getTime();
+  };
+
+  // Check if selected date is a holiday
+  const isSelectedDateHoliday = (): boolean => {
+    return isProductionHoliday(selectedDate);
   };
   
   useEffect(() => {
@@ -491,6 +529,16 @@ const Planning = () => {
       console.log(`Generating schedule for ${worker.employee.name}`);
       console.log(`Excluded task IDs: ${excludedTaskIds.join(', ')}`);
 
+      // Check if the selected date is a production holiday
+      if (isProductionHoliday(selectedDate)) {
+        toast({
+          title: "Holiday - No Scheduling",
+          description: `Cannot schedule work on ${format(selectedDate, 'PPP')} as it's a production team holiday.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
       // CRITICAL: Check if employee is on holiday for this date FIRST
       const isOnHoliday = await planningService.isEmployeeOnHoliday(workerId, selectedDate);
       if (isOnHoliday) {
@@ -636,9 +684,9 @@ const Planning = () => {
       saveScrollPosition();
       
       const today = startOfDay(new Date());
-      const tomorrow = addDays(today, 1);
+      const nextWorkingDay = getNextWorkingDay(today);
       
-      console.log('Generating schedule for tomorrow based on today\'s progress...');
+      console.log('Generating schedule for next working day based on today\'s progress...');
       
       // Get today's schedules to understand what's planned
       const { data: todaySchedules, error: todayError } = await supabase
@@ -682,13 +730,13 @@ const Planning = () => {
 
       console.log('Task remaining durations:', taskRemainingDurations);
 
-      // Clear existing schedules for tomorrow
-      const tomorrowDateStr = format(tomorrow, 'yyyy-MM-dd');
+      // Clear existing schedules for next working day
+      const nextWorkingDayStr = format(nextWorkingDay, 'yyyy-MM-dd');
       await supabase
         .from('schedules')
         .delete()
-        .gte('start_time', `${tomorrowDateStr}T00:00:00`)
-        .lte('start_time', `${tomorrowDateStr}T23:59:59`)
+        .gte('start_time', `${nextWorkingDayStr}T00:00:00`)
+        .lte('start_time', `${nextWorkingDayStr}T23:59:59`)
         .eq('is_auto_generated', true);
 
       let skippedOnHoliday = 0;
@@ -696,10 +744,10 @@ const Planning = () => {
 
       // Generate schedules for each worker
       for (const workerSchedule of workerSchedules) {
-        // Check if employee is on holiday for tomorrow
-        const isOnHoliday = await planningService.isEmployeeOnHoliday(workerSchedule.employee.id, tomorrow);
+        // Check if employee is on holiday for next working day
+        const isOnHoliday = await planningService.isEmployeeOnHoliday(workerSchedule.employee.id, nextWorkingDay);
         if (isOnHoliday) {
-          console.log(`Skipping schedule generation for ${workerSchedule.employee.name} - on approved holiday tomorrow`);
+          console.log(`Skipping schedule generation for ${workerSchedule.employee.name} - on approved holiday on next working day`);
           skippedOnHoliday++;
           continue;
         }
@@ -733,10 +781,10 @@ const Planning = () => {
         const newTasks = workerSchedule.tasks.filter(task => !scheduledTaskIds.has(task.id));
         availableTasks.push(...newTasks);
 
-        console.log(`${workerSchedule.employee.name} has ${availableTasks.length} tasks available for tomorrow`);
+        console.log(`${workerSchedule.employee.name} has ${availableTasks.length} tasks available for next working day`);
 
         if (availableTasks.length === 0) {
-          console.log(`No tasks available for ${workerSchedule.employee.name} tomorrow`);
+          console.log(`No tasks available for ${workerSchedule.employee.name} on next working day`);
           continue;
         }
 
@@ -756,7 +804,7 @@ const Planning = () => {
           return dateA.getTime() - dateB.getTime();
         });
 
-        // Create schedules for tomorrow
+        // Create schedules for next working day
         const schedulesToInsert = [];
         let currentTaskIndex = 0;
         let remainingTaskDuration = availableTasks[currentTaskIndex]?.duration || 60;
@@ -766,7 +814,7 @@ const Planning = () => {
         for (const period of workingHours) {
           if (!currentTask) break;
 
-          const periodStartTime = new Date(`${tomorrowDateStr}T${period.start}:00`);
+          const periodStartTime = new Date(`${nextWorkingDayStr}T${period.start}:00`);
           let periodRemainingMinutes = period.duration;
           let periodCurrentTime = new Date(periodStartTime);
 
@@ -826,20 +874,20 @@ const Planning = () => {
 
       await fetchAllData();
       
-      let message = `Generated tomorrow's schedule for ${successfullyGenerated} workers, building on today's progress`;
+      let message = `Generated schedule for the next working day (${format(nextWorkingDay, 'PPP')}) for ${successfullyGenerated} workers, building on today's progress`;
       if (skippedOnHoliday > 0) {
         message += ` (${skippedOnHoliday} workers skipped due to approved holidays)`;
       }
       
       toast({
-        title: "Tomorrow's Schedule Generated",
+        title: "Next Working Day Schedule Generated",
         description: message,
       });
     } catch (error: any) {
-      console.error('Error generating tomorrow schedule:', error);
+      console.error('Error generating next working day schedule:', error);
       toast({
         title: "Error",
-        description: `Failed to generate tomorrow's schedule: ${error.message}`,
+        description: `Failed to generate next working day schedule: ${error.message}`,
         variant: "destructive"
       });
     } finally {
@@ -851,6 +899,16 @@ const Planning = () => {
     try {
       setGeneratingSchedule(true);
       saveScrollPosition(); // Save scroll position before generating all schedules
+      
+      // Check if the selected date is a production holiday
+      if (isProductionHoliday(selectedDate)) {
+        toast({
+          title: "Holiday - No Scheduling",
+          description: `Cannot schedule work on ${format(selectedDate, 'PPP')} as it's a production team holiday.`,
+          variant: "destructive"
+        });
+        return;
+      }
       
       // Clear excluded tasks when generating all schedules fresh
       setExcludedTasksPerUser({});
@@ -1405,7 +1463,7 @@ const Planning = () => {
                     </Button>
                     <Button
                       onClick={generateAllSchedules}
-                      disabled={generatingSchedule}
+                      disabled={generatingSchedule || isSelectedDateHoliday()}
                       className="whitespace-nowrap"
                     >
                       <Zap className="mr-2 h-4 w-4" />
@@ -1413,25 +1471,36 @@ const Planning = () => {
                     </Button>
                     <Button
                       onClick={generateTomorrowSchedule}
-                      disabled={generatingSchedule || !checkTodayHasSchedules() || !isTomorrow()}
+                      disabled={generatingSchedule || !checkTodayHasSchedules() || !isNextWorkingDay()}
                       variant="secondary"
                       className="whitespace-nowrap"
                     >
                       <ArrowRight className="mr-2 h-4 w-4" />
-                      {generatingSchedule ? 'Generating...' : 'Generate Schedule Tomorrow'}
+                      {generatingSchedule ? 'Generating...' : 'Generate Schedule Next Working Day'}
                     </Button>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Show info message when tomorrow button is disabled */}
-            {isAdmin && isTomorrow() && !checkTodayHasSchedules() && (
+            {/* Show info message when selected date is a holiday */}
+            {isSelectedDateHoliday() && (
+              <Alert className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Production Team Holiday</AlertTitle>
+                <AlertDescription>
+                  {format(selectedDate, 'PPP')} is marked as a production team holiday. No scheduling can be performed on this date.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Show info message when next working day button is disabled */}
+            {isAdmin && isNextWorkingDay() && !checkTodayHasSchedules() && (
               <Alert className="mb-6">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Schedule Today First</AlertTitle>
                 <AlertDescription>
-                  You need to generate schedules for today before you can generate tomorrow's schedule.
+                  You need to generate schedules for today before you can generate the next working day's schedule.
                 </AlertDescription>
               </Alert>
             )}
@@ -1498,7 +1567,7 @@ const Planning = () => {
                         <div className="flex space-x-2">
                           <Button
                             onClick={() => generateDailySchedule(selectedWorker)}
-                            disabled={generatingSchedule}
+                            disabled={generatingSchedule || isSelectedDateHoliday()}
                             variant="outline"
                           >
                             <Zap className="mr-2 h-4 w-4" />
