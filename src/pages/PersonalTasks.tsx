@@ -15,6 +15,7 @@ import EnhancedDailyTimeline from '@/components/EnhancedDailyTimeline';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
+import { holidayService } from '@/services/holidayService';
 import { startOfDay, endOfDay, format, parseISO, addDays, isToday, isTomorrow } from 'date-fns';
 
 interface Task {
@@ -83,19 +84,45 @@ const PersonalTasks = () => {
   const [showBarcodeDialog, setShowBarcodeDialog] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // Helper function to get next workday (skip weekends)
-  const getNextWorkday = (date: Date) => {
+  // Helper function to get next workday (skip weekends and holidays)
+  const getNextWorkday = async (date: Date) => {
     let nextDay = addDays(date, 1);
-    // Skip weekends
-    while (nextDay.getDay() === 0 || nextDay.getDay() === 6) {
-      nextDay = addDays(nextDay, 1);
+    
+    try {
+      // Get production team holidays
+      const holidays = await holidayService.getHolidays();
+      const productionHolidays = holidays
+        .filter(holiday => holiday.team === 'production')
+        .map(holiday => holiday.date);
+
+      // Skip weekends and holidays
+      while (nextDay.getDay() === 0 || nextDay.getDay() === 6 || 
+             productionHolidays.includes(format(nextDay, 'yyyy-MM-dd'))) {
+        nextDay = addDays(nextDay, 1);
+      }
+    } catch (error) {
+      console.error('Error fetching holidays:', error);
+      // Fallback: just skip weekends
+      while (nextDay.getDay() === 0 || nextDay.getDay() === 6) {
+        nextDay = addDays(nextDay, 1);
+      }
     }
+    
     return nextDay;
   };
 
-  const nextWorkday = getNextWorkday(new Date());
+  const [nextWorkday, setNextWorkday] = useState(new Date());
   const isViewingToday = isToday(selectedDate);
   const isViewingTomorrow = isTomorrow(selectedDate);
+
+  // Update next workday when component mounts
+  useEffect(() => {
+    const updateNextWorkday = async () => {
+      const next = await getNextWorkday(new Date());
+      setNextWorkday(next);
+    };
+    updateNextWorkday();
+  }, []);
 
   useEffect(() => {
     if (currentEmployee) {
@@ -456,11 +483,17 @@ const PersonalTasks = () => {
     }
   };
 
-  const handleDateNavigation = (direction: 'today' | 'next') => {
+  const handleDateNavigation = async (direction: 'today' | 'next' | 'planning') => {
     if (direction === 'today') {
       setSelectedDate(new Date());
-    } else {
-      setSelectedDate(nextWorkday);
+    } else if (direction === 'next') {
+      const next = await getNextWorkday(new Date());
+      setSelectedDate(next);
+    } else if (direction === 'planning') {
+      // Navigate to planning page for next workday
+      const next = await getNextWorkday(new Date());
+      const planningDate = format(next, 'yyyy-MM-dd');
+      navigate(`/planning?date=${planningDate}`);
     }
   };
 
@@ -519,6 +552,14 @@ const PersonalTasks = () => {
               >
                 <ChevronRight className="h-4 w-4" />
                 Next Workday
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleDateNavigation('planning')}
+                className="flex items-center gap-2"
+              >
+                <Calendar className="h-4 w-4" />
+                Plan Next Workday
               </Button>
             </div>
           </div>
