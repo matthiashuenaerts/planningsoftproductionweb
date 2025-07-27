@@ -8,7 +8,6 @@ import WorkstationSettings from '@/components/settings/WorkstationSettings';
 import EmployeeSettings from '@/components/settings/EmployeeSettings';
 import StandardTasksSettings from '@/components/settings/StandardTasksSettings';
 import HolidayPlanner from '@/components/settings/HolidayPlanner';
-import EmailSettings from '@/components/settings/EmailSettings';
 import { Button } from '@/components/ui/button';
 import { Settings as SettingsIcon } from 'lucide-react';
 
@@ -83,7 +82,6 @@ const Settings: React.FC = () => {
               <TabsTrigger value="employees">Employees</TabsTrigger>
               <TabsTrigger value="standard-tasks">Standard Tasks</TabsTrigger>
               <TabsTrigger value="holiday-planner">Holiday Planner</TabsTrigger>
-              <TabsTrigger value="email-settings">Email Settings</TabsTrigger>
             </TabsList>
             
             <TabsContent value="workstations">
@@ -100,10 +98,6 @@ const Settings: React.FC = () => {
 
             <TabsContent value="holiday-planner">
               <HolidayPlanner />
-            </TabsContent>
-
-            <TabsContent value="email-settings">
-              <EmailSettings />
             </TabsContent>
           </Tabs>
         </div>
