@@ -6,12 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Barcode as BarcodeIcon, Download, Copy } from 'lucide-react';
 import Barcode from 'react-barcode';
+
 interface ProjectBarcodeDialogProps {
   isOpen: boolean;
   onClose: () => void;
   projectId: string;
   projectName: string;
 }
+
 export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
   isOpen,
   onClose,
@@ -19,45 +21,59 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
   projectName
 }) => {
   const barcodeContainerRef = useRef<HTMLDivElement>(null);
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
 
   // Generate barcode data - "/" + first 7 digits of project name
   const generateBarcodeData = () => {
     const digits = projectName.replace(/\D/g, ''); // Extract only digits
     const first7Digits = digits.substring(0, 7);
+    
+    // If we don't have enough digits, pad with zeros or use project ID
+    if (first7Digits.length < 7) {
+      const projectIdDigits = projectId.replace(/\D/g, '');
+      const combinedDigits = (first7Digits + projectIdDigits).substring(0, 7);
+      return `/${combinedDigits.padEnd(7, '0')}`;
+    }
+    
     return `/${first7Digits}`;
   };
+
   const barcodeData = generateBarcodeData();
+
   const handleCopyData = () => {
     navigator.clipboard.writeText(barcodeData);
     toast({
-      title: 'Copied',
-      description: 'Barcode data copied to clipboard'
+      title: 'Gekopieerd',
+      description: 'Barcode data gekopieerd naar klembord'
     });
   };
+
   const handleDownload = () => {
     if (!barcodeContainerRef.current) return;
+    
     const canvas = barcodeContainerRef.current.querySelector('canvas');
     if (!canvas) {
       toast({
-        title: 'Error',
-        description: 'Could not find barcode canvas to download.',
+        title: 'Fout',
+        description: 'Kan barcode canvas niet vinden om te downloaden.',
         variant: 'destructive'
       });
       return;
     }
+
     const link = document.createElement('a');
     link.download = `barcode-${projectName.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
+    
     toast({
-      title: 'Downloaded',
-      description: 'Barcode image downloaded'
+      title: 'Gedownload',
+      description: 'Barcode afbeelding gedownload'
     });
   };
-  return <Dialog open={isOpen} onOpenChange={onClose}>
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -67,8 +83,6 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          
-
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Barcode</CardTitle>
@@ -76,9 +90,26 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
             <CardContent className="text-center">
               <div ref={barcodeContainerRef} className="border border-gray-200 rounded mx-auto inline-block p-4 bg-white">
                 <Barcode
-                  value={barcodeData} format="CODE39" renderer="canvas" width={2} height={60} displayValue={true} font="monospace" fontSize={16} textAlign="center" textMargin={2} margin={10} />
+                  value={barcodeData}
+                  format="CODE39"
+                  renderer="canvas"
+                  width={2}
+                  height={60}
+                  displayValue={true}
+                  font="monospace"
+                  fontSize={16}
+                  textAlign="center"
+                  textMargin={2}
+                  margin={10}
+                  background="#ffffff"
+                  lineColor="#000000"
+                />
               </div>
-              <div className="mt-4">
+              <div className="mt-4 flex gap-2 justify-center">
+                <Button onClick={handleCopyData} variant="outline">
+                  <Copy className="h-4 w-4 mr-2" />
+                  Kopieer Data
+                </Button>
                 <Button onClick={handleDownload}>
                   <Download className="h-4 w-4 mr-2" />
                   Download PNG
@@ -88,5 +119,6 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
           </Card>
         </div>
       </DialogContent>
-    </Dialog>;
+    </Dialog>
+  );
 };
