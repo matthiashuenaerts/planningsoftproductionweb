@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -368,23 +369,31 @@ const PersonalTasks = () => {
     }
   };
 
-  const isTaskActive = (taskId: string) => {
-    return activeTimeRegistrations.some(reg => reg.task_id === taskId || reg.workstation_task_id === taskId);
-  };
+  // Memoize helper functions to prevent re-renders
+  const isTaskActive = useMemo(() => {
+    return (taskId: string) => {
+      return activeTimeRegistrations.some(reg => reg.task_id === taskId || reg.workstation_task_id === taskId);
+    };
+  }, [activeTimeRegistrations]);
 
-  const canCompleteTask = (task: Task) => {
-    return (task.status === 'IN_PROGRESS' || isTaskActive(task.id)) && task.status !== 'COMPLETED';
-  };
+  const canCompleteTask = useMemo(() => {
+    return (task: Task) => {
+      return (task.status === 'IN_PROGRESS' || isTaskActive(task.id)) && task.status !== 'COMPLETED';
+    };
+  }, [isTaskActive]);
 
-  const scheduleTimeMap = new Map<string, string>();
-  schedules.forEach(schedule => {
-    if (schedule.task_id) {
-      scheduleTimeMap.set(schedule.task_id, schedule.start_time);
-    }
-  });
+  const scheduleTimeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    schedules.forEach(schedule => {
+      if (schedule.task_id) {
+        map.set(schedule.task_id, schedule.start_time);
+      }
+    });
+    return map;
+  }, [schedules]);
 
-  // Memoize the enhanced timeline data to prevent unnecessary re-renders
-  const enhancedTimelineData = React.useMemo(() => {
+  // Memoize the enhanced timeline data with stable dependencies
+  const enhancedTimelineData = useMemo(() => {
     return schedules.map((schedule, scheduleIndex) => {
       let projectName = 'No Project';
       let projectId = null;
@@ -457,7 +466,7 @@ const PersonalTasks = () => {
         isActive
       };
     });
-  }, [schedules, tasks, activeTimeRegistrations]);
+  }, [schedules, tasks, isTaskActive, canCompleteTask]);
 
   const handleTimelineStartTask = (taskId: string) => {
     console.log('Starting task from timeline:', taskId);
