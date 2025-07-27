@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface HolidayRequest {
@@ -17,31 +16,30 @@ export interface HolidayRequest {
 
 const sendHolidayRequestEmail = async (request: {
   employeeName: string;
+  employeeEmail: string;
   startDate: string;
   endDate: string;
   reason?: string;
   requestId: string;
 }) => {
   try {
-    const response = await fetch('/functions/v1/send-holiday-request-email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('send-holiday-request-email', {
+      body: {
         employeeName: request.employeeName,
+        employeeEmail: request.employeeEmail,
         startDate: request.startDate,
         endDate: request.endDate,
         reason: request.reason,
         requestId: request.requestId,
-      }),
+      },
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to send email');
+    if (error) {
+      throw error;
     }
 
     console.log('Holiday request email sent successfully');
+    return data;
   } catch (error) {
     console.error('Error sending holiday request email:', error);
     // Don't throw error here to prevent blocking the request creation
@@ -60,7 +58,7 @@ export const holidayRequestService = {
     
     const { data: employee, error: employeeError } = await supabase
       .from('employees')
-      .select('id')
+      .select('id, email')
       .eq('id', request.user_id)
       .single();
 
@@ -85,6 +83,7 @@ export const holidayRequestService = {
     // Send email notification
     await sendHolidayRequestEmail({
       employeeName: request.employee_name,
+      employeeEmail: employee.email || 'no-email@company.com',
       startDate: request.start_date,
       endDate: request.end_date,
       reason: request.reason,
