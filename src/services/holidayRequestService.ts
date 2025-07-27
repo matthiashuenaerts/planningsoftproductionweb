@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface HolidayRequest {
@@ -23,6 +22,31 @@ const sendHolidayRequestEmail = async (request: {
   requestId: string;
 }) => {
   try {
+    // Fetch email connections from settings
+    const { data: emailConnections, error: emailError } = await supabase
+      .from('email_connections')
+      .select('*')
+      .eq('is_active', true);
+
+    if (emailError) {
+      console.error('Error fetching email connections:', emailError);
+      return;
+    }
+
+    // Find sender (matthias) and recipient (ontvanger) emails
+    const senderEmail = emailConnections?.find(conn => 
+      conn.general_name.toLowerCase() === 'matthias'
+    )?.email_address;
+    
+    const recipientEmail = emailConnections?.find(conn => 
+      conn.general_name.toLowerCase() === 'ontvanger'
+    )?.email_address;
+
+    if (!senderEmail || !recipientEmail) {
+      console.error('Sender or recipient email not found in settings');
+      return;
+    }
+
     const response = await fetch('/functions/v1/send-holiday-request-email', {
       method: 'POST',
       headers: {
@@ -34,6 +58,8 @@ const sendHolidayRequestEmail = async (request: {
         endDate: request.endDate,
         reason: request.reason,
         requestId: request.requestId,
+        senderEmail: senderEmail,
+        recipientEmail: recipientEmail,
       }),
     });
 

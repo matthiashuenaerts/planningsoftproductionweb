@@ -16,6 +16,8 @@ interface HolidayRequestEmailData {
   endDate: string;
   reason?: string;
   requestId: string;
+  senderEmail: string;
+  recipientEmail: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -24,33 +26,43 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { employeeName, startDate, endDate, reason, requestId }: HolidayRequestEmailData = await req.json();
+    const { 
+      employeeName, 
+      startDate, 
+      endDate, 
+      reason, 
+      requestId, 
+      senderEmail, 
+      recipientEmail 
+    }: HolidayRequestEmailData = await req.json();
+
+    console.log('Sending email from:', senderEmail, 'to:', recipientEmail);
 
     const emailResponse = await resend.emails.send({
-      from: "Holiday Requests <noreply@resend.dev>",
-      to: ["matthias.huenaerts@skynet.be"],
-      subject: `New Holiday Request from ${employeeName}`,
+      from: `Holiday Requests <${senderEmail}>`,
+      to: [recipientEmail],
+      subject: `Nieuwe vakantieaanvraag van ${employeeName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">New Holiday Request</h2>
+          <h2 style="color: #333;">Nieuwe Vakantieaanvraag</h2>
           <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <p><strong>Employee:</strong> ${employeeName}</p>
-            <p><strong>Start Date:</strong> ${new Date(startDate).toLocaleDateString('en-US', { 
+            <p><strong>Medewerker:</strong> ${employeeName}</p>
+            <p><strong>Startdatum:</strong> ${new Date(startDate).toLocaleDateString('nl-NL', { 
               weekday: 'long', 
               year: 'numeric', 
               month: 'long', 
               day: 'numeric' 
             })}</p>
-            <p><strong>End Date:</strong> ${new Date(endDate).toLocaleDateString('en-US', { 
+            <p><strong>Einddatum:</strong> ${new Date(endDate).toLocaleDateString('nl-NL', { 
               weekday: 'long', 
               year: 'numeric', 
               month: 'long', 
               day: 'numeric' 
             })}</p>
-            ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
+            ${reason ? `<p><strong>Reden:</strong> ${reason}</p>` : ''}
           </div>
-          <p>Please review and approve/reject this request in the system.</p>
-          <p style="color: #666; font-size: 12px;">Request ID: ${requestId}</p>
+          <p>Gelieve deze aanvraag te beoordelen en goed te keuren/af te wijzen in het systeem.</p>
+          <p style="color: #666; font-size: 12px;">Aanvraag ID: ${requestId}</p>
         </div>
       `,
     });
