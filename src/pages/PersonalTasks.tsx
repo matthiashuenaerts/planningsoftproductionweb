@@ -317,9 +317,22 @@ const PersonalTasks = () => {
           title: t("task_completed"),
           description: t("task_completed_desc"),
         });
-      } else if (newStatus === 'TODO' && isTaskActive(taskId)) {
-        console.log('Pausing task:', taskId);
+      } else if (newStatus === 'TODO') {
+        console.log('Pausing task (setting to TODO):', taskId);
+        // First stop any active time registrations
         await timeRegistrationService.stopActiveRegistrations(currentEmployee.id);
+        
+        // Then update the task status
+        const { error } = await supabase
+          .from('tasks')
+          .update({ 
+            status: newStatus,
+            status_changed_at: new Date().toISOString()
+          })
+          .eq('id', taskId);
+
+        if (error) throw error;
+        
         await fetchActiveTimeRegistrations();
         
         await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
@@ -370,78 +383,81 @@ const PersonalTasks = () => {
     }
   });
 
-  // Enhanced timeline data with better formatting and project info
-  const enhancedTimelineData = schedules.map(schedule => {
-    let projectName = 'No Project';
-    let projectId = null;
-    let taskTitle = schedule.title;
-    let taskDescription = schedule.description || '';
-    let taskStatus = 'scheduled';
-    let taskWorkstation = '';
-    let taskPriority = 'medium';
-    let taskId = schedule.id;
-    let canComplete = false;
-    let isActive = false;
+  // Memoize the enhanced timeline data to prevent unnecessary re-renders
+  const enhancedTimelineData = React.useMemo(() => {
+    return schedules.map((schedule, scheduleIndex) => {
+      let projectName = 'No Project';
+      let projectId = null;
+      let taskTitle = schedule.title;
+      let taskDescription = schedule.description || '';
+      let taskStatus = 'scheduled';
+      let taskWorkstation = '';
+      let taskPriority = 'medium';
+      let taskId = schedule.id;
+      let canComplete = false;
+      let isActive = false;
 
-    // Check if schedule is linked to a task and has project info
-    if (schedule.tasks && schedule.tasks.phases && schedule.tasks.phases.projects) {
-      projectName = schedule.tasks.phases.projects.name;
-      projectId = schedule.tasks.phases.projects.id;
-      taskTitle = schedule.tasks.title;
-      taskDescription = schedule.tasks.description || schedule.description || '';
-      taskStatus = schedule.tasks.status ? schedule.tasks.status.toLowerCase() : 'scheduled';
-      taskWorkstation = schedule.tasks.workstation || '';
-      taskPriority = schedule.tasks.priority || 'medium';
-      taskId = schedule.tasks.id;
-      
-      // Find the full task data for completion checks
-      const fullTask = tasks.find(t => t.id === schedule.tasks?.id);
-      if (fullTask) {
-        canComplete = canCompleteTask(fullTask);
-        isActive = isTaskActive(fullTask.id);
+      // Check if schedule is linked to a task and has project info
+      if (schedule.tasks && schedule.tasks.phases && schedule.tasks.phases.projects) {
+        projectName = schedule.tasks.phases.projects.name;
+        projectId = schedule.tasks.phases.projects.id;
+        taskTitle = schedule.tasks.title;
+        taskDescription = schedule.tasks.description || schedule.description || '';
+        taskStatus = schedule.tasks.status ? schedule.tasks.status.toLowerCase() : 'scheduled';
+        taskWorkstation = schedule.tasks.workstation || '';
+        taskPriority = schedule.tasks.priority || 'medium';
+        taskId = schedule.tasks.id;
+        
+        // Find the full task data for completion checks
+        const fullTask = tasks.find(t => t.id === schedule.tasks?.id);
+        if (fullTask) {
+          canComplete = canCompleteTask(fullTask);
+          isActive = isTaskActive(fullTask.id);
+        }
+      } else if (schedule.task_id) {
+        // Fallback: try to find task in the tasks array
+        const associatedTask = tasks.find(t => t.id === schedule.task_id);
+        if (associatedTask) {
+          projectName = associatedTask.phases.projects.name;
+          projectId = associatedTask.phases.projects.id;
+          taskTitle = associatedTask.title;
+          taskDescription = associatedTask.description || schedule.description || '';
+          taskStatus = associatedTask.status.toLowerCase();
+          taskWorkstation = associatedTask.workstation || '';
+          taskPriority = associatedTask.priority;
+          taskId = associatedTask.id;
+          canComplete = canCompleteTask(associatedTask);
+          isActive = isTaskActive(associatedTask.id);
+        }
       }
-    } else if (schedule.task_id) {
-      // Fallback: try to find task in the tasks array
-      const associatedTask = tasks.find(t => t.id === schedule.task_id);
-      if (associatedTask) {
-        projectName = associatedTask.phases.projects.name;
-        projectId = associatedTask.phases.projects.id;
-        taskTitle = associatedTask.title;
-        taskDescription = associatedTask.description || schedule.description || '';
-        taskStatus = associatedTask.status.toLowerCase();
-        taskWorkstation = associatedTask.workstation || '';
-        taskPriority = associatedTask.priority;
-        taskId = associatedTask.id;
-        canComplete = canCompleteTask(associatedTask);
-        isActive = isTaskActive(associatedTask.id);
-      }
-    }
 
-    console.log('Enhanced timeline item:', {
-      scheduleId: schedule.id,
-      taskId,
-      projectName,
-      projectId,
-      taskTitle,
-      taskStatus,
-      isActive
+      console.log('Enhanced timeline item:', {
+        scheduleId: schedule.id,
+        taskId,
+        projectName,
+        projectId,
+        taskTitle,
+        taskStatus,
+        isActive
+      });
+
+      return {
+        // Use a unique combination of schedule ID and task ID to prevent key conflicts
+        id: `${schedule.id}-${taskId}`,
+        title: taskTitle,
+        start_time: schedule.start_time,
+        end_time: schedule.end_time,
+        description: taskDescription,
+        status: taskStatus,
+        project_name: projectName,
+        project_id: projectId,
+        workstation: taskWorkstation,
+        priority: taskPriority,
+        canComplete,
+        isActive
+      };
     });
-
-    return {
-      id: taskId,
-      title: taskTitle,
-      start_time: schedule.start_time,
-      end_time: schedule.end_time,
-      description: taskDescription,
-      status: taskStatus,
-      project_name: projectName,
-      project_id: projectId,
-      workstation: taskWorkstation,
-      priority: taskPriority,
-      canComplete,
-      isActive
-    };
-  });
+  }, [schedules, tasks, activeTimeRegistrations]);
 
   const handleTimelineStartTask = (taskId: string) => {
     console.log('Starting task from timeline:', taskId);
