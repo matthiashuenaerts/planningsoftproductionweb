@@ -34,30 +34,37 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get admin email
-    const { data: adminEmployee, error: adminError } = await supabase
+    // Get admin emails (handle multiple admin users)
+    const { data: adminEmployees, error: adminError } = await supabase
       .from('employees')
       .select('email')
-      .eq('role', 'admin')
-      .single();
+      .eq('role', 'admin');
 
     if (adminError) {
-      console.error('Error fetching admin email:', adminError);
+      console.error('Error fetching admin emails:', adminError);
     }
 
-    const adminEmail = adminEmployee?.email || 'admin@company.com';
-
-    // Prepare email recipients
+    // Collect all recipients
     const recipients = [employeeEmail];
-    if (adminEmail && adminEmail !== employeeEmail) {
-      recipients.push(adminEmail);
+    
+    // Add admin emails if they exist and are different from employee email
+    if (adminEmployees && adminEmployees.length > 0) {
+      adminEmployees.forEach(admin => {
+        if (admin.email && admin.email !== employeeEmail && !recipients.includes(admin.email)) {
+          recipients.push(admin.email);
+        }
+      });
     }
 
-    console.log('Sending email to:', recipients);
+    // For testing, send only to verified email address
+    const testEmail = 'matthias.huenaerts@gmail.com';
+    const finalRecipients = [testEmail];
+
+    console.log('Sending email to:', finalRecipients);
 
     const emailResponse = await resend.emails.send({
-      from: "Holiday Requests <noreply@resend.dev>",
-      to: recipients,
+      from: "Holiday System <onboarding@resend.dev>",
+      to: finalRecipients,
       subject: `Holiday Request from ${employeeName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -81,6 +88,7 @@ const handler = async (req: Request): Promise<Response> => {
             <p><strong>Request ID:</strong> ${requestId}</p>
           </div>
           <p>This request has been submitted and is pending approval.</p>
+          <p><em>Note: This email was sent to ${testEmail} for testing purposes. Original recipients would be: ${recipients.join(', ')}</em></p>
         </div>
       `,
     });
