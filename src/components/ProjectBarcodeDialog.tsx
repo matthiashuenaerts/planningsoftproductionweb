@@ -25,11 +25,24 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
 
   // Generate barcode data using first 7 digits of project name
   const generateBarcodeData = () => {
+    console.log('Generating barcode for project:', projectName);
+    
     // Extract only digits from the project name
     const digits = projectName.replace(/\D/g, '');
+    console.log('Extracted digits from project name:', digits);
+    
+    // If no digits found in project name, use project ID as fallback
+    if (digits.length === 0) {
+      console.log('No digits found in project name, using project ID as fallback');
+      const projectIdDigits = projectId.replace(/\D/g, '');
+      const fallbackDigits = projectIdDigits.substring(0, 7).padEnd(7, '0');
+      console.log('Fallback barcode data:', fallbackDigits);
+      return fallbackDigits;
+    }
     
     // Take first 7 digits, pad with zeros if needed
     const first7Digits = digits.substring(0, 7).padEnd(7, '0');
+    console.log('Final barcode data:', first7Digits);
     
     return first7Digits;
   };
