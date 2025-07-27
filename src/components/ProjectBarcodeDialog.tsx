@@ -23,19 +23,11 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
   const barcodeContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Generate barcode data - "/" + first 7 digits of project name
+  // Generate barcode data - only the first 7 digits from project name
   const generateBarcodeData = () => {
     const digits = projectName.replace(/\D/g, ''); // Extract only digits
     const first7Digits = digits.substring(0, 7);
-    
-    // If we don't have enough digits, pad with zeros or use project ID
-    if (first7Digits.length < 7) {
-      const projectIdDigits = projectId.replace(/\D/g, '');
-      const combinedDigits = (first7Digits + projectIdDigits).substring(0, 7);
-      return `/${combinedDigits.padEnd(7, '0')}`;
-    }
-    
-    return `/${first7Digits}`;
+    return first7Digits;
   };
 
   const barcodeData = generateBarcodeData();
