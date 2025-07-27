@@ -448,6 +448,11 @@ const PersonalTasks = () => {
     handleTaskStatusChange(taskId, 'IN_PROGRESS');
   };
 
+  const handleTimelinePauseTask = (taskId: string) => {
+    console.log('Pausing task from timeline:', taskId);
+    handleTaskStatusChange(taskId, 'TODO');
+  };
+
   const handleTimelineCompleteTask = (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
     if (task) {
@@ -582,6 +587,7 @@ const PersonalTasks = () => {
           <EnhancedDailyTimeline 
             tasks={enhancedTimelineData}
             onStartTask={handleTimelineStartTask}
+            onPauseTask={handleTimelinePauseTask}
             onCompleteTask={handleTimelineCompleteTask}
             onShowFiles={handleShowFiles}
             onShowParts={handleShowParts}
