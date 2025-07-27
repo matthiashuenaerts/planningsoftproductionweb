@@ -23,28 +23,19 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
   const barcodeContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Generate barcode data using first 7 digits of project name
+  // Generate barcode data - "/" + first 7 digits of project name
   const generateBarcodeData = () => {
-    console.log('Generating barcode for project:', projectName);
+    const digits = projectName.replace(/\D/g, ''); // Extract only digits
+    const first7Digits = digits.substring(0, 7);
     
-    // Extract only digits from the project name
-    const digits = projectName.replace(/\D/g, '');
-    console.log('Extracted digits from project name:', digits);
-    
-    // If no digits found in project name, use project ID as fallback
-    if (digits.length === 0) {
-      console.log('No digits found in project name, using project ID as fallback');
+    // If we don't have enough digits, pad with zeros or use project ID
+    if (first7Digits.length < 7) {
       const projectIdDigits = projectId.replace(/\D/g, '');
-      const fallbackDigits = projectIdDigits.substring(0, 7).padEnd(7, '0');
-      console.log('Fallback barcode data:', fallbackDigits);
-      return fallbackDigits;
+      const combinedDigits = (first7Digits + projectIdDigits).substring(0, 7);
+      return `/${combinedDigits.padEnd(7, '0')}`;
     }
     
-    // Take first 7 digits, pad with zeros if needed
-    const first7Digits = digits.substring(0, 7).padEnd(7, '0');
-    console.log('Final barcode data:', first7Digits);
-    
-    return first7Digits;
+    return `/${first7Digits}`;
   };
 
   const barcodeData = generateBarcodeData();
