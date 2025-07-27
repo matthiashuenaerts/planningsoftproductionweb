@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit2, Trash2, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/context/AuthContext';
 
 interface EmailConnection {
   id: string;
@@ -27,7 +28,9 @@ const EmailSettings: React.FC = () => {
     email_address: '',
     general_name: ''
   });
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { currentEmployee } = useAuth();
 
   useEffect(() => {
     loadEmailConnections();
@@ -35,6 +38,7 @@ const EmailSettings: React.FC = () => {
 
   const loadEmailConnections = async () => {
     try {
+      console.log('Loading email connections...');
       const { data, error } = await supabase
         .from('email_connections')
         .select('*')
@@ -50,6 +54,7 @@ const EmailSettings: React.FC = () => {
         return;
       }
 
+      console.log('Email connections loaded:', data);
       setEmailConnections(data || []);
     } catch (error) {
       console.error('Error loading email connections:', error);
@@ -59,6 +64,11 @@ const EmailSettings: React.FC = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const validateEmailAddress = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -73,7 +83,40 @@ const EmailSettings: React.FC = () => {
       return;
     }
 
+    if (!validateEmailAddress(formData.email_address)) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid email address",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if user is authenticated and has admin role
+    if (!currentEmployee) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to manage email connections",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (currentEmployee.role !== 'admin') {
+      toast({
+        title: "Error",
+        description: "You must have admin privileges to manage email connections",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    
     try {
+      console.log('Submitting form data:', formData);
+      console.log('Current employee:', currentEmployee);
+      
       if (editingConnection) {
         // Update existing connection
         const { error } = await supabase
@@ -85,7 +128,10 @@ const EmailSettings: React.FC = () => {
           })
           .eq('id', editingConnection.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Update error:', error);
+          throw error;
+        }
 
         toast({
           title: "Success",
@@ -101,7 +147,10 @@ const EmailSettings: React.FC = () => {
             is_active: true
           }]);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Insert error:', error);
+          throw error;
+        }
 
         toast({
           title: "Success",
@@ -114,17 +163,39 @@ const EmailSettings: React.FC = () => {
       setIsEditDialogOpen(false);
       setEditingConnection(null);
       loadEmailConnections();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving email connection:', error);
+      
+      let errorMessage = "Failed to save email connection";
+      
+      if (error.message?.includes('row-level security')) {
+        errorMessage = "Permission denied. You must have admin privileges to manage email connections.";
+      } else if (error.message?.includes('duplicate key')) {
+        errorMessage = "An email connection with this address already exists.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       toast({
         title: "Error",
-        description: "Failed to save email connection",
+        description: errorMessage,
         variant: "destructive"
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleEdit = (connection: EmailConnection) => {
+    if (currentEmployee?.role !== 'admin') {
+      toast({
+        title: "Error",
+        description: "You must have admin privileges to edit email connections",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setEditingConnection(connection);
     setFormData({
       email_address: connection.email_address,
@@ -134,13 +205,30 @@ const EmailSettings: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (currentEmployee?.role !== 'admin') {
+      toast({
+        title: "Error",
+        description: "You must have admin privileges to delete email connections",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this email connection?')) {
+      return;
+    }
+
     try {
+      console.log('Deleting email connection:', id);
       const { error } = await supabase
         .from('email_connections')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Delete error:', error);
+        throw error;
+      }
 
       toast({
         title: "Success",
@@ -148,18 +236,37 @@ const EmailSettings: React.FC = () => {
       });
       
       loadEmailConnections();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting email connection:', error);
+      
+      let errorMessage = "Failed to delete email connection";
+      
+      if (error.message?.includes('row-level security')) {
+        errorMessage = "Permission denied. You must have admin privileges to delete email connections.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       toast({
         title: "Error",
-        description: "Failed to delete email connection",
+        description: errorMessage,
         variant: "destructive"
       });
     }
   };
 
   const toggleActive = async (id: string, isActive: boolean) => {
+    if (currentEmployee?.role !== 'admin') {
+      toast({
+        title: "Error",
+        description: "You must have admin privileges to modify email connections",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
+      console.log('Toggling active status:', id, !isActive);
       const { error } = await supabase
         .from('email_connections')
         .update({ 
@@ -168,7 +275,10 @@ const EmailSettings: React.FC = () => {
         })
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Toggle error:', error);
+        throw error;
+      }
 
       toast({
         title: "Success",
@@ -176,11 +286,20 @@ const EmailSettings: React.FC = () => {
       });
       
       loadEmailConnections();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error toggling email connection:', error);
+      
+      let errorMessage = "Failed to update email connection";
+      
+      if (error.message?.includes('row-level security')) {
+        errorMessage = "Permission denied. You must have admin privileges to modify email connections.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       toast({
         title: "Error",
-        description: "Failed to update email connection",
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -211,8 +330,8 @@ const EmailSettings: React.FC = () => {
         />
       </div>
       <div className="flex gap-2 pt-4">
-        <Button type="submit" className="flex-1">
-          {editingConnection ? 'Update' : 'Add'} Email Connection
+        <Button type="submit" className="flex-1" disabled={isLoading}>
+          {isLoading ? 'Saving...' : (editingConnection ? 'Update' : 'Add')} Email Connection
         </Button>
         <Button 
           type="button" 
@@ -223,6 +342,7 @@ const EmailSettings: React.FC = () => {
             setEditingConnection(null);
             setFormData({ email_address: '', general_name: '' });
           }}
+          disabled={isLoading}
         >
           Cancel
         </Button>
@@ -246,7 +366,7 @@ const EmailSettings: React.FC = () => {
             </div>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button disabled={currentEmployee?.role !== 'admin'}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Email Connection
                 </Button>
@@ -301,6 +421,7 @@ const EmailSettings: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => toggleActive(connection.id, connection.is_active)}
+                        disabled={currentEmployee?.role !== 'admin'}
                       >
                         {connection.is_active ? 'Deactivate' : 'Activate'}
                       </Button>
@@ -308,6 +429,7 @@ const EmailSettings: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => handleEdit(connection)}
+                        disabled={currentEmployee?.role !== 'admin'}
                       >
                         <Edit2 className="h-4 w-4" />
                       </Button>
@@ -315,6 +437,7 @@ const EmailSettings: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => handleDelete(connection.id)}
+                        disabled={currentEmployee?.role !== 'admin'}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
