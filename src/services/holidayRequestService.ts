@@ -47,12 +47,9 @@ const sendHolidayRequestEmail = async (request: {
       return;
     }
 
-    const response = await fetch('/functions/v1/send-holiday-request-email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    // Use supabase.functions.invoke instead of fetch
+    const { data, error } = await supabase.functions.invoke('send-holiday-request-email', {
+      body: {
         employeeName: request.employeeName,
         startDate: request.startDate,
         endDate: request.endDate,
@@ -60,14 +57,15 @@ const sendHolidayRequestEmail = async (request: {
         requestId: request.requestId,
         senderEmail: senderEmail,
         recipientEmail: recipientEmail,
-      }),
+      }
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to send email');
+    if (error) {
+      console.error('Error sending email:', error);
+      return;
     }
 
-    console.log('Holiday request email sent successfully');
+    console.log('Holiday request email sent successfully:', data);
   } catch (error) {
     console.error('Error sending holiday request email:', error);
     // Don't throw error here to prevent blocking the request creation
