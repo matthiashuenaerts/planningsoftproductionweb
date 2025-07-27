@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -203,7 +202,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
     );
   }
 
-  // Sort tasks by start time and create unique keys
+  // Sort tasks by start time
   const sortedTasks = [...tasks].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
   console.log('Rendering timeline with tasks:', sortedTasks.map(task => ({
@@ -229,11 +228,8 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
           const isSmallTask = duration && duration.includes('min') && !duration.includes('h');
           const timeProgress = calculateTimeProgress(task.start_time, task.end_time);
           
-          // Create unique key using task ID and start time to avoid duplicates
-          const uniqueKey = `${task.id}-${task.start_time}-${index}`;
-          
           return (
-            <div key={uniqueKey} className="relative flex items-start mb-4">
+            <div key={task.id} className="relative flex items-start mb-4">
               {/* Time marker */}
               <div className="flex-shrink-0 w-14 text-right pr-4">
                 <div className="text-sm font-medium text-gray-600">
@@ -290,6 +286,11 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
                           <span>{formatTime(task.start_time)} - {formatTime(task.end_time)}</span>
+                          {task.workstation && (
+                            <>
+                              {/* Additional workstation info can be added here */}
+                            </>
+                          )}
                         </div>
                       </div>
                       
