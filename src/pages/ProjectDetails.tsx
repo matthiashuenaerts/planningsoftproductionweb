@@ -1,816 +1,1185 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
+import Navbar from '@/components/Navbar';
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
   CardTitle,
-} from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { MoreVertical, Edit, Copy, Trash2, Plus, Loader2, CheckCircle, AlertTriangle } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Separator } from "@/components/ui/separator"
-import { useToast } from "@/hooks/use-toast"
-import { projectService } from '@/services/projectService';
-import { taskService } from '@/services/taskService';
-import { userService } from '@/services/userService';
-import { Link } from "react-router-dom";
-import { Project, ProjectPhase, Task } from '@/types/project';
-import { format, parseISO } from 'date-fns';
-import { Order } from '@/types/order';
+  CardFooter
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Edit, Trash2, Eye, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { projectService, Project, Task, taskService } from '@/services/dataService';
+import { timeRegistrationService } from '@/services/timeRegistrationService';
+import { standardTasksService } from '@/services/standardTasksService';
+import { accessoriesService, Accessory } from '@/services/accessoriesService';
 import { orderService } from '@/services/orderService';
-import OrderEditModal from '@/components/OrderEditModal';
+import { Order, OrderItem, OrderStep } from '@/types/order';
+import TaskList from '@/components/TaskList';
+import ProjectFileManager from '@/components/ProjectFileManager';
+import OneDriveIntegration from '@/components/OneDriveIntegration';
 import NewOrderModal from '@/components/NewOrderModal';
+import OrderEditModal from '@/components/OrderEditModal';
+import { PartsListDialog } from '@/components/PartsListDialog';
+import { AccessoriesDialog } from '@/components/AccessoriesDialog';
+import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useLanguage } from '@/context/LanguageContext';
+import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Progress } from "@/components/ui/progress"
-import { useScreenshot } from 'use-react-screenshot'
-import { useRef } from 'react';
-import { saveAs } from 'file-saver';
-import { generateProjectReport } from '@/lib/projectReportGenerator';
-import { ProjectReportData } from '@/types/report';
-import { useNavigate as useReactRouterNavigate } from 'react-router-dom';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import { OverviewTab } from '@/components/project-details/OverviewTab';
-import { TasksTab } from '@/components/project-details/TasksTab';
-import { BudgetTab } from '@/components/project-details/BudgetTab';
-import { FilesTab } from '@/components/project-details/FilesTab';
-import { SettingsTab } from '@/components/project-details/SettingsTab';
-import { AccessoriesTab } from '@/components/project-details/AccessoriesTab';
-import { OrderWithDetails } from '@/types/order';
-import { AccessoriesOrder } from '@/types/accessories';
-import { accessoriesService } from '@/services/accessoriesService';
-import { Accessory } from '@/services/accessoriesService';
-import { InstallationDetails } from '@/components/project-details/InstallationDetails';
 
-interface ProjectDetailsProps { }
+interface TaskWithTimeData extends Task {
+  timeRemaining?: string;
+  isOvertime?: boolean;
+  assignee_name?: string;
+  actual_duration_minutes?: number;
+  efficiency_percentage?: number;
+}
 
-const ProjectDetails: React.FC<ProjectDetailsProps> = () => {
+interface OrderWithDetails extends Order {
+  orderSteps?: OrderStep[];
+  items?: OrderItem[];
+}
+
+const ProjectDetails = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const [project, setProject] = useState<Project | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [installationDate, setInstallationDate] = useState<string | null>(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isDuplicating, setIsDuplicating] = useState(false);
-  const [newOrderModalOpen, setNewOrderModalOpen] = useState(false);
-  const [editOrderModal, setEditOrderModal] = useState<{ open: boolean; order: OrderWithDetails | null }>({ open: false, order: null });
-  const [accessoriesOrders, setAccessoriesOrders] = useState<AccessoriesOrder[]>([]);
-  const [accessories, setAccessories] = useState<Accessory[]>([]);
-  const [selectedAccessories, setSelectedAccessories] = useState<Accessory[]>([]);
-  const [isAccessoriesOrderModalOpen, setIsAccessoriesOrderModalOpen] = useState(false);
-  const [isBulkOrder, setIsBulkOrder] = useState(false);
-  const [bulkOrderSupplier, setBulkOrderSupplier] = useState<string>('');
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const [isTimelineValid, setIsTimelineValid] = useState(true);
-  const [timelineValidationMessage, setTimelineValidationMessage] = useState<string | null>(null);
-  const [isTimelineCheckRunning, setIsTimelineCheckRunning] = useState(false);
-  const [isInstallationDetailsModalOpen, setIsInstallationDetailsModalOpen] = useState(false);
-  const routerNavigate = useReactRouterNavigate();
   const { toast } = useToast();
-  const ref = useRef(null)
-  const [image, takeScreenshot] = useScreenshot()
-  const [isScreenshotLoading, setIsScreenshotLoading] = useState(false);
+  const [project, setProject] = useState<Project | null>(null);
+  const [tasks, setTasks] = useState<TaskWithTimeData[]>([]);
+  const [accessories, setAccessories] = useState<Accessory[]>([]);
+  const [orders, setOrders] = useState<OrderWithDetails[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('home');
+  const [showNewOrderModal, setShowNewOrderModal] = useState(false);
+  const [showEditOrderModal, setShowEditOrderModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
+  const [showPartsListDialog, setShowPartsListDialog] = useState(false);
+  const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
+  const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
+  const [projectEfficiency, setProjectEfficiency] = useState<number | null>(null);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedDescription, setEditedDescription] = useState('');
+  const [savingDescription, setSavingDescription] = useState(false);
+  const { currentEmployee } = useAuth();
+  const { t, lang, createLocalizedPath } = useLanguage();
 
-  const getImage = () => {
-    setIsScreenshotLoading(true);
-    takeScreenshot(ref.current)
-      .then(() => setIsScreenshotLoading(false))
-      .catch(() => setIsScreenshotLoading(false));
-  }
+  const calculateAndSaveTaskEfficiency = useCallback(async (completedTasks: TaskWithTimeData[]) => {
+    if (!projectId || completedTasks.length === 0) return [];
 
-  useEffect(() => {
-    if (image) {
-      saveAs(image, 'project-details.png');
+    // Filter out tasks that already have efficiency data calculated
+    const tasksNeedingCalculation = completedTasks.filter(task => 
+      task.actual_duration_minutes === null || task.actual_duration_minutes === undefined ||
+      task.efficiency_percentage === null || task.efficiency_percentage === undefined
+    );
+
+    if (tasksNeedingCalculation.length === 0) {
+      console.log('All completed tasks already have efficiency data - skipping calculation');
+      return completedTasks;
     }
-  }, [image]);
 
-  const downloadProjectReport = async () => {
-    if (!project) {
-      toast({
-        title: "Error",
-        description: "Project details not loaded.",
-        variant: "destructive"
+    console.log(`Processing ${tasksNeedingCalculation.length} tasks that need efficiency calculation (skipping ${completedTasks.length - tasksNeedingCalculation.length} already calculated)`);
+    
+    // Get all task IDs for batch query - only for tasks needing calculation
+    const taskIds = tasksNeedingCalculation.map(task => task.id);
+    
+    // Batch fetch all time registrations for tasks needing calculation
+    const { data: allTimeRegs, error: timeRegsError } = await supabase
+      .from('time_registrations')
+      .select('task_id, duration_minutes')
+      .in('task_id', taskIds)
+      .not('duration_minutes', 'is', null);
+
+    if (timeRegsError) {
+      console.error('Error fetching time registrations:', timeRegsError);
+      return completedTasks;
+    }
+
+    // Group time registrations by task_id
+    const timeRegsByTask = new Map<string, number>();
+    allTimeRegs?.forEach(reg => {
+      const currentTotal = timeRegsByTask.get(reg.task_id) || 0;
+      timeRegsByTask.set(reg.task_id, currentTotal + (reg.duration_minutes || 0));
+    });
+
+    let totalPlannedMinutes = 0;
+    let totalActualMinutes = 0;
+    const tasksToUpdate: { id: string; actual_duration_minutes: number; efficiency_percentage: number }[] = [];
+    const updatedTasks: TaskWithTimeData[] = [...completedTasks];
+
+    // Process only tasks that need calculation
+    for (const task of tasksNeedingCalculation) {
+      const actualMinutes = timeRegsByTask.get(task.id) || 0;
+      const plannedMinutes = task.duration || 0;
+
+      console.log(`Task ${task.id}: Planned ${plannedMinutes}min, Actual ${actualMinutes}min`);
+
+      if (plannedMinutes > 0 && actualMinutes > 0) {
+        const efficiency = ((plannedMinutes - actualMinutes) / plannedMinutes) * 100;
+        
+        totalPlannedMinutes += plannedMinutes;
+        totalActualMinutes += actualMinutes;
+
+        tasksToUpdate.push({
+          id: task.id,
+          actual_duration_minutes: actualMinutes,
+          efficiency_percentage: Math.round(efficiency)
+        });
+
+        // Update the task in the updatedTasks array
+        const taskIndex = updatedTasks.findIndex(t => t.id === task.id);
+        if (taskIndex !== -1) {
+          updatedTasks[taskIndex] = {
+            ...updatedTasks[taskIndex],
+            actual_duration_minutes: actualMinutes,
+            efficiency_percentage: Math.round(efficiency)
+          };
+        }
+      } else {
+        console.log(`Skipping task ${task.id}: plannedMinutes=${plannedMinutes}, actualMinutes=${actualMinutes}`);
+      }
+    }
+
+    // Include already calculated tasks in project efficiency calculation
+    completedTasks.forEach(task => {
+      if (task.actual_duration_minutes && task.duration && !tasksNeedingCalculation.includes(task)) {
+        totalPlannedMinutes += task.duration;
+        totalActualMinutes += task.actual_duration_minutes;
+      }
+    });
+
+    // Batch update only tasks that need updating
+    if (tasksToUpdate.length > 0) {
+      console.log(`Batch updating ${tasksToUpdate.length} tasks with efficiency data`);
+      
+      const updatePromises = tasksToUpdate.map(taskUpdate => 
+        supabase
+          .from('tasks')
+          .update({
+            actual_duration_minutes: taskUpdate.actual_duration_minutes,
+            efficiency_percentage: taskUpdate.efficiency_percentage
+          })
+          .eq('id', taskUpdate.id)
+      );
+
+      try {
+        await Promise.all(updatePromises);
+        console.log('Successfully batch updated all task efficiencies');
+      } catch (error) {
+        console.error('Error batch updating task efficiencies:', error);
+      }
+    }
+
+    // Calculate and save overall project efficiency
+    if (totalPlannedMinutes > 0) {
+      const overallEfficiency = ((totalPlannedMinutes - totalActualMinutes) / totalPlannedMinutes) * 100;
+      setProjectEfficiency(Math.round(overallEfficiency));
+      
+      console.log(`Project efficiency: ${Math.round(overallEfficiency)}% (${totalActualMinutes}min actual vs ${totalPlannedMinutes}min planned)`);
+      
+      try {
+        await supabase
+          .from('projects')
+          .update({
+            efficiency_percentage: Math.round(overallEfficiency)
+          })
+          .eq('id', projectId);
+
+        console.log('Successfully updated project efficiency in database');
+      } catch (error) {
+        console.error('Error updating project efficiency:', error);
+      }
+    }
+
+    return updatedTasks;
+  }, [projectId]);
+
+  const fetchAndSetSortedTasks = useCallback(async (pId: string) => {
+    console.log('Fetching and sorting tasks for project:', pId);
+    
+    const phaseData = await projectService.getProjectPhases(pId);
+    const standardTasks = await standardTasksService.getAll();
+    const standardTaskMap = new Map(standardTasks.map(st => [st.id, st.task_number]));
+
+    let allTasks: TaskWithTimeData[] = [];
+    for (const phase of phaseData) {
+      const phaseTasks = await taskService.getByPhase(phase.id);
+      allTasks = [...allTasks, ...phaseTasks];
+    }
+
+    allTasks.sort((a, b) => {
+      const taskA_number = a.standard_task_id ? standardTaskMap.get(a.standard_task_id) : undefined;
+      const taskB_number = b.standard_task_id ? standardTaskMap.get(b.standard_task_id) : undefined;
+
+      if (taskA_number && taskB_number) {
+        return taskA_number.localeCompare(taskB_number, undefined, { numeric: true });
+      }
+      if (taskA_number) return -1;
+      if (taskB_number) return 1;
+      return a.title.localeCompare(b.title);
+    });
+
+    const completedTasks = allTasks.filter(task => task.status === 'COMPLETED');
+    console.log(`Found ${completedTasks.length} completed tasks`);
+    
+    if (completedTasks.length > 0) {
+      const updatedCompletedTasks = await calculateAndSaveTaskEfficiency(completedTasks);
+      
+      // Replace tasks that were updated
+      allTasks = allTasks.map(task => {
+        const updatedTask = updatedCompletedTasks.find(ut => ut.id === task.id);
+        return updatedTask || task;
       });
-      return;
     }
+    
+    setTasks(allTasks);
+  }, [calculateAndSaveTaskEfficiency]);
 
-    setIsGeneratingReport(true);
-    try {
-      const reportData: ProjectReportData = {
-        project,
-        tasks,
-        orders,
-        accessoriesOrders,
-        installationDate
-      };
-      await generateProjectReport(reportData);
-      toast({
-        title: "Success",
-        description: "Project report generated successfully."
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: `Failed to generate project report: ${error.message}`,
-        variant: "destructive"
-      });
-    } finally {
-      setIsGeneratingReport(false);
-    }
-  };
-
-  const loadProject = useCallback(async () => {
-    if (!projectId) {
-      setError('Project ID is missing.');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const projectData = await projectService.getById(projectId);
-      setProject(projectData);
-      setInstallationDate(projectData.installation_date || null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load project.');
-      toast({
-        title: "Error",
-        description: `Failed to load project: ${err.message}`,
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, toast]);
-
-  const loadTasks = useCallback(async () => {
+  const fetchOrdersWithDetails = useCallback(async () => {
     if (!projectId) return;
-    try {
-      const tasksData = await taskService.getByProject(projectId);
-      setTasks(tasksData);
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: `Failed to load tasks: ${err.message}`,
-        variant: "destructive"
-      });
-    }
-  }, [projectId, toast]);
-
-  const loadOrders = useCallback(async () => {
-    if (!projectId) return;
+    
     try {
       const ordersData = await orderService.getByProject(projectId);
-      setOrders(ordersData);
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: `Failed to load orders: ${err.message}`,
-        variant: "destructive"
-      });
+      
+      const ordersWithDetails: OrderWithDetails[] = await Promise.all(
+        ordersData.map(async (order) => {
+          const [orderItems, orderSteps] = await Promise.all([
+            orderService.getOrderItems(order.id),
+            order.order_type === 'semi-finished' ? orderService.getOrderSteps(order.id) : Promise.resolve([])
+          ]);
+          
+          return {
+            ...order,
+            items: orderItems,
+            orderSteps: orderSteps
+          };
+        })
+      );
+      
+      setOrders(ordersWithDetails);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
     }
-  }, [projectId, toast]);
-
-  const loadAccessoriesOrders = useCallback(async () => {
-    if (!projectId) return;
-    try {
-      const accessoriesOrdersData = await accessoriesService.getByProject(projectId);
-      setAccessoriesOrders(accessoriesOrdersData);
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: `Failed to load accessories orders: ${err.message}`,
-        variant: "destructive"
-      });
-    }
-  }, [projectId, toast]);
-
-  const loadAccessories = useCallback(async () => {
-    try {
-      const accessoriesData = await accessoriesService.getAll();
-      setAccessories(accessoriesData);
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: `Failed to load accessories: ${err.message}`,
-        variant: "destructive"
-      });
-    }
-  }, [toast]);
+  }, [projectId]);
 
   useEffect(() => {
-    loadProject();
-    loadTasks();
-    loadOrders();
-    loadAccessoriesOrders();
-    loadAccessories();
-  }, [loadProject, loadTasks, loadOrders, loadAccessoriesOrders, loadAccessories]);
+    const fetchProjectData = async () => {
+      if (!projectId) return;
+      
+      try {
+        setLoading(true);
+        console.log('Loading project data for:', projectId);
+        
+        const projectData = await projectService.getById(projectId);
+        setProject(projectData);
+        
+        // Fetch and process tasks with time registration data
+        await fetchAndSetSortedTasks(projectId);
 
-  const handleProjectUpdate = async (updatedProject: Project) => {
-    setProject(updatedProject);
-  };
+        const accessoriesData = await accessoriesService.getByProject(projectId);
+        setAccessories(accessoriesData);
 
-  const handleTaskUpdate = () => {
-    loadTasks();
-  };
+        await fetchOrdersWithDetails();
 
-  const handleOrderUpdate = () => {
-    loadOrders();
-  };
+        // Fetch project efficiency from database (it should be updated by now)
+        try {
+          const { data: projectWithEfficiency } = await supabase
+            .from('projects')
+            .select('efficiency_percentage')
+            .eq('id', projectId)
+            .maybeSingle();
 
-  const handleAccessoriesOrderUpdate = () => {
-    loadAccessoriesOrders();
-  };
-
-  const handleInstallationDateUpdate = (newDate: string | null) => {
-    setInstallationDate(newDate);
-    if (project) {
-      setProject({ ...project, installation_date: newDate });
-    }
-  };
-
-  const handleDeleteProject = async () => {
-    if (!projectId) {
-      toast({
-        title: "Error",
-        description: "Project ID is missing.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      await projectService.delete(projectId);
-      toast({
-        title: "Success",
-        description: "Project deleted successfully."
-      });
-      navigate('/projects');
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: `Failed to delete project: ${err.message}`,
-        variant: "destructive"
-      });
-    } finally {
-      setIsDeleteModalOpen(false);
-    }
-  };
-
-  const handleDuplicateProject = async () => {
-    if (!project) {
-      toast({
-        title: "Error",
-        description: "Project details not loaded.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsDuplicating(true);
-    try {
-      // Remove id from the project object before duplicating
-      const { id, ...projectWithoutId } = project;
-      const duplicatedProject = await projectService.create(projectWithoutId);
-
-      // Duplicate tasks
-      for (const task of tasks) {
-        const { id, ...taskWithoutId } = task;
-        await taskService.create({ ...taskWithoutId, project_id: duplicatedProject.id });
-      }
-
-      // Duplicate orders
-      for (const order of orders) {
-        const { id, ...orderWithoutId } = order;
-        const newOrder = await orderService.create({ ...orderWithoutId, project_id: duplicatedProject.id });
-
-        // Duplicate order items
-        const orderItems = await orderService.getOrderItems(order.id);
-        for (const item of orderItems) {
-          const { id, ...itemWithoutId } = item;
-          await orderService.createOrderItem({ ...itemWithoutId, order_id: newOrder.id });
+          if (projectWithEfficiency?.efficiency_percentage !== null) {
+            setProjectEfficiency(projectWithEfficiency.efficiency_percentage);
+            console.log('Loaded project efficiency from database:', projectWithEfficiency.efficiency_percentage);
+          }
+        } catch (error) {
+          console.error('Error fetching project efficiency:', error);
         }
-      }
-
-      toast({
-        title: "Success",
-        description: "Project duplicated successfully."
-      });
-      navigate(`/projects/${duplicatedProject.id}`);
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: `Failed to duplicate project: ${err.message}`,
-        variant: "destructive"
-      });
-    } finally {
-      setIsDuplicating(false);
-    }
-  };
-
-  const handleCreateBulkAccessoriesOrder = async () => {
-    if (!projectId) {
-      toast({
-        title: "Error",
-        description: "Project ID is missing.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (selectedAccessories.length === 0) {
-      toast({
-        title: "Warning",
-        description: "No accessories selected.",
-        variant: "warning"
-      });
-      return;
-    }
-
-    if (!bulkOrderSupplier) {
-      toast({
-        title: "Warning",
-        description: "Please enter a supplier for the bulk order.",
-        variant: "warning"
-      });
-      return;
-    }
-
-    try {
-      // Create a new accessories order
-      const accessoriesOrder = await accessoriesService.createAccessoriesOrder({
-        project_id: projectId,
-        order_date: new Date().toISOString(),
-        supplier: bulkOrderSupplier,
-        status: 'pending',
-        notes: `Bulk order for accessories: ${selectedAccessories.map(a => a.article_name).join(', ')}`,
-      });
-
-      // Link selected accessories to the new order
-      for (const accessory of selectedAccessories) {
-        await accessoriesService.update(accessory.id, {
-          accessories_order_id: accessoriesOrder.id,
-          project_id: projectId,
-          status: 'pending',
+      } catch (error: any) {
+        console.error('Error loading project data:', error);
+        toast({
+          title: t('error'),
+          description: t('failed_to_load_projects', { message: error.message }),
+          variant: "destructive"
         });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProjectData();
+  }, [projectId, toast, fetchAndSetSortedTasks, fetchOrdersWithDetails, t]);
+
+  const checkAndUpdateLimitPhases = async (completedTaskId?: string) => {
+    if (!projectId) return;
+    
+    try {
+      const { data: holdTasks, error: holdError } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          phases!inner(project_id)
+        `)
+        .eq('phases.project_id', projectId)
+        .eq('status', 'HOLD')
+        .not('standard_task_id', 'is', null);
+
+      if (holdError) {
+        console.error('Error fetching HOLD tasks:', holdError);
+        return;
       }
 
-      toast({
-        title: "Success",
-        description: "Bulk accessories order created successfully."
-      });
-      setSelectedAccessories([]);
-      setBulkOrderSupplier('');
-      setIsAccessoriesOrderModalOpen(false);
-      loadAccessoriesOrders();
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: `Failed to create bulk accessories order: ${err.message}`,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleCreateAccessoriesOrder = async (accessories: Accessory[], supplier?: string) => {
-    if (!projectId) {
-      toast({
-        title: "Error",
-        description: "Project ID is missing.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (accessories.length === 0) {
-      toast({
-        title: "Warning",
-        description: "No accessories selected.",
-        variant: "warning"
-      });
-      return;
-    }
-
-    try {
-      // Create a new accessories order
-      const accessoriesOrder = await accessoriesService.createAccessoriesOrder({
-        project_id: projectId,
-        order_date: new Date().toISOString(),
-        supplier: supplier || 'Accessories Order',
-        status: 'pending',
-        notes: `Order for accessories: ${accessories.map(a => a.article_name).join(', ')}`,
-      });
-
-      // Link selected accessories to the new order
-      for (const accessory of accessories) {
-        await accessoriesService.update(accessory.id, {
-          accessories_order_id: accessoriesOrder.id,
-          project_id: projectId,
-          status: 'pending',
-          order_id: null, // remove direct link to order
-        });
+      if (!holdTasks || holdTasks.length === 0) {
+        console.log('No HOLD tasks found with standard_task_id');
+        return;
       }
 
-      toast({
-        title: "Success",
-        description: "Accessories order created successfully."
-      });
-      loadAccessoriesOrders();
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: `Failed to create accessories order: ${err.message}`,
-        variant: "destructive"
-      });
-    }
-  };
+      const tasksToUpdate = [];
+      for (const holdTask of holdTasks) {
+        if (holdTask.standard_task_id) {
+          try {
+            const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(
+              holdTask.standard_task_id,
+              projectId
+            );
 
-  const validateTimeline = async () => {
-    if (!projectId) {
-      toast({
-        title: "Error",
-        description: "Project ID is missing.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsTimelineCheckRunning(true);
-    setIsTimelineValid(true);
-    setTimelineValidationMessage(null);
-
-    try {
-      // Fetch all orders for the project
-      const orders = await orderService.getByProject(projectId);
-
-      // Validate each order
-      for (const order of orders) {
-        if (order.order_type === 'semi-finished') {
-          // Fetch order steps
-          const steps = await orderService.getOrderSteps(order.id);
-
-          // Check if installation date is set
-          if (!installationDate) {
-            setIsTimelineValid(false);
-            setTimelineValidationMessage("Warning: Project installation date is not set. Cannot validate delivery timeline.");
-            return;
-          }
-
-          // Calculate the end date of the last step
-          let endOfLastStep: Date | null = null;
-          if (steps.length > 0) {
-            // Sort steps by start date
-            const sortedSteps = steps.sort((a, b) => (a.start_date || '').localeCompare(b.start_date || ''));
-            const lastStep = sortedSteps[sortedSteps.length - 1];
-
-            if (lastStep.start_date && lastStep.expected_duration_days) {
-              const startDate = parseISO(lastStep.start_date);
-              const duration = lastStep.expected_duration_days;
-              endOfLastStep = new Date(startDate);
-              endOfLastStep.setDate(startDate.getDate() + duration);
+            if (limitPhasesSatisfied) {
+              tasksToUpdate.push(holdTask);
             }
-          }
-
-          if (endOfLastStep) {
-            const deadline = new Date(parseISO(installationDate));
-            deadline.setDate(deadline.getDate() - 5); // 5 days before installation
-
-            if (endOfLastStep > deadline) {
-              setIsTimelineValid(false);
-              setTimelineValidationMessage(`Error: Order "${order.supplier}" is scheduled to finish on ${format(endOfLastStep, 'MMM dd, yyyy')}, which is less than 5 working days before the installation date (${format(parseISO(installationDate), 'MMM dd, yyyy')}).`);
-              return;
-            }
+          } catch (error) {
+            console.error(`Error checking limit phases for task ${holdTask.id}:`, error);
           }
         }
       }
 
-      if (isTimelineValid) {
-        setTimelineValidationMessage("All orders are on track with the project timeline.");
+      if (tasksToUpdate.length > 0) {
+        console.log(`Updating ${tasksToUpdate.length} tasks from HOLD to TODO`);
+        
+        for (const task of tasksToUpdate) {
+          await supabase
+            .from('tasks')
+            .update({ 
+              status: 'TODO',
+              status_changed_at: new Date().toISOString()
+            })
+            .eq('id', task.id);
+        }
+        
+        toast({
+          title: t('tasks_updated'),
+          description: t('tasks_updated_desc', { count: tasksToUpdate.length.toString() }),
+        });
       }
+    } catch (error) {
+      console.error('Error in checkAndUpdateLimitPhases:', error);
+    }
+  };
+
+  const checkLimitPhasesBeforeStart = async (taskId: string, standardTaskId?: string): Promise<boolean> => {
+    if (!projectId || !standardTaskId) return true;
+    
+    try {
+      const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(
+        standardTaskId,
+        projectId
+      );
+
+      if (!limitPhasesSatisfied) {
+        toast({
+          title: t('cannot_start_task'),
+          description: t('cannot_start_task_desc'),
+          variant: "destructive"
+        });
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error checking limit phases before start:', error);
+      return true; // Allow start if we can't check (fail open)
+    }
+  };
+
+  const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
+    if (!currentEmployee || !projectId) {
+      toast({
+        title: t('auth_error'),
+        description: t('auth_error_desc'),
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      const statusValue = newStatus as string;
+      const currentTask = tasks.find(task => task.id === taskId);
+      
+      if (statusValue === 'IN_PROGRESS') {
+        const canStart = await checkLimitPhasesBeforeStart(taskId, currentTask?.standard_task_id);
+        if (!canStart) {
+          return;
+        }
+        await timeRegistrationService.startTask(currentEmployee.id, taskId);
+        toast({
+          title: t('task_started'),
+          description: t('task_started_desc'),
+        });
+      } else if (statusValue === 'COMPLETED') {
+        await timeRegistrationService.completeTask(taskId);
+        toast({
+          title: t('task_completed'),
+          description: t('task_completed_desc'),
+        });
+      } else {
+        const updateData: Partial<Task> = { 
+          status: newStatus, 
+          status_changed_at: new Date().toISOString() 
+        };
+      
+        if (statusValue === 'IN_PROGRESS') {
+          updateData.assignee_id = currentEmployee.id;
+        }
+      
+        if (statusValue === 'COMPLETED') {
+          updateData.completed_at = new Date().toISOString();
+          updateData.completed_by = currentEmployee.id;
+        }
+      
+        await taskService.update(taskId, updateData);
+        toast({
+          title: t('task_updated'),
+          description: t('task_updated_desc', { status: newStatus }),
+        });
+      }
+
+      if (newStatus === 'COMPLETED') {
+        await checkAndUpdateLimitPhases(taskId);
+      }
+
+      // Recalculate efficiency when task is completed or any status changes
+      await fetchAndSetSortedTasks(projectId);
+
     } catch (error: any) {
-      setIsTimelineValid(false);
-      setTimelineValidationMessage(`Error during timeline validation: ${error.message}`);
       toast({
-        title: "Error",
-        description: `Error during timeline validation: ${error.message}`,
+        title: t('error'),
+        description: t('task_status_update_error', { message: error.message }),
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleNewOrderSuccess = () => {
+    toast({
+      title: t('success'),
+      description: t('order_created_successfully'),
+    });
+    fetchOrdersWithDetails();
+  };
+
+  const handleEditOrder = (order: OrderWithDetails) => {
+    setSelectedOrder(order);
+    setShowEditOrderModal(true);
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    try {
+      await orderService.delete(orderId);
+      toast({
+        title: t('success'),
+        description: t('order_deleted_successfully'),
+      });
+      fetchOrdersWithDetails();
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: t('failed_to_delete_order', { message: error.message }),
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleUpdateOrderStatus = async (orderId: string, status: Order['status']) => {
+    try {
+      await orderService.updateOrderStatus(orderId, status);
+      toast({
+        title: t('success'),
+        description: t('order_status_updated'),
+      });
+      fetchOrdersWithDetails();
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: t('failed_to_update_order_status', { message: error.message }),
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditDescription = () => {
+    setEditedDescription(project?.description || '');
+    setIsEditingDescription(true);
+  };
+
+  const handleSaveDescription = async () => {
+    if (!projectId || !project) return;
+
+    try {
+      setSavingDescription(true);
+      await projectService.update(projectId, { description: editedDescription });
+      setProject({ ...project, description: editedDescription });
+      setIsEditingDescription(false);
+      toast({
+        title: t('success'),
+        description: t('project_updated_successfully')
+      });
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: t('failed_to_update_project', { message: error.message }),
         variant: "destructive"
       });
     } finally {
-      setIsTimelineCheckRunning(false);
+      setSavingDescription(false);
     }
+  };
+
+  const handleCancelEditDescription = () => {
+    setIsEditingDescription(false);
+    setEditedDescription('');
   };
 
   if (loading) {
-    return <div className="flex justify-center items-center h-screen">
-      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-      Loading project details...
-    </div>;
+    return (
+      <div className="flex min-h-screen">
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+        <div className="ml-64 w-full p-6 flex justify-center items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        </div>
+      </div>
+    );
   }
 
   if (!project) {
-    return <div className="flex justify-center items-center h-screen text-red-500">
-      Error: {error || 'Project not found.'}
-    </div>;
-  }
-
-  return (
-    <div className="container mx-auto py-10">
-      <div className="mb-4 flex justify-between items-center">
-        <CardTitle className="text-2xl font-bold">{project.name}</CardTitle>
-        <div>
-          <Button variant="outline" onClick={() => routerNavigate(-1)}>Back to Projects</Button>
+    return (
+      <div className="flex min-h-screen">
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+        <div className="ml-64 w-full p-6">
+          <div className="max-w-3xl mx-auto">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold mb-2">{t('project_not_found')}</h2>
+              <p className="text-muted-foreground mb-4">{t('project_not_found_description')}</p>
+              <Button onClick={() => navigate(createLocalizedPath('/projects'))}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> {t('back_to_projects')}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
+    );
+  }
 
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="tasks">Tasks</TabsTrigger>
-          <TabsTrigger value="budget">Budget</TabsTrigger>
-          <TabsTrigger value="accessories">Accessories</TabsTrigger>
-          <TabsTrigger value="orders">Orders</TabsTrigger>
-          <TabsTrigger value="files">Files</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
-        <TabsContent value="overview">
-          <OverviewTab project={project} onProjectUpdate={handleProjectUpdate} />
-        </TabsContent>
-        <TabsContent value="tasks">
-          <TasksTab projectId={projectId} tasks={tasks} onTaskUpdate={handleTaskUpdate} />
-        </TabsContent>
-        <TabsContent value="budget">
-          <BudgetTab project={project} onProjectUpdate={handleProjectUpdate} />
-        </TabsContent>
-        <TabsContent value="accessories">
-          <AccessoriesTab
-            projectId={projectId}
-            accessories={accessories}
-            accessoriesOrders={accessoriesOrders}
-            onAccessoriesOrderUpdate={handleAccessoriesOrderUpdate}
-            onCreateAccessoriesOrder={handleCreateAccessoriesOrder}
-          />
-        </TabsContent>
-        <TabsContent value="orders">
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <CardTitle>Orders</CardTitle>
-              <div className="space-x-2">
-                <Button onClick={() => setNewOrderModalOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Order
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString(lang, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'planned':
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-300">{t('status_planned')}</Badge>;
+      case 'in_progress':
+        return <Badge className="bg-amber-100 text-amber-800 border-amber-300">{t('in_progress')}</Badge>;
+      case 'completed':
+        return <Badge className="bg-green-100 text-green-800 border-green-300">{t('completed')}</Badge>;
+      case 'on_hold':
+        return <Badge className="bg-gray-100 text-gray-800 border-gray-300">{t('status_on_hold')}</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
+
+  const getOrderStatusBadge = (status: Order['status']) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">{t('pending')}</Badge>;
+      case 'delivered':
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">{t('delivered')}</Badge>;
+      case 'canceled':
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">{t('canceled')}</Badge>;
+      case 'delayed':
+        return <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">{t('delayed')}</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const getTaskCountByStatus = (status: string) => {
+    return tasks.filter(task => task.status === status).length;
+  };
+
+  const todoTasks = tasks.filter(task => task.status === 'TODO');
+  const holdTasks = tasks.filter(task => task.status === 'HOLD');
+  const inProgressTasks = tasks.filter(task => task.status === 'IN_PROGRESS');
+  const completedTasks = tasks.filter(task => task.status === 'COMPLETED');
+
+  const openTasks = [...todoTasks, ...holdTasks];
+
+  const openOrdersCount = orders.filter(order => order.status === 'pending').length;
+  const undeliveredOrdersCount = orders.filter(order => order.status !== 'delivered').length;
+  const allOrdersDelivered = orders.length > 0 && undeliveredOrdersCount === 0;
+  const unavailableAccessoriesCount = accessories.filter(acc => 
+    acc.status === 'to_order' || acc.status === 'ordered'
+  ).length;
+  const inStockAccessoriesCount = accessories.filter(acc => acc.status === 'in_stock').length;
+  const deliveredAccessoriesCount = accessories.filter(acc => acc.status === 'delivered').length;
+  const semiFinishedOrders = orders.filter(order => order.order_type === 'semi-finished');
+
+  return (
+    <div className="flex min-h-screen">
+      <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+        <Navbar />
+      </div>
+      <div className="ml-64 w-full p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-6">
+            <Button 
+              variant="outline" 
+              onClick={() => navigate(createLocalizedPath('/projects'))}
+              className="mb-4"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" /> {t('back_to_projects')}
+            </Button>
+            
+            <div className="flex flex-col gap-4">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">{project?.name}</h1>
+                <p className="text-muted-foreground">{t('client_label')}: {project?.client}</p>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button 
+                  variant={activeTab === 'home' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('home')}
+                >
+                  <Home className="mr-2 h-4 w-4" /> {t('home')}
                 </Button>
-                <Button onClick={() => setIsAccessoriesOrderModalOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Order Accessories
+                <Button 
+                  variant={activeTab === 'orders' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('orders')}
+                  className={cn(
+                    allOrdersDelivered 
+                      ? "bg-green-500 text-white hover:bg-green-600" 
+                      : undeliveredOrdersCount > 0 
+                        ? "bg-red-500 text-white hover:bg-red-600" 
+                        : ""
+                  )}
+                >
+                  <Package className="mr-2 h-4 w-4" /> 
+                  {t('orders')}
+                  {undeliveredOrdersCount > 0 && (
+                    <span className="ml-2 bg-white text-red-500 px-2 py-1 rounded-full text-xs font-bold">
+                      {undeliveredOrdersCount}
+                    </span>
+                  )}
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowPartsListDialog(true)}
+                >
+                  <List className="mr-2 h-4 w-4" /> {t('parts_list')}
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowAccessoriesDialog(true)}
+                >
+                  <Settings className="mr-2 h-4 w-4" /> {t('accessories')}
+                </Button>
+                <Button 
+                  variant={activeTab === 'files' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('files')}
+                >
+                  <FileText className="mr-2 h-4 w-4" /> {t('files')}
+                </Button>
+                <Button 
+                  variant={activeTab === 'onedrive' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('onedrive')}
+                >
+                  <Folder className="mr-2 h-4 w-4" /> {t('onedrive')}
                 </Button>
               </div>
             </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{openTasks.length}</div>
+                <p className="text-xs text-muted-foreground">{t('open_tasks')}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{getTaskCountByStatus('IN_PROGRESS')}</div>
+                <p className="text-xs text-muted-foreground">{t('in_progress')}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{getTaskCountByStatus('COMPLETED')}</div>
+                <p className="text-xs text-muted-foreground">{t('completed')}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{tasks.length}</div>
+                <p className="text-xs text-muted-foreground">{t('total_tasks')}</p>
+              </CardContent>
+            </Card>
+          </div>
 
-            {orders.length === 0 ? (
-              <Card className="w-full">
-                <CardContent>
-                  <p className="text-center text-gray-500">No orders found for this project.</p>
+          {activeTab === 'files' ? (
+            <ProjectFileManager projectId={projectId!} />
+          ) : activeTab === 'onedrive' ? (
+            <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} />
+          ) : activeTab === 'orders' ? (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">{t('orders')}</h2>
+                <Button onClick={() => setShowNewOrderModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('new_order')}
+                </Button>
+              </div>
+
+              {orders.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center py-8">
+                      <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">{t('no_orders')}</h3>
+                      <p className="text-muted-foreground mb-4">{t('no_orders_description')}</p>
+                      <Button onClick={() => setShowNewOrderModal(true)}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        {t('create_first_order')}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {orders.map((order) => (
+                    <Card key={order.id}>
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="flex items-center gap-2">
+                              {order.supplier}
+                              {getOrderStatusBadge(order.status)}
+                            </CardTitle>
+                            <CardDescription>
+                              {t('order_date')}: {formatDate(order.order_date)} • {t('expected_delivery')}: {formatDate(order.expected_delivery)}
+                            </CardDescription>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditOrder(order)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>{t('delete_order')}</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    {t('delete_order_confirmation')}
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteOrder(order.id)}>
+                                    {t('delete')}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {order.notes && (
+                          <p className="text-sm text-muted-foreground mb-4">{order.notes}</p>
+                        )}
+                        
+                        {order.items && order.items.length > 0 && (
+                          <div className="mb-4">
+                            <h4 className="font-medium mb-2">{t('order_items')}</h4>
+                            <div className="space-y-2">
+                              {order.items.map((item) => (
+                                <div key={item.id} className="flex justify-between items-center p-2 bg-muted rounded">
+                                  <div>
+                                    <p className="font-medium">{item.description}</p>
+                                    <p className="text-sm text-muted-foreground">{t('article_code')}: {item.article_code}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-medium">{t('quantity')}: {item.quantity}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {order.order_type === 'semi-finished' && order.orderSteps && order.orderSteps.length > 0 && (
+                          <div className="mb-4">
+                            <h4 className="font-medium mb-2">{t('order_steps')}</h4>
+                            <div className="space-y-2">
+                              {order.orderSteps.map((step) => (
+                                <div key={step.id} className="flex justify-between items-center p-2 bg-muted rounded">
+                                  <div>
+                                    <p className="font-medium">{step.name}</p>
+                                    {step.supplier && (
+                                      <p className="text-sm text-muted-foreground">{t('supplier')}: {step.supplier}</p>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <Badge variant="outline" className={
+                                      step.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
+                                      step.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                      step.status === 'delayed' ? 'bg-red-50 text-red-700 border-red-200' :
+                                      'bg-gray-50 text-gray-700 border-gray-200'
+                                    }>
+                                      {t(step.status)}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                      <CardFooter>
+                        <div className="flex gap-2">
+                          {order.status === 'pending' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdateOrderStatus(order.id, 'delivered')}
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              {t('mark_as_delivered')}
+                            </Button>
+                          )}
+                          {order.status === 'delivered' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdateOrderStatus(order.id, 'pending')}
+                            >
+                              <AlertCircle className="mr-2 h-4 w-4" />
+                              {t('mark_as_pending')}
+                            </Button>
+                          )}
+                        </div>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-1">
+                <CardHeader>
+                  <CardTitle>{t('project_summary')}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium mb-1">{t('status')}</h4>
+                    <div>{project && getStatusBadge(project.status)}</div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-medium">{t('description') || 'Description'}</h4>
+                      {!isEditingDescription && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleEditDescription}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                    {isEditingDescription ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={editedDescription}
+                          onChange={(e) => setEditedDescription(e.target.value)}
+                          placeholder={t('enter_project_description') || 'Enter project description...'}
+                          className="min-h-[80px] resize-none"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={handleSaveDescription}
+                            disabled={savingDescription}
+                          >
+                            <Save className="h-3 w-3 mr-1" />
+                            {savingDescription ? (t('saving') || 'Saving...') : (t('save') || 'Save')}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCancelEditDescription}
+                            disabled={savingDescription}
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            {t('cancel') || 'Cancel'}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        {project?.description || (t('no_description') || 'No description added yet.')}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-medium mb-1">{t('project_progress')}</h4>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">{t('completion')}</span>
+                        <span className="font-medium">{project?.progress}%</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2.5">
+                        <div 
+                          className="bg-primary h-2.5 rounded-full" 
+                          style={{ width: `${project?.progress}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {projectEfficiency !== null && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">{t('project_efficiency') || 'Project Efficiency'}</h4>
+                      <div className="flex items-center gap-2">
+                        {projectEfficiency >= 0 ? (
+                          <TrendingUp className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <TrendingDown className="h-4 w-4 text-red-600" />
+                        )}
+                        <span className={`font-medium ${projectEfficiency >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {projectEfficiency >= 0 ? '+' : ''}{projectEfficiency}%
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {projectEfficiency >= 0 ? (t('efficiency_faster') || 'faster than planned') : (t('efficiency_slower') || 'slower than planned')}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">{t('project_barcode')}</h4>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setShowBarcodeDialog(true)}
+                      className="w-full"
+                    >
+                      <Barcode className="mr-2 h-4 w-4" />
+                      {t('view_barcode')}
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">{t('orders_and_accessories')}</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="bg-orange-50 p-2 rounded">
+                        <div className="font-medium text-orange-800">{openOrdersCount}</div>
+                        <div className="text-orange-600 text-xs">{t('open_orders')}</div>
+                      </div>
+                      <div className="bg-red-50 p-2 rounded">
+                        <div className="font-medium text-red-800">{unavailableAccessoriesCount}</div>
+                        <div className="text-red-600 text-xs">{t('to_order')}</div>
+                      </div>
+                      <div className="bg-green-50 p-2 rounded">
+                        <div className="font-medium text-green-800">{inStockAccessoriesCount}</div>
+                        <div className="text-green-600 text-xs">{t('in_stock')}</div>
+                      </div>
+                      <div className="bg-blue-50 p-2 rounded">
+                        <div className="font-medium text-blue-800">{deliveredAccessoriesCount}</div>
+                        <div className="text-blue-600 text-xs">{t('delivered')}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">{t('important_dates')}</h4>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">{t('start_date_label')}:</span>
+                      <span>{project?.start_date && formatDate(project.start_date)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">{t('installation_date_label')}:</span>
+                      <span>{project?.installation_date && formatDate(project.installation_date)}</span>
+                    </div>
+                  </div>
+
+                  {semiFinishedOrders.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">{t('semi_finished_deliveries')}</h4>
+                      <div className="space-y-1.5 text-sm">
+                        {semiFinishedOrders.map((order: any) => (
+                          order.orderSteps && order.orderSteps.length > 0 && (
+                            <div key={order.id} className="bg-gray-50 p-2 rounded">
+                              <p className="font-medium mb-1">{order.supplier}{t('main_order_suffix')}</p>
+                              <div className="pl-2 space-y-1">
+                                {order.orderSteps
+                                  .filter((step: any) => step.supplier)
+                                  .map((step: any) => (
+                                    <div key={step.id} className="flex justify-between items-center">
+                                      <span className="text-muted-foreground truncate" title={`${step.name} (${step.supplier})`}>
+                                        {step.name} ({step.supplier})
+                                      </span>
+                                      <span className="font-medium whitespace-nowrap ml-2">
+                                        {step.end_date ? formatDate(step.end_date) : t('not_applicable')}
+                                      </span>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            ) : (
-              <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                {orders.map((order) => (
-                  <Card key={order.id} className="bg-white shadow-md rounded-md overflow-hidden">
-                    <CardHeader>
-                      <CardTitle className="text-lg font-semibold">{order.supplier}</CardTitle>
-                      <CardDescription>
-                        Order Date: {format(parseISO(order.order_date), 'MMM dd, yyyy')}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <p>
-                          Status: <Badge variant="secondary">{order.status}</Badge>
-                        </p>
-                        <p>Expected Delivery: {format(parseISO(order.expected_delivery), 'MMM dd, yyyy')}</p>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="ml-auto flex h-8 w-8 p-0 data-[state=open]:bg-muted">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-[160px]">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => setEditOrderModal({ open: true, order: order as OrderWithDetails })}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Copy className="mr-2 h-4 w-4" />
-                              Duplicate
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem>
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        </TabsContent>
-        <TabsContent value="files">
-          <FilesTab projectId={projectId} />
-        </TabsContent>
-        <TabsContent value="settings">
-          <SettingsTab project={project} onProjectUpdate={handleProjectUpdate} />
-        </TabsContent>
-      </Tabs>
-
-      <Separator className="my-4" />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Project Timeline</CardTitle>
-            <CardDescription>Manage project timeline and key dates.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <InstallationDetails installationDate={installationDate} onInstallationDateUpdate={handleInstallationDateUpdate} />
-            <Button variant="outline" onClick={validateTimeline} disabled={isTimelineCheckRunning}>
-              {isTimelineCheckRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Validate Timeline
-            </Button>
-            {timelineValidationMessage && (
-              <div className={`p-3 rounded-md ${isTimelineValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                {isTimelineValid ? <CheckCircle className="mr-2 h-4 w-4 inline-block" /> : <AlertTriangle className="mr-2 h-4 w-4 inline-block" />}
-                {timelineValidationMessage}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Actions</CardTitle>
-            <CardDescription>Manage project actions.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button variant="destructive" onClick={() => setIsDeleteModalOpen(true)}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete Project
-            </Button>
-            <Button variant="secondary" onClick={handleDuplicateProject} disabled={isDuplicating}>
-              {isDuplicating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <Copy className="mr-2 h-4 w-4" />
-              Duplicate Project
-            </Button>
-            <Button variant="secondary" onClick={downloadProjectReport} disabled={isGeneratingReport}>
-              {isGeneratingReport && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Generate Report
-            </Button>
-            <Button variant="secondary" onClick={getImage} disabled={isScreenshotLoading}>
-              {isScreenshotLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Take Screenshot
-            </Button>
-          </CardContent>
-        </Card>
+              
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>{t('project_tasks')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="todo">
+                    <TabsList className="mb-4">
+                      <TabsTrigger value="todo">{t('open_tasks_tab', { count: openTasks.length.toString() })}</TabsTrigger>
+                      <TabsTrigger value="in_progress">{t('in_progress_tab', { count: inProgressTasks.length.toString() })}</TabsTrigger>
+                      <TabsTrigger value="completed">{t('completed_tab', { count: completedTasks.length.toString() })}</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="todo">
+                      <TaskList 
+                        tasks={openTasks} 
+                        title={t('open_tasks_title')} 
+                        onTaskStatusChange={handleTaskStatusChange}
+                        showCompleteButton={true}
+                      />
+                    </TabsContent>
+                    <TabsContent value="in_progress">
+                      <TaskList 
+                        tasks={inProgressTasks} 
+                        title={t('in_progress_tasks_title')} 
+                        onTaskStatusChange={handleTaskStatusChange}
+                      />
+                    </TabsContent>
+                    <TabsContent value="completed">
+                      <TaskList 
+                        tasks={completedTasks} 
+                        title={t('completed_tasks_title')}
+                        onTaskStatusChange={handleTaskStatusChange}
+                        showEfficiencyData={true}
+                      />
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
       </div>
 
       <NewOrderModal
-        open={newOrderModalOpen}
-        onOpenChange={setNewOrderModalOpen}
-        projectId={projectId}
-        onSuccess={loadOrders}
-        installationDate={installationDate || undefined}
+        open={showNewOrderModal}
+        onOpenChange={setShowNewOrderModal}
+        projectId={projectId!}
+        onSuccess={handleNewOrderSuccess}
+        showAddOrderButton={true}
+        accessories={accessories}
+        installationDate={project?.installation_date}
       />
 
-      {editOrderModal.open && editOrderModal.order && (
+      {selectedOrder && (
         <OrderEditModal
-          open={editOrderModal.open}
-          onOpenChange={(open) => setEditOrderModal(prev => ({ ...prev, open }))}
-          orderId={editOrderModal.order.id}
+          open={showEditOrderModal}
+          onOpenChange={setShowEditOrderModal}
+          order={selectedOrder}
           onSuccess={() => {
-            setEditOrderModal({ open: false, order: null });
-            loadOrders();
+            setShowEditOrderModal(false);
+            setSelectedOrder(null);
+            fetchOrdersWithDetails();
+            toast({
+              title: t('success'),
+              description: t('order_updated_successfully'),
+            });
           }}
         />
       )}
 
-      <AlertDialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the project and all related data.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteProject}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <PartsListDialog
+        isOpen={showPartsListDialog}
+        onClose={() => setShowPartsListDialog(false)}
+        projectId={projectId!}
+        onImportComplete={() => {
+          toast({
+            title: t('success'),
+            description: t('parts_list_imported_successfully'),
+          });
+        }}
+      />
 
-      <Dialog open={isAccessoriesOrderModalOpen} onOpenChange={setIsAccessoriesOrderModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create Accessories Order</DialogTitle>
-            <DialogDescription>
-              Select accessories to order for this project.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="bulkOrder">
-                <Input type="checkbox" id="bulkOrder" checked={isBulkOrder} onChange={(e) => setIsBulkOrder(e.target.checked)} className="mr-2" />
-                Create a bulk order for multiple accessories
-              </Label>
-              {isBulkOrder && (
-                <>
-                  <Label htmlFor="supplier">Supplier</Label>
-                  <Input id="supplier" value={bulkOrderSupplier} onChange={(e) => setBulkOrderSupplier(e.target.value)} placeholder="Supplier name" />
-                </>
-              )}
-            </div>
-            {!isBulkOrder && (
-              <p className="text-sm text-muted-foreground">
-                You can select accessories from the Accessories tab and create an order for them.
-              </p>
-            )}
-            {isBulkOrder && (
-              <div className="space-y-2">
-                <Label>Select Accessories</Label>
-                <div className="grid gap-2 grid-cols-1 md:grid-cols-2">
-                  {accessories.map((accessory) => (
-                    <Label key={accessory.id} htmlFor={`accessory-${accessory.id}`} className="flex items-center space-x-2">
-                      <Input
-                        type="checkbox"
-                        id={`accessory-${accessory.id}`}
-                        checked={selectedAccessories.some(a => a.id === accessory.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedAccessories([...selectedAccessories, accessory]);
-                          } else {
-                            setSelectedAccessories(selectedAccessories.filter(a => a.id !== accessory.id));
-                          }
-                        }}
-                      />
-                      <span>{accessory.article_name}</span>
-                    </Label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="flex justify-end space-x-2">
-            <Button type="button" variant="secondary" onClick={() => setIsAccessoriesOrderModalOpen(false)}>
-              Cancel
-            </Button>
-            {isBulkOrder ? (
-              <Button type="button" onClick={handleCreateBulkAccessoriesOrder} disabled={selectedAccessories.length === 0}>
-                Create Bulk Order
-              </Button>
-            ) : (
-              <Button type="button" onClick={() => {
-                setIsAccessoriesOrderModalOpen(false);
-                routerNavigate(`/projects/${projectId}/accessories`);
-              }}>
-                Go to Accessories
-              </Button>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <AccessoriesDialog
+        open={showAccessoriesDialog}
+        onOpenChange={setShowAccessoriesDialog}
+        projectId={projectId!}
+      />
+
+      <ProjectBarcodeDialog
+        isOpen={showBarcodeDialog}
+        onClose={() => setShowBarcodeDialog(false)}
+        projectId={projectId!}
+        projectName={project?.name || ''}
+      />
     </div>
   );
 };
