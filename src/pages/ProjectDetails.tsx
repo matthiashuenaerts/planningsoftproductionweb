@@ -13,7 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -27,6 +29,8 @@ import NewOrderModal from '@/components/NewOrderModal';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { AccessoriesDialog } from '@/components/AccessoriesDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
+import OrderEditModal from '@/components/OrderEditModal';
+import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
@@ -48,12 +52,17 @@ const ProjectDetails = () => {
   const [tasks, setTasks] = useState<TaskWithTimeData[]>([]);
   const [accessories, setAccessories] = useState<Accessory[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [orderItems, setOrderItems] = useState<{ [orderId: string]: any[] }>({});
+  const [orderAttachments, setOrderAttachments] = useState<{ [orderId: string]: any[] }>({});
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [showPartsListDialog, setShowPartsListDialog] = useState(false);
   const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
+  const [showOrderEditModal, setShowOrderEditModal] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [projectEfficiency, setProjectEfficiency] = useState<number | null>(null);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState('');
@@ -492,6 +501,91 @@ const ProjectDetails = () => {
     setEditedDescription('');
   };
 
+  // Helper functions for order management
+  const loadOrderItems = async (orderId: string) => {
+    try {
+      const items = await orderService.getOrderItems(orderId);
+      setOrderItems(prev => ({ ...prev, [orderId]: items }));
+    } catch (error) {
+      console.error('Error loading order items:', error);
+    }
+  };
+
+  const loadOrderAttachments = async (orderId: string) => {
+    try {
+      const attachments = await orderService.getOrderAttachments(orderId);
+      setOrderAttachments(prev => ({ ...prev, [orderId]: attachments }));
+    } catch (error) {
+      console.error('Error loading order attachments:', error);
+    }
+  };
+
+  const toggleOrderExpansion = (orderId: string) => {
+    const newExpanded = new Set(expandedOrders);
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId);
+    } else {
+      newExpanded.add(orderId);
+      // Load order items and attachments when expanding
+      if (!orderItems[orderId]) {
+        loadOrderItems(orderId);
+      }
+      if (!orderAttachments[orderId]) {
+        loadOrderAttachments(orderId);
+      }
+    }
+    setExpandedOrders(newExpanded);
+  };
+
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
+    try {
+      await orderService.updateOrderStatus(orderId, newStatus as any);
+      const updatedOrders = await orderService.getByProject(projectId!);
+      setOrders(updatedOrders);
+      toast({
+        title: t('success'),
+        description: t('order_status_updated'),
+      });
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    try {
+      await orderService.delete(orderId);
+      const updatedOrders = await orderService.getByProject(projectId!);
+      setOrders(updatedOrders);
+      toast({
+        title: t('success'),
+        description: t('order_deleted_successfully'),
+      });
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditOrder = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setShowOrderEditModal(true);
+  };
+
+  const handleOrderEditSuccess = () => {
+    if (projectId) {
+      orderService.getByProject(projectId).then(setOrders);
+    }
+    setShowOrderEditModal(false);
+    setSelectedOrderId(null);
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen">
@@ -721,55 +815,151 @@ const ProjectDetails = () => {
                       <p className="text-muted-foreground">{t('no_orders_found')}</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {orders.map((order) => (
-                        <div key={order.id} className="border rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-medium">{order.supplier}</h4>
-                            <div className="flex items-center gap-2">
-                              <Badge 
-                                className={cn(
-                                  order.status === 'delivered' && 'bg-green-100 text-green-800',
-                                  order.status === 'pending' && 'bg-orange-100 text-orange-800',
-                                  order.status === 'shipped' && 'bg-blue-100 text-blue-800'
-                                )}
-                              >
-                                {order.status}
-                              </Badge>
-                              {order.status !== 'delivered' && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={async () => {
-                                    try {
-                                      await orderService.updateOrderStatus(order.id, 'delivered');
-                                      const updatedOrders = await orderService.getByProject(projectId!);
-                                      setOrders(updatedOrders);
-                                      toast({
-                                        title: t('success'),
-                                        description: t('order_delivered_successfully'),
-                                      });
-                                    } catch (error: any) {
-                                      toast({
-                                        title: t('error'),
-                                        description: error.message,
-                                        variant: "destructive"
-                                      });
-                                    }
-                                  }}
-                                >
-                                  {t('mark_delivered')}
+                        <Collapsible 
+                          key={order.id} 
+                          open={expandedOrders.has(order.id)}
+                          onOpenChange={() => toggleOrderExpansion(order.id)}
+                        >
+                          <div className="border rounded-lg p-4 bg-card">
+                            {/* Order Header */}
+                            <div className="flex items-center justify-between mb-3">
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" className="p-0 h-auto flex items-center gap-2">
+                                  {expandedOrders.has(order.id) ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronUp className="h-4 w-4" />
+                                  )}
+                                  <h4 className="font-medium text-left">{order.supplier}</h4>
                                 </Button>
-                              )}
+                              </CollapsibleTrigger>
+                              
+                              <div className="flex items-center gap-2">
+                                {/* Manual Status Editor */}
+                                <Select
+                                  value={order.status}
+                                  onValueChange={(value) => handleStatusChange(order.id, value)}
+                                >
+                                  <SelectTrigger className="w-32 h-7 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-background z-50">
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                    <SelectItem value="delivered">Delivered</SelectItem>
+                                    <SelectItem value="canceled">Canceled</SelectItem>
+                                    <SelectItem value="delayed">Delayed</SelectItem>
+                                  </SelectContent>
+                                </Select>
+
+                                {/* Action Buttons */}
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleEditOrder(order.id)}
+                                    className="h-7 w-7 p-0"
+                                  >
+                                    <Edit3 className="h-3 w-3" />
+                                  </Button>
+                                  
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDeleteOrder(order.id)}
+                                    className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
                             </div>
+
+                            {/* Order Basic Info */}
+                            <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground mb-3">
+                              <div>
+                                <span className="font-medium">{t('expected_delivery')}:</span>{' '}
+                                {order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString() : t('not_set')}
+                              </div>
+                              <div>
+                                <span className="font-medium">{t('order_type')}:</span>{' '}
+                                {order.order_type}
+                              </div>
+                            </div>
+
+                            {order.notes && (
+                              <p className="text-sm text-muted-foreground mb-3 italic">
+                                "{order.notes}"
+                              </p>
+                            )}
+
+                            {/* Camera and File Actions */}
+                            <div className="flex gap-2 mb-3">
+                              <OrderAttachmentUploader 
+                                orderId={order.id}
+                                onUploadSuccess={() => loadOrderAttachments(order.id)}
+                                compact={true}
+                              />
+                            </div>
+
+                            {/* Collapsible Content */}
+                            <CollapsibleContent className="space-y-4">
+                              {/* Order Items */}
+                              {orderItems[order.id] && orderItems[order.id].length > 0 && (
+                                <div>
+                                  <h5 className="font-medium text-sm mb-2">{t('order_items')}:</h5>
+                                  <div className="bg-muted/50 rounded p-3 space-y-2">
+                                    {orderItems[order.id].map((item: any) => (
+                                      <div key={item.id} className="flex justify-between items-center text-sm">
+                                        <div>
+                                          <span className="font-medium">{item.description}</span>
+                                          {item.article_code && (
+                                            <span className="text-muted-foreground ml-2">({item.article_code})</span>
+                                          )}
+                                        </div>
+                                        <span className="text-muted-foreground">Qty: {item.quantity}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Order Attachments */}
+                              {orderAttachments[order.id] && orderAttachments[order.id].length > 0 && (
+                                <div>
+                                  <h5 className="font-medium text-sm mb-2">{t('attachments')}:</h5>
+                                  <div className="space-y-2">
+                                    {orderAttachments[order.id].map((attachment: any) => (
+                                      <div key={attachment.id} className="flex items-center justify-between bg-muted/50 rounded p-2">
+                                        <div className="flex items-center gap-2">
+                                          <Paperclip className="h-4 w-4 text-muted-foreground" />
+                                          <span className="text-sm">{attachment.file_name}</span>
+                                        </div>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => window.open(attachment.file_path, '_blank')}
+                                          className="h-7 text-xs"
+                                        >
+                                          {t('view')}
+                                        </Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* No items/attachments message */}
+                              {(!orderItems[order.id] || orderItems[order.id].length === 0) && 
+                               (!orderAttachments[order.id] || orderAttachments[order.id].length === 0) && (
+                                <div className="text-center py-4 text-muted-foreground text-sm">
+                                  {t('no_items_or_attachments')}
+                                </div>
+                              )}
+                            </CollapsibleContent>
                           </div>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            {t('expected_delivery')}: {order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString() : t('not_set')}
-                          </p>
-                          {order.notes && (
-                            <p className="text-sm text-muted-foreground">{order.notes}</p>
-                          )}
-                        </div>
+                        </Collapsible>
                       ))}
                     </div>
                   )}
@@ -1028,6 +1218,15 @@ const ProjectDetails = () => {
         projectId={projectId!}
         projectName={project?.name || ''}
       />
+
+      {selectedOrderId && (
+        <OrderEditModal
+          open={showOrderEditModal}
+          onOpenChange={setShowOrderEditModal}
+          orderId={selectedOrderId}
+          onSuccess={handleOrderEditSuccess}
+        />
+      )}
     </div>
   );
 };
