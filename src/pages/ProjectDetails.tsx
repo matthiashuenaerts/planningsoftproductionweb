@@ -1,553 +1,337 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import Navbar from '@/components/Navbar';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle,
-  CardFooter
-} from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Edit, Trash2 } from 'lucide-react';
+import { Clock, ArrowLeft, Package, Trash2, Plus, Edit, Camera, Calendar, Users, FileText, Truck, Settings, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { projectService, Project, Task, taskService } from '@/services/dataService';
-import { timeRegistrationService } from '@/services/timeRegistrationService';
-import { standardTasksService } from '@/services/standardTasksService';
-import { accessoriesService, Accessory } from '@/services/accessoriesService';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import Navbar from '@/components/Navbar';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useNavigate } from 'react-router-dom';
 import { orderService } from '@/services/orderService';
-import TaskList from '@/components/TaskList';
+import { accessoriesService, Accessory } from '@/services/accessoriesService';
+import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
+import NewOrderModal from '@/components/NewOrderModal';
+import OrderEditModal from '@/components/OrderEditModal';
+import { DeliveryConfirmationModal } from '@/components/logistics/DeliveryConfirmationModal';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { projectService } from '@/services/dataService';
+import { Project } from '@/services/dataService';
 import ProjectFileManager from '@/components/ProjectFileManager';
 import OneDriveIntegration from '@/components/OneDriveIntegration';
-import NewOrderModal from '@/components/NewOrderModal';
-import { OrderEditModal } from '@/components/OrderEditModal';
-import { PartsListDialog } from '@/components/PartsListDialog';
-import { AccessoriesDialog } from '@/components/AccessoriesDialog';
-import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
-import { OrderPopup } from '@/components/OrderPopup';
-import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { useLanguage } from '@/context/LanguageContext';
-import { cn } from '@/lib/utils';
 
-interface TaskWithTimeData extends Task {
-  timeRemaining?: string;
-  isOvertime?: boolean;
-  assignee_name?: string;
-  actual_duration_minutes?: number;
-  efficiency_percentage?: number;
+interface Order {
+  id: string;
+  project_id: string;
+  supplier: string;
+  order_date: string;
+  expected_delivery: string;
+  status: 'pending' | 'delivered' | 'canceled' | 'delayed';
+  created_at: string;
+  updated_at: string;
+  order_type: 'standard' | 'semi-finished';
+  orderItems?: OrderItem[];
+  attachments?: OrderAttachment[];
+  orderSteps?: OrderStep[];
+}
+
+interface OrderItem {
+  id: string;
+  order_id: string;
+  description: string;
+  quantity: number;
+  article_code: string | null;
+  unit_price: number | null;
+  total_price: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface OrderAttachment {
+  id: string;
+  order_id: string;
+  file_name: string;
+  file_path: string;
+  file_type: string;
+  file_size: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface OrderStep {
+  id: string;
+  order_id: string;
+  step_number: number;
+  name: string;
+  supplier?: string | null;
+  status: 'pending' | 'in_progress' | 'completed' | 'delayed';
+  start_date?: string | null;
+  expected_duration_days?: number | null;
+  end_date?: string | null;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 const ProjectDetails = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { createLocalizedPath } = useLanguage();
   const [project, setProject] = useState<Project | null>(null);
-  const [tasks, setTasks] = useState<TaskWithTimeData[]>([]);
-  const [accessories, setAccessories] = useState<Accessory[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState('overview');
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [accessories, setAccessories] = useState<Accessory[]>([]);
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
-  const [showPartsListDialog, setShowPartsListDialog] = useState(false);
-  const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
-  const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
-  const [projectEfficiency, setProjectEfficiency] = useState<number | null>(null);
-  const [isEditingDescription, setIsEditingDescription] = useState(false);
-  const [editedDescription, setEditedDescription] = useState('');
-  const [savingDescription, setSavingDescription] = useState(false);
-  const [editingOrder, setEditingOrder] = useState<any>(null);
-  const [showOrderPopup, setShowOrderPopup] = useState(false);
-  const [selectedOrderId, setSelectedOrderId] = useState<string>('');
+  const [showEditOrderModal, setShowEditOrderModal] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const { toast } = useToast();
   const { currentEmployee } = useAuth();
-  const { t, lang, createLocalizedPath } = useLanguage();
 
-  const calculateAndSaveTaskEfficiency = useCallback(async (completedTasks: TaskWithTimeData[]) => {
-    if (!projectId || completedTasks.length === 0) return [];
+  const fetchProjectOrders = async () => {
+    try {
+      if (!projectId) return;
 
-    // Filter out tasks that already have efficiency data calculated
-    const tasksNeedingCalculation = completedTasks.filter(task => 
-      task.actual_duration_minutes === null || task.actual_duration_minutes === undefined ||
-      task.efficiency_percentage === null || task.efficiency_percentage === undefined
-    );
+      // Fetch accessories for the project
+      const accessoriesData = await accessoriesService.getByProject(projectId);
+      setAccessories(accessoriesData);
 
-    if (tasksNeedingCalculation.length === 0) {
-      console.log('All completed tasks already have efficiency data - skipping calculation');
-      return completedTasks;
-    }
-
-    console.log(`Processing ${tasksNeedingCalculation.length} tasks that need efficiency calculation (skipping ${completedTasks.length - tasksNeedingCalculation.length} already calculated)`);
-    
-    // Get all task IDs for batch query - only for tasks needing calculation
-    const taskIds = tasksNeedingCalculation.map(task => task.id);
-    
-    // Batch fetch all time registrations for tasks needing calculation
-    const { data: allTimeRegs, error: timeRegsError } = await supabase
-      .from('time_registrations')
-      .select('task_id, duration_minutes')
-      .in('task_id', taskIds)
-      .not('duration_minutes', 'is', null);
-
-    if (timeRegsError) {
-      console.error('Error fetching time registrations:', timeRegsError);
-      return completedTasks;
-    }
-
-    // Group time registrations by task_id
-    const timeRegsByTask = new Map<string, number>();
-    allTimeRegs?.forEach(reg => {
-      const currentTotal = timeRegsByTask.get(reg.task_id) || 0;
-      timeRegsByTask.set(reg.task_id, currentTotal + (reg.duration_minutes || 0));
-    });
-
-    let totalPlannedMinutes = 0;
-    let totalActualMinutes = 0;
-    const tasksToUpdate: { id: string; actual_duration_minutes: number; efficiency_percentage: number }[] = [];
-    const updatedTasks: TaskWithTimeData[] = [...completedTasks];
-
-    // Process only tasks that need calculation
-    for (const task of tasksNeedingCalculation) {
-      const actualMinutes = timeRegsByTask.get(task.id) || 0;
-      const plannedMinutes = task.duration || 0;
-
-      console.log(`Task ${task.id}: Planned ${plannedMinutes}min, Actual ${actualMinutes}min`);
-
-      if (plannedMinutes > 0 && actualMinutes > 0) {
-        const efficiency = ((plannedMinutes - actualMinutes) / plannedMinutes) * 100;
-        
-        totalPlannedMinutes += plannedMinutes;
-        totalActualMinutes += actualMinutes;
-
-        tasksToUpdate.push({
-          id: task.id,
-          actual_duration_minutes: actualMinutes,
-          efficiency_percentage: Math.round(efficiency)
-        });
-
-        // Update the task in the updatedTasks array
-        const taskIndex = updatedTasks.findIndex(t => t.id === task.id);
-        if (taskIndex !== -1) {
-          updatedTasks[taskIndex] = {
-            ...updatedTasks[taskIndex],
-            actual_duration_minutes: actualMinutes,
-            efficiency_percentage: Math.round(efficiency)
-          };
-        }
-      } else {
-        console.log(`Skipping task ${task.id}: plannedMinutes=${plannedMinutes}, actualMinutes=${actualMinutes}`);
-      }
-    }
-
-    // Include already calculated tasks in project efficiency calculation
-    completedTasks.forEach(task => {
-      if (task.actual_duration_minutes && task.duration && !tasksNeedingCalculation.includes(task)) {
-        totalPlannedMinutes += task.duration;
-        totalActualMinutes += task.actual_duration_minutes;
-      }
-    });
-
-    // Batch update only tasks that need updating
-    if (tasksToUpdate.length > 0) {
-      console.log(`Batch updating ${tasksToUpdate.length} tasks with efficiency data`);
+      // Fetch orders for the specific project
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
       
-      const updatePromises = tasksToUpdate.map(taskUpdate => 
-        supabase
-          .from('tasks')
-          .update({
-            actual_duration_minutes: taskUpdate.actual_duration_minutes,
-            efficiency_percentage: taskUpdate.efficiency_percentage
-          })
-          .eq('id', taskUpdate.id)
+      if (ordersError) throw ordersError;
+
+      // Fetch order items and attachments for each order
+      const ordersWithDetails = await Promise.all(
+        (ordersData || []).map(async (order) => {
+          const { data: itemsData, error: itemsError } = await supabase
+            .from('order_items')
+            .select('*')
+            .eq('order_id', order.id);
+          
+          if (itemsError) {
+            console.error('Error fetching order items:', itemsError);
+          }
+
+          // Fetch attachments
+          const attachments = await orderService.getOrderAttachments(order.id);
+          
+          // Fetch order steps if it's a semi-finished product
+          let orderSteps: OrderStep[] = [];
+          if (order.order_type === 'semi-finished') {
+            orderSteps = await orderService.getOrderSteps(order.id);
+          }
+          
+          return { 
+            ...order, 
+            status: order.status as 'pending' | 'delivered' | 'canceled' | 'delayed',
+            order_type: order.order_type as 'standard' | 'semi-finished',
+            orderItems: itemsData || [],
+            attachments: attachments || [],
+            orderSteps: orderSteps,
+          };
+        })
       );
 
-      try {
-        await Promise.all(updatePromises);
-        console.log('Successfully batch updated all task efficiencies');
-      } catch (error) {
-        console.error('Error batch updating task efficiencies:', error);
-      }
-    }
-
-    // Calculate and save overall project efficiency
-    if (totalPlannedMinutes > 0) {
-      const overallEfficiency = ((totalPlannedMinutes - totalActualMinutes) / totalPlannedMinutes) * 100;
-      setProjectEfficiency(Math.round(overallEfficiency));
-      
-      console.log(`Project efficiency: ${Math.round(overallEfficiency)}% (${totalActualMinutes}min actual vs ${totalPlannedMinutes}min planned)`);
-      
-      try {
-        await supabase
-          .from('projects')
-          .update({
-            efficiency_percentage: Math.round(overallEfficiency)
-          })
-          .eq('id', projectId);
-
-        console.log('Successfully updated project efficiency in database');
-      } catch (error) {
-        console.error('Error updating project efficiency:', error);
-      }
-    }
-
-    return updatedTasks;
-  }, [projectId]);
-
-  const fetchAndSetSortedTasks = useCallback(async (pId: string) => {
-    console.log('Fetching and sorting tasks for project:', pId);
-    
-    const phaseData = await projectService.getProjectPhases(pId);
-    const standardTasks = await standardTasksService.getAll();
-    const standardTaskMap = new Map(standardTasks.map(st => [st.id, st.task_number]));
-
-    let allTasks: TaskWithTimeData[] = [];
-    for (const phase of phaseData) {
-      const phaseTasks = await taskService.getByPhase(phase.id);
-      allTasks = [...allTasks, ...phaseTasks];
-    }
-
-    allTasks.sort((a, b) => {
-      const taskA_number = a.standard_task_id ? standardTaskMap.get(a.standard_task_id) : undefined;
-      const taskB_number = b.standard_task_id ? standardTaskMap.get(b.standard_task_id) : undefined;
-
-      if (taskA_number && taskB_number) {
-        return taskA_number.localeCompare(taskB_number, undefined, { numeric: true });
-      }
-      if (taskA_number) return -1;
-      if (taskB_number) return 1;
-      return a.title.localeCompare(b.title);
-    });
-
-    const completedTasks = allTasks.filter(task => task.status === 'COMPLETED');
-    console.log(`Found ${completedTasks.length} completed tasks`);
-    
-    if (completedTasks.length > 0) {
-      const updatedCompletedTasks = await calculateAndSaveTaskEfficiency(completedTasks);
-      
-      // Replace tasks that were updated
-      allTasks = allTasks.map(task => {
-        const updatedTask = updatedCompletedTasks.find(ut => ut.id === task.id);
-        return updatedTask || task;
+      setOrders(ordersWithDetails);
+    } catch (error: any) {
+      console.error('Error fetching project orders:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to load project orders: ${error.message}`,
+        variant: 'destructive'
       });
     }
-    
-    setTasks(allTasks);
-  }, [calculateAndSaveTaskEfficiency]);
+  };
+
+  const handleAttachmentUpload = async () => {
+    const updatedOrders = await Promise.all(
+      orders.map(async (order) => {
+        const attachments = await orderService.getOrderAttachments(order.id);
+        return { ...order, attachments: attachments || [] };
+      })
+    );
+    setOrders(updatedOrders);
+  };
+
+  const handleDeleteAttachment = async (attachmentId: string, orderId: string) => {
+    try {
+      await orderService.deleteOrderAttachment(attachmentId);
+      
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, attachments: (order.attachments || []).filter(att => att.id !== attachmentId) }
+            : order
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: "Attachment deleted successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to delete attachment: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string, deleteAccessories: boolean = false) => {
+    try {
+      if (deleteAccessories) {
+        const { data: linkedAccessories } = await supabase
+          .from('accessories')
+          .select('id')
+          .eq('order_id', orderId);
+        
+        if (linkedAccessories && linkedAccessories.length > 0) {
+          for (const accessory of linkedAccessories) {
+            await accessoriesService.delete(accessory.id);
+          }
+        }
+      } else {
+        await supabase
+          .from('accessories')
+          .update({ order_id: null, status: 'to_check' })
+          .eq('order_id', orderId);
+      }
+
+      await supabase
+        .from('order_items')
+        .delete()
+        .eq('order_id', orderId);
+        
+      await supabase
+        .from('order_steps')
+        .delete()
+        .eq('order_id', orderId);
+
+      await supabase
+        .from('order_attachments')
+        .delete()
+        .eq('order_id', orderId);
+
+      await orderService.delete(orderId);
+
+      toast({
+        title: "Success",
+        description: "Order deleted successfully",
+      });
+
+      fetchProjectOrders();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to delete order: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleOrderSuccess = () => {
+    fetchProjectOrders();
+    setShowNewOrderModal(false);
+  };
+
+  const handleOrderEditSuccess = () => {
+    fetchProjectOrders();
+    setShowEditOrderModal(false);
+    setSelectedOrderId(null);
+  };
+
+  const handleConfirmDelivery = (order: Order) => {
+    setSelectedOrderForDelivery(order);
+    setShowDeliveryModal(true);
+  };
+
+  const handleDeliveryConfirmed = () => {
+    fetchProjectOrders();
+    setShowDeliveryModal(false);
+    setSelectedOrderForDelivery(null);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Pending</Badge>;
+      case 'delivered':
+        return <Badge className="bg-green-100 text-green-800 border-green-300">Delivered</Badge>;
+      case 'canceled':
+        return <Badge className="bg-red-100 text-red-800 border-red-300">Canceled</Badge>;
+      case 'delayed':
+        return <Badge className="bg-orange-100 text-orange-800 border-orange-300">Delayed</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
+
+  const getStepStatusBadge = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return <Badge className="bg-gray-100 text-gray-800 border-gray-300">Pending</Badge>;
+      case 'in_progress':
+        return <Badge className="bg-amber-100 text-amber-800 border-amber-300">In Progress</Badge>;
+      case 'completed':
+        return <Badge className="bg-green-100 text-green-800 border-green-300">Completed</Badge>;
+      case 'delayed':
+        return <Badge className="bg-orange-100 text-orange-800 border-orange-300">Delayed</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
 
   useEffect(() => {
-    const fetchProjectData = async () => {
-      if (!projectId) return;
-      
-      try {
-        setLoading(true);
-        console.log('Loading project data for:', projectId);
-        
-        const projectData = await projectService.getById(projectId);
-        setProject(projectData);
-        
-        // Fetch and process tasks with time registration data
-        await fetchAndSetSortedTasks(projectId);
+    fetchProject();
+  }, [projectId]);
 
-        const accessoriesData = await accessoriesService.getByProject(projectId);
-        setAccessories(accessoriesData);
-
-        const ordersData = await orderService.getByProject(projectId);
-        
-        const ordersWithDetails = await Promise.all(
-          ordersData.map(async (order) => {
-            if (order.order_type === 'semi-finished') {
-              const orderSteps = await orderService.getOrderSteps(order.id);
-              return { ...order, orderSteps };
-            }
-            return order;
-          })
-        );
-        setOrders(ordersWithDetails);
-
-        // Fetch project efficiency from database (it should be updated by now)
-        try {
-          const { data: projectWithEfficiency } = await supabase
-            .from('projects')
-            .select('efficiency_percentage')
-            .eq('id', projectId)
-            .maybeSingle();
-
-          if (projectWithEfficiency?.efficiency_percentage !== null) {
-            setProjectEfficiency(projectWithEfficiency.efficiency_percentage);
-            console.log('Loaded project efficiency from database:', projectWithEfficiency.efficiency_percentage);
-          }
-        } catch (error) {
-          console.error('Error fetching project efficiency:', error);
-        }
-      } catch (error: any) {
-        console.error('Error loading project data:', error);
-        toast({
-          title: t('error'),
-          description: t('failed_to_load_projects', { message: error.message }),
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProjectData();
-  }, [projectId, toast, fetchAndSetSortedTasks, t]);
-
-  const checkAndUpdateLimitPhases = async (completedTaskId?: string) => {
-    if (!projectId) return;
-    
-    try {
-      const { data: holdTasks, error: holdError } = await supabase
-        .from('tasks')
-        .select(`
-          *,
-          phases!inner(project_id)
-        `)
-        .eq('phases.project_id', projectId)
-        .eq('status', 'HOLD')
-        .not('standard_task_id', 'is', null);
-
-      if (holdError) {
-        console.error('Error fetching HOLD tasks:', holdError);
-        return;
-      }
-
-      if (!holdTasks || holdTasks.length === 0) {
-        console.log('No HOLD tasks found with standard_task_id');
-        return;
-      }
-
-      const tasksToUpdate = [];
-      for (const holdTask of holdTasks) {
-        if (holdTask.standard_task_id) {
-          try {
-            const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(
-              holdTask.standard_task_id,
-              projectId
-            );
-
-            if (limitPhasesSatisfied) {
-              tasksToUpdate.push(holdTask);
-            }
-          } catch (error) {
-            console.error(`Error checking limit phases for task ${holdTask.id}:`, error);
-          }
-        }
-      }
-
-      if (tasksToUpdate.length > 0) {
-        console.log(`Updating ${tasksToUpdate.length} tasks from HOLD to TODO`);
-        
-        for (const task of tasksToUpdate) {
-          await supabase
-            .from('tasks')
-            .update({ 
-              status: 'TODO',
-              status_changed_at: new Date().toISOString()
-            })
-            .eq('id', task.id);
-        }
-        
-        toast({
-          title: t('tasks_updated'),
-          description: t('tasks_updated_desc', { count: tasksToUpdate.length.toString() }),
-        });
-      }
-    } catch (error) {
-      console.error('Error in checkAndUpdateLimitPhases:', error);
+  useEffect(() => {
+    if (activeTab === 'orders') {
+      fetchProjectOrders();
     }
-  };
+  }, [activeTab, projectId]);
 
-  const checkLimitPhasesBeforeStart = async (taskId: string, standardTaskId?: string): Promise<boolean> => {
-    if (!projectId || !standardTaskId) return true;
-    
+  const fetchProject = async () => {
     try {
-      const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(
-        standardTaskId,
-        projectId
-      );
-
-      if (!limitPhasesSatisfied) {
-        toast({
-          title: t('cannot_start_task'),
-          description: t('cannot_start_task_desc'),
-          variant: "destructive"
-        });
-        return false;
+      setLoading(true);
+      if (!projectId) {
+        throw new Error('Project ID is required');
       }
-      return true;
-    } catch (error) {
-      console.error('Error checking limit phases before start:', error);
-      return true; // Allow start if we can't check (fail open)
-    }
-  };
-
-  const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
-    if (!currentEmployee || !projectId) {
-      toast({
-        title: t('auth_error'),
-        description: t('auth_error_desc'),
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    try {
-      const statusValue = newStatus as string;
-      const currentTask = tasks.find(task => task.id === taskId);
-      
-      if (statusValue === 'IN_PROGRESS') {
-        const canStart = await checkLimitPhasesBeforeStart(taskId, currentTask?.standard_task_id);
-        if (!canStart) {
-          return;
-        }
-        await timeRegistrationService.startTask(currentEmployee.id, taskId);
-        toast({
-          title: t('task_started'),
-          description: t('task_started_desc'),
-        });
-      } else if (statusValue === 'COMPLETED') {
-        await timeRegistrationService.completeTask(taskId);
-        toast({
-          title: t('task_completed'),
-          description: t('task_completed_desc'),
-        });
-      } else {
-        const updateData: Partial<Task> = { 
-          status: newStatus, 
-          status_changed_at: new Date().toISOString() 
-        };
-      
-        if (statusValue === 'IN_PROGRESS') {
-          updateData.assignee_id = currentEmployee.id;
-        }
-      
-        if (statusValue === 'COMPLETED') {
-          updateData.completed_at = new Date().toISOString();
-          updateData.completed_by = currentEmployee.id;
-        }
-      
-        await taskService.update(taskId, updateData);
-        toast({
-          title: t('task_updated'),
-          description: t('task_updated_desc', { status: newStatus }),
-        });
-      }
-
-      if (newStatus === 'COMPLETED') {
-        await checkAndUpdateLimitPhases(taskId);
-      }
-
-      // Recalculate efficiency when task is completed or any status changes
-      await fetchAndSetSortedTasks(projectId);
-
+      const projectData = await projectService.getById(projectId);
+      setProject(projectData);
     } catch (error: any) {
+      console.error('Error fetching project:', error);
       toast({
-        title: t('error'),
-        description: t('task_status_update_error', { message: error.message }),
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleNewOrderSuccess = () => {
-    toast({
-      title: t('success'),
-      description: t('order_created_successfully'),
-    });
-    if (projectId) {
-      orderService.getByProject(projectId).then(setOrders);
-    }
-  };
-
-  const handleEditDescription = () => {
-    setEditedDescription(project?.description || '');
-    setIsEditingDescription(true);
-  };
-
-  const handleSaveDescription = async () => {
-    if (!projectId || !project) return;
-
-    try {
-      setSavingDescription(true);
-      await projectService.update(projectId, { description: editedDescription });
-      setProject({ ...project, description: editedDescription });
-      setIsEditingDescription(false);
-      toast({
-        title: t('success'),
-        description: t('project_updated_successfully')
-      });
-    } catch (error: any) {
-      toast({
-        title: t('error'),
-        description: t('failed_to_update_project', { message: error.message }),
-        variant: "destructive"
+        title: 'Error',
+        description: `Failed to load project: ${error.message}`,
+        variant: 'destructive'
       });
     } finally {
-      setSavingDescription(false);
+      setLoading(false);
     }
-  };
-
-  const handleCancelEditDescription = () => {
-    setIsEditingDescription(false);
-    setEditedDescription('');
-  };
-
-  const handleDeleteOrder = async (orderId: string) => {
-    if (!confirm(t('confirm_delete_order'))) return;
-    
-    try {
-      await orderService.deleteOrder(orderId);
-      toast({
-        title: t('success'),
-        description: t('order_deleted_successfully'),
-      });
-      if (projectId) {
-        const ordersData = await orderService.getByProject(projectId);
-        setOrders(ordersData);
-      }
-    } catch (error: any) {
-      toast({
-        title: t('error'),
-        description: t('failed_to_delete_order', { message: error.message }),
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleEditOrder = (order: any) => {
-    setEditingOrder(order);
-  };
-
-  const handleOrderUpdated = () => {
-    if (projectId) {
-      orderService.getByProject(projectId).then(setOrders);
-    }
-    setEditingOrder(null);
-    toast({
-      title: t('success'),
-      description: t('order_updated_successfully'),
-    });
-  };
-
-  const handleAddOrder = (orderId: string) => {
-    setSelectedOrderId(orderId);
-    setShowOrderPopup(true);
-  };
-
-  const handleOrderCreated = () => {
-    if (projectId) {
-      orderService.getByProject(projectId).then(setOrders);
-    }
-    setShowOrderPopup(false);
-    toast({
-      title: t('success'),
-      description: t('order_created_successfully'),
-    });
   };
 
   if (loading) {
@@ -556,8 +340,8 @@ const ProjectDetails = () => {
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
-        <div className="ml-64 w-full p-6 flex justify-center items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        <div className="ml-64 w-full flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
         </div>
       </div>
     );
@@ -569,88 +353,15 @@ const ProjectDetails = () => {
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
-        <div className="ml-64 w-full p-6">
-          <div className="max-w-3xl mx-auto">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold mb-2">{t('project_not_found')}</h2>
-              <p className="text-muted-foreground mb-4">{t('project_not_found_description')}</p>
-              <Button onClick={() => navigate(createLocalizedPath('/projects'))}>
-                <ArrowLeft className="mr-2 h-4 w-4" /> {t('back_to_projects')}
-              </Button>
-            </div>
+        <div className="ml-64 w-full flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900">Project not found</h1>
+            <p className="text-gray-600 mt-2">The project you're looking for doesn't exist.</p>
           </div>
         </div>
       </div>
     );
   }
-
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleDateString(lang, {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    } catch (error) {
-      return 'Invalid date';
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'planned':
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-300">{t('status_planned')}</Badge>;
-      case 'in_progress':
-        return <Badge className="bg-amber-100 text-amber-800 border-amber-300">{t('in_progress')}</Badge>;
-      case 'completed':
-        return <Badge className="bg-green-100 text-green-800 border-green-300">{t('completed')}</Badge>;
-      case 'on_hold':
-        return <Badge className="bg-gray-100 text-gray-800 border-gray-300">{t('status_on_hold')}</Badge>;
-      default:
-        return <Badge>{status}</Badge>;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    const validStatuses = ['TODO', 'IN_PROGRESS', 'COMPLETED', 'HOLD'];
-    if (!validStatuses.includes(status)) {
-      return 'bg-gray-100 text-gray-800';
-    }
-    
-    switch (status) {
-      case 'TODO':
-        return 'bg-blue-100 text-blue-800';
-      case 'IN_PROGRESS':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'COMPLETED':
-        return 'bg-green-100 text-green-800';
-      case 'HOLD':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getTaskCountByStatus = (status: string) => {
-    return tasks.filter(task => task.status === status).length;
-  };
-
-  const todoTasks = tasks.filter(task => task.status === 'TODO');
-  const holdTasks = tasks.filter(task => task.status === 'HOLD');
-  const inProgressTasks = tasks.filter(task => task.status === 'IN_PROGRESS');
-  const completedTasks = tasks.filter(task => task.status === 'COMPLETED');
-
-  const openTasks = [...todoTasks, ...holdTasks];
-
-  const openOrdersCount = orders.filter(order => order.status === 'pending').length;
-  const undeliveredOrdersCount = orders.filter(order => order.status !== 'delivered').length;
-  const allOrdersDelivered = orders.length > 0 && undeliveredOrdersCount === 0;
-  const unavailableAccessoriesCount = accessories.filter(acc => 
-    acc.status === 'to_order' || acc.status === 'ordered'
-  ).length;
-  const inStockAccessoriesCount = accessories.filter(acc => acc.status === 'in_stock').length;
-  const deliveredAccessoriesCount = accessories.filter(acc => acc.status === 'delivered').length;
-  const semiFinishedOrders = orders.filter(order => order.order_type === 'semi-finished');
 
   return (
     <div className="flex min-h-screen">
@@ -665,404 +376,332 @@ const ProjectDetails = () => {
               onClick={() => navigate(createLocalizedPath('/projects'))}
               className="mb-4"
             >
-              <ArrowLeft className="mr-2 h-4 w-4" /> {t('back_to_projects')}
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
             </Button>
             
-            <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">{project?.name}</h1>
-                <p className="text-muted-foreground">{t('client_label')}: {project?.client}</p>
-              </div>
-              
-              <div className="flex gap-2">
-                <Button 
-                  variant={activeTab === 'home' ? 'default' : 'outline'}
-                  onClick={() => setActiveTab('home')}
-                >
-                  <Home className="mr-2 h-4 w-4" /> {t('home')}
-                </Button>
-                <Button 
-                  variant={activeTab === 'orders' ? 'default' : 'outline'}
-                  onClick={() => setActiveTab('orders')}
-                  className={cn(
-                    allOrdersDelivered 
-                      ? "bg-green-500 text-white hover:bg-green-600" 
-                      : undeliveredOrdersCount > 0 
-                        ? "bg-red-500 text-white hover:bg-red-600" 
-                        : ""
-                  )}
-                >
-                  <Package className="mr-2 h-4 w-4" /> 
-                  {t('orders')}
-                  {undeliveredOrdersCount > 0 && (
-                    <span className="ml-2 bg-white text-red-500 px-2 py-1 rounded-full text-xs font-bold">
-                      {undeliveredOrdersCount}
-                    </span>
-                  )}
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={() => setShowPartsListDialog(true)}
-                >
-                  <List className="mr-2 h-4 w-4" /> {t('parts_list')}
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={() => setShowAccessoriesDialog(true)}
-                >
-                  <Settings className="mr-2 h-4 w-4" /> {t('accessories')}
-                </Button>
-                <Button 
-                  variant={activeTab === 'files' ? 'default' : 'outline'}
-                  onClick={() => setActiveTab('files')}
-                >
-                  <FileText className="mr-2 h-4 w-4" /> {t('files')}
-                </Button>
-                <Button 
-                  variant={activeTab === 'onedrive' ? 'default' : 'outline'}
-                  onClick={() => setActiveTab('onedrive')}
-                >
-                  <Folder className="mr-2 h-4 w-4" /> {t('onedrive')}
-                </Button>
+                <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
+                <p className="text-gray-600 mt-2">{project.description}</p>
               </div>
             </div>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{openTasks.length}</div>
-                <p className="text-xs text-muted-foreground">{t('open_tasks')}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{getTaskCountByStatus('IN_PROGRESS')}</div>
-                <p className="text-xs text-muted-foreground">{t('in_progress')}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{getTaskCountByStatus('COMPLETED')}</div>
-                <p className="text-xs text-muted-foreground">{t('completed')}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{tasks.length}</div>
-                <p className="text-xs text-muted-foreground">{t('total_tasks')}</p>
-              </CardContent>
-            </Card>
-          </div>
 
-          {activeTab === 'files' ? (
-            <ProjectFileManager projectId={projectId!} />
-          ) : activeTab === 'onedrive' ? (
-            <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} />
-          ) : activeTab === 'orders' ? (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">{t('orders')}</h2>
-                <Button onClick={() => setShowNewOrderModal(true)}>
-                  <Plus className="mr-2 h-4 w-4" /> {t('new_order')}
-                </Button>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-6">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="orders">Orders</TabsTrigger>
+              <TabsTrigger value="files">Files</TabsTrigger>
+              <TabsTrigger value="onedrive">OneDrive</TabsTrigger>
+              <TabsTrigger value="team">Team</TabsTrigger>
+              <TabsTrigger value="settings">Settings</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Status</CardTitle>
+                    <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{project.status}</div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Installation Date</CardTitle>
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {project.installation_date 
+                        ? format(new Date(project.installation_date), 'MMM dd, yyyy')
+                        : 'Not set'
+                      }
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Customer</CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{project.customer_name || 'Not specified'}</div>
+                  </CardContent>
+                </Card>
               </div>
-              
-              <div className="grid gap-4">
-                {orders.map((order) => (
-                  <Card key={order.id}>
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-lg">{order.supplier}</CardTitle>
-                          <CardDescription>
-                            {t('order_date')}: {new Date(order.order_date).toLocaleDateString(lang)}
-                          </CardDescription>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'}>
-                            {t(order.status)}
-                          </Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditOrder(order)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteOrder(order.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <p><strong>{t('expected_delivery')}:</strong> {new Date(order.expected_delivery).toLocaleDateString(lang)}</p>
-                        <p><strong>{t('order_type')}:</strong> {t(order.order_type)}</p>
-                        {order.notes && (
-                          <p><strong>{t('notes')}:</strong> {order.notes}</p>
-                        )}
-                      </div>
-                    </CardContent>
-                    <CardFooter>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAddOrder(order.id)}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          {t('add_order')}
-                        </Button>
-                        {order.status !== 'delivered' && (
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => orderService.confirmDelivery(order.id).then(() => {
-                              toast({
-                                title: t('success'),
-                                description: t('order_delivered_successfully'),
-                              });
-                              orderService.getByProject(projectId!).then(setOrders);
-                            })}
-                          >
-                            {t('confirm_delivery')}
-                          </Button>
-                        )}
-                      </div>
-                    </CardFooter>
-                  </Card>
-                ))}
-                
-                {orders.length === 0 && (
-                  <Card>
-                    <CardContent className="pt-6 text-center">
-                      <p className="text-muted-foreground">{t('no_orders_found')}</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-1">
+
+              <Card>
                 <CardHeader>
-                  <CardTitle>{t('project_summary')}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">{t('status')}</h4>
-                    <div>{project && getStatusBadge(project.status)}</div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-medium">{t('description') || 'Description'}</h4>
-                      {!isEditingDescription && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleEditDescription}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Edit3 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                    {isEditingDescription ? (
-                      <div className="space-y-2">
-                        <Textarea
-                          value={editedDescription}
-                          onChange={(e) => setEditedDescription(e.target.value)}
-                          placeholder={t('enter_project_description') || 'Enter project description...'}
-                          className="min-h-[80px] resize-none"
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={handleSaveDescription}
-                            disabled={savingDescription}
-                          >
-                            <Save className="h-3 w-3 mr-1" />
-                            {savingDescription ? (t('saving') || 'Saving...') : (t('save') || 'Save')}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleCancelEditDescription}
-                            disabled={savingDescription}
-                          >
-                            <X className="h-3 w-3 mr-1" />
-                            {t('cancel') || 'Cancel'}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">
-                        {project?.description || (t('no_description') || 'No description added yet.')}
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">{t('project_progress')}</h4>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">{t('completion')}</span>
-                        <span className="font-medium">{project?.progress}%</span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-2.5">
-                        <div 
-                          className="bg-primary h-2.5 rounded-full" 
-                          style={{ width: `${project?.progress}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {projectEfficiency !== null && (
-                    <div>
-                      <h4 className="text-sm font-medium mb-1">{t('project_efficiency') || 'Project Efficiency'}</h4>
-                      <div className="flex items-center gap-2">
-                        {projectEfficiency >= 0 ? (
-                          <TrendingUp className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <TrendingDown className="h-4 w-4 text-red-600" />
-                        )}
-                        <span className={`font-medium ${projectEfficiency >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {projectEfficiency >= 0 ? '+' : ''}{projectEfficiency}%
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {projectEfficiency >= 0 ? (t('efficiency_faster') || 'faster than planned') : (t('efficiency_slower') || 'slower than planned')}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">{t('project_barcode')}</h4>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setShowBarcodeDialog(true)}
-                      className="w-full"
-                    >
-                      <Barcode className="mr-2 h-4 w-4" />
-                      {t('view_barcode')}
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">{t('orders_and_accessories')}</h4>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="bg-orange-50 p-2 rounded">
-                        <div className="font-medium text-orange-800">{openOrdersCount}</div>
-                        <div className="text-orange-600 text-xs">{t('open_orders')}</div>
-                      </div>
-                      <div className="bg-red-50 p-2 rounded">
-                        <div className="font-medium text-red-800">{unavailableAccessoriesCount}</div>
-                        <div className="text-red-600 text-xs">{t('to_order')}</div>
-                      </div>
-                      <div className="bg-green-50 p-2 rounded">
-                        <div className="font-medium text-green-800">{inStockAccessoriesCount}</div>
-                        <div className="text-green-600 text-xs">{t('in_stock')}</div>
-                      </div>
-                      <div className="bg-blue-50 p-2 rounded">
-                        <div className="font-medium text-blue-800">{deliveredAccessoriesCount}</div>
-                        <div className="text-blue-600 text-xs">{t('delivered')}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">{t('important_dates')}</h4>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">{t('start_date_label')}:</span>
-                      <span>{project?.start_date && formatDate(project.start_date)}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">{t('installation_date_label')}:</span>
-                      <span>{project?.installation_date && formatDate(project.installation_date)}</span>
-                    </div>
-                  </div>
-
-                  {semiFinishedOrders.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-medium">{t('semi_finished_deliveries')}</h4>
-                      <div className="space-y-1.5 text-sm">
-                        {semiFinishedOrders.map((order: any) => (
-                          order.orderSteps && order.orderSteps.length > 0 && (
-                            <div key={order.id} className="bg-gray-50 p-2 rounded">
-                              <p className="font-medium mb-1">{order.supplier}{t('main_order_suffix')}</p>
-                              <div className="pl-2 space-y-1">
-                                {order.orderSteps
-                                  .filter((step: any) => step.supplier)
-                                  .map((step: any) => (
-                                    <div key={step.id} className="flex justify-between items-center">
-                                      <span className="text-muted-foreground truncate" title={`${step.name} (${step.supplier})`}>
-                                        {step.name} ({step.supplier})
-                                      </span>
-                                      <span className="font-medium whitespace-nowrap ml-2">
-                                        {step.end_date ? formatDate(step.end_date) : t('not_applicable')}
-                                      </span>
-                                    </div>
-                                  ))}
-                              </div>
-                            </div>
-                          )
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>{t('project_tasks')}</CardTitle>
+                  <CardTitle>Project Details</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Tabs defaultValue="todo">
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="todo">{t('open_tasks_tab', { count: openTasks.length.toString() })}</TabsTrigger>
-                      <TabsTrigger value="in_progress">{t('in_progress_tab', { count: inProgressTasks.length.toString() })}</TabsTrigger>
-                      <TabsTrigger value="completed">{t('completed_tab', { count: completedTasks.length.toString() })}</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="todo">
-                      <TaskList 
-                        tasks={openTasks} 
-                        title={t('open_tasks_title')} 
-                        onTaskStatusChange={handleTaskStatusChange}
-                        showCompleteButton={true}
-                      />
-                    </TabsContent>
-                    <TabsContent value="in_progress">
-                      <TaskList 
-                        tasks={inProgressTasks} 
-                        title={t('in_progress_tasks_title')} 
-                        onTaskStatusChange={handleTaskStatusChange}
-                      />
-                    </TabsContent>
-                    <TabsContent value="completed">
-                      <TaskList 
-                        tasks={completedTasks} 
-                        title={t('completed_tasks_title')}
-                        onTaskStatusChange={handleTaskStatusChange}
-                        showEfficiencyData={true}
-                      />
-                    </TabsContent>
-                  </Tabs>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Address</p>
+                      <p className="font-medium">{project.address || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Created</p>
+                      <p className="font-medium">{format(new Date(project.created_at), 'MMM dd, yyyy')}</p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
-            </div>
-          )}
+            </TabsContent>
+
+            <TabsContent value="orders" className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold">Orders</h2>
+                <Button onClick={() => setShowNewOrderModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Order
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                {orders.length === 0 ? (
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                      <p className="text-gray-500">No orders found for this project.</p>
+                      <Button onClick={() => setShowNewOrderModal(true)} className="mt-4">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create First Order
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4">
+                    {orders.map((order) => {
+                      const isProcessingOnlyOrder = order.order_type === 'semi-finished' && (!order.orderItems || order.orderItems.length === 0) && order.orderSteps && order.orderSteps.length > 0;
+                      
+                      return (
+                        <Card key={order.id} className="overflow-hidden">
+                          <CardHeader className="pb-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <CardTitle className="text-lg">{order.supplier}</CardTitle>
+                                <CardDescription>
+                                  {isProcessingOnlyOrder
+                                    ? `Processing Order | Starts: ${format(new Date(order.expected_delivery), 'MMM dd, yyyy')}`
+                                    : `Ordered: ${format(new Date(order.order_date), 'MMM dd, yyyy')} | Expected: ${format(new Date(order.expected_delivery), 'MMM dd, yyyy')}`
+                                  }
+                                </CardDescription>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {getStatusBadge(order.status)}
+                                {order.status === 'pending' && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleConfirmDelivery(order)}
+                                    className="text-green-600 hover:text-green-700"
+                                  >
+                                    <Camera className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedOrderId(order.id);
+                                    setShowEditOrderModal(true);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This order has linked accessories. What would you like to do?
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteOrder(order.id, false)}
+                                        className="bg-blue-600 hover:bg-blue-700"
+                                      >
+                                        Keep Accessories
+                                      </AlertDialogAction>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteOrder(order.id, true)}
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Delete All
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            {order.orderItems && order.orderItems.length > 0 && (
+                              <div>
+                                <h4 className="text-sm font-semibold mb-2">Order Items</h4>
+                                <div className="border rounded-lg overflow-hidden">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="h-8 py-2 text-xs">Article Code</TableHead>
+                                        <TableHead className="h-8 py-2 text-xs">Description</TableHead>
+                                        <TableHead className="h-8 py-2 text-xs text-right">Quantity</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {order.orderItems.map((item) => (
+                                        <TableRow key={item.id} className="h-8">
+                                          <TableCell className="py-1 text-xs font-medium">
+                                            {item.article_code || 'N/A'}
+                                          </TableCell>
+                                          <TableCell className="py-1 text-xs">{item.description}</TableCell>
+                                          <TableCell className="py-1 text-xs text-right">{item.quantity}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </div>
+                            )}
+
+                            {order.order_type === 'semi-finished' && order.orderSteps && order.orderSteps.length > 0 && (
+                              <div>
+                                <h4 className="text-sm font-semibold mb-2">Logistics Out</h4>
+                                <div className="border rounded-lg overflow-hidden">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="h-8 py-2 text-xs">#</TableHead>
+                                        <TableHead className="h-8 py-2 text-xs">Step</TableHead>
+                                        <TableHead className="h-8 py-2 text-xs">Supplier</TableHead>
+                                        <TableHead className="h-8 py-2 text-xs">Status</TableHead>
+                                        <TableHead className="h-8 py-2 text-xs">Start</TableHead>
+                                        <TableHead className="h-8 py-2 text-xs">End</TableHead>
+                                        <TableHead className="h-8 py-2 text-xs text-center">Duration</TableHead>
+                                        <TableHead className="h-8 py-2 text-xs">Notes</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {order.orderSteps.map((step) => (
+                                        <TableRow key={step.id} className="h-8">
+                                          <TableCell className="py-1 text-xs font-medium">{step.step_number}</TableCell>
+                                          <TableCell className="py-1 text-xs">{step.name}</TableCell>
+                                          <TableCell className="py-1 text-xs">{step.supplier || 'Internal'}</TableCell>
+                                          <TableCell className="py-1 text-xs">{getStepStatusBadge(step.status)}</TableCell>
+                                          <TableCell className="py-1 text-xs">{step.start_date ? format(new Date(step.start_date), 'MMM d, yy') : 'N/A'}</TableCell>
+                                          <TableCell className="py-1 text-xs">{step.end_date ? format(new Date(step.end_date), 'MMM d, yy') : 'N/A'}</TableCell>
+                                          <TableCell className="py-1 text-xs text-center">{step.expected_duration_days ? `${step.expected_duration_days}d` : '-'}</TableCell>
+                                          <TableCell className="py-1 text-xs">{step.notes || '-'}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </div>
+                            )}
+
+                            <div>
+                              <div className="flex justify-between items-center mb-2">
+                                <h4 className="text-sm font-semibold">Files</h4>
+                                <OrderAttachmentUploader 
+                                  orderId={order.id} 
+                                  onUploadSuccess={handleAttachmentUpload}
+                                  compact={true}
+                                />
+                              </div>
+                              
+                              {order.attachments && order.attachments.length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                  {order.attachments.map((attachment) => (
+                                    <div 
+                                      key={attachment.id} 
+                                      className="border rounded p-2 flex items-center justify-between bg-gray-50 text-xs"
+                                    >
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-medium truncate">{attachment.file_name}</p>
+                                        <p className="text-muted-foreground">
+                                          {(attachment.file_size / 1024).toFixed(1)} KB
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-1 ml-2">
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          className="h-6 w-12 text-xs"
+                                          onClick={() => window.open(attachment.file_path, '_blank')}
+                                        >
+                                          View
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm"
+                                          className="h-6 w-6 p-0"
+                                          onClick={() => handleDeleteAttachment(attachment.id, order.id)}
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-muted-foreground">No files attached to this order.</p>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="files" className="space-y-6">
+              <ProjectFileManager projectId={projectId!} />
+            </TabsContent>
+
+            <TabsContent value="onedrive" className="space-y-6">
+              <OneDriveIntegration projectId={projectId!} />
+            </TabsContent>
+
+            <TabsContent value="team" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Team Management</CardTitle>
+                  <CardDescription>Manage team assignments for this project</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">Team management functionality coming soon...</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="settings" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Project Settings</CardTitle>
+                  <CardDescription>Configure project-specific settings</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">Project settings functionality coming soon...</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
 
@@ -1070,52 +709,31 @@ const ProjectDetails = () => {
         open={showNewOrderModal}
         onOpenChange={setShowNewOrderModal}
         projectId={projectId!}
-        onSuccess={handleNewOrderSuccess}
-        showAddOrderButton={true}
+        onSuccess={handleOrderSuccess}
         accessories={accessories}
         installationDate={project?.installation_date}
       />
 
-      {editingOrder && (
+      {selectedOrderId && (
         <OrderEditModal
-          order={editingOrder}
-          isOpen={!!editingOrder}
-          onClose={() => setEditingOrder(null)}
-          onUpdated={handleOrderUpdated}
+          open={showEditOrderModal}
+          onOpenChange={setShowEditOrderModal}
+          orderId={selectedOrderId}
+          onSuccess={handleOrderEditSuccess}
         />
       )}
 
-      <OrderPopup
-        isOpen={showOrderPopup}
-        onClose={() => setShowOrderPopup(false)}
-        projectId={projectId!}
-        onOrderCreated={handleOrderCreated}
-      />
-
-      <PartsListDialog
-        isOpen={showPartsListDialog}
-        onClose={() => setShowPartsListDialog(false)}
-        projectId={projectId!}
-        onImportComplete={() => {
-          toast({
-            title: t('success'),
-            description: t('parts_list_imported_successfully'),
-          });
-        }}
-      />
-
-      <AccessoriesDialog
-        open={showAccessoriesDialog}
-        onOpenChange={setShowAccessoriesDialog}
-        projectId={projectId!}
-      />
-
-      <ProjectBarcodeDialog
-        isOpen={showBarcodeDialog}
-        onClose={() => setShowBarcodeDialog(false)}
-        projectId={projectId!}
-        projectName={project?.name || ''}
-      />
+      {selectedOrderForDelivery && (
+        <DeliveryConfirmationModal
+          order={selectedOrderForDelivery}
+          isOpen={showDeliveryModal}
+          onClose={() => {
+            setShowDeliveryModal(false);
+            setSelectedOrderForDelivery(null);
+          }}
+          onConfirmed={handleDeliveryConfirmed}
+        />
+      )}
     </div>
   );
 };
