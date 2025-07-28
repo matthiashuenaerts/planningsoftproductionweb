@@ -13,17 +13,19 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Edit, Trash2, Eye, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { standardTasksService } from '@/services/standardTasksService';
 import { accessoriesService, Accessory } from '@/services/accessoriesService';
 import { orderService } from '@/services/orderService';
+import { Order, OrderItem, OrderStep } from '@/types/order';
 import TaskList from '@/components/TaskList';
 import ProjectFileManager from '@/components/ProjectFileManager';
 import OneDriveIntegration from '@/components/OneDriveIntegration';
 import NewOrderModal from '@/components/NewOrderModal';
+import OrderEditModal from '@/components/OrderEditModal';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { AccessoriesDialog } from '@/components/AccessoriesDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
@@ -31,6 +33,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 interface TaskWithTimeData extends Task {
   timeRemaining?: string;
@@ -40,6 +43,11 @@ interface TaskWithTimeData extends Task {
   efficiency_percentage?: number;
 }
 
+interface OrderWithDetails extends Order {
+  orderSteps?: OrderStep[];
+  items?: OrderItem[];
+}
+
 const ProjectDetails = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -47,10 +55,12 @@ const ProjectDetails = () => {
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<TaskWithTimeData[]>([]);
   const [accessories, setAccessories] = useState<Accessory[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
+  const [showEditOrderModal, setShowEditOrderModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
   const [showPartsListDialog, setShowPartsListDialog] = useState(false);
   const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
@@ -232,6 +242,33 @@ const ProjectDetails = () => {
     setTasks(allTasks);
   }, [calculateAndSaveTaskEfficiency]);
 
+  const fetchOrdersWithDetails = useCallback(async () => {
+    if (!projectId) return;
+    
+    try {
+      const ordersData = await orderService.getByProject(projectId);
+      
+      const ordersWithDetails: OrderWithDetails[] = await Promise.all(
+        ordersData.map(async (order) => {
+          const [orderItems, orderSteps] = await Promise.all([
+            orderService.getOrderItems(order.id),
+            order.order_type === 'semi-finished' ? orderService.getOrderSteps(order.id) : Promise.resolve([])
+          ]);
+          
+          return {
+            ...order,
+            items: orderItems,
+            orderSteps: orderSteps
+          };
+        })
+      );
+      
+      setOrders(ordersWithDetails);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     const fetchProjectData = async () => {
       if (!projectId) return;
@@ -249,18 +286,7 @@ const ProjectDetails = () => {
         const accessoriesData = await accessoriesService.getByProject(projectId);
         setAccessories(accessoriesData);
 
-        const ordersData = await orderService.getByProject(projectId);
-        
-        const ordersWithDetails = await Promise.all(
-          ordersData.map(async (order) => {
-            if (order.order_type === 'semi-finished') {
-              const orderSteps = await orderService.getOrderSteps(order.id);
-              return { ...order, orderSteps };
-            }
-            return order;
-          })
-        );
-        setOrders(ordersWithDetails);
+        await fetchOrdersWithDetails();
 
         // Fetch project efficiency from database (it should be updated by now)
         try {
@@ -290,7 +316,7 @@ const ProjectDetails = () => {
     };
 
     fetchProjectData();
-  }, [projectId, toast, fetchAndSetSortedTasks, t]);
+  }, [projectId, toast, fetchAndSetSortedTasks, fetchOrdersWithDetails, t]);
 
   const checkAndUpdateLimitPhases = async (completedTaskId?: string) => {
     if (!projectId) return;
@@ -454,8 +480,45 @@ const ProjectDetails = () => {
       title: t('success'),
       description: t('order_created_successfully'),
     });
-    if (projectId) {
-      orderService.getByProject(projectId).then(setOrders);
+    fetchOrdersWithDetails();
+  };
+
+  const handleEditOrder = (order: OrderWithDetails) => {
+    setSelectedOrder(order);
+    setShowEditOrderModal(true);
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    try {
+      await orderService.delete(orderId);
+      toast({
+        title: t('success'),
+        description: t('order_deleted_successfully'),
+      });
+      fetchOrdersWithDetails();
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: t('failed_to_delete_order', { message: error.message }),
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleUpdateOrderStatus = async (orderId: string, status: Order['status']) => {
+    try {
+      await orderService.updateOrderStatus(orderId, status);
+      toast({
+        title: t('success'),
+        description: t('order_status_updated'),
+      });
+      fetchOrdersWithDetails();
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: t('failed_to_update_order_status', { message: error.message }),
+        variant: "destructive"
+      });
     }
   };
 
@@ -553,23 +616,18 @@ const ProjectDetails = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    const validStatuses = ['TODO', 'IN_PROGRESS', 'COMPLETED', 'HOLD'];
-    if (!validStatuses.includes(status)) {
-      return 'bg-gray-100 text-gray-800';
-    }
-    
+  const getOrderStatusBadge = (status: Order['status']) => {
     switch (status) {
-      case 'TODO':
-        return 'bg-blue-100 text-blue-800';
-      case 'IN_PROGRESS':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'COMPLETED':
-        return 'bg-green-100 text-green-800';
-      case 'HOLD':
-        return 'bg-red-100 text-red-800';
+      case 'pending':
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">{t('pending')}</Badge>;
+      case 'delivered':
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">{t('delivered')}</Badge>;
+      case 'canceled':
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">{t('canceled')}</Badge>;
+      case 'delayed':
+        return <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">{t('delayed')}</Badge>;
       default:
-        return 'bg-gray-100 text-gray-800';
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
@@ -624,8 +682,8 @@ const ProjectDetails = () => {
                   <Home className="mr-2 h-4 w-4" /> {t('home')}
                 </Button>
                 <Button 
-                  variant="outline"
-                  onClick={() => navigate(createLocalizedPath(`/projects/${projectId}/orders`))}
+                  variant={activeTab === 'orders' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('orders')}
                   className={cn(
                     allOrdersDelivered 
                       ? "bg-green-500 text-white hover:bg-green-600" 
@@ -701,6 +759,158 @@ const ProjectDetails = () => {
             <ProjectFileManager projectId={projectId!} />
           ) : activeTab === 'onedrive' ? (
             <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} />
+          ) : activeTab === 'orders' ? (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">{t('orders')}</h2>
+                <Button onClick={() => setShowNewOrderModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('new_order')}
+                </Button>
+              </div>
+
+              {orders.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center py-8">
+                      <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">{t('no_orders')}</h3>
+                      <p className="text-muted-foreground mb-4">{t('no_orders_description')}</p>
+                      <Button onClick={() => setShowNewOrderModal(true)}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        {t('create_first_order')}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {orders.map((order) => (
+                    <Card key={order.id}>
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="flex items-center gap-2">
+                              {order.supplier}
+                              {getOrderStatusBadge(order.status)}
+                            </CardTitle>
+                            <CardDescription>
+                              {t('order_date')}: {formatDate(order.order_date)} • {t('expected_delivery')}: {formatDate(order.expected_delivery)}
+                            </CardDescription>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditOrder(order)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>{t('delete_order')}</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    {t('delete_order_confirmation')}
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteOrder(order.id)}>
+                                    {t('delete')}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {order.notes && (
+                          <p className="text-sm text-muted-foreground mb-4">{order.notes}</p>
+                        )}
+                        
+                        {order.items && order.items.length > 0 && (
+                          <div className="mb-4">
+                            <h4 className="font-medium mb-2">{t('order_items')}</h4>
+                            <div className="space-y-2">
+                              {order.items.map((item) => (
+                                <div key={item.id} className="flex justify-between items-center p-2 bg-muted rounded">
+                                  <div>
+                                    <p className="font-medium">{item.description}</p>
+                                    <p className="text-sm text-muted-foreground">{t('article_code')}: {item.article_code}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-medium">{t('quantity')}: {item.quantity}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {order.order_type === 'semi-finished' && order.orderSteps && order.orderSteps.length > 0 && (
+                          <div className="mb-4">
+                            <h4 className="font-medium mb-2">{t('order_steps')}</h4>
+                            <div className="space-y-2">
+                              {order.orderSteps.map((step) => (
+                                <div key={step.id} className="flex justify-between items-center p-2 bg-muted rounded">
+                                  <div>
+                                    <p className="font-medium">{step.name}</p>
+                                    {step.supplier && (
+                                      <p className="text-sm text-muted-foreground">{t('supplier')}: {step.supplier}</p>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <Badge variant="outline" className={
+                                      step.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
+                                      step.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                      step.status === 'delayed' ? 'bg-red-50 text-red-700 border-red-200' :
+                                      'bg-gray-50 text-gray-700 border-gray-200'
+                                    }>
+                                      {t(step.status)}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                      <CardFooter>
+                        <div className="flex gap-2">
+                          {order.status === 'pending' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdateOrderStatus(order.id, 'delivered')}
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              {t('mark_as_delivered')}
+                            </Button>
+                          )}
+                          {order.status === 'delivered' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdateOrderStatus(order.id, 'pending')}
+                            >
+                              <AlertCircle className="mr-2 h-4 w-4" />
+                              {t('mark_as_pending')}
+                            </Button>
+                          )}
+                        </div>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-1">
@@ -928,6 +1138,23 @@ const ProjectDetails = () => {
         accessories={accessories}
         installationDate={project?.installation_date}
       />
+
+      {selectedOrder && (
+        <OrderEditModal
+          open={showEditOrderModal}
+          onOpenChange={setShowEditOrderModal}
+          order={selectedOrder}
+          onSuccess={() => {
+            setShowEditOrderModal(false);
+            setSelectedOrder(null);
+            fetchOrdersWithDetails();
+            toast({
+              title: t('success'),
+              description: t('order_updated_successfully'),
+            });
+          }}
+        />
+      )}
 
       <PartsListDialog
         isOpen={showPartsListDialog}
