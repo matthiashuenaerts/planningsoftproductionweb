@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -49,7 +49,7 @@ const ProjectDetails = () => {
   const [accessories, setAccessories] = useState<Accessory[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('tasks');
+  const [activeTab, setActiveTab] = useState('home');
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [showPartsListDialog, setShowPartsListDialog] = useState(false);
   const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
@@ -610,12 +610,19 @@ const ProjectDetails = () => {
               <ArrowLeft className="mr-2 h-4 w-4" /> {t('back_to_projects')}
             </Button>
             
-            <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+            <div className="flex flex-col gap-4">
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">{project?.name}</h1>
                 <p className="text-muted-foreground">{t('client_label')}: {project?.client}</p>
               </div>
+              
               <div className="flex gap-2">
+                <Button 
+                  variant={activeTab === 'home' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('home')}
+                >
+                  <Home className="mr-2 h-4 w-4" /> {t('home')}
+                </Button>
                 <Button 
                   variant="outline"
                   onClick={() => navigate(createLocalizedPath(`/projects/${projectId}/orders`))}
