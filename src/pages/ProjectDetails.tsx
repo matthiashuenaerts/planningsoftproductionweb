@@ -58,7 +58,6 @@ const ProjectDetails = () => {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState('');
   const [savingDescription, setSavingDescription] = useState(false);
-  const [isViewingProject, setIsViewingProject] = useState(true);
   const { currentEmployee } = useAuth();
   const { t, lang, createLocalizedPath } = useLanguage();
 
@@ -493,10 +492,6 @@ const ProjectDetails = () => {
     setEditedDescription('');
   };
 
-  const handleToggleView = () => {
-    setIsViewingProject(!isViewingProject);
-  };
-
   if (loading) {
     return (
       <div className="flex min-h-screen">
@@ -609,323 +604,310 @@ const ProjectDetails = () => {
           <div className="mb-6">
             <Button 
               variant="outline" 
-              onClick={isViewingProject ? () => navigate(createLocalizedPath('/projects')) : handleToggleView}
+              onClick={() => navigate(createLocalizedPath('/projects'))}
               className="mb-4"
             >
-              <ArrowLeft className="mr-2 h-4 w-4" /> 
-              {isViewingProject ? t('back_to_projects') : t('go_to_project')}
+              <ArrowLeft className="mr-2 h-4 w-4" /> {t('back_to_projects')}
             </Button>
             
-            {isViewingProject && (
-              <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-                <div>
-                  <h1 className="text-3xl font-bold tracking-tight">{project?.name}</h1>
-                  <p className="text-muted-foreground">{t('client_label')}: {project?.client}</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline"
-                    onClick={() => navigate(createLocalizedPath(`/projects/${projectId}/orders`))}
-                    className={cn(
-                      allOrdersDelivered 
-                        ? "bg-green-500 text-white hover:bg-green-600" 
-                        : undeliveredOrdersCount > 0 
-                          ? "bg-red-500 text-white hover:bg-red-600" 
-                          : ""
-                    )}
-                  >
-                    <Package className="mr-2 h-4 w-4" /> 
-                    {t('orders')}
-                    {undeliveredOrdersCount > 0 && (
-                      <span className="ml-2 bg-white text-red-500 px-2 py-1 rounded-full text-xs font-bold">
-                        {undeliveredOrdersCount}
-                      </span>
-                    )}
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    onClick={() => setShowPartsListDialog(true)}
-                  >
-                    <List className="mr-2 h-4 w-4" /> {t('parts_list')}
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    onClick={() => setShowAccessoriesDialog(true)}
-                  >
-                    <Settings className="mr-2 h-4 w-4" /> {t('accessories')}
-                  </Button>
-                  <Button 
-                    variant={activeTab === 'files' ? 'default' : 'outline'}
-                    onClick={() => setActiveTab('files')}
-                  >
-                    <FileText className="mr-2 h-4 w-4" /> {t('files')}
-                  </Button>
-                  <Button 
-                    variant={activeTab === 'onedrive' ? 'default' : 'outline'}
-                    onClick={() => setActiveTab('onedrive')}
-                  >
-                    <Folder className="mr-2 h-4 w-4" /> {t('onedrive')}
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    onClick={handleToggleView}
-                  >
-                    {t('toggle_view')}
-                  </Button>
-                </div>
+            <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">{project?.name}</h1>
+                <p className="text-muted-foreground">{t('client_label')}: {project?.client}</p>
               </div>
-            )}
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline"
+                  onClick={() => navigate(createLocalizedPath(`/projects/${projectId}/orders`))}
+                  className={cn(
+                    allOrdersDelivered 
+                      ? "bg-green-500 text-white hover:bg-green-600" 
+                      : undeliveredOrdersCount > 0 
+                        ? "bg-red-500 text-white hover:bg-red-600" 
+                        : ""
+                  )}
+                >
+                  <Package className="mr-2 h-4 w-4" /> 
+                  {t('orders')}
+                  {undeliveredOrdersCount > 0 && (
+                    <span className="ml-2 bg-white text-red-500 px-2 py-1 rounded-full text-xs font-bold">
+                      {undeliveredOrdersCount}
+                    </span>
+                  )}
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowPartsListDialog(true)}
+                >
+                  <List className="mr-2 h-4 w-4" /> {t('parts_list')}
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowAccessoriesDialog(true)}
+                >
+                  <Settings className="mr-2 h-4 w-4" /> {t('accessories')}
+                </Button>
+                <Button 
+                  variant={activeTab === 'files' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('files')}
+                >
+                  <FileText className="mr-2 h-4 w-4" /> {t('files')}
+                </Button>
+                <Button 
+                  variant={activeTab === 'onedrive' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('onedrive')}
+                >
+                  <Folder className="mr-2 h-4 w-4" /> {t('onedrive')}
+                </Button>
+              </div>
+            </div>
           </div>
           
-          {isViewingProject && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold">{openTasks.length}</div>
-                    <p className="text-xs text-muted-foreground">{t('open_tasks')}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold">{getTaskCountByStatus('IN_PROGRESS')}</div>
-                    <p className="text-xs text-muted-foreground">{t('in_progress')}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold">{getTaskCountByStatus('COMPLETED')}</div>
-                    <p className="text-xs text-muted-foreground">{t('completed')}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold">{tasks.length}</div>
-                    <p className="text-xs text-muted-foreground">{t('total_tasks')}</p>
-                  </CardContent>
-                </Card>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{openTasks.length}</div>
+                <p className="text-xs text-muted-foreground">{t('open_tasks')}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{getTaskCountByStatus('IN_PROGRESS')}</div>
+                <p className="text-xs text-muted-foreground">{t('in_progress')}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{getTaskCountByStatus('COMPLETED')}</div>
+                <p className="text-xs text-muted-foreground">{t('completed')}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{tasks.length}</div>
+                <p className="text-xs text-muted-foreground">{t('total_tasks')}</p>
+              </CardContent>
+            </Card>
+          </div>
 
-              {activeTab === 'files' ? (
-                <ProjectFileManager projectId={projectId!} />
-              ) : activeTab === 'onedrive' ? (
-                <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} />
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <Card className="lg:col-span-1">
-                    <CardHeader>
-                      <CardTitle>{t('project_summary')}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div>
-                        <h4 className="text-sm font-medium mb-1">{t('status')}</h4>
-                        <div>{project && getStatusBadge(project.status)}</div>
-                      </div>
+          {activeTab === 'files' ? (
+            <ProjectFileManager projectId={projectId!} />
+          ) : activeTab === 'onedrive' ? (
+            <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-1">
+                <CardHeader>
+                  <CardTitle>{t('project_summary')}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium mb-1">{t('status')}</h4>
+                    <div>{project && getStatusBadge(project.status)}</div>
+                  </div>
 
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-sm font-medium">{t('description') || 'Description'}</h4>
-                          {!isEditingDescription && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={handleEditDescription}
-                              className="h-6 w-6 p-0"
-                            >
-                              <Edit3 className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                        {isEditingDescription ? (
-                          <div className="space-y-2">
-                            <Textarea
-                              value={editedDescription}
-                              onChange={(e) => setEditedDescription(e.target.value)}
-                              placeholder={t('enter_project_description') || 'Enter project description...'}
-                              className="min-h-[80px] resize-none"
-                            />
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={handleSaveDescription}
-                                disabled={savingDescription}
-                              >
-                                <Save className="h-3 w-3 mr-1" />
-                                {savingDescription ? (t('saving') || 'Saving...') : (t('save') || 'Save')}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={handleCancelEditDescription}
-                                disabled={savingDescription}
-                              >
-                                <X className="h-3 w-3 mr-1" />
-                                {t('cancel') || 'Cancel'}
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-sm text-muted-foreground">
-                            {project?.description || (t('no_description') || 'No description added yet.')}
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <h4 className="text-sm font-medium mb-1">{t('project_progress')}</h4>
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">{t('completion')}</span>
-                            <span className="font-medium">{project?.progress}%</span>
-                          </div>
-                          <div className="w-full bg-muted rounded-full h-2.5">
-                            <div 
-                              className="bg-primary h-2.5 rounded-full" 
-                              style={{ width: `${project?.progress}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {projectEfficiency !== null && (
-                        <div>
-                          <h4 className="text-sm font-medium mb-1">{t('project_efficiency') || 'Project Efficiency'}</h4>
-                          <div className="flex items-center gap-2">
-                            {projectEfficiency >= 0 ? (
-                              <TrendingUp className="h-4 w-4 text-green-600" />
-                            ) : (
-                              <TrendingDown className="h-4 w-4 text-red-600" />
-                            )}
-                            <span className={`font-medium ${projectEfficiency >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {projectEfficiency >= 0 ? '+' : ''}{projectEfficiency}%
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {projectEfficiency >= 0 ? (t('efficiency_faster') || 'faster than planned') : (t('efficiency_slower') || 'slower than planned')}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium">{t('project_barcode')}</h4>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => setShowBarcodeDialog(true)}
-                          className="w-full"
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-medium">{t('description') || 'Description'}</h4>
+                      {!isEditingDescription && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleEditDescription}
+                          className="h-6 w-6 p-0"
                         >
-                          <Barcode className="mr-2 h-4 w-4" />
-                          {t('view_barcode')}
+                          <Edit3 className="h-3 w-3" />
                         </Button>
-                      </div>
-
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium">{t('orders_and_accessories')}</h4>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div className="bg-orange-50 p-2 rounded">
-                            <div className="font-medium text-orange-800">{openOrdersCount}</div>
-                            <div className="text-orange-600 text-xs">{t('open_orders')}</div>
-                          </div>
-                          <div className="bg-red-50 p-2 rounded">
-                            <div className="font-medium text-red-800">{unavailableAccessoriesCount}</div>
-                            <div className="text-red-600 text-xs">{t('to_order')}</div>
-                          </div>
-                          <div className="bg-green-50 p-2 rounded">
-                            <div className="font-medium text-green-800">{inStockAccessoriesCount}</div>
-                            <div className="text-green-600 text-xs">{t('in_stock')}</div>
-                          </div>
-                          <div className="bg-blue-50 p-2 rounded">
-                            <div className="font-medium text-blue-800">{deliveredAccessoriesCount}</div>
-                            <div className="text-blue-600 text-xs">{t('delivered')}</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium">{t('important_dates')}</h4>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">{t('start_date_label')}:</span>
-                          <span>{project?.start_date && formatDate(project.start_date)}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">{t('installation_date_label')}:</span>
-                          <span>{project?.installation_date && formatDate(project.installation_date)}</span>
-                        </div>
-                      </div>
-
-                      {semiFinishedOrders.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium">{t('semi_finished_deliveries')}</h4>
-                          <div className="space-y-1.5 text-sm">
-                            {semiFinishedOrders.map((order: any) => (
-                              order.orderSteps && order.orderSteps.length > 0 && (
-                                <div key={order.id} className="bg-gray-50 p-2 rounded">
-                                  <p className="font-medium mb-1">{order.supplier}{t('main_order_suffix')}</p>
-                                  <div className="pl-2 space-y-1">
-                                    {order.orderSteps
-                                      .filter((step: any) => step.supplier)
-                                      .map((step: any) => (
-                                        <div key={step.id} className="flex justify-between items-center">
-                                          <span className="text-muted-foreground truncate" title={`${step.name} (${step.supplier})`}>
-                                            {step.name} ({step.supplier})
-                                          </span>
-                                          <span className="font-medium whitespace-nowrap ml-2">
-                                            {step.end_date ? formatDate(step.end_date) : t('not_applicable')}
-                                          </span>
-                                        </div>
-                                      ))}
-                                  </div>
-                                </div>
-                              )
-                            ))}
-                          </div>
-                        </div>
                       )}
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="lg:col-span-2">
-                    <CardHeader>
-                      <CardTitle>{t('project_tasks')}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <Tabs defaultValue="todo">
-                        <TabsList className="mb-4">
-                          <TabsTrigger value="todo">{t('open_tasks_tab', { count: openTasks.length.toString() })}</TabsTrigger>
-                          <TabsTrigger value="in_progress">{t('in_progress_tab', { count: inProgressTasks.length.toString() })}</TabsTrigger>
-                          <TabsTrigger value="completed">{t('completed_tab', { count: completedTasks.length.toString() })}</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="todo">
-                          <TaskList 
-                            tasks={openTasks} 
-                            title={t('open_tasks_title')} 
-                            onTaskStatusChange={handleTaskStatusChange}
-                            showCompleteButton={true}
-                          />
-                        </TabsContent>
-                        <TabsContent value="in_progress">
-                          <TaskList 
-                            tasks={inProgressTasks} 
-                            title={t('in_progress_tasks_title')} 
-                            onTaskStatusChange={handleTaskStatusChange}
-                          />
-                        </TabsContent>
-                        <TabsContent value="completed">
-                          <TaskList 
-                            tasks={completedTasks} 
-                            title={t('completed_tasks_title')}
-                            onTaskStatusChange={handleTaskStatusChange}
-                            showEfficiencyData={true}
-                          />
-                        </TabsContent>
-                      </Tabs>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-            </>
+                    </div>
+                    {isEditingDescription ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={editedDescription}
+                          onChange={(e) => setEditedDescription(e.target.value)}
+                          placeholder={t('enter_project_description') || 'Enter project description...'}
+                          className="min-h-[80px] resize-none"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={handleSaveDescription}
+                            disabled={savingDescription}
+                          >
+                            <Save className="h-3 w-3 mr-1" />
+                            {savingDescription ? (t('saving') || 'Saving...') : (t('save') || 'Save')}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCancelEditDescription}
+                            disabled={savingDescription}
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            {t('cancel') || 'Cancel'}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        {project?.description || (t('no_description') || 'No description added yet.')}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-medium mb-1">{t('project_progress')}</h4>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">{t('completion')}</span>
+                        <span className="font-medium">{project?.progress}%</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2.5">
+                        <div 
+                          className="bg-primary h-2.5 rounded-full" 
+                          style={{ width: `${project?.progress}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {projectEfficiency !== null && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">{t('project_efficiency') || 'Project Efficiency'}</h4>
+                      <div className="flex items-center gap-2">
+                        {projectEfficiency >= 0 ? (
+                          <TrendingUp className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <TrendingDown className="h-4 w-4 text-red-600" />
+                        )}
+                        <span className={`font-medium ${projectEfficiency >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {projectEfficiency >= 0 ? '+' : ''}{projectEfficiency}%
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {projectEfficiency >= 0 ? (t('efficiency_faster') || 'faster than planned') : (t('efficiency_slower') || 'slower than planned')}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">{t('project_barcode')}</h4>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setShowBarcodeDialog(true)}
+                      className="w-full"
+                    >
+                      <Barcode className="mr-2 h-4 w-4" />
+                      {t('view_barcode')}
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">{t('orders_and_accessories')}</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="bg-orange-50 p-2 rounded">
+                        <div className="font-medium text-orange-800">{openOrdersCount}</div>
+                        <div className="text-orange-600 text-xs">{t('open_orders')}</div>
+                      </div>
+                      <div className="bg-red-50 p-2 rounded">
+                        <div className="font-medium text-red-800">{unavailableAccessoriesCount}</div>
+                        <div className="text-red-600 text-xs">{t('to_order')}</div>
+                      </div>
+                      <div className="bg-green-50 p-2 rounded">
+                        <div className="font-medium text-green-800">{inStockAccessoriesCount}</div>
+                        <div className="text-green-600 text-xs">{t('in_stock')}</div>
+                      </div>
+                      <div className="bg-blue-50 p-2 rounded">
+                        <div className="font-medium text-blue-800">{deliveredAccessoriesCount}</div>
+                        <div className="text-blue-600 text-xs">{t('delivered')}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">{t('important_dates')}</h4>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">{t('start_date_label')}:</span>
+                      <span>{project?.start_date && formatDate(project.start_date)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">{t('installation_date_label')}:</span>
+                      <span>{project?.installation_date && formatDate(project.installation_date)}</span>
+                    </div>
+                  </div>
+
+                  {semiFinishedOrders.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">{t('semi_finished_deliveries')}</h4>
+                      <div className="space-y-1.5 text-sm">
+                        {semiFinishedOrders.map((order: any) => (
+                          order.orderSteps && order.orderSteps.length > 0 && (
+                            <div key={order.id} className="bg-gray-50 p-2 rounded">
+                              <p className="font-medium mb-1">{order.supplier}{t('main_order_suffix')}</p>
+                              <div className="pl-2 space-y-1">
+                                {order.orderSteps
+                                  .filter((step: any) => step.supplier)
+                                  .map((step: any) => (
+                                    <div key={step.id} className="flex justify-between items-center">
+                                      <span className="text-muted-foreground truncate" title={`${step.name} (${step.supplier})`}>
+                                        {step.name} ({step.supplier})
+                                      </span>
+                                      <span className="font-medium whitespace-nowrap ml-2">
+                                        {step.end_date ? formatDate(step.end_date) : t('not_applicable')}
+                                      </span>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>{t('project_tasks')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="todo">
+                    <TabsList className="mb-4">
+                      <TabsTrigger value="todo">{t('open_tasks_tab', { count: openTasks.length.toString() })}</TabsTrigger>
+                      <TabsTrigger value="in_progress">{t('in_progress_tab', { count: inProgressTasks.length.toString() })}</TabsTrigger>
+                      <TabsTrigger value="completed">{t('completed_tab', { count: completedTasks.length.toString() })}</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="todo">
+                      <TaskList 
+                        tasks={openTasks} 
+                        title={t('open_tasks_title')} 
+                        onTaskStatusChange={handleTaskStatusChange}
+                        showCompleteButton={true}
+                      />
+                    </TabsContent>
+                    <TabsContent value="in_progress">
+                      <TaskList 
+                        tasks={inProgressTasks} 
+                        title={t('in_progress_tasks_title')} 
+                        onTaskStatusChange={handleTaskStatusChange}
+                      />
+                    </TabsContent>
+                    <TabsContent value="completed">
+                      <TaskList 
+                        tasks={completedTasks} 
+                        title={t('completed_tasks_title')}
+                        onTaskStatusChange={handleTaskStatusChange}
+                        showEfficiencyData={true}
+                      />
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
       </div>
