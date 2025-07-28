@@ -840,50 +840,46 @@ const ProjectDetails = () => {
                       <p className="text-muted-foreground">{t('no_orders_found')}</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      {orders.map((order) => (
-                        <Collapsible 
-                          key={order.id} 
-                          open={expandedOrders.has(order.id)}
-                          onOpenChange={() => toggleOrderExpansion(order.id)}
-                        >
-                          <div className={cn(
-                            "border rounded-lg p-4 transition-all duration-200",
-                            order.status === 'delivered' ? 'bg-green-50 border-green-200' :
-                            order.status === 'delayed' ? 'bg-red-50 border-red-200' :
-                            order.status === 'pending' ? 'bg-orange-50 border-orange-200' :
-                            'bg-card border-border'
-                          )}>
-                            {/* Order Header */}
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-3">
-                                <CollapsibleTrigger asChild>
-                                  <Button variant="ghost" className="p-0 h-auto flex items-center gap-2 hover:bg-transparent">
-                                    {expandedOrders.has(order.id) ? (
-                                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                    ) : (
-                                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                                    )}
-                                    <h4 className="font-semibold text-lg">{order.supplier}</h4>
-                                  </Button>
-                                </CollapsibleTrigger>
-                                
-                                {/* Status Badge with Icon */}
-                                <div className="flex items-center gap-2">
+                    <div className="space-y-3">
+                      {orders.map((order) => {
+                        // Load order items and attachments immediately for each order
+                        if (!orderItems[order.id]) {
+                          loadOrderItems(order.id);
+                        }
+                        if (!orderAttachments[order.id]) {
+                          loadOrderAttachments(order.id);
+                        }
+
+                        return (
+                          <div 
+                            key={order.id}
+                            className={cn(
+                              "border rounded-lg p-3 transition-all duration-200",
+                              order.status === 'delivered' ? 'bg-green-50 border-green-200' :
+                              order.status === 'delayed' ? 'bg-red-50 border-red-200' :
+                              order.status === 'pending' ? 'bg-orange-50 border-orange-200' :
+                              'bg-card border-border'
+                            )}
+                          >
+                            {/* Compact Order Header */}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-semibold text-base">{order.supplier}</h4>
+                                <div className="flex items-center gap-1">
                                   {getStatusIcon(order.status)}
-                                  <Badge className={getStatusColor(order.status)}>
+                                  <Badge className={cn("text-xs", getStatusColor(order.status))}>
                                     {order.status}
                                   </Badge>
                                 </div>
                               </div>
                               
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
                                 {/* Manual Status Editor */}
                                 <Select
                                   value={order.status}
                                   onValueChange={(value) => handleStatusChange(order.id, value)}
                                 >
-                                  <SelectTrigger className="w-32 h-8 text-xs bg-background border z-50">
+                                  <SelectTrigger className="w-28 h-7 text-xs bg-background border z-50">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent className="bg-background border z-50">
@@ -895,78 +891,55 @@ const ProjectDetails = () => {
                                 </Select>
 
                                 {/* Action Buttons */}
-                                <div className="flex gap-1">{/* Action Buttons */}
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleEditOrder(order.id)}
-                                    className="h-8 w-8 p-0 hover:bg-blue-50"
-                                    title="Edit order"
-                                  >
-                                    <Edit3 className="h-3 w-3" />
-                                  </Button>
-                                  
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleDeleteOrder(order.id)}
-                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-red-50"
-                                    title="Delete order"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEditOrder(order.id)}
+                                  className="h-7 w-7 p-0 hover:bg-blue-50"
+                                  title="Edit order"
+                                >
+                                  <Edit3 className="h-3 w-3" />
+                                </Button>
+                                
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleDeleteOrder(order.id)}
+                                  className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-red-50"
+                                  title="Delete order"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
                               </div>
                             </div>
 
-                            {/* Order Basic Info - Enhanced Design */}
-                            <div className="bg-muted/30 rounded-lg p-3 mb-3">
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                                  <div>
-                                    <span className="font-medium text-muted-foreground">{t('expected_delivery')}:</span>
-                                    <div className="font-medium">
-                                      {order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString() : t('not_set')}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Package className="h-4 w-4 text-muted-foreground" />
-                                  <div>
-                                    <span className="font-medium text-muted-foreground">{t('order_type')}:</span>
-                                    <div className="font-medium capitalize">{order.order_type.replace('_', ' ')}</div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Clock className="h-4 w-4 text-muted-foreground" />
-                                  <div>
-                                    <span className="font-medium text-muted-foreground">{t('created')}:</span>
-                                    <div className="font-medium">
-                                      {new Date(order.created_at).toLocaleDateString()}
-                                    </div>
-                                  </div>
-                                </div>
+                            {/* Compact Order Info */}
+                            <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground mb-2">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                <span>{order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString() : 'No date'}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Package className="h-3 w-3" />
+                                <span className="capitalize">{order.order_type.replace('_', ' ')}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                <span>{new Date(order.created_at).toLocaleDateString()}</span>
                               </div>
                             </div>
 
+                            {/* Compact Notes */}
                             {order.notes && (
-                              <div className="bg-blue-50 border-l-4 border-blue-200 p-3 mb-3">
-                                <div className="flex items-start gap-2">
-                                  <FileText className="h-4 w-4 text-blue-600 mt-0.5" />
-                                  <div>
-                                    <p className="text-sm font-medium text-blue-800 mb-1">Order Notes:</p>
-                                    <p className="text-sm text-blue-700 italic">"{order.notes}"</p>
-                                  </div>
-                                </div>
+                              <div className="bg-blue-50 border-l-2 border-blue-200 p-2 mb-2 text-xs">
+                                <span className="font-medium text-blue-800">Note:</span>
+                                <span className="text-blue-700 ml-1">"{order.notes}"</span>
                               </div>
                             )}
 
-                            {/* Camera and File Actions - Enhanced */}
-                            <div className="flex items-center justify-between mb-3 p-3 bg-muted/20 rounded-lg">
-                              <div className="flex items-center gap-2">
-                                <h5 className="font-medium text-sm">Attachments & Actions:</h5>
-                              </div>
+                            {/* Compact Camera and File Actions */}
+                            <div className="flex items-center justify-between mb-2 p-2 bg-muted/20 rounded">
+                              <span className="text-xs font-medium">Actions:</span>
                               <OrderAttachmentUploader 
                                 orderId={order.id}
                                 onUploadSuccess={() => loadOrderAttachments(order.id)}
@@ -976,107 +949,77 @@ const ProjectDetails = () => {
                               />
                             </div>
 
-                            {/* Collapsible Content */}
-                            <CollapsibleContent className="space-y-4">
-                              {/* Order Items */}
-                              {orderItems[order.id] && orderItems[order.id].length > 0 && (
-                                <div className="mb-4">
-                                  <div className="flex items-center gap-2 mb-3">
-                                    <Package className="h-4 w-4 text-primary" />
-                                    <h5 className="font-semibold text-sm">{t('order_items')} ({orderItems[order.id].length})</h5>
-                                  </div>
-                                  <div className="bg-muted/30 rounded-lg p-3 space-y-3">
-                                    {orderItems[order.id].map((item: any, index: number) => (
-                                      <div key={item.id} className="flex justify-between items-center p-2 bg-background rounded border">
-                                        <div className="flex-1">
-                                          <span className="font-medium text-sm">{item.description}</span>
-                                          {item.article_code && (
-                                            <div className="text-xs text-muted-foreground mt-1">
-                                              Article: {item.article_code}
-                                            </div>
-                                          )}
-                                          {item.notes && (
-                                            <div className="text-xs text-muted-foreground mt-1 italic">
-                                              Note: {item.notes}
-                                            </div>
+                            {/* Always Visible Compact Order Items */}
+                            {orderItems[order.id] && orderItems[order.id].length > 0 && (
+                              <div className="mb-2">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <Package className="h-3 w-3 text-primary" />
+                                  <span className="text-xs font-medium">{t('order_items')} ({orderItems[order.id].length})</span>
+                                </div>
+                                <div className="bg-muted/30 rounded p-2 space-y-1">
+                                  {orderItems[order.id].map((item: any) => (
+                                    <div key={item.id} className="flex justify-between items-center text-xs">
+                                      <div className="flex-1 min-w-0">
+                                        <span className="font-medium">{item.description}</span>
+                                        {item.article_code && (
+                                          <span className="text-muted-foreground ml-1">({item.article_code})</span>
+                                        )}
+                                      </div>
+                                      <span className="bg-primary/10 text-primary px-1 py-0.5 rounded text-xs font-medium ml-2">
+                                        {item.quantity}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Always Visible Compact Attachments */}
+                            {orderAttachments[order.id] && orderAttachments[order.id].length > 0 && (
+                              <div>
+                                <div className="flex items-center gap-1 mb-1">
+                                  <Paperclip className="h-3 w-3 text-primary" />
+                                  <span className="text-xs font-medium">{t('attachments')} ({orderAttachments[order.id].length})</span>
+                                </div>
+                                <div className="space-y-1">
+                                  {orderAttachments[order.id].map((attachment: any) => (
+                                    <div key={attachment.id} className="flex items-center justify-between bg-background rounded p-2 border text-xs">
+                                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <div className={cn(
+                                          "p-1 rounded",
+                                          attachment.file_name.includes('DELIVERY_CONFIRMED') 
+                                            ? "bg-green-100 text-green-700" 
+                                            : "bg-muted text-muted-foreground"
+                                        )}>
+                                          {attachment.file_name.includes('DELIVERY_CONFIRMED') ? (
+                                            <CheckCircle className="h-3 w-3" />
+                                          ) : (
+                                            <Paperclip className="h-3 w-3" />
                                           )}
                                         </div>
-                                        <div className="ml-4">
-                                          <span className="bg-primary/10 text-primary px-2 py-1 rounded text-xs font-medium">
-                                            Qty: {item.quantity}
-                                          </span>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="font-medium truncate">{attachment.file_name}</p>
+                                          {attachment.file_name.includes('DELIVERY_CONFIRMED') && (
+                                            <p className="text-green-600 font-medium">✓ Delivery Confirmed</p>
+                                          )}
                                         </div>
                                       </div>
-                                    ))}
-                                  </div>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => window.open(attachment.file_path, '_blank')}
+                                        className="h-6 w-12 text-xs p-0"
+                                      >
+                                        View
+                                      </Button>
+                                    </div>
+                                  ))}
                                 </div>
-                              )}
-
-                              {/* Order Attachments */}
-                              {orderAttachments[order.id] && orderAttachments[order.id].length > 0 && (
-                                <div className="mb-4">
-                                  <div className="flex items-center gap-2 mb-3">
-                                    <Paperclip className="h-4 w-4 text-primary" />
-                                    <h5 className="font-semibold text-sm">{t('attachments')} ({orderAttachments[order.id].length})</h5>
-                                  </div>
-                                  <div className="grid grid-cols-1 gap-2">
-                                    {orderAttachments[order.id].map((attachment: any) => (
-                                      <div key={attachment.id} className="flex items-center justify-between bg-background rounded-lg p-3 border">
-                                        <div className="flex items-center gap-3 flex-1">
-                                          <div className={cn(
-                                            "p-2 rounded",
-                                            attachment.file_name.includes('DELIVERY_CONFIRMED') 
-                                              ? "bg-green-100 text-green-700" 
-                                              : "bg-muted text-muted-foreground"
-                                          )}>
-                                            {attachment.file_name.includes('DELIVERY_CONFIRMED') ? (
-                                              <CheckCircle className="h-4 w-4" />
-                                            ) : (
-                                              <Paperclip className="h-4 w-4" />
-                                            )}
-                                          </div>
-                                          <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium truncate">{attachment.file_name}</p>
-                                            <p className="text-xs text-muted-foreground">
-                                              {(attachment.file_size / 1024 / 1024).toFixed(2)} MB • {new Date(attachment.created_at).toLocaleDateString()}
-                                            </p>
-                                            {attachment.file_name.includes('DELIVERY_CONFIRMED') && (
-                                              <p className="text-xs text-green-600 font-medium">✓ Delivery Confirmation Photo</p>
-                                            )}
-                                          </div>
-                                        </div>
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => window.open(attachment.file_path, '_blank')}
-                                          className="ml-3 h-8"
-                                        >
-                                          <Camera className="h-3 w-3 mr-1" />
-                                          {t('view')}
-                                        </Button>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* No items/attachments message */}
-                              {(!orderItems[order.id] || orderItems[order.id].length === 0) && 
-                               (!orderAttachments[order.id] || orderAttachments[order.id].length === 0) && (
-                                <div className="text-center py-8 bg-muted/20 rounded-lg">
-                                  <Package className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                                  <p className="text-muted-foreground text-sm font-medium">
-                                    {t('no_items_or_attachments')}
-                                  </p>
-                                  <p className="text-muted-foreground text-xs mt-1">
-                                    Expand this order to add items and attachments
-                                  </p>
-                                </div>
-                              )}
-                            </CollapsibleContent>
+                              </div>
+                            )}
                           </div>
-                        </Collapsible>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
