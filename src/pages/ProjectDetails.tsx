@@ -9,11 +9,12 @@ import {
   CardTitle,
   CardFooter
 } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -541,6 +542,23 @@ const ProjectDetails = () => {
     }
   };
 
+  const handleConfirmDelivery = async (orderId: string) => {
+    try {
+      await orderService.update(orderId, { status: 'delivered' });
+      toast({
+        title: t('success'),
+        description: t('order_delivered_successfully'),
+      });
+      await handleOrderUpdate();
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: t('failed_to_update_order', { message: error.message }),
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen">
@@ -762,32 +780,36 @@ const ProjectDetails = () => {
                 </Button>
               </div>
               
-              <div className="grid gap-4">
-                {orders.length === 0 ? (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="text-center py-8">
-                        <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">{t('no_orders_yet')}</h3>
-                        <p className="text-muted-foreground mb-4">{t('no_orders_description')}</p>
-                        <Button onClick={() => setShowNewOrderModal(true)}>
-                          <Plus className="mr-2 h-4 w-4" />
-                          {t('add_first_order')}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  orders.map((order) => (
-                    <Card key={order.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                      <CardContent className="pt-6">
-                        <div className="flex justify-between items-start">
-                          <div 
-                            className="flex-1"
-                            onClick={() => handleOrderClick(order)}
-                          >
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="font-semibold">{order.supplier}</h3>
+              <Card>
+                <CardContent className="p-0">
+                  {orders.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium mb-2">{t('no_orders_yet')}</h3>
+                      <p className="text-muted-foreground mb-4">{t('no_orders_description')}</p>
+                      <Button onClick={() => setShowNewOrderModal(true)}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        {t('add_first_order')}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t('supplier')}</TableHead>
+                          <TableHead>{t('order_type')}</TableHead>
+                          <TableHead>{t('status')}</TableHead>
+                          <TableHead>{t('expected_delivery')}</TableHead>
+                          <TableHead>{t('notes')}</TableHead>
+                          <TableHead>{t('actions')}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {orders.map((order) => (
+                          <TableRow key={order.id}>
+                            <TableCell className="font-medium">{order.supplier}</TableCell>
+                            <TableCell>{t(`order_type_${order.order_type}`)}</TableCell>
+                            <TableCell>
                               <Badge variant={
                                 order.status === 'delivered' ? 'default' :
                                 order.status === 'pending' ? 'secondary' :
@@ -795,51 +817,53 @@ const ProjectDetails = () => {
                               }>
                                 {t(`order_status_${order.status}`)}
                               </Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground mb-2">
-                              {t('order_type')}: {t(`order_type_${order.order_type}`)}
-                            </p>
-                            {order.delivery_date && (
-                              <p className="text-sm text-muted-foreground">
-                                {t('delivery_date')}: {formatDate(order.delivery_date)}
-                              </p>
-                            )}
-                            {order.notes && (
-                              <p className="text-sm text-muted-foreground mt-2">
-                                {t('notes')}: {order.notes}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex gap-2 ml-4">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditOrder(order);
-                              }}
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (confirm(t('confirm_delete_order'))) {
-                                  handleDeleteOrder(order.id);
-                                }
-                              }}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
+                            </TableCell>
+                            <TableCell>
+                              {order.expected_delivery ? formatDate(order.expected_delivery) : '-'}
+                            </TableCell>
+                            <TableCell className="max-w-[200px] truncate" title={order.notes}>
+                              {order.notes || '-'}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                {order.status !== 'delivered' && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleConfirmDelivery(order.id)}
+                                    className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                                  >
+                                    <Check className="h-4 w-4 mr-1" />
+                                    {t('confirm_delivery')}
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditOrder(order)}
+                                >
+                                  <Edit3 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (confirm(t('confirm_delete_order'))) {
+                                      handleDeleteOrder(order.id);
+                                    }
+                                  }}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
