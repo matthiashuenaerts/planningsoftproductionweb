@@ -27,6 +27,8 @@ import NewOrderModal from '@/components/NewOrderModal';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { AccessoriesDialog } from '@/components/AccessoriesDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
+import { OrderPopup } from '@/components/OrderPopup';
+import OrderEditModal from '@/components/OrderEditModal';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
@@ -58,6 +60,10 @@ const ProjectDetails = () => {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState('');
   const [savingDescription, setSavingDescription] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [showOrderPopup, setShowOrderPopup] = useState(false);
+  const [showEditOrderModal, setShowEditOrderModal] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<any>(null);
   const { currentEmployee } = useAuth();
   const { t, lang, createLocalizedPath } = useLanguage();
 
@@ -492,6 +498,49 @@ const ProjectDetails = () => {
     setEditedDescription('');
   };
 
+  const handleOrderClick = (order: any) => {
+    setSelectedOrder(order);
+    setShowOrderPopup(true);
+  };
+
+  const handleEditOrder = (order: any) => {
+    setEditingOrder(order);
+    setShowEditOrderModal(true);
+  };
+
+  const handleOrderUpdate = async () => {
+    if (projectId) {
+      const ordersData = await orderService.getByProject(projectId);
+      const ordersWithDetails = await Promise.all(
+        ordersData.map(async (order) => {
+          if (order.order_type === 'semi-finished') {
+            const orderSteps = await orderService.getOrderSteps(order.id);
+            return { ...order, orderSteps };
+          }
+          return order;
+        })
+      );
+      setOrders(ordersWithDetails);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    try {
+      await orderService.delete(orderId);
+      toast({
+        title: t('success'),
+        description: t('order_deleted_successfully'),
+      });
+      await handleOrderUpdate();
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: t('failed_to_delete_order', { message: error.message }),
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen">
@@ -624,19 +673,21 @@ const ProjectDetails = () => {
                   <Home className="mr-2 h-4 w-4" /> {t('home')}
                 </Button>
                 <Button 
-                  variant="outline"
-                  onClick={() => navigate(createLocalizedPath(`/projects/${projectId}/orders`))}
+                  variant={activeTab === 'orders' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('orders')}
                   className={cn(
-                    allOrdersDelivered 
-                      ? "bg-green-500 text-white hover:bg-green-600" 
-                      : undeliveredOrdersCount > 0 
-                        ? "bg-red-500 text-white hover:bg-red-600" 
-                        : ""
+                    activeTab !== 'orders' && (
+                      allOrdersDelivered 
+                        ? "bg-green-500 text-white hover:bg-green-600" 
+                        : undeliveredOrdersCount > 0 
+                          ? "bg-red-500 text-white hover:bg-red-600" 
+                          : ""
+                    )
                   )}
                 >
                   <Package className="mr-2 h-4 w-4" /> 
                   {t('orders')}
-                  {undeliveredOrdersCount > 0 && (
+                  {undeliveredOrdersCount > 0 && activeTab !== 'orders' && (
                     <span className="ml-2 bg-white text-red-500 px-2 py-1 rounded-full text-xs font-bold">
                       {undeliveredOrdersCount}
                     </span>
@@ -701,6 +752,95 @@ const ProjectDetails = () => {
             <ProjectFileManager projectId={projectId!} />
           ) : activeTab === 'onedrive' ? (
             <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} />
+          ) : activeTab === 'orders' ? (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">{t('project_orders')}</h2>
+                <Button onClick={() => setShowNewOrderModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('add_order')}
+                </Button>
+              </div>
+              
+              <div className="grid gap-4">
+                {orders.length === 0 ? (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-center py-8">
+                        <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-medium mb-2">{t('no_orders_yet')}</h3>
+                        <p className="text-muted-foreground mb-4">{t('no_orders_description')}</p>
+                        <Button onClick={() => setShowNewOrderModal(true)}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          {t('add_first_order')}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  orders.map((order) => (
+                    <Card key={order.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                      <CardContent className="pt-6">
+                        <div className="flex justify-between items-start">
+                          <div 
+                            className="flex-1"
+                            onClick={() => handleOrderClick(order)}
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="font-semibold">{order.supplier}</h3>
+                              <Badge variant={
+                                order.status === 'delivered' ? 'default' :
+                                order.status === 'pending' ? 'secondary' :
+                                order.status === 'ordered' ? 'outline' : 'destructive'
+                              }>
+                                {t(`order_status_${order.status}`)}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-2">
+                              {t('order_type')}: {t(`order_type_${order.order_type}`)}
+                            </p>
+                            {order.delivery_date && (
+                              <p className="text-sm text-muted-foreground">
+                                {t('delivery_date')}: {formatDate(order.delivery_date)}
+                              </p>
+                            )}
+                            {order.notes && (
+                              <p className="text-sm text-muted-foreground mt-2">
+                                {t('notes')}: {order.notes}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditOrder(order);
+                              }}
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(t('confirm_delete_order'))) {
+                                  handleDeleteOrder(order.id);
+                                }
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-1">
@@ -953,6 +1093,32 @@ const ProjectDetails = () => {
         projectId={projectId!}
         projectName={project?.name || ''}
       />
+
+      {selectedOrder && (
+        <OrderPopup
+          isOpen={showOrderPopup}
+          onClose={() => setShowOrderPopup(false)}
+          projectId={projectId!}
+          onOrderCreated={handleOrderUpdate}
+        />
+      )}
+
+      {editingOrder && (
+        <OrderEditModal
+          open={showEditOrderModal}
+          onOpenChange={setShowEditOrderModal}
+          orderId={editingOrder.id}
+          onSuccess={() => {
+            setShowEditOrderModal(false);
+            setEditingOrder(null);
+            handleOrderUpdate();
+            toast({
+              title: t('success'),
+              description: t('order_updated_successfully'),
+            });
+          }}
+        />
+      )}
     </div>
   );
 };
