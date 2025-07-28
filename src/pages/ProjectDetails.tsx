@@ -624,14 +624,16 @@ const ProjectDetails = () => {
                   <Home className="mr-2 h-4 w-4" /> {t('home')}
                 </Button>
                 <Button 
-                  variant="outline"
-                  onClick={() => navigate(createLocalizedPath(`/projects/${projectId}/orders`))}
+                  variant={activeTab === 'orders' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('orders')}
                   className={cn(
-                    allOrdersDelivered 
-                      ? "bg-green-500 text-white hover:bg-green-600" 
-                      : undeliveredOrdersCount > 0 
-                        ? "bg-red-500 text-white hover:bg-red-600" 
-                        : ""
+                    activeTab === 'orders' ? '' : (
+                      allOrdersDelivered 
+                        ? "bg-green-500 text-white hover:bg-green-600" 
+                        : undeliveredOrdersCount > 0 
+                          ? "bg-red-500 text-white hover:bg-red-600" 
+                          : ""
+                    )
                   )}
                 >
                   <Package className="mr-2 h-4 w-4" /> 
@@ -701,6 +703,79 @@ const ProjectDetails = () => {
             <ProjectFileManager projectId={projectId!} />
           ) : activeTab === 'onedrive' ? (
             <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} />
+          ) : activeTab === 'orders' ? (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>{t('orders')}</CardTitle>
+                  <Button onClick={() => setShowNewOrderModal(true)} size="sm">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('add_order')}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {orders.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">{t('no_orders_found')}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {orders.map((order) => (
+                        <div key={order.id} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium">{order.supplier}</h4>
+                            <div className="flex items-center gap-2">
+                              <Badge 
+                                className={cn(
+                                  order.status === 'delivered' && 'bg-green-100 text-green-800',
+                                  order.status === 'pending' && 'bg-orange-100 text-orange-800',
+                                  order.status === 'shipped' && 'bg-blue-100 text-blue-800'
+                                )}
+                              >
+                                {order.status}
+                              </Badge>
+                              {order.status !== 'delivered' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={async () => {
+                                    try {
+                                      await orderService.updateOrderStatus(order.id, 'delivered');
+                                      const updatedOrders = await orderService.getByProject(projectId!);
+                                      setOrders(updatedOrders);
+                                      toast({
+                                        title: t('success'),
+                                        description: t('order_delivered_successfully'),
+                                      });
+                                    } catch (error: any) {
+                                      toast({
+                                        title: t('error'),
+                                        description: error.message,
+                                        variant: "destructive"
+                                      });
+                                    }
+                                  }}
+                                >
+                                  {t('mark_delivered')}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            {t('expected_delivery')}: {order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString() : t('not_set')}
+                          </p>
+                          {order.notes && (
+                            <p className="text-sm text-muted-foreground">{order.notes}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-1">
