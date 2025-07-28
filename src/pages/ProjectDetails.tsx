@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -586,6 +586,21 @@ const ProjectDetails = () => {
     setSelectedOrderId(null);
   };
 
+  const handleDeliveryConfirm = async (orderId: string) => {
+    try {
+      await orderService.updateOrderStatus(orderId, 'delivered');
+      const updatedOrders = await orderService.getByProject(projectId!);
+      setOrders(updatedOrders);
+      loadOrderAttachments(orderId); // Reload attachments to show the new photo
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen">
@@ -648,22 +663,32 @@ const ProjectDetails = () => {
   };
 
   const getStatusColor = (status: string) => {
-    const validStatuses = ['TODO', 'IN_PROGRESS', 'COMPLETED', 'HOLD'];
-    if (!validStatuses.includes(status)) {
-      return 'bg-gray-100 text-gray-800';
-    }
-    
-    switch (status) {
-      case 'TODO':
-        return 'bg-blue-100 text-blue-800';
-      case 'IN_PROGRESS':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'COMPLETED':
-        return 'bg-green-100 text-green-800';
-      case 'HOLD':
-        return 'bg-red-100 text-red-800';
+    switch (status.toLowerCase()) {
+      case 'delivered':
+        return 'bg-green-100 text-green-800 border-green-300';
+      case 'pending':
+        return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'delayed':
+        return 'bg-red-100 text-red-800 border-red-300';
+      case 'canceled':
+        return 'bg-gray-100 text-gray-800 border-gray-300';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-blue-100 text-blue-800 border-blue-300';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'delivered':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'pending':
+        return <Clock className="h-4 w-4 text-orange-600" />;
+      case 'delayed':
+        return <AlertCircle className="h-4 w-4 text-red-600" />;
+      case 'canceled':
+        return <XCircle className="h-4 w-4 text-gray-600" />;
+      default:
+        return <Clock className="h-4 w-4 text-blue-600" />;
     }
   };
 
@@ -822,19 +847,35 @@ const ProjectDetails = () => {
                           open={expandedOrders.has(order.id)}
                           onOpenChange={() => toggleOrderExpansion(order.id)}
                         >
-                          <div className="border rounded-lg p-4 bg-card">
+                          <div className={cn(
+                            "border rounded-lg p-4 transition-all duration-200",
+                            order.status === 'delivered' ? 'bg-green-50 border-green-200' :
+                            order.status === 'delayed' ? 'bg-red-50 border-red-200' :
+                            order.status === 'pending' ? 'bg-orange-50 border-orange-200' :
+                            'bg-card border-border'
+                          )}>
                             {/* Order Header */}
                             <div className="flex items-center justify-between mb-3">
-                              <CollapsibleTrigger asChild>
-                                <Button variant="ghost" className="p-0 h-auto flex items-center gap-2">
-                                  {expandedOrders.has(order.id) ? (
-                                    <ChevronDown className="h-4 w-4" />
-                                  ) : (
-                                    <ChevronUp className="h-4 w-4" />
-                                  )}
-                                  <h4 className="font-medium text-left">{order.supplier}</h4>
-                                </Button>
-                              </CollapsibleTrigger>
+                              <div className="flex items-center gap-3">
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="ghost" className="p-0 h-auto flex items-center gap-2 hover:bg-transparent">
+                                    {expandedOrders.has(order.id) ? (
+                                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                    ) : (
+                                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                    <h4 className="font-semibold text-lg">{order.supplier}</h4>
+                                  </Button>
+                                </CollapsibleTrigger>
+                                
+                                {/* Status Badge with Icon */}
+                                <div className="flex items-center gap-2">
+                                  {getStatusIcon(order.status)}
+                                  <Badge className={getStatusColor(order.status)}>
+                                    {order.status}
+                                  </Badge>
+                                </div>
+                              </div>
                               
                               <div className="flex items-center gap-2">
                                 {/* Manual Status Editor */}
@@ -842,10 +883,10 @@ const ProjectDetails = () => {
                                   value={order.status}
                                   onValueChange={(value) => handleStatusChange(order.id, value)}
                                 >
-                                  <SelectTrigger className="w-32 h-7 text-xs">
+                                  <SelectTrigger className="w-32 h-8 text-xs bg-background border z-50">
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent className="bg-background z-50">
+                                  <SelectContent className="bg-background border z-50">
                                     <SelectItem value="pending">Pending</SelectItem>
                                     <SelectItem value="delivered">Delivered</SelectItem>
                                     <SelectItem value="canceled">Canceled</SelectItem>
@@ -854,12 +895,13 @@ const ProjectDetails = () => {
                                 </Select>
 
                                 {/* Action Buttons */}
-                                <div className="flex gap-1">
+                                <div className="flex gap-1">{/* Action Buttons */}
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleEditOrder(order.id)}
-                                    className="h-7 w-7 p-0"
+                                    className="h-8 w-8 p-0 hover:bg-blue-50"
+                                    title="Edit order"
                                   >
                                     <Edit3 className="h-3 w-3" />
                                   </Button>
@@ -868,7 +910,8 @@ const ProjectDetails = () => {
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleDeleteOrder(order.id)}
-                                    className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-red-50"
+                                    title="Delete order"
                                   >
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
@@ -876,30 +919,60 @@ const ProjectDetails = () => {
                               </div>
                             </div>
 
-                            {/* Order Basic Info */}
-                            <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground mb-3">
-                              <div>
-                                <span className="font-medium">{t('expected_delivery')}:</span>{' '}
-                                {order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString() : t('not_set')}
-                              </div>
-                              <div>
-                                <span className="font-medium">{t('order_type')}:</span>{' '}
-                                {order.order_type}
+                            {/* Order Basic Info - Enhanced Design */}
+                            <div className="bg-muted/30 rounded-lg p-3 mb-3">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                                  <div>
+                                    <span className="font-medium text-muted-foreground">{t('expected_delivery')}:</span>
+                                    <div className="font-medium">
+                                      {order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString() : t('not_set')}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Package className="h-4 w-4 text-muted-foreground" />
+                                  <div>
+                                    <span className="font-medium text-muted-foreground">{t('order_type')}:</span>
+                                    <div className="font-medium capitalize">{order.order_type.replace('_', ' ')}</div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Clock className="h-4 w-4 text-muted-foreground" />
+                                  <div>
+                                    <span className="font-medium text-muted-foreground">{t('created')}:</span>
+                                    <div className="font-medium">
+                                      {new Date(order.created_at).toLocaleDateString()}
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
                             </div>
 
                             {order.notes && (
-                              <p className="text-sm text-muted-foreground mb-3 italic">
-                                "{order.notes}"
-                              </p>
+                              <div className="bg-blue-50 border-l-4 border-blue-200 p-3 mb-3">
+                                <div className="flex items-start gap-2">
+                                  <FileText className="h-4 w-4 text-blue-600 mt-0.5" />
+                                  <div>
+                                    <p className="text-sm font-medium text-blue-800 mb-1">Order Notes:</p>
+                                    <p className="text-sm text-blue-700 italic">"{order.notes}"</p>
+                                  </div>
+                                </div>
+                              </div>
                             )}
 
-                            {/* Camera and File Actions */}
-                            <div className="flex gap-2 mb-3">
+                            {/* Camera and File Actions - Enhanced */}
+                            <div className="flex items-center justify-between mb-3 p-3 bg-muted/20 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <h5 className="font-medium text-sm">Attachments & Actions:</h5>
+                              </div>
                               <OrderAttachmentUploader 
                                 orderId={order.id}
                                 onUploadSuccess={() => loadOrderAttachments(order.id)}
                                 compact={true}
+                                showDeliveryConfirm={order.status !== 'delivered'}
+                                onDeliveryConfirm={() => handleDeliveryConfirm(order.id)}
                               />
                             </div>
 
@@ -907,18 +980,32 @@ const ProjectDetails = () => {
                             <CollapsibleContent className="space-y-4">
                               {/* Order Items */}
                               {orderItems[order.id] && orderItems[order.id].length > 0 && (
-                                <div>
-                                  <h5 className="font-medium text-sm mb-2">{t('order_items')}:</h5>
-                                  <div className="bg-muted/50 rounded p-3 space-y-2">
-                                    {orderItems[order.id].map((item: any) => (
-                                      <div key={item.id} className="flex justify-between items-center text-sm">
-                                        <div>
-                                          <span className="font-medium">{item.description}</span>
+                                <div className="mb-4">
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <Package className="h-4 w-4 text-primary" />
+                                    <h5 className="font-semibold text-sm">{t('order_items')} ({orderItems[order.id].length})</h5>
+                                  </div>
+                                  <div className="bg-muted/30 rounded-lg p-3 space-y-3">
+                                    {orderItems[order.id].map((item: any, index: number) => (
+                                      <div key={item.id} className="flex justify-between items-center p-2 bg-background rounded border">
+                                        <div className="flex-1">
+                                          <span className="font-medium text-sm">{item.description}</span>
                                           {item.article_code && (
-                                            <span className="text-muted-foreground ml-2">({item.article_code})</span>
+                                            <div className="text-xs text-muted-foreground mt-1">
+                                              Article: {item.article_code}
+                                            </div>
+                                          )}
+                                          {item.notes && (
+                                            <div className="text-xs text-muted-foreground mt-1 italic">
+                                              Note: {item.notes}
+                                            </div>
                                           )}
                                         </div>
-                                        <span className="text-muted-foreground">Qty: {item.quantity}</span>
+                                        <div className="ml-4">
+                                          <span className="bg-primary/10 text-primary px-2 py-1 rounded text-xs font-medium">
+                                            Qty: {item.quantity}
+                                          </span>
+                                        </div>
                                       </div>
                                     ))}
                                   </div>
@@ -927,21 +1014,44 @@ const ProjectDetails = () => {
 
                               {/* Order Attachments */}
                               {orderAttachments[order.id] && orderAttachments[order.id].length > 0 && (
-                                <div>
-                                  <h5 className="font-medium text-sm mb-2">{t('attachments')}:</h5>
-                                  <div className="space-y-2">
+                                <div className="mb-4">
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <Paperclip className="h-4 w-4 text-primary" />
+                                    <h5 className="font-semibold text-sm">{t('attachments')} ({orderAttachments[order.id].length})</h5>
+                                  </div>
+                                  <div className="grid grid-cols-1 gap-2">
                                     {orderAttachments[order.id].map((attachment: any) => (
-                                      <div key={attachment.id} className="flex items-center justify-between bg-muted/50 rounded p-2">
-                                        <div className="flex items-center gap-2">
-                                          <Paperclip className="h-4 w-4 text-muted-foreground" />
-                                          <span className="text-sm">{attachment.file_name}</span>
+                                      <div key={attachment.id} className="flex items-center justify-between bg-background rounded-lg p-3 border">
+                                        <div className="flex items-center gap-3 flex-1">
+                                          <div className={cn(
+                                            "p-2 rounded",
+                                            attachment.file_name.includes('DELIVERY_CONFIRMED') 
+                                              ? "bg-green-100 text-green-700" 
+                                              : "bg-muted text-muted-foreground"
+                                          )}>
+                                            {attachment.file_name.includes('DELIVERY_CONFIRMED') ? (
+                                              <CheckCircle className="h-4 w-4" />
+                                            ) : (
+                                              <Paperclip className="h-4 w-4" />
+                                            )}
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium truncate">{attachment.file_name}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                              {(attachment.file_size / 1024 / 1024).toFixed(2)} MB • {new Date(attachment.created_at).toLocaleDateString()}
+                                            </p>
+                                            {attachment.file_name.includes('DELIVERY_CONFIRMED') && (
+                                              <p className="text-xs text-green-600 font-medium">✓ Delivery Confirmation Photo</p>
+                                            )}
+                                          </div>
                                         </div>
                                         <Button
                                           size="sm"
                                           variant="outline"
                                           onClick={() => window.open(attachment.file_path, '_blank')}
-                                          className="h-7 text-xs"
+                                          className="ml-3 h-8"
                                         >
+                                          <Camera className="h-3 w-3 mr-1" />
                                           {t('view')}
                                         </Button>
                                       </div>
@@ -953,8 +1063,14 @@ const ProjectDetails = () => {
                               {/* No items/attachments message */}
                               {(!orderItems[order.id] || orderItems[order.id].length === 0) && 
                                (!orderAttachments[order.id] || orderAttachments[order.id].length === 0) && (
-                                <div className="text-center py-4 text-muted-foreground text-sm">
-                                  {t('no_items_or_attachments')}
+                                <div className="text-center py-8 bg-muted/20 rounded-lg">
+                                  <Package className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                                  <p className="text-muted-foreground text-sm font-medium">
+                                    {t('no_items_or_attachments')}
+                                  </p>
+                                  <p className="text-muted-foreground text-xs mt-1">
+                                    Expand this order to add items and attachments
+                                  </p>
                                 </div>
                               )}
                             </CollapsibleContent>
