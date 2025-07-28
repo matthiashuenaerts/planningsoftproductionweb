@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -24,9 +24,11 @@ import TaskList from '@/components/TaskList';
 import ProjectFileManager from '@/components/ProjectFileManager';
 import OneDriveIntegration from '@/components/OneDriveIntegration';
 import NewOrderModal from '@/components/NewOrderModal';
+import { OrderEditModal } from '@/components/OrderEditModal';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { AccessoriesDialog } from '@/components/AccessoriesDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
+import { OrderPopup } from '@/components/OrderPopup';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
@@ -58,6 +60,9 @@ const ProjectDetails = () => {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState('');
   const [savingDescription, setSavingDescription] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [showOrderPopup, setShowOrderPopup] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string>('');
   const { currentEmployee } = useAuth();
   const { t, lang, createLocalizedPath } = useLanguage();
 
@@ -492,6 +497,59 @@ const ProjectDetails = () => {
     setEditedDescription('');
   };
 
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!confirm(t('confirm_delete_order'))) return;
+    
+    try {
+      await orderService.deleteOrder(orderId);
+      toast({
+        title: t('success'),
+        description: t('order_deleted_successfully'),
+      });
+      if (projectId) {
+        const ordersData = await orderService.getByProject(projectId);
+        setOrders(ordersData);
+      }
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: t('failed_to_delete_order', { message: error.message }),
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditOrder = (order: any) => {
+    setEditingOrder(order);
+  };
+
+  const handleOrderUpdated = () => {
+    if (projectId) {
+      orderService.getByProject(projectId).then(setOrders);
+    }
+    setEditingOrder(null);
+    toast({
+      title: t('success'),
+      description: t('order_updated_successfully'),
+    });
+  };
+
+  const handleAddOrder = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setShowOrderPopup(true);
+  };
+
+  const handleOrderCreated = () => {
+    if (projectId) {
+      orderService.getByProject(projectId).then(setOrders);
+    }
+    setShowOrderPopup(false);
+    toast({
+      title: t('success'),
+      description: t('order_created_successfully'),
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen">
@@ -721,9 +779,25 @@ const ProjectDetails = () => {
                             {t('order_date')}: {new Date(order.order_date).toLocaleDateString(lang)}
                           </CardDescription>
                         </div>
-                        <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'}>
-                          {t(order.status)}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'}>
+                            {t(order.status)}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditOrder(order)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteOrder(order.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent>
@@ -737,6 +811,14 @@ const ProjectDetails = () => {
                     </CardContent>
                     <CardFooter>
                       <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAddOrder(order.id)}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          {t('add_order')}
+                        </Button>
                         {order.status !== 'delivered' && (
                           <Button 
                             variant="outline" 
@@ -992,6 +1074,22 @@ const ProjectDetails = () => {
         showAddOrderButton={true}
         accessories={accessories}
         installationDate={project?.installation_date}
+      />
+
+      {editingOrder && (
+        <OrderEditModal
+          order={editingOrder}
+          isOpen={!!editingOrder}
+          onClose={() => setEditingOrder(null)}
+          onUpdated={handleOrderUpdated}
+        />
+      )}
+
+      <OrderPopup
+        isOpen={showOrderPopup}
+        onClose={() => setShowOrderPopup(false)}
+        projectId={projectId!}
+        onOrderCreated={handleOrderCreated}
       />
 
       <PartsListDialog
