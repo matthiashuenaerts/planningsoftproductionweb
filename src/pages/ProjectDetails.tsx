@@ -913,17 +913,22 @@ const ProjectDetails = () => {
                               </div>
                             </div>
 
-                            {/* Compact Order Info */}
-                            <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground mb-2">
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                <span>{order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString() : 'No date'}</span>
+                            {/* Compact Order Info with Enhanced Delivery Date */}
+                            <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                              <div className="flex items-center gap-1 bg-blue-50 p-2 rounded border border-blue-200">
+                                <Calendar className="h-3 w-3 text-blue-600" />
+                                <div>
+                                  <div className="text-blue-600 font-medium text-xs">Expected</div>
+                                  <div className="font-semibold text-blue-800">
+                                    {order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString() : 'No date'}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1 text-muted-foreground">
                                 <Package className="h-3 w-3" />
                                 <span className="capitalize">{order.order_type.replace('_', ' ')}</span>
                               </div>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1 text-muted-foreground">
                                 <Clock className="h-3 w-3" />
                                 <span>{new Date(order.created_at).toLocaleDateString()}</span>
                               </div>
@@ -956,16 +961,23 @@ const ProjectDetails = () => {
                                   <Package className="h-3 w-3 text-primary" />
                                   <span className="text-xs font-medium">{t('order_items')} ({orderItems[order.id].length})</span>
                                 </div>
-                                <div className="bg-muted/30 rounded p-2 space-y-1">
+                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 space-y-2">
                                   {orderItems[order.id].map((item: any) => (
-                                    <div key={item.id} className="flex justify-between items-center text-xs">
+                                    <div key={item.id} className="flex justify-between items-center bg-white/80 backdrop-blur-sm rounded-md p-2 border border-blue-100 shadow-sm">
                                       <div className="flex-1 min-w-0">
-                                        <span className="font-medium">{item.description}</span>
+                                        <span className="font-semibold text-sm text-gray-800">{item.description}</span>
                                         {item.article_code && (
-                                          <span className="text-muted-foreground ml-1">({item.article_code})</span>
+                                          <div className="text-xs text-blue-700 font-medium mt-0.5">
+                                            Article: {item.article_code}
+                                          </div>
+                                        )}
+                                        {item.notes && (
+                                          <div className="text-xs text-gray-600 mt-0.5 italic">
+                                            Note: {item.notes}
+                                          </div>
                                         )}
                                       </div>
-                                      <span className="bg-primary/10 text-primary px-1 py-0.5 rounded text-xs font-medium ml-2">
+                                      <span className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-2 py-1 rounded-full text-xs font-bold ml-2 shadow-sm">
                                         {item.quantity}
                                       </span>
                                     </div>
