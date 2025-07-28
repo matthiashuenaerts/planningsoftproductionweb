@@ -770,8 +770,8 @@ const ProjectDetails = () => {
                   <List className="mr-2 h-4 w-4" /> {t('parts_list')}
                 </Button>
                 <Button 
-                  variant="outline"
-                  onClick={() => setShowAccessoriesDialog(true)}
+                  variant={activeTab === 'accessories' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('accessories')}
                 >
                   <Settings className="mr-2 h-4 w-4" /> {t('accessories')}
                 </Button>
@@ -822,6 +822,108 @@ const ProjectDetails = () => {
             <ProjectFileManager projectId={projectId!} />
           ) : activeTab === 'onedrive' ? (
             <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} />
+          ) : activeTab === 'accessories' ? (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>{t('accessories')}</CardTitle>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => setShowAccessoriesDialog(true)} 
+                      size="sm"
+                      variant="outline"
+                    >
+                      <Settings className="mr-2 h-4 w-4" />
+                      {t('manage_accessories')}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {accessories.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">{t('no_accessories_found')}</p>
+                      <Button 
+                        onClick={() => setShowAccessoriesDialog(true)} 
+                        className="mt-4"
+                        size="sm"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        {t('add_accessories')}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {accessories.map((accessory) => (
+                        <Card key={accessory.id} className={cn(
+                          "transition-all duration-200",
+                          accessory.status === 'delivered' ? 'bg-green-50 border-green-200' :
+                          accessory.status === 'in_stock' ? 'bg-blue-50 border-blue-200' :
+                          accessory.status === 'ordered' ? 'bg-orange-50 border-orange-200' :
+                          accessory.status === 'to_order' ? 'bg-red-50 border-red-200' :
+                          'bg-yellow-50 border-yellow-200'
+                        )}>
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-sm font-medium">{accessory.article_name}</CardTitle>
+                              <Badge className={cn(
+                                "text-xs",
+                                accessory.status === 'delivered' && 'bg-green-100 text-green-800',
+                                accessory.status === 'in_stock' && 'bg-blue-100 text-blue-800',
+                                accessory.status === 'ordered' && 'bg-orange-100 text-orange-800',
+                                accessory.status === 'to_order' && 'bg-red-100 text-red-800',
+                                accessory.status === 'to_check' && 'bg-yellow-100 text-yellow-800'
+                              )}>
+                                {accessory.status.replace('_', ' ')}
+                              </Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="space-y-2 text-sm">
+                              {accessory.article_description && (
+                                <p className="text-muted-foreground">{accessory.article_description}</p>
+                              )}
+                              {accessory.article_code && (
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">Code:</span>
+                                  <span className="text-muted-foreground">{accessory.article_code}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">Quantity:</span>
+                                <span className={cn(
+                                  "px-2 py-1 rounded text-xs font-medium",
+                                  accessory.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                                  accessory.status === 'in_stock' ? 'bg-blue-100 text-blue-800' :
+                                  accessory.status === 'ordered' ? 'bg-orange-100 text-orange-800' :
+                                  accessory.status === 'to_order' ? 'bg-red-100 text-red-800' :
+                                  'bg-yellow-100 text-yellow-800'
+                                )}>
+                                  {accessory.quantity}
+                                </span>
+                              </div>
+                              {accessory.supplier && (
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">Supplier:</span>
+                                  <span className="text-muted-foreground">{accessory.supplier}</span>
+                                </div>
+                              )}
+                              {accessory.stock_location && (
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">Location:</span>
+                                  <span className="text-muted-foreground">{accessory.stock_location}</span>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           ) : activeTab === 'orders' ? (
             <Card>
               <CardHeader>
