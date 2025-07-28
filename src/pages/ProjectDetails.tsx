@@ -624,8 +624,8 @@ const ProjectDetails = () => {
                   <Home className="mr-2 h-4 w-4" /> {t('home')}
                 </Button>
                 <Button 
-                  variant="outline"
-                  onClick={() => navigate(createLocalizedPath(`/projects/${projectId}/orders`))}
+                  variant={activeTab === 'orders' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('orders')}
                   className={cn(
                     allOrdersDelivered 
                       ? "bg-green-500 text-white hover:bg-green-600" 
@@ -701,6 +701,71 @@ const ProjectDetails = () => {
             <ProjectFileManager projectId={projectId!} />
           ) : activeTab === 'onedrive' ? (
             <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} />
+          ) : activeTab === 'orders' ? (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">{t('orders')}</h2>
+                <Button onClick={() => setShowNewOrderModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" /> {t('new_order')}
+                </Button>
+              </div>
+              
+              <div className="grid gap-4">
+                {orders.map((order) => (
+                  <Card key={order.id}>
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg">{order.supplier}</CardTitle>
+                          <CardDescription>
+                            {t('order_date')}: {new Date(order.order_date).toLocaleDateString(lang)}
+                          </CardDescription>
+                        </div>
+                        <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'}>
+                          {t(order.status)}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <p><strong>{t('expected_delivery')}:</strong> {new Date(order.expected_delivery).toLocaleDateString(lang)}</p>
+                        <p><strong>{t('order_type')}:</strong> {t(order.order_type)}</p>
+                        {order.notes && (
+                          <p><strong>{t('notes')}:</strong> {order.notes}</p>
+                        )}
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <div className="flex gap-2">
+                        {order.status !== 'delivered' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => orderService.confirmDelivery(order.id).then(() => {
+                              toast({
+                                title: t('success'),
+                                description: t('order_delivered_successfully'),
+                              });
+                              orderService.getByProject(projectId!).then(setOrders);
+                            })}
+                          >
+                            {t('confirm_delivery')}
+                          </Button>
+                        )}
+                      </div>
+                    </CardFooter>
+                  </Card>
+                ))}
+                
+                {orders.length === 0 && (
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <p className="text-muted-foreground">{t('no_orders_found')}</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-1">
