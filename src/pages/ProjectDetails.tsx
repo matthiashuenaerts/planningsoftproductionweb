@@ -915,11 +915,39 @@ const ProjectDetails = () => {
 
                             {/* Compact Order Info with Enhanced Delivery Date */}
                             <div className="grid grid-cols-3 gap-2 text-xs mb-2">
-                              <div className="flex items-center gap-1 bg-blue-50 p-2 rounded border border-blue-200">
-                                <Calendar className="h-3 w-3 text-blue-600" />
+                              <div className={cn(
+                                "flex items-center gap-1 p-2 rounded border",
+                                order.status === 'delivered' ? 'bg-green-50 border-green-200' :
+                                order.status === 'pending' ? 'bg-orange-50 border-orange-200' :
+                                order.status === 'delayed' ? 'bg-red-50 border-red-200' :
+                                order.status === 'canceled' ? 'bg-gray-50 border-gray-200' :
+                                'bg-blue-50 border-blue-200'
+                              )}>
+                                <Calendar className={cn(
+                                  "h-3 w-3",
+                                  order.status === 'delivered' ? 'text-green-600' :
+                                  order.status === 'pending' ? 'text-orange-600' :
+                                  order.status === 'delayed' ? 'text-red-600' :
+                                  order.status === 'canceled' ? 'text-gray-600' :
+                                  'text-blue-600'
+                                )} />
                                 <div>
-                                  <div className="text-blue-600 font-medium text-xs">Expected</div>
-                                  <div className="font-semibold text-blue-800">
+                                  <div className={cn(
+                                    "font-medium text-xs",
+                                    order.status === 'delivered' ? 'text-green-600' :
+                                    order.status === 'pending' ? 'text-orange-600' :
+                                    order.status === 'delayed' ? 'text-red-600' :
+                                    order.status === 'canceled' ? 'text-gray-600' :
+                                    'text-blue-600'
+                                  )}>Expected</div>
+                                  <div className={cn(
+                                    "font-semibold",
+                                    order.status === 'delivered' ? 'text-green-800' :
+                                    order.status === 'pending' ? 'text-orange-800' :
+                                    order.status === 'delayed' ? 'text-red-800' :
+                                    order.status === 'canceled' ? 'text-gray-800' :
+                                    'text-blue-800'
+                                  )}>
                                     {order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString() : 'No date'}
                                   </div>
                                 </div>
@@ -961,13 +989,34 @@ const ProjectDetails = () => {
                                   <Package className="h-3 w-3 text-primary" />
                                   <span className="text-xs font-medium">{t('order_items')} ({orderItems[order.id].length})</span>
                                 </div>
-                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                                <div className={cn(
+                                  "border rounded-lg p-3 space-y-2",
+                                  order.status === 'delivered' ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200' :
+                                  order.status === 'pending' ? 'bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200' :
+                                  order.status === 'delayed' ? 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200' :
+                                  order.status === 'canceled' ? 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200' :
+                                  'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'
+                                )}>
                                   {orderItems[order.id].map((item: any) => (
-                                    <div key={item.id} className="flex justify-between items-center bg-white/80 backdrop-blur-sm rounded-md p-2 border border-blue-100 shadow-sm">
+                                    <div key={item.id} className={cn(
+                                      "flex justify-between items-center bg-white/80 backdrop-blur-sm rounded-md p-2 shadow-sm border",
+                                      order.status === 'delivered' ? 'border-green-100' :
+                                      order.status === 'pending' ? 'border-orange-100' :
+                                      order.status === 'delayed' ? 'border-red-100' :
+                                      order.status === 'canceled' ? 'border-gray-100' :
+                                      'border-blue-100'
+                                    )}>
                                       <div className="flex-1 min-w-0">
                                         <span className="font-semibold text-sm text-gray-800">{item.description}</span>
                                         {item.article_code && (
-                                          <div className="text-xs text-blue-700 font-medium mt-0.5">
+                                          <div className={cn(
+                                            "text-xs font-medium mt-0.5",
+                                            order.status === 'delivered' ? 'text-green-700' :
+                                            order.status === 'pending' ? 'text-orange-700' :
+                                            order.status === 'delayed' ? 'text-red-700' :
+                                            order.status === 'canceled' ? 'text-gray-700' :
+                                            'text-blue-700'
+                                          )}>
                                             Article: {item.article_code}
                                           </div>
                                         )}
@@ -977,7 +1026,14 @@ const ProjectDetails = () => {
                                           </div>
                                         )}
                                       </div>
-                                      <span className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-2 py-1 rounded-full text-xs font-bold ml-2 shadow-sm">
+                                      <span className={cn(
+                                        "text-white px-2 py-1 rounded-full text-xs font-bold ml-2 shadow-sm",
+                                        order.status === 'delivered' ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
+                                        order.status === 'pending' ? 'bg-gradient-to-r from-orange-500 to-amber-500' :
+                                        order.status === 'delayed' ? 'bg-gradient-to-r from-red-500 to-rose-500' :
+                                        order.status === 'canceled' ? 'bg-gradient-to-r from-gray-500 to-slate-500' :
+                                        'bg-gradient-to-r from-blue-500 to-indigo-500'
+                                      )}>
                                         {item.quantity}
                                       </span>
                                     </div>
