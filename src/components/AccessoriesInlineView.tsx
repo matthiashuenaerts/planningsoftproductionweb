@@ -392,13 +392,15 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
     const supplier = suppliers.length > 0 ? suppliers[0] : '';
 
     return {
-      supplier,
-      items: selectedItems.map(acc => ({
+      accessories: selectedItems,
+      orderItems: selectedItems.map(acc => ({
         description: acc.article_name,
         quantity: acc.quantity,
         article_code: acc.article_code || '',
-        notes: acc.article_description || ''
-      }))
+        notes: acc.article_description || '',
+        accessory_id: acc.id
+      })),
+      supplier
     };
   };
 
@@ -895,7 +897,7 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
           projectId={projectId}
           onSuccess={handleOrderCreated}
           showAddOrderButton={false}
-          accessories={accessories.filter(acc => selectedAccessories.includes(acc.id))}
+          prefilledData={getPrefilledOrderData()}
         />
       )}
 
