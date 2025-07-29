@@ -13,6 +13,7 @@ import { orderService } from '@/services/orderService';
 import { Order, OrderItem, OrderStep } from '@/types/order';
 import { Accessory } from '@/services/accessoriesService';
 import { addBusinessDays, subBusinessDays, format, parseISO, isAfter } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 interface NewOrderModalProps {
   open: boolean;
@@ -43,6 +44,7 @@ const NewOrderModal = ({
   } = useToast();
   const [loading, setLoading] = useState(false);
   const [orderType, setOrderType] = useState<'standard' | 'semi-finished'>('standard');
+  const [suppliers, setSuppliers] = useState<{id: string, name: string}[]>([]);
   const [formData, setFormData] = useState({
     supplier: '',
     expected_delivery: '',
@@ -122,6 +124,27 @@ const NewOrderModal = ({
     }
 
   }, [formData.expected_delivery, stepDurations, stepCount, orderType, installationDate, internalProcessingDays]);
+
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('suppliers')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name');
+        
+        if (error) throw error;
+        setSuppliers(data || []);
+      } catch (error) {
+        console.error('Error fetching suppliers:', error);
+      }
+    };
+
+    if (open) {
+      fetchSuppliers();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (prefilledData && open) {
@@ -284,13 +307,28 @@ const NewOrderModal = ({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="supplier">{isProcessingOnly ? 'Order Name *' : 'Supplier *'}</Label>
-            <Input 
-              id="supplier" 
-              value={formData.supplier} 
-              onChange={e => setFormData(prev => ({ ...prev, supplier: e.target.value }))} 
-              placeholder={isProcessingOnly ? "e.g., External Powder Coating Job" : "Supplier name"}
-              required 
-            />
+            {isProcessingOnly ? (
+              <Input 
+                id="supplier" 
+                value={formData.supplier} 
+                onChange={e => setFormData(prev => ({ ...prev, supplier: e.target.value }))} 
+                placeholder="e.g., External Powder Coating Job"
+                required 
+              />
+            ) : (
+              <Select value={formData.supplier} onValueChange={(value) => setFormData(prev => ({ ...prev, supplier: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.name}>
+                      {supplier.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div>
             <Label htmlFor="order_reference">Order Reference</Label>
