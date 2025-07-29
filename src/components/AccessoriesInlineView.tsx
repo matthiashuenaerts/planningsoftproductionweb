@@ -498,6 +498,10 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
               <CardContent>
                 <AccessoryCsvImporter
                   projectId={projectId}
+                  onImportSuccess={() => {
+                    setShowCsvImporter(false);
+                    loadAccessories();
+                  }}
                 />
               </CardContent>
             </Card>
@@ -695,10 +699,10 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
 
       {showOrderEditModal && selectedOrderId && (
         <OrderEditModal
-          isOpen={showOrderEditModal}
-          onClose={() => {
-            setShowOrderEditModal(false);
-            setSelectedOrderId(null);
+          open={showOrderEditModal}
+          onOpenChange={(open) => {
+            setShowOrderEditModal(open);
+            if (!open) setSelectedOrderId(null);
           }}
           orderId={selectedOrderId}
           onSuccess={handleOrderEditSuccess}
@@ -707,18 +711,21 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
 
       {showNewOrderModal && (
         <NewOrderModal
-          isOpen={showNewOrderModal}
-          onClose={() => setShowNewOrderModal(false)}
+          open={showNewOrderModal}
+          onOpenChange={setShowNewOrderModal}
           projectId={projectId}
           onSuccess={handleOrderCreated}
-          prefilledData={getPrefilledOrderData()}
+          showAddOrderButton={false}
+          accessories={accessories.filter(acc => selectedAccessories.includes(acc.id))}
         />
       )}
 
       <AccessoryQrCodeDialog
-        isOpen={showQrCodeDialog}
-        onClose={() => setShowQrCodeDialog(false)}
+        open={showQrCodeDialog}
+        onOpenChange={setShowQrCodeDialog}
+        projectId={projectId}
         accessories={sortedAccessoriesForQr}
+        onAccessoryUpdate={loadAccessories}
       />
     </div>
   );

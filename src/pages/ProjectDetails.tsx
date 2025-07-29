@@ -34,6 +34,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 
 import { AccessoriesDialog } from '@/components/AccessoriesDialog';
+import { AccessoriesInlineView } from '@/components/AccessoriesInlineView';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import OrderEditModal from '@/components/OrderEditModal';
 import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
