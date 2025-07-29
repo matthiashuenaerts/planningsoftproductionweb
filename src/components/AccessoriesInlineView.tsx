@@ -21,7 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Plus, Trash2, ExternalLink, Edit, ShoppingCart, QrCode, Upload } from 'lucide-react';
+import { Plus, Trash2, ExternalLink, Edit, ShoppingCart, QrCode, Upload, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { accessoriesService, Accessory } from '@/services/accessoriesService';
 import { orderService } from '@/services/orderService';
@@ -53,6 +53,26 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
   
   const [editingStatusAccessoryId, setEditingStatusAccessoryId] = useState<string | null>(null);
   const [statusUpdateInfo, setStatusUpdateInfo] = useState<{status: Accessory['status'], quantity: number}>({status: 'to_check', quantity: 1});
+  const [editingAccessoryId, setEditingAccessoryId] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState<{
+    article_name: string;
+    article_description: string;
+    article_code: string;
+    quantity: number;
+    stock_location: string;
+    supplier: string;
+    status: Accessory['status'];
+    qr_code_text: string;
+  }>({
+    article_name: '',
+    article_description: '',
+    article_code: '',
+    quantity: 1,
+    stock_location: '',
+    supplier: '',
+    status: 'to_check',
+    qr_code_text: ''
+  });
 
   const statuses: Accessory['status'][] = ['to_check', 'in_stock', 'delivered', 'to_order', 'ordered'];
 
@@ -229,16 +249,18 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
     loadOrders();
   };
 
-  const handleAccessorySelection = (accessoryId: string, checked: boolean) => {
+  const handleAccessorySelection = (accessoryId: string, checked: boolean | 'indeterminate') => {
+    const isChecked = checked === true;
     setSelectedAccessories(prev => 
-      checked 
+      isChecked 
         ? [...prev, accessoryId]
         : prev.filter(id => id !== accessoryId)
     );
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    const isChecked = checked === true;
+    if (isChecked) {
       const selectableAccessories = accessories.filter(acc => 
         acc.status === 'to_order' && !acc.order_id
       );
@@ -317,6 +339,46 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
       return new Date(dateString).toLocaleDateString();
     } catch {
       return dateString;
+    }
+  };
+
+  const handleEditAccessory = (accessory: Accessory) => {
+    setEditingAccessoryId(accessory.id);
+    setEditFormData({
+      article_name: accessory.article_name,
+      article_description: accessory.article_description || '',
+      article_code: accessory.article_code || '',
+      quantity: accessory.quantity,
+      stock_location: accessory.stock_location || '',
+      supplier: accessory.supplier || '',
+      status: accessory.status,
+      qr_code_text: accessory.qr_code_text || ''
+    });
+  };
+
+  const handleUpdateAccessory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAccessoryId) return;
+    
+    try {
+      setLoading(true);
+      await accessoriesService.update(editingAccessoryId, editFormData);
+      
+      setEditingAccessoryId(null);
+      await loadAccessories();
+      
+      toast({
+        title: "Success",
+        description: "Accessory updated successfully"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to update accessory: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -507,6 +569,112 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
             </Card>
           )}
 
+          {editingAccessoryId && (
+            <Card className="mb-4">
+              <CardHeader>
+                <CardTitle>Edit Accessory</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleUpdateAccessory} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit_article_name">Article Name *</Label>
+                      <Input
+                        id="edit_article_name"
+                        value={editFormData.article_name}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, article_name: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_article_code">Article Code</Label>
+                      <Input
+                        id="edit_article_code"
+                        value={editFormData.article_code}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, article_code: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_quantity">Quantity *</Label>
+                      <Input
+                        id="edit_quantity"
+                        type="number"
+                        min="1"
+                        value={editFormData.quantity}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_supplier">Supplier</Label>
+                      <Input
+                        id="edit_supplier"
+                        value={editFormData.supplier}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, supplier: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_stock_location">Stock Location</Label>
+                      <Input
+                        id="edit_stock_location"
+                        value={editFormData.stock_location}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, stock_location: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_status">Status</Label>
+                      <Select
+                        value={editFormData.status}
+                        onValueChange={(value: Accessory['status']) => setEditFormData(prev => ({ ...prev, status: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statuses.map(status => (
+                            <SelectItem key={status} value={status}>
+                              {status.replace('_', ' ').toUpperCase()}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="edit_article_description">Description</Label>
+                    <Textarea
+                      id="edit_article_description"
+                      value={editFormData.article_description}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, article_description: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit_qr_code_text">QR Code Text</Label>
+                    <Input
+                      id="edit_qr_code_text"
+                      value={editFormData.qr_code_text}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, qr_code_text: e.target.value }))}
+                      placeholder="Optional QR code text"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={loading}>
+                      {loading ? "Updating..." : "Update Accessory"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setEditingAccessoryId(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -663,12 +831,22 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEditAccessory(accessory)}
+                          className="h-7 w-7 p-0"
+                          title="Edit accessory"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
                         {accessory.order_id && (
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleEditOrder(accessory.order_id!)}
                             className="h-7 w-7 p-0"
+                            title="Edit order"
                           >
                             <Edit className="h-3 w-3" />
                           </Button>
@@ -678,6 +856,7 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                           variant="outline"
                           onClick={() => handleDelete(accessory.id)}
                           className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          title="Delete accessory"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
