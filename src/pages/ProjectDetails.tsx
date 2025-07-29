@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { 
@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Loader2, Circle, Eye } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Loader2, Circle, Eye, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -78,7 +78,11 @@ const ProjectDetails = () => {
     commentaar: '',
     status: 'all'
   });
-  const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
+  const [partsSortConfig, setPartsSortConfig] = useState<{
+    key: string;
+    direction: 'asc' | 'desc';
+  } | null>(null);
+  const [showAccessoriesView, setShowAccessoriesView] = useState(false);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
   const [showOrderEditModal, setShowOrderEditModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -480,6 +484,56 @@ const ProjectDetails = () => {
       status: 'all'
     });
   };
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (partsSortConfig && partsSortConfig.key === key && partsSortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setPartsSortConfig({ key, direction });
+  };
+
+  const sortedAndFilteredParts = React.useMemo(() => {
+    let sortedParts = [...filteredParts];
+    if (partsSortConfig) {
+      sortedParts.sort((a, b) => {
+        const { key, direction } = partsSortConfig;
+        let aVal: any, bVal: any;
+
+        switch (key) {
+          case 'status':
+            aVal = a.color_status;
+            bVal = b.color_status;
+            break;
+          case 'afmetingen':
+            aVal = a.lengte && a.breedte ? `${a.lengte} x ${a.breedte}` : a.lengte || a.breedte || '';
+            bVal = b.lengte && b.breedte ? `${b.lengte} x ${b.breedte}` : b.lengte || b.breedte || '';
+            break;
+          case 'aantal':
+            aVal = a.aantal || 0;
+            bVal = b.aantal || 0;
+            break;
+          case 'commentaar':
+            aVal = a.commentaar || a.commentaar_2 || '';
+            bVal = b.commentaar || b.commentaar_2 || '';
+            break;
+          default:
+            aVal = (a as any)[key] || '';
+            bVal = (b as any)[key] || '';
+        }
+
+        if (typeof aVal === 'string' && typeof bVal === 'string') {
+          aVal = aVal.toLowerCase();
+          bVal = bVal.toLowerCase();
+        }
+
+        if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return sortedParts;
+  }, [filteredParts, partsSortConfig]);
 
   const checkAndUpdateLimitPhases = async (completedTaskId?: string) => {
     if (!projectId) return;
@@ -950,8 +1004,8 @@ const ProjectDetails = () => {
                   <List className="mr-2 h-4 w-4" /> {t('parts_list')}
                 </Button>
                 <Button 
-                  variant="outline"
-                  onClick={() => setShowAccessoriesDialog(true)}
+                  variant={activeTab === 'accessories' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('accessories')}
                 >
                   <Settings className="mr-2 h-4 w-4" /> {t('accessories')}
                 </Button>
@@ -1062,34 +1116,146 @@ const ProjectDetails = () => {
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          {/* Filter Controls */}
-                          <div className="flex items-center justify-between p-4 border-b">
-                            <div className="text-sm text-muted-foreground">
-                              Showing {filteredParts.length} of {parts.length} parts
-                            </div>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={clearAllFilters}
-                              className="h-8"
-                            >
-                              Clear Filters
-                            </Button>
-                          </div>
-                          
-                          <ScrollArea className="h-96">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Status</TableHead>
-                                  <TableHead>Materiaal</TableHead>
-                                  <TableHead>Dikte</TableHead>
-                                  <TableHead>Afmetingen</TableHead>
-                                  <TableHead>Aantal</TableHead>
-                                  <TableHead>Wand Naam</TableHead>
-                                  <TableHead>CNC Pos</TableHead>
-                                  <TableHead>Commentaar</TableHead>
-                                </TableRow>
+                           {/* Filter Controls */}
+                           <div className="flex items-center justify-between p-4 border-b">
+                             <div className="text-sm text-muted-foreground">
+                               Showing {sortedAndFilteredParts.length} of {parts.length} parts
+                             </div>
+                             <Button 
+                               variant="outline" 
+                               size="sm" 
+                               onClick={clearAllFilters}
+                               className="h-8"
+                             >
+                               Clear Filters
+                             </Button>
+                           </div>
+                           
+                           <ScrollArea className="h-96">
+                             <Table>
+                               <TableHeader>
+                                 <TableRow>
+                                   <TableHead 
+                                     className="cursor-pointer select-none hover:bg-muted/50"
+                                     onClick={() => handleSort('status')}
+                                   >
+                                     <div className="flex items-center gap-2">
+                                       Status
+                                       {partsSortConfig?.key === 'status' ? (
+                                         partsSortConfig.direction === 'asc' ? 
+                                         <ArrowUp className="h-4 w-4" /> : 
+                                         <ArrowDown className="h-4 w-4" />
+                                       ) : (
+                                         <ArrowUpDown className="h-4 w-4 opacity-50" />
+                                       )}
+                                     </div>
+                                   </TableHead>
+                                   <TableHead 
+                                     className="cursor-pointer select-none hover:bg-muted/50"
+                                     onClick={() => handleSort('materiaal')}
+                                   >
+                                     <div className="flex items-center gap-2">
+                                       Materiaal
+                                       {partsSortConfig?.key === 'materiaal' ? (
+                                         partsSortConfig.direction === 'asc' ? 
+                                         <ArrowUp className="h-4 w-4" /> : 
+                                         <ArrowDown className="h-4 w-4" />
+                                       ) : (
+                                         <ArrowUpDown className="h-4 w-4 opacity-50" />
+                                       )}
+                                     </div>
+                                   </TableHead>
+                                   <TableHead 
+                                     className="cursor-pointer select-none hover:bg-muted/50"
+                                     onClick={() => handleSort('dikte')}
+                                   >
+                                     <div className="flex items-center gap-2">
+                                       Dikte
+                                       {partsSortConfig?.key === 'dikte' ? (
+                                         partsSortConfig.direction === 'asc' ? 
+                                         <ArrowUp className="h-4 w-4" /> : 
+                                         <ArrowDown className="h-4 w-4" />
+                                       ) : (
+                                         <ArrowUpDown className="h-4 w-4 opacity-50" />
+                                       )}
+                                     </div>
+                                   </TableHead>
+                                   <TableHead 
+                                     className="cursor-pointer select-none hover:bg-muted/50"
+                                     onClick={() => handleSort('afmetingen')}
+                                   >
+                                     <div className="flex items-center gap-2">
+                                       Afmetingen
+                                       {partsSortConfig?.key === 'afmetingen' ? (
+                                         partsSortConfig.direction === 'asc' ? 
+                                         <ArrowUp className="h-4 w-4" /> : 
+                                         <ArrowDown className="h-4 w-4" />
+                                       ) : (
+                                         <ArrowUpDown className="h-4 w-4 opacity-50" />
+                                       )}
+                                     </div>
+                                   </TableHead>
+                                   <TableHead 
+                                     className="cursor-pointer select-none hover:bg-muted/50"
+                                     onClick={() => handleSort('aantal')}
+                                   >
+                                     <div className="flex items-center gap-2">
+                                       Aantal
+                                       {partsSortConfig?.key === 'aantal' ? (
+                                         partsSortConfig.direction === 'asc' ? 
+                                         <ArrowUp className="h-4 w-4" /> : 
+                                         <ArrowDown className="h-4 w-4" />
+                                       ) : (
+                                         <ArrowUpDown className="h-4 w-4 opacity-50" />
+                                       )}
+                                     </div>
+                                   </TableHead>
+                                   <TableHead 
+                                     className="cursor-pointer select-none hover:bg-muted/50"
+                                     onClick={() => handleSort('wand_naam')}
+                                   >
+                                     <div className="flex items-center gap-2">
+                                       Wand Naam
+                                       {partsSortConfig?.key === 'wand_naam' ? (
+                                         partsSortConfig.direction === 'asc' ? 
+                                         <ArrowUp className="h-4 w-4" /> : 
+                                         <ArrowDown className="h-4 w-4" />
+                                       ) : (
+                                         <ArrowUpDown className="h-4 w-4 opacity-50" />
+                                       )}
+                                     </div>
+                                   </TableHead>
+                                   <TableHead 
+                                     className="cursor-pointer select-none hover:bg-muted/50"
+                                     onClick={() => handleSort('cnc_pos')}
+                                   >
+                                     <div className="flex items-center gap-2">
+                                       CNC Pos
+                                       {partsSortConfig?.key === 'cnc_pos' ? (
+                                         partsSortConfig.direction === 'asc' ? 
+                                         <ArrowUp className="h-4 w-4" /> : 
+                                         <ArrowDown className="h-4 w-4" />
+                                       ) : (
+                                         <ArrowUpDown className="h-4 w-4 opacity-50" />
+                                       )}
+                                     </div>
+                                   </TableHead>
+                                   <TableHead 
+                                     className="cursor-pointer select-none hover:bg-muted/50"
+                                     onClick={() => handleSort('commentaar')}
+                                   >
+                                     <div className="flex items-center gap-2">
+                                       Commentaar
+                                       {partsSortConfig?.key === 'commentaar' ? (
+                                         partsSortConfig.direction === 'asc' ? 
+                                         <ArrowUp className="h-4 w-4" /> : 
+                                         <ArrowDown className="h-4 w-4" />
+                                       ) : (
+                                         <ArrowUpDown className="h-4 w-4 opacity-50" />
+                                       )}
+                                     </div>
+                                   </TableHead>
+                                 </TableRow>
                                 <TableRow>
                                   <TableHead className="p-2">
                                     <Select
@@ -1166,8 +1332,8 @@ const ProjectDetails = () => {
                                   </TableHead>
                                 </TableRow>
                               </TableHeader>
-                              <TableBody>
-                                {filteredParts.map(part => (
+                               <TableBody>
+                                 {sortedAndFilteredParts.map(part => (
                                 <TableRow key={part.id} className={`border ${getBackgroundColor(part.color_status)}`}>
                                   <TableCell>
                                     <div className="flex items-center gap-1">
@@ -1522,6 +1688,8 @@ const ProjectDetails = () => {
                 </div>
               </CardContent>
             </Card>
+          ) : activeTab === 'accessories' ? (
+            <AccessoriesInlineView projectId={projectId!} />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-1">
@@ -1751,11 +1919,6 @@ const ProjectDetails = () => {
       />
 
 
-      <AccessoriesDialog
-        open={showAccessoriesDialog}
-        onOpenChange={setShowAccessoriesDialog}
-        projectId={projectId!}
-      />
 
       <ProjectBarcodeDialog
         isOpen={showBarcodeDialog}
