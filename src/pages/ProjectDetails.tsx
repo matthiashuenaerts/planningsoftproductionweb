@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Loader2, Circle, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -28,6 +28,10 @@ import OneDriveIntegration from '@/components/OneDriveIntegration';
 import NewOrderModal from '@/components/NewOrderModal';
 import { PartsListImporter } from '@/components/PartsListImporter';
 import { PartsListManager } from '@/components/PartsListManager';
+import { partsListService, PartsList, Part } from '@/services/partsListService';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { AccessoriesDialog } from '@/components/AccessoriesDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import OrderEditModal from '@/components/OrderEditModal';
@@ -60,6 +64,9 @@ const ProjectDetails = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [refreshPartsKey, setRefreshPartsKey] = useState(0);
+  const [partsLists, setPartsLists] = useState<PartsList[]>([]);
+  const [parts, setParts] = useState<Part[]>([]);
+  const [loadingParts, setLoadingParts] = useState(false);
   const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
   const [showOrderEditModal, setShowOrderEditModal] = useState(false);
@@ -301,6 +308,134 @@ const ProjectDetails = () => {
 
     fetchProjectData();
   }, [projectId, toast, fetchAndSetSortedTasks, t]);
+
+  useEffect(() => {
+    if (projectId) {
+      loadPartsLists();
+    }
+  }, [projectId, refreshPartsKey]);
+
+  const loadPartsLists = async () => {
+    if (!projectId) return;
+    
+    setLoadingParts(true);
+    try {
+      const lists = await partsListService.getPartsListsByProject(projectId);
+      setPartsLists(lists);
+      
+      // If there's a parts list, load the parts automatically
+      if (lists.length > 0) {
+        const partsData = await partsListService.getPartsByPartsList(lists[0].id);
+        setParts(partsData);
+      } else {
+        setParts([]);
+      }
+    } catch (error) {
+      console.error('Error loading parts lists:', error);
+    } finally {
+      setLoadingParts(false);
+    }
+  };
+
+  const updatePartColor = async (partId: string, color: 'none' | 'green' | 'orange' | 'red') => {
+    try {
+      await partsListService.updatePartColor(partId, color);
+      setParts(prev => prev.map(part => 
+        part.id === partId ? { ...part, color_status: color } : part
+      ));
+      toast({
+        title: t('success'),
+        description: 'Part color status has been updated'
+      });
+    } catch (error) {
+      console.error('Error updating part color:', error);
+      toast({
+        title: t('error'),
+        description: 'Failed to update part color',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleDeletePartsList = async (partsListId: string) => {
+    if (!confirm('Are you sure you want to delete this parts list?')) return;
+
+    try {
+      await partsListService.deletePartsList(partsListId);
+      toast({
+        title: t('success'),
+        description: 'Parts list deleted successfully'
+      });
+      loadPartsLists();
+    } catch (error) {
+      console.error('Error deleting parts list:', error);
+      toast({
+        title: t('error'),
+        description: 'Failed to delete parts list',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const getBackgroundColor = (color: string) => {
+    switch (color) {
+      case 'green':
+        return 'bg-green-100 border-green-300';
+      case 'orange':
+        return 'bg-orange-100 border-orange-300';
+      case 'red':
+        return 'bg-red-100 border-red-300';
+      default:
+        return 'bg-gray-50 border-gray-200';
+    }
+  };
+
+  const getColorClass = (color: string) => {
+    switch (color) {
+      case 'green':
+        return 'text-green-600 fill-green-600';
+      case 'orange':
+        return 'text-orange-600 fill-orange-600';
+      case 'red':
+        return 'text-red-600 fill-red-600';
+      default:
+        return 'text-gray-400 fill-gray-400';
+    }
+  };
+
+  const ColorButton: React.FC<{
+    color: 'none' | 'green' | 'orange' | 'red';
+    isActive: boolean;
+    onClick: () => void;
+  }> = ({ color, isActive, onClick }) => {
+    const colorClasses = {
+      none: 'text-gray-400 hover:text-gray-600',
+      green: 'text-green-600 hover:text-green-700',
+      orange: 'text-orange-600 hover:text-orange-700',
+      red: 'text-red-600 hover:text-red-700'
+    };
+
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onClick}
+        className={`p-1 h-8 w-8 ${colorClasses[color]} ${isActive ? 'bg-muted' : ''}`}
+      >
+        <Circle className={`h-4 w-4 ${isActive ? 'fill-current' : ''}`} />
+      </Button>
+    );
+  };
+
+  const getStatusCounts = () => {
+    return {
+      total: parts.length,
+      none: parts.filter(p => p.color_status === 'none').length,
+      green: parts.filter(p => p.color_status === 'green').length,
+      orange: parts.filter(p => p.color_status === 'orange').length,
+      red: parts.filter(p => p.color_status === 'red').length
+    };
+  };
 
   const checkAndUpdateLimitPhases = async (completedTaskId?: string) => {
     if (!projectId) return;
@@ -824,39 +959,162 @@ const ProjectDetails = () => {
           ) : activeTab === 'onedrive' ? (
             <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} />
           ) : activeTab === 'parts' ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Parts Lists Management</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="manage" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="manage">Manage Parts Lists</TabsTrigger>
-                    <TabsTrigger value="import">Import CSV</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="manage" className="space-y-4">
-                    <PartsListManager
-                      projectId={projectId!}
-                      refreshKey={refreshPartsKey}
-                    />
-                  </TabsContent>
-                  
-                  <TabsContent value="import" className="space-y-4">
-                    <PartsListImporter
-                      projectId={projectId!}
-                      onImportComplete={() => {
-                        setRefreshPartsKey(prev => prev + 1);
-                        toast({
-                          title: t('success'),
-                          description: t('parts_list_imported_successfully'),
-                        });
-                      }}
-                    />
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              {partsLists.length > 0 ? (
+                <div className="space-y-4">
+                  {/* Parts List Management Header */}
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2">
+                          <Package className="h-5 w-5" />
+                          Parts List - {partsLists[0].file_name}
+                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeletePartsList(partsLists[0].id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex gap-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-gray-50 border border-gray-200 rounded"></div>
+                          <span>Unprocessed: {getStatusCounts().none}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
+                          <span>Complete: {getStatusCounts().green}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-orange-100 border border-orange-300 rounded"></div>
+                          <span>In Progress: {getStatusCounts().orange}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
+                          <span>Issues: {getStatusCounts().red}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Parts List Table */}
+                  <Card>
+                    <CardContent className="p-0">
+                      {loadingParts ? (
+                        <div className="flex justify-center items-center py-8">
+                          <Loader2 className="h-8 w-8 animate-spin" />
+                        </div>
+                      ) : parts.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No parts found in this list
+                        </div>
+                      ) : (
+                        <ScrollArea className="h-96">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Materiaal</TableHead>
+                                <TableHead>Dikte</TableHead>
+                                <TableHead>Afmetingen</TableHead>
+                                <TableHead>Aantal</TableHead>
+                                <TableHead>Wand Naam</TableHead>
+                                <TableHead>CNC Pos</TableHead>
+                                <TableHead>Commentaar</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {parts.map(part => (
+                                <TableRow key={part.id} className={`border ${getBackgroundColor(part.color_status)}`}>
+                                  <TableCell>
+                                    <div className="flex items-center gap-1">
+                                      <Circle className={`h-4 w-4 ${getColorClass(part.color_status)}`} />
+                                      <div className="flex gap-1 ml-2">
+                                        <ColorButton
+                                          color="none"
+                                          isActive={part.color_status === 'none'}
+                                          onClick={() => updatePartColor(part.id, 'none')}
+                                        />
+                                        <ColorButton
+                                          color="green"
+                                          isActive={part.color_status === 'green'}
+                                          onClick={() => updatePartColor(part.id, 'green')}
+                                        />
+                                        <ColorButton
+                                          color="orange"
+                                          isActive={part.color_status === 'orange'}
+                                          onClick={() => updatePartColor(part.id, 'orange')}
+                                        />
+                                        <ColorButton
+                                          color="red"
+                                          isActive={part.color_status === 'red'}
+                                          onClick={() => updatePartColor(part.id, 'red')}
+                                        />
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>{part.materiaal || '-'}</TableCell>
+                                  <TableCell>{part.dikte || '-'}</TableCell>
+                                  <TableCell>
+                                    {part.lengte && part.breedte 
+                                      ? `${part.lengte} x ${part.breedte}` 
+                                      : part.lengte || part.breedte || '-'
+                                    }
+                                  </TableCell>
+                                  <TableCell>{part.aantal || '-'}</TableCell>
+                                  <TableCell>{part.wand_naam || '-'}</TableCell>
+                                  <TableCell>{part.cnc_pos || '-'}</TableCell>
+                                  <TableCell>
+                                    <div className="max-w-32 truncate" title={part.commentaar || part.commentaar_2 || ''}>
+                                      {part.commentaar || part.commentaar_2 || '-'}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </ScrollArea>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Parts List Management</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-8 text-muted-foreground space-y-4">
+                      <FileText className="h-12 w-12 mx-auto opacity-50" />
+                      <div>
+                        <p>No parts lists found for this project</p>
+                        <p className="text-sm">Import a CSV file to get started</p>
+                      </div>
+                    </div>
+                    <div className="mt-6">
+                      <PartsListImporter
+                        projectId={projectId!}
+                        onImportComplete={() => {
+                          setRefreshPartsKey(prev => prev + 1);
+                          toast({
+                            title: t('success'),
+                            description: t('parts_list_imported_successfully'),
+                          });
+                        }}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           ) : activeTab === 'orders' ? (
             <Card>
               <CardHeader>
