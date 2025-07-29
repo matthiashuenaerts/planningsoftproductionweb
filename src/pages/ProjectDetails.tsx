@@ -31,6 +31,7 @@ import { PartsListManager } from '@/components/PartsListManager';
 import { partsListService, PartsList, Part } from '@/services/partsListService';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
 
 import { AccessoriesDialog } from '@/components/AccessoriesDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
@@ -67,6 +68,16 @@ const ProjectDetails = () => {
   const [partsLists, setPartsLists] = useState<PartsList[]>([]);
   const [parts, setParts] = useState<Part[]>([]);
   const [loadingParts, setLoadingParts] = useState(false);
+  const [partsFilters, setPartsFilters] = useState({
+    materiaal: '',
+    dikte: '',
+    afmetingen: '',
+    aantal: '',
+    wand_naam: '',
+    cnc_pos: '',
+    commentaar: '',
+    status: ''
+  });
   const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
   const [showOrderEditModal, setShowOrderEditModal] = useState(false);
@@ -435,6 +446,39 @@ const ProjectDetails = () => {
       orange: parts.filter(p => p.color_status === 'orange').length,
       red: parts.filter(p => p.color_status === 'red').length
     };
+  };
+
+  const filteredParts = parts.filter(part => {
+    const matchesStatus = partsFilters.status === '' || part.color_status === partsFilters.status;
+    const matchesMaterial = partsFilters.materiaal === '' || (part.materiaal || '').toLowerCase().includes(partsFilters.materiaal.toLowerCase());
+    const matchesDikte = partsFilters.dikte === '' || (part.dikte || '').toLowerCase().includes(partsFilters.dikte.toLowerCase());
+    const matchesAfmetingen = partsFilters.afmetingen === '' || 
+      ((part.lengte && part.breedte ? `${part.lengte} x ${part.breedte}` : part.lengte || part.breedte || '').toLowerCase().includes(partsFilters.afmetingen.toLowerCase()));
+    const matchesAantal = partsFilters.aantal === '' || (part.aantal?.toString() || '').includes(partsFilters.aantal);
+    const matchesWandNaam = partsFilters.wand_naam === '' || (part.wand_naam || '').toLowerCase().includes(partsFilters.wand_naam.toLowerCase());
+    const matchesCncPos = partsFilters.cnc_pos === '' || (part.cnc_pos || '').toLowerCase().includes(partsFilters.cnc_pos.toLowerCase());
+    const matchesCommentaar = partsFilters.commentaar === '' || 
+      ((part.commentaar || part.commentaar_2 || '').toLowerCase().includes(partsFilters.commentaar.toLowerCase()));
+
+    return matchesStatus && matchesMaterial && matchesDikte && matchesAfmetingen && 
+           matchesAantal && matchesWandNaam && matchesCncPos && matchesCommentaar;
+  });
+
+  const updatePartsFilter = (key: string, value: string) => {
+    setPartsFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const clearAllFilters = () => {
+    setPartsFilters({
+      materiaal: '',
+      dikte: '',
+      afmetingen: '',
+      aantal: '',
+      wand_naam: '',
+      cnc_pos: '',
+      commentaar: '',
+      status: ''
+    });
   };
 
   const checkAndUpdateLimitPhases = async (completedTaskId?: string) => {
@@ -1017,22 +1061,113 @@ const ProjectDetails = () => {
                           No parts found in this list
                         </div>
                       ) : (
-                        <ScrollArea className="h-96">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Materiaal</TableHead>
-                                <TableHead>Dikte</TableHead>
-                                <TableHead>Afmetingen</TableHead>
-                                <TableHead>Aantal</TableHead>
-                                <TableHead>Wand Naam</TableHead>
-                                <TableHead>CNC Pos</TableHead>
-                                <TableHead>Commentaar</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {parts.map(part => (
+                        <div className="space-y-4">
+                          {/* Filter Controls */}
+                          <div className="flex items-center justify-between p-4 border-b">
+                            <div className="text-sm text-muted-foreground">
+                              Showing {filteredParts.length} of {parts.length} parts
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={clearAllFilters}
+                              className="h-8"
+                            >
+                              Clear Filters
+                            </Button>
+                          </div>
+                          
+                          <ScrollArea className="h-96">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead>Materiaal</TableHead>
+                                  <TableHead>Dikte</TableHead>
+                                  <TableHead>Afmetingen</TableHead>
+                                  <TableHead>Aantal</TableHead>
+                                  <TableHead>Wand Naam</TableHead>
+                                  <TableHead>CNC Pos</TableHead>
+                                  <TableHead>Commentaar</TableHead>
+                                </TableRow>
+                                <TableRow>
+                                  <TableHead className="p-2">
+                                    <Select
+                                      value={partsFilters.status}
+                                      onValueChange={(value) => updatePartsFilter('status', value)}
+                                    >
+                                      <SelectTrigger className="h-8 w-full">
+                                        <SelectValue placeholder="All" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="">All</SelectItem>
+                                        <SelectItem value="none">Unprocessed</SelectItem>
+                                        <SelectItem value="green">Complete</SelectItem>
+                                        <SelectItem value="orange">In Progress</SelectItem>
+                                        <SelectItem value="red">Issues</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </TableHead>
+                                  <TableHead className="p-2">
+                                    <Input
+                                      placeholder="Filter..."
+                                      value={partsFilters.materiaal}
+                                      onChange={(e) => updatePartsFilter('materiaal', e.target.value)}
+                                      className="h-8 w-full"
+                                    />
+                                  </TableHead>
+                                  <TableHead className="p-2">
+                                    <Input
+                                      placeholder="Filter..."
+                                      value={partsFilters.dikte}
+                                      onChange={(e) => updatePartsFilter('dikte', e.target.value)}
+                                      className="h-8 w-full"
+                                    />
+                                  </TableHead>
+                                  <TableHead className="p-2">
+                                    <Input
+                                      placeholder="Filter..."
+                                      value={partsFilters.afmetingen}
+                                      onChange={(e) => updatePartsFilter('afmetingen', e.target.value)}
+                                      className="h-8 w-full"
+                                    />
+                                  </TableHead>
+                                  <TableHead className="p-2">
+                                    <Input
+                                      placeholder="Filter..."
+                                      value={partsFilters.aantal}
+                                      onChange={(e) => updatePartsFilter('aantal', e.target.value)}
+                                      className="h-8 w-full"
+                                    />
+                                  </TableHead>
+                                  <TableHead className="p-2">
+                                    <Input
+                                      placeholder="Filter..."
+                                      value={partsFilters.wand_naam}
+                                      onChange={(e) => updatePartsFilter('wand_naam', e.target.value)}
+                                      className="h-8 w-full"
+                                    />
+                                  </TableHead>
+                                  <TableHead className="p-2">
+                                    <Input
+                                      placeholder="Filter..."
+                                      value={partsFilters.cnc_pos}
+                                      onChange={(e) => updatePartsFilter('cnc_pos', e.target.value)}
+                                      className="h-8 w-full"
+                                    />
+                                  </TableHead>
+                                  <TableHead className="p-2">
+                                    <Input
+                                      placeholder="Filter..."
+                                      value={partsFilters.commentaar}
+                                      onChange={(e) => updatePartsFilter('commentaar', e.target.value)}
+                                      className="h-8 w-full"
+                                    />
+                                  </TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {filteredParts.map(part => (
                                 <TableRow key={part.id} className={`border ${getBackgroundColor(part.color_status)}`}>
                                   <TableCell>
                                     <div className="flex items-center gap-1">
@@ -1079,9 +1214,10 @@ const ProjectDetails = () => {
                                   </TableCell>
                                 </TableRow>
                               ))}
-                            </TableBody>
+                             </TableBody>
                           </Table>
                         </ScrollArea>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
