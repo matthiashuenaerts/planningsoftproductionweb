@@ -76,7 +76,7 @@ const ProjectDetails = () => {
     wand_naam: '',
     cnc_pos: '',
     commentaar: '',
-    status: ''
+    status: 'all'
   });
   const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
@@ -449,7 +449,7 @@ const ProjectDetails = () => {
   };
 
   const filteredParts = parts.filter(part => {
-    const matchesStatus = partsFilters.status === '' || part.color_status === partsFilters.status;
+    const matchesStatus = partsFilters.status === 'all' || part.color_status === partsFilters.status;
     const matchesMaterial = partsFilters.materiaal === '' || (part.materiaal || '').toLowerCase().includes(partsFilters.materiaal.toLowerCase());
     const matchesDikte = partsFilters.dikte === '' || (part.dikte || '').toLowerCase().includes(partsFilters.dikte.toLowerCase());
     const matchesAfmetingen = partsFilters.afmetingen === '' || 
@@ -477,7 +477,7 @@ const ProjectDetails = () => {
       wand_naam: '',
       cnc_pos: '',
       commentaar: '',
-      status: ''
+      status: 'all'
     });
   };
 
@@ -1100,7 +1100,7 @@ const ProjectDetails = () => {
                                         <SelectValue placeholder="All" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="">All</SelectItem>
+                                        <SelectItem value="all">All</SelectItem>
                                         <SelectItem value="none">Unprocessed</SelectItem>
                                         <SelectItem value="green">Complete</SelectItem>
                                         <SelectItem value="orange">In Progress</SelectItem>
