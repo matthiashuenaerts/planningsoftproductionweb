@@ -26,7 +26,8 @@ import TaskList from '@/components/TaskList';
 import ProjectFileManager from '@/components/ProjectFileManager';
 import OneDriveIntegration from '@/components/OneDriveIntegration';
 import NewOrderModal from '@/components/NewOrderModal';
-import { PartsListDialog } from '@/components/PartsListDialog';
+import { PartsListImporter } from '@/components/PartsListImporter';
+import { PartsListManager } from '@/components/PartsListManager';
 import { AccessoriesDialog } from '@/components/AccessoriesDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import OrderEditModal from '@/components/OrderEditModal';
@@ -58,7 +59,7 @@ const ProjectDetails = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
-  const [showPartsListDialog, setShowPartsListDialog] = useState(false);
+  const [refreshPartsKey, setRefreshPartsKey] = useState(0);
   const [showAccessoriesDialog, setShowAccessoriesDialog] = useState(false);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
   const [showOrderEditModal, setShowOrderEditModal] = useState(false);
@@ -764,8 +765,8 @@ const ProjectDetails = () => {
                   )}
                 </Button>
                 <Button 
-                  variant="outline"
-                  onClick={() => setShowPartsListDialog(true)}
+                  variant={activeTab === 'parts' ? 'default' : 'outline'}
+                  onClick={() => setActiveTab('parts')}
                 >
                   <List className="mr-2 h-4 w-4" /> {t('parts_list')}
                 </Button>
@@ -822,6 +823,40 @@ const ProjectDetails = () => {
             <ProjectFileManager projectId={projectId!} />
           ) : activeTab === 'onedrive' ? (
             <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} />
+          ) : activeTab === 'parts' ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Parts Lists Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="manage" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="manage">Manage Parts Lists</TabsTrigger>
+                    <TabsTrigger value="import">Import CSV</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="manage" className="space-y-4">
+                    <PartsListManager
+                      projectId={projectId!}
+                      refreshKey={refreshPartsKey}
+                    />
+                  </TabsContent>
+                  
+                  <TabsContent value="import" className="space-y-4">
+                    <PartsListImporter
+                      projectId={projectId!}
+                      onImportComplete={() => {
+                        setRefreshPartsKey(prev => prev + 1);
+                        toast({
+                          title: t('success'),
+                          description: t('parts_list_imported_successfully'),
+                        });
+                      }}
+                    />
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
           ) : activeTab === 'orders' ? (
             <Card>
               <CardHeader>
@@ -1321,17 +1356,6 @@ const ProjectDetails = () => {
         installationDate={project?.installation_date}
       />
 
-      <PartsListDialog
-        isOpen={showPartsListDialog}
-        onClose={() => setShowPartsListDialog(false)}
-        projectId={projectId!}
-        onImportComplete={() => {
-          toast({
-            title: t('success'),
-            description: t('parts_list_imported_successfully'),
-          });
-        }}
-      />
 
       <AccessoriesDialog
         open={showAccessoriesDialog}
