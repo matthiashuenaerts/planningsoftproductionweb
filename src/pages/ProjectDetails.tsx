@@ -243,17 +243,29 @@ const ProjectDetails = () => {
   }, [calculateAndSaveTaskEfficiency]);
   // Handle URL parameters for tab and order navigation
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabParam = urlParams.get('tab');
-    const orderIdParam = urlParams.get('orderId');
+    const handlePopState = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab');
+      const orderIdParam = urlParams.get('orderId');
+      
+      if (tabParam) {
+        setActiveTab(tabParam);
+      }
+      
+      if (orderIdParam && tabParam === 'orders') {
+        setExpandedOrders(new Set([orderIdParam]));
+      }
+    };
+
+    // Handle initial load
+    handlePopState();
     
-    if (tabParam) {
-      setActiveTab(tabParam);
-    }
+    // Listen for popstate events
+    window.addEventListener('popstate', handlePopState);
     
-    if (orderIdParam && tabParam === 'orders') {
-      setExpandedOrders(new Set([orderIdParam]));
-    }
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
   }, []);
 
   useEffect(() => {

@@ -331,7 +331,13 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
   };
 
   const handleGoToOrder = (orderId: string) => {
-    navigate(`/projects/${projectId}?tab=orders&orderId=${orderId}`);
+    // Navigate to orders tab with order ID in URL
+    const currentPath = window.location.pathname;
+    const newUrl = `${currentPath}?tab=orders&orderId=${orderId}`;
+    window.history.pushState({}, '', newUrl);
+    
+    // Trigger a popstate event to update the component
+    window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
   const formatDate = (dateString: string) => {
