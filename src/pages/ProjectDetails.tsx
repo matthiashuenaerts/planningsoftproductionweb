@@ -241,6 +241,21 @@ const ProjectDetails = () => {
     }
     setTasks(allTasks);
   }, [calculateAndSaveTaskEfficiency]);
+  // Handle URL parameters for tab and order navigation
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    const orderIdParam = urlParams.get('orderId');
+    
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+    
+    if (orderIdParam && tabParam === 'orders') {
+      setExpandedOrders(new Set([orderIdParam]));
+    }
+  }, []);
+
   useEffect(() => {
     const fetchProjectData = async () => {
       if (!projectId) return;

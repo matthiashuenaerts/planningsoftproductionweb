@@ -331,7 +331,7 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
   };
 
   const handleGoToOrder = (orderId: string) => {
-    navigate(`/orders/${orderId}`);
+    navigate(`/projects/${projectId}?tab=orders&orderId=${orderId}`);
   };
 
   const formatDate = (dateString: string) => {
