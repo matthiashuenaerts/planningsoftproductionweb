@@ -928,6 +928,45 @@ export type Database = {
           },
         ]
       }
+      products: {
+        Row: {
+          article_code: string | null
+          created_at: string
+          description: string | null
+          id: string
+          image_path: string | null
+          name: string
+          standard_order_quantity: number | null
+          supplier: string | null
+          updated_at: string
+          website_link: string | null
+        }
+        Insert: {
+          article_code?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_path?: string | null
+          name: string
+          standard_order_quantity?: number | null
+          supplier?: string | null
+          updated_at?: string
+          website_link?: string | null
+        }
+        Update: {
+          article_code?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_path?: string | null
+          name?: string
+          standard_order_quantity?: number | null
+          supplier?: string | null
+          updated_at?: string
+          website_link?: string | null
+        }
+        Relationships: []
+      }
       project_onedrive_configs: {
         Row: {
           access_token: string | null
