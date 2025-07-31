@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Plus, Trash2, ExternalLink, Edit, ShoppingCart, QrCode, Upload } from 'lucide-react';
+import ProductSelector from './ProductSelector';
 import { useToast } from '@/hooks/use-toast';
 import { accessoriesService, Accessory } from '@/services/accessoriesService';
 import { orderService } from '@/services/orderService';
@@ -338,6 +339,20 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
     }
   };
 
+  const handleProductSelect = (product: any) => {
+    setFormData({
+      article_name: product.name,
+      article_description: product.description || '',
+      article_code: product.article_code || '',
+      quantity: product.standard_order_quantity || 1,
+      stock_location: '',
+      supplier: product.supplier || '',
+      status: 'to_check' as const,
+      qr_code_text: ''
+    });
+    setShowForm(true);
+  };
+
   const getPrefilledOrderData = () => {
     const selectedAccessoryObjects = accessories.filter(acc => 
       selectedAccessories.includes(acc.id)
@@ -377,9 +392,10 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <div className="flex gap-2">
+                <ProductSelector onProductSelect={handleProductSelect} buttonText="Add from Products" />
                 <Button onClick={() => { setShowForm(!showForm); setShowCsvImporter(false); }}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Accessory
+                  Add Custom Accessory
                 </Button>
                 <Button variant="outline" onClick={() => { setShowCsvImporter(!showCsvImporter); setShowForm(false); }}>
                   <Upload className="mr-2 h-4 w-4" />

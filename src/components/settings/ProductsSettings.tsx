@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Edit, Trash2, Upload, ExternalLink } from 'lucide-react';
+import { Plus, Edit, Trash2, Upload, ExternalLink, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -48,6 +48,9 @@ const ProductsSettings: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
+  const [csvImporting, setCsvImporting] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<ProductFormData>({
@@ -220,6 +223,100 @@ const ProductsSettings: React.FC = () => {
     }
   };
 
+  const handleCsvImport = async () => {
+    if (!csvFile) return;
+
+    try {
+      setCsvImporting(true);
+      const text = await csvFile.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      if (lines.length < 2) {
+        toast({
+          title: 'Error',
+          description: 'CSV file must have at least a header and one data row',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const productsToInsert = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        if (values.length !== headers.length) continue;
+
+        const product: any = {};
+        headers.forEach((header, index) => {
+          const value = values[index];
+          switch (header) {
+            case 'name':
+              product.name = value;
+              break;
+            case 'description':
+              product.description = value || null;
+              break;
+            case 'article_code':
+            case 'article code':
+              product.article_code = value || null;
+              break;
+            case 'supplier':
+              product.supplier = value || null;
+              break;
+            case 'standard_order_quantity':
+            case 'standard order quantity':
+            case 'quantity':
+              product.standard_order_quantity = parseInt(value) || 1;
+              break;
+            case 'website_link':
+            case 'website link':
+            case 'website':
+              product.website_link = value || null;
+              break;
+          }
+        });
+
+        if (product.name) {
+          productsToInsert.push(product);
+        }
+      }
+
+      if (productsToInsert.length === 0) {
+        toast({
+          title: 'Error',
+          description: 'No valid products found in CSV file',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('products')
+        .insert(productsToInsert);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: `${productsToInsert.length} products imported successfully`,
+      });
+
+      setIsCsvDialogOpen(false);
+      setCsvFile(null);
+      fetchProducts();
+    } catch (error) {
+      console.error('Error importing CSV:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to import CSV file',
+        variant: 'destructive',
+      });
+    } finally {
+      setCsvImporting(false);
+    }
+  };
+
   const getImageUrl = (imagePath: string | null) => {
     if (!imagePath) return null;
     const { data } = supabase.storage
@@ -237,7 +334,42 @@ const ProductsSettings: React.FC = () => {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Products Management</CardTitle>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <div className="flex gap-2">
+            <Dialog open={isCsvDialogOpen} onOpenChange={setIsCsvDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Import CSV
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Import Products from CSV</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label>CSV File</Label>
+                    <Input
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
+                    />
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Expected columns: name, description, article_code, supplier, standard_order_quantity, website_link
+                    </p>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setIsCsvDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleCsvImport} disabled={!csvFile || csvImporting}>
+                      {csvImporting ? 'Importing...' : 'Import'}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => {
                 setEditingProduct(null);
@@ -392,7 +524,8 @@ const ProductsSettings: React.FC = () => {
                 </form>
               </Form>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent>

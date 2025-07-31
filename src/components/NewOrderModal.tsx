@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Trash2 } from 'lucide-react';
+import ProductSelector from './ProductSelector';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
 import { Order, OrderItem, OrderStep } from '@/types/order';
@@ -258,6 +259,15 @@ const NewOrderModal = ({
       article_code: ''
     }]);
   };
+
+  const handleProductSelect = (product: any) => {
+    setOrderItems(prev => [...prev, {
+      description: product.description || product.name,
+      quantity: product.standard_order_quantity || 1,
+      article_code: product.article_code || '',
+      notes: `Selected from products database - ${product.name}`
+    }]);
+  };
   const updateOrderItem = (index: number, field: keyof OrderItem, value: string | number | null | undefined) => {
     setOrderItems(prev => prev.map((item, i) => i === index ? {
       ...item,
@@ -451,10 +461,13 @@ const NewOrderModal = ({
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle>Order Items</CardTitle>
-              <Button type="button" onClick={addOrderItem} variant="outline" size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Item
-              </Button>
+              <div className="flex gap-2">
+                <ProductSelector onProductSelect={handleProductSelect} buttonText="Add from Products" />
+                <Button type="button" onClick={addOrderItem} variant="outline" size="sm">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Custom Item
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
