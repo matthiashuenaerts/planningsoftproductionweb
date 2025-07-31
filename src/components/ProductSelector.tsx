@@ -18,6 +18,8 @@ interface Product {
   standard_order_quantity: number | null;
   website_link: string | null;
   image_path: string | null;
+  barcode: string | null;
+  qr_code: string | null;
 }
 
 interface ProductSelectorProps {

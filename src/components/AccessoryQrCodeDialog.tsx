@@ -16,6 +16,7 @@ import {
   DropdownMenuSeparator 
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { ProductImageDisplay } from '@/components/ProductImageDisplay';
 
 interface AccessoryQrCodeDialogProps {
   open: boolean;
@@ -172,6 +173,12 @@ export const AccessoryQrCodeDialog = ({ open, onOpenChange, accessories, startIn
               <p className="text-base">Location: {accessory.stock_location || '-'}</p>
               <p className="text-base">Supplier: {accessory.supplier || '-'}</p>
               <p className="text-base">QR Text: {accessory.qr_code_text || '-'}</p>
+              {/* Show product image if available */}
+              {accessory.article_code && (
+                <div className="mt-4">
+                  <ProductImageDisplay articleCode={accessory.article_code} />
+                </div>
+              )}
               <div className="flex items-center gap-2 pt-2">
                   <p className="text-base">Status:</p>
                   <DropdownMenu>

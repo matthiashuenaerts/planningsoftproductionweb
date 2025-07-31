@@ -22,7 +22,7 @@ import { PersonalItem } from '@/pages/NotesAndTasks';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import ImageModal from '@/components/ui/image-modal';
+import { ImageModal } from '@/components/ui/image-modal';
 
 interface PersonalItemCardProps {
   item: PersonalItem;

@@ -931,11 +931,13 @@ export type Database = {
       products: {
         Row: {
           article_code: string | null
+          barcode: string | null
           created_at: string
           description: string | null
           id: string
           image_path: string | null
           name: string
+          qr_code: string | null
           standard_order_quantity: number | null
           supplier: string | null
           updated_at: string
@@ -943,11 +945,13 @@ export type Database = {
         }
         Insert: {
           article_code?: string | null
+          barcode?: string | null
           created_at?: string
           description?: string | null
           id?: string
           image_path?: string | null
           name: string
+          qr_code?: string | null
           standard_order_quantity?: number | null
           supplier?: string | null
           updated_at?: string
@@ -955,11 +959,13 @@ export type Database = {
         }
         Update: {
           article_code?: string | null
+          barcode?: string | null
           created_at?: string
           description?: string | null
           id?: string
           image_path?: string | null
           name?: string
+          qr_code?: string | null
           standard_order_quantity?: number | null
           supplier?: string | null
           updated_at?: string

@@ -23,6 +23,8 @@ const productSchema = z.object({
   supplier: z.string().optional(),
   standard_order_quantity: z.number().min(1, 'Quantity must be at least 1').optional(),
   website_link: z.string().url('Invalid URL').optional().or(z.literal('')),
+  barcode: z.string().optional(),
+  qr_code: z.string().optional(),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -36,6 +38,8 @@ interface Product {
   standard_order_quantity: number | null;
   website_link: string | null;
   image_path: string | null;
+  barcode: string | null;
+  qr_code: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -62,6 +66,8 @@ const ProductsSettings: React.FC = () => {
       supplier: '',
       standard_order_quantity: 1,
       website_link: '',
+      barcode: '',
+      qr_code: '',
     },
   });
 
@@ -145,6 +151,8 @@ const ProductsSettings: React.FC = () => {
         supplier: data.supplier || null,
         standard_order_quantity: data.standard_order_quantity || 1,
         website_link: data.website_link || null,
+        barcode: data.barcode || null,
+        qr_code: data.qr_code || null,
         image_path: imagePath,
       };
 
@@ -195,6 +203,8 @@ const ProductsSettings: React.FC = () => {
       supplier: product.supplier || '',
       standard_order_quantity: product.standard_order_quantity || 1,
       website_link: product.website_link || '',
+      barcode: product.barcode || '',
+      qr_code: product.qr_code || '',
     });
     setIsDialogOpen(true);
   };
@@ -273,6 +283,13 @@ const ProductsSettings: React.FC = () => {
             case 'website link':
             case 'website':
               product.website_link = value || null;
+              break;
+            case 'barcode':
+              product.barcode = value || null;
+              break;
+            case 'qr_code':
+            case 'qr code':
+              product.qr_code = value || null;
               break;
           }
         });
@@ -355,7 +372,7 @@ const ProductsSettings: React.FC = () => {
                       onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
                     />
                     <p className="text-sm text-muted-foreground mt-2">
-                      Expected columns: name, description, article_code, supplier, standard_order_quantity, website_link
+                      Expected columns: name, description, article_code, supplier, standard_order_quantity, website_link, barcode, qr_code
                     </p>
                   </div>
                   <div className="flex justify-end space-x-2">
@@ -488,6 +505,35 @@ const ProductsSettings: React.FC = () => {
                       </FormItem>
                     )}
                   />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="barcode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Barcode</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Product barcode..." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="qr_code"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>QR Code</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="QR code text..." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <div>
                     <Label>Product Image</Label>

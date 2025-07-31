@@ -1,36 +1,66 @@
-
 import React from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { ExternalLink } from 'lucide-react';
 
 interface ImageModalProps {
-  src: string;
-  alt: string;
-  isOpen: boolean;
-  onClose: () => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  imageUrl?: string;
+  title?: string;
+  websiteLink?: string | null;
+  // Legacy props for backward compatibility
+  src?: string;
+  alt?: string;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-const ImageModal: React.FC<ImageModalProps> = ({ src, alt, isOpen, onClose }) => {
+export const ImageModal: React.FC<ImageModalProps> = ({
+  open,
+  onOpenChange,
+  imageUrl,
+  title,
+  websiteLink,
+  // Legacy props
+  src,
+  alt,
+  isOpen,
+  onClose
+}) => {
+  // Support both new and legacy prop formats
+  const modalOpen = open ?? isOpen ?? false;
+  const modalOnOpenChange = onOpenChange ?? ((open: boolean) => !open && onClose?.());
+  const modalImageUrl = imageUrl ?? src ?? '';
+  const modalTitle = title ?? alt ?? '';
+  
+  if (!modalImageUrl) return null;
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/90 border-none">
-        <div className="relative w-full h-full flex items-center justify-center">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 z-10 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
+    <Dialog open={modalOpen} onOpenChange={modalOnOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle>{modalTitle}</DialogTitle>
+            {websiteLink && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(websiteLink, '_blank')}
+              >
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Visit Website
+              </Button>
+            )}
+          </div>
+        </DialogHeader>
+        <div className="flex justify-center">
           <img
-            src={src}
-            alt={alt}
-            className="max-w-full max-h-full object-contain"
-            onClick={(e) => e.stopPropagation()}
+            src={modalImageUrl}
+            alt={modalTitle}
+            className="max-w-full max-h-[70vh] object-contain rounded-lg"
           />
         </div>
       </DialogContent>
     </Dialog>
   );
 };
-
-export default ImageModal;

@@ -12,7 +12,7 @@ import { Check, Clock, UserCheck, ListChecks, File as FileIcon } from 'lucide-re
 import { supabase } from '@/integrations/supabase/client';
 import RushOrderChat from './RushOrderChat';
 import { useLanguage } from '@/context/LanguageContext';
-import ImageModal from '@/components/ui/image-modal';
+import { ImageModal } from '@/components/ui/image-modal';
 
 interface RushOrderDetailProps {
   rushOrderId: string;

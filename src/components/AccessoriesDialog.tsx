@@ -348,7 +348,7 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
       stock_location: '',
       supplier: product.supplier || '',
       status: 'to_check' as const,
-      qr_code_text: ''
+      qr_code_text: product.qr_code || ''
     });
     setShowForm(true);
   };
