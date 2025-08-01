@@ -39,6 +39,7 @@ import OrderEditModal from './OrderEditModal';
 import NewOrderModal from './NewOrderModal';
 import { AccessoryQrCodeDialog } from './AccessoryQrCodeDialog';
 import AccessoryCsvImporter from './AccessoryCsvImporter';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AccessoriesDialogProps {
   open: boolean;
@@ -51,6 +52,7 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
   const navigate = useNavigate();
   const [accessories, setAccessories] = useState<Accessory[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [selectedAccessories, setSelectedAccessories] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -82,6 +84,7 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
     if (open) {
       loadAccessories();
       loadOrders();
+      loadSuppliers();
     }
   }, [open, projectId]);
 
@@ -109,6 +112,25 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
       toast({
         title: "Error",
         description: `Failed to load orders: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const loadSuppliers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setSuppliers(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to load suppliers: ${error.message}`,
         variant: "destructive"
       });
     }
@@ -389,10 +411,10 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6">
+            <div className="space-y-6">
             <div className="flex justify-between items-center">
               <div className="flex gap-2">
-                <ProductSelector onProductSelect={handleProductSelect} buttonText="Add from Products" />
+                <ProductSelector onProductSelect={handleProductSelect} buttonText="Select from Products" />
                 <Button onClick={() => { setShowForm(!showForm); setShowCsvImporter(false); }}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Custom Accessory
@@ -481,11 +503,21 @@ export const AccessoriesDialog = ({ open, onOpenChange, projectId }: Accessories
                       </div>
                       <div>
                         <Label htmlFor="supplier">Supplier</Label>
-                        <Input
-                          id="supplier"
+                        <Select
                           value={formData.supplier}
-                          onChange={(e) => setFormData(prev => ({ ...prev, supplier: e.target.value }))}
-                        />
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, supplier: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select supplier" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {suppliers.map((supplier) => (
+                              <SelectItem key={supplier.id} value={supplier.name}>
+                                {supplier.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div>
                         <Label htmlFor="status">Status</Label>
