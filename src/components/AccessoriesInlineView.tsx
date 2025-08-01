@@ -30,6 +30,8 @@ import OrderEditModal from './OrderEditModal';
 import NewOrderModal from './NewOrderModal';
 import { AccessoryQrCodeDialog } from './AccessoryQrCodeDialog';
 import AccessoryCsvImporter from './AccessoryCsvImporter';
+import ProductSelector from './ProductSelector';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AccessoriesInlineViewProps {
   projectId: string;
@@ -40,6 +42,7 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
   const navigate = useNavigate();
   const [accessories, setAccessories] = useState<Accessory[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [selectedAccessories, setSelectedAccessories] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -99,6 +102,7 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
   useEffect(() => {
     loadAccessories();
     loadOrders();
+    loadSuppliers();
   }, [projectId]);
 
   const loadAccessories = async () => {
@@ -125,6 +129,25 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
       toast({
         title: "Error",
         description: `Failed to load orders: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const loadSuppliers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setSuppliers(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to load suppliers: ${error.message}`,
         variant: "destructive"
       });
     }
@@ -410,6 +433,18 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
     };
   };
 
+  const handleProductSelect = (product: any) => {
+    setFormData(prev => ({
+      ...prev,
+      article_name: product.name,
+      article_description: product.description || '',
+      article_code: product.article_code || '',
+      supplier: product.supplier || '',
+      qr_code_text: product.qr_code || ''
+    }));
+    setShowForm(true);
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -417,13 +452,14 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
           <div className="flex items-center justify-between">
             <CardTitle>Accessories</CardTitle>
             <div className="flex gap-2">
+              <ProductSelector onProductSelect={handleProductSelect} buttonText="Select from Products" />
               <Button
                 onClick={() => setShowForm(!showForm)}
                 size="sm"
                 variant="outline"
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Add Accessory
+                Add Custom Accessory
               </Button>
               <Button
                 onClick={() => setShowCsvImporter(!showCsvImporter)}
@@ -492,11 +528,21 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                     </div>
                     <div>
                       <Label htmlFor="supplier">Supplier</Label>
-                      <Input
-                        id="supplier"
+                      <Select
                         value={formData.supplier}
-                        onChange={(e) => setFormData(prev => ({ ...prev, supplier: e.target.value }))}
-                      />
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, supplier: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select supplier" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {suppliers.map((supplier) => (
+                            <SelectItem key={supplier.id} value={supplier.name}>
+                              {supplier.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
                       <Label htmlFor="stock_location">Stock Location</Label>
