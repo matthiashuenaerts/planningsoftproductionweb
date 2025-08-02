@@ -53,7 +53,8 @@ const formSchema = z.object({
   project_value: z.number()
     .min(1, { message: 'Project value must be at least 1' })
     .max(100, { message: 'Project value must be at most 100' }),
-  is_after_sales: z.boolean()
+  is_after_sales: z.boolean(),
+  project_link_id: z.string().optional()
 }).refine(
   (data) => {
     return data.installation_date >= data.start_date;
@@ -103,6 +104,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       installation_date: new Date(),
       project_value: 50,
       is_after_sales: false,
+      project_link_id: '',
     },
   });
 
@@ -309,6 +311,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         installation_date: format(data.installation_date, 'yyyy-MM-dd'),
         status: 'planned',
         progress: 0,
+        project_link_id: data.project_link_id || null,
       });
       
       // Create a generic phase for these tasks
@@ -505,6 +508,20 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                         className="resize-none" 
                         {...field} 
                       />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="project_link_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Project Link ID</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter project link ID (optional)" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -1113,6 +1113,7 @@ export type Database = {
           installation_date: string
           name: string
           progress: number | null
+          project_link_id: string | null
           start_date: string
           status: string
           updated_at: string
@@ -1126,6 +1127,7 @@ export type Database = {
           installation_date: string
           name: string
           progress?: number | null
+          project_link_id?: string | null
           start_date: string
           status: string
           updated_at?: string
@@ -1139,6 +1141,7 @@ export type Database = {
           installation_date?: string
           name?: string
           progress?: number | null
+          project_link_id?: string | null
           start_date?: string
           status?: string
           updated_at?: string

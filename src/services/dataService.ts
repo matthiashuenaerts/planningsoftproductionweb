@@ -13,6 +13,7 @@ export interface Project {
   status: 'planned' | 'in_progress' | 'completed' | 'on_hold';
   created_at: string;
   updated_at: string;
+  project_link_id?: string | null;
 }
 
 // Phase Types
