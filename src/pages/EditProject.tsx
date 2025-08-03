@@ -26,7 +26,8 @@ const EditProject = () => {
     description: '',
     start_date: '',
     installation_date: '',
-    status: 'planned' as "planned" | "in_progress" | "completed" | "on_hold"
+    status: 'planned' as "planned" | "in_progress" | "completed" | "on_hold",
+    project_link_id: ''
   });
 
   useEffect(() => {
@@ -44,7 +45,8 @@ const EditProject = () => {
             description: projectData.description || '',
             start_date: projectData.start_date,
             installation_date: projectData.installation_date,
-            status: projectData.status
+            status: projectData.status,
+            project_link_id: projectData.project_link_id || ''
           });
         }
       } catch (error: any) {
@@ -165,6 +167,16 @@ const EditProject = () => {
                     id="description"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="project_link_id">Project Link ID</Label>
+                  <Input
+                    id="project_link_id"
+                    value={formData.project_link_id}
+                    onChange={(e) => setFormData({ ...formData, project_link_id: e.target.value })}
+                    placeholder="Enter project link ID (optional)"
                   />
                 </div>
                 
