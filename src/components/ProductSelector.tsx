@@ -20,7 +20,6 @@ interface Product {
   image_path: string | null;
   barcode: string | null;
   qr_code: string | null;
-  location: string | null;
 }
 
 interface ProductSelectorProps {
@@ -132,7 +131,6 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                   <TableHead>Name</TableHead>
                   <TableHead>Article Code</TableHead>
                   <TableHead>Supplier</TableHead>
-                  <TableHead>Location</TableHead>
                   <TableHead>Std Qty</TableHead>
                   <TableHead>Website</TableHead>
                   <TableHead>Action</TableHead>
@@ -171,9 +169,8 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                         <Badge variant="outline">{product.article_code}</Badge>
                       )}
                     </TableCell>
-                     <TableCell>{product.supplier}</TableCell>
-                     <TableCell>{product.location}</TableCell>
-                     <TableCell>{product.standard_order_quantity}</TableCell>
+                    <TableCell>{product.supplier}</TableCell>
+                    <TableCell>{product.standard_order_quantity}</TableCell>
                     <TableCell>
                       {product.website_link && (
                         <Button
