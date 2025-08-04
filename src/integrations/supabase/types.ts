@@ -936,6 +936,7 @@ export type Database = {
           description: string | null
           id: string
           image_path: string | null
+          location: string | null
           name: string
           qr_code: string | null
           standard_order_quantity: number | null
@@ -950,6 +951,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_path?: string | null
+          location?: string | null
           name: string
           qr_code?: string | null
           standard_order_quantity?: number | null
@@ -964,6 +966,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_path?: string | null
+          location?: string | null
           name?: string
           qr_code?: string | null
           standard_order_quantity?: number | null

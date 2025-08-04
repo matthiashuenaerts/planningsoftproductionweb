@@ -25,6 +25,7 @@ const productSchema = z.object({
   website_link: z.string().url('Invalid URL').optional().or(z.literal('')),
   barcode: z.string().optional(),
   qr_code: z.string().optional(),
+  location: z.string().optional(),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -40,6 +41,7 @@ interface Product {
   image_path: string | null;
   barcode: string | null;
   qr_code: string | null;
+  location: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -68,6 +70,7 @@ const ProductsSettings: React.FC = () => {
       website_link: '',
       barcode: '',
       qr_code: '',
+      location: '',
     },
   });
 
@@ -153,6 +156,7 @@ const ProductsSettings: React.FC = () => {
         website_link: data.website_link || null,
         barcode: data.barcode || null,
         qr_code: data.qr_code || null,
+        location: data.location || null,
         image_path: imagePath,
       };
 
@@ -205,6 +209,7 @@ const ProductsSettings: React.FC = () => {
       website_link: product.website_link || '',
       barcode: product.barcode || '',
       qr_code: product.qr_code || '',
+      location: product.location || '',
     });
     setIsDialogOpen(true);
   };
@@ -291,6 +296,9 @@ const ProductsSettings: React.FC = () => {
             case 'qr code':
               product.qr_code = value || null;
               break;
+            case 'location':
+              product.location = value || null;
+              break;
           }
         });
 
@@ -371,9 +379,9 @@ const ProductsSettings: React.FC = () => {
                       accept=".csv"
                       onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
                     />
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Expected columns: name, description, article_code, supplier, standard_order_quantity, website_link, barcode, qr_code
-                    </p>
+                     <p className="text-sm text-muted-foreground mt-2">
+                       Expected columns: name, description, article_code, supplier, standard_order_quantity, website_link, barcode, qr_code, location
+                     </p>
                   </div>
                   <div className="flex justify-end space-x-2">
                     <Button variant="outline" onClick={() => setIsCsvDialogOpen(false)}>
@@ -506,34 +514,48 @@ const ProductsSettings: React.FC = () => {
                     )}
                   />
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="barcode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Barcode</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Product barcode..." />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="qr_code"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>QR Code</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="QR code text..." />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                   <div className="grid grid-cols-2 gap-4">
+                     <FormField
+                       control={form.control}
+                       name="barcode"
+                       render={({ field }) => (
+                         <FormItem>
+                           <FormLabel>Barcode</FormLabel>
+                           <FormControl>
+                             <Input {...field} placeholder="Product barcode..." />
+                           </FormControl>
+                           <FormMessage />
+                         </FormItem>
+                       )}
+                     />
+                     <FormField
+                       control={form.control}
+                       name="qr_code"
+                       render={({ field }) => (
+                         <FormItem>
+                           <FormLabel>QR Code</FormLabel>
+                           <FormControl>
+                             <Input {...field} placeholder="QR code text..." />
+                           </FormControl>
+                           <FormMessage />
+                         </FormItem>
+                       )}
+                     />
+                   </div>
+
+                   <FormField
+                     control={form.control}
+                     name="location"
+                     render={({ field }) => (
+                       <FormItem>
+                         <FormLabel>Location</FormLabel>
+                         <FormControl>
+                           <Input {...field} placeholder="Storage location..." />
+                         </FormControl>
+                         <FormMessage />
+                       </FormItem>
+                     )}
+                   />
 
                   <div>
                     <Label>Product Image</Label>
@@ -576,17 +598,18 @@ const ProductsSettings: React.FC = () => {
       </CardHeader>
       <CardContent>
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Image</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Article Code</TableHead>
-              <TableHead>Supplier</TableHead>
-              <TableHead>Order Qty</TableHead>
-              <TableHead>Website</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
+           <TableHeader>
+             <TableRow>
+               <TableHead>Image</TableHead>
+               <TableHead>Name</TableHead>
+               <TableHead>Article Code</TableHead>
+               <TableHead>Supplier</TableHead>
+               <TableHead>Location</TableHead>
+               <TableHead>Order Qty</TableHead>
+               <TableHead>Website</TableHead>
+               <TableHead>Actions</TableHead>
+             </TableRow>
+           </TableHeader>
           <TableBody>
             {products.map((product) => (
               <TableRow key={product.id}>
@@ -609,8 +632,9 @@ const ProductsSettings: React.FC = () => {
                     <Badge variant="outline">{product.article_code}</Badge>
                   )}
                 </TableCell>
-                <TableCell>{product.supplier}</TableCell>
-                <TableCell>{product.standard_order_quantity}</TableCell>
+                 <TableCell>{product.supplier}</TableCell>
+                 <TableCell>{product.location}</TableCell>
+                 <TableCell>{product.standard_order_quantity}</TableCell>
                 <TableCell>
                   {product.website_link && (
                     <Button
