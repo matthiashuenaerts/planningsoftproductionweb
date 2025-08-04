@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { accessoriesService, Accessory } from '@/services/accessoriesService';
+import { supabase } from '@/integrations/supabase/client';
 import { Upload } from 'lucide-react';
 
 interface AccessoryCsvImporterProps {
@@ -44,17 +45,58 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
           return;
         }
 
-        const accessoriesToCreate = json.map(item => ({
-          project_id: projectId,
-          article_name: item.article_name || '',
-          article_description: item.article_description,
-          article_code: item.article_code,
-          quantity: typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1,
-          stock_location: item.stock_location,
-          status: item.status || 'to_check',
-          supplier: item.supplier,
-          qr_code_text: item.qr_code_text,
-        }));
+        // Fetch all products first to check against article codes
+        const { data: products, error: productsError } = await supabase
+          .from('products')
+          .select('*');
+
+        if (productsError) {
+          console.error('Error fetching products:', productsError);
+        }
+
+        const productsByCode = new Map();
+        if (products) {
+          products.forEach(product => {
+            if (product.article_code) {
+              productsByCode.set(product.article_code.toLowerCase(), product);
+            }
+          });
+        }
+
+        const accessoriesToCreate = json.map(item => {
+          const importedQuantity = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
+          
+          // Check if article_code exists in products database
+          if (item.article_code && productsByCode.has(item.article_code.toLowerCase())) {
+            const product = productsByCode.get(item.article_code.toLowerCase());
+            
+            // Use product data but keep imported quantity
+            return {
+              project_id: projectId,
+              article_name: product.name,
+              article_description: product.description,
+              article_code: product.article_code,
+              quantity: importedQuantity, // Keep quantity from CSV
+              stock_location: item.stock_location, // Keep stock location from CSV if provided
+              status: item.status || 'to_check',
+              supplier: product.supplier,
+              qr_code_text: product.qr_code,
+            };
+          } else {
+            // Use CSV data as before
+            return {
+              project_id: projectId,
+              article_name: item.article_name || '',
+              article_description: item.article_description,
+              article_code: item.article_code,
+              quantity: importedQuantity,
+              stock_location: item.stock_location,
+              status: item.status || 'to_check',
+              supplier: item.supplier,
+              qr_code_text: item.qr_code_text,
+            };
+          }
+        });
 
         for (const acc of accessoriesToCreate) {
           if (!acc.article_name) {
@@ -66,7 +108,16 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
 
         await accessoriesService.createMany(accessoriesToInsert);
 
-        toast({ title: 'Success', description: `${accessoriesToCreate.length} accessories imported successfully.` });
+        // Count how many were matched with products
+        const matchedCount = accessoriesToInsert.filter(acc => 
+          acc.article_code && productsByCode.has(acc.article_code.toLowerCase())
+        ).length;
+
+        const successMessage = matchedCount > 0 
+          ? `${accessoriesToCreate.length} accessories imported successfully. ${matchedCount} matched with products database.`
+          : `${accessoriesToCreate.length} accessories imported successfully.`;
+
+        toast({ title: 'Success', description: successMessage });
         onImportSuccess();
       } catch (error: any) {
         console.error('CSV Import Error:', error);
