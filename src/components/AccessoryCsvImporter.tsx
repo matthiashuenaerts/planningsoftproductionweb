@@ -67,8 +67,8 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
           const importedQuantity = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
           
           // Check if article_code exists in products database
-          if (item.article_code && productsByCode.has(item.article_code.toLowerCase())) {
-            const product = productsByCode.get(item.article_code.toLowerCase());
+          if (item.article_code && productsByCode.has(String(item.article_code).toLowerCase())) {
+            const product = productsByCode.get(String(item.article_code).toLowerCase());
             
             // Use product data but keep imported quantity
             return {
@@ -110,7 +110,7 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
 
         // Count how many were matched with products
         const matchedCount = accessoriesToInsert.filter(acc => 
-          acc.article_code && productsByCode.has(acc.article_code.toLowerCase())
+          acc.article_code && productsByCode.has(String(acc.article_code).toLowerCase())
         ).length;
 
         const successMessage = matchedCount > 0 
