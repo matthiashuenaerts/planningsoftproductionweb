@@ -440,6 +440,7 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
       article_description: product.description || '',
       article_code: product.article_code || '',
       supplier: product.supplier || '',
+      stock_location: product.location || '',
       qr_code_text: product.qr_code || ''
     }));
     setShowForm(true);
