@@ -27,6 +27,7 @@ import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import EditProject from '@/pages/EditProject';
+import ProjectCalculation from '@/pages/ProjectCalculation';
 import GlobalComponents from './components/GlobalComponents';
 import { Toaster } from '@/components/ui/toaster';
 import { DndProvider } from 'react-dnd';
@@ -58,6 +59,7 @@ function App() {
                 <Route path="/:lang/projects/:projectId" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
                 <Route path="/:lang/projects/:projectId/orders" element={<ProtectedRoute><ProjectOrders /></ProtectedRoute>} />
                 <Route path="/:lang/projects/:projectId/edit" element={<ProtectedRoute><EditProject /></ProtectedRoute>} />
+                <Route path="/:lang/projects/:projectId/calculation" element={<ProtectedRoute><ProjectCalculation /></ProtectedRoute>} />
                 <Route path="/:lang/workstations" element={<ProtectedRoute><Workstations /></ProtectedRoute>} />
                 <Route path="/:lang/broken-parts" element={<ProtectedRoute><BrokenParts /></ProtectedRoute>} />
                 <Route path="/:lang/broken-parts/summary" element={<ProtectedRoute><BrokenPartsSummary /></ProtectedRoute>} />
