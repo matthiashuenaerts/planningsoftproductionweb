@@ -132,6 +132,44 @@ export type Database = {
           },
         ]
       }
+      calculation_task_relationships: {
+        Row: {
+          base_duration_minutes: number
+          created_at: string
+          id: string
+          multiplier: number
+          standard_task_id: string
+          updated_at: string
+          variable_name: string
+        }
+        Insert: {
+          base_duration_minutes?: number
+          created_at?: string
+          id?: string
+          multiplier?: number
+          standard_task_id: string
+          updated_at?: string
+          variable_name: string
+        }
+        Update: {
+          base_duration_minutes?: number
+          created_at?: string
+          id?: string
+          multiplier?: number
+          standard_task_id?: string
+          updated_at?: string
+          variable_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calculation_task_relationships_standard_task_id_fkey"
+            columns: ["standard_task_id"]
+            isOneToOne: false
+            referencedRelation: "standard_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           chat_room_id: string
@@ -975,6 +1013,77 @@ export type Database = {
           website_link?: string | null
         }
         Relationships: []
+      }
+      project_calculation_variables: {
+        Row: {
+          aantal_boringen: number | null
+          aantal_cnc_programmas: number | null
+          aantal_drevel_programmas: number | null
+          aantal_kasten: number | null
+          aantal_kasten_te_monteren: number | null
+          aantal_lopende_meter_kantenbanden: number | null
+          aantal_lopende_meters_zaagsnede: number | null
+          aantal_manueel_te_monteren_kasten: number | null
+          aantal_manueel_te_monteren_objecten: number | null
+          aantal_objecten: number | null
+          aantal_platen: number | null
+          aantal_stuks: number | null
+          aantal_verschillende_kantenbanden: number | null
+          aantal_zaagsnedes: number | null
+          created_at: string
+          id: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          aantal_boringen?: number | null
+          aantal_cnc_programmas?: number | null
+          aantal_drevel_programmas?: number | null
+          aantal_kasten?: number | null
+          aantal_kasten_te_monteren?: number | null
+          aantal_lopende_meter_kantenbanden?: number | null
+          aantal_lopende_meters_zaagsnede?: number | null
+          aantal_manueel_te_monteren_kasten?: number | null
+          aantal_manueel_te_monteren_objecten?: number | null
+          aantal_objecten?: number | null
+          aantal_platen?: number | null
+          aantal_stuks?: number | null
+          aantal_verschillende_kantenbanden?: number | null
+          aantal_zaagsnedes?: number | null
+          created_at?: string
+          id?: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          aantal_boringen?: number | null
+          aantal_cnc_programmas?: number | null
+          aantal_drevel_programmas?: number | null
+          aantal_kasten?: number | null
+          aantal_kasten_te_monteren?: number | null
+          aantal_lopende_meter_kantenbanden?: number | null
+          aantal_lopende_meters_zaagsnede?: number | null
+          aantal_manueel_te_monteren_kasten?: number | null
+          aantal_manueel_te_monteren_objecten?: number | null
+          aantal_objecten?: number | null
+          aantal_platen?: number | null
+          aantal_stuks?: number | null
+          aantal_verschillende_kantenbanden?: number | null
+          aantal_zaagsnedes?: number | null
+          created_at?: string
+          id?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_calculation_variables_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_onedrive_configs: {
         Row: {
