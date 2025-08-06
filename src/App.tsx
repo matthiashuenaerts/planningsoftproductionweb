@@ -7,6 +7,7 @@ import Projects from './pages/Projects';
 import ProjectDetails from './pages/ProjectDetails';
 import ProjectOrders from './pages/ProjectOrders';
 import Workstations from './pages/Workstations';
+import Floorplan from './pages/Floorplan';
 import BrokenParts from './pages/BrokenParts';
 import BrokenPartsSummary from './pages/BrokenPartsSummary';
 import NewBrokenPart from './pages/NewBrokenPart';
@@ -61,6 +62,7 @@ function App() {
                 <Route path="/:lang/projects/:projectId/edit" element={<ProtectedRoute><EditProject /></ProtectedRoute>} />
                 <Route path="/:lang/projects/:projectId/calculation" element={<ProtectedRoute><ProjectCalculation /></ProtectedRoute>} />
                 <Route path="/:lang/workstations" element={<ProtectedRoute><Workstations /></ProtectedRoute>} />
+                <Route path="/:lang/floorplan" element={<ProtectedRoute><Floorplan /></ProtectedRoute>} />
                 <Route path="/:lang/broken-parts" element={<ProtectedRoute><BrokenParts /></ProtectedRoute>} />
                 <Route path="/:lang/broken-parts/summary" element={<ProtectedRoute><BrokenPartsSummary /></ProtectedRoute>} />
                 <Route path="/:lang/broken-parts/new" element={<ProtectedRoute><NewBrokenPart /></ProtectedRoute>} />

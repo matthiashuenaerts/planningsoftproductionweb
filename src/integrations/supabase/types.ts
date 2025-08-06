@@ -966,6 +966,48 @@ export type Database = {
           },
         ]
       }
+      production_flow_lines: {
+        Row: {
+          color: string
+          created_at: string
+          end_x: number
+          end_y: number
+          id: string
+          is_active: boolean
+          name: string
+          start_x: number
+          start_y: number
+          stroke_width: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          end_x: number
+          end_y: number
+          id?: string
+          is_active?: boolean
+          name: string
+          start_x: number
+          start_y: number
+          stroke_width?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          end_x?: number
+          end_y?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          start_x?: number
+          start_y?: number
+          stroke_width?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           article_code: string | null
@@ -1994,6 +2036,41 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      workstation_positions: {
+        Row: {
+          created_at: string
+          id: string
+          updated_at: string
+          workstation_id: string
+          x_position: number
+          y_position: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          workstation_id: string
+          x_position?: number
+          y_position?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          workstation_id?: string
+          x_position?: number
+          y_position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workstation_positions_workstation_id_fkey"
+            columns: ["workstation_id"]
+            isOneToOne: false
+            referencedRelation: "workstations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workstation_schedules: {
         Row: {
