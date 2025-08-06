@@ -163,7 +163,7 @@ const Floorplan: React.FC = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      <div className="ml-64 relative w-[calc(100vw-16rem)] h-screen overflow-hidden"> {/* Account for navbar width */}
+      <div className="relative w-full h-[calc(100vh-64px)] overflow-hidden">
         {/* Floorplan Image */}
         <img
           src={FLOORPLAN_IMAGE}
@@ -176,7 +176,6 @@ const Floorplan: React.FC = () => {
           ref={containerRef}
           className="floorplan-container absolute inset-0 cursor-pointer"
           onClick={handleFloorplanClick}
-          style={{ userSelect: 'none' }}
         >
           {/* Production Flow Lines */}
           {containerRect && (

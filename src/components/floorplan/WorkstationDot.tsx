@@ -30,51 +30,13 @@ export const WorkstationDot: React.FC<WorkstationDotProps> = ({
   const handleDragEnd = (e: React.DragEvent) => {
     if (!isEditing || !onPositionChange) return;
     
-    const container = e.currentTarget.closest('.floorplan-container') as HTMLElement;
-    if (!container) return;
+    const rect = e.currentTarget.closest('.floorplan-container')?.getBoundingClientRect();
+    if (!rect) return;
     
-    const rect = container.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
     
-    // Clamp values between 0 and 100
-    const clampedX = Math.max(0, Math.min(100, x));
-    const clampedY = Math.max(0, Math.min(100, y));
-    
-    onPositionChange(workstation.id, clampedX, clampedY);
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!isEditing) return;
-    e.preventDefault();
-    
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const container = e.currentTarget.closest('.floorplan-container') as HTMLElement;
-    if (!container) return;
-    
-    const rect = container.getBoundingClientRect();
-    
-    const handleMouseMove = (moveE: MouseEvent) => {
-      if (!onPositionChange) return;
-      
-      const x = ((moveE.clientX - rect.left) / rect.width) * 100;
-      const y = ((moveE.clientY - rect.top) / rect.height) * 100;
-      
-      // Clamp values between 0 and 100
-      const clampedX = Math.max(0, Math.min(100, x));
-      const clampedY = Math.max(0, Math.min(100, y));
-      
-      onPositionChange(workstation.id, clampedX, clampedY);
-    };
-    
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    onPositionChange(workstation.id, x, y);
   };
 
   const getStatusColor = () => {
@@ -99,12 +61,9 @@ export const WorkstationDot: React.FC<WorkstationDotProps> = ({
               left: `${position.x}%`,
               top: `${position.y}%`,
             }}
-            onMouseDown={handleMouseDown}
+            draggable={isEditing}
             onDragEnd={handleDragEnd}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!isEditing) onClick?.(workstation);
-            }}
+            onClick={() => !isEditing && onClick?.(workstation)}
           >
             <div className={`w-4 h-4 rounded-full border-2 border-white shadow-lg ${getStatusColor()}`}>
               {status && status.is_active && status.active_users_count > 0 && (
