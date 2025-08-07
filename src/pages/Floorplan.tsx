@@ -41,10 +41,21 @@ const Floorplan: React.FC = () => {
     const statusesChannel = floorplanService.subscribeToTimeRegistrations(setWorkstationStatuses);
     const flowLinesChannel = floorplanService.subscribeToProductionFlowLines(setProductionFlowLines);
 
+    // Set up automatic status refresh every minute
+    const statusInterval = setInterval(async () => {
+      try {
+        const statuses = await floorplanService.getWorkstationStatuses();
+        setWorkstationStatuses(statuses);
+      } catch (error) {
+        console.error('Error refreshing workstation statuses:', error);
+      }
+    }, 60000); // 60 seconds
+
     return () => {
       positionsChannel.unsubscribe();
       statusesChannel.unsubscribe();
       flowLinesChannel.unsubscribe();
+      clearInterval(statusInterval);
     };
   }, []);
 
@@ -171,13 +182,28 @@ const Floorplan: React.FC = () => {
           className="w-full h-full object-contain"
         />
 
-        {/* Interactive Container */}
+        {/* Interactive Container - positioned relative to the image */}
         <div
           ref={containerRef}
           className="floorplan-container absolute inset-0 cursor-pointer"
           onClick={handleFloorplanClick}
           style={{ userSelect: 'none' }}
         >
+          {/* Workstation Dots positioned relative to image */}
+          <div className="absolute inset-0" style={{ aspectRatio: 'auto' }}>
+            {workstations.map((workstation) => (
+              <WorkstationDot
+                key={workstation.id}
+                workstation={workstation}
+                position={getWorkstationPosition(workstation.id)}
+                status={getWorkstationStatus(workstation.id)}
+                isEditing={isEditing}
+                onPositionChange={handleWorkstationPositionChange}
+                onClick={setSelectedWorkstation}
+              />
+            ))}
+          </div>
+
           {/* Production Flow Lines */}
           {containerRect && (
             <svg className="absolute inset-0 w-full h-full pointer-events-none">
@@ -192,19 +218,6 @@ const Floorplan: React.FC = () => {
               ))}
             </svg>
           )}
-
-          {/* Workstation Dots */}
-          {workstations.map((workstation) => (
-            <WorkstationDot
-              key={workstation.id}
-              workstation={workstation}
-              position={getWorkstationPosition(workstation.id)}
-              status={getWorkstationStatus(workstation.id)}
-              isEditing={isEditing}
-              onPositionChange={handleWorkstationPositionChange}
-              onClick={setSelectedWorkstation}
-            />
-          ))}
 
           {/* Start Point Indicator for Flow Line */}
           {startPoint && isAddingFlowLine && (

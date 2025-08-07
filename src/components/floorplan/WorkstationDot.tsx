@@ -31,11 +31,15 @@ export const WorkstationDot: React.FC<WorkstationDotProps> = ({
     if (!isEditing || !onPositionChange) return;
     
     const container = e.currentTarget.closest('.floorplan-container') as HTMLElement;
-    if (!container) return;
+    const img = container?.querySelector('img') as HTMLImageElement;
+    if (!container || !img) return;
     
-    const rect = container.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const containerRect = container.getBoundingClientRect();
+    const imgRect = img.getBoundingClientRect();
+    
+    // Calculate position relative to the actual image, not the container
+    const x = ((e.clientX - imgRect.left) / imgRect.width) * 100;
+    const y = ((e.clientY - imgRect.top) / imgRect.height) * 100;
     
     // Clamp values between 0 and 100
     const clampedX = Math.max(0, Math.min(100, x));
@@ -52,11 +56,15 @@ export const WorkstationDot: React.FC<WorkstationDotProps> = ({
       if (!onPositionChange) return;
       
       const container = document.querySelector('.floorplan-container') as HTMLElement;
-      if (!container) return;
+      const img = container?.querySelector('img') as HTMLImageElement;
+      if (!container || !img) return;
       
-      const rect = container.getBoundingClientRect();
-      const x = ((moveE.clientX - rect.left) / rect.width) * 100;
-      const y = ((moveE.clientY - rect.top) / rect.height) * 100;
+      const containerRect = container.getBoundingClientRect();
+      const imgRect = img.getBoundingClientRect();
+      
+      // Calculate position relative to the actual image, not the container
+      const x = ((moveE.clientX - imgRect.left) / imgRect.width) * 100;
+      const y = ((moveE.clientY - imgRect.top) / imgRect.height) * 100;
       
       // Clamp values between 0 and 100
       const clampedX = Math.max(0, Math.min(100, x));
@@ -99,6 +107,7 @@ export const WorkstationDot: React.FC<WorkstationDotProps> = ({
             style={{
               left: `${position.x}%`,
               top: `${position.y}%`,
+              zIndex: 10,
             }}
             onMouseDown={handleMouseDown}
             onDragEnd={handleDragEnd}
