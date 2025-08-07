@@ -78,13 +78,17 @@ export const WorkstationDot: React.FC<WorkstationDotProps> = ({
   };
 
   const getStatusColor = () => {
-    if (!status || !status.is_active) return 'bg-green-500'; // Available
-    return 'bg-red-500'; // In use
+    if (!status) return 'bg-orange-500'; // Not in use (no status data)
+    if (status.has_error) return 'bg-red-500'; // Error
+    if (status.is_active) return 'bg-green-500'; // In use
+    return 'bg-orange-500'; // Available/Not in use
   };
 
   const getStatusText = () => {
-    if (!status || !status.is_active) return 'Available';
-    return `In use (${status.active_users_count} user${status.active_users_count > 1 ? 's' : ''})`;
+    if (!status) return 'Not in use';
+    if (status.has_error) return 'Error';
+    if (status.is_active) return `In use (${status.active_users_count} user${status.active_users_count > 1 ? 's' : ''})`;
+    return 'Available';
   };
 
   return (

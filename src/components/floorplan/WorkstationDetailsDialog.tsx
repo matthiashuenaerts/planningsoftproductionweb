@@ -2,7 +2,7 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Clock, Activity, AlertCircle } from 'lucide-react';
+import { Users, Clock, Activity, AlertCircle, FolderOpen, CheckCircle } from 'lucide-react';
 import { WorkstationStatus } from '@/services/floorplanService';
 import WorkstationRushOrdersDisplay from '@/components/WorkstationRushOrdersDisplay';
 
@@ -26,18 +26,34 @@ export const WorkstationDetailsDialog: React.FC<WorkstationDetailsDialogProps> =
   if (!workstation) return null;
 
   const getStatusInfo = () => {
-    if (!status || !status.is_active) {
+    if (!status) {
+      return {
+        color: 'orange',
+        text: 'Not in use',
+        icon: <Activity className="h-4 w-4 text-orange-500" />
+      };
+    }
+    
+    if (status.has_error) {
+      return {
+        color: 'red',
+        text: 'Error',
+        icon: <AlertCircle className="h-4 w-4 text-red-500" />
+      };
+    }
+    
+    if (status.is_active) {
       return {
         color: 'green',
-        text: 'Available',
-        icon: <Activity className="h-4 w-4 text-green-500" />
+        text: `In Use (${status.active_users_count} user${status.active_users_count > 1 ? 's' : ''})`,
+        icon: <Users className="h-4 w-4 text-green-500" />
       };
     }
     
     return {
-      color: 'red',
-      text: `In Use (${status.active_users_count} user${status.active_users_count > 1 ? 's' : ''})`,
-      icon: <Users className="h-4 w-4 text-red-500" />
+      color: 'orange',
+      text: 'Available',
+      icon: <Activity className="h-4 w-4 text-orange-500" />
     };
   };
 
@@ -80,22 +96,62 @@ export const WorkstationDetailsDialog: React.FC<WorkstationDetailsDialogProps> =
             </CardContent>
           </Card>
 
-          {/* Active Users */}
-          {status && status.is_active && (
+          {/* Active Tasks */}
+          {status && status.active_tasks.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Users className="h-5 w-5" />
-                  <span>Active Users ({status.active_users_count})</span>
+                  <CheckCircle className="h-5 w-5" />
+                  <span>Active Tasks ({status.active_tasks.length})</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {status.active_user_names.map((name, index) => (
-                    <div key={index} className="flex items-center space-x-2 p-2 bg-muted rounded-md">
-                      <Clock className="h-4 w-4 text-blue-500" />
-                      <span className="text-sm">{name}</span>
-                      <Badge variant="outline" className="ml-auto">Active</Badge>
+                <div className="space-y-3">
+                  {status.active_tasks.map((task, index) => (
+                    <div key={index} className="p-3 bg-muted rounded-md">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium text-sm">{task.task_title}</span>
+                        <Badge variant="outline">Active</Badge>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                          <Users className="h-3 w-3" />
+                          <span>Employee: {task.employee_name}</span>
+                        </div>
+                        {task.project_name && (
+                          <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                            <FolderOpen className="h-3 w-3" />
+                            <span>Project: {task.project_name}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Current Projects */}
+          {status && status.current_projects.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <FolderOpen className="h-5 w-5" />
+                  <span>Current Projects ({status.current_projects.length})</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {status.current_projects.map((project, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                      <div>
+                        <span className="text-sm font-medium">{project.project_name}</span>
+                        <div className="text-xs text-muted-foreground">
+                          {project.task_count} task{project.task_count > 1 ? 's' : ''} pending
+                        </div>
+                      </div>
+                      <Badge variant="secondary">{project.task_count}</Badge>
                     </div>
                   ))}
                 </div>

@@ -239,11 +239,15 @@ const Floorplan: React.FC = () => {
           <div className="space-y-2 text-xs">
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span>Available Workstation</span>
+              <span>In Use (Active)</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+              <span>Not in Use</span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-              <span>Active Workstation</span>
+              <span>Error Status</span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-4 h-1 bg-blue-500"></div>
