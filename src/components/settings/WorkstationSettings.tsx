@@ -400,6 +400,56 @@ const WorkstationSettings: React.FC = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Image Upload Dialog */}
+      {selectedWorkstation && (
+        <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Upload Image for {selectedWorkstation.name}</DialogTitle>
+              <DialogDescription>
+                Upload an image that will be displayed for this workstation
+              </DialogDescription>
+            </DialogHeader>
+            
+            <form onSubmit={handleImageUpload} className="space-y-4">
+              <div>
+                <label htmlFor="image" className="block text-sm font-medium mb-2">
+                  Select Image
+                </label>
+                <Input
+                  id="image"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                  required
+                />
+              </div>
+              
+              {selectedWorkstation.image_path && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Current image:</p>
+                  <img 
+                    src={selectedWorkstation.image_path} 
+                    alt={selectedWorkstation.name}
+                    className="w-32 h-32 object-cover rounded-md border"
+                  />
+                </div>
+              )}
+              
+              <div className="flex justify-end gap-3">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Cancel</Button>
+                </DialogClose>
+                <Button type="submit" disabled={uploading || !uploadFile}>
+                  {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Upload
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
