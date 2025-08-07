@@ -62,20 +62,20 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden relative animate-scale-in">
-        {/* Background Image */}
-        {workstation.image_path && (
-          <div 
-            className="absolute inset-0 bg-cover bg-center opacity-10 animate-fade-in"
-            style={{ 
-              backgroundImage: `url(${workstation.image_path})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              filter: 'blur(1px)'
-            }}
-          />
-        )}
-        
+      {/* Full-screen Background Image */}
+      {workstation.image_path && (
+        <div 
+          className="fixed inset-0 z-40 bg-cover bg-center opacity-20 animate-fade-in"
+          style={{ 
+            backgroundImage: `url(${workstation.image_path})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            filter: 'blur(2px)'
+          }}
+        />
+      )}
+      
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden relative animate-scale-in z-50 fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
         {/* Content Overlay */}
         <div className="relative z-10 bg-background/95 backdrop-blur-sm rounded-lg p-6 animate-fade-in delay-200">
           <DialogHeader>
