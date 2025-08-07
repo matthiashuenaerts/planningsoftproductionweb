@@ -106,6 +106,8 @@ export const floorplanService = {
 
   // Workstation Status (based on active time registrations)
   async getWorkstationStatuses(): Promise<WorkstationStatus[]> {
+    console.log('Starting workstation status check...');
+    
     // Get active time registrations with detailed information
     const { data: timeRegistrations, error: timeError } = await supabase
       .from('time_registrations')
@@ -115,14 +117,14 @@ export const floorplanService = {
         task_id,
         is_active,
         employees!inner(name),
-        workstation_tasks!inner(
-          workstation_id,
-          workstations!inner(name)
-        ),
-        tasks(
+        tasks!inner(
           id,
           title,
           status,
+          task_workstation_links!inner(
+            workstation_id,
+            workstations!inner(id, name)
+          ),
           phases(
             project_id,
             projects(name)
@@ -130,6 +132,8 @@ export const floorplanService = {
         )
       `)
       .eq('is_active', true);
+    
+    console.log('Active time registrations:', timeRegistrations);
     
     if (timeError) throw timeError;
 
@@ -159,37 +163,50 @@ export const floorplanService = {
     
     // Process active time registrations
     timeRegistrations?.forEach((reg: any) => {
-      if (!reg.workstation_tasks?.workstation_id) return;
+      console.log('Processing time registration:', reg);
       
-      const workstationId = reg.workstation_tasks.workstation_id;
-      const userName = reg.employees?.name || 'Unknown User';
-      
-      if (!workstationStatusMap.has(workstationId)) {
-        workstationStatusMap.set(workstationId, {
-          workstation_id: workstationId,
-          is_active: false,
-          active_users_count: 0,
-          active_user_names: [],
-          active_tasks: [],
-          current_projects: [],
-          has_error: false
-        });
+      // Check if task has workstation links
+      if (!reg.tasks?.task_workstation_links?.length) {
+        console.log('No workstation links found for task:', reg.tasks?.title);
+        return;
       }
       
-      const status = workstationStatusMap.get(workstationId)!;
-      status.is_active = true;
-      status.active_users_count++;
-      status.active_user_names.push(userName);
+      const userName = reg.employees?.name || 'Unknown User';
       
-      // Add active task info
-      if (reg.tasks) {
+      // Process each workstation link for this task
+      reg.tasks.task_workstation_links.forEach((link: any) => {
+        const workstationId = link.workstation_id;
+        console.log('Found workstation assignment:', workstationId, 'for task:', reg.tasks.title);
+        
+        if (!workstationStatusMap.has(workstationId)) {
+          workstationStatusMap.set(workstationId, {
+            workstation_id: workstationId,
+            is_active: false,
+            active_users_count: 0,
+            active_user_names: [],
+            active_tasks: [],
+            current_projects: [],
+            has_error: false
+          });
+        }
+        
+        const status = workstationStatusMap.get(workstationId)!;
+        status.is_active = true;
+        
+        // Only count unique users
+        if (!status.active_user_names.includes(userName)) {
+          status.active_users_count++;
+          status.active_user_names.push(userName);
+        }
+        
+        // Add active task info
         status.active_tasks.push({
           task_id: reg.tasks.id,
           task_title: reg.tasks.title,
           employee_name: userName,
           project_name: reg.tasks.phases?.projects?.name
         });
-      }
+      });
     });
 
     // Process current projects for all workstations

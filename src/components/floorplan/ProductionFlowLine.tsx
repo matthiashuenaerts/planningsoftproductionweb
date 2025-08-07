@@ -20,6 +20,10 @@ export const ProductionFlowLine: React.FC<ProductionFlowLineProps> = ({
   const startY = (line.start_y / 100) * containerRect.height;
   const endX = (line.end_x / 100) * containerRect.width;
   const endY = (line.end_y / 100) * containerRect.height;
+  
+  // Calculate midpoint for direction indicator
+  const midX = (startX + endX) / 2;
+  const midY = (startY + endY) / 2;
 
   const handleClick = (e: React.MouseEvent) => {
     if (isEditing) {
@@ -44,39 +48,26 @@ export const ProductionFlowLine: React.FC<ProductionFlowLineProps> = ({
         onClick={handleClick}
       />
       
-      {/* Arrow head */}
-      <defs>
-        <marker
-          id={`arrowhead-${line.id}`}
-          markerWidth="10"
-          markerHeight="7"
-          refX="9"
-          refY="3.5"
-          orient="auto"
-        >
-          <polygon
-            points="0 0, 10 3.5, 0 7"
-            fill={line.color}
-          />
-        </marker>
-      </defs>
-      
-      <line
-        x1={startX}
-        y1={startY}
-        x2={endX}
-        y2={endY}
-        stroke={line.color}
-        strokeWidth={line.stroke_width}
-        markerEnd={`url(#arrowhead-${line.id})`}
+      {/* Direction indicator - small ">" in the middle */}
+      <text
+        x={midX}
+        y={midY}
+        fill={line.color}
+        fontSize="14"
+        fontWeight="bold"
+        textAnchor="middle"
+        dominantBaseline="central"
+        className="pointer-events-none select-none"
         style={{ cursor: isEditing ? 'pointer' : 'default' }}
         onClick={handleClick}
-      />
+      >
+        &gt;
+      </text>
       
       {/* Label */}
       <text
-        x={(startX + endX) / 2}
-        y={(startY + endY) / 2 - 5}
+        x={midX}
+        y={midY - 15}
         fill={line.color}
         fontSize="12"
         textAnchor="middle"

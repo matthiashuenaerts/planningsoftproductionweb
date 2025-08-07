@@ -48,16 +48,13 @@ export const WorkstationDot: React.FC<WorkstationDotProps> = ({
     if (!isEditing) return;
     e.preventDefault();
     
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const container = e.currentTarget.closest('.floorplan-container') as HTMLElement;
-    if (!container) return;
-    
-    const rect = container.getBoundingClientRect();
-    
     const handleMouseMove = (moveE: MouseEvent) => {
       if (!onPositionChange) return;
       
+      const container = document.querySelector('.floorplan-container') as HTMLElement;
+      if (!container) return;
+      
+      const rect = container.getBoundingClientRect();
       const x = ((moveE.clientX - rect.left) / rect.width) * 100;
       const y = ((moveE.clientY - rect.top) / rect.height) * 100;
       
