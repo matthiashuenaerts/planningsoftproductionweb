@@ -40,7 +40,7 @@ import { workstationService, Workstation } from '@/services/workstationService';
 import { useForm } from 'react-hook-form';
 import { TaskWorkstationsManager } from './TaskWorkstationsManager';
 import { WorkstationTasksManager } from './WorkstationTasksManager';
-
+import { supabase } from '@/integrations/supabase/client';
 const WorkstationSettings: React.FC = () => {
   const [workstations, setWorkstations] = useState<Workstation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +49,9 @@ const WorkstationSettings: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showTaskMapping, setShowTaskMapping] = useState(false);
   const [showTasksManager, setShowTasksManager] = useState(false);
+  const [showImageDialog, setShowImageDialog] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const { toast } = useToast();
 
   const form = useForm({
@@ -160,6 +163,32 @@ const WorkstationSettings: React.FC = () => {
       });
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedWorkstation || !uploadFile) return;
+    try {
+      setUploading(true);
+      const ext = uploadFile.name.split('.').pop();
+      const path = `workstations/${selectedWorkstation.id}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from('product-images').upload(path, uploadFile, {
+        upsert: true,
+        contentType: uploadFile.type,
+      });
+      if (uploadError) throw uploadError;
+      const { data: pub } = supabase.storage.from('product-images').getPublicUrl(path);
+      await workstationService.update(selectedWorkstation.id, { image_path: pub.publicUrl });
+      toast({ title: 'Success', description: 'Image uploaded successfully' });
+      setShowImageDialog(false);
+      setUploadFile(null);
+      loadWorkstations();
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      toast({ title: 'Error', description: error.message || 'Failed to upload image', variant: 'destructive' });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -283,6 +312,16 @@ const WorkstationSettings: React.FC = () => {
                             }}
                           >
                             Workstation Tasks
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedWorkstation(workstation);
+                              setShowImageDialog(true);
+                            }}
+                          >
+                            Upload image
                           </Button>
                           <Dialog>
                             <DialogTrigger asChild>

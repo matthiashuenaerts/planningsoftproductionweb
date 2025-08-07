@@ -5,6 +5,7 @@ export interface Workstation {
   id: string;
   name: string;
   description: string | null;
+  image_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -66,7 +67,7 @@ export const workstationService = {
     return data;
   },
 
-  async update(id: string, updates: Partial<Pick<Workstation, 'name' | 'description'>>): Promise<Workstation> {
+  async update(id: string, updates: Partial<Pick<Workstation, 'name' | 'description' | 'image_path'>>): Promise<Workstation> {
     const { data, error } = await supabase
       .from('workstations')
       .update(updates)
@@ -100,6 +101,7 @@ export const workstationService = {
           id,
           name,
           description,
+          image_path,
           created_at,
           updated_at
         )
@@ -121,6 +123,7 @@ export const workstationService = {
           id,
           name,
           description,
+          image_path,
           created_at,
           updated_at
         )
