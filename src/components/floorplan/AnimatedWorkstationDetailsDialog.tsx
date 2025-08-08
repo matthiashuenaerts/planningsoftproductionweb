@@ -172,9 +172,9 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
         />
       )}
       
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden relative animate-scale-in z-50 fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden relative animate-scale-in z-50 fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-transparent border-none shadow-none">
         {/* Content Overlay */}
-        <div className="relative z-10 bg-background/90 backdrop-blur-md rounded-lg p-6 animate-fade-in delay-200 border border-white/20 shadow-2xl">
+        <div className="relative z-10 bg-background/40 backdrop-blur-lg rounded-lg p-6 animate-fade-in delay-200 border border-white/10 shadow-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <span>{workstation.name}</span>
