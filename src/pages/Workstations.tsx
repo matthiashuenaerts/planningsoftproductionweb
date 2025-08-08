@@ -10,12 +10,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { workstationService } from '@/services/workstationService';
 import { workstationTasksService, WorkstationTask } from '@/services/workstationTasksService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
-import { ArrowLeft, Package, Wrench, Warehouse, Scissors, CheckCircle, PackageCheck, Calendar, Cog, Settings, MoreVertical, Play, Hammer, Drill, Zap, Truck, Factory } from 'lucide-react';
+import { ArrowLeft, Package, Wrench, Warehouse, Scissors, CheckCircle, PackageCheck, Calendar, Cog, Settings, MoreVertical, Play, Hammer, Drill, Zap, Truck, Factory, Map } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '@/context/LanguageContext';
+import { useNavigate } from 'react-router-dom';
 
 // Define workstation with appropriate icon mapping
 interface WorkstationWithIcon {
@@ -39,6 +40,7 @@ const Workstations: React.FC = () => {
   } = useAuth();
   const queryClient = useQueryClient();
   const { t } = useLanguage();
+  const navigate = useNavigate();
   useEffect(() => {
     const loadWorkstations = async () => {
       try {
@@ -218,7 +220,17 @@ const Workstations: React.FC = () => {
                   </Button>
                   <WorkstationView workstationId={selectedWorkstation} onBack={() => setSelectedWorkstation(null)} />
                 </div> : <div>
-                  <h1 className="text-2xl font-bold mb-6">{t('workstations_title')}</h1>
+                  <div className="flex items-center justify-between mb-6">
+                    <h1 className="text-2xl font-bold">{t('workstations_title')}</h1>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => navigate('/nl/floorplan')}
+                      className="flex items-center gap-2"
+                    >
+                      <Map className="h-4 w-4" />
+                      Floorplan
+                    </Button>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                     {workstations.map(workstation => <Card key={workstation.id} className="hover:shadow-md transition-shadow cursor-pointer relative">
                         <div className="absolute top-2 right-2 z-10">
