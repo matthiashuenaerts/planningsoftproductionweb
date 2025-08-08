@@ -85,7 +85,7 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
     setLoadingTasks(prev => new Set(prev).add(projectId));
     
     try {
-      console.log('Fetching tasks for project:', projectId, 'workstation:', workstation.name);
+      console.log('🔍 Fetching tasks for project:', projectId, 'workstation:', workstation.name);
       
       // First, get all tasks for the project to debug
       const { data: allTasks, error: allTasksError } = await supabase
@@ -100,25 +100,37 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
         `)
         .eq('phases.project_id', projectId);
       
-      if (allTasksError) throw allTasksError;
+      if (allTasksError) {
+        console.error('❌ Error fetching tasks:', allTasksError);
+        throw allTasksError;
+      }
       
-      console.log('All tasks for project:', allTasks);
+      console.log('📋 All tasks for project:', allTasks);
+      console.log('🏭 Current workstation name:', workstation.name);
       
       // Filter tasks for this workstation and TODO status
       const workstationTasks = (allTasks || []).filter(task => {
         const isCorrectStatus = task.status === 'TODO';
-        const isCorrectWorkstation = task.workstation && (
-          task.workstation.toLowerCase() === workstation.name.toLowerCase() ||
-          task.workstation.toLowerCase().includes(workstation.name.toLowerCase()) ||
-          workstation.name.toLowerCase().includes(task.workstation.toLowerCase())
+        const taskWorkstation = task.workstation || '';
+        const isCorrectWorkstation = taskWorkstation && (
+          taskWorkstation.toLowerCase() === workstation.name.toLowerCase() ||
+          taskWorkstation.toLowerCase().includes(workstation.name.toLowerCase()) ||
+          workstation.name.toLowerCase().includes(taskWorkstation.toLowerCase())
         );
         
-        console.log('Task:', task.title, 'Status:', task.status, 'Workstation:', task.workstation, 'Match:', isCorrectWorkstation && isCorrectStatus);
+        console.log('🔸 Task:', task.title);
+        console.log('  Status:', task.status, '(TODO?', isCorrectStatus, ')');
+        console.log('  Task Workstation:', taskWorkstation);
+        console.log('  Current Workstation:', workstation.name);
+        console.log('  Workstation Match:', isCorrectWorkstation);
+        console.log('  Final Match:', isCorrectStatus && isCorrectWorkstation);
+        console.log('  ---');
         
         return isCorrectStatus && isCorrectWorkstation;
       });
       
-      console.log('Filtered workstation tasks:', workstationTasks);
+      console.log('✅ Filtered workstation tasks:', workstationTasks);
+      console.log('📊 Found', workstationTasks.length, 'matching tasks');
       
       setProjectTasks(prev => ({
         ...prev,
