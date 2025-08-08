@@ -87,7 +87,7 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
     try {
       console.log('🔍 Fetching tasks for project:', projectId, 'workstation:', workstation.name);
       
-      // First, get all tasks for the project to debug
+      // Get all tasks for the project with workstation links
       const { data: allTasks, error: allTasksError } = await supabase
         .from('tasks')
         .select(`
@@ -95,10 +95,14 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
           title,
           status,
           assignee_id,
-          workstation,
-          phases!inner(project_id)
+          phases!inner(project_id),
+          task_workstation_links!inner(
+            workstation_id,
+            workstations!inner(id, name)
+          )
         `)
-        .eq('phases.project_id', projectId);
+        .eq('phases.project_id', projectId)
+        .eq('status', 'TODO');
       
       if (allTasksError) {
         console.error('❌ Error fetching tasks:', allTasksError);
@@ -106,27 +110,20 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
       }
       
       console.log('📋 All tasks for project:', allTasks);
-      console.log('🏭 Current workstation name:', workstation.name);
+      console.log('🏭 Current workstation ID:', workstation.id);
       
-      // Filter tasks for this workstation and pending status (TODO or HOLD)
+      // Filter tasks assigned to this specific workstation
       const workstationTasks = (allTasks || []).filter(task => {
-        const isCorrectStatus = task.status === 'TODO' || task.status === 'HOLD';
-        const taskWorkstation = task.workstation || '';
-        const isCorrectWorkstation = taskWorkstation && (
-          taskWorkstation.toLowerCase() === workstation.name.toLowerCase() ||
-          taskWorkstation.toLowerCase().includes(workstation.name.toLowerCase()) ||
-          workstation.name.toLowerCase().includes(taskWorkstation.toLowerCase())
+        const isAssignedToWorkstation = task.task_workstation_links.some(
+          link => link.workstation_id === workstation.id
         );
         
         console.log('🔸 Task:', task.title);
-        console.log('  Status:', task.status, '(TODO?', isCorrectStatus, ')');
-        console.log('  Task Workstation:', taskWorkstation);
-        console.log('  Current Workstation:', workstation.name);
-        console.log('  Workstation Match:', isCorrectWorkstation);
-        console.log('  Final Match:', isCorrectStatus && isCorrectWorkstation);
+        console.log('  Workstation Links:', task.task_workstation_links);
+        console.log('  Assigned to this workstation:', isAssignedToWorkstation);
         console.log('  ---');
         
-        return isCorrectStatus && isCorrectWorkstation;
+        return isAssignedToWorkstation;
       });
       
       console.log('✅ Filtered workstation tasks:', workstationTasks);
