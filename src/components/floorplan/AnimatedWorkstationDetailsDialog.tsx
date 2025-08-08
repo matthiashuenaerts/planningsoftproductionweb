@@ -177,7 +177,7 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
         <div className="relative z-10 bg-white/10 backdrop-blur-sm rounded-lg p-6 animate-fade-in delay-200 border border-white/20 shadow-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
-              <span>{workstation.name}</span>
+              <span className="text-white">{workstation.name}</span>
               <Badge variant={statusInfo.color === 'green' ? 'default' : 'destructive'} className="ml-2">
                 {statusInfo.text}
               </Badge>
