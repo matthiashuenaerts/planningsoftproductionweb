@@ -85,7 +85,6 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
     setLoadingTasks(prev => new Set(prev).add(projectId));
     
     try {
-      // Query both by exact workstation name and by checking if the task is assigned to this workstation
       const { data, error } = await supabase
         .from('tasks')
         .select(`
@@ -98,21 +97,13 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
         `)
         .eq('phases.project_id', projectId)
         .eq('status', 'TODO')
-        .or(`workstation.eq.${workstation.name},workstation.ilike.%${workstation.name}%`);
+        .ilike('workstation', `%${workstation.name}%`);
       
       if (error) throw error;
       
-      // Filter tasks that are specifically for this workstation
-      const workstationTasks = (data || []).filter(task => 
-        task.workstation && (
-          task.workstation.toLowerCase() === workstation.name.toLowerCase() ||
-          task.workstation.toLowerCase().includes(workstation.name.toLowerCase())
-        )
-      );
-      
       setProjectTasks(prev => ({
         ...prev,
-        [projectId]: workstationTasks
+        [projectId]: data || []
       }));
     } catch (error) {
       console.error('Error fetching project tasks:', error);
