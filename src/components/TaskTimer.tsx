@@ -200,7 +200,7 @@ const TaskTimer = () => {
   }
 
   return (
-    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none">
+    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[9999] pointer-events-none">
       <div className="pointer-events-auto">
         <Card 
           className={`cursor-pointer transition-colors max-w-sm ${
