@@ -17,7 +17,7 @@ interface ProjectTask {
   title: string;
   status: string;
   assignee_id?: string;
-  workstation: string;
+  workstation?: string;
 }
 
 interface AnimatedWorkstationDetailsDialogProps {
@@ -96,7 +96,7 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
           phases!inner(project_id)
         `)
         .eq('phases.project_id', projectId)
-        .eq('workstation', workstation.name)
+        .ilike('workstation', workstation.name)
         .in('status', ['TODO', 'IN_PROGRESS']);
       
       if (error) throw error;
