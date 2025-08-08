@@ -96,7 +96,7 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
           phases!inner(project_id)
         `)
         .eq('phases.project_id', projectId)
-        .ilike('workstation', workstation.name)
+        .eq('workstation', workstation.name)
         .in('status', ['TODO', 'IN_PROGRESS']);
       
       if (error) throw error;
