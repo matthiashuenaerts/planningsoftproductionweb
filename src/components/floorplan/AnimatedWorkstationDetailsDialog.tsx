@@ -1,10 +1,24 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Clock, Activity, AlertCircle, FolderOpen, CheckCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Users, Clock, Activity, AlertCircle, FolderOpen, CheckCircle, ChevronDown, ChevronUp, Play } from 'lucide-react';
 import { WorkstationStatus } from '@/services/floorplanService';
+import { timeRegistrationService } from '@/services/timeRegistrationService';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import WorkstationRushOrdersDisplay from '@/components/WorkstationRushOrdersDisplay';
+
+interface ProjectTask {
+  id: string;
+  title: string;
+  status: string;
+  assignee_id?: string;
+  workstation: string;
+}
 
 interface AnimatedWorkstationDetailsDialogProps {
   workstation: {
@@ -24,6 +38,11 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
   isOpen,
   onClose
 }) => {
+  const { currentEmployee } = useAuth();
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [projectTasks, setProjectTasks] = useState<Record<string, ProjectTask[]>>({});
+  const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
+
   if (!workstation) return null;
 
   const getStatusInfo = () => {
@@ -60,24 +79,102 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
 
   const statusInfo = getStatusInfo();
 
+  const fetchProjectTasks = async (projectId: string) => {
+    if (loadingTasks.has(projectId) || projectTasks[projectId]) return;
+    
+    setLoadingTasks(prev => new Set(prev).add(projectId));
+    
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select(`
+          id,
+          title,
+          status,
+          assignee_id,
+          workstation,
+          phases!inner(project_id)
+        `)
+        .eq('phases.project_id', projectId)
+        .eq('workstation', workstation.name)
+        .in('status', ['TODO', 'IN_PROGRESS']);
+      
+      if (error) throw error;
+      
+      setProjectTasks(prev => ({
+        ...prev,
+        [projectId]: data || []
+      }));
+    } catch (error) {
+      console.error('Error fetching project tasks:', error);
+      toast.error('Failed to load project tasks');
+    } finally {
+      setLoadingTasks(prev => {
+        const next = new Set(prev);
+        next.delete(projectId);
+        return next;
+      });
+    }
+  };
+
+  const toggleProject = (projectId: string) => {
+    const newExpanded = new Set(expandedProjects);
+    if (newExpanded.has(projectId)) {
+      newExpanded.delete(projectId);
+    } else {
+      newExpanded.add(projectId);
+      fetchProjectTasks(projectId);
+    }
+    setExpandedProjects(newExpanded);
+  };
+
+  const startTask = async (task: ProjectTask) => {
+    if (!currentEmployee) {
+      toast.error('You must be logged in to start a task');
+      return;
+    }
+
+    try {
+      await timeRegistrationService.startTask(currentEmployee.id, task.id);
+      toast.success(`Started task: ${task.title}`);
+      
+      // Update local state to reflect the change
+      setProjectTasks(prev => ({
+        ...prev,
+        ...Object.fromEntries(
+          Object.entries(prev).map(([projId, tasks]) => [
+            projId,
+            tasks.map(t => 
+              t.id === task.id 
+                ? { ...t, status: 'IN_PROGRESS', assignee_id: currentEmployee.id }
+                : t
+            )
+          ])
+        )
+      }));
+    } catch (error) {
+      console.error('Error starting task:', error);
+      toast.error('Failed to start task');
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       {/* Full-screen Background Image */}
       {workstation.image_path && (
         <div 
-          className="fixed inset-0 z-40 bg-cover bg-center opacity-20 animate-fade-in"
+          className="fixed inset-0 z-40 bg-cover bg-center animate-fade-in"
           style={{ 
             backgroundImage: `url(${workstation.image_path})`,
             backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            filter: 'blur(2px)'
+            backgroundPosition: 'center'
           }}
         />
       )}
       
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden relative animate-scale-in z-50 fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
         {/* Content Overlay */}
-        <div className="relative z-10 bg-background/95 backdrop-blur-sm rounded-lg p-6 animate-fade-in delay-200">
+        <div className="relative z-10 bg-background/90 backdrop-blur-md rounded-lg p-6 animate-fade-in delay-200 border border-white/20 shadow-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <span>{workstation.name}</span>
@@ -160,15 +257,68 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
                 <CardContent>
                   <div className="space-y-2">
                     {status.current_projects.map((project, index) => (
-                      <div key={index} className="flex items-center justify-between p-2 bg-muted/80 rounded-md backdrop-blur">
-                        <div>
-                          <span className="text-sm font-medium">{project.project_name}</span>
-                          <div className="text-xs text-muted-foreground">
-                            {project.task_count} task{project.task_count > 1 ? 's' : ''} pending
+                      <Collapsible 
+                        key={index}
+                        open={expandedProjects.has(project.project_id)}
+                        onOpenChange={() => toggleProject(project.project_id)}
+                      >
+                        <CollapsibleTrigger asChild>
+                          <div className="flex items-center justify-between p-2 bg-muted/80 rounded-md backdrop-blur cursor-pointer hover:bg-muted/90 transition-colors">
+                            <div>
+                              <span className="text-sm font-medium">{project.project_name}</span>
+                              <div className="text-xs text-muted-foreground">
+                                {project.task_count} task{project.task_count > 1 ? 's' : ''} pending
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Badge variant="secondary">{project.task_count}</Badge>
+                              {expandedProjects.has(project.project_id) ? 
+                                <ChevronUp className="h-4 w-4" /> : 
+                                <ChevronDown className="h-4 w-4" />
+                              }
+                            </div>
                           </div>
-                        </div>
-                        <Badge variant="secondary">{project.task_count}</Badge>
-                      </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-2">
+                          <div className="space-y-2 ml-4">
+                            {loadingTasks.has(project.project_id) ? (
+                              <div className="text-sm text-muted-foreground">Loading tasks...</div>
+                            ) : projectTasks[project.project_id]?.length > 0 ? (
+                              projectTasks[project.project_id].map((task) => (
+                                <div key={task.id} className="flex items-center justify-between p-3 bg-muted/60 rounded-md">
+                                  <div>
+                                    <div className="text-sm font-medium">{task.title}</div>
+                                    <div className="text-xs text-muted-foreground flex items-center space-x-2">
+                                      <Badge variant={task.status === 'IN_PROGRESS' ? 'default' : 'outline'} className="text-xs">
+                                        {task.status}
+                                      </Badge>
+                                      {task.assignee_id && currentEmployee?.id === task.assignee_id && (
+                                        <span className="text-xs text-green-600">Assigned to you</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {task.status === 'TODO' && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        startTask(task);
+                                      }}
+                                      className="h-8 px-3"
+                                    >
+                                      <Play className="h-3 w-3 mr-1" />
+                                      Start
+                                    </Button>
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-sm text-muted-foreground">No pending tasks for this workstation</div>
+                            )}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
                     ))}
                   </div>
                 </CardContent>
