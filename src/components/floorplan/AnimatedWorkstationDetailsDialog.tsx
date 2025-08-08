@@ -85,7 +85,10 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
     setLoadingTasks(prev => new Set(prev).add(projectId));
     
     try {
-      const { data, error } = await supabase
+      console.log('Fetching tasks for project:', projectId, 'workstation:', workstation.name);
+      
+      // First, get all tasks for the project to debug
+      const { data: allTasks, error: allTasksError } = await supabase
         .from('tasks')
         .select(`
           id,
@@ -95,15 +98,31 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
           workstation,
           phases!inner(project_id)
         `)
-        .eq('phases.project_id', projectId)
-        .eq('status', 'TODO')
-        .ilike('workstation', `%${workstation.name}%`);
+        .eq('phases.project_id', projectId);
       
-      if (error) throw error;
+      if (allTasksError) throw allTasksError;
+      
+      console.log('All tasks for project:', allTasks);
+      
+      // Filter tasks for this workstation and TODO status
+      const workstationTasks = (allTasks || []).filter(task => {
+        const isCorrectStatus = task.status === 'TODO';
+        const isCorrectWorkstation = task.workstation && (
+          task.workstation.toLowerCase() === workstation.name.toLowerCase() ||
+          task.workstation.toLowerCase().includes(workstation.name.toLowerCase()) ||
+          workstation.name.toLowerCase().includes(task.workstation.toLowerCase())
+        );
+        
+        console.log('Task:', task.title, 'Status:', task.status, 'Workstation:', task.workstation, 'Match:', isCorrectWorkstation && isCorrectStatus);
+        
+        return isCorrectStatus && isCorrectWorkstation;
+      });
+      
+      console.log('Filtered workstation tasks:', workstationTasks);
       
       setProjectTasks(prev => ({
         ...prev,
-        [projectId]: data || []
+        [projectId]: workstationTasks
       }));
     } catch (error) {
       console.error('Error fetching project tasks:', error);
