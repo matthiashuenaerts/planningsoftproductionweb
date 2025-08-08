@@ -174,7 +174,7 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
       
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden relative animate-scale-in z-50 fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-transparent border-none shadow-none">
         {/* Content Overlay */}
-        <div className="relative z-10 bg-background/40 backdrop-blur-lg rounded-lg p-6 animate-fade-in delay-200 border border-white/10 shadow-2xl">
+        <div className="relative z-10 bg-white/30 backdrop-blur-lg rounded-lg p-6 animate-fade-in delay-200 border border-white/20 shadow-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <span>{workstation.name}</span>
@@ -186,54 +186,54 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
 
           <div className="space-y-6 max-h-[60vh] overflow-y-auto">
             {/* Basic Information */}
-            <Card className="bg-background/20 backdrop-blur border border-white/10 shadow-lg">
+            <Card className="bg-white/20 backdrop-blur border border-white/30 shadow-lg">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2 text-foreground">
-                  <Activity className="h-5 w-5" />
+                <CardTitle className="flex items-center space-x-2 text-white">
+                  <Activity className="h-5 w-5 text-white" />
                   <span>Workstation Information</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {workstation.description && (
                   <div>
-                    <span className="text-sm font-medium text-foreground">Description:</span>
-                    <p className="text-sm text-foreground/80 mt-1">{workstation.description}</p>
+                    <span className="text-sm font-medium text-white">Description:</span>
+                    <p className="text-sm text-white/80 mt-1">{workstation.description}</p>
                   </div>
                 )}
                 
                 <div className="flex items-center space-x-2">
                   {statusInfo.icon}
-                  <span className="text-sm font-medium text-foreground">Status:</span>
-                  <span className="text-sm text-foreground/80">{statusInfo.text}</span>
+                  <span className="text-sm font-medium text-white">Status:</span>
+                  <span className="text-sm text-white/80">{statusInfo.text}</span>
                 </div>
               </CardContent>
             </Card>
 
             {/* Active Tasks */}
             {status && status.active_tasks.length > 0 && (
-              <Card className="bg-background/20 backdrop-blur border border-white/10 shadow-lg animate-slide-in-right delay-300">
+              <Card className="bg-white/20 backdrop-blur border border-white/30 shadow-lg animate-slide-in-right delay-300">
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-2 text-foreground">
-                    <CheckCircle className="h-5 w-5" />
+                  <CardTitle className="flex items-center space-x-2 text-white">
+                    <CheckCircle className="h-5 w-5 text-white" />
                     <span>Active Tasks ({status.active_tasks.length})</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {status.active_tasks.map((task, index) => (
-                      <div key={index} className="p-3 bg-background/20 backdrop-blur rounded-md border border-white/10">
+                      <div key={index} className="p-3 bg-white/15 backdrop-blur rounded-md border border-white/20">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-sm text-foreground">{task.task_title}</span>
+                          <span className="font-medium text-sm text-white">{task.task_title}</span>
                           <Badge variant="outline">Active</Badge>
                         </div>
                         <div className="space-y-1">
-                          <div className="flex items-center space-x-2 text-xs text-foreground/70">
-                            <Users className="h-3 w-3" />
+                          <div className="flex items-center space-x-2 text-xs text-white/70">
+                            <Users className="h-3 w-3 text-white/70" />
                             <span>Employee: {task.employee_name}</span>
                           </div>
                           {task.project_name && (
-                            <div className="flex items-center space-x-2 text-xs text-foreground/70">
-                              <FolderOpen className="h-3 w-3" />
+                            <div className="flex items-center space-x-2 text-xs text-white/70">
+                              <FolderOpen className="h-3 w-3 text-white/70" />
                               <span>Project: {task.project_name}</span>
                             </div>
                           )}
@@ -247,10 +247,10 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
 
             {/* Current Projects */}
             {status && status.current_projects.length > 0 && (
-              <Card className="bg-background/20 backdrop-blur border border-white/10 shadow-lg animate-slide-in-right delay-400">
+              <Card className="bg-white/20 backdrop-blur border border-white/30 shadow-lg animate-slide-in-right delay-400">
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-2 text-foreground">
-                    <FolderOpen className="h-5 w-5" />
+                  <CardTitle className="flex items-center space-x-2 text-white">
+                    <FolderOpen className="h-5 w-5 text-white" />
                     <span>Current Projects ({status.current_projects.length})</span>
                   </CardTitle>
                 </CardHeader>
@@ -263,18 +263,18 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
                         onOpenChange={() => toggleProject(project.project_id)}
                       >
                         <CollapsibleTrigger asChild>
-                          <div className="flex items-center justify-between p-2 bg-background/20 backdrop-blur rounded-md border border-white/10 cursor-pointer hover:bg-background/30 transition-colors">
+                          <div className="flex items-center justify-between p-2 bg-white/15 backdrop-blur rounded-md border border-white/20 cursor-pointer hover:bg-white/25 transition-colors">
                             <div>
-                              <span className="text-sm font-medium text-foreground">{project.project_name}</span>
-                              <div className="text-xs text-foreground/70">
+                              <span className="text-sm font-medium text-white">{project.project_name}</span>
+                              <div className="text-xs text-white/70">
                                 {project.task_count} task{project.task_count > 1 ? 's' : ''} pending
                               </div>
                             </div>
                             <div className="flex items-center space-x-2">
                               <Badge variant="secondary">{project.task_count}</Badge>
                               {expandedProjects.has(project.project_id) ? 
-                                <ChevronUp className="h-4 w-4 text-foreground/70" /> : 
-                                <ChevronDown className="h-4 w-4 text-foreground/70" />
+                                <ChevronUp className="h-4 w-4 text-white/70" /> : 
+                                <ChevronDown className="h-4 w-4 text-white/70" />
                               }
                             </div>
                           </div>
@@ -282,18 +282,18 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
                         <CollapsibleContent className="mt-2">
                           <div className="space-y-2 ml-4">
                             {loadingTasks.has(project.project_id) ? (
-                              <div className="text-sm text-foreground/70">Loading tasks...</div>
+                              <div className="text-sm text-white/70">Loading tasks...</div>
                             ) : projectTasks[project.project_id]?.length > 0 ? (
                               projectTasks[project.project_id].map((task) => (
-                                <div key={task.id} className="flex items-center justify-between p-3 bg-background/20 backdrop-blur rounded-md border border-white/10">
+                                <div key={task.id} className="flex items-center justify-between p-3 bg-white/15 backdrop-blur rounded-md border border-white/20">
                                   <div>
-                                    <div className="text-sm font-medium text-foreground">{task.title}</div>
-                                    <div className="text-xs text-foreground/70 flex items-center space-x-2">
+                                    <div className="text-sm font-medium text-white">{task.title}</div>
+                                    <div className="text-xs text-white/70 flex items-center space-x-2">
                                       <Badge variant={task.status === 'IN_PROGRESS' ? 'default' : 'outline'} className="text-xs">
                                         {task.status}
                                       </Badge>
                                       {task.assignee_id && currentEmployee?.id === task.assignee_id && (
-                                        <span className="text-xs text-green-400">Assigned to you</span>
+                                        <span className="text-xs text-green-300">Assigned to you</span>
                                       )}
                                     </div>
                                   </div>
@@ -314,7 +314,7 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
                                 </div>
                               ))
                             ) : (
-                              <div className="text-sm text-foreground/70">No pending tasks for this workstation</div>
+                              <div className="text-sm text-white/70">No pending tasks for this workstation</div>
                             )}
                           </div>
                         </CollapsibleContent>
@@ -326,10 +326,10 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
             )}
 
             {/* Rush Orders */}
-            <Card className="bg-background/20 backdrop-blur border border-white/10 shadow-lg animate-slide-in-right delay-500">
+            <Card className="bg-white/20 backdrop-blur border border-white/30 shadow-lg animate-slide-in-right delay-500">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2 text-foreground">
-                  <AlertCircle className="h-5 w-5 text-red-400" />
+                <CardTitle className="flex items-center space-x-2 text-white">
+                  <AlertCircle className="h-5 w-5 text-red-300" />
                   <span>Rush Orders</span>
                 </CardTitle>
               </CardHeader>
