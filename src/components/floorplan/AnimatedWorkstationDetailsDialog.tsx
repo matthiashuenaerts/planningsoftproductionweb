@@ -108,9 +108,9 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
       console.log('📋 All tasks for project:', allTasks);
       console.log('🏭 Current workstation name:', workstation.name);
       
-      // Filter tasks for this workstation and TODO status
+      // Filter tasks for this workstation and pending status (TODO or HOLD)
       const workstationTasks = (allTasks || []).filter(task => {
-        const isCorrectStatus = task.status === 'TODO';
+        const isCorrectStatus = task.status === 'TODO' || task.status === 'HOLD';
         const taskWorkstation = task.workstation || '';
         const isCorrectWorkstation = taskWorkstation && (
           taskWorkstation.toLowerCase() === workstation.name.toLowerCase() ||
