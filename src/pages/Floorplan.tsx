@@ -197,7 +197,7 @@ const Floorplan: React.FC = () => {
                 style={{ userSelect: 'none' }}
               >
                 {/* Workstation Dots positioned relative to image */}
-                <div className="absolute inset-0">
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 aspect-square" style={{ width: 'min(100%, 100vh * 9/16)', height: 'min(100%, 100vh * 9/16)' }}>
                   {workstations.map((workstation) => (
                     <WorkstationDot
                       key={workstation.id}
