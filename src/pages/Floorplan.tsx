@@ -190,7 +190,7 @@ const Floorplan: React.FC = () => {
                 style={{ userSelect: 'none' }}
               >
                 {/* Square container matching image dimensions */}
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 aspect-square" style={{ width: 'min(100%, 100vh * 9/16)', height: 'min(100%, 100vh * 9/16)' }}>
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 aspect-square w-full h-full max-w-full max-h-full" style={{ width: 'min(100%, 100vh)', height: 'min(100%, 100vh)' }}>
                   {/* Background Image */}
                   <img
                     src={FLOORPLAN_IMAGE}
