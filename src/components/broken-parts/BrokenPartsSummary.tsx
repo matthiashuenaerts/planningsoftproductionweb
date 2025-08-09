@@ -113,7 +113,7 @@ const BrokenPartsSummary: React.FC = () => {
   const uniqueWorkstations = new Set(filteredData.map(part => part.workstation_id)).size;
   const uniqueEmployees = new Set(filteredData.map(part => part.reported_by)).size;
   return <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end gap-4 justify-between">
         <h1 className="text-2xl font-bold">Broken Parts Summary</h1>
         
         <div className="flex flex-wrap gap-2 py-[40px]">
