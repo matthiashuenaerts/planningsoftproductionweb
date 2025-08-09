@@ -133,7 +133,7 @@ const BrokenPartsSummary: React.FC = () => {
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
               <Label>Time Period:</Label>
               <Select value={timeFilter} onValueChange={(value) => setTimeFilter(value as TimeFilter)}>
-                <SelectTrigger className="w-[75px]">
+                <SelectTrigger className="w-[150px]">
                   <SelectValue placeholder="Select time period" />
                 </SelectTrigger>
                 <SelectContent>
