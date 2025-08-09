@@ -12,6 +12,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts';
 import { brokenPartsService, BrokenPart } from '@/services/brokenPartsService';
 import { CalendarDays, ListFilter, Users, Filter, List, PlusCircle } from 'lucide-react';
+import TaskTimer from '@/components/TaskTimer';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
@@ -121,49 +122,53 @@ const BrokenPartsSummary: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-        <h1 className="text-2xl font-bold">Broken Parts Summary</h1>
-        
-        <div className="flex flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            <Label>Time Period:</Label>
-            <Select value={timeFilter} onValueChange={(value) => setTimeFilter(value as TimeFilter)}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Select time period" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="day">Today</SelectItem>
-                <SelectItem value="week">This Week</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
-                <SelectItem value="year">This Year</SelectItem>
-                <SelectItem value="all">All Time</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      <TaskTimer />
+      
+      <div className="pt-20"> {/* Add padding to account for fixed TaskTimer */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+          <h1 className="text-2xl font-bold">Broken Parts Summary</h1>
           
-          <div className="flex items-center gap-2">
-            <ListFilter className="h-4 w-4 text-muted-foreground" />
-            <Label>Group By:</Label>
-            <Select value={groupBy} onValueChange={(value) => setGroupBy(value as GroupBy)}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Select grouping" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="project">Project</SelectItem>
-                <SelectItem value="workstation">Workstation</SelectItem>
-                <SelectItem value="employee">Employee</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <Link to="/broken-parts">
-                <List className="h-4 w-4 mr-2" />
-                List View
-              </Link>
-            </Button>
+          <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              <Label>Time Period:</Label>
+              <Select value={timeFilter} onValueChange={(value) => setTimeFilter(value as TimeFilter)}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Select time period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Today</SelectItem>
+                  <SelectItem value="week">This Week</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                  <SelectItem value="year">This Year</SelectItem>
+                  <SelectItem value="all">All Time</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <ListFilter className="h-4 w-4 text-muted-foreground" />
+              <Label>Group By:</Label>
+              <Select value={groupBy} onValueChange={(value) => setGroupBy(value as GroupBy)}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Select grouping" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="project">Project</SelectItem>
+                  <SelectItem value="workstation">Workstation</SelectItem>
+                  <SelectItem value="employee">Employee</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button variant="outline" asChild>
+                <Link to="/broken-parts">
+                  <List className="h-4 w-4 mr-2" />
+                  List View
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </div>
