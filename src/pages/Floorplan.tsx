@@ -195,7 +195,7 @@ const Floorplan: React.FC = () => {
                   <img
                     src={FLOORPLAN_IMAGE}
                     alt="Production Hall Floorplan"
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-cover"
                   />
                   {/* Workstation Dots */}
                   {workstations.map((workstation) => (
