@@ -116,7 +116,7 @@ const BrokenPartsSummary: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-end gap-4 justify-between">
         <h1 className="text-2xl font-bold">Broken Parts Summary</h1>
         
-        <div className="flex flex-wrap gap-2 py-[40px]">
+        <div className="flex flex-wrap items-end gap-2 py-[40px]">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
             <Label>Time Period:</Label>
