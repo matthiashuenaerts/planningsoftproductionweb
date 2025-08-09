@@ -182,6 +182,13 @@ const Floorplan: React.FC = () => {
           <div className="absolute inset-0 flex items-center justify-center">
             {/* Floorplan Container with Fixed Aspect Ratio */}
             <div className="relative w-full h-full" style={{ aspectRatio: '16/9', maxWidth: '100%', maxHeight: '100%' }}>
+              {/* Background Image */}
+              <img
+                src={FLOORPLAN_IMAGE}
+                alt="Production Hall Floorplan"
+                className="w-full h-full object-contain"
+              />
+
               {/* Interactive Container - positioned absolute to maintain aspect ratio */}
               <div
                 ref={containerRef}
@@ -190,13 +197,7 @@ const Floorplan: React.FC = () => {
                 style={{ userSelect: 'none' }}
               >
                 {/* Square container matching image dimensions */}
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 aspect-square w-full h-full max-w-full max-h-full" style={{ width: 'min(100%, 100vh)', height: 'min(100%, 100vh)' }}>
-                  {/* Background Image */}
-                  <img
-                    src={FLOORPLAN_IMAGE}
-                    alt="Production Hall Floorplan"
-                    className="w-full h-full object-contain"
-                  />
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 aspect-square" style={{ width: 'min(100%, 100vh * 9/16)', height: 'min(100%, 100vh * 9/16)' }}>
                   {/* Workstation Dots */}
                   {workstations.map((workstation) => (
                     <WorkstationDot
