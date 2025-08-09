@@ -3,13 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Edit, Plus, Save, X, Palette, Settings, Users, Activity, Files, Package, UserCheck, Truck, ShoppingCart } from 'lucide-react';
+import { Edit, Plus, Save, X, Palette, Settings, Users, Activity } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import ProjectFilesPopup from '@/components/ProjectFilesPopup';
-import { PartsListDialog } from '@/components/PartsListDialog';
-import { ProjectTeamAssignmentsPopup } from '@/components/ProjectTeamAssignmentsPopup';
-import { ProjectTruckAssignmentPopup } from '@/components/ProjectTruckAssignmentPopup';
-import { OrderPopup } from '@/components/OrderPopup';
 
 interface FloorplanToolbarProps {
   isEditing: boolean;
@@ -27,8 +22,6 @@ interface FloorplanToolbarProps {
   activeWorkstations: number;
   totalActiveUsers: number;
   isAdmin: boolean;
-  projectId?: string;
-  projectName?: string;
 }
 
 export const FloorplanToolbar: React.FC<FloorplanToolbarProps> = ({
@@ -38,9 +31,7 @@ export const FloorplanToolbar: React.FC<FloorplanToolbarProps> = ({
   totalWorkstations,
   activeWorkstations,
   totalActiveUsers,
-  isAdmin,
-  projectId = "default-project",
-  projectName = "Default Project"
+  isAdmin
 }) => {
   const [isAddingLine, setIsAddingLine] = useState(false);
   const [newLine, setNewLine] = useState({
@@ -49,13 +40,6 @@ export const FloorplanToolbar: React.FC<FloorplanToolbarProps> = ({
     stroke_width: 3
   });
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
-  
-  // Project popups state
-  const [isProjectFilesOpen, setIsProjectFilesOpen] = useState(false);
-  const [isPartsListOpen, setIsPartsListOpen] = useState(false);
-  const [isTeamAssignmentsOpen, setIsTeamAssignmentsOpen] = useState(false);
-  const [isTruckAssignmentOpen, setIsTruckAssignmentOpen] = useState(false);
-  const [isOrderPopupOpen, setIsOrderPopupOpen] = useState(false);
 
   const handleAddLine = () => {
     if (newLine.name && startPoint) {
@@ -100,59 +84,6 @@ export const FloorplanToolbar: React.FC<FloorplanToolbarProps> = ({
           <span className="text-sm font-medium">Users</span>
           <Badge variant="default" className="bg-blue-500">{totalActiveUsers}</Badge>
         </div>
-      </div>
-
-      {/* Project Actions */}
-      <div className="flex items-center space-x-2 pt-2 border-t">
-        <Button
-          onClick={() => setIsProjectFilesOpen(true)}
-          variant="outline"
-          size="sm"
-          className="flex items-center space-x-2"
-        >
-          <Files className="h-4 w-4" />
-          <span>Files</span>
-        </Button>
-
-        <Button
-          onClick={() => setIsPartsListOpen(true)}
-          variant="outline"
-          size="sm"
-          className="flex items-center space-x-2"
-        >
-          <Package className="h-4 w-4" />
-          <span>Parts</span>
-        </Button>
-
-        <Button
-          onClick={() => setIsTeamAssignmentsOpen(true)}
-          variant="outline"
-          size="sm"
-          className="flex items-center space-x-2"
-        >
-          <UserCheck className="h-4 w-4" />
-          <span>Team</span>
-        </Button>
-
-        <Button
-          onClick={() => setIsTruckAssignmentOpen(true)}
-          variant="outline"
-          size="sm"
-          className="flex items-center space-x-2"
-        >
-          <Truck className="h-4 w-4" />
-          <span>Truck</span>
-        </Button>
-
-        <Button
-          onClick={() => setIsOrderPopupOpen(true)}
-          variant="outline"
-          size="sm"
-          className="flex items-center space-x-2"
-        >
-          <ShoppingCart className="h-4 w-4" />
-          <span>Orders</span>
-        </Button>
       </div>
 
       {/* Admin Controls */}
@@ -252,42 +183,6 @@ export const FloorplanToolbar: React.FC<FloorplanToolbarProps> = ({
           <div>• Click "Save Changes" when done</div>
         </div>
       )}
-
-      {/* Project Popups */}
-      <ProjectFilesPopup
-        isOpen={isProjectFilesOpen}
-        onClose={() => setIsProjectFilesOpen(false)}
-        projectId={projectId}
-        projectName={projectName}
-      />
-
-      <PartsListDialog
-        isOpen={isPartsListOpen}
-        onClose={() => setIsPartsListOpen(false)}
-        projectId={projectId}
-        onImportComplete={() => {}}
-      />
-
-      <ProjectTeamAssignmentsPopup
-        isOpen={isTeamAssignmentsOpen}
-        onClose={() => setIsTeamAssignmentsOpen(false)}
-        projectId={projectId}
-        onTeamAssigned={() => {}}
-      />
-
-      <ProjectTruckAssignmentPopup
-        isOpen={isTruckAssignmentOpen}
-        onClose={() => setIsTruckAssignmentOpen(false)}
-        projectId={projectId}
-        onTruckAssigned={() => {}}
-      />
-
-      <OrderPopup
-        isOpen={isOrderPopupOpen}
-        onClose={() => setIsOrderPopupOpen(false)}
-        projectId={projectId}
-        onOrderCreated={() => {}}
-      />
     </div>
   );
 };
