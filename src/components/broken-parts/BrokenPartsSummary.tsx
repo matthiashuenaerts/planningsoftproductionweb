@@ -12,28 +12,26 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts';
 import { brokenPartsService, BrokenPart } from '@/services/brokenPartsService';
 import { CalendarDays, ListFilter, Users, Filter, List, PlusCircle } from 'lucide-react';
-import TaskTimer from '@/components/TaskTimer';
-
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
-
 type TimeFilter = 'day' | 'week' | 'month' | 'year' | 'all';
 type GroupBy = 'project' | 'workstation' | 'employee';
-
 const BrokenPartsSummary: React.FC = () => {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('month');
   const [groupBy, setGroupBy] = useState<GroupBy>('workstation');
-  
+
   // Fetch broken parts
-  const { data: brokenParts = [], isLoading } = useQuery({
+  const {
+    data: brokenParts = [],
+    isLoading
+  } = useQuery({
     queryKey: ['broken-parts'],
-    queryFn: () => brokenPartsService.getAll(),
+    queryFn: () => brokenPartsService.getAll()
   });
 
   // Filter data based on time period
   const getFilteredData = () => {
     const now = new Date();
     let startDate: Date;
-    
     switch (timeFilter) {
       case 'day':
         startDate = startOfDay(now);
@@ -50,20 +48,17 @@ const BrokenPartsSummary: React.FC = () => {
       default:
         return brokenParts;
     }
-    
     return brokenParts.filter(part => {
       const partDate = new Date(part.created_at as string);
       return partDate >= startDate;
     });
   };
-
   const filteredData = getFilteredData();
-  
+
   // Group data by selected attribute
   const getGroupedData = () => {
     const grouped = filteredData.reduce((acc: Record<string, number>, part: BrokenPart) => {
       let key = 'Unknown';
-      
       switch (groupBy) {
         case 'project':
           key = part.projects?.name || 'No Project';
@@ -75,22 +70,24 @@ const BrokenPartsSummary: React.FC = () => {
           key = part.employees?.name || 'Unknown Employee';
           break;
       }
-      
       if (!acc[key]) {
         acc[key] = 0;
       }
       acc[key]++;
       return acc;
     }, {});
-    
-    return Object.entries(grouped).map(([name, value]) => ({ name, value }));
+    return Object.entries(grouped).map(([name, value]) => ({
+      name,
+      value
+    }));
   };
-  
   const groupedData = getGroupedData();
-  
+
   // Calculate time-based statistics
   const getTimeBasedStats = () => {
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const last7Days = Array.from({
+      length: 7
+    }, (_, i) => {
       const date = subDays(new Date(), 6 - i);
       const dateStr = format(date, 'MMM dd');
       return {
@@ -98,77 +95,67 @@ const BrokenPartsSummary: React.FC = () => {
         count: 0
       };
     });
-    
     filteredData.forEach(part => {
       const partDate = new Date(part.created_at as string);
       const dateStr = format(partDate, 'MMM dd');
-      
       const dayEntry = last7Days.find(day => day.date === dateStr);
       if (dayEntry) {
         dayEntry.count++;
       }
     });
-    
     return last7Days;
   };
-  
   const timeBasedData = getTimeBasedStats();
-  
+
   // Calculate total stats
   const totalReports = filteredData.length;
   const uniqueProjects = new Set(filteredData.map(part => part.project_id)).size;
   const uniqueWorkstations = new Set(filteredData.map(part => part.workstation_id)).size;
   const uniqueEmployees = new Set(filteredData.map(part => part.reported_by)).size;
-
-  return (
-    <div className="space-y-6">
-      <TaskTimer />
-      
-      <div className="pt-20"> {/* Add padding to account for fixed TaskTimer */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-          <h1 className="text-2xl font-bold">Broken Parts Summary</h1>
+  return <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+        <h1 className="text-2xl font-bold">Broken Parts Summary</h1>
+        
+        <div className="flex flex-wrap gap-2 py-[40px]">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <Label>Time Period:</Label>
+            <Select value={timeFilter} onValueChange={value => setTimeFilter(value as TimeFilter)}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Select time period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="day">Today</SelectItem>
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+                <SelectItem value="year">This Year</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           
-          <div className="flex flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              <Label>Time Period:</Label>
-              <Select value={timeFilter} onValueChange={(value) => setTimeFilter(value as TimeFilter)}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Select time period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="day">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
-                  <SelectItem value="year">This Year</SelectItem>
-                  <SelectItem value="all">All Time</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <ListFilter className="h-4 w-4 text-muted-foreground" />
-              <Label>Group By:</Label>
-              <Select value={groupBy} onValueChange={(value) => setGroupBy(value as GroupBy)}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Select grouping" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="project">Project</SelectItem>
-                  <SelectItem value="workstation">Workstation</SelectItem>
-                  <SelectItem value="employee">Employee</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="flex gap-2">
-              <Button variant="outline" asChild>
-                <Link to="/broken-parts">
-                  <List className="h-4 w-4 mr-2" />
-                  List View
-                </Link>
-              </Button>
-            </div>
+          <div className="flex items-center gap-2">
+            <ListFilter className="h-4 w-4 text-muted-foreground" />
+            <Label>Group By:</Label>
+            <Select value={groupBy} onValueChange={value => setGroupBy(value as GroupBy)}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Select grouping" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="project">Project</SelectItem>
+                <SelectItem value="workstation">Workstation</SelectItem>
+                <SelectItem value="employee">Employee</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link to="/broken-parts">
+                <List className="h-4 w-4 mr-2" />
+                List View
+              </Link>
+            </Button>
           </div>
         </div>
       </div>
@@ -231,19 +218,11 @@ const BrokenPartsSummary: React.FC = () => {
               <CardContent className="pt-2">
                 <ChartContainer config={{}} className="h-80">
                   <PieChart>
-                    <Pie
-                      data={groupedData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {groupedData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
+                    <Pie data={groupedData} cx="50%" cy="50%" labelLine={false} outerRadius={80} fill="#8884d8" dataKey="value" label={({
+                    name,
+                    percent
+                  }) => `${name}: ${(percent * 100).toFixed(0)}%`}>
+                      {groupedData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                     </Pie>
                     <Tooltip content={<ChartTooltipContent />} />
                     <Legend />
@@ -291,29 +270,21 @@ const BrokenPartsSummary: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredData.length === 0 ? (
-                    <TableRow>
+                  {filteredData.length === 0 ? <TableRow>
                       <TableCell colSpan={5} className="text-center">No data available for the selected filters</TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredData.map((part) => (
-                      <TableRow key={part.id}>
+                    </TableRow> : filteredData.map(part => <TableRow key={part.id}>
                         <TableCell>{part.created_at ? format(new Date(part.created_at), 'MMM dd, yyyy') : 'N/A'}</TableCell>
                         <TableCell>{part.projects?.name || 'N/A'}</TableCell>
                         <TableCell>{part.workstations?.name || 'N/A'}</TableCell>
                         <TableCell>{part.employees?.name || 'N/A'}</TableCell>
                         <TableCell className="max-w-xs truncate">{part.description}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
+                      </TableRow>)}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
-  );
+    </div>;
 };
-
 export default BrokenPartsSummary;
