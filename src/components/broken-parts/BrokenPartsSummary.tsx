@@ -164,12 +164,6 @@ const BrokenPartsSummary: React.FC = () => {
                 List View
               </Link>
             </Button>
-            <Button asChild>
-              <Link to="/broken-parts/new">
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Report New
-              </Link>
-            </Button>
           </div>
         </div>
       </div>
