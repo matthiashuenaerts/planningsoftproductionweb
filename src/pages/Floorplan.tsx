@@ -196,9 +196,8 @@ const Floorplan: React.FC = () => {
                 onClick={handleFloorplanClick}
                 style={{ userSelect: 'none' }}
               >
-                {/* Square container matching image dimensions */}
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 aspect-square" style={{ width: 'min(100%, 100vh * 9/16)', height: 'min(100%, 100vh * 9/16)' }}>
-                  {/* Workstation Dots */}
+                {/* Workstation Dots positioned relative to image */}
+                <div className="absolute inset-0">
                   {workstations.map((workstation) => (
                     <WorkstationDot
                       key={workstation.id}
@@ -210,33 +209,33 @@ const Floorplan: React.FC = () => {
                       onClick={setSelectedWorkstation}
                     />
                   ))}
-
-                  {/* Production Flow Lines */}
-                  {containerRect && (
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                      {productionFlowLines.map((line) => (
-                        <ProductionFlowLineComponent
-                          key={line.id}
-                          line={line}
-                          containerRect={containerRect}
-                          isEditing={isEditing}
-                          onDelete={handleDeleteProductionFlowLine}
-                        />
-                      ))}
-                    </svg>
-                  )}
-
-                  {/* Start Point Indicator for Flow Line */}
-                  {startPoint && isAddingFlowLine && (
-                    <div
-                      className="absolute w-3 h-3 bg-blue-500 rounded-full border-2 border-white transform -translate-x-1/2 -translate-y-1/2 animate-pulse"
-                      style={{
-                        left: `${startPoint.x}%`,
-                        top: `${startPoint.y}%`,
-                      }}
-                    />
-                  )}
                 </div>
+
+                {/* Production Flow Lines */}
+                {containerRect && (
+                  <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                    {productionFlowLines.map((line) => (
+                      <ProductionFlowLineComponent
+                        key={line.id}
+                        line={line}
+                        containerRect={containerRect}
+                        isEditing={isEditing}
+                        onDelete={handleDeleteProductionFlowLine}
+                      />
+                    ))}
+                  </svg>
+                )}
+
+                {/* Start Point Indicator for Flow Line */}
+                {startPoint && isAddingFlowLine && (
+                  <div
+                    className="absolute w-3 h-3 bg-blue-500 rounded-full border-2 border-white transform -translate-x-1/2 -translate-y-1/2 animate-pulse"
+                    style={{
+                      left: `${startPoint.x}%`,
+                      top: `${startPoint.y}%`,
+                    }}
+                  />
+                )}
               </div>
             </div>
           </div>
