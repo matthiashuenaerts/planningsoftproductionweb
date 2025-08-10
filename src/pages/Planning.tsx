@@ -132,8 +132,7 @@ const Planning = () => {
   const workingHours = [
     { name: 'Early Morning', start: '07:00', end: '10:00', duration: 180 },     // 3 hours
     { name: 'Late Morning', start: '10:15', end: '12:30', duration: 135 },      // 2h 15min (break 10:00-10:15)
-    { name: 'Early Afternoon', start: '13:00', end: '15:00', duration: 120 },   // 2 hours (lunch 12:30-13:00)
-    { name: 'Late Afternoon', start: '15:00', end: '16:00', duration: 60 }      // 1 hour
+    { name: 'Afternoon', start: '13:00', end: '16:00', duration: 180 }           // 3 hours continuous (lunch 12:30-13:00)
   ];
 
   const totalWorkingMinutes = workingHours.reduce((sum, period) => sum + period.duration, 0);
@@ -1180,8 +1179,7 @@ const Planning = () => {
       const workingHours = [
         { start: '07:00', end: '10:00', duration: 180, name: 'Early Morning' },     // 3 hours
         { start: '10:15', end: '12:30', duration: 135, name: 'Late Morning' },      // 2h 15min (break 10:00-10:15)
-        { start: '13:00', end: '15:00', duration: 120, name: 'Early Afternoon' },   // 2 hours (lunch 12:30-13:00)
-        { start: '15:00', end: '16:00', duration: 60, name: 'Late Afternoon' }      // 1 hour
+        { start: '13:00', end: '16:00', duration: 180, name: 'Afternoon' }          // 3 hours continuous (lunch 12:30-13:00)
       ];
       
       // Generate schedules for each employee
