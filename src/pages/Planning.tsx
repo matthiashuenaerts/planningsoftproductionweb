@@ -898,7 +898,7 @@ const Planning = () => {
   const generateAllSchedules = async () => {
     try {
       setGeneratingSchedule(true);
-      saveScrollPosition(); // Save scroll position before generating all schedules
+      saveScrollPosition();
       
       // Check if the selected date is a production holiday
       if (isProductionHoliday(selectedDate)) {
@@ -910,52 +910,395 @@ const Planning = () => {
         return;
       }
       
-      // Clear excluded tasks when generating all schedules fresh
-      setExcludedTasksPerUser({});
+      console.log('🚀 Starting Advanced Schedule Generation Algorithm...');
       
+      // Clear previous state
+      setExcludedTasksPerUser({});
       let skippedOnHoliday = 0;
       let successfullyGenerated = 0;
       
-      // Step 1: Generate worker schedules
-      for (const workerSchedule of workerSchedules) {
-        // CRITICAL: Check if employee is on holiday before generating schedule
-        const isOnHoliday = await planningService.isEmployeeOnHoliday(workerSchedule.employee.id, selectedDate);
-        if (isOnHoliday) {
-          console.log(`Skipping schedule generation for ${workerSchedule.employee.name} - on approved holiday`);
-          skippedOnHoliday++;
+      // PHASE 1: Data Collection & Analysis
+      console.log('📊 Phase 1: Collecting and analyzing data...');
+      
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      
+      // Get all available tasks for the date
+      const { data: allTasks, error: tasksError } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          phases!inner(
+            id,
+            project_id,
+            projects!inner(
+              id,
+              name
+            )
+          ),
+          task_workstation_links(
+            workstation:workstations(id, name)
+          )
+        `)
+        .eq('status', 'TODO')
+        .lte('due_date', dateStr);
+      
+      if (tasksError) throw tasksError;
+      
+      // Get task history to determine who has worked on tasks before
+      const { data: taskHistory, error: historyError } = await supabase
+        .from('schedules')
+        .select('task_id, employee_id, start_time')
+        .not('task_id', 'is', null)
+        .order('start_time', { ascending: true });
+      
+      if (historyError) throw historyError;
+      
+      // Get employee-workstation assignments
+      const { data: employeeWorkstations, error: empWsError } = await supabase
+        .from('employee_workstation_links')
+        .select(`
+          employee_id,
+          workstation:workstations(id, name)
+        `);
+      
+      if (empWsError) throw empWsError;
+      
+      // Get standard task assignments
+      const { data: standardTaskLinks, error: stdTaskError } = await supabase
+        .from('standard_task_workstation_links')
+        .select(`
+          standard_task_id,
+          workstation:workstations(id, name)
+        `);
+      
+      if (stdTaskError) throw stdTaskError;
+      
+      // PHASE 2: Task Ownership & Continuity Analysis
+      console.log('🔍 Phase 2: Analyzing task ownership and continuity...');
+      
+      // Build task ownership map (who started each task)
+      const taskOwnershipMap = new Map<string, string>();
+      const taskWorkHistoryMap = new Map<string, Set<string>>();
+      
+      for (const history of taskHistory || []) {
+        if (history.task_id && history.employee_id) {
+          // Record who started the task (first occurrence)
+          if (!taskOwnershipMap.has(history.task_id)) {
+            taskOwnershipMap.set(history.task_id, history.employee_id);
+          }
+          
+          // Track all employees who have worked on this task
+          if (!taskWorkHistoryMap.has(history.task_id)) {
+            taskWorkHistoryMap.set(history.task_id, new Set());
+          }
+          taskWorkHistoryMap.get(history.task_id)!.add(history.employee_id);
+        }
+      }
+      
+      // Build employee competency map (which workstations they can work at)
+      const employeeCompetencyMap = new Map<string, Set<string>>();
+      for (const empWs of employeeWorkstations || []) {
+        if (!employeeCompetencyMap.has(empWs.employee_id)) {
+          employeeCompetencyMap.set(empWs.employee_id, new Set());
+        }
+        employeeCompetencyMap.get(empWs.employee_id)!.add(empWs.workstation?.id || '');
+      }
+      
+      // Build task-workstation requirement map
+      const taskWorkstationMap = new Map<string, Set<string>>();
+      for (const task of allTasks || []) {
+        const workstationIds = new Set<string>();
+        for (const link of task.task_workstation_links || []) {
+          if (link.workstation?.id) {
+            workstationIds.add(link.workstation.id);
+          }
+        }
+        taskWorkstationMap.set(task.id, workstationIds);
+      }
+      
+      // PHASE 3: Intelligent Task Assignment Algorithm
+      console.log('🧠 Phase 3: Running intelligent task assignment algorithm...');
+      
+      // Create assignment state
+      const taskAssignments = new Map<string, string>(); // taskId -> employeeId
+      const employeeTaskQueue = new Map<string, any[]>(); // employeeId -> task[]
+      const conflictedTasks = new Set<string>();
+      
+      // Priority scoring function
+      const getTaskPriorityScore = (task: any): number => {
+        const priorityScores = { 'Urgent': 100, 'High': 75, 'Medium': 50, 'Low': 25 };
+        const baseScore = priorityScores[task.priority as keyof typeof priorityScores] || 25;
+        
+        // Boost score for overdue tasks
+        const dueDate = new Date(task.due_date);
+        const daysDiff = Math.floor((dueDate.getTime() - selectedDate.getTime()) / (1000 * 60 * 60 * 24));
+        const overdueBoost = daysDiff < 0 ? Math.abs(daysDiff) * 10 : 0;
+        
+        return baseScore + overdueBoost;
+      };
+      
+      // Sort tasks by priority and other factors
+      const sortedTasks = (allTasks || []).sort((a, b) => {
+        // 1. Tasks with ownership (continuation) get highest priority
+        const aHasOwner = taskOwnershipMap.has(a.id);
+        const bHasOwner = taskOwnershipMap.has(b.id);
+        if (aHasOwner && !bHasOwner) return -1;
+        if (!aHasOwner && bHasOwner) return 1;
+        
+        // 2. Priority score
+        const scoreA = getTaskPriorityScore(a);
+        const scoreB = getTaskPriorityScore(b);
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        
+        // 3. Due date
+        const dateA = new Date(a.due_date);
+        const dateB = new Date(b.due_date);
+        return dateA.getTime() - dateB.getTime();
+      });
+      
+      console.log(`Processing ${sortedTasks.length} tasks for assignment...`);
+      
+      // PHASE 4: Task Assignment Logic
+      console.log('⚡ Phase 4: Executing task assignment logic...');
+      
+      for (const task of sortedTasks) {
+        let assignedEmployee: string | null = null;
+        const taskWorkstations = taskWorkstationMap.get(task.id) || new Set();
+        
+        // RULE 1: Continuation - If task has been started, only the original employee can continue
+        if (taskOwnershipMap.has(task.id)) {
+          const originalEmployee = taskOwnershipMap.get(task.id)!;
+          
+          // Check if original employee is available and competent
+          const employeeCompetencies = employeeCompetencyMap.get(originalEmployee) || new Set();
+          const canWorkOnTask = taskWorkstations.size === 0 || 
+            Array.from(taskWorkstations).some(wsId => employeeCompetencies.has(wsId));
+          
+          if (canWorkOnTask) {
+            // Check if employee is not on holiday
+            const isOnHoliday = await planningService.isEmployeeOnHoliday(originalEmployee, selectedDate);
+            if (!isOnHoliday) {
+              assignedEmployee = originalEmployee;
+              console.log(`✅ Task ${task.title} assigned to original owner ${originalEmployee} (continuation)`);
+            } else {
+              console.log(`❌ Original owner ${originalEmployee} on holiday, task ${task.title} cannot be continued`);
+              conflictedTasks.add(task.id);
+              continue;
+            }
+          } else {
+            console.log(`❌ Original owner ${originalEmployee} not competent for task ${task.title}`);
+            conflictedTasks.add(task.id);
+            continue;
+          }
+        }
+        
+        // RULE 2: New task assignment - Find best available employee
+        if (!assignedEmployee) {
+          const candidateEmployees: Array<{employeeId: string, score: number}> = [];
+          
+          for (const workerSchedule of workerSchedules) {
+            const employeeId = workerSchedule.employee.id;
+            
+            // Skip if employee is on holiday
+            const isOnHoliday = await planningService.isEmployeeOnHoliday(employeeId, selectedDate);
+            if (isOnHoliday) continue;
+            
+            // Check competency for required workstations
+            const employeeCompetencies = employeeCompetencyMap.get(employeeId) || new Set();
+            const canWorkOnTask = taskWorkstations.size === 0 || 
+              Array.from(taskWorkstations).some(wsId => employeeCompetencies.has(wsId));
+            
+            if (!canWorkOnTask) continue;
+            
+            // Calculate assignment score
+            let score = 0;
+            
+            // Experience bonus (if employee worked on this task before)
+            if (taskWorkHistoryMap.has(task.id) && taskWorkHistoryMap.get(task.id)!.has(employeeId)) {
+              score += 50;
+            }
+            
+            // Workload balancing (fewer assigned tasks = higher score)
+            const currentTaskCount = employeeTaskQueue.get(employeeId)?.length || 0;
+            score += Math.max(0, 100 - (currentTaskCount * 10));
+            
+            // Workstation efficiency (exact workstation match gets bonus)
+            if (taskWorkstations.size > 0) {
+              const matchingWorkstations = Array.from(taskWorkstations).filter(wsId => 
+                employeeCompetencies.has(wsId)
+              );
+              score += matchingWorkstations.length * 25;
+            }
+            
+            candidateEmployees.push({ employeeId, score });
+          }
+          
+          // Select best candidate
+          if (candidateEmployees.length > 0) {
+            candidateEmployees.sort((a, b) => b.score - a.score);
+            assignedEmployee = candidateEmployees[0].employeeId;
+            console.log(`✅ Task ${task.title} assigned to ${assignedEmployee} (score: ${candidateEmployees[0].score})`);
+          } else {
+            console.log(`❌ No suitable employee found for task ${task.title}`);
+            conflictedTasks.add(task.id);
+            continue;
+          }
+        }
+        
+        // RULE 3: Prevent double assignment
+        if (taskAssignments.has(task.id)) {
+          console.log(`⚠️ Task ${task.title} already assigned, skipping duplicate`);
           continue;
         }
         
-        await generateDailySchedule(workerSchedule.employee.id);
-        successfullyGenerated++;
+        // Record assignment
+        if (assignedEmployee) {
+          taskAssignments.set(task.id, assignedEmployee);
+          
+          if (!employeeTaskQueue.has(assignedEmployee)) {
+            employeeTaskQueue.set(assignedEmployee, []);
+          }
+          employeeTaskQueue.get(assignedEmployee)!.push(task);
+        }
       }
       
-      // Step 2: Refresh data after generating all worker schedules
+      // PHASE 5: Generate Actual Schedules
+      console.log('📅 Phase 5: Generating actual schedules...');
+      
+      // Clear existing schedules for the date
+      const { error: deleteError } = await supabase
+        .from('schedules')
+        .delete()
+        .gte('start_time', `${dateStr}T00:00:00`)
+        .lte('start_time', `${dateStr}T23:59:59`)
+        .eq('is_auto_generated', true);
+      
+      if (deleteError) console.error('Error clearing existing schedules:', deleteError);
+      
+      const workingHours = [
+        { start: '08:00', end: '12:00', duration: 240, name: 'Morning' },
+        { start: '13:00', end: '17:00', duration: 240, name: 'Afternoon' }
+      ];
+      
+      // Generate schedules for each employee
+      for (const [employeeId, tasks] of employeeTaskQueue.entries()) {
+        if (tasks.length === 0) continue;
+        
+        const employee = workerSchedules.find(ws => ws.employee.id === employeeId)?.employee;
+        if (!employee) continue;
+        
+        console.log(`📋 Creating schedule for ${employee.name} with ${tasks.length} tasks`);
+        
+        // Sort tasks by priority within employee queue
+        tasks.sort((a, b) => {
+          const scoreA = getTaskPriorityScore(a);
+          const scoreB = getTaskPriorityScore(b);
+          return scoreB - scoreA;
+        });
+        
+        const schedulesToInsert = [];
+        let currentTaskIndex = 0;
+        let remainingTaskDuration = tasks[currentTaskIndex]?.duration || 60;
+        let currentTask = tasks[currentTaskIndex];
+        let taskPartCounter = 1;
+        
+        for (const period of workingHours) {
+          if (!currentTask) break;
+          
+          const periodStartTime = new Date(`${dateStr}T${period.start}:00`);
+          let periodRemainingMinutes = period.duration;
+          let periodCurrentTime = new Date(periodStartTime);
+          
+          while (periodRemainingMinutes > 0 && currentTask) {
+            const timeToAllocate = Math.min(remainingTaskDuration, periodRemainingMinutes);
+            const endTime = new Date(periodCurrentTime.getTime() + (timeToAllocate * 60000));
+            
+            // Determine task title with continuation logic
+            let taskTitle = currentTask.title;
+            if (taskOwnershipMap.has(currentTask.id)) {
+              taskTitle = `${currentTask.title} (Continued)`;
+            } else {
+              const totalParts = Math.ceil((currentTask.duration || 60) / period.duration);
+              if (totalParts > 1) {
+                taskTitle = `${currentTask.title} (Part ${taskPartCounter})`;
+              }
+            }
+            
+            schedulesToInsert.push({
+              employee_id: employeeId,
+              task_id: currentTask.id,
+              title: taskTitle,
+              description: currentTask.description || '',
+              start_time: periodCurrentTime.toISOString(),
+              end_time: endTime.toISOString(),
+              is_auto_generated: true
+            });
+            
+            // Update counters
+            remainingTaskDuration -= timeToAllocate;
+            periodRemainingMinutes -= timeToAllocate;
+            periodCurrentTime = new Date(endTime);
+            
+            // Move to next task if current is completed
+            if (remainingTaskDuration <= 0) {
+              currentTaskIndex++;
+              currentTask = tasks[currentTaskIndex];
+              remainingTaskDuration = currentTask?.duration || 60;
+              taskPartCounter = 1;
+            } else {
+              taskPartCounter++;
+            }
+          }
+        }
+        
+        // Insert schedules for this employee
+        if (schedulesToInsert.length > 0) {
+          const { error: insertError } = await supabase
+            .from('schedules')
+            .insert(schedulesToInsert);
+          
+          if (insertError) {
+            console.error(`Error inserting schedules for ${employee.name}:`, insertError);
+          } else {
+            successfullyGenerated++;
+            console.log(`✅ Created ${schedulesToInsert.length} schedule items for ${employee.name}`);
+          }
+        }
+      }
+      
+      // PHASE 6: Generate Workstation Schedules
+      console.log('🏭 Phase 6: Generating workstation schedules...');
       await fetchAllData();
-      
-      // Step 3: Check for conflicts
-      const conflicts = detectTaskConflicts(workerSchedules);
-      if (conflicts.length > 0) {
-        setTaskConflicts(conflicts);
-        setShowConflictResolver(true);
-        return; // Stop here if there are conflicts to resolve
-      }
-      
-      // Step 4: Generate workstation schedules based on worker schedules
-      console.log('Generating workstation schedules from worker schedules...');
       await generateWorkstationSchedulesFromWorkerSchedules();
       
-      let message = `Generated schedules for ${successfullyGenerated} workers and their workstation assignments`;
+      // PHASE 7: Summary and Reporting
+      console.log('📊 Phase 7: Generating summary report...');
+      
+      const totalAssignedTasks = Array.from(employeeTaskQueue.values()).reduce((sum, tasks) => sum + tasks.length, 0);
+      const unassignedTasks = conflictedTasks.size;
+      
+      let message = `Advanced algorithm completed: ${successfullyGenerated} workers scheduled with ${totalAssignedTasks} tasks assigned`;
+      if (unassignedTasks > 0) {
+        message += ` (${unassignedTasks} tasks couldn't be assigned due to constraints)`;
+      }
       if (skippedOnHoliday > 0) {
-        message += ` (${skippedOnHoliday} workers skipped due to approved holidays)`;
+        message += ` (${skippedOnHoliday} workers on holiday)`;
       }
       
+      console.log(`🎯 Algorithm Results:
+        - Workers processed: ${successfullyGenerated}
+        - Tasks assigned: ${totalAssignedTasks}
+        - Unassigned tasks: ${unassignedTasks}
+        - Continued tasks: ${Array.from(taskOwnershipMap.keys()).length}
+        - New task assignments: ${totalAssignedTasks - Array.from(taskOwnershipMap.keys()).length}`);
+      
       toast({
-        title: "All Schedules Generated",
+        title: "Advanced Schedule Generation Complete",
         description: message,
       });
+      
     } catch (error: any) {
-      console.error('Error generating all schedules:', error);
+      console.error('Error in advanced schedule generation:', error);
       toast({
         title: "Error",
         description: `Failed to generate schedules: ${error.message}`,
