@@ -128,11 +128,12 @@ const Planning = () => {
     }
   };
 
-  // Working hours configuration
+  // Working hours configuration: 7:00 - 16:00 with proper breaks
   const workingHours = [
-    { name: 'Morning', start: '07:00', end: '10:00', duration: 180 },
-    { name: 'Mid-day', start: '10:15', end: '12:30', duration: 135 },
-    { name: 'Afternoon', start: '13:00', end: '16:00', duration: 180 },
+    { name: 'Early Morning', start: '07:00', end: '10:00', duration: 180 },
+    { name: 'Late Morning', start: '10:15', end: '12:00', duration: 105 },  // 15-min break
+    { name: 'Early Afternoon', start: '13:00', end: '15:00', duration: 120 },  // 1-hour lunch
+    { name: 'Late Afternoon', start: '15:15', end: '16:00', duration: 45 }   // 15-min break
   ];
 
   const totalWorkingMinutes = workingHours.reduce((sum, period) => sum + period.duration, 0);
@@ -1175,9 +1176,12 @@ const Planning = () => {
       
       if (deleteError) console.error('Error clearing existing schedules:', deleteError);
       
+      // Define proper working hours: 7:00 - 16:00 with breaks
       const workingHours = [
-        { start: '08:00', end: '12:00', duration: 240, name: 'Morning' },
-        { start: '13:00', end: '17:00', duration: 240, name: 'Afternoon' }
+        { start: '07:00', end: '10:00', duration: 180, name: 'Early Morning' },
+        { start: '10:15', end: '12:00', duration: 105, name: 'Late Morning' },  // 15-min break
+        { start: '13:00', end: '15:00', duration: 120, name: 'Early Afternoon' },  // 1-hour lunch
+        { start: '15:15', end: '16:00', duration: 45, name: 'Late Afternoon' }   // 15-min break
       ];
       
       // Generate schedules for each employee
