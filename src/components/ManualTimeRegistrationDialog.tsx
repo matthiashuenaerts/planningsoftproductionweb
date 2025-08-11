@@ -24,6 +24,7 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
 
   const [formData, setFormData] = useState({
     employee_id: '',
+    project_id: '',
     task_id: '',
     workstation_task_id: '',
     start_time: '',
@@ -45,28 +46,45 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
     }
   });
 
-  // Fetch project tasks
-  const { data: projectTasks = [] } = useQuery({
-    queryKey: ['project-tasks'],
+  // Fetch projects
+  const { data: projects = [] } = useQuery({
+    queryKey: ['projects'],
     queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch project tasks (filtered by selected project)
+  const { data: projectTasks = [] } = useQuery({
+    queryKey: ['project-tasks', formData.project_id],
+    queryFn: async () => {
+      if (!formData.project_id) return [];
+      
       const { data, error } = await supabase
         .from('tasks')
         .select(`
           id,
           title,
-          phases(
+          phases!inner(
             id,
             name,
-            projects(
+            projects!inner(
               id,
               name
             )
           )
         `)
+        .eq('phases.projects.id', formData.project_id)
         .order('title');
       if (error) throw error;
       return data;
-    }
+    },
+    enabled: !!formData.project_id
   });
 
   // Fetch workstation tasks
@@ -117,6 +135,7 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
       onOpenChange(false);
       setFormData({
         employee_id: '',
+        project_id: '',
         task_id: '',
         workstation_task_id: '',
         start_time: '',
@@ -206,7 +225,7 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
               <SelectTrigger>
                 <SelectValue placeholder={t("select_employee")} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg z-50">
                 {employees.map((employee) => (
                   <SelectItem key={employee.id} value={employee.id}>
                     {employee.name}
@@ -218,11 +237,11 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
 
           <div className="space-y-2">
             <Label htmlFor="task-type">{t("task_type")}</Label>
-            <Select value={formData.task_type} onValueChange={(value) => setFormData(prev => ({ ...prev, task_type: value, task_id: '', workstation_task_id: '' }))}>
+            <Select value={formData.task_type} onValueChange={(value) => setFormData(prev => ({ ...prev, task_type: value, project_id: '', task_id: '', workstation_task_id: '' }))}>
               <SelectTrigger>
                 <SelectValue placeholder={t("select_task_type")} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg z-50">
                 <SelectItem value="project">{t("project_task")}</SelectItem>
                 <SelectItem value="workstation">{t("workstation_task")}</SelectItem>
               </SelectContent>
@@ -230,39 +249,57 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
           </div>
 
           {formData.task_type === 'project' && (
-            <div className="space-y-2">
-              <Label htmlFor="task">{t("project_task")}</Label>
-              <Select value={formData.task_id} onValueChange={(value) => setFormData(prev => ({ ...prev, task_id: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t("select_task")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {projectTasks.map((task) => (
-                    <SelectItem key={task.id} value={task.id}>
-                      {task.phases?.projects?.name} - {task.phases?.name} - {task.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="project">{t("project")}</Label>
+                <Select value={formData.project_id} onValueChange={(value) => setFormData(prev => ({ ...prev, project_id: value, task_id: '' }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("select_project")} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg z-50">
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="task">{t("task")}</Label>
+                <Select value={formData.task_id} onValueChange={(value) => setFormData(prev => ({ ...prev, task_id: value }))} disabled={!formData.project_id}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={formData.project_id ? t("select_task") : t("select_project_first")} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg z-50">
+                    {projectTasks.map((task) => (
+                      <SelectItem key={task.id} value={task.id}>
+                        {task.phases?.name} - {task.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
           )}
 
           {formData.task_type === 'workstation' && (
             <div className="space-y-2">
               <Label htmlFor="workstation-task">{t("workstation_task")}</Label>
               <Select value={formData.workstation_task_id} onValueChange={(value) => setFormData(prev => ({ ...prev, workstation_task_id: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t("select_workstation_task")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {workstationTasks.map((task) => (
-                    <SelectItem key={task.id} value={task.id}>
-                      {task.task_number} - {task.task_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <SelectTrigger>
+                <SelectValue placeholder={t("select_workstation_task")} />
+              </SelectTrigger>
+              <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg z-50">
+                {workstationTasks.map((task) => (
+                  <SelectItem key={task.id} value={task.id}>
+                    {task.task_number} - {task.task_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           )}
 
           <div className="space-y-2">
