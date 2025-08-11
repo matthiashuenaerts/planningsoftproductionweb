@@ -13,6 +13,7 @@ import { ArrowLeft, Calculator, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, phaseService, Phase, taskService, Task } from '@/services/dataService';
 import { useLanguage } from '@/context/LanguageContext';
+import { standardTasksService } from '@/services/standardTasksService';
 
 const EditProject = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -88,13 +89,66 @@ const EditProject = () => {
     loadProject();
   }, [projectId, toast, t]);
 
+  const updateTaskDueDates = async (newInstallationDate: string) => {
+    if (!projectId) return;
+
+    try {
+      // Get all tasks with standard_task_id from all phases
+      const allTasks = Object.values(tasks).flat().filter(task => task.standard_task_id);
+      
+      for (const task of allTasks) {
+        if (task.standard_task_id) {
+          // Get the standard task to access day_counter
+          const standardTask = await standardTasksService.getById(task.standard_task_id);
+          if (standardTask) {
+            // Calculate new due date
+            const installationDate = new Date(newInstallationDate);
+            const newDueDate = standardTasksService.calculateTaskDueDate(installationDate, standardTask.day_counter);
+            const dueDateString = newDueDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+            
+            // Update task in database
+            await taskService.update(task.id, { due_date: dueDateString });
+            
+            // Update local state
+            setTasks(prevTasks => {
+              const updatedTasks = { ...prevTasks };
+              Object.keys(updatedTasks).forEach(phaseId => {
+                updatedTasks[phaseId] = updatedTasks[phaseId].map(t =>
+                  t.id === task.id ? { ...t, due_date: dueDateString } : t
+                );
+              });
+              return updatedTasks;
+            });
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('Error updating task due dates:', error);
+      toast({
+        title: t('error'),
+        description: `Failed to update task due dates: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId || !project) return;
 
     try {
       setSaving(true);
+      
+      // Check if installation date changed
+      const installationDateChanged = formData.installation_date !== project.installation_date;
+      
       await projectService.update(projectId, formData);
+      
+      // Update task due dates if installation date changed
+      if (installationDateChanged) {
+        await updateTaskDueDates(formData.installation_date);
+      }
+      
       toast({
         title: t('success'),
         description: t('project_updated_successfully')
