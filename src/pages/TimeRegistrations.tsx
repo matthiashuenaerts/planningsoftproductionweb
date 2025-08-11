@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { useAuth } from '@/context/AuthContext';
-import { Clock, Users, Calendar, BarChart3, Download, Filter, DollarSign } from 'lucide-react';
+import { Clock, Users, Calendar, BarChart3, Download, Filter, DollarSign, Plus, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
+import { ManualTimeRegistrationDialog } from '@/components/ManualTimeRegistrationDialog';
+import { EditTimeRegistrationDialog } from '@/components/EditTimeRegistrationDialog';
 
 const TimeRegistrations = () => {
   const { currentEmployee } = useAuth();
@@ -28,6 +30,9 @@ const TimeRegistrations = () => {
   });
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [taskFilter, setTaskFilter] = useState<string>('all');
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [selectedRegistration, setSelectedRegistration] = useState<any>(null);
 
   // Check if user is admin or manager
   const canViewAllRegistrations = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
@@ -404,10 +409,12 @@ const TimeRegistrations = () => {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>{t("time_registration_history")}</CardTitle>
-                <Button onClick={exportToCSV} variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  {t("export_timesheet")}
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={exportToCSV} variant="outline" size="sm">
+                    <Download className="h-4 w-4 mr-2" />
+                    {t("export_timesheet")}
+                  </Button>
+                </div>
               </div>
               <CardDescription>
                 {t("showing_sessions", { count: filteredRegistrations.length.toString() })}
@@ -425,10 +432,11 @@ const TimeRegistrations = () => {
                     <TableHead>{t("project")}</TableHead>
                     <TableHead>{t("task")}</TableHead>
                     <TableHead>{t("start_time")}</TableHead>
-                    <TableHead>{t("end_time")}</TableHead>
-                    <TableHead>{t("duration")}</TableHead>
-                    <TableHead>{t("cost")}</TableHead>
-                    <TableHead>{t("status")}</TableHead>
+                     <TableHead>{t("end_time")}</TableHead>
+                     <TableHead>{t("duration")}</TableHead>
+                     <TableHead>{t("cost")}</TableHead>
+                     <TableHead>{t("status")}</TableHead>
+                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -451,12 +459,24 @@ const TimeRegistrations = () => {
                       </TableCell>
                       <TableCell>{formatDuration(registration.duration_minutes)}</TableCell>
                       <TableCell>{formatCurrency(cost)}</TableCell>
-                      <TableCell>
-                        <Badge variant={registration.is_active ? 'default' : 'secondary'}>
-                          {registration.is_active ? t("active") : t("completed")}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
+                       <TableCell>
+                         <Badge variant={registration.is_active ? 'default' : 'secondary'}>
+                           {registration.is_active ? t("active") : t("completed")}
+                         </Badge>
+                       </TableCell>
+                       <TableCell>
+                         <Button
+                           variant="ghost"
+                           size="sm"
+                           onClick={() => {
+                             setSelectedRegistration(registration);
+                             setShowEditDialog(true);
+                           }}
+                         >
+                           <Edit className="h-4 w-4" />
+                         </Button>
+                       </TableCell>
+                     </TableRow>
                     );
                   })}
                 </TableBody>
@@ -649,7 +669,13 @@ const TimeRegistrations = () => {
         {/* Registration History */}
         <Card>
           <CardHeader>
-            <CardTitle>{t("time_registration_history")}</CardTitle>
+            <div className="flex justify-between items-center">
+              <CardTitle>{t("time_registration_history")}</CardTitle>
+              <Button onClick={() => setShowAddDialog(true)} variant="default" size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                {t("add_manual_registration")}
+              </Button>
+            </div>
             <CardDescription>
               {t("showing_sessions", { count: filteredRegistrations.length.toString() })}
               {!isFilterActive && allRegistrations.length > 50 && (
@@ -669,9 +695,10 @@ const TimeRegistrations = () => {
                   <TableHead>{t("start_time")}</TableHead>
                   <TableHead>{t("end_time")}</TableHead>
                   <TableHead>{t("duration")}</TableHead>
-                  <TableHead>{t("cost")}</TableHead>
-                  <TableHead>{t("status")}</TableHead>
-                </TableRow>
+                   <TableHead>{t("cost")}</TableHead>
+                   <TableHead>{t("status")}</TableHead>
+                   <TableHead></TableHead>
+                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredRegistrations.map((registration: any) => {
@@ -696,18 +723,41 @@ const TimeRegistrations = () => {
                     </TableCell>
                     <TableCell>{formatDuration(registration.duration_minutes)}</TableCell>
                     <TableCell>{formatCurrency(cost)}</TableCell>
-                    <TableCell>
-                      <Badge variant={registration.is_active ? 'default' : 'secondary'}>
-                        {registration.is_active ? t("active") : t("completed")}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
+                     <TableCell>
+                       <Badge variant={registration.is_active ? 'default' : 'secondary'}>
+                         {registration.is_active ? t("active") : t("completed")}
+                       </Badge>
+                     </TableCell>
+                     <TableCell>
+                       <Button
+                         variant="ghost"
+                         size="sm"
+                         onClick={() => {
+                           setSelectedRegistration(registration);
+                           setShowEditDialog(true);
+                         }}
+                       >
+                         <Edit className="h-4 w-4" />
+                       </Button>
+                     </TableCell>
+                   </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
+        
+        <ManualTimeRegistrationDialog 
+          open={showAddDialog} 
+          onOpenChange={setShowAddDialog} 
+        />
+        
+        <EditTimeRegistrationDialog 
+          open={showEditDialog} 
+          onOpenChange={setShowEditDialog} 
+          registration={selectedRegistration}
+        />
       </div>
     </div>
   );
