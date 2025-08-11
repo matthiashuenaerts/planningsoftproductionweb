@@ -41,7 +41,6 @@ import {
 import PlanningTaskManager from '@/components/PlanningTaskManager';
 import TaskConflictResolver from '@/components/TaskConflictResolver';
 import StandardTaskAssignment from '@/components/StandardTaskAssignment';
-import { ScheduleGenerationProgress } from '@/components/ScheduleGenerationProgress';
 import { supabase } from '@/integrations/supabase/client';
 import DraggableScheduleItem from '@/components/DraggableScheduleItem';
 import WorkstationScheduleView from '@/components/WorkstationScheduleView';
@@ -103,15 +102,6 @@ const Planning = () => {
   const [showStandardTaskAssignment, setShowStandardTaskAssignment] = useState(false);
   const [showWorkstationView, setShowWorkstationView] = useState(false);
   const [holidays, setHolidays] = useState<any[]>([]);
-  
-  // Progress tracking state
-  const [showProgressModal, setShowProgressModal] = useState(false);
-  const [progressSteps, setProgressSteps] = useState<any[]>([]);
-  const [currentProgressStep, setCurrentProgressStep] = useState('');
-  const [generationProgress, setGenerationProgress] = useState(0);
-  const [currentWorkerName, setCurrentWorkerName] = useState('');
-  const [totalWorkersCount, setTotalWorkersCount] = useState(0);
-  const [processedWorkersCount, setProcessedWorkersCount] = useState(0);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const isAdmin = currentEmployee?.role === 'admin';
@@ -910,35 +900,8 @@ const Planning = () => {
       setGeneratingSchedule(true);
       saveScrollPosition();
       
-      // Initialize progress tracking
-      const steps = [
-        { id: 'validation', title: 'Validation', description: 'Checking holidays and prerequisites', status: 'pending' },
-        { id: 'data-collection', title: 'Data Collection', description: 'Gathering tasks and worker information', status: 'pending' },
-        { id: 'analysis', title: 'Analysis', description: 'Analyzing task priorities and requirements', status: 'pending' },
-        { id: 'generation', title: 'Schedule Generation', description: 'Creating optimal schedules for each worker', status: 'pending' },
-        { id: 'conflict-detection', title: 'Conflict Detection', description: 'Identifying and resolving conflicts', status: 'pending' },
-        { id: 'finalization', title: 'Finalization', description: 'Saving schedules and updating database', status: 'pending' }
-      ];
-      
-      setProgressSteps(steps);
-      setShowProgressModal(true);
-      setGenerationProgress(0);
-      setCurrentProgressStep('validation');
-      
-      // Update step status
-      const updateStepStatus = (stepId: string, status: 'running' | 'completed' | 'error') => {
-        setProgressSteps(prev => prev.map(step => 
-          step.id === stepId ? { ...step, status } : step
-        ));
-      };
-      
-      // VALIDATION PHASE
-      updateStepStatus('validation', 'running');
-      setCurrentProgressStep('validation');
-      
       // Check if the selected date is a production holiday
       if (isProductionHoliday(selectedDate)) {
-        updateStepStatus('validation', 'error');
         toast({
           title: "Holiday - No Scheduling",
           description: `Cannot schedule work on ${format(selectedDate, 'PPP')} as it's a production team holiday.`,
@@ -947,9 +910,6 @@ const Planning = () => {
         return;
       }
       
-      updateStepStatus('validation', 'completed');
-      setGenerationProgress(16);
-      
       console.log('🚀 Starting Advanced Schedule Generation Algorithm...');
       
       // Clear previous state
@@ -957,9 +917,7 @@ const Planning = () => {
       let skippedOnHoliday = 0;
       let successfullyGenerated = 0;
       
-      // DATA COLLECTION PHASE
-      updateStepStatus('data-collection', 'running');
-      setCurrentProgressStep('data-collection');
+      // PHASE 1: Data Collection & Analysis
       console.log('📊 Phase 1: Collecting and analyzing data...');
       
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -1015,12 +973,7 @@ const Planning = () => {
       
       if (stdTaskError) throw stdTaskError;
       
-      updateStepStatus('data-collection', 'completed');
-      setGenerationProgress(33);
-      
-      // ANALYSIS PHASE
-      updateStepStatus('analysis', 'running');
-      setCurrentProgressStep('analysis');
+      // PHASE 2: Task Ownership & Continuity Analysis
       console.log('🔍 Phase 2: Analyzing task ownership and continuity...');
       
       // Build task ownership map (who started each task)
@@ -1209,25 +1162,8 @@ const Planning = () => {
         }
       }
       
-      updateStepStatus('analysis', 'completed');
-      setGenerationProgress(50);
-      
-      // GENERATION PHASE
-      updateStepStatus('generation', 'running');
-      setCurrentProgressStep('generation');
+      // PHASE 5: Generate Actual Schedules
       console.log('📅 Phase 5: Generating actual schedules...');
-      
-      // Set up worker tracking
-      const availableWorkers = [];
-      for (const worker of workers) {
-        const isOnHoliday = await planningService.isEmployeeOnHoliday(worker.employee.id, selectedDate);
-        if (!isOnHoliday) {
-          availableWorkers.push(worker);
-        }
-      }
-      const totalWorkers = availableWorkers.length;
-      setTotalWorkersCount(totalWorkers);
-      setProcessedWorkersCount(0);
       
       // Clear existing schedules for the date
       const { error: deleteError } = await supabase
@@ -1247,17 +1183,11 @@ const Planning = () => {
       ];
       
       // Generate schedules for each employee
-      let processedWorkers = 0;
       for (const [employeeId, tasks] of employeeTaskQueue.entries()) {
         if (tasks.length === 0) continue;
         
         const employee = workerSchedules.find(ws => ws.employee.id === employeeId)?.employee;
         if (!employee) continue;
-        
-        // Update progress
-        setCurrentWorkerName(employee.name);
-        setProcessedWorkersCount(processedWorkers);
-        setGenerationProgress(50 + (processedWorkers / totalWorkers) * 25);
         
         console.log(`📋 Creating schedule for ${employee.name} with ${tasks.length} tasks`);
         
@@ -1336,15 +1266,9 @@ const Planning = () => {
             console.log(`✅ Created ${schedulesToInsert.length} schedule items for ${employee.name}`);
           }
         }
-        processedWorkers++;
       }
       
-      updateStepStatus('generation', 'completed');
-      setGenerationProgress(75);
-      
-      // CONFLICT DETECTION PHASE
-      updateStepStatus('conflict-detection', 'running');
-      setCurrentProgressStep('conflict-detection');
+      // PHASE 6: Generate Workstation Schedules
       console.log('🏭 Phase 6: Generating workstation schedules...');
       await fetchAllData();
       await generateWorkstationSchedulesFromWorkerSchedules();
@@ -1370,47 +1294,18 @@ const Planning = () => {
         - Continued tasks: ${Array.from(taskOwnershipMap.keys()).length}
         - New task assignments: ${totalAssignedTasks - Array.from(taskOwnershipMap.keys()).length}`);
       
-      updateStepStatus('conflict-detection', 'completed');
-      setGenerationProgress(90);
-      
-      // FINALIZATION PHASE
-      updateStepStatus('finalization', 'running');
-      setCurrentProgressStep('finalization');
-      
       toast({
         title: "Advanced Schedule Generation Complete",
         description: message,
       });
       
-      updateStepStatus('finalization', 'completed');
-      setGenerationProgress(100);
-      
-      // Close progress modal after a short delay
-      setTimeout(() => {
-        setShowProgressModal(false);
-      }, 2000);
-      
     } catch (error: any) {
       console.error('Error in advanced schedule generation:', error);
-      
-      // Mark current step as error
-      const currentStepToMarkError = progressSteps.find(step => step.status === 'running');
-      if (currentStepToMarkError) {
-        setProgressSteps(prev => prev.map(step => 
-          step.id === currentStepToMarkError.id ? { ...step, status: 'error' } : step
-        ));
-      }
-      
       toast({
         title: "Error",
         description: `Failed to generate schedules: ${error.message}`,
         variant: "destructive"
       });
-      
-      // Close progress modal after error
-      setTimeout(() => {
-        setShowProgressModal(false);
-      }, 3000);
     } finally {
       setGeneratingSchedule(false);
     }
@@ -2391,17 +2286,6 @@ const Planning = () => {
                 fetchAllData();
                 setShowStandardTaskAssignment(false);
               }}
-            />
-
-            <ScheduleGenerationProgress
-              isOpen={showProgressModal}
-              onOpenChange={setShowProgressModal}
-              currentStep={currentProgressStep}
-              steps={progressSteps}
-              progress={generationProgress}
-              currentWorker={currentWorkerName}
-              totalWorkers={totalWorkersCount}
-              processedWorkers={processedWorkersCount}
             />
           </div>
         </div>
