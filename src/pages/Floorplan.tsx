@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { workstationService } from '@/services/workstationService';
 import { floorplanService, WorkstationPosition, ProductionFlowLine, WorkstationStatus } from '@/services/floorplanService';
-import { WorkstationDot } from '@/components/floorplan/WorkstationDot';
+import { ImageAwareWorkstationDot } from '@/components/floorplan/ImageAwareWorkstationDot';
 import { ProductionFlowLine as ProductionFlowLineComponent } from '@/components/floorplan/ProductionFlowLine';
 import { FloorplanToolbar } from '@/components/floorplan/FloorplanToolbar';
 import { AnimatedWorkstationDetailsDialog } from '@/components/floorplan/AnimatedWorkstationDetailsDialog';
@@ -20,11 +20,13 @@ const Floorplan: React.FC = () => {
   const [workstationStatuses, setWorkstationStatuses] = useState<WorkstationStatus[]>([]);
   const [selectedWorkstation, setSelectedWorkstation] = useState<any>(null);
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
+  const [imageRect, setImageRect] = useState<DOMRect | null>(null);
   const [isAddingFlowLine, setIsAddingFlowLine] = useState(false);
   const [newFlowLine, setNewFlowLine] = useState<any>(null);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const isAdmin = true; // This should come from auth context
 
   // Fetch workstations
@@ -60,17 +62,31 @@ const Floorplan: React.FC = () => {
     };
   }, []);
 
-  // Update container rect on resize
+  // Update container and image rects on resize and image load
   useEffect(() => {
-    const updateRect = () => {
+    const updateRects = () => {
       if (containerRef.current) {
         setContainerRect(containerRef.current.getBoundingClientRect());
       }
+      if (imageRef.current) {
+        setImageRect(imageRef.current.getBoundingClientRect());
+      }
     };
 
-    updateRect();
-    window.addEventListener('resize', updateRect);
-    return () => window.removeEventListener('resize', updateRect);
+    updateRects();
+    window.addEventListener('resize', updateRects);
+    
+    // Also update when image loads
+    const imageElement = imageRef.current;
+    if (imageElement) {
+      imageElement.addEventListener('load', updateRects);
+      return () => {
+        window.removeEventListener('resize', updateRects);
+        imageElement.removeEventListener('load', updateRects);
+      };
+    }
+    
+    return () => window.removeEventListener('resize', updateRects);
   }, []);
 
   const loadFloorplanData = async () => {
@@ -121,11 +137,10 @@ const Floorplan: React.FC = () => {
   };
 
   const handleFloorplanClick = (e: React.MouseEvent) => {
-    if (!isAddingFlowLine || !newFlowLine || !containerRef.current) return;
+    if (!isAddingFlowLine || !newFlowLine || !imageRect) return;
 
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const x = ((e.clientX - imageRect.left) / imageRect.width) * 100;
+    const y = ((e.clientY - imageRect.top) / imageRect.height) * 100;
 
     if (!startPoint) {
       setStartPoint({ x, y });
@@ -186,6 +201,7 @@ const Floorplan: React.FC = () => {
               <div className="relative w-full h-full">
                 {/* Background Image */}
                 <img
+                  ref={imageRef}
                   src={FLOORPLAN_IMAGE}
                   alt="Production Hall Floorplan"
                   className="w-full h-full object-contain"
@@ -201,7 +217,7 @@ const Floorplan: React.FC = () => {
                   {/* Workstation Dots positioned relative to image */}
                   <div className="absolute inset-0">
                     {workstations.map((workstation) => (
-                      <WorkstationDot
+                      <ImageAwareWorkstationDot
                         key={workstation.id}
                         workstation={workstation}
                         position={getWorkstationPosition(workstation.id)}
@@ -209,6 +225,7 @@ const Floorplan: React.FC = () => {
                         isEditing={isEditing}
                         onPositionChange={handleWorkstationPositionChange}
                         onClick={setSelectedWorkstation}
+                        imageRef={imageRef}
                       />
                     ))}
                   </div>
