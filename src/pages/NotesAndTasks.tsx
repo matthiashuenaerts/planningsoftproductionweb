@@ -242,7 +242,7 @@ const NotesAndTasks = () => {
     <div className="flex min-h-screen">
       <Navbar />
       <div className="flex-1 ml-64">
-        <div className="w-full px-4 py-6">
+        <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold">Notes & Tasks</h1>
             <Button onClick={() => setIsCreateDialogOpen(true)}>
@@ -298,52 +298,49 @@ const NotesAndTasks = () => {
             </TabsList>
 
             <TabsContent value="all" className="mt-6">
-              <div className="columns-1 md:columns-2 lg:columns-3 gap-4 space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredItems.map((item) => (
-                  <div key={item.id} className="break-inside-avoid mb-4">
-                    <PersonalItemCard
-                      item={item}
-                      onEdit={() => setEditingItem(item)}
-                      onDelete={() => handleDeleteItem(item)}
-                      onShare={() => setSharingItem(item)}
-                      onToggleComplete={() => handleToggleComplete(item)}
-                      refetch={refetch}
-                    />
-                  </div>
+                  <PersonalItemCard
+                    key={item.id}
+                    item={item}
+                    onEdit={() => setEditingItem(item)}
+                    onDelete={() => handleDeleteItem(item)}
+                    onShare={() => setSharingItem(item)}
+                    onToggleComplete={() => handleToggleComplete(item)}
+                    refetch={refetch}
+                  />
                 ))}
               </div>
             </TabsContent>
 
             <TabsContent value="note" className="mt-6">
-              <div className="columns-1 md:columns-2 lg:columns-3 gap-4 space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredItems.map((item) => (
-                  <div key={item.id} className="break-inside-avoid mb-4">
-                    <PersonalItemCard
-                      item={item}
-                      onEdit={() => setEditingItem(item)}
-                      onDelete={() => handleDeleteItem(item)}
-                      onShare={() => setSharingItem(item)}
-                      onToggleComplete={() => handleToggleComplete(item)}
-                      refetch={refetch}
-                    />
-                  </div>
+                  <PersonalItemCard
+                    key={item.id}
+                    item={item}
+                    onEdit={() => setEditingItem(item)}
+                    onDelete={() => handleDeleteItem(item)}
+                    onShare={() => setSharingItem(item)}
+                    onToggleComplete={() => handleToggleComplete(item)}
+                    refetch={refetch}
+                  />
                 ))}
               </div>
             </TabsContent>
 
             <TabsContent value="task" className="mt-6">
-              <div className="columns-1 md:columns-2 lg:columns-3 gap-4 space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredItems.map((item) => (
-                  <div key={item.id} className="break-inside-avoid mb-4">
-                    <PersonalItemCard
-                      item={item}
-                      onEdit={() => setEditingItem(item)}
-                      onDelete={() => handleDeleteItem(item)}
-                      onShare={() => setSharingItem(item)}
-                      onToggleComplete={() => handleToggleComplete(item)}
-                      refetch={refetch}
-                    />
-                  </div>
+                  <PersonalItemCard
+                    key={item.id}
+                    item={item}
+                    onEdit={() => setEditingItem(item)}
+                    onDelete={() => handleDeleteItem(item)}
+                    onShare={() => setSharingItem(item)}
+                    onToggleComplete={() => handleToggleComplete(item)}
+                    refetch={refetch}
+                  />
                 ))}
               </div>
             </TabsContent>
