@@ -242,7 +242,7 @@ const NotesAndTasks = () => {
     <div className="flex min-h-screen">
       <Navbar />
       <div className="flex-1 ml-64">
-        <div className="container mx-auto px-4 py-6">
+        <div className="w-full px-4 py-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold">Notes & Tasks</h1>
             <Button onClick={() => setIsCreateDialogOpen(true)}>
