@@ -298,49 +298,52 @@ const NotesAndTasks = () => {
             </TabsList>
 
             <TabsContent value="all" className="mt-6">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="columns-1 md:columns-2 lg:columns-3 gap-4 space-y-4">
                 {filteredItems.map((item) => (
-                  <PersonalItemCard
-                    key={item.id}
-                    item={item}
-                    onEdit={() => setEditingItem(item)}
-                    onDelete={() => handleDeleteItem(item)}
-                    onShare={() => setSharingItem(item)}
-                    onToggleComplete={() => handleToggleComplete(item)}
-                    refetch={refetch}
-                  />
+                  <div key={item.id} className="break-inside-avoid mb-4">
+                    <PersonalItemCard
+                      item={item}
+                      onEdit={() => setEditingItem(item)}
+                      onDelete={() => handleDeleteItem(item)}
+                      onShare={() => setSharingItem(item)}
+                      onToggleComplete={() => handleToggleComplete(item)}
+                      refetch={refetch}
+                    />
+                  </div>
                 ))}
               </div>
             </TabsContent>
 
             <TabsContent value="note" className="mt-6">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="columns-1 md:columns-2 lg:columns-3 gap-4 space-y-4">
                 {filteredItems.map((item) => (
-                  <PersonalItemCard
-                    key={item.id}
-                    item={item}
-                    onEdit={() => setEditingItem(item)}
-                    onDelete={() => handleDeleteItem(item)}
-                    onShare={() => setSharingItem(item)}
-                    onToggleComplete={() => handleToggleComplete(item)}
-                    refetch={refetch}
-                  />
+                  <div key={item.id} className="break-inside-avoid mb-4">
+                    <PersonalItemCard
+                      item={item}
+                      onEdit={() => setEditingItem(item)}
+                      onDelete={() => handleDeleteItem(item)}
+                      onShare={() => setSharingItem(item)}
+                      onToggleComplete={() => handleToggleComplete(item)}
+                      refetch={refetch}
+                    />
+                  </div>
                 ))}
               </div>
             </TabsContent>
 
             <TabsContent value="task" className="mt-6">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="columns-1 md:columns-2 lg:columns-3 gap-4 space-y-4">
                 {filteredItems.map((item) => (
-                  <PersonalItemCard
-                    key={item.id}
-                    item={item}
-                    onEdit={() => setEditingItem(item)}
-                    onDelete={() => handleDeleteItem(item)}
-                    onShare={() => setSharingItem(item)}
-                    onToggleComplete={() => handleToggleComplete(item)}
-                    refetch={refetch}
-                  />
+                  <div key={item.id} className="break-inside-avoid mb-4">
+                    <PersonalItemCard
+                      item={item}
+                      onEdit={() => setEditingItem(item)}
+                      onDelete={() => handleDeleteItem(item)}
+                      onShare={() => setSharingItem(item)}
+                      onToggleComplete={() => handleToggleComplete(item)}
+                      refetch={refetch}
+                    />
+                  </div>
                 ))}
               </div>
             </TabsContent>
