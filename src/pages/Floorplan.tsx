@@ -192,71 +192,122 @@ const Floorplan: React.FC = () => {
       <GlobalComponents />
       
       <div className="ml-64 relative w-[calc(100vw-16rem)] h-screen flex items-center justify-center overflow-hidden">
-        {/* Fixed Aspect Ratio Container */}
-        <div className="relative w-full h-full max-w-full max-h-full">
-          <div className="absolute inset-0 flex items-center justify-center">
-            {/* Floorplan Container with Fixed Aspect Ratio */}
-            <div className="relative" style={{ aspectRatio: '16/9', width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%' }}>
-              {/* Image and Interactive Container - both must have identical dimensions */}
-              <div className="relative w-full h-full">
-                {/* Background Image */}
-                <img
-                  ref={imageRef}
-                  src={FLOORPLAN_IMAGE}
-                  alt="Production Hall Floorplan"
-                  className="w-full h-full object-contain"
-                />
+        {/* Image Container */}
+        <div className="relative w-full h-full flex items-center justify-center">
+          <div className="relative inline-block">
+            {/* Background Image */}
+            <img
+              ref={imageRef}
+              src={FLOORPLAN_IMAGE}
+              alt="Production Hall Floorplan"
+              className="block max-w-full max-h-full object-contain"
+              onLoad={() => {
+                // Update container rect when image loads
+                if (containerRef.current && imageRef.current) {
+                  const imageRect = imageRef.current.getBoundingClientRect();
+                  setImageRect(imageRect);
+                  setContainerRect(imageRef.current.getBoundingClientRect());
+                }
+              }}
+            />
 
-                {/* Interactive Container - positioned absolute with same dimensions as image */}
-                <div
-                  ref={containerRef}
-                  className="floorplan-container absolute inset-0 cursor-pointer"
-                  onClick={handleFloorplanClick}
-                  style={{ userSelect: 'none' }}
-                >
-                  {/* Workstation Dots positioned relative to image */}
-                  <div className="absolute inset-0">
-                    {workstations.map((workstation) => (
-                      <ImageAwareWorkstationDot
-                        key={workstation.id}
-                        workstation={workstation}
-                        position={getWorkstationPosition(workstation.id)}
-                        status={getWorkstationStatus(workstation.id)}
-                        isEditing={isEditing}
-                        onPositionChange={handleWorkstationPositionChange}
-                        onClick={setSelectedWorkstation}
-                        imageRef={imageRef}
-                      />
-                    ))}
+            {/* Interactive Container - EXACTLY matches the image size and position */}
+            <div
+              ref={containerRef}
+              className="absolute inset-0 cursor-pointer"
+              onClick={handleFloorplanClick}
+              style={{ userSelect: 'none' }}
+            >
+              {/* Workstation Dots */}
+              {workstations.map((workstation) => {
+                const position = getWorkstationPosition(workstation.id);
+                return (
+                  <div
+                    key={workstation.id}
+                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${
+                      isEditing ? 'cursor-move' : 'cursor-pointer'
+                    }`}
+                    style={{
+                      left: `${position.x}%`,
+                      top: `${position.y}%`,
+                      zIndex: 10,
+                    }}
+                    onMouseDown={(e) => {
+                      if (!isEditing) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      const handleMouseMove = (moveE: MouseEvent) => {
+                        if (!imageRef.current) return;
+                        
+                        const imageRect = imageRef.current.getBoundingClientRect();
+                        const x = ((moveE.clientX - imageRect.left) / imageRect.width) * 100;
+                        const y = ((moveE.clientY - imageRect.top) / imageRect.height) * 100;
+                        
+                        const clampedX = Math.max(0, Math.min(100, x));
+                        const clampedY = Math.max(0, Math.min(100, y));
+                        
+                        handleWorkstationPositionChange(workstation.id, clampedX, clampedY);
+                      };
+                      
+                      const handleMouseUp = () => {
+                        document.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                      };
+                      
+                      document.addEventListener('mousemove', handleMouseMove);
+                      document.addEventListener('mouseup', handleMouseUp);
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isEditing) setSelectedWorkstation(workstation);
+                    }}
+                  >
+                    <div className={`w-4 h-4 rounded-full border-2 border-white shadow-lg ${
+                      !getWorkstationStatus(workstation.id) ? 'bg-orange-500' :
+                      getWorkstationStatus(workstation.id)?.has_error ? 'bg-red-500' :
+                      getWorkstationStatus(workstation.id)?.is_active ? 'bg-green-500' : 'bg-orange-500'
+                    }`}>
+                      {getWorkstationStatus(workstation.id)?.is_active && getWorkstationStatus(workstation.id)?.active_users_count > 0 && (
+                        <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-background border flex items-center justify-center text-xs">
+                          {getWorkstationStatus(workstation.id)?.active_users_count}
+                        </div>
+                      )}
+                    </div>
+                    {isEditing && (
+                      <div className="absolute top-5 left-1/2 transform -translate-x-1/2 bg-background border rounded px-2 py-1 text-xs whitespace-nowrap shadow-lg">
+                        {workstation.name}
+                      </div>
+                    )}
                   </div>
+                );
+              })}
 
-                  {/* Production Flow Lines */}
-                  {containerRect && (
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                      {productionFlowLines.map((line) => (
-                        <ProductionFlowLineComponent
-                          key={line.id}
-                          line={line}
-                          containerRect={containerRect}
-                          isEditing={isEditing}
-                          onDelete={handleDeleteProductionFlowLine}
-                        />
-                      ))}
-                    </svg>
-                  )}
-
-                  {/* Start Point Indicator for Flow Line */}
-                  {startPoint && isAddingFlowLine && (
-                    <div
-                      className="absolute w-3 h-3 bg-blue-500 rounded-full border-2 border-white transform -translate-x-1/2 -translate-y-1/2 animate-pulse"
-                      style={{
-                        left: `${startPoint.x}%`,
-                        top: `${startPoint.y}%`,
-                      }}
+              {/* Production Flow Lines */}
+              {imageRef.current && (
+                <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                  {productionFlowLines.map((line) => (
+                    <ProductionFlowLineComponent
+                      key={line.id}
+                      line={line}
+                      containerRect={imageRef.current?.getBoundingClientRect() || null}
+                      isEditing={isEditing}
+                      onDelete={handleDeleteProductionFlowLine}
                     />
-                  )}
-                </div>
-              </div>
+                  ))}
+                </svg>
+              )}
+
+              {/* Start Point Indicator for Flow Line */}
+              {startPoint && isAddingFlowLine && (
+                <div
+                  className="absolute w-3 h-3 bg-blue-500 rounded-full border-2 border-white transform -translate-x-1/2 -translate-y-1/2 animate-pulse"
+                  style={{
+                    left: `${startPoint.x}%`,
+                    top: `${startPoint.y}%`,
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>
