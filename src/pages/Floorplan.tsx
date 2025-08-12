@@ -187,7 +187,7 @@ const Floorplan: React.FC = () => {
         <div className="relative w-full h-full flex items-center justify-center">
           <div className="relative inline-block">
             {/* Background Image */}
-            <img ref={imageRef} src={FLOORPLAN_IMAGE} alt="Production Hall Floorplan" className="block max-w-full max-h-full object-contain py-[50px]" onLoad={() => {
+            <img ref={imageRef} src={FLOORPLAN_IMAGE} alt="Production Hall Floorplan" className="block max-w-full max-h-full object-contain" onLoad={() => {
             // Update container rect when image loads
             if (containerRef.current && imageRef.current) {
               const imageRect = imageRef.current.getBoundingClientRect();
