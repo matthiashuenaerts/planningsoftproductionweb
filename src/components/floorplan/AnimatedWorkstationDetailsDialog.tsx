@@ -313,7 +313,7 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
                               <div className="text-sm text-white/70">Loading tasks...</div>
                             ) : projectTasks[project.project_id]?.length > 0 ? (
                               projectTasks[project.project_id].map((task) => (
-                                <div key={task.id} className="flex items-center justify-between p-3 bg-white/15 backdrop-blur rounded-md border border-white/20">
+                                 <div key={task.id} className="flex items-center justify-between p-3 bg-white/15 backdrop-blur rounded-md border border-white/20">
                                   <div>
                                     <div className="text-sm font-medium text-white">{task.title}</div>
                                     <div className="text-xs text-white/70 flex items-center space-x-2">
@@ -324,21 +324,49 @@ export const AnimatedWorkstationDetailsDialog: React.FC<AnimatedWorkstationDetai
                                         <span className="text-xs text-green-300">Assigned to you</span>
                                       )}
                                     </div>
-                                  </div>
-                                  {task.status === 'TODO' && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        startTask(task);
-                                      }}
-                                      className="h-8 px-3"
-                                    >
-                                      <Play className="h-3 w-3 mr-1" />
-                                      Start
-                                    </Button>
-                                  )}
+                                   </div>
+                                   <div className="flex items-center space-x-2">
+                                     <Button
+                                       size="sm"
+                                       variant="outline"
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         // TODO: Open project files popup
+                                         toast.info('Project files popup coming soon');
+                                       }}
+                                       className="h-8 px-3"
+                                     >
+                                       <FolderOpen className="h-3 w-3 mr-1" />
+                                       Files
+                                     </Button>
+                                     <Button
+                                       size="sm"
+                                       variant="outline"
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         // TODO: Open parts list dialog
+                                         toast.info('Parts list dialog coming soon');
+                                       }}
+                                       className="h-8 px-3"
+                                     >
+                                       <Clock className="h-3 w-3 mr-1" />
+                                       Parts
+                                     </Button>
+                                     {task.status === 'TODO' && (
+                                       <Button
+                                         size="sm"
+                                         variant="outline"
+                                         onClick={(e) => {
+                                           e.stopPropagation();
+                                           startTask(task);
+                                         }}
+                                         className="h-8 px-3"
+                                       >
+                                         <Play className="h-3 w-3 mr-1" />
+                                         Start
+                                       </Button>
+                                     )}
+                                   </div>
                                 </div>
                               ))
                             ) : (
