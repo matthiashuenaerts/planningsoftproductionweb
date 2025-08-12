@@ -298,7 +298,7 @@ const NotesAndTasks = () => {
             </TabsList>
 
             <TabsContent value="all" className="mt-6">
-              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredItems.map((item) => (
                   <PersonalItemCard
                     key={item.id}
@@ -314,7 +314,7 @@ const NotesAndTasks = () => {
             </TabsContent>
 
             <TabsContent value="note" className="mt-6">
-              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredItems.map((item) => (
                   <PersonalItemCard
                     key={item.id}
@@ -330,7 +330,7 @@ const NotesAndTasks = () => {
             </TabsContent>
 
             <TabsContent value="task" className="mt-6">
-              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredItems.map((item) => (
                   <PersonalItemCard
                     key={item.id}
