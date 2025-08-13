@@ -40,36 +40,61 @@ const ExternalDatabaseSettings: React.FC = () => {
     setTestingConnection(true);
     setConnectionStatus('idle');
     
+    console.log('Testing connection via edge function...');
+    console.log('BaseURL:', config.baseUrl);
+    console.log('Username:', config.username);
+    
     try {
-      const response = await fetch(`${config.baseUrl}/sessions`, {
+      const response = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/external-db-proxy', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Basic ${btoa(`${config.username}:${config.password}`)}`
-        }
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
+        },
+        body: JSON.stringify({
+          action: 'authenticate',
+          baseUrl: config.baseUrl,
+          username: config.username,
+          password: config.password
+        })
       });
 
+      console.log('Edge function response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorData = await response.json();
+        console.error('Edge function error:', errorData);
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('Edge function response data:', data);
       
       if (data.response && data.response.token) {
         setToken(data.response.token);
         setConnectionStatus('success');
+        console.log('Token received via edge function:', data.response.token);
         toast({
           title: "Connection Successful",
-          description: "Successfully authenticated and received token",
+          description: "Successfully authenticated via edge function and received token",
         });
       } else {
-        throw new Error('No token received from API');
+        console.error('No token in edge function response:', data);
+        throw new Error('No token received from API via edge function');
       }
     } catch (error) {
+      console.error('Connection error details:', error);
+      
       setConnectionStatus('error');
+      let errorMessage = "Failed to connect to external database";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
       toast({
-        title: "Connection Failed",
-        description: error instanceof Error ? error.message : "Failed to connect to external database",
+        title: "Connection Failed", 
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -98,30 +123,43 @@ const ExternalDatabaseSettings: React.FC = () => {
 
     setTestingQuery(true);
     
+    console.log('Testing query via edge function...');
+    console.log('Order number:', config.testOrderNumber);
+    console.log('Token:', token);
+    
     try {
-      const response = await fetch(
-        `${config.baseUrl}/layouts/API_order/script/FindOrderNumber?script.param=${config.testOrderNumber}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const response = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/external-db-proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
+        },
+        body: JSON.stringify({
+          action: 'query',
+          baseUrl: config.baseUrl,
+          token: token,
+          orderNumber: config.testOrderNumber
+        })
+      });
+
+      console.log('Query response status:', response.status);
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorData = await response.json();
+        console.error('Query error:', errorData);
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('Query response data:', data);
       setQueryResult(JSON.stringify(data, null, 2));
       
       toast({
         title: "Query Successful",
-        description: "Successfully retrieved order data",
+        description: "Successfully retrieved order data via edge function",
       });
     } catch (error) {
+      console.error('Query error details:', error);
       toast({
         title: "Query Failed",
         description: error instanceof Error ? error.message : "Failed to query external database",
