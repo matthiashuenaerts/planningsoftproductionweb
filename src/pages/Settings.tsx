@@ -81,7 +81,7 @@ const Settings: React.FC = () => {
           <h1 className="text-2xl font-bold mb-6">System Settings</h1>
           
           <Tabs defaultValue="workstations">
-            <TabsList className="mb-4">
+            <TabsList className="mb-4 overflow-x-auto w-full justify-start">
               <TabsTrigger value="workstations">Workstations</TabsTrigger>
               <TabsTrigger value="employees">Employees</TabsTrigger>
               <TabsTrigger value="standard-tasks">Standard Tasks</TabsTrigger>
