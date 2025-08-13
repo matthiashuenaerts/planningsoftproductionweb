@@ -11,6 +11,7 @@ import HolidayPlanner from '@/components/settings/HolidayPlanner';
 import SupplierSettings from '@/components/settings/SupplierSettings';
 import ProductsSettings from '@/components/settings/ProductsSettings';
 import CalculationRelationshipsSettings from '@/components/settings/CalculationRelationshipsSettings';
+import ExternalDatabaseSettings from '@/components/settings/ExternalDatabaseSettings';
 import { Button } from '@/components/ui/button';
 import { Settings as SettingsIcon } from 'lucide-react';
 
@@ -88,6 +89,7 @@ const Settings: React.FC = () => {
               <TabsTrigger value="holiday-planner">Holiday Planner</TabsTrigger>
               <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
               <TabsTrigger value="products">Products</TabsTrigger>
+              <TabsTrigger value="external-database">External Database API</TabsTrigger>
             </TabsList>
             
             <TabsContent value="workstations">
@@ -116,6 +118,10 @@ const Settings: React.FC = () => {
 
             <TabsContent value="products">
               <ProductsSettings />
+            </TabsContent>
+
+            <TabsContent value="external-database">
+              <ExternalDatabaseSettings />
             </TabsContent>
           </Tabs>
         </div>
