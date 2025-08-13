@@ -289,6 +289,19 @@ const ExternalDatabaseSettings: React.FC = () => {
             </Button>
 
             <Button 
+              onClick={() => {
+                setConfig(prev => ({ ...prev, testOrderNumber: '24000079' }));
+                setTimeout(() => testQuery(), 100);
+              }}
+              disabled={testingQuery || !token}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Search className="h-4 w-4" />
+              Query Order 24000079
+            </Button>
+
+            <Button 
               onClick={saveConfiguration} 
               disabled={loading}
               className="flex items-center gap-2"
@@ -322,15 +335,49 @@ const ExternalDatabaseSettings: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle>Query Result</CardTitle>
-            <CardDescription>Response from the external database</CardDescription>
+            <CardDescription>
+              Response from the external database for order number: {config.testOrderNumber}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Textarea
-              value={queryResult}
-              readOnly
-              className="min-h-[200px] font-mono text-sm"
-              placeholder="Query results will appear here..."
-            />
+            <div className="space-y-4">
+              <Textarea
+                value={queryResult}
+                readOnly
+                className="min-h-[300px] font-mono text-sm"
+                placeholder="Query results will appear here..."
+              />
+              
+              {/* Parse and display order data if available */}
+              {(() => {
+                try {
+                  const parsed = JSON.parse(queryResult);
+                  if (parsed.response?.scriptResult) {
+                    const orderData = JSON.parse(parsed.response.scriptResult);
+                    if (orderData.order) {
+                      return (
+                        <div className="mt-4 p-4 bg-muted rounded-md">
+                          <h4 className="font-semibold mb-2">Parsed Order Information:</h4>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div><strong>Order Number:</strong> {orderData.order.ordernummer}</div>
+                            <div><strong>Client:</strong> {orderData.order.klant}</div>
+                            <div><strong>Order Type:</strong> {orderData.order.ordertype}</div>
+                            <div><strong>Order Date:</strong> {orderData.order.orderdatum}</div>
+                            <div><strong>Address:</strong> {orderData.order.adres}</div>
+                            <div><strong>Processor:</strong> {orderData.order.orderverwerker}</div>
+                            <div><strong>Placement Date:</strong> {orderData.order.plaatsingsdatum}</div>
+                            <div><strong>Reference:</strong> {orderData.order.referentie}</div>
+                          </div>
+                        </div>
+                      );
+                    }
+                  }
+                } catch (e) {
+                  return null;
+                }
+                return null;
+              })()}
+            </div>
           </CardContent>
         </Card>
       )}
