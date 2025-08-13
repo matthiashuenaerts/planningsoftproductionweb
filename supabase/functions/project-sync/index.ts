@@ -106,6 +106,12 @@ serve(async (req) => {
 
         if (!authResponse.ok) {
           const authError = await authResponse.text();
+          console.error(`Authentication failed for project ${project.id}:`, {
+            status: authResponse.status,
+            statusText: authResponse.statusText,
+            error: authError,
+            url: `${externalDbConfig.baseUrl}/sessions`
+          });
           throw new Error(`Authentication failed (${authResponse.status}): ${authError}`);
         }
 
@@ -133,6 +139,13 @@ serve(async (req) => {
 
         if (!orderResponse.ok) {
           const orderError = await orderResponse.text();
+          console.error(`Order query failed for project ${project.id}:`, {
+            status: orderResponse.status,
+            statusText: orderResponse.statusText,
+            error: orderError,
+            url: scriptUrl,
+            orderNumber: project.project_link_id
+          });
           throw new Error(`Order query failed (${orderResponse.status}): ${orderError}`);
         }
 
@@ -146,6 +159,7 @@ serve(async (req) => {
           if (orderDetails.order && orderDetails.order.plaatsingsdatum) {
             const rawPlacementDate = orderDetails.order.plaatsingsdatum;
             console.log(`Raw placement date for project ${project.id}: ${rawPlacementDate}`);
+            console.log(`Placement date type: ${typeof rawPlacementDate}, value: "${rawPlacementDate}"`);
             
             // Convert placement date (could be week number or date)
             const externalInstallationDate = convertWeekNumberToDate(rawPlacementDate);
@@ -179,8 +193,11 @@ serve(async (req) => {
                 .eq('id', project.id);
 
               if (updateProjectError) {
+                console.error(`Failed to update project ${project.id}:`, updateProjectError);
                 throw new Error(`Failed to update project: ${updateProjectError.message}`);
               }
+              
+              console.log(`Successfully updated project ${project.id} installation date to ${normalizedExternal}`);
 
               // Get all tasks for this project and update their due dates
               const { data: phases, error: phasesError } = await supabase
@@ -234,14 +251,24 @@ serve(async (req) => {
             }
           } else {
             console.log(`No placement date found for project ${project.id}`);
+            console.log(`Order details structure:`, JSON.stringify(orderDetails, null, 2));
           }
         } else {
           console.log(`No script result found for project ${project.id}`);
+          console.log(`Order response structure:`, JSON.stringify(orderData, null, 2));
         }
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error(`Error processing project ${project.id}:`, errorMessage);
+        console.error(`Error processing project ${project.id} (order: ${project.project_link_id}):`, errorMessage);
+        console.error(`Full error details:`, error);
+        
+        // Log specific error context
+        if (error instanceof Error) {
+          console.error(`Error stack:`, error.stack);
+          console.error(`Error name:`, error.name);
+        }
+        
         errorDetails.push(`Project ${project.project_link_id}: ${errorMessage}`);
         errorCount++;
       } finally {

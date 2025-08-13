@@ -209,8 +209,13 @@ const ExternalDatabaseSettings: React.FC = () => {
       });
     } catch (error) {
       console.error('Sync error details:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error constructor:', error?.constructor?.name);
+      
       const errorMessage = error instanceof Error ? error.message : "Failed to sync projects";
-      setSyncResult(`Error: ${errorMessage}`);
+      const errorDetails = JSON.stringify(error, null, 2);
+      
+      setSyncResult(`Error: ${errorMessage}\n\nFull error details:\n${errorDetails}`);
       
       toast({
         title: "Sync Failed",
