@@ -97,17 +97,19 @@ serve(async (req) => {
         token = authData.response.token;
         console.log(`Authentication successful for project ${project.id}`);
 
-        // Query order data
-        const orderResponse = await fetch(
-          `${externalDbConfig.baseUrl}/layouts/Crown_REST_GetOrderDetails/scripts/GetOrderDetails?script.param=${project.project_link_id}`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+        // Query order data using the correct endpoint structure
+        const scriptUrl = `${externalDbConfig.baseUrl}/layouts/Crown_REST_GetOrderDetails/scripts/GetOrderDetails`;
+        const orderResponse = await fetch(scriptUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            script: 'GetOrderDetails',
+            'script.param': project.project_link_id
+          })
+        });
 
         if (!orderResponse.ok) {
           const orderError = await orderResponse.text();
