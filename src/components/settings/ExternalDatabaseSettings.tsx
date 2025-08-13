@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle, XCircle, Database, Key, Search } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Database, Key, Search, RefreshCw } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 
 const ExternalDatabaseSettings: React.FC = () => {
@@ -12,9 +12,11 @@ const ExternalDatabaseSettings: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [testingQuery, setTestingQuery] = useState(false);
+  const [syncingProjects, setSyncingProjects] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [token, setToken] = useState<string>('');
   const [queryResult, setQueryResult] = useState<string>('');
+  const [syncResult, setSyncResult] = useState<string>('');
   
   const [config, setConfig] = useState({
     baseUrl: 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
@@ -171,6 +173,55 @@ const ExternalDatabaseSettings: React.FC = () => {
     }
   };
 
+  const syncProjects = async () => {
+    setSyncingProjects(true);
+    setSyncResult('');
+    
+    console.log('Starting manual project sync...');
+    
+    try {
+      const response = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/project-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
+        },
+        body: JSON.stringify({
+          timestamp: new Date().toISOString()
+        })
+      });
+
+      console.log('Sync response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Sync error:', errorData);
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Sync response data:', data);
+      setSyncResult(JSON.stringify(data, null, 2));
+      
+      toast({
+        title: "Sync Completed",
+        description: data.message || "Project synchronization completed successfully",
+      });
+    } catch (error) {
+      console.error('Sync error details:', error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to sync projects";
+      setSyncResult(`Error: ${errorMessage}`);
+      
+      toast({
+        title: "Sync Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setSyncingProjects(false);
+    }
+  };
+
   const saveConfiguration = async () => {
     setLoading(true);
     
@@ -314,6 +365,49 @@ const ExternalDatabaseSettings: React.FC = () => {
               {loading ? 'Saving...' : 'Save Configuration'}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCw className="h-5 w-5" />
+            Project Synchronization
+          </CardTitle>
+          <CardDescription>
+            Manually sync all projects with external database for installation date updates
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Button 
+              onClick={syncProjects} 
+              disabled={syncingProjects}
+              className="flex items-center gap-2"
+            >
+              {syncingProjects ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {syncingProjects ? 'Syncing Projects...' : 'Sync All Projects'}
+            </Button>
+            <div className="text-sm text-muted-foreground">
+              This process checks all projects with project_link_id against the external database and updates installation dates if they differ.
+            </div>
+          </div>
+          
+          {syncResult && (
+            <div className="mt-4">
+              <Label>Sync Result:</Label>
+              <Textarea
+                value={syncResult}
+                readOnly
+                className="mt-2 min-h-[200px] font-mono text-sm"
+                placeholder="Sync results will appear here..."
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
