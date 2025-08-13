@@ -8,25 +8,46 @@ const corsHeaders = {
 
 // Function to convert week number to date
 function convertWeekNumberToDate(weekNumber: string): string {
+  console.log(`Converting date/week: ${weekNumber}`);
+  
   // Check if it's a week number format (like 202544)
   if (/^\d{6}$/.test(weekNumber)) {
     const year = parseInt(weekNumber.substring(0, 4));
     const week = parseInt(weekNumber.substring(4, 6));
     
-    // Calculate the date from year and week number
+    console.log(`Detected week number - Year: ${year}, Week: ${week}`);
+    
+    // Calculate the first day of the year
     const jan1 = new Date(year, 0, 1);
-    const daysToAdd = (week - 1) * 7;
-    const targetDate = new Date(jan1.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
     
-    // Adjust to Monday of that week
-    const dayOfWeek = targetDate.getDay();
-    const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    targetDate.setDate(targetDate.getDate() + daysToMonday);
+    // Find the first Monday of the year
+    const jan1Day = jan1.getDay();
+    const daysToFirstMonday = jan1Day === 0 ? 1 : (8 - jan1Day);
+    const firstMonday = new Date(year, 0, 1 + daysToFirstMonday);
     
-    return targetDate.toISOString().split('T')[0];
+    // Calculate the target week's Monday
+    const targetDate = new Date(firstMonday.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000);
+    
+    const result = targetDate.toISOString().split('T')[0];
+    console.log(`Week ${weekNumber} converted to: ${result}`);
+    return result;
   }
   
-  // If it's already a date string, return as is
+  // If it's already a date string, try to parse and format it
+  if (weekNumber) {
+    try {
+      const date = new Date(weekNumber);
+      if (!isNaN(date.getTime())) {
+        const result = date.toISOString().split('T')[0];
+        console.log(`Date ${weekNumber} formatted to: ${result}`);
+        return result;
+      }
+    } catch (e) {
+      console.warn(`Failed to parse date: ${weekNumber}`);
+    }
+  }
+  
+  console.log(`Using original value: ${weekNumber}`);
   return weekNumber;
 }
 
@@ -97,8 +118,8 @@ serve(async (req) => {
         token = authData.response.token;
         console.log(`Authentication successful for project ${project.id}`);
 
-        // Query order data using the correct endpoint structure
-        const scriptUrl = `${externalDbConfig.baseUrl}/layouts/Crown_REST_GetOrderDetails/scripts/GetOrderDetails`;
+        // Execute script to get order details (using script execution endpoint)
+        const scriptUrl = `${externalDbConfig.baseUrl}/layouts/Crown_REST_GetOrderDetails/_script/GetOrderDetails`;
         const orderResponse = await fetch(scriptUrl, {
           method: 'POST',
           headers: {
@@ -106,7 +127,6 @@ serve(async (req) => {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            script: 'GetOrderDetails',
             'script.param': project.project_link_id
           })
         });
