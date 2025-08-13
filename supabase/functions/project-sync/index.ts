@@ -6,6 +6,30 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Function to convert week number to date
+function convertWeekNumberToDate(weekNumber: string): string {
+  // Check if it's a week number format (like 202544)
+  if (/^\d{6}$/.test(weekNumber)) {
+    const year = parseInt(weekNumber.substring(0, 4));
+    const week = parseInt(weekNumber.substring(4, 6));
+    
+    // Calculate the date from year and week number
+    const jan1 = new Date(year, 0, 1);
+    const daysToAdd = (week - 1) * 7;
+    const targetDate = new Date(jan1.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+    
+    // Adjust to Monday of that week
+    const dayOfWeek = targetDate.getDay();
+    const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    targetDate.setDate(targetDate.getDate() + daysToMonday);
+    
+    return targetDate.toISOString().split('T')[0];
+  }
+  
+  // If it's already a date string, return as is
+  return weekNumber;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -31,7 +55,8 @@ serve(async (req) => {
     const { data: projects, error: projectsError } = await supabase
       .from('projects')
       .select('id, project_link_id, installation_date')
-      .not('project_link_id', 'is', null);
+      .not('project_link_id', 'is', null)
+      .not('project_link_id', 'eq', '');
 
     if (projectsError) {
       throw new Error(`Failed to fetch projects: ${projectsError.message}`);
@@ -41,8 +66,11 @@ serve(async (req) => {
 
     let syncedCount = 0;
     let errorCount = 0;
+    const errorDetails: string[] = [];
 
     for (const project of projects || []) {
+      let token: string | null = null;
+      
       try {
         console.log(`Processing project ${project.id} with order number ${project.project_link_id}`);
 
@@ -56,11 +84,18 @@ serve(async (req) => {
         });
 
         if (!authResponse.ok) {
-          throw new Error(`Authentication failed: ${authResponse.statusText}`);
+          const authError = await authResponse.text();
+          throw new Error(`Authentication failed (${authResponse.status}): ${authError}`);
         }
 
         const authData = await authResponse.json();
-        const token = authData.response.token;
+        
+        if (!authData.response || !authData.response.token) {
+          throw new Error('No token received from authentication');
+        }
+        
+        token = authData.response.token;
+        console.log(`Authentication successful for project ${project.id}`);
 
         // Query order data
         const orderResponse = await fetch(
@@ -75,33 +110,50 @@ serve(async (req) => {
         );
 
         if (!orderResponse.ok) {
-          throw new Error(`Order query failed: ${orderResponse.statusText}`);
+          const orderError = await orderResponse.text();
+          throw new Error(`Order query failed (${orderResponse.status}): ${orderError}`);
         }
 
         const orderData = await orderResponse.json();
+        console.log(`Order data received for project ${project.id}:`, JSON.stringify(orderData));
         
         if (orderData.response && orderData.response.scriptResult) {
           const orderDetails = JSON.parse(orderData.response.scriptResult);
+          console.log(`Parsed order details for project ${project.id}:`, JSON.stringify(orderDetails));
           
           if (orderDetails.order && orderDetails.order.plaatsingsdatum) {
-            const externalInstallationDate = orderDetails.order.plaatsingsdatum;
+            const rawPlacementDate = orderDetails.order.plaatsingsdatum;
+            console.log(`Raw placement date for project ${project.id}: ${rawPlacementDate}`);
+            
+            // Convert placement date (could be week number or date)
+            const externalInstallationDate = convertWeekNumberToDate(rawPlacementDate);
             const currentInstallationDate = project.installation_date;
 
-            console.log(`Project ${project.id}: Current date: ${currentInstallationDate}, External date: ${externalInstallationDate}`);
+            console.log(`Project ${project.id}: Current date: ${currentInstallationDate}, External date: ${externalInstallationDate} (converted from ${rawPlacementDate})`);
+
+            // Normalize dates for comparison
+            const normalizedExternal = new Date(externalInstallationDate).toISOString().split('T')[0];
+            const normalizedCurrent = currentInstallationDate ? new Date(currentInstallationDate).toISOString().split('T')[0] : null;
 
             // Check if dates are different
-            if (externalInstallationDate !== currentInstallationDate) {
-              console.log(`Updating project ${project.id} installation date from ${currentInstallationDate} to ${externalInstallationDate}`);
+            if (normalizedExternal !== normalizedCurrent) {
+              console.log(`Updating project ${project.id} installation date from ${normalizedCurrent} to ${normalizedExternal}`);
 
-              // Calculate the date difference
-              const currentDate = new Date(currentInstallationDate || '');
-              const newDate = new Date(externalInstallationDate);
-              const daysDifference = Math.round((newDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+              // Calculate the date difference for task updates
+              let daysDifference = 0;
+              if (normalizedCurrent) {
+                const currentDate = new Date(normalizedCurrent);
+                const newDate = new Date(normalizedExternal);
+                daysDifference = Math.round((newDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+              }
 
               // Update project installation date
               const { error: updateProjectError } = await supabase
                 .from('projects')
-                .update({ installation_date: externalInstallationDate })
+                .update({ 
+                  installation_date: normalizedExternal,
+                  updated_at: new Date().toISOString()
+                })
                 .eq('id', project.id);
 
               if (updateProjectError) {
@@ -115,33 +167,39 @@ serve(async (req) => {
                 .eq('project_id', project.id);
 
               if (phasesError) {
-                throw new Error(`Failed to fetch phases: ${phasesError.message}`);
-              }
-
-              for (const phase of phases || []) {
-                const { data: tasks, error: tasksError } = await supabase
-                  .from('tasks')
-                  .select('id, due_date')
-                  .eq('phase_id', phase.id);
-
-                if (tasksError) {
-                  console.error(`Failed to fetch tasks for phase ${phase.id}: ${tasksError.message}`);
-                  continue;
-                }
-
-                // Update each task's due date
-                for (const task of tasks || []) {
-                  if (task.due_date) {
-                    const taskDueDate = new Date(task.due_date);
-                    taskDueDate.setDate(taskDueDate.getDate() + daysDifference);
-                    
-                    const { error: updateTaskError } = await supabase
+                console.warn(`Failed to fetch phases for project ${project.id}: ${phasesError.message}`);
+              } else {
+                // Update task due dates if we have a current date to calculate from
+                if (normalizedCurrent && daysDifference !== 0) {
+                  for (const phase of phases || []) {
+                    const { data: tasks, error: tasksError } = await supabase
                       .from('tasks')
-                      .update({ due_date: taskDueDate.toISOString().split('T')[0] })
-                      .eq('id', task.id);
+                      .select('id, due_date')
+                      .eq('phase_id', phase.id);
 
-                    if (updateTaskError) {
-                      console.error(`Failed to update task ${task.id}: ${updateTaskError.message}`);
+                    if (tasksError) {
+                      console.error(`Failed to fetch tasks for phase ${phase.id}: ${tasksError.message}`);
+                      continue;
+                    }
+
+                    // Update each task's due date
+                    for (const task of tasks || []) {
+                      if (task.due_date) {
+                        const taskDueDate = new Date(task.due_date);
+                        taskDueDate.setDate(taskDueDate.getDate() + daysDifference);
+                        
+                        const { error: updateTaskError } = await supabase
+                          .from('tasks')
+                          .update({ 
+                            due_date: taskDueDate.toISOString().split('T')[0],
+                            updated_at: new Date().toISOString()
+                          })
+                          .eq('id', task.id);
+
+                        if (updateTaskError) {
+                          console.error(`Failed to update task ${task.id}: ${updateTaskError.message}`);
+                        }
+                      }
                     }
                   }
                 }
@@ -152,20 +210,32 @@ serve(async (req) => {
             } else {
               console.log(`Project ${project.id} installation date is already up to date`);
             }
+          } else {
+            console.log(`No placement date found for project ${project.id}`);
           }
+        } else {
+          console.log(`No script result found for project ${project.id}`);
         }
 
-        // Logout from external DB
-        await fetch(`${externalDbConfig.baseUrl}/sessions/${token}`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
       } catch (error) {
-        console.error(`Error processing project ${project.id}:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`Error processing project ${project.id}:`, errorMessage);
+        errorDetails.push(`Project ${project.project_link_id}: ${errorMessage}`);
         errorCount++;
+      } finally {
+        // Always try to logout from external DB if we have a token
+        if (token) {
+          try {
+            await fetch(`${externalDbConfig.baseUrl}/sessions/${token}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+          } catch (logoutError) {
+            console.warn(`Failed to logout token for project ${project.id}:`, logoutError);
+          }
+        }
       }
     }
 
