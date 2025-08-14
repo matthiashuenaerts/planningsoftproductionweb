@@ -6,7 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Search, ArrowLeft, Play, ExternalLink, Tag } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Search, ArrowLeft, Play, ExternalLink, Tag, Plus, Edit, Trash2, Upload, Video, Image, Settings } from 'lucide-react';
 import { helpService, HelpCategory, HelpArticleWithCategory } from '@/services/helpService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
@@ -23,6 +28,9 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
   const [selectedArticle, setSelectedArticle] = useState<HelpArticleWithCategory | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [managementMode, setManagementMode] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<HelpCategory | null>(null);
+  const [editingArticle, setEditingArticle] = useState<HelpArticleWithCategory | null>(null);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
 
@@ -32,6 +40,9 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
       setSearchQuery('');
       setSelectedCategory(null);
       setSelectedArticle(null);
+      setManagementMode(false);
+      setEditingCategory(null);
+      setEditingArticle(null);
     }
   }, [open]);
 
@@ -105,11 +116,136 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
   };
 
   const handleBack = () => {
-    if (selectedArticle) {
+    if (editingArticle || editingCategory) {
+      setEditingArticle(null);
+      setEditingCategory(null);
+    } else if (managementMode) {
+      setManagementMode(false);
+    } else if (selectedArticle) {
       setSelectedArticle(null);
     } else if (selectedCategory) {
       setSelectedCategory(null);
       setArticles([]);
+    }
+  };
+
+  const handleManageClick = () => {
+    setManagementMode(true);
+    setSelectedCategory(null);
+    setSelectedArticle(null);
+    loadCategories();
+    loadArticles();
+  };
+
+  const handleCategorySubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    
+    const categoryData = {
+      name: formData.get('name') as string,
+      description: formData.get('description') as string,
+      display_order: parseInt(formData.get('display_order') as string) || 0,
+      is_active: formData.get('is_active') === 'on'
+    };
+
+    try {
+      if (editingCategory?.id) {
+        await helpService.updateCategory(editingCategory.id, categoryData);
+        toast({ title: "Success", description: "Category updated successfully" });
+      } else {
+        await helpService.createCategory(categoryData);
+        toast({ title: "Success", description: "Category created successfully" });
+      }
+      
+      setEditingCategory(null);
+      loadCategories();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save category",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleArticleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    
+    const tags = (formData.get('tags') as string).split(',').map(tag => tag.trim()).filter(tag => tag);
+    
+    const articleData = {
+      category_id: formData.get('category_id') as string,
+      title: formData.get('title') as string,
+      content: formData.get('content') as string,
+      video_url: formData.get('video_url') as string || undefined,
+      image_url: formData.get('image_url') as string || undefined,
+      tags,
+      display_order: parseInt(formData.get('display_order') as string) || 0,
+      is_published: formData.get('is_published') === 'on'
+    };
+
+    try {
+      if (editingArticle?.id) {
+        await helpService.updateArticle(editingArticle.id, articleData);
+        toast({ title: "Success", description: "Article updated successfully" });
+      } else {
+        await helpService.createArticle(articleData);
+        toast({ title: "Success", description: "Article created successfully" });
+      }
+      
+      setEditingArticle(null);
+      loadCategories();
+      loadArticles();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save article",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    try {
+      await helpService.deleteCategory(id);
+      toast({ title: "Success", description: "Category deleted successfully" });
+      loadCategories();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete category",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteArticle = async (id: string) => {
+    try {
+      await helpService.deleteArticle(id);
+      toast({ title: "Success", description: "Article deleted successfully" });
+      loadArticles();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete article",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleFileUpload = async (file: File, type: 'image' | 'video') => {
+    try {
+      const url = await helpService.uploadHelpMedia(file, type + 's');
+      toast({ title: "Success", description: `${type} uploaded successfully` });
+      return url;
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to upload ${type}`,
+        variant: "destructive"
+      });
+      return null;
     }
   };
 
@@ -279,19 +415,355 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
     );
   };
 
+  const renderManagement = () => (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={handleBack}>
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Back
+        </Button>
+        <h3 className="text-lg font-semibold">Help Management</h3>
+      </div>
+
+      <Tabs defaultValue="categories" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="articles">Articles</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="categories" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h4 className="font-medium">Categories</h4>
+            <Button
+              size="sm"
+              onClick={() => setEditingCategory({
+                id: '',
+                name: '',
+                description: '',
+                display_order: 0,
+                is_active: true,
+                created_at: '',
+                updated_at: ''
+              })}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Category
+            </Button>
+          </div>
+
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {categories.map((category) => (
+              <Card key={category.id} className="p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h5 className="font-medium">{category.name}</h5>
+                    <p className="text-sm text-muted-foreground">{category.description}</p>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => setEditingCategory(category)}>
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(category.id)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="articles" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h4 className="font-medium">Articles</h4>
+            <Button
+              size="sm"
+              onClick={() => setEditingArticle({
+                id: '',
+                category_id: '',
+                title: '',
+                content: '',
+                video_url: '',
+                image_url: '',
+                tags: [],
+                display_order: 0,
+                is_published: true,
+                created_by: '',
+                created_at: '',
+                updated_at: '',
+                category: categories[0] || { id: '', name: '', description: '', display_order: 0, is_active: true, created_at: '', updated_at: '' }
+              })}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Article
+            </Button>
+          </div>
+
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {articles.map((article) => (
+              <Card key={article.id} className="p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h5 className="font-medium">{article.title}</h5>
+                    <p className="text-sm text-muted-foreground">{article.category.name}</p>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => setEditingArticle(article)}>
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteArticle(article.id)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+
+  const renderCategoryForm = () => (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={handleBack}>
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Back
+        </Button>
+        <h3 className="text-lg font-semibold">
+          {editingCategory?.id ? 'Edit Category' : 'Create Category'}
+        </h3>
+      </div>
+
+      <form onSubmit={handleCategorySubmit} className="space-y-4">
+        <div>
+          <Label htmlFor="name">Name</Label>
+          <Input
+            id="name"
+            name="name"
+            defaultValue={editingCategory?.name}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="description">Description</Label>
+          <Textarea
+            id="description"
+            name="description"
+            defaultValue={editingCategory?.description}
+          />
+        </div>
+        <div>
+          <Label htmlFor="display_order">Display Order</Label>
+          <Input
+            id="display_order"
+            name="display_order"
+            type="number"
+            defaultValue={editingCategory?.display_order || 0}
+          />
+        </div>
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="is_active"
+            name="is_active"
+            defaultChecked={editingCategory?.is_active ?? true}
+          />
+          <Label htmlFor="is_active">Active</Label>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={handleBack}>
+            Cancel
+          </Button>
+          <Button type="submit">
+            {editingCategory?.id ? 'Update' : 'Create'}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+
+  const renderArticleForm = () => {
+    const handleVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) {
+        const url = await handleFileUpload(file, 'video');
+        if (url) {
+          const videoInput = document.getElementById('video_url') as HTMLInputElement;
+          if (videoInput) videoInput.value = url;
+        }
+      }
+    };
+
+    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) {
+        const url = await handleFileUpload(file, 'image');
+        if (url) {
+          const imageInput = document.getElementById('image_url') as HTMLInputElement;
+          if (imageInput) imageInput.value = url;
+        }
+      }
+    };
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={handleBack}>
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+          <h3 className="text-lg font-semibold">
+            {editingArticle?.id ? 'Edit Article' : 'Create Article'}
+          </h3>
+        </div>
+
+        <form onSubmit={handleArticleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="category_id">Category</Label>
+            <Select name="category_id" defaultValue={editingArticle?.category_id} required>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="title">Title</Label>
+            <Input
+              id="title"
+              name="title"
+              defaultValue={editingArticle?.title}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="content">Content (Instructions)</Label>
+            <Textarea
+              id="content"
+              name="content"
+              defaultValue={editingArticle?.content}
+              rows={6}
+              placeholder="Write detailed instructions here..."
+              required
+            />
+          </div>
+          <div>
+            <Label>Video</Label>
+            <div className="flex gap-2">
+              <Input
+                id="video_url"
+                name="video_url"
+                type="url"
+                defaultValue={editingArticle?.video_url}
+                placeholder="Video URL or upload below"
+              />
+              <div>
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={handleVideoUpload}
+                  className="hidden"
+                  id="video-upload"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => document.getElementById('video-upload')?.click()}
+                >
+                  <Upload className="h-4 w-4 mr-1" />
+                  Upload Video
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <Label>Image</Label>
+            <div className="flex gap-2">
+              <Input
+                id="image_url"
+                name="image_url"
+                type="url"
+                defaultValue={editingArticle?.image_url}
+                placeholder="Image URL or upload below"
+              />
+              <div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  id="image-upload"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => document.getElementById('image-upload')?.click()}
+                >
+                  <Upload className="h-4 w-4 mr-1" />
+                  Upload Image
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="tags">Tags (comma-separated)</Label>
+            <Input
+              id="tags"
+              name="tags"
+              defaultValue={editingArticle?.tags.join(', ')}
+              placeholder="tag1, tag2, tag3"
+            />
+          </div>
+          <div>
+            <Label htmlFor="display_order">Display Order</Label>
+            <Input
+              id="display_order"
+              name="display_order"
+              type="number"
+              defaultValue={editingArticle?.display_order || 0}
+            />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="is_published"
+              name="is_published"
+              defaultChecked={editingArticle?.is_published ?? true}
+            />
+            <Label htmlFor="is_published">Published</Label>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={handleBack}>
+              Cancel
+            </Button>
+            <Button type="submit">
+              {editingArticle?.id ? 'Update' : 'Create'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Help & Documentation
-            {currentEmployee?.role === 'admin' && (
+            {currentEmployee?.role === 'admin' && !managementMode && !editingCategory && !editingArticle && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => window.open('/settings', '_blank')}
+                onClick={handleManageClick}
               >
-                <ExternalLink className="h-4 w-4 mr-1" />
+                <Settings className="h-4 w-4 mr-1" />
                 Manage
               </Button>
             )}
@@ -303,6 +775,12 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
+          ) : editingCategory ? (
+            renderCategoryForm()
+          ) : editingArticle ? (
+            renderArticleForm()
+          ) : managementMode ? (
+            renderManagement()
           ) : selectedArticle ? (
             renderArticleDetail()
           ) : selectedCategory || searchQuery ? (
