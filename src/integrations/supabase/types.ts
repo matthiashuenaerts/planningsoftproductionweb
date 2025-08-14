@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
@@ -2230,25 +2230,25 @@ export type Database = {
       create_storage_policy: {
         Args: {
           bucket_name: string
-          policy_name: string
           definition: string
           operation: string
+          policy_name: string
         }
         Returns: undefined
       }
       get_phase_offsets: {
         Args: Record<PropertyKey, never>
         Returns: {
+          created_at: string
+          days_before_installation: number
           id: string
           phase_id: string
           phase_name: string
-          days_before_installation: number
-          created_at: string
           updated_at: string
         }[]
       }
       is_employee_on_holiday: {
-        Args: { emp_id: string; check_date: string }
+        Args: { check_date: string; emp_id: string }
         Returns: boolean
       }
       setup_phase_offsets_table: {

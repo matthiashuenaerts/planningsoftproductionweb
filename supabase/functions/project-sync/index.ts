@@ -62,7 +62,8 @@ serve(async (req) => {
 
     // Parse request body to get configuration
     const body = await req.json();
-    console.log('Request body:', JSON.stringify(body));
+    const { automated = false } = body;
+    console.log('Request body:', JSON.stringify(body, null, 2));
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -79,13 +80,14 @@ serve(async (req) => {
     console.log('Using external DB config:', {
       baseUrl: externalDbConfig.baseUrl,
       username: externalDbConfig.username,
-      passwordProvided: !!externalDbConfig.password
+      passwordProvided: !!externalDbConfig.password,
+      automated
     });
 
     // Get all projects with project_link_id
     const { data: projects, error: projectsError } = await supabase
       .from('projects')
-      .select('id, project_link_id, installation_date')
+      .select('id, name, project_link_id, installation_date')
       .not('project_link_id', 'is', null)
       .not('project_link_id', 'eq', '');
 
@@ -97,13 +99,14 @@ serve(async (req) => {
 
     let syncedCount = 0;
     let errorCount = 0;
+    const syncDetails: any[] = [];
     const errorDetails: string[] = [];
 
     for (const project of projects || []) {
       let token: string | null = null;
       
       try {
-        console.log(`Processing project ${project.id} with order number ${project.project_link_id}`);
+        console.log(`Processing project ${project.name} (${project.id}) with order number ${project.project_link_id}`);
 
         // Authenticate with external DB
         const authResponse = await fetch(`${externalDbConfig.baseUrl}/sessions`, {
@@ -116,7 +119,7 @@ serve(async (req) => {
 
         if (!authResponse.ok) {
           const authError = await authResponse.text();
-          console.error(`Authentication failed for project ${project.id}:`, {
+          console.error(`Authentication failed for project ${project.name}:`, {
             status: authResponse.status,
             statusText: authResponse.statusText,
             error: authError,
@@ -132,7 +135,7 @@ serve(async (req) => {
         }
         
         token = authData.response.token;
-        console.log(`Authentication successful for project ${project.id}`);
+        console.log(`Authentication successful for project ${project.name}`);
 
         // Try multiple approaches to get order details
         let orderDetails = null;
@@ -160,11 +163,11 @@ serve(async (req) => {
 
           if (findResponse.ok) {
             const findData = await findResponse.json();
-            console.log(`Find response for project ${project.id}:`, JSON.stringify(findData));
+            console.log(`Find response for project ${project.name}:`, JSON.stringify(findData));
             
             if (findData.response && findData.response.data && findData.response.data.length > 0) {
               const record = findData.response.data[0];
-              console.log(`Found record for project ${project.id}:`, JSON.stringify(record));
+              console.log(`Found record for project ${project.name}:`, JSON.stringify(record));
               
               // Extract placement date from the record fields
               if (record.fieldData && record.fieldData.plaatsingsdatum) {
@@ -188,7 +191,7 @@ serve(async (req) => {
             }
           } else {
             const findError = await findResponse.text();
-            console.error(`Find request failed for project ${project.id}:`, {
+            console.error(`Find request failed for project ${project.name}:`, {
               status: findResponse.status,
               statusText: findResponse.statusText,
               error: findError,
@@ -197,12 +200,12 @@ serve(async (req) => {
             });
           }
         } catch (findErr) {
-          console.error(`Find approach failed for project ${project.id}:`, findErr);
+          console.error(`Find approach failed for project ${project.name}:`, findErr);
         }
 
         // Approach 2: If no placement date found, try script execution
         if (!rawPlacementDate) {
-          console.log(`Trying script execution approach for project ${project.id}`);
+          console.log(`Trying script execution approach for project ${project.name}`);
           try {
             const scriptUrl = `${externalDbConfig.baseUrl}/layouts/Crown_REST_GetOrderDetails/_script/GetOrderDetails`;
             const orderResponse = await fetch(scriptUrl, {
@@ -218,24 +221,24 @@ serve(async (req) => {
 
             if (orderResponse.ok) {
               const orderData = await orderResponse.json();
-              console.log(`Script response for project ${project.id}:`, JSON.stringify(orderData));
+              console.log(`Script response for project ${project.name}:`, JSON.stringify(orderData));
               
               if (orderData.response && orderData.response.scriptResult) {
                 try {
                   orderDetails = JSON.parse(orderData.response.scriptResult);
-                  console.log(`Parsed script result for project ${project.id}:`, JSON.stringify(orderDetails));
+                  console.log(`Parsed script result for project ${project.name}:`, JSON.stringify(orderDetails));
                   
                   if (orderDetails.order && orderDetails.order.plaatsingsdatum) {
                     rawPlacementDate = orderDetails.order.plaatsingsdatum;
                     console.log(`Found placement date in script result: ${rawPlacementDate}`);
                   }
                 } catch (parseErr) {
-                  console.error(`Failed to parse script result for project ${project.id}:`, parseErr);
+                  console.error(`Failed to parse script result for project ${project.name}:`, parseErr);
                 }
               }
             } else {
               const orderError = await orderResponse.text();
-              console.error(`Script execution failed for project ${project.id}:`, {
+              console.error(`Script execution failed for project ${project.name}:`, {
                 status: orderResponse.status,
                 statusText: orderResponse.statusText,
                 error: orderError,
@@ -244,20 +247,20 @@ serve(async (req) => {
               });
             }
           } catch (scriptErr) {
-            console.error(`Script execution approach failed for project ${project.id}:`, scriptErr);
+            console.error(`Script execution approach failed for project ${project.name}:`, scriptErr);
           }
         }
 
         // Process the placement date if found
         if (rawPlacementDate) {
-          console.log(`Raw placement date for project ${project.id}: ${rawPlacementDate}`);
+          console.log(`Raw placement date for project ${project.name}: ${rawPlacementDate}`);
           console.log(`Placement date type: ${typeof rawPlacementDate}, value: "${rawPlacementDate}"`);
           
           // Convert placement date (could be week number or date)
           const externalInstallationDate = convertWeekNumberToDate(rawPlacementDate);
           const currentInstallationDate = project.installation_date;
 
-          console.log(`Project ${project.id}: Current date: ${currentInstallationDate}, External date: ${externalInstallationDate} (converted from ${rawPlacementDate})`);
+          console.log(`Project ${project.name}: Current date: ${currentInstallationDate}, External date: ${externalInstallationDate} (converted from ${rawPlacementDate})`);
 
           // Normalize dates for comparison
           const normalizedExternal = new Date(externalInstallationDate).toISOString().split('T')[0];
@@ -265,7 +268,7 @@ serve(async (req) => {
 
           // Check if dates are different
           if (normalizedExternal !== normalizedCurrent) {
-            console.log(`Updating project ${project.id} installation date from ${normalizedCurrent} to ${normalizedExternal}`);
+            console.log(`Updating project ${project.name} installation date from ${normalizedCurrent} to ${normalizedExternal}`);
 
             // Calculate the date difference for task updates
             let daysDifference = 0;
@@ -285,11 +288,11 @@ serve(async (req) => {
               .eq('id', project.id);
 
             if (updateProjectError) {
-              console.error(`Failed to update project ${project.id}:`, updateProjectError);
+              console.error(`Failed to update project ${project.name}:`, updateProjectError);
               throw new Error(`Failed to update project: ${updateProjectError.message}`);
             }
             
-            console.log(`Successfully updated project ${project.id} installation date to ${normalizedExternal}`);
+            console.log(`Successfully updated project ${project.name} installation date to ${normalizedExternal}`);
 
             // Get all tasks for this project and update their due dates
             const { data: phases, error: phasesError } = await supabase
@@ -298,7 +301,7 @@ serve(async (req) => {
               .eq('project_id', project.id);
 
             if (phasesError) {
-              console.warn(`Failed to fetch phases for project ${project.id}: ${phasesError.message}`);
+              console.warn(`Failed to fetch phases for project ${project.name}: ${phasesError.message}`);
             } else {
               // Update task due dates if we have a current date to calculate from
               if (normalizedCurrent && daysDifference !== 0) {
@@ -337,17 +340,38 @@ serve(async (req) => {
             }
 
             syncedCount++;
-            console.log(`Successfully synced project ${project.id}`);
+            syncDetails.push({
+              project_name: project.name,
+              project_link_id: project.project_link_id,
+              status: 'updated',
+              old_date: normalizedCurrent,
+              new_date: normalizedExternal,
+              raw_placement_date: rawPlacementDate
+            });
+            console.log(`Successfully synced project ${project.name}`);
           } else {
-            console.log(`Project ${project.id} installation date is already up to date`);
+            console.log(`Project ${project.name} installation date is already up to date`);
+            syncDetails.push({
+              project_name: project.name,
+              project_link_id: project.project_link_id,
+              status: 'up_to_date',
+              current_date: normalizedCurrent,
+              external_date: normalizedExternal
+            });
           }
         } else {
-          console.log(`No placement date found for project ${project.id} - tried both find and script approaches`);
+          console.log(`No placement date found for project ${project.name} - tried both find and script approaches`);
+          syncDetails.push({
+            project_name: project.name,
+            project_link_id: project.project_link_id,
+            status: 'no_placement_date',
+            message: 'No placement date found in external database'
+          });
         }
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error(`Error processing project ${project.id} (order: ${project.project_link_id}):`, errorMessage);
+        console.error(`Error processing project ${project.name} (order: ${project.project_link_id}):`, errorMessage);
         console.error(`Full error details:`, error);
         
         // Log specific error context
@@ -357,6 +381,12 @@ serve(async (req) => {
         }
         
         errorDetails.push(`Project ${project.project_link_id}: ${errorMessage}`);
+        syncDetails.push({
+          project_name: project.name,
+          project_link_id: project.project_link_id,
+          status: 'error',
+          error: errorMessage
+        });
         errorCount++;
       } finally {
         // Always try to logout from external DB if we have a token
@@ -369,17 +399,56 @@ serve(async (req) => {
               }
             });
           } catch (logoutError) {
-            console.warn(`Failed to logout token for project ${project.id}:`, logoutError);
+            console.warn(`Failed to logout token for project ${project.name}:`, logoutError);
           }
         }
       }
     }
 
+    // Log sync results to database
+    console.log('Logging sync results to project_sync_logs table...');
+    try {
+      const syncLogEntry = {
+        synced_count: syncedCount,
+        error_count: errorCount,
+        details: {
+          automated,
+          total_projects: projects?.length || 0,
+          sync_details: syncDetails,
+          error_details: errorDetails,
+          timestamp: new Date().toISOString(),
+          config_used: {
+            baseUrl: externalDbConfig.baseUrl,
+            username: externalDbConfig.username
+          }
+        }
+      };
+
+      const { error: logError } = await supabase
+        .from('project_sync_logs')
+        .insert(syncLogEntry);
+
+      if (logError) {
+        console.error('Error logging sync results:', logError);
+      } else {
+        console.log('Sync results logged successfully to project_sync_logs');
+      }
+    } catch (logError) {
+      console.error('Failed to log sync results:', logError);
+    }
+
+    const message = automated 
+      ? `Automated sync completed: ${syncedCount} projects updated, ${errorCount} errors`
+      : `Manual sync completed: ${syncedCount} projects updated, ${errorCount} errors`;
+
     const result = {
       success: true,
-      message: `Sync completed. ${syncedCount} projects updated, ${errorCount} errors`,
+      message,
       syncedCount,
       errorCount,
+      totalProjects: projects?.length || 0,
+      automated,
+      details: syncDetails,
       timestamp: new Date().toISOString()
     };
 
