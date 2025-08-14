@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle, XCircle, Database, Key, Search, RefreshCw } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { supabase } from '@/integrations/supabase/client';
 
 const ExternalDatabaseSettings: React.FC = () => {
   // Helper function to convert week number to date
@@ -505,10 +506,71 @@ const ExternalDatabaseSettings: React.FC = () => {
                   if (parsed.response?.scriptResult) {
                     const orderData = JSON.parse(parsed.response.scriptResult);
                     if (orderData.order) {
+                      const updateInstallationDate = async () => {
+                        try {
+                          const orderNumber = orderData.order.ordernummer;
+                          const placementDate = orderData.order.plaatsingsdatum;
+                          const convertedDate = convertWeekNumberToDate(placementDate);
+                          
+                          // Look up project in Supabase
+                          const { data: project, error: fetchError } = await supabase
+                            .from('projects')
+                            .select('id, installation_date')
+                            .eq('project_link_id', orderNumber)
+                            .single();
+                          
+                          if (fetchError) {
+                            toast({
+                              title: "Project Not Found",
+                              description: `No project found with order number: ${orderNumber}`,
+                              variant: "destructive"
+                            });
+                            return;
+                          }
+                          
+                          // Compare dates
+                          const currentDate = project.installation_date;
+                          if (currentDate === convertedDate) {
+                            toast({
+                              title: "No Update Needed",
+                              description: "Installation date is already up to date",
+                            });
+                            return;
+                          }
+                          
+                          // Update the date
+                          const { error: updateError } = await supabase
+                            .from('projects')
+                            .update({ installation_date: convertedDate })
+                            .eq('id', project.id);
+                          
+                          if (updateError) {
+                            toast({
+                              title: "Update Failed",
+                              description: updateError.message,
+                              variant: "destructive"
+                            });
+                            return;
+                          }
+                          
+                          toast({
+                            title: "Date Updated",
+                            description: `Installation date updated from ${currentDate} to ${convertedDate}`,
+                          });
+                          
+                        } catch (error) {
+                          toast({
+                            title: "Update Error",
+                            description: error instanceof Error ? error.message : "Unknown error occurred",
+                            variant: "destructive"
+                          });
+                        }
+                      };
+                      
                       return (
                         <div className="mt-4 p-4 bg-muted rounded-md">
                           <h4 className="font-semibold mb-2">Parsed Order Information:</h4>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="grid grid-cols-2 gap-2 text-sm mb-4">
                             <div><strong>Order Number:</strong> {orderData.order.ordernummer}</div>
                             <div><strong>Client:</strong> {orderData.order.klant}</div>
                             <div><strong>Order Type:</strong> {orderData.order.ordertype}</div>
@@ -518,6 +580,13 @@ const ExternalDatabaseSettings: React.FC = () => {
                             <div><strong>Placement Date:</strong> {orderData.order.plaatsingsdatum} → {convertWeekNumberToDate(orderData.order.plaatsingsdatum)}</div>
                             <div><strong>Reference:</strong> {orderData.order.referentie}</div>
                           </div>
+                          <Button 
+                            onClick={updateInstallationDate}
+                            className="mt-2"
+                            size="sm"
+                          >
+                            Update Date in Supabase
+                          </Button>
                         </div>
                       );
                     }
