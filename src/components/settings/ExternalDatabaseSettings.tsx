@@ -8,6 +8,51 @@ import { Loader2, CheckCircle, XCircle, Database, Key, Search, RefreshCw } from 
 import { Textarea } from '@/components/ui/textarea';
 
 const ExternalDatabaseSettings: React.FC = () => {
+  // Helper function to convert week number to date
+  const convertWeekNumberToDate = (weekNumber: string): string => {
+    console.log(`Converting date/week: ${weekNumber}`);
+    
+    // Check if it's a week number format (like 202544)
+    if (/^\d{6}$/.test(weekNumber)) {
+      const year = parseInt(weekNumber.substring(0, 4));
+      const week = parseInt(weekNumber.substring(4, 6));
+      
+      console.log(`Detected week number - Year: ${year}, Week: ${week}`);
+      
+      // Calculate the first day of the year
+      const jan1 = new Date(year, 0, 1);
+      
+      // Find the first Monday of the year
+      const jan1Day = jan1.getDay();
+      const daysToFirstMonday = jan1Day === 0 ? 1 : (8 - jan1Day);
+      const firstMonday = new Date(year, 0, 1 + daysToFirstMonday);
+      
+      // Calculate the target week's Monday
+      const targetDate = new Date(firstMonday.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000);
+      
+      const result = targetDate.toISOString().split('T')[0];
+      console.log(`Week ${weekNumber} converted to: ${result}`);
+      return result;
+    }
+    
+    // If it's already a date string, try to parse and format it
+    if (weekNumber) {
+      try {
+        const date = new Date(weekNumber);
+        if (!isNaN(date.getTime())) {
+          const result = date.toISOString().split('T')[0];
+          console.log(`Date ${weekNumber} formatted to: ${result}`);
+          return result;
+        }
+      } catch (e) {
+        console.warn(`Failed to parse date: ${weekNumber}`);
+      }
+    }
+    
+    console.log(`Using original value: ${weekNumber}`);
+    return weekNumber;
+  };
+
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
@@ -470,7 +515,7 @@ const ExternalDatabaseSettings: React.FC = () => {
                             <div><strong>Order Date:</strong> {orderData.order.orderdatum}</div>
                             <div><strong>Address:</strong> {orderData.order.adres}</div>
                             <div><strong>Processor:</strong> {orderData.order.orderverwerker}</div>
-                            <div><strong>Placement Date:</strong> {orderData.order.plaatsingsdatum}</div>
+                            <div><strong>Placement Date:</strong> {orderData.order.plaatsingsdatum} → {convertWeekNumberToDate(orderData.order.plaatsingsdatum)}</div>
                             <div><strong>Reference:</strong> {orderData.order.referentie}</div>
                           </div>
                         </div>
