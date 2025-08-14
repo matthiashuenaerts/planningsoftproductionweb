@@ -1,7 +1,7 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock, FileText } from 'lucide-react';
+import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock, FileText, HelpCircle } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
@@ -13,6 +13,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 import UserMenu from './UserMenu';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { HelpDialog } from '@/components/help/HelpDialog';
 
 const NavbarContent = ({
   onItemClick
@@ -24,6 +25,7 @@ const NavbarContent = ({
     logout
   } = useAuth();
   const { t, lang, changeLang, createLocalizedPath } = useLanguage();
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
 
   // Allow admin, manager, installation_team, and worker roles to see the Rush Orders menu
   const canSeeRushOrders = currentEmployee && ['admin', 'manager', 'installation_team', 'worker'].includes(currentEmployee.role);
@@ -61,6 +63,15 @@ const NavbarContent = ({
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 mb-2">
         <h2 className="text-lg font-semibold">{t('demo_account')}</h2>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setHelpDialogOpen(true)}
+          className="p-2 text-white hover:bg-sky-700"
+          title="Help"
+        >
+          <HelpCircle className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Scrollable Menu Items */}
@@ -247,6 +258,12 @@ const NavbarContent = ({
           <span className="ml-3">{t('logout')}</span>
         </button>
       </div>
+
+      {/* Help Dialog */}
+      <HelpDialog 
+        open={helpDialogOpen} 
+        onOpenChange={setHelpDialogOpen} 
+      />
     </div>
   );
 };

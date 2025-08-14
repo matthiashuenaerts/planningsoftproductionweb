@@ -12,6 +12,7 @@ import SupplierSettings from '@/components/settings/SupplierSettings';
 import ProductsSettings from '@/components/settings/ProductsSettings';
 import CalculationRelationshipsSettings from '@/components/settings/CalculationRelationshipsSettings';
 import ExternalDatabaseSettings from '@/components/settings/ExternalDatabaseSettings';
+import { HelpManagement } from '@/components/help/HelpManagement';
 import { Button } from '@/components/ui/button';
 import { Settings as SettingsIcon } from 'lucide-react';
 
@@ -90,6 +91,7 @@ const Settings: React.FC = () => {
               <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
               <TabsTrigger value="products">Products</TabsTrigger>
               <TabsTrigger value="external-database">External Database API</TabsTrigger>
+              <TabsTrigger value="help">Help Management</TabsTrigger>
             </TabsList>
             
             <TabsContent value="workstations">
@@ -122,6 +124,10 @@ const Settings: React.FC = () => {
 
             <TabsContent value="external-database">
               <ExternalDatabaseSettings />
+            </TabsContent>
+
+            <TabsContent value="help">
+              <HelpManagement />
             </TabsContent>
           </Tabs>
         </div>
