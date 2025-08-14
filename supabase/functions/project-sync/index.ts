@@ -302,10 +302,16 @@ serve(async (req) => {
 
             if (phasesError) {
               console.warn(`Failed to fetch phases for project ${project.name}: ${phasesError.message}`);
-            } else {
-              // Update task due dates if we have a current date to calculate from
-              if (normalizedCurrent && daysDifference !== 0) {
-                for (const phase of phases || []) {
+            } else if (phases && phases.length > 0) {
+              console.log(`Found ${phases.length} phases for project ${project.name}`);
+              console.log(`Days difference: ${daysDifference}, Current date: ${normalizedCurrent}, External date: ${normalizedExternal}`);
+              
+              // Update task due dates - remove the normalizedCurrent check since we want to update even if there was no previous date
+              if (daysDifference !== 0) {
+                console.log(`Updating task due dates for project ${project.name} by ${daysDifference} days`);
+                let updatedTasksCount = 0;
+                
+                for (const phase of phases) {
                   const { data: tasks, error: tasksError } = await supabase
                     .from('tasks')
                     .select('id, due_date')
@@ -316,27 +322,42 @@ serve(async (req) => {
                     continue;
                   }
 
+                  console.log(`Found ${tasks?.length || 0} tasks in phase ${phase.id}`);
+
                   // Update each task's due date
                   for (const task of tasks || []) {
                     if (task.due_date) {
+                      const originalDueDate = task.due_date;
                       const taskDueDate = new Date(task.due_date);
                       taskDueDate.setDate(taskDueDate.getDate() + daysDifference);
+                      const newDueDate = taskDueDate.toISOString().split('T')[0];
+                      
+                      console.log(`Updating task ${task.id} due date from ${originalDueDate} to ${newDueDate}`);
                       
                       const { error: updateTaskError } = await supabase
                         .from('tasks')
                         .update({ 
-                          due_date: taskDueDate.toISOString().split('T')[0],
+                          due_date: newDueDate,
                           updated_at: new Date().toISOString()
                         })
                         .eq('id', task.id);
 
                       if (updateTaskError) {
                         console.error(`Failed to update task ${task.id}: ${updateTaskError.message}`);
+                      } else {
+                        updatedTasksCount++;
+                        console.log(`Successfully updated task ${task.id} due date`);
                       }
                     }
                   }
                 }
+                
+                console.log(`Updated ${updatedTasksCount} task due dates for project ${project.name}`);
+              } else {
+                console.log(`No date difference for project ${project.name}, skipping task updates`);
               }
+            } else {
+              console.log(`No phases found for project ${project.name}`);
             }
 
             syncedCount++;
