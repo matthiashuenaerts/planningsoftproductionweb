@@ -177,7 +177,8 @@ const ExternalDatabaseSettings: React.FC = () => {
     setSyncingProjects(true);
     setSyncResult('');
     
-    console.log('Starting manual project sync...');
+    console.log('Starting manual project sync with connection configuration...');
+    console.log('Using credentials:', { username: 'Matthias HUENAERTS', baseUrl: 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon' });
     
     try {
       const response = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/project-sync', {
@@ -187,7 +188,12 @@ const ExternalDatabaseSettings: React.FC = () => {
           'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
         },
         body: JSON.stringify({
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          config: {
+            baseUrl: 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
+            username: 'Matthias HUENAERTS',
+            password: '8pJ1A24z'
+          }
         })
       });
 
