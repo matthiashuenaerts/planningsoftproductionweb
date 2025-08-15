@@ -45,6 +45,7 @@ export interface RushOrder {
   created_by: string;
   created_at: string;
   updated_at: string;
+  project_id?: string;
   tasks?: RushOrderTask[];
   assignments?: RushOrderAssignment[];
   messages?: RushOrderMessage[];
@@ -65,4 +66,5 @@ export interface RushOrderFormData {
   attachment?: File;
   selectedTasks: string[];
   assignedUsers: string[];
+  projectId?: string;
 }

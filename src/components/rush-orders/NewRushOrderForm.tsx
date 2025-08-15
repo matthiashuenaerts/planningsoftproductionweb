@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Camera, File as FileIcon } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StandardTask, standardTasksService } from '@/services/standardTasksService';
 import { rushOrderService } from '@/services/rushOrderService';
 import { useAuth } from '@/context/AuthContext';
@@ -35,7 +36,8 @@ const NewRushOrderForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) =
       deadline: new Date(),
       attachment: undefined,
       selectedTasks: [],
-      assignedUsers: []
+      assignedUsers: [],
+      projectId: ''
     }
   });
   
@@ -66,6 +68,20 @@ const NewRushOrderForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) =
       
       if (error) throw error;
       return data as Employee[];
+    }
+  });
+
+  // Fetch projects
+  const { data: projects, isLoading: loadingProjects } = useQuery({
+    queryKey: ['projects'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, client')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
     }
   });
   
@@ -150,7 +166,8 @@ const NewRushOrderForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) =
         data.description,
         formattedDeadline,
         currentEmployee.id,
-        data.attachment
+        data.attachment,
+        data.projectId || undefined
       );
       
       if (!rushOrder) throw new Error("Failed to create rush order");
@@ -260,6 +277,27 @@ const NewRushOrderForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) =
             </Popover>
           </div>
           
+          <div className="space-y-2">
+            <label htmlFor="projectId" className="block text-sm font-medium">Project (Optional)</label>
+            <Select onValueChange={(value) => setValue('projectId', value || '')}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">No project</SelectItem>
+                {loadingProjects ? (
+                  <SelectItem value="" disabled>Loading projects...</SelectItem>
+                ) : (
+                  projects?.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name} - {project.client}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <label className="block text-sm font-medium">Attachment</label>
             <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer" onClick={triggerFileInput}>

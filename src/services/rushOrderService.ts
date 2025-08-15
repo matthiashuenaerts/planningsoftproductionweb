@@ -9,20 +9,28 @@ export const rushOrderService = {
     description: string,
     deadline: string,
     createdBy: string,
-    attachmentFile?: File
+    attachmentFile?: File,
+    projectId?: string
   ): Promise<RushOrder | null> {
     try {
       // Create rush order record
+      const insertData: any = {
+        title,
+        description,
+        deadline,
+        status: 'pending',
+        priority: 'critical',
+        created_by: createdBy
+      };
+
+      // Add project_id if provided
+      if (projectId) {
+        insertData.project_id = projectId;
+      }
+
       const { data, error } = await supabase
         .from('rush_orders')
-        .insert({
-          title,
-          description,
-          deadline,
-          status: 'pending',
-          priority: 'critical',
-          created_by: createdBy
-        })
+        .insert(insertData)
         .select()
         .single();
       
