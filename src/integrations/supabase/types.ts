@@ -2002,6 +2002,8 @@ export type Database = {
           end_time: string | null
           id: string
           is_active: boolean
+          project_name: string | null
+          rush_order_id: string | null
           start_time: string
           task_id: string | null
           updated_at: string
@@ -2014,6 +2016,8 @@ export type Database = {
           end_time?: string | null
           id?: string
           is_active?: boolean
+          project_name?: string | null
+          rush_order_id?: string | null
           start_time: string
           task_id?: string | null
           updated_at?: string
@@ -2026,6 +2030,8 @@ export type Database = {
           end_time?: string | null
           id?: string
           is_active?: boolean
+          project_name?: string | null
+          rush_order_id?: string | null
           start_time?: string
           task_id?: string | null
           updated_at?: string
@@ -2037,6 +2043,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_registrations_rush_order_id_fkey"
+            columns: ["rush_order_id"]
+            isOneToOne: false
+            referencedRelation: "rush_orders"
             referencedColumns: ["id"]
           },
           {
