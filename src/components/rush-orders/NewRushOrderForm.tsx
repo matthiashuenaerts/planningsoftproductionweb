@@ -279,14 +279,14 @@ const NewRushOrderForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) =
           
           <div className="space-y-2">
             <label htmlFor="projectId" className="block text-sm font-medium">Project (Optional)</label>
-            <Select onValueChange={(value) => setValue('projectId', value || '')}>
+            <Select onValueChange={(value) => setValue('projectId', value === 'none' ? '' : value)}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a project" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No project</SelectItem>
+                <SelectItem value="none">No project</SelectItem>
                 {loadingProjects ? (
-                  <SelectItem value="" disabled>Loading projects...</SelectItem>
+                  <SelectItem value="loading" disabled>Loading projects...</SelectItem>
                 ) : (
                   projects?.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
