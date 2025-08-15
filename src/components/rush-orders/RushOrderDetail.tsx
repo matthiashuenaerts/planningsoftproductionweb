@@ -2,17 +2,19 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
 import { standardTasksService } from '@/services/standardTasksService';
+import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { RushOrder } from '@/types/rushOrder';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
-import { Check, Clock, UserCheck, ListChecks, File as FileIcon } from 'lucide-react';
+import { Check, Clock, UserCheck, ListChecks, File as FileIcon, Play } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import RushOrderChat from './RushOrderChat';
 import { useLanguage } from '@/context/LanguageContext';
 import { ImageModal } from '@/components/ui/image-modal';
+import { useAuth } from '@/context/AuthContext';
 
 interface RushOrderDetailProps {
   rushOrderId: string;
@@ -23,7 +25,9 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [isStartingTimeRegistration, setIsStartingTimeRegistration] = useState(false);
   const { t } = useLanguage();
+  const { currentEmployee } = useAuth();
   
   const { data: rushOrder, isLoading, error, refetch } = useQuery({
     queryKey: ['rushOrder', rushOrderId],
@@ -54,6 +58,24 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
       return data;
     },
     enabled: !!rushOrder?.assignments && rushOrder.assignments.length > 0,
+  });
+
+  // Query for project details if project_id exists
+  const { data: projectData } = useQuery({
+    queryKey: ['project', rushOrder?.project_id],
+    queryFn: async () => {
+      if (!rushOrder?.project_id) return null;
+      
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, client')
+        .eq('id', rushOrder.project_id)
+        .single();
+        
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!rushOrder?.project_id,
   });
   
   const isImage = (url: string | undefined): boolean => {
@@ -88,6 +110,38 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
     }
   };
   
+  const handleStartTimeRegistration = async () => {
+    if (!currentEmployee || !rushOrder) return;
+    
+    try {
+      setIsStartingTimeRegistration(true);
+      
+      const projectName = projectData ? `${projectData.name} - ${projectData.client}` : undefined;
+      
+      await timeRegistrationService.startRushOrderTask(
+        currentEmployee.id,
+        rushOrder.id,
+        projectName
+      );
+      
+      toast({
+        title: t('time_registration_started'),
+        description: t('time_registration_started_description', { 
+          title: rushOrder.title,
+          project: projectName || t('no_project')
+        }),
+      });
+    } catch (error: any) {
+      toast({
+        title: t('time_registration_error'),
+        description: t('time_registration_error_description', { error: error.message }),
+        variant: "destructive"
+      });
+    } finally {
+      setIsStartingTimeRegistration(false);
+    }
+  };
+
   const getTaskName = (taskId: string) => {
     const task = standardTasks?.find(t => t.id === taskId);
     return task ? `${task.task_name} (Task #${task.task_number})` : t('unknown_task');
@@ -188,6 +242,17 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
               </div>
             </div>
           )}
+
+          {rushOrder.project_id && projectData && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">{t('project_label')}</h3>
+              <div className="flex items-center">
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                  {projectData.name} - {projectData.client}
+                </Badge>
+              </div>
+            </div>
+          )}
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -243,6 +308,16 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
           </Badge>
           
           <div className="flex gap-3">
+            <Button 
+              variant="outline"
+              onClick={handleStartTimeRegistration}
+              disabled={isStartingTimeRegistration || !currentEmployee}
+              className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+            >
+              <Play className="h-4 w-4 mr-2" />
+              {isStartingTimeRegistration ? t('starting') : t('start_time_registration')}
+            </Button>
+            
             {rushOrder.status === 'pending' && (
               <Button 
                 variant="secondary"

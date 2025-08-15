@@ -5,6 +5,8 @@ export interface TimeRegistration {
   employee_id: string;
   task_id?: string;
   workstation_task_id?: string;
+  rush_order_id?: string;
+  project_name?: string;
   start_time: string;
   end_time?: string;
   duration_minutes?: number;
@@ -14,6 +16,26 @@ export interface TimeRegistration {
 }
 
 export const timeRegistrationService = {
+  async startRushOrderTask(employeeId: string, rushOrderId: string, projectName?: string): Promise<TimeRegistration> {
+    // First, stop any active registrations for this employee
+    await this.stopActiveRegistrations(employeeId);
+    
+    const { data, error } = await supabase
+      .from('time_registrations')
+      .insert({
+        employee_id: employeeId,
+        rush_order_id: rushOrderId,
+        project_name: projectName,
+        start_time: new Date().toISOString(),
+        is_active: true
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as TimeRegistration;
+  },
+
   async startTask(employeeId: string, taskId: string, remainingDurationMinutes?: number): Promise<TimeRegistration> {
     // First, stop any active registrations for this employee
     await this.stopActiveRegistrations(employeeId);
