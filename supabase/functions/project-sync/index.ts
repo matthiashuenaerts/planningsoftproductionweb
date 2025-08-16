@@ -294,7 +294,7 @@ serve(async (req) => {
             
             console.log(`Successfully updated project ${project.name} installation date to ${normalizedExternal}`);
 
-            // Get all tasks for this project and update their due dates
+            // Get all tasks for this project and update their due dates based on standard task day_counter
             const { data: phases, error: phasesError } = await supabase
               .from('phases')
               .select('id')
@@ -304,58 +304,65 @@ serve(async (req) => {
               console.warn(`Failed to fetch phases for project ${project.name}: ${phasesError.message}`);
             } else if (phases && phases.length > 0) {
               console.log(`Found ${phases.length} phases for project ${project.name}`);
-              console.log(`Days difference: ${daysDifference}, Current date: ${normalizedCurrent}, External date: ${normalizedExternal}`);
+              console.log(`Recalculating task due dates based on new installation date: ${normalizedExternal}`);
               
-              // Update task due dates - remove the normalizedCurrent check since we want to update even if there was no previous date
-              if (daysDifference !== 0) {
-                console.log(`Updating task due dates for project ${project.name} by ${daysDifference} days`);
-                let updatedTasksCount = 0;
-                
-                for (const phase of phases) {
-                  const { data: tasks, error: tasksError } = await supabase
-                    .from('tasks')
-                    .select('id, due_date')
-                    .eq('phase_id', phase.id);
+              let updatedTasksCount = 0;
+              
+              for (const phase of phases) {
+                const { data: tasks, error: tasksError } = await supabase
+                  .from('tasks')
+                  .select('id, standard_task_id')
+                  .eq('phase_id', phase.id);
 
-                  if (tasksError) {
-                    console.error(`Failed to fetch tasks for phase ${phase.id}: ${tasksError.message}`);
-                    continue;
-                  }
+                if (tasksError) {
+                  console.error(`Failed to fetch tasks for phase ${phase.id}: ${tasksError.message}`);
+                  continue;
+                }
 
-                  console.log(`Found ${tasks?.length || 0} tasks in phase ${phase.id}`);
+                console.log(`Found ${tasks?.length || 0} tasks in phase ${phase.id}`);
 
-                  // Update each task's due date
-                  for (const task of tasks || []) {
-                    if (task.due_date) {
-                      const originalDueDate = task.due_date;
-                      const taskDueDate = new Date(task.due_date);
-                      taskDueDate.setDate(taskDueDate.getDate() + daysDifference);
-                      const newDueDate = taskDueDate.toISOString().split('T')[0];
-                      
-                      console.log(`Updating task ${task.id} due date from ${originalDueDate} to ${newDueDate}`);
-                      
-                      const { error: updateTaskError } = await supabase
-                        .from('tasks')
-                        .update({ 
-                          due_date: newDueDate,
-                          updated_at: new Date().toISOString()
-                        })
-                        .eq('id', task.id);
+                // Update each task's due date based on standard task day_counter
+                for (const task of tasks || []) {
+                  if (task.standard_task_id) {
+                    // Get the day_counter for this standard task
+                    const { data: standardTask, error: standardTaskError } = await supabase
+                      .from('standard_tasks')
+                      .select('day_counter')
+                      .eq('id', task.standard_task_id)
+                      .single();
 
-                      if (updateTaskError) {
-                        console.error(`Failed to update task ${task.id}: ${updateTaskError.message}`);
-                      } else {
-                        updatedTasksCount++;
-                        console.log(`Successfully updated task ${task.id} due date`);
-                      }
+                    if (standardTaskError) {
+                      console.error(`Failed to fetch standard task ${task.standard_task_id}: ${standardTaskError.message}`);
+                      continue;
+                    }
+
+                    const dayCounter = standardTask?.day_counter || 0;
+                    const installationDate = new Date(normalizedExternal);
+                    const dueDate = new Date(installationDate);
+                    dueDate.setDate(dueDate.getDate() - dayCounter);
+                    const newDueDate = dueDate.toISOString().split('T')[0];
+                    
+                    console.log(`Updating task ${task.id} due date to ${newDueDate} (installation: ${normalizedExternal}, day_counter: ${dayCounter})`);
+                    
+                    const { error: updateTaskError } = await supabase
+                      .from('tasks')
+                      .update({ 
+                        due_date: newDueDate,
+                        updated_at: new Date().toISOString()
+                      })
+                      .eq('id', task.id);
+
+                    if (updateTaskError) {
+                      console.error(`Failed to update task ${task.id}: ${updateTaskError.message}`);
+                    } else {
+                      updatedTasksCount++;
+                      console.log(`Successfully updated task ${task.id} due date`);
                     }
                   }
                 }
-                
-                console.log(`Updated ${updatedTasksCount} task due dates for project ${project.name}`);
-              } else {
-                console.log(`No date difference for project ${project.name}, skipping task updates`);
               }
+              
+              console.log(`Updated ${updatedTasksCount} task due dates for project ${project.name} based on day_counter`);
             } else {
               console.log(`No phases found for project ${project.name}`);
             }
