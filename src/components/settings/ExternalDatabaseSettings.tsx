@@ -222,47 +222,153 @@ const ExternalDatabaseSettings: React.FC = () => {
   const syncProjects = async () => {
     setSyncingProjects(true);
     setSyncResult('');
-
+    
+    console.log('Starting manual project sync with connection configuration...');
+    console.log('Using credentials:', { username: 'Matthias HUENAERTS', baseUrl: 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon' });
+    
     try {
-      // Invoke server-side sync to also adjust task due dates
-      const { data, error } = await supabase.functions.invoke('project-sync', {
-        body: {
-          baseUrl: config.baseUrl,
-          username: config.username,
-          password: config.password,
-          automated: false,
-        },
-      });
+      // Get all projects with project_link_id from Supabase
+      const { data: projects, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name, project_link_id, installation_date')
+        .not('project_link_id', 'is', null);
 
-      if (error) throw error;
+      if (projectsError) {
+        throw new Error(`Failed to fetch projects: ${projectsError.message}`);
+      }
 
-      const updated = (data as any)?.synced_count ?? (data as any)?.syncedCount ?? 0;
-      const errors = (data as any)?.error_count ?? (data as any)?.errorCount ?? 0;
-      const details = (data as any)?.details;
+      if (!projects || projects.length === 0) {
+        setSyncResult('No projects found with project_link_id');
+        toast({
+          title: "No Projects",
+          description: "No projects found with project_link_id to sync",
+          variant: "destructive"
+        });
+        return;
+      }
 
-      const detailsText = Array.isArray(details)
-        ? details
-            .map((d: any) => (typeof d === 'string' ? d : JSON.stringify(d)))
-            .join('\n')
-        : JSON.stringify(data, null, 2);
+      let updatedCount = 0;
+      let errorCount = 0;
+      const results = [];
 
-      const resultText = `Sync completed:\n- Updated: ${updated}\n- Errors: ${errors}\n\nDetails:\n${detailsText}`;
+      // Process each project
+      for (const project of projects) {
+        try {
+          console.log(`\n--- Processing project: ${project.name} (ID: ${project.project_link_id}) ---`);
+          
+          // Authenticate with external API
+          const authResponse = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/external-db-proxy', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
+            },
+            body: JSON.stringify({
+              action: 'authenticate',
+              baseUrl: 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
+              username: 'Matthias HUENAERTS',
+              password: '8pJ1A24z'
+            })
+          });
+
+          if (!authResponse.ok) {
+            throw new Error(`Authentication failed: ${authResponse.statusText}`);
+          }
+
+          const authData = await authResponse.json();
+          const token = authData.response?.token;
+
+          if (!token) {
+            throw new Error('No token received from authentication');
+          }
+
+          // Query external API for order data
+          const queryResponse = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/external-db-proxy', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
+            },
+            body: JSON.stringify({
+              action: 'query',
+              baseUrl: 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
+              token: token,
+              orderNumber: project.project_link_id
+            })
+          });
+
+          if (!queryResponse.ok) {
+            throw new Error(`Query failed: ${queryResponse.statusText}`);
+          }
+
+          const queryData = await queryResponse.json();
+          
+          // Extract placement date from response
+          let placementDate = null;
+          try {
+            if (queryData.response?.scriptResult) {
+              const orderData = JSON.parse(queryData.response.scriptResult);
+              placementDate = orderData.order?.plaatsingsdatum;
+            }
+          } catch (parseError) {
+            console.warn(`Failed to parse order data for ${project.project_link_id}:`, parseError);
+          }
+
+          if (!placementDate) {
+            results.push(`${project.name}: No placement date found`);
+            continue;
+          }
+
+          // Convert week number to date
+          const convertedDate = convertWeekNumberToDate(placementDate);
+          
+          // Compare with current installation date
+          if (project.installation_date === convertedDate) {
+            results.push(`${project.name}: Already up to date (${convertedDate})`);
+            continue;
+          }
+
+          // Update installation date in Supabase
+          const { error: updateError } = await supabase
+            .from('projects')
+            .update({ installation_date: convertedDate })
+            .eq('id', project.id);
+
+          if (updateError) {
+            throw new Error(`Failed to update project: ${updateError.message}`);
+          }
+
+          updatedCount++;
+          results.push(`${project.name}: Updated from ${project.installation_date} to ${convertedDate}`);
+          console.log(`Successfully updated ${project.name}: ${project.installation_date} → ${convertedDate}`);
+
+        } catch (error) {
+          errorCount++;
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          results.push(`${project.name}: ERROR - ${errorMessage}`);
+          console.error(`Error processing ${project.name}:`, error);
+        }
+      }
+
+      // Show results
+      const resultText = `Sync completed:\n- Projects processed: ${projects.length}\n- Updated: ${updatedCount}\n- Errors: ${errorCount}\n\nDetails:\n${results.join('\n')}`;
       setSyncResult(resultText);
-
+      
       toast({
-        title: 'Sync Completed',
-        description: `Updated ${updated} projects with ${errors} errors`,
-        variant: updated > 0 ? 'default' : 'destructive',
+        title: "Sync Completed",
+        description: `Updated ${updatedCount} projects with ${errorCount} errors`,
+        variant: updatedCount > 0 ? "default" : "destructive"
       });
+
     } catch (error) {
       console.error('Sync error details:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to sync projects';
+      const errorMessage = error instanceof Error ? error.message : "Failed to sync projects";
       setSyncResult(`Error: ${errorMessage}`);
-
+      
       toast({
-        title: 'Sync Failed',
+        title: "Sync Failed",
         description: errorMessage,
-        variant: 'destructive',
+        variant: "destructive"
       });
     } finally {
       setSyncingProjects(false);
