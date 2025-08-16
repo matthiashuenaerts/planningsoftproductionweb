@@ -137,118 +137,48 @@ serve(async (req) => {
         token = authData.response.token;
         console.log(`Authentication successful for project ${project.name}`);
 
-        // Try multiple approaches to get order details
-        let orderDetails = null;
+        // Query external API using the working endpoint from external-db-proxy
         let rawPlacementDate = null;
-
-        // Approach 1: Try to find records using the ordernummer field
-        console.log(`Attempting to find order records for order number: ${project.project_link_id}`);
         
-        try {
-          const findUrl = `${externalDbConfig.baseUrl}/layouts/Crown_REST_GetOrderDetails/_find`;
-          const findResponse = await fetch(findUrl, {
-            method: 'POST',
+        console.log(`Querying for order number: ${project.project_link_id}`);
+        
+        const queryResponse = await fetch(
+          `${externalDbConfig.baseUrl}/layouts/API_order/script/FindOrderNumber?script.param=${project.project_link_id}`,
+          {
+            method: 'GET',
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              query: [
-                {
-                  ordernummer: project.project_link_id
-                }
-              ]
-            })
+            }
+          }
+        );
+
+        if (queryResponse.ok) {
+          const queryData = await queryResponse.json();
+          console.log(`Query response for project ${project.name}:`, JSON.stringify(queryData));
+          
+          // Extract placement date from response
+          if (queryData.response && queryData.response.scriptResult) {
+            try {
+              const orderData = JSON.parse(queryData.response.scriptResult);
+              console.log(`Parsed script result for project ${project.name}:`, JSON.stringify(orderData));
+              
+              if (orderData.order && orderData.order.plaatsingsdatum) {
+                rawPlacementDate = orderData.order.plaatsingsdatum;
+                console.log(`Found placement date in script result: ${rawPlacementDate}`);
+              }
+            } catch (parseErr) {
+              console.error(`Failed to parse script result for project ${project.name}:`, parseErr);
+            }
+          }
+        } else {
+          const queryError = await queryResponse.text();
+          console.error(`Query failed for project ${project.name}:`, {
+            status: queryResponse.status,
+            statusText: queryResponse.statusText,
+            error: queryError,
+            orderNumber: project.project_link_id
           });
-
-          if (findResponse.ok) {
-            const findData = await findResponse.json();
-            console.log(`Find response for project ${project.name}:`, JSON.stringify(findData));
-            
-            if (findData.response && findData.response.data && findData.response.data.length > 0) {
-              const record = findData.response.data[0];
-              console.log(`Found record for project ${project.name}:`, JSON.stringify(record));
-              
-              // Extract placement date from the record fields
-              if (record.fieldData && record.fieldData.plaatsingsdatum) {
-                rawPlacementDate = record.fieldData.plaatsingsdatum;
-                console.log(`Found placement date in fieldData: ${rawPlacementDate}`);
-              } else {
-                // Check if placement date is in a different field structure
-                console.log(`Record fieldData structure:`, JSON.stringify(record.fieldData));
-                // Look for any field that might contain the placement date
-                for (const [key, value] of Object.entries(record.fieldData || {})) {
-                  if (key.toLowerCase().includes('plaats') || key.toLowerCase().includes('installation') || key.toLowerCase().includes('datum')) {
-                    console.log(`Potential placement date field ${key}: ${value}`);
-                    if (!rawPlacementDate && value) {
-                      rawPlacementDate = value;
-                    }
-                  }
-                }
-              }
-            } else {
-              console.log(`No records found for order number ${project.project_link_id}`);
-            }
-          } else {
-            const findError = await findResponse.text();
-            console.error(`Find request failed for project ${project.name}:`, {
-              status: findResponse.status,
-              statusText: findResponse.statusText,
-              error: findError,
-              url: findUrl,
-              orderNumber: project.project_link_id
-            });
-          }
-        } catch (findErr) {
-          console.error(`Find approach failed for project ${project.name}:`, findErr);
-        }
-
-        // Approach 2: If no placement date found, try script execution
-        if (!rawPlacementDate) {
-          console.log(`Trying script execution approach for project ${project.name}`);
-          try {
-            const scriptUrl = `${externalDbConfig.baseUrl}/layouts/Crown_REST_GetOrderDetails/_script/GetOrderDetails`;
-            const orderResponse = await fetch(scriptUrl, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                'script.param': project.project_link_id
-              })
-            });
-
-            if (orderResponse.ok) {
-              const orderData = await orderResponse.json();
-              console.log(`Script response for project ${project.name}:`, JSON.stringify(orderData));
-              
-              if (orderData.response && orderData.response.scriptResult) {
-                try {
-                  orderDetails = JSON.parse(orderData.response.scriptResult);
-                  console.log(`Parsed script result for project ${project.name}:`, JSON.stringify(orderDetails));
-                  
-                  if (orderDetails.order && orderDetails.order.plaatsingsdatum) {
-                    rawPlacementDate = orderDetails.order.plaatsingsdatum;
-                    console.log(`Found placement date in script result: ${rawPlacementDate}`);
-                  }
-                } catch (parseErr) {
-                  console.error(`Failed to parse script result for project ${project.name}:`, parseErr);
-                }
-              }
-            } else {
-              const orderError = await orderResponse.text();
-              console.error(`Script execution failed for project ${project.name}:`, {
-                status: orderResponse.status,
-                statusText: orderResponse.statusText,
-                error: orderError,
-                url: scriptUrl,
-                orderNumber: project.project_link_id
-              });
-            }
-          } catch (scriptErr) {
-            console.error(`Script execution approach failed for project ${project.name}:`, scriptErr);
-          }
         }
 
         // Process the placement date if found
