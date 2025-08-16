@@ -100,9 +100,9 @@ export const timeRegistrationService = {
         project_name: projectName ?? null
       };
 
-      // If no phase is available (no project), remove phase_id to avoid null insert if not allowed
+      // If no phase is available, we cannot reliably link to a project
       if (!phaseId) {
-        delete taskPayload.phase_id;
+        throw new Error('Rush order has no linked project; cannot start time registration.');
       }
 
       const { data: createdTask, error: taskCreateError } = await supabase

@@ -121,7 +121,8 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
       await timeRegistrationService.startRushOrderTask(
         currentEmployee.id,
         rushOrder.id,
-        projectName
+        projectName,
+        rushOrder.project_id
       );
       
       toast({
