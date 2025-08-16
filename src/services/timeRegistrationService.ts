@@ -16,24 +16,106 @@ export interface TimeRegistration {
 }
 
 export const timeRegistrationService = {
-  async startRushOrderTask(employeeId: string, rushOrderId: string, projectName?: string): Promise<TimeRegistration> {
-    // First, stop any active registrations for this employee
+  async startRushOrderTask(
+    employeeId: string,
+    rushOrderId: string,
+    projectName?: string,
+    projectId?: string
+  ): Promise<TimeRegistration> {
+    // Stop any active registrations for this employee
     await this.stopActiveRegistrations(employeeId);
-    
-    const { data, error } = await supabase
-      .from('time_registrations')
-      .insert({
-        employee_id: employeeId,
+
+    // Try to find an existing task linked to this rush order
+    const resultExisting: any = await (supabase.from('tasks') as any)
+      .select('id')
+      .eq('rush_order_id', rushOrderId)
+      .eq('is_rush_order', true)
+      .limit(1);
+
+    const existingTask = (resultExisting?.data && resultExisting.data[0]) || null;
+
+    let taskId: string | null = existingTask?.id ?? null;
+
+    // If no task exists yet, create one under the rush order's project
+    if (!taskId) {
+      // Ensure we have a project id. If not provided, fetch it from rush_orders
+      let resolvedProjectId = projectId;
+      if (!resolvedProjectId) {
+        const { data: rushOrderRecord, error: roError } = await supabase
+          .from('rush_orders')
+          .select('project_id, title, deadline')
+          .eq('id', rushOrderId)
+          .maybeSingle();
+        if (roError) throw roError;
+        resolvedProjectId = rushOrderRecord?.project_id ?? undefined;
+        // Use rush order title as fallback projectName for display on task
+        if (!projectName && rushOrderRecord?.title) projectName = rushOrderRecord.title;
+      }
+
+      // Find an existing phase for this project or create a lightweight one
+      let phaseId: string | null = null;
+      if (resolvedProjectId) {
+        const { data: phase } = await supabase
+          .from('phases')
+          .select('id')
+          .eq('project_id', resolvedProjectId)
+          .order('start_date', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        phaseId = phase?.id ?? null;
+
+        if (!phaseId) {
+          // Create a minimal phase to host the rush order task
+          const today = new Date();
+          const isoDate = today.toISOString().split('T')[0];
+          const { data: newPhase, error: phaseError } = await supabase
+            .from('phases')
+            .insert({
+              project_id: resolvedProjectId,
+              name: 'Rush Orders',
+              start_date: isoDate,
+              end_date: isoDate,
+              progress: 0
+            })
+            .select('id')
+            .single();
+          if (phaseError) throw phaseError;
+          phaseId = newPhase.id;
+        }
+      }
+
+      // Build the rush order task payload
+      const todayIso = new Date().toISOString().split('T')[0];
+      const taskPayload: any = {
+        phase_id: phaseId, // can be null if no project; DB may allow or reject
+        title: 'Rush Order',
+        description: projectName ? `Project: ${projectName}` : 'Rush order task',
+        workstation: 'GENERAL',
+        status: 'IN_PROGRESS',
+        priority: 'Urgent',
+        due_date: todayIso,
+        is_rush_order: true,
         rush_order_id: rushOrderId,
-        project_name: projectName,
-        start_time: new Date().toISOString(),
-        is_active: true
-      })
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data as TimeRegistration;
+        project_name: projectName ?? null
+      };
+
+      // If no phase is available (no project), remove phase_id to avoid null insert if not allowed
+      if (!phaseId) {
+        delete taskPayload.phase_id;
+      }
+
+      const { data: createdTask, error: taskCreateError } = await supabase
+        .from('tasks')
+        .insert(taskPayload)
+        .select('id')
+        .single();
+      if (taskCreateError) throw taskCreateError;
+      taskId = createdTask.id;
+    }
+
+    // Start time registration on the created/found task using existing columns only
+    return await this.startTask(employeeId, taskId!);
   },
 
   async startTask(employeeId: string, taskId: string, remainingDurationMinutes?: number): Promise<TimeRegistration> {
