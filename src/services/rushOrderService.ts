@@ -135,9 +135,9 @@ export const rushOrderService = {
           phase_id: rushPhase.id,
           title: `[RUSH] ${standardTask.task_name}`,
           description: `Rush order task based on ${standardTask.task_name} (${standardTask.task_number})`,
-          workstation: 'Rush Order',
+          workstation: standardTask.task_name || 'Rush Order',
           status: 'TODO',
-          priority: 'CRITICAL',
+          priority: 'HIGH',
           due_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 3 days from now
           standard_task_id: standardTask.id
         }));
