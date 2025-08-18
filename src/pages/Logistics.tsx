@@ -4,16 +4,18 @@ import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 import { orderService } from '@/services/orderService';
 import { TodaysDeliveries } from '@/components/logistics/TodaysDeliveries';
 import { UpcomingDeliveries } from '@/components/logistics/UpcomingDeliveries';
 import { BackorderDeliveries } from '@/components/logistics/BackorderDeliveries';
-import { Truck, Calendar, AlertTriangle } from 'lucide-react';
+import { Truck, Calendar, AlertTriangle, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 
 const Logistics = () => {
   const { t } = useLanguage();
+  const [searchTerm, setSearchTerm] = useState('');
   
   const {
     data: rawOrders = [],
@@ -67,22 +69,37 @@ const Logistics = () => {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
+  // Filter function for search
+  const filterOrders = (orderList) => {
+    if (!searchTerm) return orderList;
+    
+    return orderList.filter(order => {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        order.project_name?.toLowerCase().includes(searchLower) ||
+        order.supplier?.toLowerCase().includes(searchLower) ||
+        order.notes?.toLowerCase().includes(searchLower) ||
+        order.id?.toLowerCase().includes(searchLower)
+      );
+    });
+  };
+
   // Filter orders by delivery status
-  const todaysDeliveries = orders.filter(order => {
+  const todaysDeliveries = filterOrders(orders.filter(order => {
     const deliveryDate = new Date(order.expected_delivery);
     deliveryDate.setHours(0, 0, 0, 0);
     return deliveryDate.getTime() === today.getTime() && order.status !== 'delivered';
-  });
+  }));
   
-  const upcomingDeliveries = orders.filter(order => {
+  const upcomingDeliveries = filterOrders(orders.filter(order => {
     const deliveryDate = new Date(order.expected_delivery);
     return deliveryDate >= tomorrow && order.status !== 'delivered';
-  });
+  }));
   
-  const backorderDeliveries = orders.filter(order => {
+  const backorderDeliveries = filterOrders(orders.filter(order => {
     const deliveryDate = new Date(order.expected_delivery);
     return deliveryDate < today && order.status !== 'delivered';
-  });
+  }));
 
   const handleDeliveryConfirmed = () => {
     refetch();
@@ -147,6 +164,19 @@ const Logistics = () => {
               </p>
             </CardContent>
           </Card>
+        </div>
+
+        <div className="mb-6">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              type="text"
+              placeholder="Search by project name, supplier, order ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
 
         <Tabs defaultValue="today" className="space-y-4">
