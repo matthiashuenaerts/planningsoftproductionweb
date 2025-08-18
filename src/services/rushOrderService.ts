@@ -142,11 +142,24 @@ export const rushOrderService = {
           standard_task_id: standardTask.id
         }));
 
-        const { error: taskCreateError } = await supabase
+        const { data: createdTasks, error: taskCreateError } = await supabase
           .from('tasks')
-          .insert(taskRecords);
+          .insert(taskRecords)
+          .select('id, standard_task_id');
 
         if (taskCreateError) throw taskCreateError;
+
+        // Link created tasks to this rush order for traceability
+        if (createdTasks && createdTasks.length > 0) {
+          const linkRows = createdTasks.map((t: any) => ({
+            rush_order_id: rushOrderId,
+            task_id: t.id
+          }));
+          const { error: linkInsertError } = await supabase
+            .from('rush_order_task_links')
+            .insert(linkRows);
+          if (linkInsertError) throw linkInsertError;
+        }
       }
       return true;
     } catch (error: any) {
@@ -356,6 +369,37 @@ export const rushOrderService = {
         } catch(e) {
             console.error("Could not parse image_url to delete attachment", e)
         }
+      }
+
+      // Delete linked tasks (and their time registrations) before deleting the rush order
+      const { data: links, error: linksError } = await supabase
+        .from('rush_order_task_links')
+        .select('task_id')
+        .eq('rush_order_id', id);
+      if (linksError && linksError.code !== 'PGRST116') throw linksError;
+
+      const taskIds = (links || []).map((l: any) => l.task_id).filter(Boolean);
+
+      if (taskIds.length > 0) {
+        // Delete time registrations referencing these tasks to satisfy FK constraints
+        const { error: trDeleteError } = await supabase
+          .from('time_registrations')
+          .delete()
+          .in('task_id', taskIds);
+        if (trDeleteError) throw trDeleteError;
+
+        // Delete the tasks
+        const { error: tasksDeleteError } = await supabase
+          .from('tasks')
+          .delete()
+          .in('id', taskIds);
+        if (tasksDeleteError) throw tasksDeleteError;
+
+        // Clean up link rows
+        await supabase
+          .from('rush_order_task_links')
+          .delete()
+          .eq('rush_order_id', id);
       }
 
       const { error: deleteOrderError } = await supabase
