@@ -25,16 +25,16 @@ export const timeRegistrationService = {
     // Stop any active registrations for this employee
     await this.stopActiveRegistrations(employeeId);
 
-    // Try to find an existing task linked to this rush order
-    const resultExisting: any = await (supabase.from('tasks') as any)
-      .select('id')
+    // Try to find an existing task linked to this rush order through rush_order_task_links
+    const { data: taskLink, error: linkError } = await supabase
+      .from('rush_order_task_links')
+      .select('task_id')
       .eq('rush_order_id', rushOrderId)
-      .eq('is_rush_order', true)
-      .limit(1);
+      .maybeSingle();
 
-    const existingTask = (resultExisting?.data && resultExisting.data[0]) || null;
+    if (linkError && linkError.code !== 'PGRST116') throw linkError;
 
-    let taskId: string | null = existingTask?.id ?? null;
+    let taskId: string | null = taskLink?.task_id ?? null;
 
     // If no task exists yet, create one under the rush order's project
     if (!taskId) {
@@ -59,8 +59,7 @@ export const timeRegistrationService = {
           .from('phases')
           .select('id')
           .eq('project_id', resolvedProjectId)
-          .order('start_date', { ascending: true })
-          .limit(1)
+          .eq('name', 'Rush Order')
           .maybeSingle();
 
         phaseId = phase?.id ?? null;
@@ -73,7 +72,7 @@ export const timeRegistrationService = {
             .from('phases')
             .insert({
               project_id: resolvedProjectId,
-              name: 'Rush Orders',
+              name: 'Rush Order',
               start_date: isoDate,
               end_date: isoDate,
               progress: 0
@@ -89,15 +88,12 @@ export const timeRegistrationService = {
       const todayIso = new Date().toISOString().split('T')[0];
       const taskPayload: any = {
         phase_id: phaseId, // can be null if no project; DB may allow or reject
-        title: 'Rush Order',
-        description: projectName ? `Project: ${projectName}` : 'Rush order task',
-        workstation: 'GENERAL',
+        title: `[RUSH] ${projectName || 'Rush Order'}`,
+        description: projectName ? `Rush order task for project: ${projectName}` : 'Rush order task',
+        workstation: 'ASSEMBLY',
         status: 'IN_PROGRESS',
         priority: 'Urgent',
-        due_date: todayIso,
-        is_rush_order: true,
-        rush_order_id: rushOrderId,
-        project_name: projectName ?? null
+        due_date: todayIso
       };
 
       // If no phase is available, we cannot reliably link to a project
@@ -112,6 +108,15 @@ export const timeRegistrationService = {
         .single();
       if (taskCreateError) throw taskCreateError;
       taskId = createdTask.id;
+
+      // Link the task to the rush order
+      const { error: linkInsertError } = await supabase
+        .from('rush_order_task_links')
+        .insert({
+          rush_order_id: rushOrderId,
+          task_id: taskId
+        });
+      if (linkInsertError) throw linkInsertError;
     }
 
     // Start time registration on the created/found task using existing columns only

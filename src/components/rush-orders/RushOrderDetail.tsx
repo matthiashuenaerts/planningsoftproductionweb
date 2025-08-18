@@ -116,15 +116,32 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
     try {
       setStartingTaskIds(prev => new Set([...prev, taskId]));
       
-      const projectName = projectData ? `${projectData.name} - ${projectData.client}` : undefined;
-      const taskName = getTaskName(standardTaskId);
+      // Check if this is an actual task from the tasks table that was created for this rush order
+      const { data: actualTask, error: taskError } = await supabase
+        .from('tasks')
+        .select('id')
+        .eq('standard_task_id', standardTaskId)
+        .eq('title', `[RUSH] ${getTaskName(standardTaskId)}`)
+        .maybeSingle();
       
-      await timeRegistrationService.startRushOrderTask(
-        currentEmployee.id,
-        rushOrder.id,
-        projectName,
-        rushOrder.project_id
-      );
+      if (taskError && taskError.code !== 'PGRST116') throw taskError;
+      
+      if (actualTask) {
+        // Start time registration on the actual task
+        await timeRegistrationService.startTask(currentEmployee.id, actualTask.id);
+      } else {
+        // Create and start time registration for rush order
+        const projectName = projectData ? `${projectData.name} - ${projectData.client}` : undefined;
+        await timeRegistrationService.startRushOrderTask(
+          currentEmployee.id,
+          rushOrder.id,
+          projectName,
+          rushOrder.project_id
+        );
+      }
+      
+      const taskName = getTaskName(standardTaskId);
+      const projectName = projectData ? `${projectData.name} - ${projectData.client}` : undefined;
       
       toast({
         title: t('time_registration_started'),
