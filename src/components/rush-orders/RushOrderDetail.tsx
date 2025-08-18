@@ -25,7 +25,7 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
-  const [isStartingTimeRegistration, setIsStartingTimeRegistration] = useState(false);
+  const [startingTaskIds, setStartingTaskIds] = useState<Set<string>>(new Set());
   const { t } = useLanguage();
   const { currentEmployee } = useAuth();
   
@@ -110,13 +110,14 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
     }
   };
   
-  const handleStartTimeRegistration = async () => {
+  const handleStartTaskTimeRegistration = async (taskId: string, standardTaskId: string) => {
     if (!currentEmployee || !rushOrder) return;
     
     try {
-      setIsStartingTimeRegistration(true);
+      setStartingTaskIds(prev => new Set([...prev, taskId]));
       
       const projectName = projectData ? `${projectData.name} - ${projectData.client}` : undefined;
+      const taskName = getTaskName(standardTaskId);
       
       await timeRegistrationService.startRushOrderTask(
         currentEmployee.id,
@@ -128,7 +129,7 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
       toast({
         title: t('time_registration_started'),
         description: t('time_registration_started_description', { 
-          title: rushOrder.title,
+          title: `${rushOrder.title} - ${taskName}`,
           project: projectName || t('no_project')
         }),
       });
@@ -139,7 +140,11 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
         variant: "destructive"
       });
     } finally {
-      setIsStartingTimeRegistration(false);
+      setStartingTaskIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
     }
   };
 
@@ -267,9 +272,21 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
               ) : (
                 <ul className="space-y-2">
                   {rushOrder.tasks.map((task) => (
-                    <li key={task.id} className="flex items-center bg-gray-50 p-3 rounded-md">
-                      <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                      <span className="text-sm">{getTaskName(task.standard_task_id)}</span>
+                    <li key={task.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
+                      <div className="flex items-center">
+                        <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                        <span className="text-sm">{getTaskName(task.standard_task_id)}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleStartTaskTimeRegistration(task.id, task.standard_task_id)}
+                        disabled={startingTaskIds.has(task.id) || !currentEmployee}
+                        className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                      >
+                        <Play className="h-3 w-3 mr-1" />
+                        {startingTaskIds.has(task.id) ? t('starting') : t('start_time_registration')}
+                      </Button>
                     </li>
                   ))}
                 </ul>
@@ -309,15 +326,6 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
           </Badge>
           
           <div className="flex gap-3">
-            <Button 
-              variant="outline"
-              onClick={handleStartTimeRegistration}
-              disabled={isStartingTimeRegistration || !currentEmployee}
-              className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
-            >
-              <Play className="h-4 w-4 mr-2" />
-              {isStartingTimeRegistration ? t('starting') : t('start_time_registration')}
-            </Button>
             
             {rushOrder.status === 'pending' && (
               <Button 
