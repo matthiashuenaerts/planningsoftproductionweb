@@ -59,8 +59,17 @@ const NotificationBanner = () => {
 
   const handleClick = () => {
     if (latestUnread) {
-      // Navigate to notes and tasks page instead of rush orders
-      navigate(createLocalizedPath('/notes-and-tasks'));
+      // Route based on notification type
+      if (latestUnread.rush_order_id) {
+        // Navigate to specific rush order details
+        navigate(createLocalizedPath(`/rush-orders/${latestUnread.rush_order_id}`));
+      } else if (latestUnread.link) {
+        // Navigate to the provided link
+        navigate(createLocalizedPath(latestUnread.link));
+      } else {
+        // Default fallback: navigate to notes and tasks page
+        navigate(createLocalizedPath('/notes-and-tasks'));
+      }
       handleClose();
     }
   };
