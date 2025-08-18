@@ -314,8 +314,17 @@ const TaskList: React.FC<TaskListProps> = ({
                     </>
                   )}
                   {task.status === 'COMPLETED' && task.completed_at && (
-                    <div className="text-sm text-gray-500">
-                      Completed: {new Date(task.completed_at).toLocaleString()}
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm text-gray-500">
+                        Completed: {new Date(task.completed_at).toLocaleString()}
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleStatusChange(task, 'TODO')}
+                      >
+                        Back to Todo
+                      </Button>
                     </div>
                   )}
                   {task.status === 'HOLD' && (
