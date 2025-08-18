@@ -172,9 +172,9 @@ const NewRushOrderForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) =
       
       if (!rushOrder) throw new Error("Failed to create rush order");
       
-      // Assign tasks
+      // Assign tasks and create actual task records if project is selected
       if (data.selectedTasks.length > 0) {
-        await rushOrderService.assignTasksToRushOrder(rushOrder.id, data.selectedTasks);
+        await rushOrderService.assignTasksToRushOrder(rushOrder.id, data.selectedTasks, data.projectId);
       }
       
       // Assign users

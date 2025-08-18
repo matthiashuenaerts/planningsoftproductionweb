@@ -79,18 +79,75 @@ export const rushOrderService = {
     }
   },
   
-  async assignTasksToRushOrder(rushOrderId: string, taskIds: string[]): Promise<boolean> {
+  async assignTasksToRushOrder(rushOrderId: string, taskIds: string[], projectId?: string): Promise<boolean> {
     try {
+      // First, create the rush order task links
       const taskAssignments = taskIds.map(taskId => ({
         rush_order_id: rushOrderId,
         standard_task_id: taskId
       }));
       
-      const { error } = await supabase
+      const { error: linkError } = await supabase
         .from('rush_order_tasks')
         .insert(taskAssignments);
         
-      if (error) throw error;
+      if (linkError) throw linkError;
+
+      // If we have a project ID, create actual task records
+      if (projectId) {
+        // Get or create a "Rush Order" phase for the project
+        let { data: rushPhase, error: phaseError } = await supabase
+          .from('phases')
+          .select('id')
+          .eq('project_id', projectId)
+          .eq('name', 'Rush Order')
+          .maybeSingle();
+
+        if (phaseError && phaseError.code !== 'PGRST116') throw phaseError;
+
+        // Create the phase if it doesn't exist
+        if (!rushPhase) {
+          const { data: newPhase, error: createPhaseError } = await supabase
+            .from('phases')
+            .insert({
+              project_id: projectId,
+              name: 'Rush Order',
+              start_date: new Date().toISOString().split('T')[0],
+              end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 7 days from now
+            })
+            .select('id')
+            .single();
+
+          if (createPhaseError) throw createPhaseError;
+          rushPhase = newPhase;
+        }
+
+        // Get standard task details
+        const { data: standardTasks, error: standardTasksError } = await supabase
+          .from('standard_tasks')
+          .select('*')
+          .in('id', taskIds);
+
+        if (standardTasksError) throw standardTasksError;
+
+        // Create actual task records
+        const taskRecords = standardTasks.map(standardTask => ({
+          phase_id: rushPhase.id,
+          title: `[RUSH] ${standardTask.task_name}`,
+          description: `Rush order task based on ${standardTask.task_name} (${standardTask.task_number})`,
+          workstation: 'Rush Order',
+          status: 'TODO',
+          priority: 'CRITICAL',
+          due_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 3 days from now
+          standard_task_id: standardTask.id
+        }));
+
+        const { error: taskCreateError } = await supabase
+          .from('tasks')
+          .insert(taskRecords);
+
+        if (taskCreateError) throw taskCreateError;
+      }
       return true;
     } catch (error: any) {
       console.error('Error assigning tasks to rush order:', error);
