@@ -75,11 +75,18 @@ const Logistics = () => {
     
     return orderList.filter(order => {
       const searchLower = searchTerm.toLowerCase();
+      
+      // Check article codes in order items
+      const hasMatchingArticleCode = order.order_items?.some(item => 
+        item.article_code?.toLowerCase().includes(searchLower)
+      ) || false;
+      
       return (
         order.project_name?.toLowerCase().includes(searchLower) ||
         order.supplier?.toLowerCase().includes(searchLower) ||
         order.notes?.toLowerCase().includes(searchLower) ||
-        order.id?.toLowerCase().includes(searchLower)
+        order.id?.toLowerCase().includes(searchLower) ||
+        hasMatchingArticleCode
       );
     });
   };
