@@ -35,11 +35,39 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
   }, [isOpen]);
 
   const initializeScanner = async () => {
-    if (!videoRef.current) return;
+    if (!videoRef.current) {
+      console.log('Video ref not available');
+      return;
+    }
 
     try {
-      // Check if camera permissions are available
+      console.log('Initializing QR scanner...');
+      
+      // First request camera permissions explicitly
+      try {
+        await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          } 
+        });
+        console.log('Camera permissions granted');
+      } catch (permError) {
+        console.error('Camera permission error:', permError);
+        setHasPermission(false);
+        toast({
+          title: 'Camera toegang geweigerd',
+          description: 'Geef toestemming voor camera toegang om QR codes te scannen.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Check if camera is available
       const hasCamera = await QrScanner.hasCamera();
+      console.log('Has camera:', hasCamera);
+      
       if (!hasCamera) {
         toast({
           title: 'Camera niet beschikbaar',
@@ -50,9 +78,11 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
       }
 
       // Initialize the QR scanner
+      console.log('Creating QR scanner instance...');
       const scanner = new QrScanner(
         videoRef.current,
         (result) => {
+          console.log('QR code detected:', result);
           if (result && result.data) {
             handleQRCodeDetected(result.data);
           }
@@ -61,29 +91,40 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
           returnDetailedScanResult: true,
           highlightScanRegion: true,
           highlightCodeOutline: true,
-          preferredCamera: 'environment', // Use back camera if available
+          preferredCamera: 'environment',
+          maxScansPerSecond: 5,
         }
       );
 
       scannerRef.current = scanner;
+      console.log('Starting QR scanner...');
       await scanner.start();
+      console.log('QR scanner started successfully');
+      
       setScanning(true);
       setHasPermission(true);
 
     } catch (error: any) {
       console.error('Failed to initialize QR scanner:', error);
+      console.error('Error details:', error.message, error.name);
       
-      if (error.name === 'NotAllowedError') {
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
         setHasPermission(false);
         toast({
           title: 'Camera toegang geweigerd',
           description: 'Geef toestemming voor camera toegang om QR codes te scannen.',
           variant: 'destructive'
         });
+      } else if (error.name === 'NotFoundError') {
+        toast({
+          title: 'Camera niet gevonden',
+          description: 'Geen camera gevonden op dit apparaat.',
+          variant: 'destructive'
+        });
       } else {
         toast({
           title: 'Scanner fout',
-          description: 'Kon de QR scanner niet initialiseren.',
+          description: `Kon de QR scanner niet initialiseren: ${error.message}`,
           variant: 'destructive'
         });
       }
