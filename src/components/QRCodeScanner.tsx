@@ -92,8 +92,20 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
         videoRef.current,
         (result) => {
           console.log('QR code detected:', result);
-          if (result && result.data) {
-            handleQRCodeDetected(result.data);
+          console.log('Result type:', typeof result);
+          console.log('Result data:', result?.data);
+          
+          // Handle both string results and detailed scan results
+          let qrData = '';
+          if (typeof result === 'string') {
+            qrData = result;
+          } else if (result && result.data) {
+            qrData = result.data;
+          }
+          
+          console.log('Processing QR data:', qrData);
+          if (qrData) {
+            handleQRCodeDetected(qrData);
           }
         },
         {
@@ -101,7 +113,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
           highlightScanRegion: true,
           highlightCodeOutline: true,
           preferredCamera: currentCamera,
-          maxScansPerSecond: 5,
+          maxScansPerSecond: 3,
         }
       );
 
