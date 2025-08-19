@@ -90,22 +90,44 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
       console.log('Creating QR scanner instance...');
       const scanner = new QrScanner(
         videoRef.current,
-        (result) => {
-          console.log('QR code detected:', result);
+        async (result: any) => {
+          console.log('QR code detected - Raw result:', result);
           console.log('Result type:', typeof result);
-          console.log('Result data:', result?.data);
           
           // Handle both string results and detailed scan results
           let qrData = '';
           if (typeof result === 'string') {
-            qrData = result;
-          } else if (result && result.data) {
-            qrData = result.data;
+            qrData = result.trim();
+            console.log('String result:', qrData);
+          } else if (result && typeof result === 'object' && 'data' in result) {
+            qrData = String(result.data).trim();
+            console.log('Object result data:', qrData);
           }
           
-          console.log('Processing QR data:', qrData);
-          if (qrData) {
-            handleQRCodeDetected(qrData);
+          console.log('Final QR data to process:', qrData);
+          console.log('Current states - scanning:', scanning, 'processing:', processing);
+          
+          if (qrData && !processing) {
+            console.log('Processing QR code:', qrData);
+            
+            // Stop scanner immediately to prevent multiple detections
+            if (scannerRef.current) {
+              scannerRef.current.stop();
+            }
+            
+            // Capture image from video
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (ctx && videoRef.current) {
+              canvas.width = videoRef.current.videoWidth;
+              canvas.height = videoRef.current.videoHeight;
+              ctx.drawImage(videoRef.current, 0, 0);
+              console.log('Image captured from video');
+            }
+            
+            await handleQRCodeDetected(qrData);
+          } else {
+            console.log('QR detection skipped - processing:', processing, 'data:', !!qrData);
           }
         },
         {
@@ -113,7 +135,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
           highlightScanRegion: true,
           highlightCodeOutline: true,
           preferredCamera: currentCamera,
-          maxScansPerSecond: 3,
+          maxScansPerSecond: 1,
         }
       );
 
@@ -163,7 +185,8 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
   };
 
   const handleQRCodeDetected = async (qrCode: string) => {
-    if (scanning && !processing) {
+    if (!processing) {
+      console.log('Starting QR code processing for:', qrCode);
       setScanning(false);
       setProcessing(true);
       
@@ -173,12 +196,15 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
       
       setTimeout(async () => {
         try {
+          console.log('Searching for part with QR code:', qrCode);
           // Search for the QR code in parts list
           const part = await qrCodeService.findPartByQRCode(qrCode);
+          console.log('Search result:', part);
           
           if (part) {
             // Update the workstation status
             await qrCodeService.updatePartWorkstationStatus(part.id, workstationName);
+            console.log('Part status updated successfully');
             
             toast({
               title: 'Succes!',
@@ -187,6 +213,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
             
             onQRCodeDetected(qrCode);
           } else {
+            console.log('Part not found for QR code:', qrCode);
             toast({
               title: 'Onderdeel niet gevonden',
               description: `"${qrCode}" werd niet gevonden in de onderdelenlijst`,
@@ -206,6 +233,8 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
           onClose();
         }
       }, 2000);
+    } else {
+      console.log('QR code processing already in progress, skipping');
     }
   };
 
