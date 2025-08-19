@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import QrScanner from 'qr-scanner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { X, Camera } from 'lucide-react';
+import { X, Camera, RotateCcw, Play } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface QRCodeScannerProps {
@@ -22,37 +22,36 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
   const scannerRef = useRef<QrScanner | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [cameraStarted, setCameraStarted] = useState(false);
+  const [currentCamera, setCurrentCamera] = useState<'environment' | 'user'>('environment');
   const { toast } = useToast();
 
   useEffect(() => {
-    if (isOpen && videoRef.current) {
-      initializeScanner();
-    }
-
     return () => {
       cleanup();
     };
   }, [isOpen]);
 
-  const initializeScanner = async () => {
+  const startCamera = async () => {
     if (!videoRef.current) {
       console.log('Video ref not available');
       return;
     }
 
     try {
-      console.log('Initializing QR scanner...');
+      console.log('Starting camera with facing mode:', currentCamera);
       
       // First request camera permissions explicitly
       try {
         await navigator.mediaDevices.getUserMedia({ 
           video: { 
-            facingMode: 'environment',
+            facingMode: currentCamera,
             width: { ideal: 1280 },
             height: { ideal: 720 }
           } 
         });
         console.log('Camera permissions granted');
+        setHasPermission(true);
       } catch (permError) {
         console.error('Camera permission error:', permError);
         setHasPermission(false);
@@ -77,6 +76,12 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
         return;
       }
 
+      // Clean up existing scanner
+      if (scannerRef.current) {
+        scannerRef.current.stop();
+        scannerRef.current.destroy();
+      }
+
       // Initialize the QR scanner
       console.log('Creating QR scanner instance...');
       const scanner = new QrScanner(
@@ -91,7 +96,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
           returnDetailedScanResult: true,
           highlightScanRegion: true,
           highlightCodeOutline: true,
-          preferredCamera: 'environment',
+          preferredCamera: currentCamera,
           maxScansPerSecond: 5,
         }
       );
@@ -102,10 +107,10 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
       console.log('QR scanner started successfully');
       
       setScanning(true);
-      setHasPermission(true);
+      setCameraStarted(true);
 
     } catch (error: any) {
-      console.error('Failed to initialize QR scanner:', error);
+      console.error('Failed to start camera:', error);
       console.error('Error details:', error.message, error.name);
       
       if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
@@ -131,6 +136,16 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     }
   };
 
+  const switchCamera = async () => {
+    const newCamera = currentCamera === 'environment' ? 'user' : 'environment';
+    setCurrentCamera(newCamera);
+    
+    if (cameraStarted) {
+      // Restart camera with new facing mode
+      await startCamera();
+    }
+  };
+
   const handleQRCodeDetected = (qrCode: string) => {
     if (scanning) {
       setScanning(false);
@@ -150,6 +165,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
       scannerRef.current = null;
     }
     setScanning(false);
+    setCameraStarted(false);
     setHasPermission(null);
   };
 
@@ -161,7 +177,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
   const requestPermission = async () => {
     try {
       await navigator.mediaDevices.getUserMedia({ video: true });
-      initializeScanner();
+      await startCamera();
     } catch (error) {
       toast({
         title: 'Camera toegang geweigerd',
@@ -196,22 +212,49 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
               </Button>
             </div>
           ) : (
-            <div className="relative">
-              <video
-                ref={videoRef}
-                className="w-full rounded-lg bg-black"
-                style={{ aspectRatio: '1 / 1' }}
-                playsInline
-                muted
-              />
-              {scanning && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg">
-                  <div className="text-white text-center">
-                    <div className="animate-pulse">
-                      <Camera className="h-8 w-8 mx-auto mb-2" />
-                      <p className="text-sm">Richt de camera op een QR code</p>
+            <div className="space-y-4">
+              <div className="relative">
+                <video
+                  ref={videoRef}
+                  className="w-full rounded-lg bg-black"
+                  style={{ aspectRatio: '1 / 1' }}
+                  playsInline
+                  muted
+                />
+                {!cameraStarted && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
+                    <div className="text-white text-center">
+                      <Camera className="h-12 w-12 mx-auto mb-4" />
+                      <p className="text-sm mb-4">Klik op "Start Camera" om te beginnen</p>
+                      <Button onClick={startCamera} variant="outline" className="text-white border-white hover:bg-white hover:text-black">
+                        <Play className="h-4 w-4 mr-2" />
+                        Start Camera
+                      </Button>
                     </div>
                   </div>
+                )}
+                {scanning && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg">
+                    <div className="text-white text-center">
+                      <div className="animate-pulse">
+                        <Camera className="h-8 w-8 mx-auto mb-2" />
+                        <p className="text-sm">Richt de camera op een QR code</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {cameraStarted && (
+                <div className="flex gap-2 justify-center">
+                  <Button onClick={switchCamera} variant="outline" size="sm">
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    {currentCamera === 'environment' ? 'Voorcamera' : 'Achtercamera'}
+                  </Button>
+                  <Button onClick={startCamera} variant="outline" size="sm">
+                    <Play className="h-4 w-4 mr-2" />
+                    Herstart Camera
+                  </Button>
                 </div>
               )}
             </div>
