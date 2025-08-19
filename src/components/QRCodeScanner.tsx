@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { X, Camera, RotateCcw, Play } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { qrCodeService } from '@/services/qrCodeService';
 
 interface QRCodeScannerProps {
   isOpen: boolean;
@@ -24,6 +25,9 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
   const [scanning, setScanning] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
   const [currentCamera, setCurrentCamera] = useState<'environment' | 'user'>('environment');
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [processing, setProcessing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -146,15 +150,50 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     }
   };
 
-  const handleQRCodeDetected = (qrCode: string) => {
-    if (scanning) {
+  const handleQRCodeDetected = async (qrCode: string) => {
+    if (scanning && !processing) {
       setScanning(false);
-      toast({
-        title: 'QR Code gevonden!',
-        description: `Zoeken naar "${qrCode}" in onderdelenlijst...`
-      });
-      onQRCodeDetected(qrCode);
-      onClose();
+      setProcessing(true);
+      
+      // Show green success screen for 2 seconds
+      setSuccessMessage(`QR Code gevonden: ${qrCode}`);
+      setShowSuccess(true);
+      
+      setTimeout(async () => {
+        try {
+          // Search for the QR code in parts list
+          const part = await qrCodeService.findPartByQRCode(qrCode);
+          
+          if (part) {
+            // Update the workstation status
+            await qrCodeService.updatePartWorkstationStatus(part.id, workstationName);
+            
+            toast({
+              title: 'Succes!',
+              description: `Onderdeel "${qrCode}" toegewezen aan workstation "${workstationName}"`,
+            });
+            
+            onQRCodeDetected(qrCode);
+          } else {
+            toast({
+              title: 'Onderdeel niet gevonden',
+              description: `"${qrCode}" werd niet gevonden in de onderdelenlijst`,
+              variant: 'destructive'
+            });
+          }
+        } catch (error) {
+          console.error('Error processing QR code:', error);
+          toast({
+            title: 'Fout bij verwerken',
+            description: 'Er is een fout opgetreden bij het verwerken van de QR code',
+            variant: 'destructive'
+          });
+        } finally {
+          setShowSuccess(false);
+          setProcessing(false);
+          onClose();
+        }
+      }, 2000);
     }
   };
 
@@ -167,6 +206,8 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     setScanning(false);
     setCameraStarted(false);
     setHasPermission(null);
+    setShowSuccess(false);
+    setProcessing(false);
   };
 
   const handleClose = () => {
@@ -221,7 +262,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                   playsInline
                   muted
                 />
-                {!cameraStarted && (
+                {!cameraStarted && !showSuccess && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
                     <div className="text-white text-center">
                       <Camera className="h-12 w-12 mx-auto mb-4" />
@@ -233,7 +274,20 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                     </div>
                   </div>
                 )}
-                {scanning && (
+                {showSuccess && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-green-500/90 rounded-lg">
+                    <div className="text-white text-center">
+                      <div className="animate-pulse">
+                        <div className="h-12 w-12 mx-auto mb-4 bg-white rounded-full flex items-center justify-center">
+                          <div className="h-6 w-6 bg-green-500 rounded-full"></div>
+                        </div>
+                        <p className="text-lg font-semibold">{successMessage}</p>
+                        <p className="text-sm mt-2">Verwerken...</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {scanning && !showSuccess && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg">
                     <div className="text-white text-center">
                       <div className="animate-pulse">
