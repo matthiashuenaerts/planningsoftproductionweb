@@ -728,6 +728,7 @@ export type Database = {
           parts_list_id: string
           updated_at: string
           wand_naam: string | null
+          workstation_name_status: string | null
         }
         Insert: {
           aantal?: number | null
@@ -754,6 +755,7 @@ export type Database = {
           parts_list_id: string
           updated_at?: string
           wand_naam?: string | null
+          workstation_name_status?: string | null
         }
         Update: {
           aantal?: number | null
@@ -780,6 +782,7 @@ export type Database = {
           parts_list_id?: string
           updated_at?: string
           wand_naam?: string | null
+          workstation_name_status?: string | null
         }
         Relationships: [
           {

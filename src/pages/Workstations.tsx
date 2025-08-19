@@ -10,13 +10,15 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { workstationService } from '@/services/workstationService';
 import { workstationTasksService, WorkstationTask } from '@/services/workstationTasksService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
-import { ArrowLeft, Package, Wrench, Warehouse, Scissors, CheckCircle, PackageCheck, Calendar, Cog, Settings, MoreVertical, Play, Hammer, Drill, Zap, Truck, Factory, Map } from 'lucide-react';
+import { ArrowLeft, Package, Wrench, Warehouse, Scissors, CheckCircle, PackageCheck, Calendar, Cog, Settings, MoreVertical, Play, Hammer, Drill, Zap, Truck, Factory, Map, QrCode } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '@/context/LanguageContext';
 import { useNavigate } from 'react-router-dom';
+import { QRCodeScanner } from '@/components/QRCodeScanner';
+import { qrCodeService } from '@/services/qrCodeService';
 
 // Define workstation with appropriate icon mapping
 interface WorkstationWithIcon {
@@ -32,6 +34,7 @@ const Workstations: React.FC = () => {
   const [showWorkstationTasks, setShowWorkstationTasks] = useState<string | null>(null);
   const [workstationTasks, setWorkstationTasks] = useState<WorkstationTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState<string | null>(null);
   const {
     toast
   } = useToast();
@@ -183,6 +186,46 @@ const Workstations: React.FC = () => {
       });
     }
   };
+  const handleQRCodeDetected = async (qrCode: string) => {
+    if (!showQRScanner) return;
+
+    try {
+      const selectedWorkstation = workstations.find(ws => ws.id === showQRScanner);
+      if (!selectedWorkstation) return;
+
+      // Search for the QR code in all parts
+      const matchingParts = await qrCodeService.findAllPartsByQRCode(qrCode);
+      
+      if (matchingParts.length === 0) {
+        toast({
+          title: 'Geen onderdeel gevonden',
+          description: `Geen onderdeel gevonden voor QR code: "${qrCode}"`,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Update all matching parts with the workstation name
+      for (const part of matchingParts) {
+        await qrCodeService.updatePartWorkstationStatus(part.id, selectedWorkstation.name);
+      }
+
+      toast({
+        title: 'QR Code succesvol verwerkt!',
+        description: `${matchingParts.length} onderdeel(en) bijgewerkt met werkstation "${selectedWorkstation.name}"`
+      });
+
+      setShowQRScanner(null);
+    } catch (error: any) {
+      console.error('Error processing QR code:', error);
+      toast({
+        title: 'Fout bij verwerken QR code',
+        description: error.message || 'Er is een fout opgetreden',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const getPriorityBadge = (priority: string) => {
     switch (priority.toLowerCase()) {
       case 'high':
@@ -240,15 +283,22 @@ const Workstations: React.FC = () => {
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={e => {
+                             <DropdownMenuContent align="end">
+                               <DropdownMenuItem onClick={e => {
                         e.stopPropagation();
                         handleShowWorkstationTasks(workstation.id);
                       }}>
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                {t('workstation_tasks')}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
+                                 <CheckCircle className="mr-2 h-4 w-4" />
+                                 {t('workstation_tasks')}
+                               </DropdownMenuItem>
+                               <DropdownMenuItem onClick={e => {
+                        e.stopPropagation();
+                        setShowQRScanner(workstation.id);
+                      }}>
+                                 <QrCode className="mr-2 h-4 w-4" />
+                                 Scan QR-code
+                               </DropdownMenuItem>
+                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
                         <CardContent className="p-6 flex flex-col items-center text-center" onClick={() => setSelectedWorkstation(workstation.id)}>
@@ -316,6 +366,14 @@ const Workstations: React.FC = () => {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      {/* QR Code Scanner Dialog */}
+      <QRCodeScanner
+        isOpen={!!showQRScanner}
+        onClose={() => setShowQRScanner(null)}
+        onQRCodeDetected={handleQRCodeDetected}
+        workstationName={workstations.find(ws => ws.id === showQRScanner)?.name || ''}
+      />
     </div>;
 };
 export default Workstations;
