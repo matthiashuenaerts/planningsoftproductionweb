@@ -28,37 +28,18 @@ export interface Part {
 
 export const qrCodeService = {
   /**
-   * Search for a QR code value across all columns in the parts table
+   * Search for a QR code value specifically in the doorlopende_nerf column
    */
   async findPartByQRCode(qrCode: string): Promise<Part | null> {
     try {
       const { data, error } = await supabase
         .from('parts')
         .select('*')
-        .or(
-          `wand_naam.ilike.%${qrCode}%,` +
-          `materiaal.ilike.%${qrCode}%,` +
-          `dikte.ilike.%${qrCode}%,` +
-          `doorlopende_nerf.ilike.%${qrCode}%,` +
-          `nerf.ilike.%${qrCode}%,` +
-          `commentaar.ilike.%${qrCode}%,` +
-          `commentaar_2.ilike.%${qrCode}%,` +
-          `cncprg1.ilike.%${qrCode}%,` +
-          `cncprg2.ilike.%${qrCode}%,` +
-          `abd.ilike.%${qrCode}%,` +
-          `afbeelding.ilike.%${qrCode}%,` +
-          `lengte.ilike.%${qrCode}%,` +
-          `breedte.ilike.%${qrCode}%,` +
-          `cnc_pos.ilike.%${qrCode}%,` +
-          `afplak_boven.ilike.%${qrCode}%,` +
-          `afplak_onder.ilike.%${qrCode}%,` +
-          `afplak_links.ilike.%${qrCode}%,` +
-          `afplak_rechts.ilike.%${qrCode}%`
-        )
+        .eq('doorlopende_nerf', qrCode)
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         throw error;
       }
 

@@ -110,10 +110,9 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
           if (qrData && !processing) {
             console.log('Processing QR code:', qrData);
             
-            // Stop scanner immediately to prevent multiple detections
-            if (scannerRef.current) {
-              scannerRef.current.stop();
-            }
+            // Remove first character from QR code
+            const processedQrData = qrData.length > 1 ? qrData.substring(1) : qrData;
+            console.log('QR code after removing first character:', processedQrData);
             
             // Capture image from video
             const canvas = document.createElement('canvas');
@@ -125,7 +124,7 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
               console.log('Image captured from video');
             }
             
-            await handleQRCodeDetected(qrData);
+            await handleQRCodeDetected(processedQrData);
           } else {
             console.log('QR detection skipped - processing:', processing, 'data:', !!qrData);
           }
@@ -230,7 +229,13 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
         } finally {
           setShowSuccess(false);
           setProcessing(false);
-          onClose();
+          // Don't close the scanner, restart it for continuous scanning
+          setTimeout(() => {
+            if (scannerRef.current && cameraStarted) {
+              scannerRef.current.start();
+              setScanning(true);
+            }
+          }, 500);
         }
       }, 2000);
     } else {
