@@ -84,14 +84,18 @@ const TaskList: React.FC<TaskListProps> = ({
   };
 
   const handleStatusChange = async (task: ExtendedTask, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
+    console.log('handleStatusChange called:', { taskId: task.id, newStatus, standardTaskId: task.standard_task_id });
+    
     if (newStatus === 'COMPLETED') {
       // Show checklist dialog if standard_task_id exists
       if (task.standard_task_id) {
+        console.log('Showing checklist dialog for task:', task.id);
         setPendingCompletionTask(task);
         setChecklistDialogOpen(true);
         return;
       }
       
+      console.log('No checklist found, proceeding with direct completion');
       setLoadingTasks(prev => new Set(prev).add(task.id));
     }
 
