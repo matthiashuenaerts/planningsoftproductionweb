@@ -15,7 +15,6 @@ import EnhancedDailyTimeline from '@/components/EnhancedDailyTimeline';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
-import { TaskCompletionChecklistDialog } from '@/components/TaskCompletionChecklistDialog';
 import { holidayService } from '@/services/holidayService';
 import { startOfDay, endOfDay, format, parseISO, addDays, isToday, isTomorrow } from 'date-fns';
 
@@ -83,8 +82,6 @@ const PersonalTasks = () => {
   const [showFilesPopup, setShowFilesPopup] = useState<string | null>(null);
   const [showPartsDialog, setShowPartsDialog] = useState<string | null>(null);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState<string | null>(null);
-  const [checklistDialogOpen, setChecklistDialogOpen] = useState(false);
-  const [pendingCompletionTask, setPendingCompletionTask] = useState<Task | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   // Helper function to get next workday (skip weekends and holidays)
@@ -309,17 +306,6 @@ const PersonalTasks = () => {
           description: t("task_started_desc"),
         });
       } else if (newStatus === 'COMPLETED') {
-        // Check if task has a checklist
-        const taskToComplete = tasks.find(t => t.id === taskId);
-        
-        // Show checklist dialog if standard_task_id exists
-        if (taskToComplete && taskToComplete.standard_task_id) {
-          setPendingCompletionTask(taskToComplete);
-          setChecklistDialogOpen(true);
-          return;
-        }
-        
-        // If no checklist, proceed with normal completion
         console.log('Completing task:', taskId);
         await timeRegistrationService.completeTask(taskId);
         await fetchActiveTimeRegistrations();
@@ -502,30 +488,6 @@ const PersonalTasks = () => {
     }
   };
 
-  const handleCompleteWithChecklist = async () => {
-    if (pendingCompletionTask) {
-      console.log('Completing task with checklist:', pendingCompletionTask.id);
-      await timeRegistrationService.completeTask(pendingCompletionTask.id);
-      await fetchActiveTimeRegistrations();
-      
-      await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
-      await queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
-      
-      toast({
-        title: t("task_completed"),
-        description: t("task_completed_desc"),
-      });
-      
-      setPendingCompletionTask(null);
-      setChecklistDialogOpen(false);
-    }
-  };
-
-  const handleCancelCompletion = () => {
-    setPendingCompletionTask(null);
-    setChecklistDialogOpen(false);
-  };
-
   const handleDateNavigation = async (direction: 'today' | 'next' | 'planning') => {
     if (direction === 'today') {
       setSelectedDate(new Date());
@@ -664,19 +626,6 @@ const PersonalTasks = () => {
             onClose={() => setShowBarcodeDialog(null)}
             projectId={showBarcodeDialog}
             projectName={tasks.find(task => task.phases.projects.id === showBarcodeDialog)?.phases.projects.name || t("unknown_project")}
-          />
-        )}
-        
-        {/* Task Completion Checklist Dialog */}
-        {checklistDialogOpen && pendingCompletionTask && (
-          <TaskCompletionChecklistDialog
-            isOpen={checklistDialogOpen}
-            onOpenChange={setChecklistDialogOpen}
-            taskId={pendingCompletionTask.id}
-            taskTitle={`${pendingCompletionTask.phases.projects.name} - ${pendingCompletionTask.title}`}
-            standardTaskId={pendingCompletionTask.standard_task_id}
-            onComplete={handleCompleteWithChecklist}
-            onCancel={handleCancelCompletion}
           />
         )}
       </div>

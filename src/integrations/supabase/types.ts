@@ -1713,36 +1713,6 @@ export type Database = {
           },
         ]
       }
-      standard_task_checklists: {
-        Row: {
-          created_at: string
-          display_order: number
-          id: string
-          is_required: boolean
-          item_text: string
-          standard_task_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          display_order?: number
-          id?: string
-          is_required?: boolean
-          item_text: string
-          standard_task_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          display_order?: number
-          id?: string
-          is_required?: boolean
-          item_text?: string
-          standard_task_id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       standard_task_limit_phases: {
         Row: {
           created_at: string
@@ -1893,39 +1863,6 @@ export type Database = {
           phone?: string | null
           updated_at?: string
           website?: string | null
-        }
-        Relationships: []
-      }
-      task_completion_checklists: {
-        Row: {
-          checked_at: string | null
-          checked_by: string | null
-          checklist_item_id: string
-          created_at: string
-          id: string
-          is_checked: boolean
-          task_id: string
-          updated_at: string
-        }
-        Insert: {
-          checked_at?: string | null
-          checked_by?: string | null
-          checklist_item_id: string
-          created_at?: string
-          id?: string
-          is_checked?: boolean
-          task_id: string
-          updated_at?: string
-        }
-        Update: {
-          checked_at?: string | null
-          checked_by?: string | null
-          checklist_item_id?: string
-          created_at?: string
-          id?: string
-          is_checked?: boolean
-          task_id?: string
-          updated_at?: string
         }
         Relationships: []
       }
