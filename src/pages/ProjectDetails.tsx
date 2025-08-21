@@ -28,7 +28,6 @@ import { Input } from '@/components/ui/input';
 import { AccessoriesDialog } from '@/components/AccessoriesDialog';
 import { AccessoriesInlineView } from '@/components/AccessoriesInlineView';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
-import { TaskCompletionChecklistDialog } from '@/components/TaskCompletionChecklistDialog';
 import OrderEditModal from '@/components/OrderEditModal';
 import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
 import { useAuth } from '@/context/AuthContext';
@@ -92,8 +91,6 @@ const ProjectDetails = () => {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState('');
   const [savingDescription, setSavingDescription] = useState(false);
-  const [showChecklistDialog, setShowChecklistDialog] = useState(false);
-  const [pendingTaskCompletion, setPendingTaskCompletion] = useState<{taskId: string, taskTitle: string, standardTaskId: string} | null>(null);
   const {
     currentEmployee
   } = useAuth();
@@ -599,22 +596,7 @@ const ProjectDetails = () => {
     try {
       const statusValue = newStatus as string;
       const currentTask = tasks.find(task => task.id === taskId);
-      
-      if (statusValue === 'COMPLETED') {
-        // Check if task has a checklist
-        if (currentTask?.standard_task_id) {
-          setPendingTaskCompletion({
-            taskId,
-            taskTitle: currentTask.title,
-            standardTaskId: currentTask.standard_task_id
-          });
-          setShowChecklistDialog(true);
-          return;
-        } else {
-          // No checklist, complete directly
-          await completeTaskDirectly(taskId);
-        }
-      } else if (statusValue === 'IN_PROGRESS') {
+      if (statusValue === 'IN_PROGRESS') {
         const canStart = await checkLimitPhasesBeforeStart(taskId, currentTask?.standard_task_id);
         if (!canStart) {
           return;
@@ -624,6 +606,12 @@ const ProjectDetails = () => {
           title: t('task_started'),
           description: t('task_started_desc')
         });
+      } else if (statusValue === 'COMPLETED') {
+        await timeRegistrationService.completeTask(taskId);
+        toast({
+          title: t('task_completed'),
+          description: t('task_completed_desc')
+        });
       } else {
         const updateData: Partial<Task> = {
           status: newStatus,
@@ -631,6 +619,10 @@ const ProjectDetails = () => {
         };
         if (statusValue === 'IN_PROGRESS') {
           updateData.assignee_id = currentEmployee.id;
+        }
+        if (statusValue === 'COMPLETED') {
+          updateData.completed_at = new Date().toISOString();
+          updateData.completed_by = currentEmployee.id;
         }
         await taskService.update(taskId, updateData);
         toast({
@@ -640,8 +632,11 @@ const ProjectDetails = () => {
           })
         });
       }
+      if (newStatus === 'COMPLETED') {
+        await checkAndUpdateLimitPhases(taskId);
+      }
 
-      // Recalculate efficiency when task status changes
+      // Recalculate efficiency when task is completed or any status changes
       await fetchAndSetSortedTasks(projectId);
     } catch (error: any) {
       toast({
@@ -652,39 +647,6 @@ const ProjectDetails = () => {
         variant: "destructive"
       });
     }
-  };
-
-  const completeTaskDirectly = async (taskId: string) => {
-    try {
-      await timeRegistrationService.completeTask(taskId);
-      await checkAndUpdateLimitPhases(taskId);
-      await fetchAndSetSortedTasks(projectId);
-      toast({
-        title: t('task_completed'),
-        description: t('task_completed_desc')
-      });
-    } catch (error: any) {
-      toast({
-        title: t('error'),
-        description: t('task_status_update_error', {
-          message: error.message
-        }),
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleChecklistComplete = async () => {
-    if (pendingTaskCompletion) {
-      await completeTaskDirectly(pendingTaskCompletion.taskId);
-      setShowChecklistDialog(false);
-      setPendingTaskCompletion(null);
-    }
-  };
-
-  const handleChecklistCancel = () => {
-    setShowChecklistDialog(false);
-    setPendingTaskCompletion(null);
   };
   const handleNewOrderSuccess = () => {
     toast({
@@ -1516,18 +1478,6 @@ const ProjectDetails = () => {
       <ProjectBarcodeDialog isOpen={showBarcodeDialog} onClose={() => setShowBarcodeDialog(false)} projectId={projectId!} projectName={project?.name || ''} />
 
       {selectedOrderId && <OrderEditModal open={showOrderEditModal} onOpenChange={setShowOrderEditModal} orderId={selectedOrderId} onSuccess={handleOrderEditSuccess} />}
-      
-      {pendingTaskCompletion && (
-        <TaskCompletionChecklistDialog
-          isOpen={showChecklistDialog}
-          onOpenChange={setShowChecklistDialog}
-          taskId={pendingTaskCompletion.taskId}
-          standardTaskId={pendingTaskCompletion.standardTaskId}
-          taskTitle={pendingTaskCompletion.taskTitle}
-          onComplete={handleChecklistComplete}
-          onCancel={handleChecklistCancel}
-        />
-      )}
     </div>;
-  };
+};
 export default ProjectDetails;
