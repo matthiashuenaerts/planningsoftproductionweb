@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Task } from '@/services/dataService';
 import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader, TrendingUp, TrendingDown } from 'lucide-react';
+import { TaskCompletionChecklistDialog } from './TaskCompletionChecklistDialog';
 
 interface ExtendedTask extends Task {
   timeRemaining?: string;
@@ -40,6 +41,8 @@ const TaskList: React.FC<TaskListProps> = ({
 }) => {
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
   const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
+  const [checklistDialogOpen, setChecklistDialogOpen] = useState(false);
+  const [pendingCompletionTask, setPendingCompletionTask] = useState<ExtendedTask | null>(null);
 
   const getPriorityColor = (priority: string) => {
     switch (priority.toLowerCase()) {
@@ -81,6 +84,21 @@ const TaskList: React.FC<TaskListProps> = ({
   };
 
   const handleStatusChange = async (task: ExtendedTask, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
+    if (newStatus === 'COMPLETED') {
+      // Show checklist dialog if standard_task_id exists
+      if (task.standard_task_id) {
+        setPendingCompletionTask(task);
+        setChecklistDialogOpen(true);
+        return;
+      }
+      
+      setLoadingTasks(prev => new Set(prev).add(task.id));
+    }
+
+    await performTaskStatusUpdate(task, newStatus);
+  };
+
+  const performTaskStatusUpdate = async (task: ExtendedTask, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     if (newStatus === 'COMPLETED') {
       setLoadingTasks(prev => new Set(prev).add(task.id));
     }
@@ -125,6 +143,19 @@ const TaskList: React.FC<TaskListProps> = ({
       }
       throw error;
     }
+  };
+
+  const handleCompleteWithChecklist = async () => {
+    if (pendingCompletionTask) {
+      await performTaskStatusUpdate(pendingCompletionTask, 'COMPLETED');
+      setPendingCompletionTask(null);
+      setChecklistDialogOpen(false);
+    }
+  };
+
+  const handleCancelCompletion = () => {
+    setPendingCompletionTask(null);
+    setChecklistDialogOpen(false);
   };
 
   if (tasks.length === 0) {
@@ -343,6 +374,19 @@ const TaskList: React.FC<TaskListProps> = ({
           </Card>
         );
       })}
+
+      {/* Task Completion Checklist Dialog */}
+      {pendingCompletionTask && (
+        <TaskCompletionChecklistDialog
+          isOpen={checklistDialogOpen}
+          onOpenChange={setChecklistDialogOpen}
+          taskId={pendingCompletionTask.id}
+          standardTaskId={pendingCompletionTask.standard_task_id || ''}
+          taskTitle={pendingCompletionTask.title}
+          onComplete={handleCompleteWithChecklist}
+          onCancel={handleCancelCompletion}
+        />
+      )}
     </div>
   );
 };
