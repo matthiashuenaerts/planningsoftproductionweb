@@ -40,6 +40,14 @@ export const TaskCompletionChecklistDialog: React.FC<TaskCompletionChecklistDial
     }
   }, [isOpen, taskId, standardTaskId]);
 
+  // Handle automatic completion when no checklist items exist
+  useEffect(() => {
+    if (!loading && checklistItems.length === 0 && isOpen) {
+      // Complete task immediately if no checklist items
+      onComplete();
+    }
+  }, [loading, checklistItems.length, isOpen, onComplete]);
+
   const loadChecklist = async () => {
     try {
       setLoading(true);
@@ -122,9 +130,8 @@ export const TaskCompletionChecklistDialog: React.FC<TaskCompletionChecklistDial
     );
   }
 
-  // If no checklist items, complete task immediately
+  // Don't render dialog if no checklist items (auto-completion will handle it)
   if (checklistItems.length === 0) {
-    onComplete();
     return null;
   }
 

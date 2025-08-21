@@ -151,9 +151,12 @@ const TaskList: React.FC<TaskListProps> = ({
 
   const handleCompleteWithChecklist = async () => {
     if (pendingCompletionTask) {
-      await performTaskStatusUpdate(pendingCompletionTask, 'COMPLETED');
-      setPendingCompletionTask(null);
-      setChecklistDialogOpen(false);
+      try {
+        await performTaskStatusUpdate(pendingCompletionTask, 'COMPLETED');
+      } finally {
+        setPendingCompletionTask(null);
+        setChecklistDialogOpen(false);
+      }
     }
   };
 
