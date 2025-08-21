@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import QrScanner from 'qr-scanner';
+import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { X, Camera, RotateCcw, Play } from 'lucide-react';
@@ -21,6 +22,8 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
+  const zxingReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanning, setScanning] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
@@ -35,6 +38,34 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
       cleanup();
     };
   }, [isOpen]);
+
+  // Function to try DataMatrix scanning with ZXing
+  const tryDataMatrixScan = async () => {
+    if (!videoRef.current || processing) return;
+    
+    try {
+      if (!zxingReaderRef.current) {
+        zxingReaderRef.current = new BrowserMultiFormatReader();
+        console.log('ZXing DataMatrix reader initialized');
+      }
+      
+      const result = await zxingReaderRef.current.decodeOnceFromVideoDevice(undefined, videoRef.current);
+      if (result) {
+        console.log('DataMatrix detected:', result.getText());
+        
+        // Remove first character from detected code
+        const code = result.getText();
+        const processedCode = code.length > 1 ? code.substring(1) : code;
+        console.log('DataMatrix code after removing first character:', processedCode);
+        
+        await handleQRCodeDetected(processedCode);
+      }
+    } catch (error) {
+      if (!(error instanceof NotFoundException)) {
+        console.log('DataMatrix scan attempt failed:', error);
+      }
+    }
+  };
 
   const startCamera = async () => {
     if (!videoRef.current) {
@@ -153,6 +184,10 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
       setScanning(true);
       setCameraStarted(true);
 
+      // Start periodic DataMatrix scanning
+      scanIntervalRef.current = setInterval(tryDataMatrixScan, 1000);
+      console.log('DataMatrix scanning interval started');
+
     } catch (error: any) {
       console.error('Failed to start camera:', error);
       console.error('Error details:', error.message, error.name);
@@ -256,6 +291,17 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
       scannerRef.current.destroy();
       scannerRef.current = null;
     }
+    
+    if (zxingReaderRef.current) {
+      zxingReaderRef.current.reset();
+      zxingReaderRef.current = null;
+    }
+    
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    
     setScanning(false);
     setCameraStarted(false);
     setHasPermission(null);
