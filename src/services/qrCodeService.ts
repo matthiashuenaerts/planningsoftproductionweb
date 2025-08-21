@@ -28,14 +28,14 @@ export interface Part {
 
 export const qrCodeService = {
   /**
-   * Search for a QR code value specifically in the doorlopende_nerf column
+   * Search for a QR code value in cncprg1, cncprg2, and abd columns
    */
   async findPartByQRCode(qrCode: string): Promise<Part | null> {
     try {
       const { data, error } = await supabase
         .from('parts')
         .select('*')
-        .eq('doorlopende_nerf', qrCode)
+        .or(`cncprg1.eq.${qrCode},cncprg2.eq.${qrCode},abd.eq.${qrCode}`)
         .limit(1)
         .maybeSingle();
 
