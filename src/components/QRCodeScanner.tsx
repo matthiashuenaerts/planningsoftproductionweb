@@ -86,8 +86,8 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
         scannerRef.current.destroy();
       }
 
-      // Initialize the QR scanner
-      console.log('Creating QR scanner instance...');
+      // Initialize the scanner with DataMatrix support
+      console.log('Creating QR/DataMatrix scanner instance...');
       const scanner = new QrScanner(
         videoRef.current,
         async (result: any) => {
@@ -134,9 +134,16 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
           highlightScanRegion: true,
           highlightCodeOutline: true,
           preferredCamera: currentCamera,
-          maxScansPerSecond: 1,
+          maxScansPerSecond: 2,
+          calculateScanRegion: (video) => {
+            // Use full area for better DataMatrix detection
+            return { x: 0, y: 0, width: video.videoWidth, height: video.videoHeight };
+          }
         }
       );
+
+      // Enable inversion mode for better DataMatrix detection
+      scanner.setInversionMode('both');
 
       scannerRef.current = scanner;
       console.log('Starting QR scanner...');
