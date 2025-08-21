@@ -50,9 +50,10 @@ export const standardTaskChecklistService = {
         is_required: isRequired
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
+    if (!data) throw new Error('Failed to create checklist item');
     return data;
   },
 
@@ -66,9 +67,10 @@ export const standardTaskChecklistService = {
       .update(updates)
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
+    if (!data) throw new Error('Checklist item not found');
     return data;
   },
 
@@ -130,9 +132,10 @@ export const standardTaskChecklistService = {
       .update(updates)
       .eq('id', taskCompletionItemId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
+    if (!data) throw new Error('Task completion checklist item not found');
     return data;
   },
 

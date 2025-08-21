@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, GripVertical } from 'lucide-react';
 import { standardTaskChecklistService, type StandardTaskChecklistItem } from '@/services/standardTaskChecklistService';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
 
 interface StandardTaskChecklistManagerProps {
   standardTaskId: string;
@@ -22,6 +23,15 @@ export const StandardTaskChecklistManager: React.FC<StandardTaskChecklistManager
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const { currentEmployee } = useAuth();
+
+  // Check if user is admin
+  const isAdmin = currentEmployee?.role === 'admin';
+  
+  useEffect(() => {
+    console.log('StandardTaskChecklistManager - Current user:', currentEmployee);
+    console.log('StandardTaskChecklistManager - Is admin:', isAdmin);
+  }, [currentEmployee, isAdmin]);
 
   useEffect(() => {
     loadChecklistItems();
@@ -37,7 +47,7 @@ export const StandardTaskChecklistManager: React.FC<StandardTaskChecklistManager
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to load checklist items"
+        description: `Failed to load checklist items: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
     } finally {
       setLoading(false);
@@ -45,15 +55,38 @@ export const StandardTaskChecklistManager: React.FC<StandardTaskChecklistManager
   };
 
   const handleAddItem = async () => {
-    if (!newItemText.trim()) return;
+    console.log('Attempting to add checklist item...');
+    console.log('New item text:', newItemText);
+    console.log('Current user:', currentEmployee);
+    console.log('Is admin:', isAdmin);
+    
+    if (!newItemText.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Input",
+        description: "Please enter a checklist item description"
+      });
+      return;
+    }
+    
+    if (!isAdmin) {
+      toast({
+        variant: "destructive",
+        title: "Access Denied",
+        description: `Only administrators can modify checklist items. Your role: ${currentEmployee?.role || 'unknown'}`
+      });
+      return;
+    }
 
     try {
       setSaving(true);
+      console.log('Creating checklist item for standard task:', standardTaskId);
       const newItem = await standardTaskChecklistService.createChecklistItem(
         standardTaskId,
         newItemText.trim(),
         checklistItems.length
       );
+      console.log('Successfully created checklist item:', newItem);
       setChecklistItems(prev => [...prev, newItem]);
       setNewItemText('');
       toast({
@@ -65,7 +98,7 @@ export const StandardTaskChecklistManager: React.FC<StandardTaskChecklistManager
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to add checklist item"
+        description: `Failed to add checklist item: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
     } finally {
       setSaving(false);
@@ -73,6 +106,15 @@ export const StandardTaskChecklistManager: React.FC<StandardTaskChecklistManager
   };
 
   const handleDeleteItem = async (itemId: string) => {
+    if (!isAdmin) {
+      toast({
+        variant: "destructive",
+        title: "Access Denied", 
+        description: "Only administrators can modify checklist items"
+      });
+      return;
+    }
+
     try {
       setSaving(true);
       await standardTaskChecklistService.deleteChecklistItem(itemId);
@@ -94,6 +136,15 @@ export const StandardTaskChecklistManager: React.FC<StandardTaskChecklistManager
   };
 
   const handleToggleRequired = async (itemId: string, isRequired: boolean) => {
+    if (!isAdmin) {
+      toast({
+        variant: "destructive",
+        title: "Access Denied",
+        description: "Only administrators can modify checklist items"
+      });
+      return;
+    }
+
     try {
       setSaving(true);
       await standardTaskChecklistService.updateChecklistItem(itemId, { is_required: isRequired });
@@ -120,6 +171,14 @@ export const StandardTaskChecklistManager: React.FC<StandardTaskChecklistManager
 
   const handleUpdateText = async (itemId: string, newText: string) => {
     if (!newText.trim()) return;
+    if (!isAdmin) {
+      toast({
+        variant: "destructive",
+        title: "Access Denied",
+        description: "Only administrators can modify checklist items"
+      });
+      return;
+    }
 
     try {
       setSaving(true);
@@ -171,95 +230,103 @@ export const StandardTaskChecklistManager: React.FC<StandardTaskChecklistManager
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Add new item */}
-        <div className="flex gap-2">
-          <Input
-            placeholder="Enter checklist item..."
-            value={newItemText}
-            onChange={(e) => setNewItemText(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
-                handleAddItem();
-              }
-            }}
-            disabled={saving}
-          />
-          <Button 
-            onClick={handleAddItem} 
-            disabled={!newItemText.trim() || saving}
-            size="sm"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Checklist items */}
-        {checklistItems.length === 0 ? (
+        {!isAdmin ? (
           <div className="text-center py-8 text-muted-foreground">
-            <p>No checklist items configured</p>
-            <p className="text-sm">Add items above to create a checklist for this task</p>
+            <p>You need administrator privileges to manage checklists</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {checklistItems.map((item, index) => (
-              <div key={item.id} className="flex items-center gap-3 p-3 border rounded-lg">
-                <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={item.is_required}
-                    onCheckedChange={(checked) =>
-                      handleToggleRequired(item.id, checked as boolean)
-                    }
-                    disabled={saving}
-                  />
-                  <span className="text-sm text-muted-foreground">Required</span>
-                </div>
+          <>
+            {/* Add new item */}
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter checklist item..."
+                value={newItemText}
+                onChange={(e) => setNewItemText(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAddItem();
+                  }
+                }}
+                disabled={saving}
+              />
+              <Button 
+                onClick={handleAddItem} 
+                disabled={!newItemText.trim() || saving}
+                size="sm"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
 
-                <Input
-                  value={item.item_text}
-                  onChange={(e) => {
-                    setChecklistItems(prev =>
-                      prev.map(prevItem =>
-                        prevItem.id === item.id 
-                          ? { ...prevItem, item_text: e.target.value }
-                          : prevItem
-                      )
-                    );
-                  }}
-                  onBlur={(e) => {
-                    if (e.target.value !== item.item_text) {
-                      handleUpdateText(item.id, e.target.value);
-                    }
-                  }}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      handleUpdateText(item.id, (e.target as HTMLInputElement).value);
-                    }
-                  }}
-                  disabled={saving}
-                  className="flex-1"
-                />
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDeleteItem(item.id)}
-                  disabled={saving}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+            {/* Checklist items */}
+            {checklistItems.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No checklist items configured</p>
+                <p className="text-sm">Add items above to create a checklist for this task</p>
               </div>
-            ))}
-          </div>
-        )}
+            ) : (
+              <div className="space-y-2">
+                {checklistItems.map((item, index) => (
+                  <div key={item.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                    <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                    
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={item.is_required}
+                        onCheckedChange={(checked) =>
+                          handleToggleRequired(item.id, checked as boolean)
+                        }
+                        disabled={saving}
+                      />
+                      <span className="text-sm text-muted-foreground">Required</span>
+                    </div>
 
-        {checklistItems.length > 0 && (
-          <div className="text-xs text-muted-foreground">
-            <p>• Required items must be completed before the task can be finished</p>
-            <p>• Drag items to reorder them</p>
-            <p>• Press Enter or click away to save text changes</p>
-          </div>
+                    <Input
+                      value={item.item_text}
+                      onChange={(e) => {
+                        setChecklistItems(prev =>
+                          prev.map(prevItem =>
+                            prevItem.id === item.id 
+                              ? { ...prevItem, item_text: e.target.value }
+                              : prevItem
+                          )
+                        );
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value !== item.item_text) {
+                          handleUpdateText(item.id, e.target.value);
+                        }
+                      }}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleUpdateText(item.id, (e.target as HTMLInputElement).value);
+                        }
+                      }}
+                      disabled={saving}
+                      className="flex-1"
+                    />
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteItem(item.id)}
+                      disabled={saving}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {checklistItems.length > 0 && (
+              <div className="text-xs text-muted-foreground">
+                <p>• Required items must be completed before the task can be finished</p>
+                <p>• Drag items to reorder them</p>
+                <p>• Press Enter or click away to save text changes</p>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

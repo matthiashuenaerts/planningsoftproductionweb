@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { standardTaskChecklistService, type StandardTaskChecklistItem, type TaskCompletionChecklistItem } from '@/services/standardTaskChecklistService';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
 
 interface TaskCompletionChecklistDialogProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export const TaskCompletionChecklistDialog: React.FC<TaskCompletionChecklistDial
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const { currentEmployee } = useAuth();
 
   useEffect(() => {
     if (isOpen) {
@@ -65,7 +67,7 @@ export const TaskCompletionChecklistDialog: React.FC<TaskCompletionChecklistDial
       const updatedItem = await standardTaskChecklistService.updateChecklistItemCompletion(
         completionItemId,
         checked,
-        'current-user-id' // Replace with actual user ID
+        currentEmployee?.id
       );
 
       setCompletionItems(prev =>
