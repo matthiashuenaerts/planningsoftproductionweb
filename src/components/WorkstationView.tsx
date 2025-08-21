@@ -21,6 +21,7 @@ import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListViewer } from '@/components/PartsListViewer';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
+import { TaskCompletionChecklistDialog } from '@/components/TaskCompletionChecklistDialog';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface WorkstationViewProps {
@@ -57,6 +58,8 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
   const [standardTasks, setStandardTasks] = useState<Record<string, any>>({});
   const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
+  const [checklistDialogOpen, setChecklistDialogOpen] = useState(false);
+  const [pendingCompletionTask, setPendingCompletionTask] = useState<ExtendedTask | null>(null);
   
   const {
     toast
@@ -448,27 +451,18 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
   const handleTaskUpdate = async (taskId: string, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     try {
       if (newStatus === 'COMPLETED') {
-        setCompletingTasks(prev => new Set(prev).add(taskId));
-        setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+        // Find the task to check for checklist
+        const taskToComplete = fetchedTasks.find(task => task.id === taskId);
         
-        toast({
-          title: t('success'),
-          description: t('task_completed_successfully')
-        });
-        
-        await timeRegistrationService.completeTask(taskId);
-        const completedTask = fetchedTasks.find(task => task.id === taskId);
-        if (completedTask) {
-          await checkAndUpdateLimitPhases(completedTask);
-        } else {
-          await loadTasks();
+        // Show checklist dialog if standard_task_id exists
+        if (taskToComplete && taskToComplete.standard_task_id) {
+          setPendingCompletionTask(taskToComplete);
+          setChecklistDialogOpen(true);
+          return;
         }
         
-        setCompletingTasks(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(taskId);
-          return newSet;
-        });
+        // If no checklist, proceed with normal completion
+        await performTaskCompletion(taskId);
         return;
       }
       
@@ -524,6 +518,43 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
         variant: 'destructive'
       });
     }
+  };
+
+  const performTaskCompletion = async (taskId: string) => {
+    setCompletingTasks(prev => new Set(prev).add(taskId));
+    setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+    
+    toast({
+      title: t('success'),
+      description: t('task_completed_successfully')
+    });
+    
+    await timeRegistrationService.completeTask(taskId);
+    const completedTask = fetchedTasks.find(task => task.id === taskId);
+    if (completedTask) {
+      await checkAndUpdateLimitPhases(completedTask);
+    } else {
+      await loadTasks();
+    }
+    
+    setCompletingTasks(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(taskId);
+      return newSet;
+    });
+  };
+
+  const handleCompleteWithChecklist = async () => {
+    if (pendingCompletionTask) {
+      await performTaskCompletion(pendingCompletionTask.id);
+      setPendingCompletionTask(null);
+      setChecklistDialogOpen(false);
+    }
+  };
+
+  const handleCancelCompletion = () => {
+    setPendingCompletionTask(null);
+    setChecklistDialogOpen(false);
   };
   
   const handleJoinTask = async (taskId: string) => {
@@ -955,6 +986,19 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
           onClose={() => setShowBarcodeDialog(false)}
           projectId={selectedProjectId}
           projectName={selectedProjectName}
+        />
+      )}
+      
+      {/* Task Completion Checklist Dialog */}
+      {checklistDialogOpen && pendingCompletionTask && (
+        <TaskCompletionChecklistDialog
+          isOpen={checklistDialogOpen}
+          onOpenChange={setChecklistDialogOpen}
+          taskId={pendingCompletionTask.id}
+          taskTitle={`${pendingCompletionTask.project_name} - ${pendingCompletionTask.title}`}
+          standardTaskId={pendingCompletionTask.standard_task_id}
+          onComplete={handleCompleteWithChecklist}
+          onCancel={handleCancelCompletion}
         />
       )}
     </div>
