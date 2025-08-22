@@ -5,9 +5,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, X } from 'lucide-react';
+import { Save, X, Plus, Trash2, CheckSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { checklistService, ChecklistItem } from '@/services/checklistService';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 interface LimitPhase {
   id: string;
@@ -22,6 +26,10 @@ const StandardTasksSettings: React.FC = () => {
   const [allStandardTasks, setAllStandardTasks] = useState<StandardTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const [checklists, setChecklists] = useState<Record<string, ChecklistItem[]>>({});
+  const [checklistDialogOpen, setChecklistDialogOpen] = useState<string | null>(null);
+  const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [newItemRequired, setNewItemRequired] = useState(true);
   const { toast } = useToast();
 
   // Predefined color options
@@ -53,19 +61,29 @@ const StandardTasksSettings: React.FC = () => {
         console.log('All standard tasks for limit phases:', allTasks);
         setAllStandardTasks(allTasks);
         
-        // Fetch limit phases for each standard task
+        // Fetch limit phases and checklists for each standard task
         const limitPhasesData: Record<string, LimitPhase[]> = {};
+        const checklistsData: Record<string, ChecklistItem[]> = {};
+        
         for (const task of tasks) {
           try {
+            // Fetch limit phases
             const taskLimitPhases = await standardTasksService.getLimitPhases(task.id);
             console.log(`Limit phases for task ${task.task_number}:`, taskLimitPhases);
             limitPhasesData[task.id] = taskLimitPhases;
+            
+            // Fetch checklist items
+            const taskChecklistItems = await checklistService.getChecklistItems(task.id);
+            console.log(`Checklist items for task ${task.task_number}:`, taskChecklistItems);
+            checklistsData[task.id] = taskChecklistItems;
           } catch (error) {
-            console.error(`Error fetching limit phases for task ${task.id}:`, error);
+            console.error(`Error fetching data for task ${task.id}:`, error);
             limitPhasesData[task.id] = [];
+            checklistsData[task.id] = [];
           }
         }
         setLimitPhases(limitPhasesData);
+        setChecklists(checklistsData);
       } catch (error) {
         console.error('Error loading standard tasks:', error);
         toast({
@@ -282,6 +300,108 @@ const StandardTasksSettings: React.FC = () => {
     }
   };
 
+  // Checklist management functions
+  const loadChecklistItems = async (standardTaskId: string) => {
+    try {
+      const items = await checklistService.getChecklistItems(standardTaskId);
+      setChecklists(prev => ({
+        ...prev,
+        [standardTaskId]: items
+      }));
+    } catch (error) {
+      console.error('Error loading checklist items:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load checklist items',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const addChecklistItem = async (standardTaskId: string) => {
+    if (!newChecklistItem.trim()) return;
+    
+    try {
+      const newItem = await checklistService.addChecklistItem(
+        standardTaskId, 
+        newChecklistItem.trim(), 
+        newItemRequired
+      );
+      
+      setChecklists(prev => ({
+        ...prev,
+        [standardTaskId]: [...(prev[standardTaskId] || []), newItem]
+      }));
+      
+      setNewChecklistItem('');
+      setNewItemRequired(true);
+      
+      toast({
+        title: 'Success',
+        description: 'Checklist item added successfully'
+      });
+    } catch (error) {
+      console.error('Error adding checklist item:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add checklist item',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const deleteChecklistItem = async (standardTaskId: string, itemId: string) => {
+    try {
+      await checklistService.deleteChecklistItem(itemId);
+      
+      setChecklists(prev => ({
+        ...prev,
+        [standardTaskId]: prev[standardTaskId]?.filter(item => item.id !== itemId) || []
+      }));
+      
+      toast({
+        title: 'Success',
+        description: 'Checklist item deleted successfully'
+      });
+    } catch (error) {
+      console.error('Error deleting checklist item:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete checklist item',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const toggleItemRequired = async (standardTaskId: string, item: ChecklistItem) => {
+    try {
+      const updatedItem = await checklistService.updateChecklistItem(
+        item.id, 
+        item.item_text, 
+        !item.is_required
+      );
+      
+      setChecklists(prev => ({
+        ...prev,
+        [standardTaskId]: prev[standardTaskId]?.map(i => 
+          i.id === item.id ? updatedItem : i
+        ) || []
+      }));
+      
+      toast({
+        title: 'Success',
+        description: 'Checklist item updated successfully'
+      });
+    } catch (error) {
+      console.error('Error updating checklist item:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update checklist item',
+        variant: 'destructive'
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center p-8">
@@ -311,6 +431,7 @@ const StandardTasksSettings: React.FC = () => {
                 <TableHead className="w-32">Color</TableHead>
                 <TableHead className="w-20">Actions</TableHead>
                 <TableHead className="w-96">Limit Phases (Standard Tasks)</TableHead>
+                <TableHead className="w-40">Checklist Items</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -494,6 +615,123 @@ const StandardTasksSettings: React.FC = () => {
                             })}
                           {allStandardTasks.length === 0 && (
                             <div className="text-xs text-gray-500">No standard tasks available</div>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">
+                            {(checklists[task.id] || []).length} items
+                          </span>
+                          <Dialog
+                            open={checklistDialogOpen === task.id}
+                            onOpenChange={(open) => setChecklistDialogOpen(open ? task.id : null)}
+                          >
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => loadChecklistItems(task.id)}
+                              >
+                                <CheckSquare className="h-4 w-4 mr-1" />
+                                Manage
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl">
+                              <DialogHeader>
+                                <DialogTitle>
+                                  Checklist for {task.task_number} - {task.task_name}
+                                </DialogTitle>
+                              </DialogHeader>
+                              
+                              <div className="space-y-4">
+                                {/* Add new item */}
+                                <div className="border rounded-lg p-4 space-y-3">
+                                  <h4 className="font-medium">Add New Checklist Item</h4>
+                                  <div className="space-y-2">
+                                    <Input
+                                      placeholder="Enter checklist item..."
+                                      value={newChecklistItem}
+                                      onChange={(e) => setNewChecklistItem(e.target.value)}
+                                    />
+                                    <div className="flex items-center space-x-2">
+                                      <Switch
+                                        id="required"
+                                        checked={newItemRequired}
+                                        onCheckedChange={setNewItemRequired}
+                                      />
+                                      <Label htmlFor="required">Required item</Label>
+                                    </div>
+                                    <Button
+                                      onClick={() => addChecklistItem(task.id)}
+                                      disabled={!newChecklistItem.trim()}
+                                      size="sm"
+                                    >
+                                      <Plus className="h-4 w-4 mr-1" />
+                                      Add Item
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                {/* Existing items */}
+                                <div className="space-y-2">
+                                  <h4 className="font-medium">Existing Items</h4>
+                                  {(checklists[task.id] || []).length === 0 ? (
+                                    <p className="text-muted-foreground text-sm">
+                                      No checklist items configured for this task.
+                                    </p>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {(checklists[task.id] || []).map((item) => (
+                                        <div
+                                          key={item.id}
+                                          className="flex items-center justify-between p-3 border rounded-lg"
+                                        >
+                                          <div className="flex-1">
+                                            <p className="text-sm">{item.item_text}</p>
+                                            <div className="flex items-center space-x-2 mt-1">
+                                              <Switch
+                                                checked={item.is_required}
+                                                onCheckedChange={() => toggleItemRequired(task.id, item)}
+                                                size="sm"
+                                              />
+                                              <Label className="text-xs text-muted-foreground">
+                                                {item.is_required ? 'Required' : 'Optional'}
+                                              </Label>
+                                            </div>
+                                          </div>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => deleteChecklistItem(task.id, item.id)}
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                        
+                        {/* Preview of checklist items */}
+                        <div className="space-y-1">
+                          {(checklists[task.id] || []).slice(0, 3).map((item) => (
+                            <div key={item.id} className="text-xs text-muted-foreground">
+                              • {item.item_text.substring(0, 30)}
+                              {item.item_text.length > 30 ? '...' : ''}
+                              {item.is_required && <span className="text-red-500 ml-1">*</span>}
+                            </div>
+                          ))}
+                          {(checklists[task.id] || []).length > 3 && (
+                            <div className="text-xs text-muted-foreground">
+                              ... and {(checklists[task.id] || []).length - 3} more
+                            </div>
                           )}
                         </div>
                       </div>
