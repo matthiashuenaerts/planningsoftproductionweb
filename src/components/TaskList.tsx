@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Task } from '@/services/dataService';
 import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader, TrendingUp, TrendingDown } from 'lucide-react';
+import TaskCompletionChecklistDialog from './TaskCompletionChecklistDialog';
+import { checklistService } from '@/services/checklistService';
 
 interface ExtendedTask extends Task {
   timeRemaining?: string;
@@ -40,6 +42,11 @@ const TaskList: React.FC<TaskListProps> = ({
 }) => {
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
   const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
+  const [checklistDialogTask, setChecklistDialogTask] = useState<{
+    taskId: string;
+    standardTaskId: string;
+    taskName: string;
+  } | null>(null);
 
   const getPriorityColor = (priority: string) => {
     switch (priority.toLowerCase()) {
@@ -82,6 +89,26 @@ const TaskList: React.FC<TaskListProps> = ({
 
   const handleStatusChange = async (task: ExtendedTask, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     if (newStatus === 'COMPLETED') {
+      // Check if task has a standard_task_id and checklist items before completing
+      if (task.standard_task_id) {
+        try {
+          const checklistItems = await checklistService.getChecklistItems(task.standard_task_id);
+          
+          if (checklistItems.length > 0) {
+            // Show checklist dialog
+            setChecklistDialogTask({ 
+              taskId: task.id, 
+              standardTaskId: task.standard_task_id, 
+              taskName: task.name 
+            });
+            return; // Don't complete the task yet
+          }
+        } catch (error) {
+          console.error('Error checking checklist items:', error);
+          // Continue with normal completion if checklist check fails
+        }
+      }
+      
       setLoadingTasks(prev => new Set(prev).add(task.id));
     }
 
@@ -124,6 +151,50 @@ const TaskList: React.FC<TaskListProps> = ({
         });
       }
       throw error;
+    }
+  };
+
+  const handleChecklistComplete = async () => {
+    if (!checklistDialogTask) return;
+    
+    try {
+      setLoadingTasks(prev => new Set(prev).add(checklistDialogTask.taskId));
+      
+      if (onTaskStatusChange) {
+        await onTaskStatusChange(checklistDialogTask.taskId, 'COMPLETED');
+      } else if (onTaskUpdate) {
+        const task = tasks.find(t => t.id === checklistDialogTask.taskId);
+        if (task) {
+          const updatedTask = { ...task, status: 'COMPLETED' as const, completed_at: new Date().toISOString() };
+          onTaskUpdate(updatedTask);
+        }
+      }
+
+      // Show completion animation
+      setLoadingTasks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(checklistDialogTask.taskId);
+        return newSet;
+      });
+      setCompletingTasks(prev => new Set(prev).add(checklistDialogTask.taskId));
+      
+      // Remove completion animation after 1 second
+      setTimeout(() => {
+        setCompletingTasks(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(checklistDialogTask.taskId);
+          return newSet;
+        });
+      }, 1000);
+      
+      setChecklistDialogTask(null);
+    } catch (error) {
+      console.error('Error completing task:', error);
+      setLoadingTasks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(checklistDialogTask.taskId);
+        return newSet;
+      });
     }
   };
 
@@ -343,6 +414,19 @@ const TaskList: React.FC<TaskListProps> = ({
           </Card>
         );
       })}
+      
+      {/* Checklist Dialog */}
+      {checklistDialogTask && (
+        <TaskCompletionChecklistDialog
+          open={!!checklistDialogTask}
+          onOpenChange={(open) => {
+            if (!open) setChecklistDialogTask(null);
+          }}
+          standardTaskId={checklistDialogTask.standardTaskId}
+          taskName={checklistDialogTask.taskName}
+          onComplete={handleChecklistComplete}
+        />
+      )}
     </div>
   );
 };

@@ -695,7 +695,6 @@ const StandardTasksSettings: React.FC = () => {
                                               <Switch
                                                 checked={item.is_required}
                                                 onCheckedChange={() => toggleItemRequired(task.id, item)}
-                                                size="sm"
                                               />
                                               <Label className="text-xs text-muted-foreground">
                                                 {item.is_required ? 'Required' : 'Optional'}
