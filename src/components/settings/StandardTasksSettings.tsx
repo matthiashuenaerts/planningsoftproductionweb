@@ -5,11 +5,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, X, ChevronDown, ChevronUp, List } from 'lucide-react';
+import { Save, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { StandardTaskChecklistManager } from './StandardTaskChecklistManager';
 
 interface LimitPhase {
   id: string;
@@ -24,7 +22,6 @@ const StandardTasksSettings: React.FC = () => {
   const [allStandardTasks, setAllStandardTasks] = useState<StandardTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<Record<string, boolean>>({});
-  const [expandedChecklists, setExpandedChecklists] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   // Predefined color options
@@ -314,7 +311,6 @@ const StandardTasksSettings: React.FC = () => {
                 <TableHead className="w-32">Color</TableHead>
                 <TableHead className="w-20">Actions</TableHead>
                 <TableHead className="w-96">Limit Phases (Standard Tasks)</TableHead>
-                <TableHead className="w-24">Checklist</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -502,24 +498,6 @@ const StandardTasksSettings: React.FC = () => {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setExpandedChecklists(prev => ({
-                          ...prev,
-                          [task.id]: !prev[task.id]
-                        }))}
-                        className="w-full"
-                      >
-                        <List className="h-4 w-4 mr-1" />
-                        {expandedChecklists[task.id] ? (
-                          <ChevronUp className="h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -527,25 +505,6 @@ const StandardTasksSettings: React.FC = () => {
           </Table>
         </CardContent>
       </Card>
-
-      {/* Checklist Management Sections */}
-      {standardTasks.map((task) => (
-        <Collapsible 
-          key={`checklist-${task.id}`} 
-          open={expandedChecklists[task.id]}
-          onOpenChange={(open) => setExpandedChecklists(prev => ({
-            ...prev,
-            [task.id]: open
-          }))}
-        >
-          <CollapsibleContent>
-            <StandardTaskChecklistManager
-              standardTaskId={task.id}
-              standardTaskName={`${task.task_number} - ${task.task_name}`}
-            />
-          </CollapsibleContent>
-        </Collapsible>
-      ))}
     </div>
   );
 };
