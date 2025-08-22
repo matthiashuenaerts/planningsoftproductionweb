@@ -8,6 +8,7 @@ import { workstationService } from '@/services/workstationService';
 import { standardTasksService } from '@/services/standardTasksService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { workstationTasksService } from '@/services/workstationTasksService';
+import { checklistService } from '@/services/checklistService';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListViewer } from '@/components/PartsListViewer';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
+import TaskCompletionChecklistDialog from '@/components/TaskCompletionChecklistDialog';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface WorkstationViewProps {
@@ -57,6 +59,11 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
   const [standardTasks, setStandardTasks] = useState<Record<string, any>>({});
   const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
+  const [checklistDialogTask, setChecklistDialogTask] = useState<{
+    taskId: string;
+    standardTaskId: string;
+    taskName: string;
+  } | null>(null);
   
   const {
     toast
@@ -448,6 +455,30 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
   const handleTaskUpdate = async (taskId: string, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     try {
       if (newStatus === 'COMPLETED') {
+        // Find the task to check for standard_task_id
+        const currentTask = fetchedTasks.find(task => task.id === taskId);
+        
+        // Check if task has a standard_task_id and checklist items before completing
+        if (currentTask?.standard_task_id) {
+          try {
+            const checklistItems = await checklistService.getChecklistItems(currentTask.standard_task_id);
+            
+            if (checklistItems.length > 0) {
+              // Show checklist dialog - user must complete checklist before task completion
+              setChecklistDialogTask({ 
+                taskId: taskId, 
+                standardTaskId: currentTask.standard_task_id, 
+                taskName: currentTask.title 
+              });
+              return; // Don't complete the task yet - wait for checklist completion
+            }
+          } catch (error) {
+            console.error('Error checking checklist items:', error);
+            // Continue with normal completion if checklist check fails
+          }
+        }
+        
+        // No checklist or empty checklist - proceed with normal completion
         setCompletingTasks(prev => new Set(prev).add(taskId));
         setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
         
@@ -955,6 +986,34 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
           onClose={() => setShowBarcodeDialog(false)}
           projectId={selectedProjectId}
           projectName={selectedProjectName}
+        />
+      )}
+      
+      {/* Checklist Dialog */}
+      {checklistDialogTask && (
+        <TaskCompletionChecklistDialog
+          open={!!checklistDialogTask}
+          onOpenChange={(open) => {
+            if (!open) setChecklistDialogTask(null);
+          }}
+          standardTaskId={checklistDialogTask.standardTaskId}
+          taskName={checklistDialogTask.taskName}
+          onComplete={async () => {
+            if (!checklistDialogTask) return;
+            
+            try {
+              // Complete the task after checklist is done
+              await handleTaskUpdate(checklistDialogTask.taskId, 'COMPLETED');
+              setChecklistDialogTask(null);
+            } catch (error) {
+              console.error('Error completing task after checklist:', error);
+              toast({
+                title: t('error'),
+                description: t('failed_to_complete_task_error'),
+                variant: 'destructive'
+              });
+            }
+          }}
         />
       )}
     </div>
