@@ -452,6 +452,45 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
     }
   };
   
+  // Direct task completion without checklist checks (used after checklist is completed)
+  const completeTaskDirectly = async (taskId: string) => {
+    try {
+      setCompletingTasks(prev => new Set(prev).add(taskId));
+      setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+      
+      toast({
+        title: t('success'),
+        description: t('task_completed_successfully')
+      });
+      
+      await timeRegistrationService.completeTask(taskId);
+      const completedTask = fetchedTasks.find(task => task.id === taskId);
+      if (completedTask) {
+        await checkAndUpdateLimitPhases(completedTask);
+      } else {
+        await loadTasks();
+      }
+      
+      setCompletingTasks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
+    } catch (error) {
+      console.error('Error completing task:', error);
+      toast({
+        title: t('error'),
+        description: t('failed_to_complete_task_error'),
+        variant: 'destructive'
+      });
+      setCompletingTasks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
+    }
+  };
+
   const handleTaskUpdate = async (taskId: string, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     try {
       if (newStatus === 'COMPLETED') {
@@ -1002,8 +1041,8 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
             if (!checklistDialogTask) return;
             
             try {
-              // Complete the task after checklist is done
-              await handleTaskUpdate(checklistDialogTask.taskId, 'COMPLETED');
+              // Complete the task directly without checklist checks (since checklist is already done)
+              await completeTaskDirectly(checklistDialogTask.taskId);
               setChecklistDialogTask(null);
             } catch (error) {
               console.error('Error completing task after checklist:', error);
