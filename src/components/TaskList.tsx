@@ -95,13 +95,13 @@ const TaskList: React.FC<TaskListProps> = ({
           const checklistItems = await checklistService.getChecklistItems(task.standard_task_id);
           
           if (checklistItems.length > 0) {
-            // Show checklist dialog
+            // Show checklist dialog - user must complete checklist before task completion
             setChecklistDialogTask({ 
               taskId: task.id, 
               standardTaskId: task.standard_task_id, 
               taskName: task.title 
             });
-            return; // Don't complete the task yet
+            return; // Don't complete the task yet - wait for checklist completion
           }
         } catch (error) {
           console.error('Error checking checklist items:', error);
@@ -109,6 +109,7 @@ const TaskList: React.FC<TaskListProps> = ({
         }
       }
       
+      // No checklist or empty checklist - proceed with normal completion
       setLoadingTasks(prev => new Set(prev).add(task.id));
     }
 
