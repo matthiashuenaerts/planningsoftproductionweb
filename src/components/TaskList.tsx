@@ -99,7 +99,7 @@ const TaskList: React.FC<TaskListProps> = ({
             setChecklistDialogTask({ 
               taskId: task.id, 
               standardTaskId: task.standard_task_id, 
-              taskName: task.name 
+              taskName: task.title 
             });
             return; // Don't complete the task yet
           }
