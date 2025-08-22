@@ -864,7 +864,7 @@ const ProjectDetails = () => {
             </div>
           </div>
         </div>
-      </div>;
+      </div>
   }
   const formatDate = (dateString: string) => {
     try {
@@ -1519,24 +1519,10 @@ const ProjectDetails = () => {
 
       <NewOrderModal open={showNewOrderModal} onOpenChange={setShowNewOrderModal} projectId={projectId!} onSuccess={handleNewOrderSuccess} showAddOrderButton={true} accessories={accessories} installationDate={project?.installation_date} />
 
-
-
       <ProjectBarcodeDialog isOpen={showBarcodeDialog} onClose={() => setShowBarcodeDialog(false)} projectId={projectId!} projectName={project?.name || ''} />
 
       {selectedOrderId && <OrderEditModal open={showOrderEditModal} onOpenChange={setShowOrderEditModal} orderId={selectedOrderId} onSuccess={handleOrderEditSuccess} />}
 
-      {/* Checklist Dialog */}
-      {checklistDialogTask && (
-        <TaskCompletionChecklistDialog
-          open={!!checklistDialogTask}
-          onOpenChange={(open) => {
-            if (!open) setChecklistDialogTask(null);
-          }}
-          standardTaskId={checklistDialogTask.standardTaskId}
-          taskName={checklistDialogTask.taskName}
-          onComplete={handleChecklistComplete}
-        />
-      )}
     </div>
   );
 };
