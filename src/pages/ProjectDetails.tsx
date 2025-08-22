@@ -607,25 +607,6 @@ const ProjectDetails = () => {
           description: t('task_started_desc')
         });
       } else if (statusValue === 'COMPLETED') {
-        // Check if task has a standard_task_id and checklist items before completing
-        const currentTask = tasks.find(t => t.id === taskId);
-        if (currentTask?.standard_task_id) {
-          // Import checklistService dynamically
-          const { checklistService } = await import('@/services/checklistService');
-          const checklistItems = await checklistService.getChecklistItems(currentTask.standard_task_id);
-          
-          if (checklistItems.length > 0) {
-            // Show checklist dialog
-            setChecklistDialogTask({ 
-              taskId, 
-              standardTaskId: currentTask.standard_task_id, 
-              taskName: currentTask.name 
-            });
-            return; // Don't complete the task yet
-          }
-        }
-        
-        // No checklist or empty checklist - proceed with normal completion
         await timeRegistrationService.completeTask(taskId);
         toast({
           title: t('task_completed'),
@@ -661,32 +642,6 @@ const ProjectDetails = () => {
       toast({
         title: t('error'),
         description: t('task_status_update_error', {
-          message: error.message
-        }),
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleChecklistComplete = async () => {
-    if (!checklistDialogTask) return;
-    
-    try {
-      await timeRegistrationService.completeTask(checklistDialogTask.taskId);
-      toast({
-        title: t('task_completed'),
-        description: t('task_completed_desc')
-      });
-      
-      // Update tasks after completion
-      await checkAndUpdateLimitPhases(checklistDialogTask.taskId);
-      await fetchAndSetSortedTasks(projectId);
-      
-      setChecklistDialogTask(null);
-    } catch (error: any) {
-      toast({
-        title: t('error'),
-        description: t('task_completion_error', {
           message: error.message
         }),
         variant: "destructive"
@@ -864,7 +819,7 @@ const ProjectDetails = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div>;
   }
   const formatDate = (dateString: string) => {
     try {
