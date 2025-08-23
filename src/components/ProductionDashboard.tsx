@@ -20,8 +20,11 @@ import {
   Target,
   Timer,
   ListTodo,
-  Zap
+  Zap,
+  BarChart3,
+  Activity
 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { taskService, projectService, Project, Task } from '@/services/dataService';
 import { rushOrderService } from '@/services/rushOrderService';
 import { supabase } from '@/integrations/supabase/client';
@@ -65,6 +68,12 @@ interface ProductionMetrics {
   efficiency: number;
 }
 
+interface ChartData {
+  weeklyTasks: Array<{ name: string; completed: number; total: number }>;
+  projectStatus: Array<{ name: string; value: number; color: string }>;
+  workstationEfficiency: Array<{ name: string; efficiency: number }>;
+}
+
 const ProductionDashboard: React.FC = () => {
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
@@ -84,6 +93,11 @@ const ProductionDashboard: React.FC = () => {
     delayedProjects: 0,
     efficiency: 0
   });
+  const [chartData, setChartData] = useState<ChartData>({
+    weeklyTasks: [],
+    projectStatus: [],
+    workstationEfficiency: []
+  });
 
   useEffect(() => {
     fetchDashboardData();
@@ -101,7 +115,8 @@ const ProductionDashboard: React.FC = () => {
         fetchTodayTruckLoadings(),
         fetchUpcomingLogistics(),
         fetchUnstartedRushOrders(),
-        fetchProductionMetrics()
+        fetchProductionMetrics(),
+        fetchChartData()
       ]);
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
@@ -240,6 +255,60 @@ const ProductionDashboard: React.FC = () => {
       });
     } catch (error) {
       console.error('Error fetching production metrics:', error);
+    }
+  };
+
+  const fetchChartData = async () => {
+    try {
+      const allTasks = await taskService.getAll();
+      const allProjects = await projectService.getAll();
+      
+      // Weekly task completion data (last 7 days)
+      const weeklyTasks = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        const dayName = date.toLocaleDateString('en', { weekday: 'short' });
+        
+        const dayTasks = allTasks.filter(task => task.due_date === dateStr);
+        const completed = dayTasks.filter(task => task.status === 'COMPLETED').length;
+        
+        weeklyTasks.push({
+          name: dayName,
+          completed,
+          total: dayTasks.length
+        });
+      }
+
+      // Project status distribution
+      const statusCounts = allProjects.reduce((acc, project) => {
+        acc[project.status] = (acc[project.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const projectStatus = Object.entries(statusCounts).map(([status, count]) => ({
+        name: status.replace('_', ' ').toUpperCase(),
+        value: count,
+        color: status === 'completed' ? '#22c55e' : 
+               status === 'in_progress' ? '#3b82f6' : 
+               status === 'planning' ? '#f59e0b' : '#ef4444'
+      }));
+
+      // Workstation efficiency (mock data for now - would need workstation-specific task data)
+      const { data: workstations } = await supabase.from('workstations').select('name');
+      const workstationEfficiency = (workstations || []).slice(0, 6).map(ws => ({
+        name: ws.name,
+        efficiency: Math.floor(Math.random() * 30) + 70 // Mock efficiency between 70-100%
+      }));
+
+      setChartData({
+        weeklyTasks,
+        projectStatus,
+        workstationEfficiency
+      });
+    } catch (error) {
+      console.error('Error fetching chart data:', error);
     }
   };
 
@@ -471,69 +540,175 @@ const ProductionDashboard: React.FC = () => {
           </Card>
         </div>
 
-        {/* Rush Orders & Alerts Column */}
+        {/* Charts & Analytics Column */}
         <div className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-red-600" />
-                Urgent Rush Orders
+                <BarChart3 className="h-5 w-5 text-blue-600" />
+                Weekly Task Completion
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {unstartedRushOrders.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground">
-                  <CheckCircle2 className="mx-auto h-8 w-8 mb-2 opacity-30" />
-                  <p>No urgent orders</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {unstartedRushOrders.map((order) => (
-                    <div key={order.id} className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="destructive" className="text-xs">
-                          {order.priority}
-                        </Badge>
-                        <span className="text-xs text-red-600">
-                          Due: {format(new Date(order.deadline), 'MMM dd')}
-                        </span>
-                      </div>
-                      <h4 className="font-medium text-sm">{order.title}</h4>
-                      <p className="text-xs text-muted-foreground">
-                        Created: {format(new Date(order.created_at), 'MMM dd, HH:mm')}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData.weeklyTasks}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="completed" fill="hsl(var(--primary))" />
+                    <Bar dataKey="total" fill="hsl(var(--muted))" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Timer className="h-5 w-5 text-orange-600" />
-                Quick Actions
+                <Activity className="h-5 w-5 text-green-600" />
+                Project Status Distribution
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full justify-start" size="sm">
-                <Calendar className="mr-2 h-4 w-4" />
-                View Full Schedule
-              </Button>
-              <Button variant="outline" className="w-full justify-start" size="sm">
-                <Clock className="mr-2 h-4 w-4" />
-                Time Registration
-              </Button>
-              <Button variant="outline" className="w-full justify-start" size="sm">
-                <ListTodo className="mr-2 h-4 w-4" />
-                Personal Tasks
-              </Button>
+            <CardContent>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={chartData.projectStatus}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {chartData.projectStatus.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-4">
+                {chartData.projectStatus.map((item, index) => (
+                  <div key={index} className="flex items-center gap-1">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: item.color }}
+                    ></div>
+                    <span className="text-xs text-muted-foreground">
+                      {item.name} ({item.value})
+                    </span>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Additional Analytics Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-purple-600" />
+              Workstation Efficiency
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData.workstationEfficiency} layout="horizontal">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" domain={[0, 100]} />
+                  <YAxis type="category" dataKey="name" width={80} />
+                  <Tooltip formatter={(value) => [`${value}%`, 'Efficiency']} />
+                  <Bar dataKey="efficiency" fill="hsl(var(--primary))" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-red-600" />
+              Urgent Rush Orders
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {unstartedRushOrders.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <CheckCircle2 className="mx-auto h-12 w-12 mb-4 opacity-30" />
+                <p>No urgent orders pending</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-52 overflow-y-auto">
+                {unstartedRushOrders.map((order) => (
+                  <div key={order.id} className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="destructive" className="text-xs">
+                        {order.priority}
+                      </Badge>
+                      <span className="text-xs text-red-600">
+                        Due: {format(new Date(order.deadline), 'MMM dd')}
+                      </span>
+                    </div>
+                    <h4 className="font-medium text-sm">{order.title}</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Created: {format(new Date(order.created_at), 'MMM dd, HH:mm')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Actions Bar */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Timer className="h-5 w-5 text-orange-600" />
+            Quick Actions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <Button variant="outline" className="justify-start" size="sm">
+              <Calendar className="mr-2 h-4 w-4" />
+              Schedule
+            </Button>
+            <Button variant="outline" className="justify-start" size="sm">
+              <Clock className="mr-2 h-4 w-4" />
+              Time Reg
+            </Button>
+            <Button variant="outline" className="justify-start" size="sm">
+              <ListTodo className="mr-2 h-4 w-4" />
+              Tasks
+            </Button>
+            <Button variant="outline" className="justify-start" size="sm">
+              <Truck className="mr-2 h-4 w-4" />
+              Logistics
+            </Button>
+            <Button variant="outline" className="justify-start" size="sm">
+              <Package className="mr-2 h-4 w-4" />
+              Orders
+            </Button>
+            <Button variant="outline" className="justify-start" size="sm">
+              <Target className="mr-2 h-4 w-4" />
+              Projects
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

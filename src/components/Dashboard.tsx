@@ -1,6 +1,5 @@
 import React from 'react';
 import ProductionDashboard from './ProductionDashboard';
-import SeedDataButton from './SeedDataButton';
 import { useAuth } from '@/context/AuthContext';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ShieldCheck } from "lucide-react";
@@ -20,8 +19,6 @@ const Dashboard: React.FC = () => {
         </Alert>
       )}
 
-      <SeedDataButton />
-      
       <ProductionDashboard />
     </div>
   );
