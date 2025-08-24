@@ -63,36 +63,63 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
 
   const startCamera = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
+      console.log('Starting camera with facingMode:', facingMode);
+      
+      // Stop any existing stream first
+      stopCamera();
+      
+      const constraints = {
         video: { 
           facingMode,
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
-      });
+      };
+      
+      console.log('Requesting camera with constraints:', constraints);
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('Camera stream obtained:', mediaStream);
+      
       setStream(mediaStream);
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        videoRef.current.play().catch(console.error);
-      }
+      // Wait a moment then set the video source
+      setTimeout(() => {
+        if (videoRef.current && mediaStream) {
+          console.log('Setting video srcObject');
+          videoRef.current.srcObject = mediaStream;
+          videoRef.current.onloadedmetadata = () => {
+            console.log('Video metadata loaded, attempting to play');
+            if (videoRef.current) {
+              videoRef.current.play()
+                .then(() => console.log('Video playing successfully'))
+                .catch(error => console.error('Error playing video:', error));
+            }
+          };
+        }
+      }, 100);
+      
     } catch (error) {
       console.error('Error accessing camera:', error);
       toast({
         title: "Camera Error",
-        description: "Could not access camera. Please check permissions and ensure you're using HTTPS.",
+        description: `Camera failed: ${error.message}. Please try again.`,
         variant: "destructive"
       });
     }
   };
 
   const stopCamera = () => {
+    console.log('Stopping camera');
     if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach(track => {
+        console.log('Stopping track:', track);
+        track.stop();
+      });
       setStream(null);
     }
     if (videoRef.current) {
       videoRef.current.srcObject = null;
+      videoRef.current.pause();
     }
   };
 
@@ -339,11 +366,15 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                     playsInline
                     muted
                     className="w-full h-64 object-cover"
-                    onLoadedMetadata={() => {
+                    style={{ background: '#000' }}
+                    onLoadedData={() => {
+                      console.log('Video data loaded');
                       if (videoRef.current) {
-                        videoRef.current.play().catch(console.error);
+                        console.log('Video dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
                       }
                     }}
+                    onPlay={() => console.log('Video started playing')}
+                    onError={(e) => console.error('Video error:', e)}
                   />
                 ) : (
                   <div className="w-full h-64 flex items-center justify-center text-white">
@@ -363,12 +394,15 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                   </Button>
                 ) : (
                   <>
-                    <Button onClick={captureImage}>
+                    <Button onClick={captureImage} disabled={!videoRef.current?.videoWidth}>
                       <Camera className="h-4 w-4 mr-2" />
                       Capture Photo
                     </Button>
                     <Button variant="outline" onClick={switchCamera}>
                       Switch Camera
+                    </Button>
+                    <Button variant="outline" onClick={stopCamera}>
+                      Stop Camera
                     </Button>
                   </>
                 )}
