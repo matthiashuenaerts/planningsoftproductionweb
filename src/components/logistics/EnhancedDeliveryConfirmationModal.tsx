@@ -64,18 +64,23 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
   const startCamera = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode }
+        video: { 
+          facingMode,
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
       });
       setStream(mediaStream);
       
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        videoRef.current.play().catch(console.error);
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
       toast({
         title: "Camera Error",
-        description: "Could not access camera. Please check permissions.",
+        description: "Could not access camera. Please check permissions and ensure you're using HTTPS.",
         variant: "destructive"
       });
     }
@@ -85,6 +90,9 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
   };
 
@@ -112,7 +120,10 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
   const switchCamera = async () => {
     stopCamera();
     setFacingMode(facingMode === 'user' ? 'environment' : 'user');
-    await startCamera();
+    // Wait a moment for the camera to fully release
+    setTimeout(() => {
+      startCamera();
+    }, 500);
   };
 
   const updateItemDelivery = (itemId: string, field: 'deliveredQuantity' | 'stockLocation', value: string | number) => {
@@ -326,7 +337,13 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                     ref={videoRef}
                     autoPlay
                     playsInline
+                    muted
                     className="w-full h-64 object-cover"
+                    onLoadedMetadata={() => {
+                      if (videoRef.current) {
+                        videoRef.current.play().catch(console.error);
+                      }
+                    }}
                   />
                 ) : (
                   <div className="w-full h-64 flex items-center justify-center text-white">
