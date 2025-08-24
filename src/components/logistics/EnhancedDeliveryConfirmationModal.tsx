@@ -365,7 +365,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-64 object-cover"
+                    className="w-full h-80 object-cover"
                     style={{ background: '#000' }}
                     onLoadedData={() => {
                       console.log('Video data loaded');
@@ -377,7 +377,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                     onError={(e) => console.error('Video error:', e)}
                   />
                 ) : (
-                  <div className="w-full h-64 flex items-center justify-center text-white">
+                  <div className="w-full h-80 flex items-center justify-center text-white">
                     <div className="text-center">
                       <Camera className="h-12 w-12 mx-auto mb-2" />
                       <p>Camera not started</p>
@@ -394,15 +394,12 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                   </Button>
                 ) : (
                   <>
-                    <Button onClick={captureImage} disabled={!videoRef.current?.videoWidth}>
+                    <Button onClick={captureImage}>
                       <Camera className="h-4 w-4 mr-2" />
                       Capture Photo
                     </Button>
                     <Button variant="outline" onClick={switchCamera}>
                       Switch Camera
-                    </Button>
-                    <Button variant="outline" onClick={stopCamera}>
-                      Stop Camera
                     </Button>
                   </>
                 )}
@@ -414,7 +411,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                   <div className="grid grid-cols-3 gap-2">
                     {capturedImages.map((image, index) => (
                       <div key={index} className="relative">
-                        <img src={image} alt={`Captured ${index + 1}`} className="w-full h-20 object-cover rounded border" />
+                        <img src={image} alt={`Captured ${index + 1}`} className="w-full h-32 object-cover rounded border" />
                         <Button
                           size="sm"
                           variant="destructive"
