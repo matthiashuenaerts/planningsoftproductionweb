@@ -5,7 +5,7 @@ export interface Order {
   supplier: string;
   order_date: string;
   expected_delivery: string;
-  status: 'pending' | 'delivered' | 'canceled' | 'delayed';
+  status: 'pending' | 'delivered' | 'canceled' | 'delayed' | 'partially_delivered';
   created_at: string;
   updated_at: string;
   order_type: 'standard' | 'semi-finished';
@@ -23,6 +23,8 @@ export interface OrderItem {
   updated_at: string;
   accessory_id?: string | null;
   notes?: string | null;
+  delivered_quantity?: number;
+  stock_location?: string | null;
 }
 
 export interface OrderAttachment {

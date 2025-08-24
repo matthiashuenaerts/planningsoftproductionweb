@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Order } from '@/types/order';
-import { DeliveryConfirmationModal } from './DeliveryConfirmationModal';
+import { EnhancedDeliveryConfirmationModal } from './EnhancedDeliveryConfirmationModal';
 import { format } from 'date-fns';
 import { Truck, Package, Building2, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { orderService } from '@/services/orderService';
@@ -196,7 +196,7 @@ export const TodaysDeliveries: React.FC<TodaysDeliveriesProps> = ({
       </Card>
 
       {selectedOrder && (
-        <DeliveryConfirmationModal
+        <EnhancedDeliveryConfirmationModal
           order={selectedOrder}
           isOpen={!!selectedOrder}
           onClose={() => setSelectedOrder(null)}

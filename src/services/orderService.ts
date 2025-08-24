@@ -115,22 +115,39 @@ export const orderService = {
     if (error) throw error;
   },
 
-  async confirmDelivery(orderId: string): Promise<void> {
-    // Update order status to delivered
-    const { error: orderError } = await supabase
-      .from('orders')
-      .update({ status: 'delivered' })
-      .eq('id', orderId);
+  async confirmDelivery(orderId: string, deliveryData?: { itemDeliveries: Array<{itemId: string, deliveredQuantity: number, stockLocation?: string}> }): Promise<void> {
+    if (deliveryData?.itemDeliveries) {
+      // Update delivered quantities for each item
+      for (const delivery of deliveryData.itemDeliveries) {
+        await supabase
+          .from('order_items')
+          .update({ 
+            delivered_quantity: delivery.deliveredQuantity,
+            stock_location: delivery.stockLocation 
+          })
+          .eq('id', delivery.itemId);
+      }
 
-    if (orderError) throw orderError;
+      // Check if all items are fully delivered
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('quantity, delivered_quantity')
+        .eq('order_id', orderId);
 
-    // Update all accessories linked to this order to 'delivered' status
-    const { error: accessoriesError } = await supabase
-      .from('accessories')
-      .update({ status: 'delivered' })
-      .eq('order_id', orderId);
+      const allItemsDelivered = orderItems?.every(item => item.delivered_quantity >= item.quantity);
+      const someItemsDelivered = orderItems?.some(item => item.delivered_quantity > 0);
 
-    if (accessoriesError) throw accessoriesError;
+      if (allItemsDelivered) {
+        await this.updateLinkedAccessoriesStatus(orderId, 'delivered');
+        await this.updateOrderStatus(orderId, 'delivered');
+      } else if (someItemsDelivered) {
+        await this.updateOrderStatus(orderId, 'partially_delivered');
+      }
+    } else {
+      // Legacy behavior - mark everything as delivered
+      await this.updateLinkedAccessoriesStatus(orderId, 'delivered');
+      await this.updateOrderStatus(orderId, 'delivered');
+    }
   },
 
   async getLogisticsOutOrders(): Promise<Order[]> {
