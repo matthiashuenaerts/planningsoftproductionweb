@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Order } from '@/types/order';
-import { DeliveryConfirmationModal } from './DeliveryConfirmationModal';
+import { EnhancedDeliveryConfirmationModal } from './EnhancedDeliveryConfirmationModal';
 import { format } from 'date-fns';
 import { Calendar, Package, Building2, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { orderService } from '@/services/orderService';
@@ -35,6 +35,7 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
     
     switch (status) {
       case 'delivered': return 'bg-green-100 text-green-800';
+      case 'partially_delivered': return 'bg-blue-100 text-blue-800';
       case 'canceled': return 'bg-red-100 text-red-800';
       case 'delayed': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -90,17 +91,25 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Article Code</TableHead>
               <TableHead>Description</TableHead>
-              <TableHead className="text-right">Quantity</TableHead>
-              <TableHead className="text-right">Article Code</TableHead>
+              <TableHead className="text-center">Ordered</TableHead>
+              <TableHead className="text-center">Delivered</TableHead>
+              <TableHead>Location</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {orderItems.map((item) => (
               <TableRow key={item.id}>
+                <TableCell>{item.article_code}</TableCell>
                 <TableCell>{item.description}</TableCell>
-                <TableCell className="text-right">{item.quantity}</TableCell>
-                <TableCell className="text-right">{item.article_code}</TableCell>
+                <TableCell className="text-center">{item.quantity}</TableCell>
+                <TableCell className="text-center">
+                  <span className={item.delivered_quantity && item.delivered_quantity > 0 ? 'text-green-600 font-medium' : ''}>
+                    {item.delivered_quantity || 0}
+                  </span>
+                </TableCell>
+                <TableCell>{item.stock_location || '-'}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -221,7 +230,7 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
       </Card>
 
       {selectedOrder && (
-        <DeliveryConfirmationModal
+        <EnhancedDeliveryConfirmationModal
           order={selectedOrder}
           isOpen={!!selectedOrder}
           onClose={() => setSelectedOrder(null)}
