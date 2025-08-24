@@ -550,11 +550,13 @@ export type Database = {
           accessory_id: string | null
           article_code: string | null
           created_at: string
+          delivered_quantity: number
           description: string
           id: string
           notes: string | null
           order_id: string
           quantity: number
+          stock_location: string | null
           total_price: number | null
           unit_price: number | null
           updated_at: string
@@ -563,11 +565,13 @@ export type Database = {
           accessory_id?: string | null
           article_code?: string | null
           created_at?: string
+          delivered_quantity?: number
           description: string
           id?: string
           notes?: string | null
           order_id: string
           quantity: number
+          stock_location?: string | null
           total_price?: number | null
           unit_price?: number | null
           updated_at?: string
@@ -576,11 +580,13 @@ export type Database = {
           accessory_id?: string | null
           article_code?: string | null
           created_at?: string
+          delivered_quantity?: number
           description?: string
           id?: string
           notes?: string | null
           order_id?: string
           quantity?: number
+          stock_location?: string | null
           total_price?: number | null
           unit_price?: number | null
           updated_at?: string
