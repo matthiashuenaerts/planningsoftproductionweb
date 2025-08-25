@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Order } from '@/types/order';
-import { DeliveryConfirmationModal } from './DeliveryConfirmationModal';
+import { EnhancedDeliveryConfirmationModal } from './EnhancedDeliveryConfirmationModal';
 import { format, differenceInDays } from 'date-fns';
 import { AlertTriangle, Package, Building2, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { orderService } from '@/services/orderService';
@@ -217,7 +217,7 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
       </Card>
 
       {selectedOrder && (
-        <DeliveryConfirmationModal
+        <EnhancedDeliveryConfirmationModal
           order={selectedOrder}
           isOpen={!!selectedOrder}
           onClose={() => setSelectedOrder(null)}

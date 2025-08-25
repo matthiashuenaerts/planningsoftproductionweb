@@ -36,7 +36,7 @@ import { format } from 'date-fns';
 import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ImportStockOrderModal from '@/components/ImportStockOrderModal';
-import { DeliveryConfirmationModal } from '@/components/logistics/DeliveryConfirmationModal';
+import { EnhancedDeliveryConfirmationModal } from '@/components/logistics/EnhancedDeliveryConfirmationModal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -718,7 +718,7 @@ const Orders: React.FC = () => {
       )}
 
       {selectedOrderForDelivery && (
-        <DeliveryConfirmationModal
+        <EnhancedDeliveryConfirmationModal
           order={selectedOrderForDelivery}
           isOpen={showDeliveryModal}
           onClose={() => {

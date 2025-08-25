@@ -17,7 +17,7 @@ import { accessoriesService, Accessory } from '@/services/accessoriesService';
 import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
 import NewOrderModal from '@/components/NewOrderModal';
 import OrderEditModal from '@/components/OrderEditModal';
-import { DeliveryConfirmationModal } from '@/components/logistics/DeliveryConfirmationModal';
+import { EnhancedDeliveryConfirmationModal } from '@/components/logistics/EnhancedDeliveryConfirmationModal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -576,7 +576,7 @@ const ProjectOrders = () => {
       )}
 
       {selectedOrderForDelivery && (
-        <DeliveryConfirmationModal
+        <EnhancedDeliveryConfirmationModal
           order={selectedOrderForDelivery}
           isOpen={showDeliveryModal}
           onClose={() => {
