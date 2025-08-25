@@ -55,13 +55,16 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
   useEffect(() => {
     if (orderItems.length > 0 && itemDeliveries.length === 0) {
       setItemDeliveries(
-        orderItems.map(item => ({
-          itemId: item.id,
-          deliveredQuantity: item.quantity - (item.delivered_quantity || 0),
-          stockLocation: item.stock_location || '',
-          isFullyDelivered: true,
-          notDeliveredQuantity: 0
-        }))
+        orderItems.map(item => {
+          const remainingQuantity = item.quantity - (item.delivered_quantity || 0);
+          return {
+            itemId: item.id,
+            deliveredQuantity: remainingQuantity, // Default to delivering all remaining
+            stockLocation: item.stock_location || '',
+            isFullyDelivered: true,
+            notDeliveredQuantity: 0
+          };
+        })
       );
     }
   }, [orderItems, itemDeliveries.length]);
@@ -190,8 +193,23 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
         await orderService.uploadOrderAttachment(order.id, file);
       }
 
+      // Transform itemDeliveries to include cumulative delivered quantities
+      const deliveryData = {
+        itemDeliveries: itemDeliveries.map(delivery => {
+          const orderItem = orderItems.find(item => item.id === delivery.itemId);
+          const previouslyDelivered = orderItem?.delivered_quantity || 0;
+          const totalDelivered = previouslyDelivered + delivery.deliveredQuantity;
+          
+          return {
+            itemId: delivery.itemId,
+            deliveredQuantity: totalDelivered, // Total cumulative quantity
+            stockLocation: delivery.stockLocation
+          };
+        })
+      };
+
       // Update order with delivery data
-      await orderService.confirmDelivery(order.id, { itemDeliveries });
+      await orderService.confirmDelivery(order.id, deliveryData);
 
       toast({
         title: "Delivery Confirmed",
