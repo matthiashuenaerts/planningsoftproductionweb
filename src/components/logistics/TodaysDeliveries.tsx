@@ -74,7 +74,8 @@ export const TodaysDeliveries: React.FC<TodaysDeliveriesProps> = ({
           <TableHeader>
             <TableRow>
               <TableHead>Description</TableHead>
-              <TableHead className="text-right">Quantity</TableHead>
+              <TableHead className="text-right">Ordered</TableHead>
+              <TableHead className="text-right">Delivered</TableHead>
               <TableHead className="text-right">Article Code</TableHead>
             </TableRow>
           </TableHeader>
@@ -83,6 +84,7 @@ export const TodaysDeliveries: React.FC<TodaysDeliveriesProps> = ({
               <TableRow key={item.id}>
                 <TableCell>{item.description}</TableCell>
                 <TableCell className="text-right">{item.quantity}</TableCell>
+                <TableCell className="text-right">{item.delivered_quantity || 0}</TableCell>
                 <TableCell className="text-right">{item.article_code}</TableCell>
               </TableRow>
             ))}

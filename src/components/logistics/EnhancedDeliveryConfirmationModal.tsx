@@ -158,7 +158,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
     }, 500);
   };
 
-  const updateItemDelivery = (itemId: string, field: 'deliveredQuantity' | 'stockLocation' | 'isFullyDelivered' | 'notDeliveredQuantity', value: string | number | boolean) => {
+  const updateItemDelivery = (itemId: string, field: 'deliveredQuantity' | 'stockLocation' | 'isFullyDelivered', value: string | number | boolean) => {
     setItemDeliveries(prev => 
       prev.map(item => {
         if (item.itemId === itemId) {
@@ -168,17 +168,8 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
             return {
               ...item,
               isFullyDelivered: value as boolean,
-              deliveredQuantity: value ? remainingQuantity : remainingQuantity - item.notDeliveredQuantity,
-              notDeliveredQuantity: value ? 0 : item.notDeliveredQuantity
-            };
-          } else if (field === 'notDeliveredQuantity') {
-            const orderItem = orderItems.find(oi => oi.id === itemId);
-            const remainingQuantity = orderItem ? orderItem.quantity - (orderItem.delivered_quantity || 0) : 0;
-            const notDelivered = Math.min(remainingQuantity, Math.max(0, value as number));
-            return {
-              ...item,
-              notDeliveredQuantity: notDelivered,
-              deliveredQuantity: remainingQuantity - notDelivered
+              deliveredQuantity: value ? remainingQuantity : 0,
+              notDeliveredQuantity: value ? 0 : remainingQuantity
             };
           }
           return { ...item, [field]: value };
@@ -340,21 +331,21 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
 
                         {!delivery.isFullyDelivered && (
                           <div className="pl-6 space-y-2">
-                            <Label htmlFor={`not-delivered-${item.id}`} className="text-sm font-medium text-orange-600">
-                              How many items are NOT in this delivery?
+                            <Label htmlFor={`delivered-${item.id}`} className="text-sm font-medium text-green-600">
+                              How many items are being delivered now?
                             </Label>
                             <Input
-                              id={`not-delivered-${item.id}`}
+                              id={`delivered-${item.id}`}
                               type="number"
                               min="0"
                               max={remainingQuantity}
-                              value={delivery.notDeliveredQuantity}
-                              onChange={(e) => updateItemDelivery(item.id, 'notDeliveredQuantity', parseInt(e.target.value) || 0)}
+                              value={delivery.deliveredQuantity}
+                              onChange={(e) => updateItemDelivery(item.id, 'deliveredQuantity', parseInt(e.target.value) || 0)}
                               className="w-24"
                               placeholder="0"
                             />
                             <p className="text-xs text-gray-500">
-                              Delivering: {delivery.deliveredQuantity} out of {remainingQuantity} remaining
+                              Out of {remainingQuantity} remaining items
                             </p>
                           </div>
                         )}
