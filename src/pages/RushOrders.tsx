@@ -26,8 +26,8 @@ const RushOrders = () => {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
   
-  // Keep this existing check - only admin, manager, installation_team can create rush orders
-  const canCreateRushOrder = currentEmployee && ['admin', 'manager', 'installation_team'].includes(currentEmployee.role);
+  // Allow all authenticated roles to create rush orders
+  const canCreateRushOrder = !!currentEmployee;
   
   const handleCreateSuccess = () => {
     setIsCreateDialogOpen(false);
