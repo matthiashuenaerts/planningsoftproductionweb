@@ -548,17 +548,56 @@ const ExternalDatabaseSettings: React.FC = () => {
                       
                       return (
                         <div className="mt-4 p-4 bg-muted rounded-md">
-                          <h4 className="font-semibold mb-2">Parsed Order Information:</h4>
-                          <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-                            <div><strong>Order Number:</strong> {orderData.order.ordernummer}</div>
-                            <div><strong>Client:</strong> {orderData.order.klant}</div>
-                            <div><strong>Order Type:</strong> {orderData.order.ordertype}</div>
-                            <div><strong>Order Date:</strong> {orderData.order.orderdatum}</div>
-                            <div><strong>Address:</strong> {orderData.order.adres}</div>
-                            <div><strong>Processor:</strong> {orderData.order.orderverwerker}</div>
-                            <div><strong>Placement Date:</strong> {orderData.order.plaatsingsdatum} → {convertWeekNumberToDate(orderData.order.plaatsingsdatum)}</div>
-                            <div><strong>Reference:</strong> {orderData.order.referentie}</div>
+                          <h4 className="font-semibold mb-4">Parsed Order Information:</h4>
+                          
+                          {/* Basic Order Information */}
+                          <div className="mb-6">
+                            <h5 className="font-medium mb-3 text-sm text-muted-foreground">Order Details</h5>
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                              <div><strong>Order Number:</strong> {orderData.order.ordernummer}</div>
+                              <div><strong>Record ID:</strong> {orderData.order.recordID}</div>
+                              <div><strong>Client:</strong> {orderData.order.klant}</div>
+                              <div><strong>Customer Number:</strong> {orderData.order.klantnummer}</div>
+                              <div><strong>Order Type:</strong> {orderData.order.ordertype}</div>
+                              <div><strong>Reference:</strong> {orderData.order.referentie}</div>
+                              <div><strong>Order Date:</strong> {orderData.order.orderdatum}</div>
+                              <div><strong>Processor:</strong> {orderData.order.orderverwerker}</div>
+                              <div className="col-span-2"><strong>Address:</strong> {orderData.order.adres}</div>
+                              <div className="col-span-2"><strong>Placement Date:</strong> {orderData.order.plaatsingsdatum} → {convertWeekNumberToDate(orderData.order.plaatsingsdatum)}</div>
+                            </div>
                           </div>
+
+                          {/* Planning Information */}
+                          {orderData.order.planning && orderData.order.planning.length > 0 && (
+                            <div className="mb-6">
+                              <h5 className="font-medium mb-3 text-sm text-muted-foreground">Planning Details</h5>
+                              {orderData.order.planning.map((plan: any, index: number) => (
+                                <div key={index} className="border border-border rounded-md p-3 mb-3 last:mb-0">
+                                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                                    <div><strong>Summary:</strong> {plan.samenvatting}</div>
+                                    <div><strong>Start Date:</strong> {plan.datum_start}</div>
+                                    <div><strong>End Date:</strong> {plan.datum_einde}</div>
+                                    {plan.tijd_start && <div><strong>Start Time:</strong> {plan.tijd_start}</div>}
+                                    {plan.tijd_einde && <div><strong>End Time:</strong> {plan.tijd_einde}</div>}
+                                    {plan.beschrijving && <div className="col-span-2"><strong>Description:</strong> {plan.beschrijving}</div>}
+                                  </div>
+                                  {plan.teams && plan.teams.length > 0 && (
+                                    <div className="mt-2">
+                                      <strong className="text-sm">Teams:</strong>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {plan.teams.map((team: string, teamIndex: number) => (
+                                          <span key={teamIndex} className="inline-block bg-primary/10 text-primary px-2 py-1 rounded text-xs">
+                                            {team}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
                           <Button 
                             onClick={updateInstallationDate}
                             className="mt-2"
