@@ -51,6 +51,34 @@ function convertWeekNumberToDate(weekNumber: string): string {
   return weekNumber;
 }
 
+// Helper to parse external dates like dd/MM/yyyy into ISO date (yyyy-MM-dd)
+function parseExternalDate(input: string | null | undefined): string | null {
+  if (!input) return null;
+  const trimmed = String(input).trim();
+  // dd/MM/yyyy
+  const m = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) {
+    const [, dd, mm, yyyy] = m;
+    const date = new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd));
+    if (!isNaN(date.getTime())) return date.toISOString().split('T')[0];
+  }
+  // Fallback to existing converter (handles week numbers or ISO strings)
+  try {
+    const converted = convertWeekNumberToDate(trimmed);
+    return converted || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Inclusive day difference (e.g., start=end -> 1 day)
+function daysBetweenInclusive(startISO: string, endISO: string): number {
+  const s = new Date(startISO);
+  const e = new Date(endISO);
+  const diffDays = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
+  return diffDays + 1;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -138,7 +166,11 @@ serve(async (req) => {
         console.log(`Authentication successful for project ${project.name}`);
 
         // Query external API using the working endpoint from external-db-proxy
-        let rawPlacementDate = null;
+let rawPlacementDate: string | null = null;
+let planningStartRaw: string | null = null;
+let planningEndRaw: string | null = null;
+let planningTeams: string[] = [];
+
         
         console.log(`Querying for order number: ${project.project_link_id}`);
         
@@ -163,9 +195,18 @@ serve(async (req) => {
               const orderData = JSON.parse(queryData.response.scriptResult);
               console.log(`Parsed script result for project ${project.name}:`, JSON.stringify(orderData));
               
-              if (orderData.order && orderData.order.plaatsingsdatum) {
-                rawPlacementDate = orderData.order.plaatsingsdatum;
-                console.log(`Found placement date in script result: ${rawPlacementDate}`);
+              if (orderData.order) {
+                if (orderData.order.plaatsingsdatum) {
+                  rawPlacementDate = orderData.order.plaatsingsdatum;
+                  console.log(`Found placement date in script result: ${rawPlacementDate}`);
+                }
+                if (Array.isArray(orderData.order.planning) && orderData.order.planning.length > 0) {
+                  const p = orderData.order.planning[0];
+                  planningStartRaw = p.datum_start || p.start_date || null;
+                  planningEndRaw = p.datum_einde || p.end_date || null;
+                  planningTeams = Array.isArray(p.teams) ? p.teams : [];
+                  console.log(`Found planning: start=${planningStartRaw}, end=${planningEndRaw}, teams=${JSON.stringify(planningTeams)}`);
+                }
               }
             } catch (parseErr) {
               console.error(`Failed to parse script result for project ${project.name}:`, parseErr);
@@ -182,18 +223,26 @@ serve(async (req) => {
         }
 
         // Process the placement date if found
-        if (rawPlacementDate) {
-          console.log(`Raw placement date for project ${project.name}: ${rawPlacementDate}`);
-          console.log(`Placement date type: ${typeof rawPlacementDate}, value: "${rawPlacementDate}"`);
+if (planningStartRaw || rawPlacementDate) {
+          if (planningStartRaw) {
+            console.log(`Raw planning start for project ${project.name}: ${planningStartRaw}`);
+          }
+          if (rawPlacementDate) {
+            console.log(`Raw placement date for project ${project.name}: ${rawPlacementDate}`);
+            console.log(`Placement date type: ${typeof rawPlacementDate}, value: "${rawPlacementDate}"`);
+          }
           
-          // Convert placement date (could be week number or date)
-          const externalInstallationDate = convertWeekNumberToDate(rawPlacementDate);
+          // Prefer planning start date; fallback to placement date/week number
+          const startFromPlanning = planningStartRaw ? parseExternalDate(planningStartRaw) : null;
+          const endFromPlanning = planningEndRaw ? parseExternalDate(planningEndRaw) : null;
+          const placementConverted = rawPlacementDate ? convertWeekNumberToDate(rawPlacementDate) : null;
+          const externalInstallationDate = startFromPlanning || placementConverted;
           const currentInstallationDate = project.installation_date;
 
-          console.log(`Project ${project.name}: Current date: ${currentInstallationDate}, External date: ${externalInstallationDate} (converted from ${rawPlacementDate})`);
+          console.log(`Project ${project.name}: Current date: ${currentInstallationDate}, External date (preferred start): ${externalInstallationDate}`);
 
           // Normalize dates for comparison
-          const normalizedExternal = new Date(externalInstallationDate).toISOString().split('T')[0];
+          const normalizedExternal = externalInstallationDate ? new Date(externalInstallationDate).toISOString().split('T')[0] : null;
           const normalizedCurrent = currentInstallationDate ? new Date(currentInstallationDate).toISOString().split('T')[0] : null;
 
           // Check if dates are different
@@ -223,6 +272,50 @@ serve(async (req) => {
             }
             
             console.log(`Successfully updated project ${project.name} installation date to ${normalizedExternal}`);
+
+            // Upsert/update project_team_assignments based on planning
+            try {
+              if (startFromPlanning && endFromPlanning) {
+                const durationDays = daysBetweenInclusive(startFromPlanning, endFromPlanning);
+                const teamName = (planningTeams && planningTeams.length > 0) ? planningTeams[0] : 'INSTALLATION TEAM';
+                const { data: existingAssignments, error: fetchPtaError } = await supabase
+                  .from('project_team_assignments')
+                  .select('id, team')
+                  .eq('project_id', project.id);
+                if (fetchPtaError) {
+                  console.warn(`Failed to fetch team assignments for project ${project.name}: ${fetchPtaError.message}`);
+                } else {
+                  const match = existingAssignments?.find((a: any) => a.team === teamName);
+                  if (match) {
+                    const { error: updatePtaError } = await supabase
+                      .from('project_team_assignments')
+                      .update({ start_date: startFromPlanning, duration: durationDays, updated_at: new Date().toISOString() })
+                      .eq('id', match.id);
+                    if (updatePtaError) {
+                      console.warn(`Failed to update team assignment for project ${project.name}: ${updatePtaError.message}`);
+                    } else {
+                      console.log(`Updated team assignment (${teamName}) for project ${project.name}`);
+                    }
+                  } else {
+                    const { error: insertPtaError } = await supabase
+                      .from('project_team_assignments')
+                      .insert({
+                        project_id: project.id,
+                        team: teamName,
+                        start_date: startFromPlanning,
+                        duration: durationDays
+                      });
+                    if (insertPtaError) {
+                      console.warn(`Failed to insert team assignment for project ${project.name}: ${insertPtaError.message}`);
+                    } else {
+                      console.log(`Inserted team assignment (${teamName}) for project ${project.name}`);
+                    }
+                  }
+                }
+              }
+            } catch (ptaErr) {
+              console.warn(`PTA upsert failed for project ${project.name}:`, ptaErr);
+            }
 
             // Get all tasks for this project and update their due dates based on standard task day_counter
             const { data: phases, error: phasesError } = await supabase
@@ -318,12 +411,12 @@ serve(async (req) => {
             });
           }
         } else {
-          console.log(`No placement date found for project ${project.name} - tried both find and script approaches`);
+          console.log(`No placement or planning start date found for project ${project.name} - tried both find and script approaches`);
           syncDetails.push({
             project_name: project.name,
             project_link_id: project.project_link_id,
-            status: 'no_placement_date',
-            message: 'No placement date found in external database'
+            status: 'no_date_found',
+            message: 'No placement or planning start date found in external database'
           });
         }
 
