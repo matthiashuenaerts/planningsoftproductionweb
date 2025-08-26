@@ -293,6 +293,23 @@ if (planningStartRaw || rawPlacementDate) {
                   console.warn(`Failed to upsert team assignment for project ${project.name}: ${upsertPtaError.message}`);
                 } else {
                   console.log(`Upserted team assignment for project ${project.name} (team: ${teamName}, start: ${startFromPlanning}, duration: ${durationDays})`);
+                  // After PTA upsert, ensure installation_date remains the START date
+                  try {
+                    const normalizedStart = startFromPlanning ? new Date(startFromPlanning).toISOString().slice(0, 10) : null;
+                    if (normalizedStart) {
+                      const { error: enforceInstallError } = await supabase
+                        .from('projects')
+                        .update({ installation_date: normalizedStart, updated_at: new Date().toISOString() })
+                        .eq('id', project.id);
+                      if (enforceInstallError) {
+                        console.warn(`Failed to enforce installation_date to start date for project ${project.name}: ${enforceInstallError.message}`);
+                      } else {
+                        console.log(`Ensured project ${project.name} installation_date set to start date ${normalizedStart}`);
+                      }
+                    }
+                  } catch (enforceErr) {
+                    console.warn(`Post-PTA install_date enforcement failed for project ${project.name}:`, enforceErr);
+                  }
                 }
               }
             } catch (ptaErr) {
