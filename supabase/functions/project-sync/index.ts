@@ -232,10 +232,11 @@ if (planningStartRaw || rawPlacementDate) {
             console.log(`Placement date type: ${typeof rawPlacementDate}, value: "${rawPlacementDate}"`);
           }
           
-          // Prefer planning start date; fallback to placement date/week number
+          // Use planning start date as installation date; fallback to placement date/week number
           const startFromPlanning = planningStartRaw ? parseExternalDate(planningStartRaw) : null;
           const endFromPlanning = planningEndRaw ? parseExternalDate(planningEndRaw) : null;
           const placementConverted = rawPlacementDate ? convertWeekNumberToDate(rawPlacementDate) : null;
+          // Installation date should be the START date from planning, not end date
           const externalInstallationDate = startFromPlanning || placementConverted;
           const currentInstallationDate = project.installation_date;
 
