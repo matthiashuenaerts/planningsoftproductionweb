@@ -55,12 +55,12 @@ function convertWeekNumberToDate(weekNumber: string): string {
 function parseExternalDate(input: string | null | undefined): string | null {
   if (!input) return null;
   const trimmed = String(input).trim();
-  // dd/MM/yyyy
-  const m = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  // Support d/M/yyyy and dd/MM/yyyy
+  const m = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (m) {
-    const [, dd, mm, yyyy] = m;
-    const date = new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd));
-    if (!isNaN(date.getTime())) return date.toISOString().split('T')[0];
+    const [, d, mth, y] = m;
+    const date = new Date(Date.UTC(parseInt(y, 10), parseInt(mth, 10) - 1, parseInt(d, 10)));
+    if (!isNaN(date.getTime())) return date.toISOString().slice(0, 10);
   }
   // Fallback to existing converter (handles week numbers or ISO strings)
   try {
@@ -278,39 +278,20 @@ if (planningStartRaw || rawPlacementDate) {
               if (startFromPlanning && endFromPlanning) {
                 const durationDays = daysBetweenInclusive(startFromPlanning, endFromPlanning);
                 const teamName = (planningTeams && planningTeams.length > 0) ? planningTeams[0] : 'INSTALLATION TEAM';
-                const { data: existingAssignments, error: fetchPtaError } = await supabase
+                const payload = {
+                  project_id: project.id,
+                  team: teamName,
+                  start_date: startFromPlanning,
+                  duration: durationDays,
+                  updated_at: new Date().toISOString()
+                };
+                const { error: upsertPtaError } = await supabase
                   .from('project_team_assignments')
-                  .select('id, team')
-                  .eq('project_id', project.id);
-                if (fetchPtaError) {
-                  console.warn(`Failed to fetch team assignments for project ${project.name}: ${fetchPtaError.message}`);
+                  .upsert(payload, { onConflict: 'project_id' });
+                if (upsertPtaError) {
+                  console.warn(`Failed to upsert team assignment for project ${project.name}: ${upsertPtaError.message}`);
                 } else {
-                  const match = existingAssignments?.find((a: any) => a.team === teamName);
-                  if (match) {
-                    const { error: updatePtaError } = await supabase
-                      .from('project_team_assignments')
-                      .update({ start_date: startFromPlanning, duration: durationDays, updated_at: new Date().toISOString() })
-                      .eq('id', match.id);
-                    if (updatePtaError) {
-                      console.warn(`Failed to update team assignment for project ${project.name}: ${updatePtaError.message}`);
-                    } else {
-                      console.log(`Updated team assignment (${teamName}) for project ${project.name}`);
-                    }
-                  } else {
-                    const { error: insertPtaError } = await supabase
-                      .from('project_team_assignments')
-                      .insert({
-                        project_id: project.id,
-                        team: teamName,
-                        start_date: startFromPlanning,
-                        duration: durationDays
-                      });
-                    if (insertPtaError) {
-                      console.warn(`Failed to insert team assignment for project ${project.name}: ${insertPtaError.message}`);
-                    } else {
-                      console.log(`Inserted team assignment (${teamName}) for project ${project.name}`);
-                    }
-                  }
+                  console.log(`Upserted team assignment for project ${project.name} (team: ${teamName}, start: ${startFromPlanning}, duration: ${durationDays})`);
                 }
               }
             } catch (ptaErr) {
