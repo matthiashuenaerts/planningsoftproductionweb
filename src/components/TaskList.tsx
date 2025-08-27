@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Task } from '@/services/dataService';
-import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader, TrendingUp, TrendingDown } from 'lucide-react';
+import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import { differenceInDays, isBefore } from 'date-fns';
 import TaskCompletionChecklistDialog from './TaskCompletionChecklistDialog';
 import { checklistService } from '@/services/checklistService';
 
@@ -48,13 +49,41 @@ const TaskList: React.FC<TaskListProps> = ({
     taskName: string;
   } | null>(null);
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority.toLowerCase()) {
-      case 'urgent': return 'bg-red-500';
-      case 'high': return 'bg-orange-500';
-      case 'medium': return 'bg-yellow-500';
-      case 'low': return 'bg-green-500';
-      default: return 'bg-gray-500';
+  const getUrgencyClass = (dueDate: string) => {
+    const today = new Date();
+    const due = new Date(dueDate);
+    const daysUntilDue = differenceInDays(due, today);
+    
+    if (isBefore(due, today)) {
+      return {
+        class: 'overdue',
+        label: 'Overdue',
+        variant: 'destructive' as const
+      };
+    } else if (daysUntilDue <= 1) {
+      return {
+        class: 'critical',
+        label: 'Critical',
+        variant: 'destructive' as const
+      };
+    } else if (daysUntilDue <= 3) {
+      return {
+        class: 'urgent',
+        label: 'Urgent',
+        variant: 'default' as const
+      };
+    } else if (daysUntilDue <= 7) {
+      return {
+        class: 'high',
+        label: 'High',
+        variant: 'secondary' as const
+      };
+    } else {
+      return {
+        class: 'normal',
+        label: 'Normal',
+        variant: 'outline' as const
+      };
     }
   };
 
@@ -281,11 +310,15 @@ const TaskList: React.FC<TaskListProps> = ({
                       Rush Order
                     </Badge>
                   )}
-                  <Badge 
-                    className={`${getPriorityColor(task.priority)} text-white`}
-                  >
-                    {task.priority}
-                  </Badge>
+                  {task.due_date && (() => {
+                    const urgency = getUrgencyClass(task.due_date);
+                    return (
+                      <Badge variant={urgency.variant} className="flex items-center gap-1">
+                        {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3" />}
+                        {urgency.label}
+                      </Badge>
+                    );
+                  })()}
                   <Badge 
                     className={`${getStatusColor(task.status)} text-white flex items-center gap-1`}
                   >
