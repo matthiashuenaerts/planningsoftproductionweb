@@ -344,8 +344,29 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                             </div>
                           </div>
 
-                          {delivery.isFullyDelivered && (
-                            <div className="mt-4">
+                          {!delivery.isFullyDelivered && (
+                            <div className="space-y-2">
+                              <Label htmlFor={`delivered-${item.id}`} className="text-sm font-medium text-green-600">
+                                How many items are being delivered now?
+                              </Label>
+                              <Input
+                                id={`delivered-${item.id}`}
+                                type="number"
+                                min="0"
+                                max={remainingQuantity}
+                                value={delivery.deliveredQuantity}
+                                onChange={(e) => updateItemDelivery(item.id, 'deliveredQuantity', parseInt(e.target.value) || 0)}
+                                className="w-32"
+                                placeholder="0"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Out of {remainingQuantity} remaining items
+                              </p>
+                            </div>
+                          )}
+
+                          {(delivery.isFullyDelivered || delivery.deliveredQuantity > 0) && (
+                            <div>
                               <Label htmlFor={`location-${item.id}`} className="text-sm font-medium flex items-center gap-1">
                                 <MapPin className="h-4 w-4" />
                                 Stock Location
@@ -364,7 +385,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                         
                         <div className="flex flex-col items-center space-y-3">
                           <div className="flex flex-col items-center space-y-2">
-                            <Label className="text-sm font-medium text-center">Article Received</Label>
+                            <Label className="text-sm font-medium text-center">All articles received</Label>
                             <Checkbox
                               id={`full-delivery-${item.id}`}
                               checked={delivery.isFullyDelivered}
