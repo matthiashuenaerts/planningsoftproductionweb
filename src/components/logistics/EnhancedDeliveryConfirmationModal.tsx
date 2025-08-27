@@ -59,10 +59,10 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
           const remainingQuantity = item.quantity - (item.delivered_quantity || 0);
           return {
             itemId: item.id,
-            deliveredQuantity: remainingQuantity, // Default to delivering all remaining
+            deliveredQuantity: 0, // Default to 0 - user must confirm
             stockLocation: item.stock_location || '',
-            isFullyDelivered: true,
-            notDeliveredQuantity: 0
+            isFullyDelivered: false, // Default unchecked
+            notDeliveredQuantity: remainingQuantity
           };
         })
       );
@@ -322,65 +322,62 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                   const remainingQuantity = item.quantity - (item.delivered_quantity || 0);
 
                   return (
-                    <div key={item.id} className="p-4 border rounded-lg space-y-3">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h4 className="font-medium">{item.description}</h4>
-                          <p className="text-sm text-gray-600">Article: {item.article_code}</p>
-                          <p className="text-sm text-gray-600">Ordered: {item.quantity}</p>
-                          {item.delivered_quantity > 0 && (
-                            <p className="text-sm text-blue-600">Previously delivered: {item.delivered_quantity}</p>
-                          )}
-                          <p className="text-sm text-green-600">Remaining: {remainingQuantity}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`full-delivery-${item.id}`}
-                            checked={delivery.isFullyDelivered}
-                            onCheckedChange={(checked) => updateItemDelivery(item.id, 'isFullyDelivered', checked)}
-                          />
-                          <Label htmlFor={`full-delivery-${item.id}`} className="text-sm font-medium">
-                            All remaining items ({remainingQuantity}) are in this delivery
-                          </Label>
-                        </div>
-
-                        {!delivery.isFullyDelivered && (
-                          <div className="pl-6 space-y-2">
-                            <Label htmlFor={`delivered-${item.id}`} className="text-sm font-medium text-green-600">
-                              How many items are being delivered now?
-                            </Label>
-                            <Input
-                              id={`delivered-${item.id}`}
-                              type="number"
-                              min="0"
-                              max={remainingQuantity}
-                              value={delivery.deliveredQuantity}
-                              onChange={(e) => updateItemDelivery(item.id, 'deliveredQuantity', parseInt(e.target.value) || 0)}
-                              className="w-24"
-                              placeholder="0"
-                            />
-                            <p className="text-xs text-gray-500">
-                              Out of {remainingQuantity} remaining items
-                            </p>
+                    <div key={item.id} className="p-6 border rounded-lg">
+                      <div className="flex items-start justify-between gap-6">
+                        <div className="flex-1 space-y-3">
+                          <div>
+                            <h4 className="text-lg font-semibold">{item.description}</h4>
+                            <p className="text-base text-muted-foreground">Article: {item.article_code}</p>
                           </div>
-                        )}
+                          
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="font-medium">Ordered:</span> {item.quantity}
+                            </div>
+                            {item.delivered_quantity > 0 && (
+                              <div>
+                                <span className="font-medium text-blue-600">Previously delivered:</span> {item.delivered_quantity}
+                              </div>
+                            )}
+                            <div>
+                              <span className="font-medium text-green-600">Remaining:</span> {remainingQuantity}
+                            </div>
+                          </div>
 
-                        <div>
-                          <Label htmlFor={`location-${item.id}`} className="text-sm font-medium flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            Stock Location
-                          </Label>
-                          <Input
-                            id={`location-${item.id}`}
-                            type="text"
-                            value={delivery.stockLocation}
-                            onChange={(e) => updateItemDelivery(item.id, 'stockLocation', e.target.value)}
-                            placeholder="e.g., A1-B2, Warehouse 1"
-                            className="mt-1"
-                          />
+                          {delivery.isFullyDelivered && (
+                            <div className="mt-4">
+                              <Label htmlFor={`location-${item.id}`} className="text-sm font-medium flex items-center gap-1">
+                                <MapPin className="h-4 w-4" />
+                                Stock Location
+                              </Label>
+                              <Input
+                                id={`location-${item.id}`}
+                                type="text"
+                                value={delivery.stockLocation}
+                                onChange={(e) => updateItemDelivery(item.id, 'stockLocation', e.target.value)}
+                                placeholder="e.g., A1-B2, Warehouse 1"
+                                className="mt-1"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-col items-center space-y-3">
+                          <div className="flex flex-col items-center space-y-2">
+                            <Label className="text-sm font-medium text-center">Article Received</Label>
+                            <Checkbox
+                              id={`full-delivery-${item.id}`}
+                              checked={delivery.isFullyDelivered}
+                              onCheckedChange={(checked) => updateItemDelivery(item.id, 'isFullyDelivered', checked)}
+                              className="w-8 h-8 rounded-md"
+                            />
+                          </div>
+                          
+                          {delivery.isFullyDelivered && (
+                            <div className="text-center">
+                              <div className="text-sm font-medium text-green-600">✓ All {remainingQuantity} items</div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
