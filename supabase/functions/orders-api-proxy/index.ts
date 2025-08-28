@@ -38,10 +38,15 @@ serve(async (req) => {
       }
 
       const authData = await authResponse.json();
+      const token = authData?.response?.token;
+      if (!token) {
+        console.error('No token in Orders auth response:', authData);
+        throw new Error('No token received from Orders API');
+      }
       console.log('Orders authentication successful, token received');
       
       return new Response(
-        JSON.stringify({ response: authData }),
+        JSON.stringify({ response: { token } }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 
