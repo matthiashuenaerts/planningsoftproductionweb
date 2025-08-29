@@ -67,7 +67,7 @@ const TruckLoadingCalendar = () => {
             projects!fk_project_truck_assignments_project(name, client, status),
             trucks!fk_project_truck_assignments_truck(truck_number, description)
           `)
-          .order('installation_date', { ascending: true })  // sorteer op eerste dag;
+          .order('loading_date');
           
         if (assignmentsError) throw assignmentsError;
         
