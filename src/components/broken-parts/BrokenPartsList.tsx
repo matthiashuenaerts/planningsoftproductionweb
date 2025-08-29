@@ -19,9 +19,11 @@ import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from '@/context/LanguageContext';
+import { BrokenPartDetailDialog } from './BrokenPartDetailDialog';
 
 const BrokenPartsList: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedBrokenPart, setSelectedBrokenPart] = useState<any | null>(null);
   const [imageError, setImageError] = useState<Record<string, boolean>>({});
   const { t, createLocalizedPath } = useLanguage();
 
@@ -102,13 +104,20 @@ const BrokenPartsList: React.FC = () => {
                 </TableHeader>
                 <TableBody>
                   {brokenParts.map((part: any) => (
-                    <TableRow key={part.id}>
+                    <TableRow 
+                      key={part.id} 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setSelectedBrokenPart(part)}
+                    >
                       <TableCell>
                         {part.image_path ? (
                           <div className="relative">
                             <div 
                               className="w-20 h-20 relative overflow-hidden rounded-md cursor-pointer"
-                              onClick={() => openImageDialog(part.image_path)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openImageDialog(part.image_path);
+                              }}
                             >
                               <AspectRatio ratio={1/1}>
                                 {imageError[part.id] ? (
@@ -193,6 +202,13 @@ const BrokenPartsList: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Detailed Broken Part Dialog */}
+      <BrokenPartDetailDialog
+        open={!!selectedBrokenPart}
+        onOpenChange={(open) => !open && setSelectedBrokenPart(null)}
+        brokenPart={selectedBrokenPart}
+      />
     </>
   );
 };
