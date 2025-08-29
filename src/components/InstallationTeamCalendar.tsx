@@ -1128,22 +1128,6 @@ const InstallationTeamCalendar = ({
       <CardContent>
         <UnassignedProjects projects={projects} assignments={assignments} truckAssignments={truckAssignments} onTruckAssign={handleTruckAssign} onDropProject={handleDropProject} />
         <TeamCalendar 
-          team="01 - GROEN PLAATSING - IVECO" 
-          currentMonth={currentMonth} 
-          projects={projects} 
-          assignments={assignments} 
-          truckAssignments={truckAssignments} 
-          onDropProject={handleDropProject} 
-          handleExtendProject={handleExtendProject} 
-          handleDurationChange={handleDurationChange} 
-          onTruckAssign={handleTruckAssign} 
-          onRefreshData={refreshDataWithScrollPreservation} 
-          scrollPositions={scrollPositions} 
-          setScrollPositions={setScrollPositions}
-          isCollapsed={teamCollapsedStates.green}
-          setIsCollapsed={(collapsed) => setTeamCollapsed('green', collapsed)}
-        />
-        <TeamCalendar 
           team="05 - GROEN PLAATSING - SPRINTER 2" 
           currentMonth={currentMonth} 
           projects={projects} 
@@ -1158,22 +1142,6 @@ const InstallationTeamCalendar = ({
           setScrollPositions={setScrollPositions}
           isCollapsed={teamCollapsedStates.green}
           setIsCollapsed={(collapsed) => setTeamCollapsed('green', collapsed)}
-        />
-        <TeamCalendar 
-          team="02 - BLAUW PLAATSING - IVECO" 
-          currentMonth={currentMonth} 
-          projects={projects} 
-          assignments={assignments} 
-          truckAssignments={truckAssignments} 
-          onDropProject={handleDropProject} 
-          handleExtendProject={handleExtendProject} 
-          handleDurationChange={handleDurationChange} 
-          onTruckAssign={handleTruckAssign} 
-          onRefreshData={refreshDataWithScrollPreservation} 
-          scrollPositions={scrollPositions} 
-          setScrollPositions={setScrollPositions}
-          isCollapsed={teamCollapsedStates.blue}
-          setIsCollapsed={(collapsed) => setTeamCollapsed('blue', collapsed)}
         />
         <TeamCalendar 
           team="04 - BLAUW PLAATSING - SPRINTER 1" 
