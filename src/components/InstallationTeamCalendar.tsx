@@ -181,7 +181,14 @@ const ProjectItem = ({
       isDragging: !!monitor.isDragging()
     })
   }));
-  const teamColor = team ? teamColors[team] : teamColors.unassigned;
+  // Map team names to colors based on content  
+  const getTeamColor = (teamName: string) => {
+    if (teamName?.toLowerCase().includes('groen')) return teamColors.green;
+    if (teamName?.toLowerCase().includes('blauw')) return teamColors.blue;
+    if (teamName?.toLowerCase().includes('orange')) return teamColors.orange;
+    return teamColors[teamName] || teamColors.unassigned;
+  };
+  const teamColor = team ? getTeamColor(team) : teamColors.unassigned;
   const handleDurationChange = (newDuration: number) => {
     if (assignment && onDurationChange) {
       onDurationChange(assignment.id, newDuration);
@@ -414,7 +421,14 @@ const TeamCalendar = ({
   isCollapsed,
   setIsCollapsed
 }) => {
-  const teamColor = teamColors[team];
+  // Map team names to colors based on content
+  const getTeamColor = (teamName: string) => {
+    if (teamName?.toLowerCase().includes('groen')) return teamColors.green;
+    if (teamName?.toLowerCase().includes('blauw')) return teamColors.blue;
+    if (teamName?.toLowerCase().includes('orange')) return teamColors.orange;
+    return teamColors[teamName] || teamColors.unassigned;
+  };
+  const teamColor = getTeamColor(team);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Generate multiple months for scrolling (current month in the middle)
@@ -485,7 +499,7 @@ const TeamCalendar = ({
       <div className={cn("rounded-lg border", teamColor.border)}>
         <CollapsibleTrigger asChild>
           <div className={cn("p-3 rounded-t-lg cursor-pointer flex items-center justify-between hover:opacity-80 transition-opacity", teamColor.header)}>
-            <h3 className="text-lg font-medium capitalize">{team} Team</h3>
+            <h3 className="text-lg font-medium">{team}</h3>
             {isCollapsed ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
           </div>
         </CollapsibleTrigger>
@@ -1114,7 +1128,7 @@ const InstallationTeamCalendar = ({
       <CardContent>
         <UnassignedProjects projects={projects} assignments={assignments} truckAssignments={truckAssignments} onTruckAssign={handleTruckAssign} onDropProject={handleDropProject} />
         <TeamCalendar 
-          team="green" 
+          team="01 - GROEN PLAATSING - IVECO" 
           currentMonth={currentMonth} 
           projects={projects} 
           assignments={assignments} 
@@ -1130,7 +1144,39 @@ const InstallationTeamCalendar = ({
           setIsCollapsed={(collapsed) => setTeamCollapsed('green', collapsed)}
         />
         <TeamCalendar 
-          team="blue" 
+          team="05 - GROEN PLAATSING - SPRINTER 2" 
+          currentMonth={currentMonth} 
+          projects={projects} 
+          assignments={assignments} 
+          truckAssignments={truckAssignments} 
+          onDropProject={handleDropProject} 
+          handleExtendProject={handleExtendProject} 
+          handleDurationChange={handleDurationChange} 
+          onTruckAssign={handleTruckAssign} 
+          onRefreshData={refreshDataWithScrollPreservation} 
+          scrollPositions={scrollPositions} 
+          setScrollPositions={setScrollPositions}
+          isCollapsed={teamCollapsedStates.green}
+          setIsCollapsed={(collapsed) => setTeamCollapsed('green', collapsed)}
+        />
+        <TeamCalendar 
+          team="02 - BLAUW PLAATSING - IVECO" 
+          currentMonth={currentMonth} 
+          projects={projects} 
+          assignments={assignments} 
+          truckAssignments={truckAssignments} 
+          onDropProject={handleDropProject} 
+          handleExtendProject={handleExtendProject} 
+          handleDurationChange={handleDurationChange} 
+          onTruckAssign={handleTruckAssign} 
+          onRefreshData={refreshDataWithScrollPreservation} 
+          scrollPositions={scrollPositions} 
+          setScrollPositions={setScrollPositions}
+          isCollapsed={teamCollapsedStates.blue}
+          setIsCollapsed={(collapsed) => setTeamCollapsed('blue', collapsed)}
+        />
+        <TeamCalendar 
+          team="04 - BLAUW PLAATSING - SPRINTER 1" 
           currentMonth={currentMonth} 
           projects={projects} 
           assignments={assignments} 
