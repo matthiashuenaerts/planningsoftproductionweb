@@ -64,41 +64,22 @@ serve(async (req) => {
       const queryUrl = `${baseUrl}/layouts/${layout}/script/${scriptName}?script.param=${param}`;
       console.log(`Query URL (GET): ${queryUrl}`);
 
-      // First attempt: GET as per FileMaker Data API docs for running a script on a layout
-      let queryResponse = await fetch(queryUrl, {
+      // Perform GET request to run the layout script with script.param
+      const queryResponse = await fetch(queryUrl, {
         method: 'GET',
         headers: {
-          // Do not set Content-Type for GET
+          'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`,
         }
       });
 
       console.log(`Query response status (GET): ${queryResponse.status}`);
-
+      
       if (!queryResponse.ok) {
         const errorText = await queryResponse.text();
         console.error(`Query error (GET): ${errorText}`);
-
-        // Fallback attempt: Some servers expect POST with JSON body containing script.param
-        const postUrl = `${baseUrl}/layouts/${layout}/script/${scriptName}`;
-        console.log(`Retrying with POST to: ${postUrl}`);
-        queryResponse = await fetch(postUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ 'script.param': String(orderNumber) })
-        });
-        console.log(`Query response status (POST): ${queryResponse.status}`);
-
-        if (!queryResponse.ok) {
-          const postErrorText = await queryResponse.text();
-          console.error(`Query error (POST): ${postErrorText}`);
-          throw new Error(`Query failed: ${queryResponse.status} ${queryResponse.statusText}`);
-        }
+        throw new Error(`Query failed: ${queryResponse.status} ${queryResponse.statusText}`);
       }
 
       const queryData = await queryResponse.json();
