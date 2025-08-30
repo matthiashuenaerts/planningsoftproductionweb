@@ -34,6 +34,7 @@ export interface Part {
   abd?: string;
   afbeelding?: string;
   doorlopende_nerf?: string;
+  workstation_name_status?: string;
   color_status: 'none' | 'green' | 'orange' | 'red';
   created_at: string;
   updated_at: string;

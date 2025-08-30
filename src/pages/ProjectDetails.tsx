@@ -75,7 +75,7 @@ const ProjectDetails = () => {
     afmetingen: '',
     aantal: '',
     wand_naam: '',
-    cnc_pos: '',
+    workstation_name_status: '',
     commentaar: '',
     status: 'all'
   });
@@ -443,9 +443,9 @@ const ProjectDetails = () => {
     const matchesAfmetingen = partsFilters.afmetingen === '' || (part.lengte && part.breedte ? `${part.lengte} x ${part.breedte}` : part.lengte || part.breedte || '').toLowerCase().includes(partsFilters.afmetingen.toLowerCase());
     const matchesAantal = partsFilters.aantal === '' || (part.aantal?.toString() || '').includes(partsFilters.aantal);
     const matchesWandNaam = partsFilters.wand_naam === '' || (part.wand_naam || '').toLowerCase().includes(partsFilters.wand_naam.toLowerCase());
-    const matchesCncPos = partsFilters.cnc_pos === '' || (part.cnc_pos || '').toLowerCase().includes(partsFilters.cnc_pos.toLowerCase());
+    const matchesWorkstationStatus = partsFilters.workstation_name_status === '' || (part.workstation_name_status || '').toLowerCase().includes(partsFilters.workstation_name_status.toLowerCase());
     const matchesCommentaar = partsFilters.commentaar === '' || (part.commentaar || part.commentaar_2 || '').toLowerCase().includes(partsFilters.commentaar.toLowerCase());
-    return matchesStatus && matchesMaterial && matchesDikte && matchesAfmetingen && matchesAantal && matchesWandNaam && matchesCncPos && matchesCommentaar;
+    return matchesStatus && matchesMaterial && matchesDikte && matchesAfmetingen && matchesAantal && matchesWandNaam && matchesWorkstationStatus && matchesCommentaar;
   });
   const updatePartsFilter = (key: string, value: string) => {
     setPartsFilters(prev => ({
@@ -460,7 +460,7 @@ const ProjectDetails = () => {
       afmetingen: '',
       aantal: '',
       wand_naam: '',
-      cnc_pos: '',
+      workstation_name_status: '',
       commentaar: '',
       status: 'all'
     });
@@ -1000,8 +1000,8 @@ const ProjectDetails = () => {
                   </Card>
 
                   {/* Parts List Table */}
-                  <Card>
-                    <CardContent className="p-0">
+                  <Card className="h-screen">
+                    <CardContent className="p-0 h-full">
                       {loadingParts ? <div className="flex justify-center items-center py-8">
                           <Loader2 className="h-8 w-8 animate-spin" />
                         </div> : parts.length === 0 ? <div className="text-center py-8 text-muted-foreground">
@@ -1017,7 +1017,7 @@ const ProjectDetails = () => {
                              </Button>
                            </div>
                            
-                           <ScrollArea className="h-96">
+                           <ScrollArea className="h-full">
                              <Table>
                                <TableHeader>
                                  <TableRow>
@@ -1057,12 +1057,12 @@ const ProjectDetails = () => {
                                        {partsSortConfig?.key === 'wand_naam' ? partsSortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" /> : <ArrowUpDown className="h-4 w-4 opacity-50" />}
                                      </div>
                                    </TableHead>
-                                   <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort('cnc_pos')}>
-                                     <div className="flex items-center gap-2">
-                                       CNC Pos
-                                       {partsSortConfig?.key === 'cnc_pos' ? partsSortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" /> : <ArrowUpDown className="h-4 w-4 opacity-50" />}
-                                     </div>
-                                   </TableHead>
+                                    <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort('workstation_name_status')}>
+                                      <div className="flex items-center gap-2">
+                                        Workstation Status
+                                        {partsSortConfig?.key === 'workstation_name_status' ? partsSortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" /> : <ArrowUpDown className="h-4 w-4 opacity-50" />}
+                                      </div>
+                                    </TableHead>
                                    <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort('commentaar')}>
                                      <div className="flex items-center gap-2">
                                        Commentaar
@@ -1100,9 +1100,9 @@ const ProjectDetails = () => {
                                   <TableHead className="p-2">
                                     <Input placeholder="Filter..." value={partsFilters.wand_naam} onChange={e => updatePartsFilter('wand_naam', e.target.value)} className="h-8 w-full" />
                                   </TableHead>
-                                  <TableHead className="p-2">
-                                    <Input placeholder="Filter..." value={partsFilters.cnc_pos} onChange={e => updatePartsFilter('cnc_pos', e.target.value)} className="h-8 w-full" />
-                                  </TableHead>
+                                   <TableHead className="p-2">
+                                     <Input placeholder="Filter..." value={partsFilters.workstation_name_status || ''} onChange={e => updatePartsFilter('workstation_name_status', e.target.value)} className="h-8 w-full" />
+                                   </TableHead>
                                   <TableHead className="p-2">
                                     <Input placeholder="Filter..." value={partsFilters.commentaar} onChange={e => updatePartsFilter('commentaar', e.target.value)} className="h-8 w-full" />
                                   </TableHead>
@@ -1127,9 +1127,9 @@ const ProjectDetails = () => {
                                     {part.lengte && part.breedte ? `${part.lengte} x ${part.breedte}` : part.lengte || part.breedte || '-'}
                                   </TableCell>
                                   <TableCell>{part.aantal || '-'}</TableCell>
-                                  <TableCell>{part.wand_naam || '-'}</TableCell>
-                                  <TableCell>{part.cnc_pos || '-'}</TableCell>
-                                  <TableCell>
+                                   <TableCell>{part.wand_naam || '-'}</TableCell>
+                                   <TableCell>{part.workstation_name_status || '-'}</TableCell>
+                                   <TableCell>
                                     <div className="max-w-32 truncate" title={part.commentaar || part.commentaar_2 || ''}>
                                       {part.commentaar || part.commentaar_2 || '-'}
                                     </div>
