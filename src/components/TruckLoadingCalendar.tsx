@@ -76,7 +76,7 @@ const TruckLoadingCalendar = () => {
           ...assignment,
           project: assignment.projects,
           truck: assignment.trucks,
-          // Calculate loading date as 1 day before installation date
+          // Calculate loading date as 1 day before the installation date (which should be the first installation day)
           calculated_loading_date: format(subDays(new Date(assignment.installation_date), 1), 'yyyy-MM-dd')
         })) || [];
         
