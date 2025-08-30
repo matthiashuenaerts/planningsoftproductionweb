@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { format, addDays, startOfWeek, isToday, isPast, isTomorrow } from 'date-fns';
+import { format, addDays, startOfWeek, isToday, isPast, isTomorrow, subDays } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ interface TruckAssignment {
   truck_id: string;
   loading_date: string;
   installation_date: string;
+  calculated_loading_date: string; // Calculated based on first installation day
   notes?: string;
   project?: {
     name: string;
@@ -74,7 +75,9 @@ const TruckLoadingCalendar = () => {
         const formattedAssignments = assignmentsData?.map(assignment => ({
           ...assignment,
           project: assignment.projects,
-          truck: assignment.trucks
+          truck: assignment.trucks,
+          // Calculate loading date as 1 day before installation date
+          calculated_loading_date: format(subDays(new Date(assignment.installation_date), 1), 'yyyy-MM-dd')
         })) || [];
         
         setAssignments(formattedAssignments);
@@ -105,7 +108,7 @@ const TruckLoadingCalendar = () => {
   // Get assignments for today's loading
   const getTodayLoadingAssignments = () => {
     const today = format(new Date(), 'yyyy-MM-dd');
-    return assignments.filter(assignment => assignment.loading_date === today);
+    return assignments.filter(assignment => assignment.calculated_loading_date === today);
   };
 
   // Get upcoming loading assignments (next 7 days)
@@ -114,15 +117,15 @@ const TruckLoadingCalendar = () => {
     const weekFromNow = addDays(today, 7);
     
     return assignments.filter(assignment => {
-      const loadingDate = new Date(assignment.loading_date);
+      const loadingDate = new Date(assignment.calculated_loading_date);
       return loadingDate > today && loadingDate <= weekFromNow;
-    }).sort((a, b) => new Date(a.loading_date).getTime() - new Date(b.loading_date).getTime());
+    }).sort((a, b) => new Date(a.calculated_loading_date).getTime() - new Date(b.calculated_loading_date).getTime());
   };
 
   // Get assignments for a specific date
   const getAssignmentsForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return assignments.filter(assignment => assignment.loading_date === dateStr);
+    return assignments.filter(assignment => assignment.calculated_loading_date === dateStr);
   };
 
   // Get truck color for visual distinction
@@ -284,7 +287,7 @@ const TruckLoadingCalendar = () => {
                   key={assignment.id}
                   className={cn(
                     "p-3 rounded-lg border-l-4 bg-white border",
-                    getLoadingPriority(assignment.loading_date)
+                    getLoadingPriority(assignment.calculated_loading_date)
                   )}
                 >
                   <div className="flex justify-between items-start">
@@ -294,7 +297,7 @@ const TruckLoadingCalendar = () => {
                           Truck {assignment.truck?.truck_number}
                         </Badge>
                         <span className="text-sm text-gray-600">
-                          Load: {format(new Date(assignment.loading_date), 'MMM d')}
+                          Load: {format(new Date(assignment.calculated_loading_date), 'MMM d')}
                         </span>
                       </div>
                       <h4 className="font-medium">{assignment.project?.name}</h4>
