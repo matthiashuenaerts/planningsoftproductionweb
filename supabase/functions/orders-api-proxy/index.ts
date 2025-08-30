@@ -61,11 +61,11 @@ serve(async (req) => {
       const scriptName = encodeURIComponent('FindSupplierOrderByOrderNumber');
       const param = encodeURIComponent(String(orderNumber));
 
-      // Preferred: call the layout records endpoint and run the script with script.param
-      const recordsUrl = `${baseUrl}/layouts/${layout}/records?script=${scriptName}&script.param=${param}`;
-      console.log(`Query URL (GET records+script): ${recordsUrl}`);
+      const queryUrl = `${baseUrl}/layouts/${layout}/script/${scriptName}?script.param=${param}`;
+      console.log(`Query URL (GET): ${queryUrl}`);
 
-      let queryResponse = await fetch(recordsUrl, {
+      // Perform GET request to run the layout script with script.param
+      const queryResponse = await fetch(queryUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -74,29 +74,11 @@ serve(async (req) => {
         }
       });
 
-      console.log(`Query response status (GET records+script): ${queryResponse.status}`);
-
-      // Fallback: directly call the scripts endpoint via POST if GET approach fails
+      console.log(`Query response status (GET): ${queryResponse.status}`);
+      
       if (!queryResponse.ok) {
         const errorText = await queryResponse.text();
-        console.error(`Primary query error (GET records+script): ${errorText}`);
-        const scriptsUrl = `${baseUrl}/scripts/${scriptName}`;
-        console.log(`Fallback URL (POST scripts): ${scriptsUrl}`);
-        queryResponse = await fetch(scriptsUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ 'script.param': String(orderNumber) })
-        });
-        console.log(`Query response status (POST scripts): ${queryResponse.status}`);
-      }
-
-      if (!queryResponse.ok) {
-        const finalError = await queryResponse.text();
-        console.error(`Query error after fallback: ${finalError}`);
+        console.error(`Query error (GET): ${errorText}`);
         throw new Error(`Query failed: ${queryResponse.status} ${queryResponse.statusText}`);
       }
 
