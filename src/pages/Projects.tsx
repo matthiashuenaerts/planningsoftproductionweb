@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download } from 'lucide-react';
+import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download, Cog, Wrench, Hammer, Scissors, PaintBucket, Truck, Drill } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { projectService, Project } from '@/services/dataService';
+import { projectService, taskService, Project, Task } from '@/services/dataService';
 import { useAuth } from '@/context/AuthContext';
 import NewProjectModal from '@/components/NewProjectModal';
 import { exportProjectData } from '@/services/projectExportService';
@@ -23,6 +23,7 @@ const Projects = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
+  const [projectTasks, setProjectTasks] = useState<Record<string, Task[]>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
@@ -61,6 +62,21 @@ const Projects = () => {
       );
       setProjects(sortedData);
       setFilteredProjects(sortedData);
+      
+      // Load tasks for each project
+      const tasksData: Record<string, Task[]> = {};
+      await Promise.all(
+        sortedData.map(async (project) => {
+          try {
+            const tasks = await taskService.getTasksByProject(project.id);
+            tasksData[project.id] = tasks;
+          } catch (error) {
+            console.error(`Failed to load tasks for project ${project.id}:`, error);
+            tasksData[project.id] = [];
+          }
+        })
+      );
+      setProjectTasks(tasksData);
     } catch (error: any) {
       toast({
         title: t('error'),
@@ -115,6 +131,97 @@ const Projects = () => {
   };
   const handleProjectClick = (projectId: string) => {
     navigate(createLocalizedPath(`/projects/${projectId}`));
+  };
+
+// Function to get icon based on workstation name (Dutch names)
+  const getWorkstationIcon = (name: string) => {
+    const lowercaseName = name.toLowerCase();
+    
+    // CNC related workstations
+    if (lowercaseName.includes('cnc') || lowercaseName.includes('draaibank') || lowercaseName.includes('freesmachine')) {
+      return <Cog className="h-4 w-4" />;
+    }
+    
+    // Assembly/Montage workstations
+    if (lowercaseName.includes('montage') || lowercaseName.includes('assemblage') || lowercaseName.includes('assembly')) {
+      return <Wrench className="h-4 w-4" />;
+    }
+    
+    // Woodworking/Houtbewerking workstations
+    if (lowercaseName.includes('hout') || lowercaseName.includes('wood') || lowercaseName.includes('timber')) {
+      return <Hammer className="h-4 w-4" />;
+    }
+    
+    // Cutting/Snijden workstations
+    if (lowercaseName.includes('snij') || lowercaseName.includes('zaag') || lowercaseName.includes('cut') || lowercaseName.includes('saw')) {
+      return <Scissors className="h-4 w-4" />;
+    }
+    
+    // Drilling/Boren workstations
+    if (lowercaseName.includes('boor') || lowercaseName.includes('drill') || lowercaseName.includes('ponsen')) {
+      return <Drill className="h-4 w-4" />;
+    }
+    
+    // Painting/Schilderen workstations
+    if (lowercaseName.includes('verf') || lowercaseName.includes('lak') || lowercaseName.includes('paint') || lowercaseName.includes('coating')) {
+      return <PaintBucket className="h-4 w-4" />;
+    }
+    
+    // Transport/Verzending workstations
+    if (lowercaseName.includes('transport') || lowercaseName.includes('verzending') || lowercaseName.includes('levering')) {
+      return <Truck className="h-4 w-4" />;
+    }
+    
+    // Settings/Instellingen workstations
+    if (lowercaseName.includes('instellingen') || lowercaseName.includes('settings') || lowercaseName.includes('configuratie')) {
+      return <Settings className="h-4 w-4" />;
+    }
+
+    // Default icon for unmatched workstations
+    return <Package className="h-4 w-4" />;
+  };
+
+  // Get workstation progress indicators for a project
+  const getWorkstationProgress = (tasks: Task[]) => {
+    if (!tasks || tasks.length === 0) return null;
+
+    // Group tasks by workstation
+    const tasksByWorkstation = tasks.reduce((acc, task) => {
+      if (!acc[task.workstation]) {
+        acc[task.workstation] = [];
+      }
+      acc[task.workstation].push(task);
+      return acc;
+    }, {} as Record<string, Task[]>);
+
+    // Find farthest TODO workstation
+    let farthestTodoWorkstation = null;
+    let farthestTodoIndex = -1;
+    
+    // Find incomplete previous workstations
+    const incompleteWorkstations = [];
+    
+    Object.entries(tasksByWorkstation).forEach(([workstation, workstationTasks], index) => {
+      const hasTodoTasks = workstationTasks.some(task => task.status === 'TODO');
+      const hasCompletedTasks = workstationTasks.some(task => task.status === 'COMPLETED');
+      const hasInProgressTasks = workstationTasks.some(task => task.status === 'IN_PROGRESS');
+      
+      // This workstation has TODO tasks - potential farthest
+      if (hasTodoTasks && index > farthestTodoIndex) {
+        farthestTodoWorkstation = workstation;
+        farthestTodoIndex = index;
+      }
+      
+      // Previous workstations with incomplete tasks
+      if (index < farthestTodoIndex && (hasTodoTasks || hasInProgressTasks)) {
+        incompleteWorkstations.push(workstation);
+      }
+    });
+
+    return {
+      farthestTodo: farthestTodoWorkstation,
+      incompleteWorkstations
+    };
   };
   return (
     <div className="flex min-h-screen">
@@ -229,6 +336,43 @@ const Projects = () => {
                           </span>
                         </div>
                       </div>
+                      
+                      {/* Workstation Progress Indicators */}
+                      {(() => {
+                        const tasks = projectTasks[project.id] || [];
+                        const progress = getWorkstationProgress(tasks);
+                        
+                        if (progress && (progress.farthestTodo || progress.incompleteWorkstations.length > 0)) {
+                          return (
+                            <div className="flex items-center gap-2 mt-3">
+                              <span className="text-xs text-muted-foreground">Status:</span>
+                              <div className="flex items-center gap-1">
+                                {/* Red circles for incomplete previous workstations */}
+                                {progress.incompleteWorkstations.map((workstation, index) => (
+                                  <div
+                                    key={`incomplete-${index}`}
+                                    className="flex items-center justify-center w-6 h-6 bg-red-100 border-2 border-red-500 rounded-full"
+                                    title={`${workstation} - incomplete tasks`}
+                                  >
+                                    {getWorkstationIcon(workstation)}
+                                  </div>
+                                ))}
+                                
+                                {/* Green circle for farthest TODO workstation */}
+                                {progress.farthestTodo && (
+                                  <div
+                                    className="flex items-center justify-center w-6 h-6 bg-green-100 border-2 border-green-500 rounded-full"
+                                    title={`${progress.farthestTodo} - next tasks`}
+                                  >
+                                    {getWorkstationIcon(progress.farthestTodo)}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                       
                       <div className="mt-4">
                         <div className="flex justify-between text-sm mb-1">

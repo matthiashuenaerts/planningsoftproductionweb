@@ -294,6 +294,20 @@ export const phaseService = {
 
 // Task service functions
 export const taskService = {
+  async getTasksByProject(projectId: string): Promise<Task[]> {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select(`
+        *,
+        phases!inner(project_id)
+      `)
+      .eq('phases.project_id', projectId)
+      .order('due_date', { ascending: true });
+    
+    if (error) throw error;
+    return data as Task[] || [];
+  },
+
   async getAll(): Promise<Task[]> {
     const { data, error } = await supabase
       .from('tasks')
