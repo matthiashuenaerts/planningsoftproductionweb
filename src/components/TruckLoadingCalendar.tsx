@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { format, addDays, startOfWeek, isToday, isPast, isTomorrow } from 'date-fns';
+import { format, addDays, startOfWeek, isToday, isPast, isTomorrow, isWeekend, subDays } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,29 +8,20 @@ import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft, ChevronRight, Truck, Calendar, AlertTriangle, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { holidayService, Holiday } from '@/services/holidayService';
 
-interface TruckAssignment {
+interface Project {
   id: string;
-  project_id: string;
-  truck_id: string;
-  loading_date: string;
+  name: string;
+  client: string;
+  status: string;
   installation_date: string;
-  notes?: string;
-  project?: {
-    name: string;
-    client: string;
-    status: string;
-  };
-  truck?: {
-    truck_number: string;
-    description?: string;
-  };
 }
 
-interface Truck {
-  id: string;
-  truck_number: string;
-  description?: string;
+interface LoadingAssignment {
+  project: Project;
+  loading_date: string;
+  truck_number?: string;
 }
 
 const TruckLoadingCalendar = () => {
@@ -39,45 +30,68 @@ const TruckLoadingCalendar = () => {
     return startOfWeek(today, { weekStartsOn: 1 });
   });
   
-  const [assignments, setAssignments] = useState<TruckAssignment[]>([]);
-  const [trucks, setTrucks] = useState<Truck[]>([]);
+  const [assignments, setAssignments] = useState<LoadingAssignment[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // Fetch trucks and assignments
+  // Calculate previous workday considering holidays
+  const getPreviousWorkday = (date: Date, holidaysList: Holiday[]): Date => {
+    let previousDay = subDays(date, 1);
+    
+    while (true) {
+      // Skip weekends
+      if (isWeekend(previousDay)) {
+        previousDay = subDays(previousDay, 1);
+        continue;
+      }
+      
+      // Skip production holidays
+      const dateStr = format(previousDay, 'yyyy-MM-dd');
+      const isHoliday = holidaysList.some(h => h.date === dateStr && h.team === 'production');
+      
+      if (isHoliday) {
+        previousDay = subDays(previousDay, 1);
+        continue;
+      }
+      
+      break;
+    }
+    
+    return previousDay;
+  };
+
+  // Fetch projects and calculate loading dates
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         
-        // Fetch trucks
-        const { data: trucksData, error: trucksError } = await supabase
-          .from('trucks')
-          .select('*')
-          .order('truck_number');
+        // Fetch holidays
+        const holidaysData = await holidayService.getHolidays();
+        setHolidays(holidaysData);
+        
+        // Fetch all projects with installation dates
+        const { data: projectsData, error: projectsError } = await supabase
+          .from('projects')
+          .select('id, name, client, status, installation_date')
+          .not('installation_date', 'is', null)
+          .order('installation_date');
           
-        if (trucksError) throw trucksError;
-        setTrucks(trucksData || []);
+        if (projectsError) throw projectsError;
         
-        // Fetch truck assignments with project details
-        const { data: assignmentsData, error: assignmentsError } = await supabase
-          .from('project_truck_assignments')
-          .select(`
-            *,
-            projects!fk_project_truck_assignments_project(name, client, status),
-            trucks!fk_project_truck_assignments_truck(truck_number, description)
-          `)
-          .order('loading_date');
+        // Calculate loading dates for each project
+        const loadingAssignments: LoadingAssignment[] = (projectsData || []).map(project => {
+          const installationDate = new Date(project.installation_date);
+          const loadingDate = getPreviousWorkday(installationDate, holidaysData);
           
-        if (assignmentsError) throw assignmentsError;
+          return {
+            project,
+            loading_date: format(loadingDate, 'yyyy-MM-dd'),
+          };
+        });
         
-        const formattedAssignments = assignmentsData?.map(assignment => ({
-          ...assignment,
-          project: assignment.projects,
-          truck: assignment.trucks
-        })) || [];
-        
-        setAssignments(formattedAssignments);
+        setAssignments(loadingAssignments);
       } catch (error) {
         console.error('Error fetching truck loading data:', error);
         toast({
@@ -92,6 +106,23 @@ const TruckLoadingCalendar = () => {
     
     fetchData();
   }, [toast]);
+
+  // Re-calculate assignments when holidays change
+  useEffect(() => {
+    if (assignments.length > 0 && holidays.length > 0) {
+      const updatedAssignments = assignments.map(assignment => {
+        const installationDate = new Date(assignment.project.installation_date);
+        const loadingDate = getPreviousWorkday(installationDate, holidays);
+        
+        return {
+          ...assignment,
+          loading_date: format(loadingDate, 'yyyy-MM-dd'),
+        };
+      });
+      
+      setAssignments(updatedAssignments);
+    }
+  }, [holidays]);
 
   // Navigate weeks
   const prevWeek = () => {
@@ -125,13 +156,13 @@ const TruckLoadingCalendar = () => {
     return assignments.filter(assignment => assignment.loading_date === dateStr);
   };
 
-  // Get truck color for visual distinction
-  const getTruckColor = (truckNumber: string) => {
-    switch (truckNumber) {
-      case '01': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case '02': return 'bg-green-100 text-green-800 border-green-300';
-      case '03': return 'bg-orange-100 text-orange-800 border-orange-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+  // Get project color for visual distinction
+  const getProjectColor = (status: string) => {
+    switch (status) {
+      case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'planned': return 'bg-green-100 text-green-800 border-green-300';
+      case 'completed': return 'bg-gray-100 text-gray-800 border-gray-300';
+      default: return 'bg-orange-100 text-orange-800 border-orange-300';
     }
   };
 
@@ -170,27 +201,27 @@ const TruckLoadingCalendar = () => {
         <CardContent className="p-6">
           {todayAssignments.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {todayAssignments.map((assignment) => (
+              {todayAssignments.map((assignment, index) => (
                 <div
-                  key={assignment.id}
+                  key={`${assignment.project.id}-${index}`}
                   className={cn(
                     "p-4 rounded-lg border-2",
-                    getTruckColor(assignment.truck?.truck_number || '')
+                    getProjectColor(assignment.project.status)
                   )}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <Badge className={cn("text-lg px-3 py-1", getTruckColor(assignment.truck?.truck_number || ''))}>
-                      Truck {assignment.truck?.truck_number}
+                    <Badge className={cn("text-lg px-3 py-1", getProjectColor(assignment.project.status))}>
+                      {assignment.project.status.replace('_', ' ').toUpperCase()}
                     </Badge>
                     <div className="text-sm text-gray-600">
-                      Install: {format(new Date(assignment.installation_date), 'MMM d')}
+                      Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
                     </div>
                   </div>
-                  <h3 className="font-bold text-lg mb-1">{assignment.project?.name}</h3>
-                  <p className="text-gray-600 mb-2">{assignment.project?.client}</p>
-                  {assignment.notes && (
-                    <p className="text-sm text-gray-500 italic">{assignment.notes}</p>
-                  )}
+                  <h3 className="font-bold text-lg mb-1">{assignment.project.name}</h3>
+                  <p className="text-gray-600 mb-2">{assignment.project.client}</p>
+                  <div className="text-sm text-gray-500">
+                    Loading scheduled for today based on installation tomorrow
+                  </div>
                 </div>
               ))}
             </div>
@@ -248,16 +279,18 @@ const TruckLoadingCalendar = () => {
                   </div>
                   
                   <div className="space-y-1">
-                    {dayAssignments.map(assignment => (
+                    {dayAssignments.map((assignment, index) => (
                       <div
-                        key={assignment.id}
+                        key={`${assignment.project.id}-${index}`}
                         className={cn(
                           "p-1 rounded text-xs border",
-                          getTruckColor(assignment.truck?.truck_number || '')
+                          getProjectColor(assignment.project.status)
                         )}
                       >
-                        <div className="font-medium">T{assignment.truck?.truck_number}</div>
-                        <div className="truncate">{assignment.project?.name}</div>
+                        <div className="font-medium truncate">{assignment.project.name}</div>
+                        <div className="text-xs text-gray-500">
+                          Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -279,9 +312,9 @@ const TruckLoadingCalendar = () => {
         <CardContent>
           {upcomingAssignments.length > 0 ? (
             <div className="space-y-3">
-              {upcomingAssignments.slice(0, 10).map((assignment) => (
+              {upcomingAssignments.slice(0, 10).map((assignment, index) => (
                 <div
-                  key={assignment.id}
+                  key={`${assignment.project.id}-${index}`}
                   className={cn(
                     "p-3 rounded-lg border-l-4 bg-white border",
                     getLoadingPriority(assignment.loading_date)
@@ -290,19 +323,19 @@ const TruckLoadingCalendar = () => {
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <Badge className={getTruckColor(assignment.truck?.truck_number || '')}>
-                          Truck {assignment.truck?.truck_number}
+                        <Badge className={getProjectColor(assignment.project.status)}>
+                          {assignment.project.status.replace('_', ' ').toUpperCase()}
                         </Badge>
                         <span className="text-sm text-gray-600">
                           Load: {format(new Date(assignment.loading_date), 'MMM d')}
                         </span>
                       </div>
-                      <h4 className="font-medium">{assignment.project?.name}</h4>
-                      <p className="text-sm text-gray-600">{assignment.project?.client}</p>
+                      <h4 className="font-medium">{assignment.project.name}</h4>
+                      <p className="text-sm text-gray-600">{assignment.project.client}</p>
                     </div>
                     <div className="text-xs text-gray-500 text-right">
                       <div>Install:</div>
-                      <div>{format(new Date(assignment.installation_date), 'MMM d')}</div>
+                      <div>{format(new Date(assignment.project.installation_date), 'MMM d')}</div>
                     </div>
                   </div>
                 </div>
