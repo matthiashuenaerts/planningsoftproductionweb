@@ -44,15 +44,23 @@ const Projects = () => {
         project.name.toLowerCase().includes(query) || 
         project.client.toLowerCase().includes(query)
       );
-      setFilteredProjects(filtered);
+      // Sort filtered results by installation date (latest first)
+      const sortedFiltered = filtered.sort((a, b) => 
+        new Date(b.installation_date).getTime() - new Date(a.installation_date).getTime()
+      );
+      setFilteredProjects(sortedFiltered);
     }
   }, [searchQuery, projects]);
   const loadProjects = async () => {
     setIsLoading(true);
     try {
       const data = await projectService.getAll();
-      setProjects(data);
-      setFilteredProjects(data);
+      // Sort projects by installation date (latest first)
+      const sortedData = data.sort((a, b) => 
+        new Date(b.installation_date).getTime() - new Date(a.installation_date).getTime()
+      );
+      setProjects(sortedData);
+      setFilteredProjects(sortedData);
     } catch (error: any) {
       toast({
         title: t('error'),
