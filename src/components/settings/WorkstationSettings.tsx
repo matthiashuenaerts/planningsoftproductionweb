@@ -50,8 +50,11 @@ const WorkstationSettings: React.FC = () => {
   const [showTaskMapping, setShowTaskMapping] = useState(false);
   const [showTasksManager, setShowTasksManager] = useState(false);
   const [showImageDialog, setShowImageDialog] = useState(false);
+  const [showIconDialog, setShowIconDialog] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingIcon, setUploadingIcon] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadIconFile, setUploadIconFile] = useState<File | null>(null);
   const { toast } = useToast();
 
   const form = useForm({
@@ -192,6 +195,32 @@ const WorkstationSettings: React.FC = () => {
     }
   };
 
+  const handleIconUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedWorkstation || !uploadIconFile) return;
+    try {
+      setUploadingIcon(true);
+      const ext = uploadIconFile.name.split('.').pop();
+      const path = `workstation-icons/${selectedWorkstation.id}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from('product-images').upload(path, uploadIconFile, {
+        upsert: true,
+        contentType: uploadIconFile.type,
+      });
+      if (uploadError) throw uploadError;
+      const { data: pub } = supabase.storage.from('product-images').getPublicUrl(path);
+      await workstationService.update(selectedWorkstation.id, { icon_path: pub.publicUrl });
+      toast({ title: 'Success', description: 'Icon uploaded successfully' });
+      setShowIconDialog(false);
+      setUploadIconFile(null);
+      loadWorkstations();
+    } catch (error: any) {
+      console.error('Error uploading icon:', error);
+      toast({ title: 'Error', description: error.message || 'Failed to upload icon', variant: 'destructive' });
+    } finally {
+      setUploadingIcon(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -323,6 +352,16 @@ const WorkstationSettings: React.FC = () => {
                           >
                             Upload image
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedWorkstation(workstation);
+                              setShowIconDialog(true);
+                            }}
+                          >
+                            Upload icon
+                          </Button>
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button
@@ -443,6 +482,56 @@ const WorkstationSettings: React.FC = () => {
                 </DialogClose>
                 <Button type="submit" disabled={uploading || !uploadFile}>
                   {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Upload
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Icon Upload Dialog */}
+      {selectedWorkstation && (
+        <Dialog open={showIconDialog} onOpenChange={setShowIconDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Upload Icon for {selectedWorkstation.name}</DialogTitle>
+              <DialogDescription>
+                Upload an icon that will be used as progress indicator and in dashboard tiles
+              </DialogDescription>
+            </DialogHeader>
+            
+            <form onSubmit={handleIconUpload} className="space-y-4">
+              <div>
+                <label htmlFor="icon" className="block text-sm font-medium mb-2">
+                  Select Icon (PNG, SVG, or other image formats)
+                </label>
+                <Input
+                  id="icon"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setUploadIconFile(e.target.files?.[0] || null)}
+                  required
+                />
+              </div>
+              
+              {selectedWorkstation.icon_path && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Current icon:</p>
+                  <img 
+                    src={selectedWorkstation.icon_path} 
+                    alt={`${selectedWorkstation.name} icon`}
+                    className="w-8 h-8 object-contain border rounded"
+                  />
+                </div>
+              )}
+              
+              <div className="flex justify-end gap-3">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Cancel</Button>
+                </DialogClose>
+                <Button type="submit" disabled={uploadingIcon || !uploadIconFile}>
+                  {uploadingIcon ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Upload
                 </Button>
               </div>
