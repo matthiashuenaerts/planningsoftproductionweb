@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download, Cog, Wrench, Hammer, Scissors, PaintBucket, Truck, Drill } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, taskService, Project, Task } from '@/services/dataService';
+import { workstationService, Workstation } from '@/services/workstationService';
 import { useAuth } from '@/context/AuthContext';
 import NewProjectModal from '@/components/NewProjectModal';
 import { exportProjectData } from '@/services/projectExportService';
@@ -24,6 +25,7 @@ const Projects = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [projectTasks, setProjectTasks] = useState<Record<string, Task[]>>({});
+  const [workstations, setWorkstations] = useState<Workstation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
@@ -33,7 +35,17 @@ const Projects = () => {
 
   useEffect(() => {
     loadProjects();
+    loadWorkstations();
   }, []);
+
+  const loadWorkstations = async () => {
+    try {
+      const data = await workstationService.getAll();
+      setWorkstations(data);
+    } catch (error) {
+      console.error('Error loading workstations:', error);
+    }
+  };
 
   // Filter projects when search query changes
   useEffect(() => {
@@ -133,9 +145,23 @@ const Projects = () => {
     navigate(createLocalizedPath(`/projects/${projectId}`));
   };
 
-// Function to get icon based on workstation name (Dutch names)
-  const getWorkstationIcon = (name: string) => {
-    const lowercaseName = name.toLowerCase();
+// Function to get icon based on workstation name or uploaded icon
+  const getWorkstationIcon = (workstationName: string) => {
+    // Find the workstation to check if it has an uploaded icon
+    const workstation = workstations.find(ws => ws.name.toLowerCase() === workstationName.toLowerCase());
+    
+    if (workstation?.icon_path) {
+      return (
+        <img 
+          src={workstation.icon_path} 
+          alt={workstation.name} 
+          className="h-4 w-4 object-contain"
+        />
+      );
+    }
+
+    // Fallback to default icons based on name
+    const lowercaseName = workstationName.toLowerCase();
     
     // CNC related workstations
     if (lowercaseName.includes('cnc') || lowercaseName.includes('draaibank') || lowercaseName.includes('freesmachine')) {

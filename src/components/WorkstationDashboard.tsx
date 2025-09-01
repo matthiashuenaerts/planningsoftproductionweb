@@ -156,7 +156,7 @@ const WorkstationDashboard = () => {
         for (const link of workstationLinks) {
           const { data: workstationData, error: workstationError } = await supabase
             .from('workstations')
-            .select('id, name, description, created_at, updated_at')
+            .select('*')
             .eq('id', link.workstation_id)
             .single();
             
@@ -174,7 +174,7 @@ const WorkstationDashboard = () => {
         if (currentEmployee.workstation) {
           const { data: workstationData, error: workstationError } = await supabase
             .from('workstations')
-            .select('id, name, description, created_at, updated_at')
+            .select('*')
             .ilike('name', currentEmployee.workstation)
             .maybeSingle();
             
@@ -186,7 +186,7 @@ const WorkstationDashboard = () => {
             // Try to find workstation case-insensitively
             const { data: allWorkstations, error: listError } = await supabase
               .from('workstations')
-              .select('id, name, description, created_at, updated_at');
+              .select('*');
               
             if (listError) {
               console.error('Error fetching all workstations:', listError);
@@ -208,7 +208,7 @@ const WorkstationDashboard = () => {
         // For workstation accounts, use the name to find the matching workstation
         const { data: matchByName, error: matchError } = await supabase
           .from('workstations')
-          .select('id, name, description, created_at, updated_at')
+          .select('*')
           .ilike('name', currentEmployee.name)
           .maybeSingle();
           
@@ -601,9 +601,20 @@ const WorkstationDashboard = () => {
   const renderWorkstationSection = (data: WorkstationData) => {
     return (
       <div key={data.workstation.id} className="border rounded-lg p-4 bg-white shadow mb-4">
-        <h2 className="text-xl font-bold mb-4 text-primary">
-          {data.workstation.name}
-        </h2>
+        <div className="flex items-center mb-4">
+          {data.workstation.icon_path ? (
+            <img 
+              src={data.workstation.icon_path} 
+              alt={`${data.workstation.name} icon`}
+              className="w-8 h-8 object-contain mr-3"
+            />
+          ) : (
+            <Package className="w-8 h-8 mr-3 text-primary" />
+          )}
+          <h2 className="text-xl font-bold text-primary">
+            {data.workstation.name}
+          </h2>
+        </div>
         
         <div className="grid grid-cols-4 gap-4">
           {/* Tasks column - takes up 3/4 of the space */}
