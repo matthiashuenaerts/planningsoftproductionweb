@@ -180,13 +180,13 @@ const WorkstationSettings: React.FC = () => {
       if (uploadError) throw uploadError;
       const { data: pub } = supabase.storage.from('product-images').getPublicUrl(path);
       await workstationService.update(selectedWorkstation.id, { image_path: pub.publicUrl });
-      toast({ title: 'Success', description: 'Image uploaded successfully' });
+      toast({ title: 'Success', description: 'Icon uploaded successfully' });
       setShowImageDialog(false);
       setUploadFile(null);
       loadWorkstations();
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      toast({ title: 'Error', description: error.message || 'Failed to upload image', variant: 'destructive' });
+      toast({ title: 'Error', description: error.message || 'Failed to upload icon', variant: 'destructive' });
     } finally {
       setUploading(false);
     }
@@ -321,7 +321,7 @@ const WorkstationSettings: React.FC = () => {
                               setShowImageDialog(true);
                             }}
                           >
-                            Upload image
+                            Upload Icon
                           </Button>
                           <Dialog>
                             <DialogTrigger asChild>
@@ -406,33 +406,36 @@ const WorkstationSettings: React.FC = () => {
         <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Upload Image for {selectedWorkstation.name}</DialogTitle>
+              <DialogTitle>Upload Icon for {selectedWorkstation.name}</DialogTitle>
               <DialogDescription>
-                Upload an image that will be displayed for this workstation
+                Upload an icon file that will be used for this workstation in progress indicators
               </DialogDescription>
             </DialogHeader>
             
             <form onSubmit={handleImageUpload} className="space-y-4">
               <div>
-                <label htmlFor="image" className="block text-sm font-medium mb-2">
-                  Select Image
+                <label htmlFor="icon" className="block text-sm font-medium mb-2">
+                  Select Icon
                 </label>
                 <Input
-                  id="image"
+                  id="icon"
                   type="file"
-                  accept="image/*"
+                  accept="image/svg+xml,image/png,image/jpg,image/jpeg,image/gif"
                   onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
                   required
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Recommended: SVG, PNG, or other icon formats. Will be used as progress indicators.
+                </p>
               </div>
               
               {selectedWorkstation.image_path && (
                 <div>
-                  <p className="text-sm text-muted-foreground mb-2">Current image:</p>
+                  <p className="text-sm text-muted-foreground mb-2">Current icon:</p>
                   <img 
                     src={selectedWorkstation.image_path} 
                     alt={selectedWorkstation.name}
-                    className="w-32 h-32 object-cover rounded-md border"
+                    className="w-12 h-12 object-contain rounded-md border bg-muted p-2"
                   />
                 </div>
               )}
