@@ -85,8 +85,20 @@ serve(async (req) => {
       const queryData = await queryResponse.json();
       console.log('Orders query successful');
 
+      // Try to parse scriptResult if present so the client directly receives the business JSON
+      let resultBody: any = queryData;
+      try {
+        const scriptResult = queryData?.response?.scriptResult;
+        if (scriptResult) {
+          resultBody = JSON.parse(scriptResult);
+          console.log('Parsed scriptResult successfully');
+        }
+      } catch (e) {
+        console.warn('Failed to parse scriptResult, returning raw response');
+      }
+
       return new Response(
-        JSON.stringify(queryData),
+        JSON.stringify(resultBody),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200

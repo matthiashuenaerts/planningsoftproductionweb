@@ -85,7 +85,7 @@ const ExternalDatabaseSettings: React.FC = () => {
   const [ordersConfig, setOrdersConfig] = useState({
     baseUrl: 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
     username: 'Matthias HUENAERTS',
-    password: '8pJ1A24z',
+    password: '89ot8diZ',
     testOrderNumber: '24000079'
   });
 
