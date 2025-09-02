@@ -5,6 +5,7 @@ export interface PartsList {
   id: string;
   project_id: string;
   task_id?: string;
+  order_id?: string;
   file_name: string;
   imported_by?: string;
   imported_at: string;
@@ -46,7 +47,8 @@ export class PartsListService {
     taskId: string | null,
     csvContent: string,
     fileName: string,
-    importedBy?: string
+    importedBy?: string,
+    orderId?: string
   ): Promise<PartsList> {
     // Create parts list record
     const { data: partsList, error: partsListError } = await supabase
@@ -54,6 +56,7 @@ export class PartsListService {
       .insert({
         project_id: projectId,
         task_id: taskId,
+        order_id: orderId,
         file_name: fileName,
         imported_by: importedBy
       })
@@ -149,6 +152,49 @@ export class PartsListService {
 
     if (error) throw error;
     return data || [];
+  }
+
+  async getPartsListsByOrder(orderId: string): Promise<PartsList[]> {
+    const { data, error } = await supabase
+      .from('parts_lists')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('imported_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  async createPart(part: Omit<Part, 'id' | 'created_at' | 'updated_at'>): Promise<Part> {
+    const { data, error } = await supabase
+      .from('parts')
+      .insert(part)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as Part;
+  }
+
+  async updatePart(partId: string, updates: Partial<Part>): Promise<Part> {
+    const { data, error } = await supabase
+      .from('parts')
+      .update(updates)
+      .eq('id', partId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as Part;
+  }
+
+  async deletePart(partId: string): Promise<void> {
+    const { error } = await supabase
+      .from('parts')
+      .delete()
+      .eq('id', partId);
+
+    if (error) throw error;
   }
 
   async getPartsByPartsList(partsListId: string): Promise<Part[]> {

@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListDialog } from '@/components/PartsListDialog';
+import { OrderPartsListEditor } from '@/components/OrderPartsListEditor';
 import { useLanguage } from '@/context/LanguageContext';
 
 type LogisticsOutOrder = Order & { 
@@ -48,7 +49,9 @@ const LogisticsOut: React.FC = () => {
   const [showBarcodeDialog, setShowBarcodeDialog] = useState(false);
   const [showFilesDialog, setShowFilesDialog] = useState(false);
   const [showPartsDialog, setShowPartsDialog] = useState(false);
+  const [showOrderPartsDialog, setShowOrderPartsDialog] = useState(false);
   const [selectedProject, setSelectedProject] = useState<{ id: string; name: string } | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     const loadLogisticsOutOrders = async () => {
@@ -203,6 +206,11 @@ const LogisticsOut: React.FC = () => {
   const handleShowParts = (projectId: string, projectName: string) => {
     setSelectedProject({ id: projectId, name: projectName });
     setShowPartsDialog(true);
+  };
+
+  const handleShowOrderParts = (orderId: string, orderName: string) => {
+    setSelectedOrder({ id: orderId, name: orderName });
+    setShowOrderPartsDialog(true);
   };
 
   const today = new Date();
@@ -381,7 +389,7 @@ const LogisticsOut: React.FC = () => {
                             <Button 
                               size="sm" 
                               variant="outline"
-                              onClick={() => handleShowParts(event.order.project_id, event.order.project_name)}
+                              onClick={() => handleShowOrderParts(event.order.id, `${event.order.project_name} - ${event.order.supplier}`)}
                               className="text-xs h-6 px-2 bg-white/90 text-gray-800 border-white hover:bg-white hover:text-gray-900"
                             >
                               <List className="h-3 w-3" />

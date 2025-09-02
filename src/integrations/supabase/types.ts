@@ -807,6 +807,7 @@ export type Database = {
           id: string
           imported_at: string
           imported_by: string | null
+          order_id: string | null
           project_id: string
           task_id: string | null
           updated_at: string
@@ -817,6 +818,7 @@ export type Database = {
           id?: string
           imported_at?: string
           imported_by?: string | null
+          order_id?: string | null
           project_id: string
           task_id?: string | null
           updated_at?: string
@@ -827,6 +829,7 @@ export type Database = {
           id?: string
           imported_at?: string
           imported_by?: string | null
+          order_id?: string | null
           project_id?: string
           task_id?: string | null
           updated_at?: string
@@ -837,6 +840,13 @@ export type Database = {
             columns: ["imported_by"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parts_lists_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
           {
