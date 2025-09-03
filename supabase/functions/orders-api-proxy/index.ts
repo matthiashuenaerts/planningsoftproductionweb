@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, baseUrl, username, password, token, orderNumber } = await req.json();
+    const { action, baseUrl, username, password, token, orderNumber, projectLinkId } = await req.json();
     
     console.log(`Orders API Proxy - Action: ${action}`);
     
@@ -55,11 +55,11 @@ serve(async (req) => {
       
     } else if (action === 'query') {
       // Query request - fetch orders data using the specific endpoint
-      console.log(`Querying orders for order number: ${orderNumber} with token: ${token}`);
+      console.log(`Querying orders for projectLinkId: ${projectLinkId ?? orderNumber} with token: ${token}`);
 
-      const layout = encodeURIComponent('API_');
+      const layout = encodeURIComponent('API_order');
       const scriptName = encodeURIComponent('FindSupplierOrderByOrderNumber');
-      const param = encodeURIComponent(String(orderNumber));
+      const param = encodeURIComponent(String(projectLinkId ?? orderNumber));
 
       const queryUrl = `${baseUrl}/layouts/${layout}/script/${scriptName}?script.param=${param}`;
       console.log(`Query URL (GET): ${queryUrl}`);

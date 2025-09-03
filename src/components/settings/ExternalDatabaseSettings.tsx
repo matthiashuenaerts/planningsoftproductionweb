@@ -86,7 +86,7 @@ const ExternalDatabaseSettings: React.FC = () => {
     baseUrl: 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
     username: 'Matthias HUENAERTS',
     password: '89ot8diZ',
-    testOrderNumber: '24000079'
+    testOrderNumber: '25031020'
   });
 
   const handleConfigChange = (field: string, value: string) => {
@@ -413,7 +413,7 @@ const ExternalDatabaseSettings: React.FC = () => {
           action: 'query',
           baseUrl: ordersConfig.baseUrl,
           token: ordersToken,
-          orderNumber: ordersConfig.testOrderNumber
+          projectLinkId: ordersConfig.testOrderNumber
         })
       });
 
@@ -843,12 +843,12 @@ const ExternalDatabaseSettings: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="orders-testOrderNumber">Test Order Number</Label>
+                  <Label htmlFor="orders-testOrderNumber">Project Link ID</Label>
                   <Input
                     id="orders-testOrderNumber"
                     value={ordersConfig.testOrderNumber}
                     onChange={(e) => handleOrdersConfigChange('testOrderNumber', e.target.value)}
-                    placeholder="24000079"
+                    placeholder="25031020"
                   />
                 </div>
               </div>
@@ -921,7 +921,7 @@ const ExternalDatabaseSettings: React.FC = () => {
               <CardHeader>
                 <CardTitle>Orders Query Result</CardTitle>
                 <CardDescription>
-                  Response from the orders API for order number: {ordersConfig.testOrderNumber}
+                  Response from the orders API for project link id: {ordersConfig.testOrderNumber}
                 </CardDescription>
               </CardHeader>
               <CardContent>
