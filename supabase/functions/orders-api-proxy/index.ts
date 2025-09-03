@@ -8,7 +8,7 @@ const corsHeaders = {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -20,18 +20,11 @@ serve(async (req) => {
       // Authentication request - create session and get token
       console.log(`Authenticating with baseUrl: ${baseUrl}, username: ${username}`);
       
-      // Sanitize and encode credentials (UTF-8 safe) and base URL
-      const cleanBaseUrl = String(baseUrl).replace(/\/+$/, '');
-      const cleanUsername = String(username ?? '').trim();
-      const cleanPassword = String(password ?? '');
-      const basicToken = btoa(unescape(encodeURIComponent(`${cleanUsername}:${cleanPassword}`)));
-
-      const authResponse = await fetch(`${cleanBaseUrl}/sessions`, {
+      const authResponse = await fetch(`${baseUrl}/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Basic ${basicToken}`,
+          'Authorization': `Basic ${btoa(`${username}:${password}`)}`,
         },
         body: JSON.stringify({})
       });
