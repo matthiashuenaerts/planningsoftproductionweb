@@ -20,11 +20,18 @@ serve(async (req) => {
       // Authentication request - create session and get token
       console.log(`Authenticating with baseUrl: ${baseUrl}, username: ${username}`);
       
-      const authResponse = await fetch(`${baseUrl}/sessions`, {
+      // Sanitize and encode credentials (UTF-8 safe) and base URL
+      const cleanBaseUrl = String(baseUrl).replace(/\/+$/, '');
+      const cleanUsername = String(username ?? '').trim();
+      const cleanPassword = String(password ?? '');
+      const basicToken = btoa(unescape(encodeURIComponent(`${cleanUsername}:${cleanPassword}`)));
+
+      const authResponse = await fetch(`${cleanBaseUrl}/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Basic ${btoa(`${username}:${password}`)}`,
+          'Accept': 'application/json',
+          'Authorization': `Basic ${basicToken}`,
         },
         body: JSON.stringify({})
       });
