@@ -1025,6 +1025,65 @@ const ExternalDatabaseSettings: React.FC = () => {
                       if (parsed.response?.scriptResult) {
                         const ordersData = JSON.parse(parsed.response.scriptResult);
                         if (ordersData.bestellingen && ordersData.bestellingen.length > 0) {
+                          
+                          const importOrdersFromQuery = async () => {
+                            try {
+                              setOrdersImporting(true);
+                              setOrdersImportResult('');
+                              
+                              const response = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/orders-import', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
+                                },
+                                body: JSON.stringify({
+                                  projectLinkId: ordersConfig.testOrderNumber,
+                                  baseUrl: ordersConfig.baseUrl,
+                                  username: ordersConfig.username,
+                                  password: ordersConfig.password
+                                })
+                              });
+
+                              if (!response.ok) {
+                                const errorData = await response.json();
+                                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+                              }
+
+                              const data = await response.json();
+                              
+                              if (data.success) {
+                                setOrdersImportResult(`Import successful: ${data.message}\nImported: ${data.imported} orders\nErrors: ${data.errors.length}`);
+                                
+                                toast({
+                                  title: "Import Successful",
+                                  description: data.message,
+                                  variant: "default"
+                                });
+                              } else {
+                                setOrdersImportResult(`Import failed: ${data.message || 'Unknown error'}`);
+                                
+                                toast({
+                                  title: "Import Failed",
+                                  description: data.message || 'Unknown error',
+                                  variant: "destructive"
+                                });
+                              }
+                            } catch (error) {
+                              console.error('Import error:', error);
+                              const errorMessage = error instanceof Error ? error.message : "Failed to import orders";
+                              setOrdersImportResult(`Error: ${errorMessage}`);
+                              
+                              toast({
+                                title: "Import Failed",
+                                description: errorMessage,
+                                variant: "destructive"
+                              });
+                            } finally {
+                              setOrdersImporting(false);
+                            }
+                          };
+                          
                           return (
                             <div className="mt-4 p-4 bg-muted rounded-md">
                               <h4 className="font-semibold mb-4">Parsed Orders Information:</h4>
@@ -1059,9 +1118,133 @@ const ExternalDatabaseSettings: React.FC = () => {
                                   )}
                                 </div>
                               ))}
+                              
+                              <Button 
+                                onClick={importOrdersFromQuery}
+                                disabled={ordersImporting}
+                                className="mt-4 flex items-center gap-2"
+                              >
+                                {ordersImporting ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4" />
+                                )}
+                                {ordersImporting ? 'Importing...' : 'Manual Import to Database'}
+                              </Button>
                             </div>
                           );
                         }
+                      } else if (parsed.bestellingen && parsed.bestellingen.length > 0) {
+                        // Handle direct bestellingen data without scriptResult wrapper
+                        const ordersData = parsed;
+                        
+                        const importOrdersFromQuery = async () => {
+                          try {
+                            setOrdersImporting(true);
+                            setOrdersImportResult('');
+                            
+                            const response = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/orders-import', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
+                              },
+                              body: JSON.stringify({
+                                projectLinkId: ordersConfig.testOrderNumber,
+                                baseUrl: ordersConfig.baseUrl,
+                                username: ordersConfig.username,
+                                password: ordersConfig.password
+                              })
+                            });
+
+                            if (!response.ok) {
+                              const errorData = await response.json();
+                              throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+                            }
+
+                            const data = await response.json();
+                            
+                            if (data.success) {
+                              setOrdersImportResult(`Import successful: ${data.message}\nImported: ${data.imported} orders\nErrors: ${data.errors.length}`);
+                              
+                              toast({
+                                title: "Import Successful",
+                                description: data.message,
+                                variant: "default"
+                              });
+                            } else {
+                              setOrdersImportResult(`Import failed: ${data.message || 'Unknown error'}`);
+                              
+                              toast({
+                                title: "Import Failed",
+                                description: data.message || 'Unknown error',
+                                variant: "destructive"
+                              });
+                            }
+                          } catch (error) {
+                            console.error('Import error:', error);
+                            const errorMessage = error instanceof Error ? error.message : "Failed to import orders";
+                            setOrdersImportResult(`Error: ${errorMessage}`);
+                            
+                            toast({
+                              title: "Import Failed",
+                              description: errorMessage,
+                              variant: "destructive"
+                            });
+                          } finally {
+                            setOrdersImporting(false);
+                          }
+                        };
+                        
+                        return (
+                          <div className="mt-4 p-4 bg-muted rounded-md">
+                            <h4 className="font-semibold mb-4">Parsed Orders Information:</h4>
+                            
+                            {ordersData.bestellingen.map((bestelling: any, index: number) => (
+                              <div key={index} className="mb-6 p-4 border border-border rounded-md">
+                                <h5 className="font-medium mb-3 text-sm text-muted-foreground">Order #{bestelling.bestelnummer}</h5>
+                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 text-sm mb-4">
+                                  <div><strong>Order Number:</strong> {bestelling.bestelnummer}</div>
+                                  <div><strong>Supplier:</strong> {bestelling.leverancier}</div>
+                                  <div><strong>Delivery Week:</strong> {bestelling.leverweek}</div>
+                                  <div><strong>Shipped:</strong> {bestelling.isVerzonden ? 'Yes' : 'No'}</div>
+                                </div>
+                                
+                                {bestelling.artikelen && bestelling.artikelen.length > 0 && (
+                                  <div className="mt-4">
+                                    <h6 className="font-medium mb-2">Articles:</h6>
+                                    <div className="space-y-2">
+                                      {bestelling.artikelen.map((artikel: any, articleIndex: number) => (
+                                        <div key={articleIndex} className="bg-background p-3 rounded border text-sm">
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                            <div><strong>Article:</strong> {artikel.artikel || 'N/A'}</div>
+                                            <div><strong>Quantity:</strong> {artikel.aantal}</div>
+                                            <div><strong>Category:</strong> {artikel.categorie || 'N/A'}</div>
+                                            <div><strong>Category #:</strong> {artikel.categorienummer}</div>
+                                            <div className="md:col-span-2"><strong>Description:</strong> {artikel.omschrijving}</div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            
+                            <Button 
+                              onClick={importOrdersFromQuery}
+                              disabled={ordersImporting}
+                              className="mt-4 flex items-center gap-2"
+                            >
+                              {ordersImporting ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-4 w-4" />
+                              )}
+                              {ordersImporting ? 'Importing...' : 'Manual Import to Database'}
+                            </Button>
+                          </div>
+                        );
                       }
                     } catch (e) {
                       return null;
