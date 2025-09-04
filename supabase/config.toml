@@ -186,3 +186,7 @@ url = ""
 [functions]
 [functions.create-storage-bucket]
 verify_jwt = false
+[functions.orders-api-proxy]
+verify_jwt = false
+[functions.orders-import]
+verify_jwt = false

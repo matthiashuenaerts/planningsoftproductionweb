@@ -78,9 +78,11 @@ const ExternalDatabaseSettings: React.FC = () => {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersTestingConnection, setOrdersTestingConnection] = useState(false);
   const [ordersTestingQuery, setOrdersTestingQuery] = useState(false);
+  const [ordersImporting, setOrdersImporting] = useState(false);
   const [ordersConnectionStatus, setOrdersConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [ordersToken, setOrdersToken] = useState<string>('');
   const [ordersQueryResult, setOrdersQueryResult] = useState<string>('');
+  const [ordersImportResult, setOrdersImportResult] = useState<string>('');
   
   const [ordersConfig, setOrdersConfig] = useState({
     baseUrl: 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
@@ -464,6 +466,75 @@ const ExternalDatabaseSettings: React.FC = () => {
       });
     } finally {
       setOrdersLoading(false);
+    }
+  };
+
+  const importOrders = async () => {
+    if (!ordersConfig.testOrderNumber) {
+      toast({
+        title: "Project Link ID Required",
+        description: "Please enter a project link ID first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setOrdersImporting(true);
+    setOrdersImportResult('');
+    
+    try {
+      console.log('Starting orders import...');
+      
+      const response = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/orders-import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
+        },
+        body: JSON.stringify({
+          projectLinkId: ordersConfig.testOrderNumber,
+          baseUrl: ordersConfig.baseUrl,
+          username: ordersConfig.username,
+          password: ordersConfig.password
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setOrdersImportResult(`Import successful: ${data.message}\nImported: ${data.imported} orders\nErrors: ${data.errors.length}`);
+        
+        toast({
+          title: "Import Successful",
+          description: data.message,
+          variant: "default"
+        });
+      } else {
+        setOrdersImportResult(`Import failed: ${data.message || 'Unknown error'}`);
+        
+        toast({
+          title: "Import Failed",
+          description: data.message || 'Unknown error',
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to import orders";
+      setOrdersImportResult(`Error: ${errorMessage}`);
+      
+      toast({
+        title: "Import Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setOrdersImporting(false);
     }
   };
 
@@ -898,6 +969,20 @@ const ExternalDatabaseSettings: React.FC = () => {
                   )}
                   {ordersLoading ? 'Saving...' : 'Save Configuration'}
                 </Button>
+
+                <Button 
+                  onClick={importOrders} 
+                  disabled={ordersImporting}
+                  variant="default"
+                  className="flex items-center gap-2"
+                >
+                  {ordersImporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  {ordersImporting ? 'Importing...' : 'Manual Import'}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -984,6 +1069,25 @@ const ExternalDatabaseSettings: React.FC = () => {
                     return null;
                   })()}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {ordersImportResult && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Orders Import Result</CardTitle>
+                <CardDescription>
+                  Result of the manual orders import for project: {ordersConfig.testOrderNumber}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  value={ordersImportResult}
+                  readOnly
+                  className="min-h-[200px] font-mono text-sm"
+                  placeholder="Import results will appear here..."
+                />
               </CardContent>
             </Card>
           )}

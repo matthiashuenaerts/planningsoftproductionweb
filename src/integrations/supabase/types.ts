@@ -665,6 +665,7 @@ export type Database = {
         Row: {
           created_at: string
           expected_delivery: string
+          external_order_number: string | null
           id: string
           notes: string | null
           order_date: string
@@ -677,6 +678,7 @@ export type Database = {
         Insert: {
           created_at?: string
           expected_delivery: string
+          external_order_number?: string | null
           id?: string
           notes?: string | null
           order_date?: string
@@ -689,6 +691,7 @@ export type Database = {
         Update: {
           created_at?: string
           expected_delivery?: string
+          external_order_number?: string | null
           id?: string
           notes?: string | null
           order_date?: string
