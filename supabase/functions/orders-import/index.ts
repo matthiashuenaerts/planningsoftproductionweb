@@ -98,7 +98,28 @@ serve(async (req) => {
       );
     }
 
-    // Step 4: Process and import orders
+    // Step 4: Find the project first to ensure it exists
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('project_link_id', projectLinkId)
+      .single();
+
+    if (projectError || !project) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: `Project not found with project_link_id: ${projectLinkId}. Please ensure the project exists in the database.`,
+          imported: 0,
+          errors: [`Project lookup failed: ${projectError?.message || 'Project not found'}`]
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+      );
+    }
+
+    console.log(`Found project ${project.id} for project_link_id: ${projectLinkId}`);
+
+    // Step 5: Process and import orders
     let importedCount = 0;
     const errors: string[] = [];
     
@@ -127,30 +148,18 @@ serve(async (req) => {
           expectedDeliveryDate = new Date().toISOString();
         }
 
-        // Find project by project_link_id
-        const { data: project, error: projectError } = await supabase
-          .from('projects')
-          .select('id')
-          .eq('project_link_id', projectLinkId)
-          .single();
-
-        if (projectError || !project) {
-          console.warn(`Project not found for project_link_id: ${projectLinkId}`);
-          // Continue processing but don't link to project
-        }
-
-        // Upsert order (using external_order_number for idempotency)
+        // Upsert order (using external_order_number for idempotency) - now properly linked to project
         const { data: order, error: orderError } = await supabase
           .from('orders')
           .upsert({
             external_order_number: orderNumber,
-            project_id: project?.id || null,
+            project_id: project.id, // Always link to the found project
             supplier: supplier,
             order_date: new Date().toISOString(),
             expected_delivery: expectedDeliveryDate,
             status: isShipped ? 'delivered' : 'pending',
             order_type: 'standard',
-            notes: `Imported from Orders API. Delivery week: ${deliveryWeek}`,
+            notes: `Imported from Orders API. Delivery week: ${deliveryWeek}. ${isShipped ? 'Already shipped.' : 'Pending shipment.'}`,
           }, {
             onConflict: 'external_order_number',
             ignoreDuplicates: false
