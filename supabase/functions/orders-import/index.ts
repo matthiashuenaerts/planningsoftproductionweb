@@ -98,26 +98,47 @@ serve(async (req) => {
       );
     }
 
-    // Step 4: Find the project first to ensure it exists
-    const { data: project, error: projectError } = await supabase
+    // Step 4: Find the project first to ensure it exists (normalize id and try fallbacks)
+    const normalizedId = String(projectLinkId ?? '').trim();
+    const altId = normalizedId.replace(/^0+/, '');
+
+    let projectId: string | null = null;
+
+    // Try exact match first
+    const { data: project1, error: projectError1 } = await supabase
       .from('projects')
       .select('id')
-      .eq('project_link_id', projectLinkId)
+      .eq('project_link_id', normalizedId)
       .single();
 
-    if (projectError || !project) {
+    if (!projectError1 && project1) {
+      projectId = project1.id;
+    } else if (altId !== normalizedId) {
+      // Fallback: try without leading zeros
+      const { data: project2, error: projectError2 } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('project_link_id', altId)
+        .single();
+      if (!projectError2 && project2) {
+        projectId = project2.id;
+      }
+    }
+
+    if (!projectId) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: `Project not found with project_link_id: ${projectLinkId}. Please ensure the project exists in the database.`,
+          error: `Project not found with project_link_id: ${normalizedId}`,
+          message: `No project found for project_link_id: ${normalizedId}. Ensure the project exists and has the correct project_link_id.`,
           imported: 0,
-          errors: [`Project lookup failed: ${projectError?.message || 'Project not found'}`]
+          errors: [`Project lookup failed for ${normalizedId}${altId !== normalizedId ? ` or ${altId}` : ''}`]
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } } // return 200 so UI can show message
       );
     }
 
-    console.log(`Found project ${project.id} for project_link_id: ${projectLinkId}`);
+    console.log(`Found project ${projectId} for project_link_id: ${normalizedId}`);
 
     // Step 5: Process and import orders
     let importedCount = 0;
@@ -149,17 +170,18 @@ serve(async (req) => {
         }
 
         // Upsert order (using external_order_number for idempotency) - now properly linked to project
+        const itemsCount = Array.isArray(bestelling.artikelen) ? bestelling.artikelen.length : 0;
         const { data: order, error: orderError } = await supabase
           .from('orders')
           .upsert({
             external_order_number: orderNumber,
-            project_id: project.id, // Always link to the found project
+            project_id: projectId, // Always link to the found project
             supplier: supplier,
             order_date: new Date().toISOString(),
             expected_delivery: expectedDeliveryDate,
             status: isShipped ? 'delivered' : 'pending',
-            order_type: 'standard',
-            notes: `Imported from Orders API. Delivery week: ${deliveryWeek}. ${isShipped ? 'Already shipped.' : 'Pending shipment.'}`,
+            order_type: 'external',
+            notes: `Imported from Orders API | Supplier: ${supplier} | Delivery week: ${deliveryWeek} | Shipped: ${isShipped ? 'yes' : 'no'} | Items: ${itemsCount}`,
           }, {
             onConflict: 'external_order_number',
             ignoreDuplicates: false
@@ -178,14 +200,20 @@ serve(async (req) => {
         // Process order items (articles)
         if (bestelling.artikelen && bestelling.artikelen.length > 0) {
           for (const artikel of bestelling.artikelen) {
+            const qty = parseInt(artikel.aantal) || 1;
+            const categoryNote = (artikel.categorie || typeof artikel.categorienummer !== 'undefined')
+              ? `Category: ${artikel.categorie || 'N/A'}${typeof artikel.categorienummer !== 'undefined' ? ` (${artikel.categorienummer})` : ''}`
+              : null;
+
             const { error: itemError } = await supabase
               .from('order_items')
               .upsert({
                 order_id: order.id,
                 description: artikel.omschrijving || 'No description',
-                quantity: parseInt(artikel.aantal) || 1,
+                quantity: qty,
+                delivered_quantity: isShipped ? qty : 0,
                 article_code: artikel.artikel || null,
-                notes: artikel.categorie ? `Category: ${artikel.categorie}` : null,
+                notes: categoryNote,
               }, {
                 onConflict: 'order_id,article_code',
                 ignoreDuplicates: true
