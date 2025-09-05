@@ -197,32 +197,41 @@ serve(async (req) => {
 
         console.log(`Order ${orderNumber} imported successfully`);
 
-        // Process order items (articles)
-        if (bestelling.artikelen && bestelling.artikelen.length > 0) {
-          for (const artikel of bestelling.artikelen) {
+        // Process order items (replace existing with latest from API)
+        if (Array.isArray(bestelling.artikelen) && bestelling.artikelen.length > 0) {
+          // Remove existing items for this order to avoid duplicates and ensure full sync
+          const { error: delError } = await supabase
+            .from('order_items')
+            .delete()
+            .eq('order_id', order.id);
+
+          if (delError) {
+            console.error(`Error clearing existing items for order ${orderNumber}:`, delError);
+            errors.push(`Failed to clear existing items for order ${orderNumber}: ${delError.message}`);
+          }
+
+          const itemsToInsert = bestelling.artikelen.map((artikel: any) => {
             const qty = parseInt(artikel.aantal) || 1;
             const categoryNote = (artikel.categorie || typeof artikel.categorienummer !== 'undefined')
               ? `Category: ${artikel.categorie || 'N/A'}${typeof artikel.categorienummer !== 'undefined' ? ` (${artikel.categorienummer})` : ''}`
               : null;
+            return {
+              order_id: order.id,
+              description: artikel.omschrijving || 'No description',
+              quantity: qty,
+              delivered_quantity: isShipped ? qty : 0,
+              article_code: artikel.artikel || null,
+              notes: categoryNote,
+            };
+          });
 
-            const { error: itemError } = await supabase
-              .from('order_items')
-              .upsert({
-                order_id: order.id,
-                description: artikel.omschrijving || 'No description',
-                quantity: qty,
-                delivered_quantity: isShipped ? qty : 0,
-                article_code: artikel.artikel || null,
-                notes: categoryNote,
-              }, {
-                onConflict: 'order_id,article_code',
-                ignoreDuplicates: true
-              });
+          const { error: insertError } = await supabase
+            .from('order_items')
+            .insert(itemsToInsert);
 
-            if (itemError) {
-              console.error(`Error importing item for order ${orderNumber}:`, itemError);
-              errors.push(`Failed to import item for order ${orderNumber}: ${itemError.message}`);
-            }
+          if (insertError) {
+            console.error(`Error inserting items for order ${orderNumber}:`, insertError);
+            errors.push(`Failed to insert items for order ${orderNumber}: ${insertError.message}`);
           }
         }
 
