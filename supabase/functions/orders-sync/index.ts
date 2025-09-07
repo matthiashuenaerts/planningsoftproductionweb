@@ -121,7 +121,14 @@ serve(async (req) => {
 
         // Process each order
         for (const externalOrder of externalOrders) {
-          const orderNumber = externalOrder.ordernummer;
+          // Normalize order number from various possible fields
+          const rawOrderNumber = externalOrder.ordernummer ?? externalOrder.bestelnummer ?? externalOrder.ordernr ?? externalOrder.orderNumber ?? externalOrder.bestellingsnummer ?? null;
+          const orderNumber = typeof rawOrderNumber === 'string' ? rawOrderNumber.trim() : (rawOrderNumber != null ? String(rawOrderNumber) : null);
+
+          if (!orderNumber) {
+            console.warn(`Skipping order without order number for project ${project.name}`);
+            continue;
+          }
           
           // Check if order already exists in Supabase
           const { data: existingOrder } = await supabase
@@ -129,7 +136,7 @@ serve(async (req) => {
             .select('*')
             .eq('external_order_number', orderNumber)
             .eq('project_id', project.id)
-            .single();
+            .maybeSingle();
 
           // Convert delivery week to date
           const deliveryDate = convertWeekNumberToDate(externalOrder.leverweek);
@@ -147,10 +154,11 @@ serve(async (req) => {
 
           if (existingOrder) {
             // Update existing order if there are changes
-            const hasChanges = 
+            const hasChanges =
               existingOrder.expected_delivery !== deliveryDate ||
               existingOrder.status !== orderData.status ||
-              existingOrder.supplier !== orderData.supplier;
+              existingOrder.supplier !== orderData.supplier ||
+              existingOrder.notes !== orderData.notes;
 
             if (hasChanges) {
               const { error: updateError } = await supabase
