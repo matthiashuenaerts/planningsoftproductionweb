@@ -14,12 +14,15 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const ordersApiUsername = Deno.env.get('ORDERS_API_USERNAME')!;
-    const ordersApiPassword = Deno.env.get('ORDERS_API_PASSWORD')!;
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { automated = true } = await req.json().catch(() => ({ automated: true }));
+    const { 
+      automated = true,
+      baseUrl = 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
+      username = 'Matthias HUENAERTS',
+      password = '8pJ1A24z'
+    } = await req.json().catch(() => ({ automated: true }));
     
     console.log(`Starting ${automated ? 'automated' : 'manual'} orders sync...`);
     
@@ -62,9 +65,9 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             action: 'authenticate',
-            baseUrl: 'https://db.meubelwerkbankleuven.be',
-            username: ordersApiUsername,
-            password: ordersApiPassword
+            baseUrl: baseUrl,
+            username: username,
+            password: password
           })
         });
 
@@ -73,7 +76,7 @@ serve(async (req) => {
         }
 
         const authData = await authResponse.json();
-        const token = authData.token;
+        const token = authData.response?.token;
 
         if (!token) {
           throw new Error('No token received from Orders API');
@@ -88,7 +91,7 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             action: 'query',
-            baseUrl: 'https://db.meubelwerkbankleuven.be',
+            baseUrl: baseUrl,
             token: token,
             projectLinkId: project.project_link_id
           })
@@ -129,7 +132,7 @@ serve(async (req) => {
             .single();
 
           // Convert delivery week to date
-          const deliveryDate = convertWeekNumberToDate(externalOrder.levering);
+          const deliveryDate = convertWeekNumberToDate(externalOrder.leverweek);
           
           const orderData = {
             project_id: project.id,

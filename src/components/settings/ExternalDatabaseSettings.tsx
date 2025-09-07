@@ -548,7 +548,12 @@ const ExternalDatabaseSettings: React.FC = () => {
       console.log('Starting automated orders sync for all projects...');
       
       const response = await supabase.functions.invoke('orders-sync', {
-        body: { automated: false } // Manual sync from UI
+        body: { 
+          automated: false, // Manual sync from UI
+          baseUrl: ordersConfig.baseUrl,
+          username: ordersConfig.username,
+          password: ordersConfig.password
+        }
       });
 
       if (response.error) {
