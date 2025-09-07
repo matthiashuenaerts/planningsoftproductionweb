@@ -711,6 +711,33 @@ export type Database = {
           },
         ]
       }
+      orders_sync_logs: {
+        Row: {
+          created_at: string | null
+          details: Json | null
+          error_count: number | null
+          id: string
+          sync_timestamp: string | null
+          synced_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          details?: Json | null
+          error_count?: number | null
+          id?: string
+          sync_timestamp?: string | null
+          synced_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          details?: Json | null
+          error_count?: number | null
+          id?: string
+          sync_timestamp?: string | null
+          synced_count?: number | null
+        }
+        Relationships: []
+      }
       parts: {
         Row: {
           aantal: number | null

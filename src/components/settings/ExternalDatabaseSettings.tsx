@@ -79,10 +79,12 @@ const ExternalDatabaseSettings: React.FC = () => {
   const [ordersTestingConnection, setOrdersTestingConnection] = useState(false);
   const [ordersTestingQuery, setOrdersTestingQuery] = useState(false);
   const [ordersImporting, setOrdersImporting] = useState(false);
+  const [isSyncingOrders, setIsSyncingOrders] = useState(false);
   const [ordersConnectionStatus, setOrdersConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [ordersToken, setOrdersToken] = useState<string>('');
   const [ordersQueryResult, setOrdersQueryResult] = useState<string>('');
   const [ordersImportResult, setOrdersImportResult] = useState<string>('');
+  const [ordersSyncResult, setOrdersSyncResult] = useState<string>('');
   
   const [ordersConfig, setOrdersConfig] = useState({
     baseUrl: 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
@@ -538,6 +540,55 @@ const ExternalDatabaseSettings: React.FC = () => {
     }
   };
 
+  const syncAllOrders = async () => {
+    setIsSyncingOrders(true);
+    setOrdersSyncResult('');
+    
+    try {
+      console.log('Starting automated orders sync for all projects...');
+      
+      const response = await supabase.functions.invoke('orders-sync', {
+        body: { automated: false } // Manual sync from UI
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      const data = response.data;
+      
+      if (data.success) {
+        setOrdersSyncResult(`Sync successful: ${data.message}\nProjects processed: ${data.totalProjects}\nSynced: ${data.syncedCount}\nErrors: ${data.errorCount}`);
+        
+        toast({
+          title: "Sync Successful",
+          description: data.message,
+          variant: "default"
+        });
+      } else {
+        setOrdersSyncResult(`Sync failed: ${data.error || 'Unknown error'}`);
+        
+        toast({
+          title: "Sync Failed",
+          description: data.error || 'Unknown error',
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to sync orders";
+      setOrdersSyncResult(`Error: ${errorMessage}`);
+      
+      toast({
+        title: "Sync Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setIsSyncingOrders(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -987,6 +1038,21 @@ const ExternalDatabaseSettings: React.FC = () => {
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader>
+              <CardTitle>Sync All Projects</CardTitle>
+              <CardDescription>
+                Automatically sync orders for all projects from external database
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button onClick={syncAllOrders} disabled={isSyncingOrders} variant="outline">
+                {isSyncingOrders && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Sync All Projects
+              </Button>
+            </CardContent>
+          </Card>
+
           {ordersToken && (
             <Card>
               <CardHeader>
@@ -1270,6 +1336,25 @@ const ExternalDatabaseSettings: React.FC = () => {
                   readOnly
                   className="min-h-[200px] font-mono text-sm"
                   placeholder="Import results will appear here..."
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {ordersSyncResult && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Orders Sync Result</CardTitle>
+                <CardDescription>
+                  Result of the automated orders sync for all projects
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  value={ordersSyncResult}
+                  readOnly
+                  className="min-h-[200px] font-mono text-sm"
+                  placeholder="Sync results will appear here..."
                 />
               </CardContent>
             </Card>
