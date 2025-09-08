@@ -385,7 +385,9 @@ const Projects = () => {
                                     className="flex items-center justify-center w-6 h-6 bg-red-100 border-2 border-red-500 rounded-full"
                                     title={`${progress.earliestIncomplete} - requires attention`}
                                   >
-                                    {getWorkstationIcon(progress.earliestIncomplete)}
+                                    <div className="w-4 h-4 flex items-center justify-center">
+                                      {getWorkstationIcon(progress.earliestIncomplete)}
+                                    </div>
                                   </div>
                                 )}
                                 
@@ -395,7 +397,9 @@ const Projects = () => {
                                     className="flex items-center justify-center w-6 h-6 bg-green-100 border-2 border-green-500 rounded-full"
                                     title={`${progress.farthestTodo} - ready for next phase`}
                                   >
-                                    {getWorkstationIcon(progress.farthestTodo)}
+                                    <div className="w-4 h-4 flex items-center justify-center">
+                                      {getWorkstationIcon(progress.farthestTodo)}
+                                    </div>
                                   </div>
                                 )}
                               </div>
