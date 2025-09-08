@@ -220,33 +220,39 @@ const Projects = () => {
       return acc;
     }, {} as Record<string, Task[]>);
 
-    // Find farthest TODO workstation
-    let farthestTodoWorkstation = null;
-    let farthestTodoIndex = -1;
-    
-    // Find incomplete previous workstations
-    const incompleteWorkstations = [];
-    
-    Object.entries(tasksByWorkstation).forEach(([workstation, workstationTasks], index) => {
-      const hasTodoTasks = workstationTasks.some(task => task.status === 'TODO');
-      const hasCompletedTasks = workstationTasks.some(task => task.status === 'COMPLETED');
-      const hasInProgressTasks = workstationTasks.some(task => task.status === 'IN_PROGRESS');
-      
-      // This workstation has TODO tasks - potential farthest
-      if (hasTodoTasks && index > farthestTodoIndex) {
-        farthestTodoWorkstation = workstation;
-        farthestTodoIndex = index;
-      }
-      
-      // Previous workstations with incomplete tasks
-      if (index < farthestTodoIndex && (hasTodoTasks || hasInProgressTasks)) {
-        incompleteWorkstations.push(workstation);
-      }
+    // Sort workstations by their earliest due date (workflow order)
+    const workstationOrder = Object.keys(tasksByWorkstation).sort((a, b) => {
+      const aEarliestDate = Math.min(...tasksByWorkstation[a].map(t => new Date(t.due_date).getTime()));
+      const bEarliestDate = Math.min(...tasksByWorkstation[b].map(t => new Date(t.due_date).getTime()));
+      return aEarliestDate - bEarliestDate;
     });
 
+    // Find the earliest workstation with incomplete tasks (red circle)
+    let earliestIncomplete = null;
+    
+    // Find the farthest workstation with TODO tasks (green circle)
+    let farthestTodo = null;
+    
+    for (const workstation of workstationOrder) {
+      const workstationTasks = tasksByWorkstation[workstation];
+      const hasTodoTasks = workstationTasks.some(task => task.status === 'TODO');
+      const hasInProgressTasks = workstationTasks.some(task => task.status === 'IN_PROGRESS');
+      const hasIncompleteTasks = hasTodoTasks || hasInProgressTasks;
+      
+      // Set earliest incomplete if not already set
+      if (hasIncompleteTasks && !earliestIncomplete) {
+        earliestIncomplete = workstation;
+      }
+      
+      // Update farthest TODO as we progress through workstations
+      if (hasTodoTasks) {
+        farthestTodo = workstation;
+      }
+    }
+
     return {
-      farthestTodo: farthestTodoWorkstation,
-      incompleteWorkstations
+      earliestIncomplete,
+      farthestTodo
     };
   };
   return (
@@ -368,27 +374,26 @@ const Projects = () => {
                         const tasks = projectTasks[project.id] || [];
                         const progress = getWorkstationProgress(tasks);
                         
-                        if (progress && (progress.farthestTodo || progress.incompleteWorkstations.length > 0)) {
+                        if (progress && (progress.earliestIncomplete || progress.farthestTodo)) {
                           return (
                             <div className="flex items-center gap-2 mt-3">
                               <span className="text-xs text-muted-foreground">Status:</span>
-                              <div className="flex items-center gap-1">
-                                {/* Red circles for incomplete previous workstations */}
-                                {progress.incompleteWorkstations.map((workstation, index) => (
+                              <div className="flex items-center gap-2">
+                                {/* Red circle for earliest incomplete workstation */}
+                                {progress.earliestIncomplete && (
                                   <div
-                                    key={`incomplete-${index}`}
                                     className="flex items-center justify-center w-6 h-6 bg-red-100 border-2 border-red-500 rounded-full"
-                                    title={`${workstation} - incomplete tasks`}
+                                    title={`${progress.earliestIncomplete} - requires attention`}
                                   >
-                                    {getWorkstationIcon(workstation)}
+                                    {getWorkstationIcon(progress.earliestIncomplete)}
                                   </div>
-                                ))}
+                                )}
                                 
                                 {/* Green circle for farthest TODO workstation */}
-                                {progress.farthestTodo && (
+                                {progress.farthestTodo && progress.farthestTodo !== progress.earliestIncomplete && (
                                   <div
                                     className="flex items-center justify-center w-6 h-6 bg-green-100 border-2 border-green-500 rounded-full"
-                                    title={`${progress.farthestTodo} - next tasks`}
+                                    title={`${progress.farthestTodo} - ready for next phase`}
                                   >
                                     {getWorkstationIcon(progress.farthestTodo)}
                                   </div>
