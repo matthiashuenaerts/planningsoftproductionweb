@@ -15,6 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 import NewProjectModal from '@/components/NewProjectModal';
 import { exportProjectData } from '@/services/projectExportService';
 import { useLanguage } from '@/context/LanguageContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const Projects = () => {
   const navigate = useNavigate();
@@ -208,15 +209,45 @@ const Projects = () => {
   };
 
   // Get workstation progress indicators for a project
-  const getWorkstationProgress = (tasks: Task[]) => {
+  const getWorkstationProgress = async (tasks: Task[]) => {
     if (!tasks || tasks.length === 0) return null;
 
-    // Group tasks by workstation
+    // Get workstation mappings for tasks
+    const taskWorkstationMap: Record<string, string> = {};
+    
+    // For each task, find its linked workstation
+    await Promise.all(
+      tasks.map(async (task) => {
+        try {
+          const { data: linkData, error } = await supabase
+            .from('task_workstation_links')
+            .select(`
+              workstation_id,
+              workstations!inner(name)
+            `)
+            .eq('task_id', task.id)
+            .maybeSingle();
+          
+          if (error || !linkData) {
+            // Fallback to task.workstation field if no link found
+            taskWorkstationMap[task.id] = task.workstation || 'Unknown';
+          } else {
+            taskWorkstationMap[task.id] = (linkData.workstations as any).name;
+          }
+        } catch (error) {
+          console.error(`Error fetching workstation for task ${task.id}:`, error);
+          taskWorkstationMap[task.id] = task.workstation || 'Unknown';
+        }
+      })
+    );
+
+    // Group tasks by workstation using the mapped workstation names
     const tasksByWorkstation = tasks.reduce((acc, task) => {
-      if (!acc[task.workstation]) {
-        acc[task.workstation] = [];
+      const workstationName = taskWorkstationMap[task.id];
+      if (!acc[workstationName]) {
+        acc[workstationName] = [];
       }
-      acc[task.workstation].push(task);
+      acc[workstationName].push(task);
       return acc;
     }, {} as Record<string, Task[]>);
 
@@ -255,6 +286,58 @@ const Projects = () => {
       farthestTodo
     };
   };
+
+  // Workstation Progress Component
+  const WorkstationProgress = ({ tasks, getWorkstationIcon }: { tasks: Task[], getWorkstationIcon: (name: string) => React.ReactNode }) => {
+    const [progress, setProgress] = useState<{ earliestIncomplete: string | null, farthestTodo: string | null } | null>(null);
+
+    useEffect(() => {
+      const loadProgress = async () => {
+        const result = await getWorkstationProgress(tasks);
+        setProgress(result);
+      };
+      
+      if (tasks.length > 0) {
+        loadProgress();
+      }
+    }, [tasks]);
+
+    if (!progress || (!progress.earliestIncomplete && !progress.farthestTodo)) {
+      return null;
+    }
+
+    return (
+      <div className="flex items-center gap-2 mt-3">
+        <span className="text-xs text-muted-foreground">Status:</span>
+        <div className="flex items-center gap-2">
+          {/* Red circle for earliest incomplete workstation */}
+          {progress.earliestIncomplete && (
+            <div
+              className="flex items-center justify-center w-6 h-6 bg-red-100 border-2 border-red-500 rounded-full"
+              title={`${progress.earliestIncomplete} - requires attention`}
+            >
+              <div className="w-4 h-4 flex items-center justify-center">
+                {getWorkstationIcon(progress.earliestIncomplete)}
+              </div>
+            </div>
+          )}
+          
+          {/* Green circle for farthest TODO workstation */}
+          {progress.farthestTodo && progress.farthestTodo !== progress.earliestIncomplete && (
+            <div
+              className="flex items-center justify-center w-6 h-6 bg-green-100 border-2 border-green-500 rounded-full"
+              title={`${progress.farthestTodo} - ready for next phase`}
+            >
+              <div className="w-4 h-4 flex items-center justify-center">
+                {getWorkstationIcon(progress.farthestTodo)}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex min-h-screen">
       <div className="w-64 bg-sidebar fixed top-0 bottom-0">
@@ -370,44 +453,10 @@ const Projects = () => {
                       </div>
                       
                       {/* Workstation Progress Indicators */}
-                      {(() => {
-                        const tasks = projectTasks[project.id] || [];
-                        const progress = getWorkstationProgress(tasks);
-                        
-                        if (progress && (progress.earliestIncomplete || progress.farthestTodo)) {
-                          return (
-                            <div className="flex items-center gap-2 mt-3">
-                              <span className="text-xs text-muted-foreground">Status:</span>
-                              <div className="flex items-center gap-2">
-                                {/* Red circle for earliest incomplete workstation */}
-                                {progress.earliestIncomplete && (
-                                  <div
-                                    className="flex items-center justify-center w-6 h-6 bg-red-100 border-2 border-red-500 rounded-full"
-                                    title={`${progress.earliestIncomplete} - requires attention`}
-                                  >
-                                    <div className="w-4 h-4 flex items-center justify-center">
-                                      {getWorkstationIcon(progress.earliestIncomplete)}
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                {/* Green circle for farthest TODO workstation */}
-                                {progress.farthestTodo && progress.farthestTodo !== progress.earliestIncomplete && (
-                                  <div
-                                    className="flex items-center justify-center w-6 h-6 bg-green-100 border-2 border-green-500 rounded-full"
-                                    title={`${progress.farthestTodo} - ready for next phase`}
-                                  >
-                                    <div className="w-4 h-4 flex items-center justify-center">
-                                      {getWorkstationIcon(progress.farthestTodo)}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
+                      <WorkstationProgress 
+                        tasks={projectTasks[project.id] || []} 
+                        getWorkstationIcon={getWorkstationIcon}
+                      />
                       
                       <div className="mt-4">
                         <div className="flex justify-between text-sm mb-1">
