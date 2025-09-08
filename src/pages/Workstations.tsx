@@ -26,6 +26,7 @@ interface WorkstationWithIcon {
   name: string;
   description: string | null;
   icon: React.ReactNode;
+  icon_path: string | null;
 }
 const Workstations: React.FC = () => {
   const [selectedWorkstation, setSelectedWorkstation] = useState<string | null>(null);
@@ -303,7 +304,15 @@ const Workstations: React.FC = () => {
                         </div>
                         <CardContent className="p-6 flex flex-col items-center text-center" onClick={() => setSelectedWorkstation(workstation.id)}>
                           <div className="bg-primary/10 p-4 rounded-full mb-4">
-                            {workstation.icon}
+                            {workstation.icon_path ? (
+                              <img 
+                                src={workstation.icon_path} 
+                                alt={workstation.name} 
+                                className="h-8 w-8 object-contain"
+                              />
+                            ) : (
+                              workstation.icon
+                            )}
                           </div>
                           <h3 className="text-lg font-medium mb-1">{workstation.name}</h3>
                           {workstation.description && <p className="text-sm text-muted-foreground">{workstation.description}</p>}
