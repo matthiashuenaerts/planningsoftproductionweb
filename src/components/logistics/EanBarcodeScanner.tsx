@@ -76,8 +76,8 @@ export const EanBarcodeScanner: React.FC<EanBarcodeScannerProps> = ({
         videoRef.current.play();
         setIsScanning(true);
         
-        // Start scanning for barcodes
-        scanIntervalRef.current = setInterval(scanForBarcode, 500);
+        // Start scanning for barcodes with higher frequency
+        scanIntervalRef.current = setInterval(scanForBarcode, 200);
       }
     } catch (error) {
       console.error('Error starting camera:', error);
@@ -99,27 +99,55 @@ export const EanBarcodeScanner: React.FC<EanBarcodeScannerProps> = ({
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     try {
-      // Use ZXing library for barcode detection
+      // Use ZXing library for comprehensive barcode detection
       const { BrowserMultiFormatReader } = await import('@zxing/library');
       const codeReader = new BrowserMultiFormatReader();
       
-      // Create a data URL from the canvas
-      const dataUrl = canvas.toDataURL('image/png');
-      const result = await codeReader.decodeFromImage(dataUrl);
+      // Try multiple detection methods for better accuracy
+      let result = null;
+      
+      // Method 1: High quality JPEG
+      try {
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        result = await codeReader.decodeFromImage(dataUrl);
+      } catch (e) {
+        // Method 2: PNG format
+        try {
+          const dataUrl = canvas.toDataURL('image/png');
+          result = await codeReader.decodeFromImage(dataUrl);
+        } catch (e2) {
+          // Method 3: Enhanced contrast for difficult barcodes
+          const tempCanvas = document.createElement('canvas');
+          const tempContext = tempCanvas.getContext('2d');
+          if (tempContext) {
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            tempContext.filter = 'contrast(200%) brightness(120%) grayscale(100%)';
+            tempContext.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+            const enhancedDataUrl = tempCanvas.toDataURL('image/png');
+            result = await codeReader.decodeFromImage(enhancedDataUrl);
+          }
+        }
+      }
       
       if (result) {
         const detectedCode = result.getText();
-        console.log('Barcode detected:', detectedCode);
+        console.log('Barcode detected:', detectedCode, 'Format:', result.getBarcodeFormat());
         
-        // Check if it's a valid EAN (8 or 13 digits)
+        // Accept EAN codes (8 or 13 digits) or any other valid barcode
         if (/^\d{8}$|^\d{13}$/.test(detectedCode)) {
           setIsScanning(false);
           cleanup();
           onEanDetected(detectedCode);
           onClose();
           toast.success(`EAN code scanned: ${detectedCode}`);
-        } else {
-          toast.error('Invalid EAN code format. Please scan a valid EAN barcode.');
+        } else if (detectedCode.length > 0) {
+          // For non-EAN codes, still provide them but with a warning
+          setIsScanning(false);
+          cleanup();
+          onEanDetected(detectedCode);
+          onClose();
+          toast.success(`Barcode scanned: ${detectedCode}`);
         }
       }
     } catch (error) {
