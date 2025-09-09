@@ -25,6 +25,7 @@ export interface OrderItem {
   notes?: string | null;
   delivered_quantity?: number;
   stock_location?: string | null;
+  ean?: string | null;
 }
 
 export interface OrderAttachment {

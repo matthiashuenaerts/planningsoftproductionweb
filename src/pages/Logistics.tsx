@@ -9,13 +9,16 @@ import { orderService } from '@/services/orderService';
 import { TodaysDeliveries } from '@/components/logistics/TodaysDeliveries';
 import { UpcomingDeliveries } from '@/components/logistics/UpcomingDeliveries';
 import { BackorderDeliveries } from '@/components/logistics/BackorderDeliveries';
-import { Truck, Calendar, AlertTriangle, Search } from 'lucide-react';
+import { Truck, Calendar, AlertTriangle, Search, Scan } from 'lucide-react';
+import { EanBarcodeScanner } from '@/components/logistics/EanBarcodeScanner';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 
 const Logistics = () => {
   const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   
   const {
     data: rawOrders = [],
@@ -76,9 +79,10 @@ const Logistics = () => {
     return orderList.filter(order => {
       const searchLower = searchTerm.toLowerCase();
       
-      // Check article codes in order items
+      // Check article codes and EAN codes in order items
       const hasMatchingArticleCode = order.order_items?.some(item => 
-        item.article_code?.toLowerCase().includes(searchLower)
+        item.article_code?.toLowerCase().includes(searchLower) ||
+        item.ean?.toLowerCase().includes(searchLower)
       ) || false;
       
       return (
@@ -110,6 +114,10 @@ const Logistics = () => {
 
   const handleDeliveryConfirmed = () => {
     refetch();
+  };
+
+  const handleEanDetected = (ean: string) => {
+    setSearchTerm(ean);
   };
 
   if (isLoading) {
@@ -174,15 +182,25 @@ const Logistics = () => {
         </div>
 
         <div className="mb-6">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              type="text"
-              placeholder="Search by project name, supplier, order ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex gap-2 max-w-md">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                type="text"
+                placeholder="Search by project, supplier, article code, EAN..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setIsScannerOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <Scan className="h-4 w-4" />
+              Scan EAN
+            </Button>
           </div>
         </div>
 
@@ -205,6 +223,12 @@ const Logistics = () => {
             <BackorderDeliveries orders={backorderDeliveries} onDeliveryConfirmed={handleDeliveryConfirmed} />
           </TabsContent>
         </Tabs>
+
+        <EanBarcodeScanner
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onEanDetected={handleEanDetected}
+        />
       </div>
     </div>
   );

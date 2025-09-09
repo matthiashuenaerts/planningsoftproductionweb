@@ -96,6 +96,7 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
               <TableHead className="text-center">Ordered</TableHead>
               <TableHead className="text-center">Delivered</TableHead>
               <TableHead>Location</TableHead>
+              <TableHead className="text-right">EAN</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -110,6 +111,13 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
                   </span>
                 </TableCell>
                 <TableCell>{item.stock_location || '-'}</TableCell>
+                <TableCell className="text-right">
+                  {item.ean ? (
+                    <span className="font-mono text-xs">{item.ean}</span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

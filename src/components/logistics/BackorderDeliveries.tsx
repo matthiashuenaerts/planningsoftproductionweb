@@ -89,6 +89,7 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
               <TableHead className="text-right">Ordered</TableHead>
               <TableHead className="text-right">Delivered</TableHead>
               <TableHead className="text-right">Article Code</TableHead>
+              <TableHead className="text-right">EAN</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -98,6 +99,13 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
                 <TableCell className="text-right">{item.quantity}</TableCell>
                 <TableCell className="text-right">{item.delivered_quantity || 0}</TableCell>
                 <TableCell className="text-right">{item.article_code}</TableCell>
+                <TableCell className="text-right">
+                  {item.ean ? (
+                    <span className="font-mono text-xs">{item.ean}</span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
