@@ -141,13 +141,27 @@ serve(async (req) => {
           // Convert delivery week to date
           const deliveryDate = convertWeekNumberToDate(externalOrder.leverweek);
           
+          // Determine order status with upgrade-only logic for isVolledigOntvangen
+          let orderStatus = 'pending';
+          const isDelivered = externalOrder.isVolledigOntvangen;
+          const isShipped = externalOrder.isVerzonden;
+          
+          if (isDelivered) {
+            orderStatus = 'delivered';
+          } else if (isShipped && (!existingOrder || existingOrder.status !== 'delivered')) {
+            orderStatus = 'pending';
+          } else if (existingOrder) {
+            // Keep existing status if order was already delivered and isVolledigOntvangen is now false
+            orderStatus = existingOrder.status === 'delivered' ? 'delivered' : 'pending';
+          }
+          
           const orderData = {
             project_id: project.id,
             external_order_number: orderNumber,
             supplier: externalOrder.leverancier || 'Unknown',
             order_date: new Date().toISOString(),
             expected_delivery: deliveryDate,
-            status: externalOrder.status === 'Verzonden' ? 'delivered' : 'pending',
+            status: orderStatus,
             order_type: 'standard',
             notes: externalOrder.referentie || null
           };
@@ -202,6 +216,7 @@ serve(async (req) => {
                   description: artikel.omschrijving || 'No description',
                   quantity: parseInt(artikel.aantal) || 1,
                   article_code: artikel.artikel || null,
+                  ean: artikel.ean || null, // Add EAN field
                   delivered_quantity: orderData.status === 'delivered' ? (parseInt(artikel.aantal) || 1) : 0,
                   notes: artikel.categorie ? `Category: ${artikel.categorie}` : null
                 }));

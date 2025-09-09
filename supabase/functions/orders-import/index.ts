@@ -152,6 +152,7 @@ serve(async (req) => {
         const supplier = bestelling.leverancier;
         const deliveryWeek = bestelling.leverweek;
         const isShipped = bestelling.isVerzonden;
+        const isDelivered = bestelling.isVolledigOntvangen;
         
         // Convert delivery week to date (leverweek format: 202511 = year 2025, week 11)
         let expectedDeliveryDate: string;
@@ -169,6 +170,25 @@ serve(async (req) => {
           expectedDeliveryDate = new Date().toISOString();
         }
 
+        // Check if order already exists to handle status updates
+        const { data: existingOrder } = await supabase
+          .from('orders')
+          .select('status')
+          .eq('external_order_number', orderNumber)
+          .eq('project_id', projectId)
+          .maybeSingle();
+
+        // Determine order status with upgrade-only logic for isVolledigOntvangen
+        let orderStatus = 'pending';
+        if (isDelivered) {
+          orderStatus = 'delivered';
+        } else if (isShipped && (!existingOrder || existingOrder.status !== 'delivered')) {
+          orderStatus = 'pending'; // Keep as pending if not fully received
+        } else if (existingOrder) {
+          // Keep existing status if order was already delivered and isVolledigOntvangen is now false
+          orderStatus = existingOrder.status === 'delivered' ? 'delivered' : 'pending';
+        }
+
         // Upsert order (using external_order_number for idempotency) - now properly linked to project
         const itemsCount = Array.isArray(bestelling.artikelen) ? bestelling.artikelen.length : 0;
         const { data: order, error: orderError } = await supabase
@@ -179,9 +199,9 @@ serve(async (req) => {
             supplier: supplier,
             order_date: new Date().toISOString(),
             expected_delivery: expectedDeliveryDate,
-            status: isShipped ? 'delivered' : 'pending',
+            status: orderStatus,
             order_type: 'external',
-            notes: `Imported from Orders API | Supplier: ${supplier} | Delivery week: ${deliveryWeek} | Shipped: ${isShipped ? 'yes' : 'no'} | Items: ${itemsCount}`,
+            notes: `Imported from Orders API | Supplier: ${supplier} | Delivery week: ${deliveryWeek} | Shipped: ${isShipped ? 'yes' : 'no'} | Delivered: ${isDelivered ? 'yes' : 'no'} | Items: ${itemsCount}`,
           }, {
             onConflict: 'external_order_number',
             ignoreDuplicates: false
@@ -219,8 +239,9 @@ serve(async (req) => {
               order_id: order.id,
               description: artikel.omschrijving || 'No description',
               quantity: qty,
-              delivered_quantity: isShipped ? qty : 0,
+              delivered_quantity: isDelivered ? qty : 0, // Use isVolledigOntvangen for delivered quantity
               article_code: artikel.artikel || null,
+              ean: artikel.ean || null, // Add EAN field
               notes: categoryNote,
             };
           });

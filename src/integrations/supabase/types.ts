@@ -552,6 +552,7 @@ export type Database = {
           created_at: string
           delivered_quantity: number
           description: string
+          ean: string | null
           id: string
           notes: string | null
           order_id: string
@@ -567,6 +568,7 @@ export type Database = {
           created_at?: string
           delivered_quantity?: number
           description: string
+          ean?: string | null
           id?: string
           notes?: string | null
           order_id: string
@@ -582,6 +584,7 @@ export type Database = {
           created_at?: string
           delivered_quantity?: number
           description?: string
+          ean?: string | null
           id?: string
           notes?: string | null
           order_id?: string
