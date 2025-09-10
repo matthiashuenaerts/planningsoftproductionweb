@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download, Cog, Wrench, Hammer, Scissors, PaintBucket, Truck, Drill } from 'lucide-react';
+import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download, Cog, Wrench, Hammer, Scissors, PaintBucket, Truck, Drill, ChevronDown, ChevronUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, taskService, Project, Task } from '@/services/dataService';
 import { workstationService, Workstation } from '@/services/workstationService';
@@ -31,6 +31,8 @@ const Projects = () => {
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
   const [exportingProject, setExportingProject] = useState<string | null>(null);
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [projectProgress, setProjectProgress] = useState<Record<string, { earliestIncomplete: string | null, farthestTodo: string | null }>>({});
   const isAdmin = ['admin', 'teamleader', 'preparater'].includes(currentEmployee?.role);
 
 
@@ -75,21 +77,6 @@ const Projects = () => {
       );
       setProjects(sortedData);
       setFilteredProjects(sortedData);
-      
-      // Load tasks for each project
-      const tasksData: Record<string, Task[]> = {};
-      await Promise.all(
-        sortedData.map(async (project) => {
-          try {
-            const tasks = await taskService.getTasksByProject(project.id);
-            tasksData[project.id] = tasks;
-          } catch (error) {
-            console.error(`Failed to load tasks for project ${project.id}:`, error);
-            tasksData[project.id] = [];
-          }
-        })
-      );
-      setProjectTasks(tasksData);
     } catch (error: any) {
       toast({
         title: t('error'),
@@ -287,21 +274,38 @@ const Projects = () => {
     };
   };
 
-  // Workstation Progress Component
-  const WorkstationProgress = ({ tasks, getWorkstationIcon }: { tasks: Task[], getWorkstationIcon: (name: string) => React.ReactNode }) => {
-    const [progress, setProgress] = useState<{ earliestIncomplete: string | null, farthestTodo: string | null } | null>(null);
-
-    useEffect(() => {
-      const loadProgress = async () => {
-        const result = await getWorkstationProgress(tasks);
-        setProgress(result);
-      };
+  const loadProjectTasks = async (projectId: string) => {
+    try {
+      const tasks = await taskService.getTasksByProject(projectId);
+      setProjectTasks(prev => ({ ...prev, [projectId]: tasks }));
       
-      if (tasks.length > 0) {
-        loadProgress();
-      }
-    }, [tasks]);
+      // Calculate progress for this project
+      const progress = await getWorkstationProgress(tasks);
+      setProjectProgress(prev => ({ ...prev, [projectId]: progress }));
+    } catch (error) {
+      console.error(`Failed to load tasks for project ${projectId}:`, error);
+      setProjectTasks(prev => ({ ...prev, [projectId]: [] }));
+    }
+  };
 
+  const toggleProjectExpansion = async (projectId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    const newExpanded = new Set(expandedProjects);
+    if (expandedProjects.has(projectId)) {
+      newExpanded.delete(projectId);
+    } else {
+      newExpanded.add(projectId);
+      // Only load tasks if not already loaded
+      if (!projectTasks[projectId]) {
+        await loadProjectTasks(projectId);
+      }
+    }
+    setExpandedProjects(newExpanded);
+  };
+
+  // Workstation Progress Component
+  const WorkstationProgress = ({ progress }: { progress: { earliestIncomplete: string | null, farthestTodo: string | null } | null }) => {
     if (!progress || (!progress.earliestIncomplete && !progress.farthestTodo)) {
       return null;
     }
@@ -452,11 +456,32 @@ const Projects = () => {
                         </div>
                       </div>
                       
-                      {/* Workstation Progress Indicators */}
-                      <WorkstationProgress 
-                        tasks={projectTasks[project.id] || []} 
-                        getWorkstationIcon={getWorkstationIcon}
-                      />
+                      {/* Status Expand Button */}
+                      <div className="mt-3">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => toggleProjectExpansion(project.id, e)}
+                          className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          {expandedProjects.has(project.id) ? (
+                            <>
+                              <ChevronUp className="h-3 w-3 mr-1" />
+                              Hide Status
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-3 w-3 mr-1" />
+                              Show Status
+                            </>
+                          )}
+                        </Button>
+                        
+                        {/* Workstation Progress Indicators - Only shown when expanded */}
+                        {expandedProjects.has(project.id) && (
+                          <WorkstationProgress progress={projectProgress[project.id]} />
+                        )}
+                      </div>
                       
                       <div className="mt-4">
                         <div className="flex justify-between text-sm mb-1">
