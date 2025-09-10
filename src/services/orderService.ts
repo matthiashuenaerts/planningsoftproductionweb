@@ -23,7 +23,30 @@ export const orderService = {
   },
 
   async getAllOrders(): Promise<Order[]> {
-    return this.getAll();
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items!inner(
+          id,
+          description,
+          quantity,
+          article_code,
+          ean,
+          delivered_quantity,
+          stock_location,
+          notes
+        )
+      `);
+
+    if (error) throw error;
+    
+    return (data || []).map((order: any) => ({
+      ...order,
+      status: order.status as Order['status'],
+      order_type: order.order_type as Order['order_type'],
+      order_items_count: order.order_items?.length || 0,
+    }));
   },
 
   async getById(id: string): Promise<Order> {
