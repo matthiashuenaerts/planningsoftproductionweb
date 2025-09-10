@@ -218,12 +218,9 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
         description: "Order delivery has been successfully confirmed.",
       });
 
-      // Ask if user wants to print labels
-      setTimeout(() => {
-        setShowLabelDialog(true);
-      }, 500);
+      // Show label dialog immediately
+      setShowLabelDialog(true);
 
-      onConfirmed();
     } catch (error) {
       console.error('Error confirming delivery:', error);
       toast({
@@ -539,6 +536,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
           isOpen={showLabelDialog}
           onClose={() => {
             setShowLabelDialog(false);
+            onConfirmed();
             handleClose();
           }}
         />
