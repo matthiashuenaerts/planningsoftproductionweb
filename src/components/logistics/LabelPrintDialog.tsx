@@ -27,10 +27,12 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
   isOpen,
   onClose
 }) => {
-  const [selectedItem, setSelectedItem] = useState<string>('');
   const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+
+  // Filter only delivered items
+  const deliveredItems = orderItems.filter(item => (item.delivered_quantity || 0) > 0);
 
   React.useEffect(() => {
     const fetchProjectInfo = async () => {
@@ -53,26 +55,11 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
     fetchProjectInfo();
   }, [order.project_id, isOpen]);
 
-  const generateLabelContent = (item: OrderItem) => {
-    const installationDate = projectInfo?.installation_date 
-      ? new Date(projectInfo.installation_date).toLocaleDateString()
-      : 'Not set';
-    
-    return {
-      project: projectInfo?.name || 'Unknown Project',
-      articleCode: item.article_code,
-      installationDate,
-      description: item.description,
-      quantity: item.delivered_quantity || item.quantity
-    };
-  };
-
-  const printLabel = async () => {
-    const item = orderItems.find(i => i.id === selectedItem);
-    if (!item) {
+  const printLabels = async () => {
+    if (deliveredItems.length === 0) {
       toast({
-        title: "Error",
-        description: "Please select an item to print",
+        title: "No Items",
+        description: "No delivered items to print labels for",
         variant: "destructive"
       });
       return;
@@ -81,60 +68,64 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
     setIsLoading(true);
 
     try {
-      const labelData = generateLabelContent(item);
-      
-      // Create a printable format for Dymo 89x36mm
-      const labelContent = `
-        <div style="width: 89mm; height: 36mm; padding: 2mm; font-family: Arial, sans-serif; font-size: 8pt; line-height: 1.2;">
-          <div style="font-weight: bold; font-size: 9pt; margin-bottom: 1mm;">${labelData.project}</div>
-          <div style="margin-bottom: 1mm;">Article: ${labelData.articleCode}</div>
-          <div style="margin-bottom: 1mm;">Qty: ${labelData.quantity}</div>
-          <div style="margin-bottom: 1mm;">Install: ${labelData.installationDate}</div>
-        </div>
-      `;
+      const installationDate = projectInfo?.installation_date 
+        ? new Date(projectInfo.installation_date).toLocaleDateString()
+        : 'Not set';
 
-      // Open print dialog with label content
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>Dymo Label Print</title>
-              <style>
-                @page {
-                  size: 89mm 36mm;
-                  margin: 0;
-                }
-                body {
-                  margin: 0;
-                  padding: 0;
-                  width: 89mm;
-                  height: 36mm;
-                }
-              </style>
-            </head>
-            <body>
-              ${labelContent}
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
-        printWindow.print();
-        printWindow.close();
+      for (const item of deliveredItems) {
+        const labelContent = `
+          <div style="width: 89mm; height: 36mm; padding: 2mm; font-family: Arial, sans-serif; font-size: 8pt; line-height: 1.2;">
+            <div style="font-weight: bold; font-size: 9pt; margin-bottom: 1mm;">${projectInfo?.name || 'Unknown Project'}</div>
+            <div style="margin-bottom: 1mm;">Article: ${item.article_code}</div>
+            <div style="margin-bottom: 1mm;">Qty: ${item.delivered_quantity}</div>
+            <div style="margin-bottom: 1mm;">Install: ${installationDate}</div>
+            ${item.stock_location ? `<div>Location: ${item.stock_location}</div>` : ''}
+          </div>
+        `;
+
+        // Open print dialog with label content
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>Dymo Label Print</title>
+                <style>
+                  @page {
+                    size: 89mm 36mm;
+                    margin: 0;
+                  }
+                  body {
+                    margin: 0;
+                    padding: 0;
+                    width: 89mm;
+                    height: 36mm;
+                  }
+                </style>
+              </head>
+              <body>
+                ${labelContent}
+              </body>
+            </html>
+          `);
+          printWindow.document.close();
+          printWindow.print();
+          printWindow.close();
+        }
       }
 
       toast({
-        title: "Label Sent to Printer",
-        description: "Label has been sent to your default printer",
+        title: "Labels Sent to Printer",
+        description: `${deliveredItems.length} label(s) sent to printer`,
       });
 
       onClose();
     } catch (error) {
-      console.error('Error printing label:', error);
+      console.error('Error printing labels:', error);
       toast({
         title: "Print Error",
-        description: "Failed to print label. Please try again.",
+        description: "Failed to print labels. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -142,15 +133,13 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
     }
   };
 
-  const selectedItemData = orderItems.find(item => item.id === selectedItem);
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Printer className="h-5 w-5" />
-            Print Delivery Label
+            Print Delivery Labels
           </DialogTitle>
         </DialogHeader>
 
@@ -162,46 +151,34 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="item-select">Select Item to Print</Label>
-            <Select value={selectedItem} onValueChange={setSelectedItem}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose an item..." />
-              </SelectTrigger>
-              <SelectContent>
-                {orderItems
-                  .filter(item => (item.delivered_quantity || 0) > 0)
-                  .map(item => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.article_code} - {item.description} (Qty: {item.delivered_quantity || item.quantity})
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {selectedItemData && (
-            <div className="p-3 border rounded-lg bg-blue-50">
-              <div className="text-sm font-medium text-blue-900 mb-2">Label Preview:</div>
-              <div className="text-xs space-y-1 text-blue-800">
-                <div><strong>{projectInfo?.name}</strong></div>
-                <div>Article: {selectedItemData.article_code}</div>
-                <div>Qty: {selectedItemData.delivered_quantity || selectedItemData.quantity}</div>
-                <div>Install: {projectInfo?.installation_date ? new Date(projectInfo.installation_date).toLocaleDateString() : 'Not set'}</div>
-              </div>
+          <div>
+            <p className="text-sm mb-3">
+              Do you want to print labels for the {deliveredItems.length} delivered item(s)?
+            </p>
+            
+            <div className="space-y-2">
+              {deliveredItems.map((item) => (
+                <div key={item.id} className="p-3 bg-blue-50 rounded-lg">
+                  <div className="text-sm font-medium text-blue-900">{item.description}</div>
+                  <div className="text-xs text-blue-700">
+                    Article: {item.article_code} • Qty: {item.delivered_quantity}
+                    {item.stock_location && ` • Location: ${item.stock_location}`}
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
 
           <div className="flex justify-between gap-2">
             <Button variant="outline" onClick={onClose}>
-              Cancel
+              No, Skip
             </Button>
             <Button 
-              onClick={printLabel}
-              disabled={!selectedItem || isLoading}
+              onClick={printLabels}
+              disabled={deliveredItems.length === 0 || isLoading}
             >
-              <Package className="h-4 w-4 mr-2" />
-              {isLoading ? 'Printing...' : 'Print Label'}
+              <Printer className="h-4 w-4 mr-2" />
+              {isLoading ? 'Printing...' : 'Yes, Print Labels'}
             </Button>
           </div>
         </div>
