@@ -6,11 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Camera, Upload, X, Package, MapPin } from 'lucide-react';
+import { Camera, Upload, X, Package, MapPin, Printer } from 'lucide-react';
 import { Order, OrderItem } from '@/types/order';
 import { orderService } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
+import { LabelPrintDialog } from './LabelPrintDialog';
 
 interface EnhancedDeliveryConfirmationModalProps {
   order: Order;
@@ -40,6 +41,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const [showLabelDialog, setShowLabelDialog] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
@@ -216,8 +218,12 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
         description: "Order delivery has been successfully confirmed.",
       });
 
+      // Ask if user wants to print labels
+      setTimeout(() => {
+        setShowLabelDialog(true);
+      }, 500);
+
       onConfirmed();
-      handleClose();
     } catch (error) {
       console.error('Error confirming delivery:', error);
       toast({
@@ -526,6 +532,16 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
         )}
 
         <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+        <LabelPrintDialog
+          order={order}
+          orderItems={orderItems}
+          isOpen={showLabelDialog}
+          onClose={() => {
+            setShowLabelDialog(false);
+            handleClose();
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
