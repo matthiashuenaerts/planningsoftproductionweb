@@ -76,20 +76,21 @@ const Projects = () => {
       setProjects(sortedData);
       setFilteredProjects(sortedData);
       
-      // Load tasks for each project with better error handling
+      // Load tasks for each project
       const tasksData: Record<string, Task[]> = {};
-      for (const project of sortedData) {
-        try {
-          const tasks = await taskService.getTasksByProject(project.id);
-          tasksData[project.id] = tasks || [];
-        } catch (error) {
-          console.error(`Failed to load tasks for project ${project.id}:`, error);
-          tasksData[project.id] = [];
-        }
-      }
+      await Promise.all(
+        sortedData.map(async (project) => {
+          try {
+            const tasks = await taskService.getTasksByProject(project.id);
+            tasksData[project.id] = tasks;
+          } catch (error) {
+            console.error(`Failed to load tasks for project ${project.id}:`, error);
+            tasksData[project.id] = [];
+          }
+        })
+      );
       setProjectTasks(tasksData);
     } catch (error: any) {
-      console.error('Error loading projects:', error);
       toast({
         title: t('error'),
         description: t('failed_to_load_projects', { message: error.message }),
@@ -207,13 +208,42 @@ const Projects = () => {
     return <Package className="h-4 w-4" />;
   };
 
-  // Simplified workstation progress calculation using existing task data
-  const getWorkstationProgress = (tasks: Task[]) => {
+  // Get workstation progress indicators for a project
+  const getWorkstationProgress = async (tasks: Task[]) => {
     if (!tasks || tasks.length === 0) return null;
 
-    // Group tasks by workstation using the task.workstation field
+    // Get workstation mappings for tasks
+    const taskWorkstationMap: Record<string, string> = {};
+    
+    // For each task, find its linked workstation
+    await Promise.all(
+      tasks.map(async (task) => {
+        try {
+          const { data: linkData, error } = await supabase
+            .from('task_workstation_links')
+            .select(`
+              workstation_id,
+              workstations!inner(name)
+            `)
+            .eq('task_id', task.id)
+            .maybeSingle();
+          
+          if (error || !linkData) {
+            // Fallback to task.workstation field if no link found
+            taskWorkstationMap[task.id] = task.workstation || 'Unknown';
+          } else {
+            taskWorkstationMap[task.id] = (linkData.workstations as any).name;
+          }
+        } catch (error) {
+          console.error(`Error fetching workstation for task ${task.id}:`, error);
+          taskWorkstationMap[task.id] = task.workstation || 'Unknown';
+        }
+      })
+    );
+
+    // Group tasks by workstation using the mapped workstation names
     const tasksByWorkstation = tasks.reduce((acc, task) => {
-      const workstationName = task.workstation || 'Unknown';
+      const workstationName = taskWorkstationMap[task.id];
       if (!acc[workstationName]) {
         acc[workstationName] = [];
       }
@@ -257,14 +287,18 @@ const Projects = () => {
     };
   };
 
-  // Workstation Progress Component - Now synchronous
+  // Workstation Progress Component
   const WorkstationProgress = ({ tasks, getWorkstationIcon }: { tasks: Task[], getWorkstationIcon: (name: string) => React.ReactNode }) => {
-    const progress = React.useMemo(() => {
-      try {
-        return getWorkstationProgress(tasks);
-      } catch (error) {
-        console.error('Error calculating workstation progress:', error);
-        return null;
+    const [progress, setProgress] = useState<{ earliestIncomplete: string | null, farthestTodo: string | null } | null>(null);
+
+    useEffect(() => {
+      const loadProgress = async () => {
+        const result = await getWorkstationProgress(tasks);
+        setProgress(result);
+      };
+      
+      if (tasks.length > 0) {
+        loadProgress();
       }
     }, [tasks]);
 
