@@ -384,7 +384,7 @@ const Projects = () => {
                     <CardHeader className="pb-2">
                         <div className="flex justify-between items-start gap-2">
                           <div className="flex-1 min-w-0">
-                            <CardTitle className="text-xl mb-1 truncate">{project.name}</CardTitle>
+                            <CardTitle className="text-xl mb-1 break-words">{project.name}</CardTitle>
                             <CardDescription className="truncate">{project.client}</CardDescription>
                           </div>
                           <div className="flex gap-1 flex-shrink-0">
