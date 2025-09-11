@@ -58,6 +58,7 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
   const [bucketInitialized, setBucketInitialized] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewFileName, setPreviewFileName] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     // Check if user is authenticated
@@ -382,6 +383,45 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
     setPreviewFileName(fileName);
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (!isAuthenticated || !currentEmployee) {
+      toast({
+        title: "Authentication required",
+        description: "You must be logged in to upload files",
+        variant: "destructive"
+      });
+      navigate('/login');
+      return;
+    }
+
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length === 0) return;
+
+    // Use the same upload logic as file input
+    const fileList = droppedFiles as unknown as FileList;
+    const fakeEvent = {
+      target: { files: fileList }
+    } as React.ChangeEvent<HTMLInputElement>;
+    
+    await handleFileChange(fakeEvent);
+  };
+
   const formatFileSize = (bytes: number): string => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     if (bytes === 0) return '0 Byte';
@@ -427,7 +467,21 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
             Manage files associated with this project
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent 
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`relative ${isDragging ? 'border-2 border-dashed border-primary bg-primary/5' : ''}`}
+        >
+          {isDragging && (
+            <div className="absolute inset-0 flex items-center justify-center bg-primary/10 rounded-lg z-10">
+              <div className="text-center">
+                <FileUp className="mx-auto h-12 w-12 text-primary mb-2" />
+                <p className="text-lg font-medium text-primary">Drop files here to upload</p>
+              </div>
+            </div>
+          )}
+          
           {error && (
             <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
