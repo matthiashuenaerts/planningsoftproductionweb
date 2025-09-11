@@ -16,7 +16,8 @@ import {
   AlertCircle,
   Users,
   BarChart3,
-  ListTodo
+  ListTodo,
+  Truck
 } from "lucide-react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import {
@@ -31,12 +32,25 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import { format, startOfToday, isToday, subDays, parseISO } from 'date-fns';
+import { format, startOfToday, isToday, subDays, parseISO, addDays, isWeekend } from 'date-fns';
 import { 
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent
 } from '@/components/ui/chart';
+import { supabase } from '@/integrations/supabase/client';
+import { holidayService, Holiday } from '@/services/holidayService';
+
+interface LoadingAssignment {
+  project: {
+    id: string;
+    name: string;
+    client: string;
+    status: string;
+    installation_date: string;
+  };
+  loading_date: string;
+}
 
 const Dashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -46,6 +60,7 @@ const Dashboard: React.FC = () => {
   const [tasksByPriority, setTasksByPriority] = useState<any[]>([]);
   const [tasksByStatus, setTasksByStatus] = useState<any[]>([]);
   const [taskCompletionTrend, setTaskCompletionTrend] = useState<any[]>([]);
+  const [truckLoadingData, setTruckLoadingData] = useState<{ todayLoadings: LoadingAssignment[], daysToNext: number }>({ todayLoadings: [], daysToNext: 0 });
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   
@@ -141,6 +156,9 @@ const Dashboard: React.FC = () => {
         
         setTaskCompletionTrend(last7Days);
         
+        // Fetch truck loading data
+        await fetchTruckLoadingData();
+        
       } catch (error: any) {
         console.error('Error fetching dashboard data:', error);
         toast({
@@ -155,6 +173,82 @@ const Dashboard: React.FC = () => {
 
     fetchDashboardData();
   }, [toast]);
+
+  // Calculate previous workday considering holidays
+  const getPreviousWorkday = (date: Date, holidaysList: Holiday[]): Date => {
+    let previousDay = subDays(date, 1);
+    
+    while (true) {
+      // Skip weekends
+      if (isWeekend(previousDay)) {
+        previousDay = subDays(previousDay, 1);
+        continue;
+      }
+      
+      // Skip production holidays
+      const dateStr = format(previousDay, 'yyyy-MM-dd');
+      const isHoliday = holidaysList.some(h => h.date === dateStr && h.team === 'production');
+      
+      if (isHoliday) {
+        previousDay = subDays(previousDay, 1);
+        continue;
+      }
+      
+      break;
+    }
+    
+    return previousDay;
+  };
+
+  const fetchTruckLoadingData = async () => {
+    try {
+      // Fetch holidays
+      const holidaysData = await holidayService.getHolidays();
+      
+      // Fetch all projects with installation dates
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name, client, status, installation_date')
+        .not('installation_date', 'is', null)
+        .order('installation_date');
+        
+      if (projectsError) throw projectsError;
+      
+      // Calculate loading dates for each project
+      const loadingAssignments: LoadingAssignment[] = (projectsData || []).map(project => {
+        const installationDate = new Date(project.installation_date);
+        const loadingDate = getPreviousWorkday(installationDate, holidaysData);
+        
+        return {
+          project,
+          loading_date: format(loadingDate, 'yyyy-MM-dd'),
+        };
+      });
+      
+      // Get today's loadings
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const todayLoadings = loadingAssignments.filter(assignment => assignment.loading_date === today);
+      
+      // Calculate days to next loading
+      let daysToNext = 0;
+      if (todayLoadings.length === 0) {
+        const futureLoadings = loadingAssignments.filter(assignment => {
+          const loadingDate = new Date(assignment.loading_date);
+          return loadingDate > new Date();
+        }).sort((a, b) => new Date(a.loading_date).getTime() - new Date(b.loading_date).getTime());
+        
+        if (futureLoadings.length > 0) {
+          const nextLoadingDate = new Date(futureLoadings[0].loading_date);
+          const today = new Date();
+          daysToNext = Math.ceil((nextLoadingDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+        }
+      }
+      
+      setTruckLoadingData({ todayLoadings, daysToNext });
+    } catch (error) {
+      console.error('Error fetching truck loading data:', error);
+    }
+  };
 
   // Calculate statistics
   const totalProjects = projects.length;
@@ -217,7 +311,7 @@ const Dashboard: React.FC = () => {
         </div>
       )}
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <StatCard 
           title="Total Projects" 
           value={totalProjects.toString()} 
@@ -241,6 +335,15 @@ const Dashboard: React.FC = () => {
           value={todayCompletedCount.toString()}
           footer="Tasks fulfilled today" 
           icon={<CheckCircle2 className="h-5 w-5 text-green-600" />}
+        />
+        <StatCard 
+          title="Truck Loading" 
+          value={truckLoadingData.todayLoadings.length > 0 ? truckLoadingData.todayLoadings.length.toString() : truckLoadingData.daysToNext.toString()}
+          footer={truckLoadingData.todayLoadings.length > 0 ? 
+            `Loading today: ${truckLoadingData.todayLoadings.map(l => l.project.name).join(', ')}` : 
+            truckLoadingData.daysToNext > 0 ? `${truckLoadingData.daysToNext} days to next loading` : 'No upcoming loadings'
+          } 
+          icon={<Truck className="h-5 w-5 text-orange-500" />}
         />
       </div>
       
