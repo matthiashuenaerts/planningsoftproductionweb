@@ -75,22 +75,27 @@ const Logistics = () => {
   // Filter function for search
   const filterOrders = (orderList) => {
     if (!searchTerm) return orderList;
-    
+
+    const normalize = (val: any) => (val ?? '')
+      .toString()
+      .replace(/\s|-/g, '')
+      .toLowerCase();
+
+    const query = normalize(searchTerm);
+
     return orderList.filter(order => {
-      const searchLower = searchTerm.toLowerCase();
-      
-      // Check article codes and EAN codes in order items
-      const hasMatchingArticleCode = order.order_items?.some(item => 
-        item.article_code?.toLowerCase().includes(searchLower) ||
-        item.ean?.toLowerCase().includes(searchLower)
+      // Check article codes and EAN codes in order items (normalized)
+      const hasMatchingItem = order.order_items?.some(item =>
+        normalize(item.article_code).includes(query) ||
+        normalize(item.ean).includes(query)
       ) || false;
-      
+
       return (
-        order.project_name?.toLowerCase().includes(searchLower) ||
-        order.supplier?.toLowerCase().includes(searchLower) ||
-        order.notes?.toLowerCase().includes(searchLower) ||
-        order.id?.toLowerCase().includes(searchLower) ||
-        hasMatchingArticleCode
+        normalize(order.project_name).includes(query) ||
+        normalize(order.supplier).includes(query) ||
+        normalize(order.notes).includes(query) ||
+        normalize(order.id).includes(query) ||
+        hasMatchingItem
       );
     });
   };
@@ -99,17 +104,17 @@ const Logistics = () => {
   const todaysDeliveries = filterOrders(orders.filter(order => {
     const deliveryDate = new Date(order.expected_delivery);
     deliveryDate.setHours(0, 0, 0, 0);
-    return deliveryDate.getTime() === today.getTime() && order.status !== 'delivered';
+    return deliveryDate.getTime() === today.getTime() && (searchTerm ? true : order.status !== 'delivered');
   }));
   
   const upcomingDeliveries = filterOrders(orders.filter(order => {
     const deliveryDate = new Date(order.expected_delivery);
-    return deliveryDate >= tomorrow && order.status !== 'delivered';
+    return deliveryDate >= tomorrow && (searchTerm ? true : order.status !== 'delivered');
   }));
   
   const backorderDeliveries = filterOrders(orders.filter(order => {
     const deliveryDate = new Date(order.expected_delivery);
-    return deliveryDate < today && order.status !== 'delivered';
+    return deliveryDate < today && (searchTerm ? true : order.status !== 'delivered');
   }));
 
   const handleDeliveryConfirmed = () => {
