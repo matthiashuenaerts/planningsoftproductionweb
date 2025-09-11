@@ -74,8 +74,8 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
 
       for (const item of deliveredItems) {
         const labelContent = `
-          <div style="width: 89mm; height: 36mm; padding: 2mm; font-family: Arial, sans-serif; font-size: 8pt; line-height: 1.2;">
-            <div style="font-weight: bold; font-size: 9pt; margin-bottom: 1mm;">${projectInfo?.name || 'Unknown Project'}</div>
+          <div style="width: 89mm; height: 32mm; padding: 2mm; font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.2;">
+            <div style="font-weight: bold; font-size: 11pt; margin-bottom: 1mm;">${projectInfo?.name || 'Unknown Project'}</div>
             <div style="margin-bottom: 1mm;">Article: ${item.article_code}</div>
             <div style="margin-bottom: 1mm;">Qty: ${item.delivered_quantity}</div>
             <div style="margin-bottom: 1mm;">Install: ${installationDate}</div>
@@ -93,14 +93,14 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
                 <title>Dymo Label Print</title>
                 <style>
                   @page {
-                    size: 89mm 36mm;
+                    size: 89mm 35mm;
                     margin: 0;
                   }
                   body {
                     margin: 0;
                     padding: 0;
                     width: 89mm;
-                    height: 36mm;
+                    height: 35mm;
                   }
                 </style>
               </head>
