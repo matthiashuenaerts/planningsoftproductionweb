@@ -382,12 +382,12 @@ const Projects = () => {
               {filteredProjects.map(project => <Card key={project.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleProjectClick(project.id)}>
                   <div>
                     <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-xl mb-1">{project.name}</CardTitle>
-                          <CardDescription>{project.client}</CardDescription>
-                        </div>
-                        <div className="flex gap-1">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-xl mb-1 truncate">{project.name}</CardTitle>
+                            <CardDescription className="truncate">{project.client}</CardDescription>
+                          </div>
+                          <div className="flex gap-1 flex-shrink-0">
                           {isAdmin && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
