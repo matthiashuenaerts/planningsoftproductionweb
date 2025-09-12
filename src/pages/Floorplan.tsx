@@ -6,6 +6,7 @@ import { ImageAwareWorkstationDot } from '@/components/floorplan/ImageAwareWorks
 import { ProductionFlowLine as ProductionFlowLineComponent } from '@/components/floorplan/ProductionFlowLine';
 import { FloorplanToolbar } from '@/components/floorplan/FloorplanToolbar';
 import { AnimatedWorkstationDetailsDialog } from '@/components/floorplan/AnimatedWorkstationDetailsDialog';
+import { WorkstationTooltip } from '@/components/floorplan/WorkstationTooltip';
 import { toast } from 'sonner';
 import Navbar from '@/components/Navbar';
 import GlobalComponents from '@/components/GlobalComponents';
@@ -222,64 +223,74 @@ const Floorplan: React.FC = () => {
               {workstations.map((workstation) => {
                 const position = getWorkstationPosition(workstation.id);
                 return (
-                  <div
+                  <WorkstationTooltip
                     key={workstation.id}
-                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${
-                      isEditing ? 'cursor-move' : 'cursor-pointer'
-                    }`}
-                    style={{
-                      left: `${position.x}%`,
-                      top: `${position.y}%`,
-                      zIndex: 10,
-                    }}
-                    onMouseDown={(e) => {
-                      if (!isEditing) return;
-                      e.preventDefault();
-                      e.stopPropagation();
-                      
-                      const handleMouseMove = (moveE: MouseEvent) => {
-                        if (!imageRef.current) return;
-                        
-                        const imageRect = imageRef.current.getBoundingClientRect();
-                        const x = ((moveE.clientX - imageRect.left) / imageRect.width) * 100;
-                        const y = ((moveE.clientY - imageRect.top) / imageRect.height) * 100;
-                        
-                        const clampedX = Math.max(0, Math.min(100, x));
-                        const clampedY = Math.max(0, Math.min(100, y));
-                        
-                        handleWorkstationPositionChange(workstation.id, clampedX, clampedY);
-                      };
-                      
-                      const handleMouseUp = () => {
-                        document.removeEventListener('mousemove', handleMouseMove);
-                        document.removeEventListener('mouseup', handleMouseUp);
-                      };
-                      
-                      document.addEventListener('mousemove', handleMouseMove);
-                      document.addEventListener('mouseup', handleMouseUp);
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isEditing) setSelectedWorkstation(workstation);
-                    }}
+                    workstation={workstation}
+                    status={getWorkstationStatus(workstation.id)}
                   >
-                    <div className={`w-4 h-4 rounded-full border-2 border-white shadow-lg ${
-                      !getWorkstationStatus(workstation.id) ? 'bg-orange-500' :
-                      getWorkstationStatus(workstation.id)?.has_error ? 'bg-red-500' :
-                      getWorkstationStatus(workstation.id)?.is_active ? 'bg-green-500' : 'bg-orange-500'
-                    }`}>
-                      {getWorkstationStatus(workstation.id)?.is_active && getWorkstationStatus(workstation.id)?.active_users_count > 0 && (
-                        <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-background border flex items-center justify-center text-xs">
-                          {getWorkstationStatus(workstation.id)?.active_users_count}
+                    <div
+                      className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${
+                        isEditing ? 'cursor-move' : 'cursor-pointer'
+                      }`}
+                      style={{
+                        left: `${position.x}%`,
+                        top: `${position.y}%`,
+                        zIndex: 10,
+                      }}
+                      onMouseDown={(e) => {
+                        if (!isEditing) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const handleMouseMove = (moveE: MouseEvent) => {
+                          if (!imageRef.current) return;
+                          
+                          const imageRect = imageRef.current.getBoundingClientRect();
+                          const x = ((moveE.clientX - imageRect.left) / imageRect.width) * 100;
+                          const y = ((moveE.clientY - imageRect.top) / imageRect.height) * 100;
+                          
+                          const clampedX = Math.max(0, Math.min(100, x));
+                          const clampedY = Math.max(0, Math.min(100, y));
+                          
+                          handleWorkstationPositionChange(workstation.id, clampedX, clampedY);
+                        };
+                        
+                        const handleMouseUp = () => {
+                          document.removeEventListener('mousemove', handleMouseMove);
+                          document.removeEventListener('mouseup', handleMouseUp);
+                        };
+                        
+                        document.addEventListener('mousemove', handleMouseMove);
+                        document.addEventListener('mouseup', handleMouseUp);
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isEditing) setSelectedWorkstation(workstation);
+                      }}
+                    >
+                      <div className={`w-4 h-4 rounded-full border-2 border-white shadow-lg ${
+                        !getWorkstationStatus(workstation.id) ? 'bg-orange-500' :
+                        getWorkstationStatus(workstation.id)?.has_error ? 'bg-red-500' :
+                        getWorkstationStatus(workstation.id)?.is_active ? 'bg-green-500' : 'bg-orange-500'
+                      }`}>
+                        {getWorkstationStatus(workstation.id)?.is_active && getWorkstationStatus(workstation.id)?.active_users_count > 0 && (
+                          <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-background border flex items-center justify-center text-xs">
+                            {getWorkstationStatus(workstation.id)?.active_users_count}
+                          </div>
+                        )}
+                        {getWorkstationStatus(workstation.id)?.workstation_tasks && getWorkstationStatus(workstation.id)?.workstation_tasks.length > 0 && (
+                          <div className="absolute -top-2 -left-2 w-5 h-5 rounded-full bg-blue-500 border border-white flex items-center justify-center text-xs text-white">
+                            {getWorkstationStatus(workstation.id)?.workstation_tasks.length}
+                          </div>
+                        )}
+                      </div>
+                      {isEditing && (
+                        <div className="absolute top-5 left-1/2 transform -translate-x-1/2 bg-background border rounded px-2 py-1 text-xs whitespace-nowrap shadow-lg">
+                          {workstation.name}
                         </div>
                       )}
                     </div>
-                    {isEditing && (
-                      <div className="absolute top-5 left-1/2 transform -translate-x-1/2 bg-background border rounded px-2 py-1 text-xs whitespace-nowrap shadow-lg">
-                        {workstation.name}
-                      </div>
-                    )}
-                  </div>
+                  </WorkstationTooltip>
                 );
               })}
 
@@ -346,6 +357,12 @@ const Floorplan: React.FC = () => {
             <div className="flex items-center space-x-2">
               <div className="w-4 h-1 bg-blue-500"></div>
               <span>Production Flow</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-blue-500 rounded-full text-white text-xs flex items-center justify-center">
+                <span className="text-[8px]">5</span>
+              </div>
+              <span>Workstation Tasks Count</span>
             </div>
           </div>
         </div>
