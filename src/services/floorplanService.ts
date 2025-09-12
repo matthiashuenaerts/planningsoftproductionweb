@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { workstationTasksService, WorkstationTask } from './workstationTasksService';
 
 export interface WorkstationPosition {
   id: string;
@@ -39,6 +40,7 @@ export interface WorkstationStatus {
     project_name: string;
     task_count: number;
   }>;
+  workstation_tasks: WorkstationTask[];
   has_error: boolean;
 }
 
@@ -108,7 +110,7 @@ export const floorplanService = {
   async getWorkstationStatuses(): Promise<WorkstationStatus[]> {
     console.log('Starting workstation status check...');
     
-    // Get active time registrations with detailed information
+    // Get active time registrations with detailed information including workstation tasks
     const { data: timeRegistrations, error: timeError } = await supabase
       .from('time_registrations')
       .select(`
@@ -117,18 +119,26 @@ export const floorplanService = {
         task_id,
         is_active,
         employees!inner(name),
-        tasks!inner(
+        tasks(
           id,
           title,
           status,
-          task_workstation_links!inner(
+          task_workstation_links(
             workstation_id,
-            workstations!inner(id, name)
+            workstations(id, name)
           ),
           phases(
             project_id,
             projects(name)
           )
+        ),
+        workstation_tasks(
+          id,
+          task_name,
+          workstation_id,
+          priority,
+          description,
+          duration
         )
       `)
       .eq('is_active', true);
@@ -136,6 +146,9 @@ export const floorplanService = {
     console.log('Active time registrations:', timeRegistrations);
     
     if (timeError) throw timeError;
+
+    // Get all workstation tasks for reference
+    const allWorkstationTasks = await workstationTasksService.getAll();
 
     // Get current projects for each workstation (tasks that are todo or in_progress)
     const { data: currentProjects, error: projectError } = await supabase
@@ -165,18 +178,50 @@ export const floorplanService = {
     timeRegistrations?.forEach((reg: any) => {
       console.log('Processing time registration:', reg);
       
-      // Check if task has workstation links
-      if (!reg.tasks?.task_workstation_links?.length) {
-        console.log('No workstation links found for task:', reg.tasks?.title);
-        return;
-      }
-      
       const userName = reg.employees?.name || 'Unknown User';
       
-      // Process each workstation link for this task
-      reg.tasks.task_workstation_links.forEach((link: any) => {
-        const workstationId = link.workstation_id;
-        console.log('Found workstation assignment:', workstationId, 'for task:', reg.tasks.title);
+      // Handle regular project tasks
+      if (reg.tasks && reg.tasks.task_workstation_links?.length > 0) {
+        reg.tasks.task_workstation_links.forEach((link: any) => {
+          const workstationId = link.workstation_id;
+          console.log('Found workstation assignment:', workstationId, 'for task:', reg.tasks.title);
+          
+          if (!workstationStatusMap.has(workstationId)) {
+            workstationStatusMap.set(workstationId, {
+              workstation_id: workstationId,
+              is_active: false,
+              active_users_count: 0,
+              active_user_names: [],
+              active_tasks: [],
+              current_projects: [],
+              workstation_tasks: [],
+              has_error: false
+            });
+          }
+          
+          const status = workstationStatusMap.get(workstationId)!;
+          status.is_active = true;
+          
+          // Only count unique users
+          if (!status.active_user_names.includes(userName)) {
+            status.active_users_count++;
+            status.active_user_names.push(userName);
+          }
+          
+          // Add active task info
+          status.active_tasks.push({
+            task_id: reg.tasks.id,
+            task_title: reg.tasks.title,
+            employee_name: userName,
+            project_name: reg.tasks.phases?.projects?.name
+          });
+        });
+      }
+      
+      // Handle workstation tasks (only when they have active time registrations)
+      if (reg.workstation_tasks) {
+        const workstationId = reg.workstation_tasks.workstation_id;
+        console.log('Found active workstation task:', reg.workstation_tasks.task_name, 'for workstation:', workstationId);
         
         if (!workstationStatusMap.has(workstationId)) {
           workstationStatusMap.set(workstationId, {
@@ -186,6 +231,7 @@ export const floorplanService = {
             active_user_names: [],
             active_tasks: [],
             current_projects: [],
+            workstation_tasks: [],
             has_error: false
           });
         }
@@ -199,14 +245,14 @@ export const floorplanService = {
           status.active_user_names.push(userName);
         }
         
-        // Add active task info
+        // Add active workstation task info to active_tasks (treat same as project tasks)
         status.active_tasks.push({
-          task_id: reg.tasks.id,
-          task_title: reg.tasks.title,
+          task_id: reg.workstation_tasks.id,
+          task_title: reg.workstation_tasks.task_name,
           employee_name: userName,
-          project_name: reg.tasks.phases?.projects?.name
+          project_name: 'Workstation Task'
         });
-      });
+      }
     });
 
     // Process current projects for all workstations
@@ -256,12 +302,32 @@ export const floorplanService = {
           active_user_names: [],
           active_tasks: [],
           current_projects: [],
+          workstation_tasks: [],
           has_error: false
         });
       }
       
       const status = workstationStatusMap.get(workstationId)!;
       status.current_projects = Array.from(projectMap.values());
+    });
+
+    // Add all workstation tasks to each workstation status for reference (not counting as active unless in time registration)
+    allWorkstationTasks.forEach(task => {
+      if (!workstationStatusMap.has(task.workstation_id)) {
+        workstationStatusMap.set(task.workstation_id, {
+          workstation_id: task.workstation_id,
+          is_active: false,
+          active_users_count: 0,
+          active_user_names: [],
+          active_tasks: [],
+          current_projects: [],
+          workstation_tasks: [],
+          has_error: false
+        });
+      }
+      
+      const status = workstationStatusMap.get(task.workstation_id)!;
+      status.workstation_tasks.push(task);
     });
 
     return Array.from(workstationStatusMap.values());
