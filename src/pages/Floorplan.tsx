@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { workstationService } from '@/services/workstationService';
 import { floorplanService, WorkstationPosition, ProductionFlowLine, WorkstationStatus } from '@/services/floorplanService';
-import { workstationTasksService, WorkstationTask } from '@/services/workstationTasksService';
 import { ImageAwareWorkstationDot } from '@/components/floorplan/ImageAwareWorkstationDot';
 import { ProductionFlowLine as ProductionFlowLineComponent } from '@/components/floorplan/ProductionFlowLine';
 import { FloorplanToolbar } from '@/components/floorplan/FloorplanToolbar';
@@ -10,10 +9,6 @@ import { AnimatedWorkstationDetailsDialog } from '@/components/floorplan/Animate
 import { toast } from 'sonner';
 import Navbar from '@/components/Navbar';
 import GlobalComponents from '@/components/GlobalComponents';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Clock, User, AlertCircle } from 'lucide-react';
 
 // Import the uploaded floorplan image
 const FLOORPLAN_IMAGE = "/lovable-uploads/a8ecb0d1-2146-481f-8c3a-31fa480e3aad.png";
@@ -38,12 +33,6 @@ const Floorplan: React.FC = () => {
   const { data: workstations = [] } = useQuery({
     queryKey: ['workstations'],
     queryFn: workstationService.getAll
-  });
-
-  // Fetch workstation tasks
-  const { data: workstationTasks = [] } = useQuery({
-    queryKey: ['workstation-tasks'],
-    queryFn: workstationTasksService.getAll
   });
 
   // Load initial data
@@ -197,29 +186,12 @@ const Floorplan: React.FC = () => {
   const totalActiveWorkstations = workstationStatuses.filter(s => s.is_active).length;
   const totalActiveUsers = workstationStatuses.reduce((sum, s) => sum + s.active_users_count, 0);
 
-  const getWorkstationTasks = (workstationId: string) => {
-    return workstationTasks.filter(task => task.workstation_id === workstationId);
-  };
-
-  const getPriorityBadgeColor = (priority: string) => {
-    switch (priority.toLowerCase()) {
-      case 'high':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low':
-        return 'bg-green-100 text-green-800 border-green-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       <GlobalComponents />
       
-      <div className="ml-64 relative w-[calc(100vw-20rem)] h-screen flex items-center justify-center overflow-hidden">
+      <div className="ml-64 relative w-[calc(100vw-16rem)] h-screen flex items-center justify-center overflow-hidden">
         {/* Image Container */}
         <div className="relative w-full h-full flex items-center justify-center">
           <div className="relative inline-block">
@@ -377,79 +349,6 @@ const Floorplan: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Active Workstation Tasks Sidebar */}
-      <div className="fixed right-0 top-16 bottom-0 w-64 bg-background border-l border-border overflow-hidden">
-        <Card className="h-full rounded-none border-0">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertCircle className="h-5 w-5" />
-              Active Tasks
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="h-full px-4 pb-4">
-              <div className="space-y-4">
-                {workstations.map((workstation) => {
-                  const tasks = getWorkstationTasks(workstation.id);
-                  const status = getWorkstationStatus(workstation.id);
-                  
-                  if (tasks.length === 0) return null;
-                  
-                  return (
-                    <div key={workstation.id} className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${
-                          !status ? 'bg-orange-500' :
-                          status.has_error ? 'bg-red-500' :
-                          status.is_active ? 'bg-green-500' : 'bg-orange-500'
-                        }`} />
-                        <h4 className="font-medium text-sm truncate">{workstation.name}</h4>
-                      </div>
-                      
-                      <div className="space-y-2 ml-4">
-                        {tasks.map((task) => (
-                          <div key={task.id} className="p-2 rounded-lg bg-muted/50 space-y-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <span className="text-xs font-medium truncate">{task.task_name}</span>
-                              <Badge 
-                                variant="outline" 
-                                className={`text-xs px-1 py-0 ${getPriorityBadgeColor(task.priority)}`}
-                              >
-                                {task.priority}
-                              </Badge>
-                            </div>
-                            
-                            {task.description && (
-                              <p className="text-xs text-muted-foreground line-clamp-2">
-                                {task.description}
-                              </p>
-                            )}
-                            
-                            {task.duration && (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Clock className="h-3 w-3" />
-                                <span>{task.duration} min</span>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-                
-                {workstationTasks.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <AlertCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No active tasks found</p>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Animated Workstation Details Dialog */}
