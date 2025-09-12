@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { workstationTasksService, WorkstationTask } from './workstationTasksService';
 
 export interface WorkstationPosition {
   id: string;
@@ -39,6 +40,7 @@ export interface WorkstationStatus {
     project_name: string;
     task_count: number;
   }>;
+  workstation_tasks: WorkstationTask[];
   has_error: boolean;
 }
 
@@ -137,6 +139,9 @@ export const floorplanService = {
     
     if (timeError) throw timeError;
 
+    // Get all workstation tasks
+    const allWorkstationTasks = await workstationTasksService.getAll();
+
     // Get current projects for each workstation (tasks that are todo or in_progress)
     const { data: currentProjects, error: projectError } = await supabase
       .from('tasks')
@@ -186,6 +191,7 @@ export const floorplanService = {
             active_user_names: [],
             active_tasks: [],
             current_projects: [],
+            workstation_tasks: [],
             has_error: false
           });
         }
@@ -256,12 +262,32 @@ export const floorplanService = {
           active_user_names: [],
           active_tasks: [],
           current_projects: [],
+          workstation_tasks: [],
           has_error: false
         });
       }
       
       const status = workstationStatusMap.get(workstationId)!;
       status.current_projects = Array.from(projectMap.values());
+    });
+
+    // Add workstation tasks to each workstation status
+    allWorkstationTasks.forEach(task => {
+      if (!workstationStatusMap.has(task.workstation_id)) {
+        workstationStatusMap.set(task.workstation_id, {
+          workstation_id: task.workstation_id,
+          is_active: false,
+          active_users_count: 0,
+          active_user_names: [],
+          active_tasks: [],
+          current_projects: [],
+          workstation_tasks: [],
+          has_error: false
+        });
+      }
+      
+      const status = workstationStatusMap.get(task.workstation_id)!;
+      status.workstation_tasks.push(task);
     });
 
     return Array.from(workstationStatusMap.values());
