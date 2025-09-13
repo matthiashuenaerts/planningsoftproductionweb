@@ -253,60 +253,6 @@ const TruckLoadingCalendar = () => {
         </CardContent>
       </Card>
 
-      {/* Upcoming Loading - Small Column */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Upcoming Loading ({upcomingAssignments.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {upcomingAssignments.length > 0 ? (
-            <div className="space-y-3">
-              {upcomingAssignments.slice(0, 10).map((assignment, index) => (
-                <div
-                  key={`${assignment.project.id}-${index}`}
-                  className={cn(
-                    "p-3 rounded-lg border-l-4 bg-white border",
-                    getLoadingPriority(assignment.loading_date)
-                  )}
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge className={getProjectColor(assignment.project.status)}>
-                          {assignment.project.status.replace('_', ' ').toUpperCase()}
-                        </Badge>
-                        <span className="text-sm text-gray-600">
-                          Load: {format(new Date(assignment.loading_date), 'MMM d')}
-                        </span>
-                      </div>
-                      <h4 className="font-medium">{assignment.project.name}</h4>
-                      <p className="text-sm text-gray-600">{assignment.project.client}</p>
-                    </div>
-                    <div className="text-xs text-gray-500 text-right">
-                      <div>Install:</div>
-                      <div>{format(new Date(assignment.project.installation_date), 'MMM d')}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              
-              {upcomingAssignments.length > 10 && (
-                <div className="text-center py-2 text-sm text-gray-500">
-                  +{upcomingAssignments.length - 10} more assignments
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-6 text-gray-500">
-              <Clock className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-              <p>No upcoming loading scheduled</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 };
