@@ -9,6 +9,8 @@ import { ChevronLeft, ChevronRight, Truck, Calendar, AlertTriangle, Clock } from
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { holidayService, Holiday } from '@/services/holidayService';
+import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface Project {
   id: string;
@@ -24,6 +26,30 @@ interface LoadingAssignment {
   truck_number?: string;
 }
 
+// Define installation team colors
+const installationTeamColors = {
+  green: {
+    bg: 'bg-green-100 hover:bg-green-200',
+    border: 'border-green-300',
+    text: 'text-green-800',
+  },
+  blue: {
+    bg: 'bg-blue-100 hover:bg-blue-200',
+    border: 'border-blue-300',
+    text: 'text-blue-800',
+  },
+  orange: {
+    bg: 'bg-orange-100 hover:bg-orange-200',
+    border: 'border-orange-300',
+    text: 'text-orange-800',
+  },
+  unassigned: {
+    bg: 'bg-gray-100 hover:bg-gray-200',
+    border: 'border-gray-300',
+    text: 'text-gray-800',
+  }
+};
+
 const TruckLoadingCalendar = () => {
   const [weekStartDate, setWeekStartDate] = useState(() => {
     const today = new Date();
@@ -34,6 +60,8 @@ const TruckLoadingCalendar = () => {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { lang } = useLanguage();
 
   // Calculate previous workday considering holidays
   const getPreviousWorkday = (date: Date, holidaysList: Holiday[]): Date => {
@@ -156,14 +184,19 @@ const TruckLoadingCalendar = () => {
     return assignments.filter(assignment => assignment.loading_date === dateStr);
   };
 
-  // Get project color for visual distinction
-  const getProjectColor = (status: string) => {
+  // Get installation team color based on project status/team
+  const getInstallationTeamColor = (status: string) => {
     switch (status) {
-      case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'planned': return 'bg-green-100 text-green-800 border-green-300';
-      case 'completed': return 'bg-gray-100 text-gray-800 border-gray-300';
-      default: return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'in_progress': return installationTeamColors.blue;
+      case 'planned': return installationTeamColors.green;
+      case 'completed': return installationTeamColors.unassigned;
+      default: return installationTeamColors.orange;
     }
+  };
+
+  // Handle project click navigation
+  const handleProjectClick = (projectId: string) => {
+    navigate(`/${lang}/projects/${projectId}`);
   };
 
   // Get priority styling for loading dates
@@ -231,20 +264,26 @@ const TruckLoadingCalendar = () => {
                   </div>
                   
                   <div className="space-y-1">
-                    {dayAssignments.map((assignment, index) => (
-                      <div
-                        key={`${assignment.project.id}-${index}`}
-                        className={cn(
-                          "p-1 rounded text-xs border",
-                          getProjectColor(assignment.project.status)
-                        )}
-                      >
-                        <div className="font-medium truncate">{assignment.project.name}</div>
-                        <div className="text-xs text-gray-500">
-                          Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
+                    {dayAssignments.map((assignment, index) => {
+                      const teamColor = getInstallationTeamColor(assignment.project.status);
+                      return (
+                        <div
+                          key={`${assignment.project.id}-${index}`}
+                          className={cn(
+                            "p-1 rounded text-xs border cursor-pointer transition-colors",
+                            teamColor.bg,
+                            teamColor.border,
+                            teamColor.text
+                          )}
+                          onClick={() => handleProjectClick(assignment.project.id)}
+                        >
+                          <div className="font-medium truncate">{assignment.project.name}</div>
+                          <div className="text-xs opacity-75">
+                            Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
