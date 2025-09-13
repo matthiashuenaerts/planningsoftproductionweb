@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { projectService, taskService, Project, Task } from '@/services/dataService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   ShieldCheck, 
@@ -76,6 +77,7 @@ const Dashboard: React.FC = () => {
   const [weekLoading, setWeekLoading] = useState(false);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
+  const { createLocalizedPath } = useLanguage();
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -487,7 +489,7 @@ const Dashboard: React.FC = () => {
                           "p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity",
                           getProjectColor(assignment.project.status)
                         )}
-                        onClick={() => navigate(`/projects/${assignment.project.id}`)}
+                        onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}
                       >
                         <div className="font-medium truncate">{assignment.project.name}</div>
                         <div className="text-xs text-gray-500">
