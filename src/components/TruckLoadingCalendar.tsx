@@ -9,8 +9,6 @@ import { ChevronLeft, ChevronRight, Truck, Calendar, AlertTriangle, Clock } from
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { holidayService, Holiday } from '@/services/holidayService';
-import { useNavigate } from 'react-router-dom';
-import { useLanguage } from '@/context/LanguageContext';
 
 interface Project {
   id: string;
@@ -26,30 +24,6 @@ interface LoadingAssignment {
   truck_number?: string;
 }
 
-// Define installation team colors
-const installationTeamColors = {
-  green: {
-    bg: 'bg-green-100 hover:bg-green-200',
-    border: 'border-green-300',
-    text: 'text-green-800',
-  },
-  blue: {
-    bg: 'bg-blue-100 hover:bg-blue-200',
-    border: 'border-blue-300',
-    text: 'text-blue-800',
-  },
-  orange: {
-    bg: 'bg-orange-100 hover:bg-orange-200',
-    border: 'border-orange-300',
-    text: 'text-orange-800',
-  },
-  unassigned: {
-    bg: 'bg-gray-100 hover:bg-gray-200',
-    border: 'border-gray-300',
-    text: 'text-gray-800',
-  }
-};
-
 const TruckLoadingCalendar = () => {
   const [weekStartDate, setWeekStartDate] = useState(() => {
     const today = new Date();
@@ -59,11 +33,7 @@ const TruckLoadingCalendar = () => {
   const [assignments, setAssignments] = useState<LoadingAssignment[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadedWeeks, setLoadedWeeks] = useState<Set<string>>(new Set());
-  const [weekLoading, setWeekLoading] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const { lang } = useLanguage();
 
   // Calculate previous workday considering holidays
   const getPreviousWorkday = (date: Date, holidaysList: Holiday[]): Date => {
@@ -91,36 +61,27 @@ const TruckLoadingCalendar = () => {
     return previousDay;
   };
 
-  // Load projects for a specific week
-  const loadWeekData = async (weekStart: Date, holidaysData: Holiday[]) => {
-    const weekEnd = addDays(weekStart, 6);
-    const weekKey = format(weekStart, 'yyyy-MM-dd');
-    
-    if (loadedWeeks.has(weekKey)) {
-      return; // Already loaded
-    }
-
-    try {
-      setWeekLoading(true);
-      
-      // Calculate date range for loading dates (projects that load during this week)
-      // We need to look ahead to find projects whose loading dates fall in this week
-      const searchStart = format(weekStart, 'yyyy-MM-dd');
-      const searchEnd = format(addDays(weekEnd, 30), 'yyyy-MM-dd'); // Look ahead 30 days for installation dates
-      
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select('id, name, client, status, installation_date')
-        .not('installation_date', 'is', null)
-        .gte('installation_date', searchStart)
-        .lte('installation_date', searchEnd)
-        .order('installation_date');
+  // Fetch projects and calculate loading dates
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
         
-      if (projectsError) throw projectsError;
-      
-      // Calculate loading dates and filter for current week
-      const weekLoadingAssignments: LoadingAssignment[] = (projectsData || [])
-        .map(project => {
+        // Fetch holidays
+        const holidaysData = await holidayService.getHolidays();
+        setHolidays(holidaysData);
+        
+        // Fetch all projects with installation dates
+        const { data: projectsData, error: projectsError } = await supabase
+          .from('projects')
+          .select('id, name, client, status, installation_date')
+          .not('installation_date', 'is', null)
+          .order('installation_date');
+          
+        if (projectsError) throw projectsError;
+        
+        // Calculate loading dates for each project
+        const loadingAssignments: LoadingAssignment[] = (projectsData || []).map(project => {
           const installationDate = new Date(project.installation_date);
           const loadingDate = getPreviousWorkday(installationDate, holidaysData);
           
@@ -128,54 +89,14 @@ const TruckLoadingCalendar = () => {
             project,
             loading_date: format(loadingDate, 'yyyy-MM-dd'),
           };
-        })
-        .filter(assignment => {
-          const loadingDate = new Date(assignment.loading_date);
-          return loadingDate >= weekStart && loadingDate <= weekEnd;
         });
-      
-      // Merge with existing assignments (avoid duplicates)
-      setAssignments(prev => {
-        const existingIds = new Set(prev.map(a => `${a.project.id}-${a.loading_date}`));
-        const newAssignments = weekLoadingAssignments.filter(
-          a => !existingIds.has(`${a.project.id}-${a.loading_date}`)
-        );
-        return [...prev, ...newAssignments];
-      });
-      
-      // Mark week as loaded
-      setLoadedWeeks(prev => new Set([...prev, weekKey]));
-      
-    } catch (error) {
-      console.error('Error loading week data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load week data",
-        variant: "destructive"
-      });
-    } finally {
-      setWeekLoading(false);
-    }
-  };
-
-  // Initial data fetch - load holidays and current week
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        setLoading(true);
         
-        // Fetch holidays first
-        const holidaysData = await holidayService.getHolidays();
-        setHolidays(holidaysData);
-        
-        // Load current week data
-        await loadWeekData(weekStartDate, holidaysData);
-        
+        setAssignments(loadingAssignments);
       } catch (error) {
-        console.error('Error fetching initial data:', error);
+        console.error('Error fetching truck loading data:', error);
         toast({
           title: "Error",
-          description: "Failed to load initial data",
+          description: "Failed to load truck loading data",
           variant: "destructive"
         });
       } finally {
@@ -183,15 +104,8 @@ const TruckLoadingCalendar = () => {
       }
     };
     
-    fetchInitialData();
+    fetchData();
   }, [toast]);
-
-  // Load new week data when week changes
-  useEffect(() => {
-    if (holidays.length > 0) {
-      loadWeekData(weekStartDate, holidays);
-    }
-  }, [weekStartDate, holidays]);
 
   // Re-calculate assignments when holidays change
   useEffect(() => {
@@ -211,14 +125,12 @@ const TruckLoadingCalendar = () => {
   }, [holidays]);
 
   // Navigate weeks
-  const prevWeek = async () => {
-    const newWeekStart = addDays(weekStartDate, -7);
-    setWeekStartDate(newWeekStart);
+  const prevWeek = () => {
+    setWeekStartDate(addDays(weekStartDate, -7));
   };
 
-  const nextWeek = async () => {
-    const newWeekStart = addDays(weekStartDate, 7);
-    setWeekStartDate(newWeekStart);
+  const nextWeek = () => {
+    setWeekStartDate(addDays(weekStartDate, 7));
   };
 
   // Get assignments for today's loading
@@ -244,19 +156,14 @@ const TruckLoadingCalendar = () => {
     return assignments.filter(assignment => assignment.loading_date === dateStr);
   };
 
-  // Get installation team color based on project status/team
-  const getInstallationTeamColor = (status: string) => {
+  // Get project color for visual distinction
+  const getProjectColor = (status: string) => {
     switch (status) {
-      case 'in_progress': return installationTeamColors.blue;
-      case 'planned': return installationTeamColors.green;
-      case 'completed': return installationTeamColors.unassigned;
-      default: return installationTeamColors.orange;
+      case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'planned': return 'bg-green-100 text-green-800 border-green-300';
+      case 'completed': return 'bg-gray-100 text-gray-800 border-gray-300';
+      default: return 'bg-orange-100 text-orange-800 border-orange-300';
     }
-  };
-
-  // Handle project click navigation
-  const handleProjectClick = (projectId: string) => {
-    navigate(`/${lang}/projects/${projectId}`);
   };
 
   // Get priority styling for loading dates
@@ -273,16 +180,61 @@ const TruckLoadingCalendar = () => {
   const upcomingAssignments = getUpcomingAssignments();
 
   if (loading) {
-    return (
-      <div className="flex justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-        <span className="ml-2 text-gray-600">Loading truck loading calendar...</span>
-      </div>
-    );
+    return <div className="flex justify-center p-8">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+    </div>;
   }
 
   return (
     <div className="space-y-6">
+      {/* Today's Loading - Big Sign */}
+      <Card className="border-2 border-red-500">
+        <CardHeader className="bg-red-500 text-white">
+          <CardTitle className="text-2xl flex items-center gap-3">
+            <Truck className="h-8 w-8" />
+            TODAY'S LOADING SCHEDULE
+            <Badge className="bg-white text-red-500 text-lg px-3 py-1">
+              {format(new Date(), 'EEEE, MMMM d')}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          {todayAssignments.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {todayAssignments.map((assignment, index) => (
+                <div
+                  key={`${assignment.project.id}-${index}`}
+                  className={cn(
+                    "p-4 rounded-lg border-2",
+                    getProjectColor(assignment.project.status)
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge className={cn("text-lg px-3 py-1", getProjectColor(assignment.project.status))}>
+                      {assignment.project.status.replace('_', ' ').toUpperCase()}
+                    </Badge>
+                    <div className="text-sm text-gray-600">
+                      Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
+                    </div>
+                  </div>
+                  <h3 className="font-bold text-lg mb-1">{assignment.project.name}</h3>
+                  <p className="text-gray-600 mb-2">{assignment.project.client}</p>
+                  <div className="text-sm text-gray-500">
+                    Loading scheduled for today based on installation tomorrow
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Truck className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+              <h3 className="text-xl font-medium text-gray-600 mb-2">No Loading Scheduled Today</h3>
+              <p className="text-gray-500">All trucks are ready for tomorrow's installations</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Weekly Overview */}
       <Card>
         <CardHeader className="pb-2">
@@ -292,14 +244,13 @@ const TruckLoadingCalendar = () => {
               Weekly Loading Schedule
             </CardTitle>
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="icon" onClick={prevWeek} disabled={weekLoading}>
+              <Button variant="outline" size="icon" onClick={prevWeek}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-sm font-medium min-w-[200px] text-center">
                 {format(weekStartDate, 'MMM d')} - {format(addDays(weekStartDate, 6), 'MMM d, yyyy')}
-                {weekLoading && <span className="ml-2 text-xs text-gray-500">Loading...</span>}
               </span>
-              <Button variant="outline" size="icon" onClick={nextWeek} disabled={weekLoading}>
+              <Button variant="outline" size="icon" onClick={nextWeek}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -328,26 +279,20 @@ const TruckLoadingCalendar = () => {
                   </div>
                   
                   <div className="space-y-1">
-                    {dayAssignments.map((assignment, index) => {
-                      const teamColor = getInstallationTeamColor(assignment.project.status);
-                      return (
-                        <div
-                          key={`${assignment.project.id}-${index}`}
-                          className={cn(
-                            "p-1 rounded text-xs border cursor-pointer transition-colors",
-                            teamColor.bg,
-                            teamColor.border,
-                            teamColor.text
-                          )}
-                          onClick={() => handleProjectClick(assignment.project.id)}
-                        >
-                          <div className="font-medium truncate">{assignment.project.name}</div>
-                          <div className="text-xs opacity-75">
-                            Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
-                          </div>
+                    {dayAssignments.map((assignment, index) => (
+                      <div
+                        key={`${assignment.project.id}-${index}`}
+                        className={cn(
+                          "p-1 rounded text-xs border",
+                          getProjectColor(assignment.project.status)
+                        )}
+                      >
+                        <div className="font-medium truncate">{assignment.project.name}</div>
+                        <div className="text-xs text-gray-500">
+                          Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
                 </div>
               );
@@ -356,6 +301,60 @@ const TruckLoadingCalendar = () => {
         </CardContent>
       </Card>
 
+      {/* Upcoming Loading - Small Column */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Upcoming Loading ({upcomingAssignments.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {upcomingAssignments.length > 0 ? (
+            <div className="space-y-3">
+              {upcomingAssignments.slice(0, 10).map((assignment, index) => (
+                <div
+                  key={`${assignment.project.id}-${index}`}
+                  className={cn(
+                    "p-3 rounded-lg border-l-4 bg-white border",
+                    getLoadingPriority(assignment.loading_date)
+                  )}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge className={getProjectColor(assignment.project.status)}>
+                          {assignment.project.status.replace('_', ' ').toUpperCase()}
+                        </Badge>
+                        <span className="text-sm text-gray-600">
+                          Load: {format(new Date(assignment.loading_date), 'MMM d')}
+                        </span>
+                      </div>
+                      <h4 className="font-medium">{assignment.project.name}</h4>
+                      <p className="text-sm text-gray-600">{assignment.project.client}</p>
+                    </div>
+                    <div className="text-xs text-gray-500 text-right">
+                      <div>Install:</div>
+                      <div>{format(new Date(assignment.project.installation_date), 'MMM d')}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {upcomingAssignments.length > 10 && (
+                <div className="text-center py-2 text-sm text-gray-500">
+                  +{upcomingAssignments.length - 10} more assignments
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-6 text-gray-500">
+              <Clock className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+              <p>No upcoming loading scheduled</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
