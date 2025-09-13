@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ProjectCard from './ProjectCard';
 import TaskList from './TaskList';
 import SeedDataButton from './SeedDataButton';
@@ -71,8 +72,11 @@ const Dashboard: React.FC = () => {
   });
   const [allLoadingAssignments, setAllLoadingAssignments] = useState<LoadingAssignment[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [loadedWeeks, setLoadedWeeks] = useState<Set<string>>(new Set());
+  const [weekLoading, setWeekLoading] = useState(false);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
+  const navigate = useNavigate();
   
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -167,7 +171,7 @@ const Dashboard: React.FC = () => {
         setTaskCompletionTrend(last7Days);
         
         // Fetch truck loading data
-        await fetchTruckLoadingData();
+        await fetchInitialTruckLoadingData();
         
       } catch (error: any) {
         console.error('Error fetching dashboard data:', error);
@@ -210,65 +214,112 @@ const Dashboard: React.FC = () => {
     return previousDay;
   };
 
-  const fetchTruckLoadingData = async () => {
+  const fetchInitialTruckLoadingData = async () => {
     try {
       // Fetch holidays
       const holidaysData = await holidayService.getHolidays();
+      setHolidays(holidaysData);
       
-      // Fetch all projects with installation dates
+      // Load current week data
+      await loadWeekData(weekStartDate, holidaysData);
+      
+    } catch (error) {
+      console.error('Error fetching initial truck loading data:', error);
+    }
+  };
+
+  const loadWeekData = async (weekStart: Date, holidaysData?: Holiday[]) => {
+    const weekKey = format(weekStart, 'yyyy-MM-dd');
+    
+    // Skip if week already loaded
+    if (loadedWeeks.has(weekKey)) return;
+    
+    try {
+      setWeekLoading(true);
+      
+      const weekEnd = addDays(weekStart, 6);
+      const holidaysList = holidaysData || holidays;
+      
+      // Fetch projects for this week range
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('id, name, client, status, installation_date')
         .not('installation_date', 'is', null)
+        .gte('installation_date', format(subDays(weekStart, 10), 'yyyy-MM-dd')) // Buffer for loading date calculation
+        .lte('installation_date', format(addDays(weekEnd, 10), 'yyyy-MM-dd'))
         .order('installation_date');
         
       if (projectsError) throw projectsError;
       
-      // Calculate loading dates for each project
-      const loadingAssignments: LoadingAssignment[] = (projectsData || []).map(project => {
+      // Calculate loading dates for projects
+      const weekLoadingAssignments: LoadingAssignment[] = (projectsData || []).map(project => {
         const installationDate = new Date(project.installation_date);
-        const loadingDate = getPreviousWorkday(installationDate, holidaysData);
+        const loadingDate = getPreviousWorkday(installationDate, holidaysList);
         
         return {
           project,
           loading_date: format(loadingDate, 'yyyy-MM-dd'),
         };
+      }).filter(assignment => {
+        const loadingDate = new Date(assignment.loading_date);
+        return loadingDate >= weekStart && loadingDate <= weekEnd;
       });
       
-      // Get today's loadings
-      const today = format(new Date(), 'yyyy-MM-dd');
-      const todayLoadings = loadingAssignments.filter(assignment => assignment.loading_date === today);
+      // Merge with existing assignments
+      setAllLoadingAssignments(prev => {
+        const existingIds = new Set(prev.map(a => `${a.project.id}-${a.loading_date}`));
+        const newAssignments = weekLoadingAssignments.filter(
+          a => !existingIds.has(`${a.project.id}-${a.loading_date}`)
+        );
+        return [...prev, ...newAssignments];
+      });
       
-      // Calculate days to next loading
-      let daysToNext = 0;
-      if (todayLoadings.length === 0) {
-        const futureLoadings = loadingAssignments.filter(assignment => {
-          const loadingDate = new Date(assignment.loading_date);
-          return loadingDate > new Date();
-        }).sort((a, b) => new Date(a.loading_date).getTime() - new Date(b.loading_date).getTime());
+      // Update today's loading stats if current week
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const isCurrentWeek = today >= format(weekStart, 'yyyy-MM-dd') && today <= format(weekEnd, 'yyyy-MM-dd');
+      
+      if (isCurrentWeek) {
+        const todayLoadings = weekLoadingAssignments.filter(assignment => assignment.loading_date === today);
         
-        if (futureLoadings.length > 0) {
-          const nextLoadingDate = new Date(futureLoadings[0].loading_date);
-          const today = new Date();
-          daysToNext = Math.ceil((nextLoadingDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+        // Calculate days to next loading
+        let daysToNext = 0;
+        if (todayLoadings.length === 0) {
+          const futureLoadings = weekLoadingAssignments.filter(assignment => {
+            const loadingDate = new Date(assignment.loading_date);
+            return loadingDate > new Date();
+          }).sort((a, b) => new Date(a.loading_date).getTime() - new Date(b.loading_date).getTime());
+          
+          if (futureLoadings.length > 0) {
+            const nextLoadingDate = new Date(futureLoadings[0].loading_date);
+            const today = new Date();
+            daysToNext = Math.ceil((nextLoadingDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+          }
         }
+        
+        setTruckLoadingData({ todayLoadings, daysToNext });
       }
       
-      setTruckLoadingData({ todayLoadings, daysToNext });
-      setAllLoadingAssignments(loadingAssignments);
-      setHolidays(holidaysData);
+      // Mark week as loaded
+      setLoadedWeeks(prev => new Set([...prev, weekKey]));
+      
     } catch (error) {
-      console.error('Error fetching truck loading data:', error);
+      console.error('Error loading week data:', error);
+    } finally {
+      setWeekLoading(false);
     }
   };
 
   // Navigate weeks
-  const prevWeek = () => {
-    setWeekStartDate(addDays(weekStartDate, -7));
+  const prevWeek = async () => {
+    const newWeekStart = addDays(weekStartDate, -7);
+    setWeekStartDate(newWeekStart);
+    await loadWeekData(newWeekStart);
   };
 
-  const nextWeek = () => {
-    setWeekStartDate(addDays(weekStartDate, 7));
+  const nextWeek = async () => {
+    const newWeekStart = addDays(weekStartDate, 7);
+    setWeekStartDate(newWeekStart);
+    await loadWeekData(newWeekStart);
   };
 
   // Get assignments for a specific date
@@ -393,13 +444,14 @@ const Dashboard: React.FC = () => {
               Weekly Loading Schedule
             </CardTitle>
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="icon" onClick={prevWeek}>
+              <Button variant="outline" size="icon" onClick={prevWeek} disabled={weekLoading}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-sm font-medium min-w-[200px] text-center">
                 {format(weekStartDate, 'MMM d')} - {format(addDays(weekStartDate, 6), 'MMM d, yyyy')}
+                {weekLoading && <span className="ml-2 text-xs text-gray-500">Loading...</span>}
               </span>
-              <Button variant="outline" size="icon" onClick={nextWeek}>
+              <Button variant="outline" size="icon" onClick={nextWeek} disabled={weekLoading}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -432,9 +484,10 @@ const Dashboard: React.FC = () => {
                       <div
                         key={`${assignment.project.id}-${index}`}
                         className={cn(
-                          "p-1 rounded text-xs border",
+                          "p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity",
                           getProjectColor(assignment.project.status)
                         )}
+                        onClick={() => navigate(`/projects/${assignment.project.id}`)}
                       >
                         <div className="font-medium truncate">{assignment.project.name}</div>
                         <div className="text-xs text-gray-500">
