@@ -4,6 +4,7 @@ import TaskList from './TaskList';
 import SeedDataButton from './SeedDataButton';
 import HolidayRequestsList from './HolidayRequestsList';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { projectService, taskService, Project, Task } from '@/services/dataService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
@@ -17,7 +18,9 @@ import {
   Users,
   BarChart3,
   ListTodo,
-  Truck
+  Truck,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import {
@@ -32,7 +35,7 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import { format, startOfToday, isToday, subDays, parseISO, addDays, isWeekend } from 'date-fns';
+import { format, startOfToday, isToday, subDays, parseISO, addDays, isWeekend, startOfWeek } from 'date-fns';
 import { 
   ChartContainer,
   ChartTooltip,
@@ -40,6 +43,7 @@ import {
 } from '@/components/ui/chart';
 import { supabase } from '@/integrations/supabase/client';
 import { holidayService, Holiday } from '@/services/holidayService';
+import { cn } from '@/lib/utils';
 
 interface LoadingAssignment {
   project: {
@@ -61,6 +65,12 @@ const Dashboard: React.FC = () => {
   const [tasksByStatus, setTasksByStatus] = useState<any[]>([]);
   const [taskCompletionTrend, setTaskCompletionTrend] = useState<any[]>([]);
   const [truckLoadingData, setTruckLoadingData] = useState<{ todayLoadings: LoadingAssignment[], daysToNext: number }>({ todayLoadings: [], daysToNext: 0 });
+  const [weekStartDate, setWeekStartDate] = useState(() => {
+    const today = new Date();
+    return startOfWeek(today, { weekStartsOn: 1 });
+  });
+  const [allLoadingAssignments, setAllLoadingAssignments] = useState<LoadingAssignment[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   
@@ -245,8 +255,35 @@ const Dashboard: React.FC = () => {
       }
       
       setTruckLoadingData({ todayLoadings, daysToNext });
+      setAllLoadingAssignments(loadingAssignments);
+      setHolidays(holidaysData);
     } catch (error) {
       console.error('Error fetching truck loading data:', error);
+    }
+  };
+
+  // Navigate weeks
+  const prevWeek = () => {
+    setWeekStartDate(addDays(weekStartDate, -7));
+  };
+
+  const nextWeek = () => {
+    setWeekStartDate(addDays(weekStartDate, 7));
+  };
+
+  // Get assignments for a specific date
+  const getAssignmentsForDate = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return allLoadingAssignments.filter(assignment => assignment.loading_date === dateStr);
+  };
+
+  // Get project color for visual distinction
+  const getProjectColor = (status: string) => {
+    switch (status) {
+      case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'planned': return 'bg-green-100 text-green-800 border-green-300';
+      case 'completed': return 'bg-gray-100 text-gray-800 border-gray-300';
+      default: return 'bg-orange-100 text-orange-800 border-orange-300';
     }
   };
 
@@ -346,6 +383,72 @@ const Dashboard: React.FC = () => {
           icon={<Truck className="h-5 w-5 text-orange-500" />}
         />
       </div>
+      
+      {/* Weekly Loading Schedule */}
+      <Card className="mb-6">
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Weekly Loading Schedule
+            </CardTitle>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="icon" onClick={prevWeek}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium min-w-[200px] text-center">
+                {format(weekStartDate, 'MMM d')} - {format(addDays(weekStartDate, 6), 'MMM d, yyyy')}
+              </span>
+              <Button variant="outline" size="icon" onClick={nextWeek}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-7 gap-2">
+            {Array.from({ length: 7 }, (_, i) => addDays(weekStartDate, i)).map((date, index) => {
+              const dayAssignments = getAssignmentsForDate(date);
+              const isCurrentDay = isToday(date);
+              
+              return (
+                <div
+                  key={index}
+                  className={cn(
+                    "min-h-[120px] border rounded p-2",
+                    isCurrentDay ? "border-red-500 bg-red-50" : "border-gray-200"
+                  )}
+                >
+                  <div className={cn(
+                    "text-center text-sm font-medium mb-2",
+                    isCurrentDay ? "text-red-700" : "text-gray-700"
+                  )}>
+                    <div>{format(date, 'EEE')}</div>
+                    <div className="text-lg">{format(date, 'd')}</div>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    {dayAssignments.map((assignment, index) => (
+                      <div
+                        key={`${assignment.project.id}-${index}`}
+                        className={cn(
+                          "p-1 rounded text-xs border",
+                          getProjectColor(assignment.project.status)
+                        )}
+                      >
+                        <div className="font-medium truncate">{assignment.project.name}</div>
+                        <div className="text-xs text-gray-500">
+                          Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
       
       {/* Charts Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
