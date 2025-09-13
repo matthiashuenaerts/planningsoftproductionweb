@@ -187,54 +187,6 @@ const TruckLoadingCalendar = () => {
 
   return (
     <div className="space-y-6">
-      {/* Today's Loading - Big Sign */}
-      <Card className="border-2 border-red-500">
-        <CardHeader className="bg-red-500 text-white">
-          <CardTitle className="text-2xl flex items-center gap-3">
-            <Truck className="h-8 w-8" />
-            TODAY'S LOADING SCHEDULE
-            <Badge className="bg-white text-red-500 text-lg px-3 py-1">
-              {format(new Date(), 'EEEE, MMMM d')}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          {todayAssignments.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {todayAssignments.map((assignment, index) => (
-                <div
-                  key={`${assignment.project.id}-${index}`}
-                  className={cn(
-                    "p-4 rounded-lg border-2",
-                    getProjectColor(assignment.project.status)
-                  )}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge className={cn("text-lg px-3 py-1", getProjectColor(assignment.project.status))}>
-                      {assignment.project.status.replace('_', ' ').toUpperCase()}
-                    </Badge>
-                    <div className="text-sm text-gray-600">
-                      Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
-                    </div>
-                  </div>
-                  <h3 className="font-bold text-lg mb-1">{assignment.project.name}</h3>
-                  <p className="text-gray-600 mb-2">{assignment.project.client}</p>
-                  <div className="text-sm text-gray-500">
-                    Loading scheduled for today based on installation tomorrow
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Truck className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-              <h3 className="text-xl font-medium text-gray-600 mb-2">No Loading Scheduled Today</h3>
-              <p className="text-gray-500">All trucks are ready for tomorrow's installations</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Weekly Overview */}
       <Card>
         <CardHeader className="pb-2">
