@@ -59,6 +59,8 @@ const TruckLoadingCalendar = () => {
   const [assignments, setAssignments] = useState<LoadingAssignment[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadedWeeks, setLoadedWeeks] = useState<Set<string>>(new Set());
+  const [weekLoading, setWeekLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { lang } = useLanguage();
@@ -89,27 +91,36 @@ const TruckLoadingCalendar = () => {
     return previousDay;
   };
 
-  // Fetch projects and calculate loading dates
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
+  // Load projects for a specific week
+  const loadWeekData = async (weekStart: Date, holidaysData: Holiday[]) => {
+    const weekEnd = addDays(weekStart, 6);
+    const weekKey = format(weekStart, 'yyyy-MM-dd');
+    
+    if (loadedWeeks.has(weekKey)) {
+      return; // Already loaded
+    }
+
+    try {
+      setWeekLoading(true);
+      
+      // Calculate date range for loading dates (projects that load during this week)
+      // We need to look ahead to find projects whose loading dates fall in this week
+      const searchStart = format(weekStart, 'yyyy-MM-dd');
+      const searchEnd = format(addDays(weekEnd, 30), 'yyyy-MM-dd'); // Look ahead 30 days for installation dates
+      
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name, client, status, installation_date')
+        .not('installation_date', 'is', null)
+        .gte('installation_date', searchStart)
+        .lte('installation_date', searchEnd)
+        .order('installation_date');
         
-        // Fetch holidays
-        const holidaysData = await holidayService.getHolidays();
-        setHolidays(holidaysData);
-        
-        // Fetch all projects with installation dates
-        const { data: projectsData, error: projectsError } = await supabase
-          .from('projects')
-          .select('id, name, client, status, installation_date')
-          .not('installation_date', 'is', null)
-          .order('installation_date');
-          
-        if (projectsError) throw projectsError;
-        
-        // Calculate loading dates for each project
-        const loadingAssignments: LoadingAssignment[] = (projectsData || []).map(project => {
+      if (projectsError) throw projectsError;
+      
+      // Calculate loading dates and filter for current week
+      const weekLoadingAssignments: LoadingAssignment[] = (projectsData || [])
+        .map(project => {
           const installationDate = new Date(project.installation_date);
           const loadingDate = getPreviousWorkday(installationDate, holidaysData);
           
@@ -117,14 +128,54 @@ const TruckLoadingCalendar = () => {
             project,
             loading_date: format(loadingDate, 'yyyy-MM-dd'),
           };
+        })
+        .filter(assignment => {
+          const loadingDate = new Date(assignment.loading_date);
+          return loadingDate >= weekStart && loadingDate <= weekEnd;
         });
+      
+      // Merge with existing assignments (avoid duplicates)
+      setAssignments(prev => {
+        const existingIds = new Set(prev.map(a => `${a.project.id}-${a.loading_date}`));
+        const newAssignments = weekLoadingAssignments.filter(
+          a => !existingIds.has(`${a.project.id}-${a.loading_date}`)
+        );
+        return [...prev, ...newAssignments];
+      });
+      
+      // Mark week as loaded
+      setLoadedWeeks(prev => new Set([...prev, weekKey]));
+      
+    } catch (error) {
+      console.error('Error loading week data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load week data",
+        variant: "destructive"
+      });
+    } finally {
+      setWeekLoading(false);
+    }
+  };
+
+  // Initial data fetch - load holidays and current week
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        setLoading(true);
         
-        setAssignments(loadingAssignments);
+        // Fetch holidays first
+        const holidaysData = await holidayService.getHolidays();
+        setHolidays(holidaysData);
+        
+        // Load current week data
+        await loadWeekData(weekStartDate, holidaysData);
+        
       } catch (error) {
-        console.error('Error fetching truck loading data:', error);
+        console.error('Error fetching initial data:', error);
         toast({
           title: "Error",
-          description: "Failed to load truck loading data",
+          description: "Failed to load initial data",
           variant: "destructive"
         });
       } finally {
@@ -132,8 +183,15 @@ const TruckLoadingCalendar = () => {
       }
     };
     
-    fetchData();
+    fetchInitialData();
   }, [toast]);
+
+  // Load new week data when week changes
+  useEffect(() => {
+    if (holidays.length > 0) {
+      loadWeekData(weekStartDate, holidays);
+    }
+  }, [weekStartDate, holidays]);
 
   // Re-calculate assignments when holidays change
   useEffect(() => {
@@ -153,12 +211,14 @@ const TruckLoadingCalendar = () => {
   }, [holidays]);
 
   // Navigate weeks
-  const prevWeek = () => {
-    setWeekStartDate(addDays(weekStartDate, -7));
+  const prevWeek = async () => {
+    const newWeekStart = addDays(weekStartDate, -7);
+    setWeekStartDate(newWeekStart);
   };
 
-  const nextWeek = () => {
-    setWeekStartDate(addDays(weekStartDate, 7));
+  const nextWeek = async () => {
+    const newWeekStart = addDays(weekStartDate, 7);
+    setWeekStartDate(newWeekStart);
   };
 
   // Get assignments for today's loading
@@ -213,9 +273,12 @@ const TruckLoadingCalendar = () => {
   const upcomingAssignments = getUpcomingAssignments();
 
   if (loading) {
-    return <div className="flex justify-center p-8">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-    </div>;
+    return (
+      <div className="flex justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <span className="ml-2 text-gray-600">Loading truck loading calendar...</span>
+      </div>
+    );
   }
 
   return (
@@ -229,13 +292,14 @@ const TruckLoadingCalendar = () => {
               Weekly Loading Schedule
             </CardTitle>
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="icon" onClick={prevWeek}>
+              <Button variant="outline" size="icon" onClick={prevWeek} disabled={weekLoading}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-sm font-medium min-w-[200px] text-center">
                 {format(weekStartDate, 'MMM d')} - {format(addDays(weekStartDate, 6), 'MMM d, yyyy')}
+                {weekLoading && <span className="ml-2 text-xs text-gray-500">Loading...</span>}
               </span>
-              <Button variant="outline" size="icon" onClick={nextWeek}>
+              <Button variant="outline" size="icon" onClick={nextWeek} disabled={weekLoading}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
