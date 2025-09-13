@@ -3,7 +3,6 @@ import ProjectCard from './ProjectCard';
 import TaskList from './TaskList';
 import SeedDataButton from './SeedDataButton';
 import HolidayRequestsList from './HolidayRequestsList';
-import TruckLoadingCalendar from './TruckLoadingCalendar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { projectService, taskService, Project, Task } from '@/services/dataService';
 import { useToast } from '@/hooks/use-toast';
@@ -346,11 +345,6 @@ const Dashboard: React.FC = () => {
           } 
           icon={<Truck className="h-5 w-5 text-orange-500" />}
         />
-      </div>
-      
-      {/* Truck Loading Calendar */}
-      <div className="mb-6">
-        <TruckLoadingCalendar />
       </div>
       
       {/* Charts Section */}
