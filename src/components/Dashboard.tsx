@@ -299,8 +299,18 @@ const Dashboard: React.FC = () => {
         
         // Get team color
         const teamAssignment = teamAssignments.find(ta => ta.projectId === assignment.project.id);
-        const installationTeam = teamAssignment?.assignments.find(a => a.team.toLowerCase().includes('montage') || a.team.toLowerCase().includes('installation'));
-        const teamColor = installationTeam ? getTeamColorFromName(installationTeam.team) : '';
+        let teamColor = '';
+        
+        if (teamAssignment?.assignments && teamAssignment.assignments.length > 0) {
+          // Look for any team assignment that contains color keywords
+          for (const team of teamAssignment.assignments) {
+            const color = getTeamColorFromName(team.team);
+            if (color) {
+              teamColor = color;
+              break;
+            }
+          }
+        }
         
         return {
           ...assignment,
@@ -390,15 +400,16 @@ const Dashboard: React.FC = () => {
     if (!teamColor) return '';
     
     switch (teamColor) {
-      case 'green': return 'bg-green-200';
-      case 'blue': return 'bg-blue-200';
-      case 'orange': return 'bg-orange-200';
+      case 'green': return 'bg-green-200/70';
+      case 'blue': return 'bg-blue-200/70'; 
+      case 'orange': return 'bg-orange-200/70';
       default: return '';
     }
   };
 
   // Determine team color from team name
   const getTeamColorFromName = (teamName: string): string => {
+    if (!teamName) return '';
     const lowerTeamName = teamName.toLowerCase();
     if (lowerTeamName.includes('groen')) return 'green';
     if (lowerTeamName.includes('blauw')) return 'blue';  
