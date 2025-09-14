@@ -10,6 +10,7 @@ import { projectService, taskService, Project, Task } from '@/services/dataServi
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { projectTeamAssignmentService } from '@/services/projectTeamAssignmentService';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   ShieldCheck, 
@@ -56,6 +57,11 @@ interface LoadingAssignment {
     installation_date: string;
   };
   loading_date: string;
+  orderStatus?: {
+    undeliveredCount: number;
+    allDelivered: boolean;
+  };
+  teamColor?: string;
 }
 
 const Dashboard: React.FC = () => {
@@ -266,11 +272,50 @@ const Dashboard: React.FC = () => {
         const loadingDate = new Date(assignment.loading_date);
         return loadingDate >= weekStart && loadingDate <= weekEnd;
       });
+
+      // Fetch additional data for each project
+      const projectIds = weekLoadingAssignments.map(a => a.project.id);
+      
+      // Fetch orders for projects
+      const { data: ordersData } = await supabase
+        .from('orders')
+        .select('project_id, status')
+        .in('project_id', projectIds);
+      
+      // Fetch team assignments for projects  
+      const teamAssignments = await Promise.all(
+        projectIds.map(async (projectId) => {
+          const assignments = await projectTeamAssignmentService.getByProject(projectId);
+          return { projectId, assignments };
+        })
+      );
+
+      // Enhance assignments with order status and team colors
+      const enhancedAssignments = weekLoadingAssignments.map(assignment => {
+        // Calculate order status
+        const projectOrders = ordersData?.filter(o => o.project_id === assignment.project.id) || [];
+        const undeliveredCount = projectOrders.filter(o => o.status !== 'delivered').length;
+        const allDelivered = projectOrders.length > 0 && undeliveredCount === 0;
+        
+        // Get team color
+        const teamAssignment = teamAssignments.find(ta => ta.projectId === assignment.project.id);
+        const installationTeam = teamAssignment?.assignments.find(a => a.team.toLowerCase().includes('montage') || a.team.toLowerCase().includes('installation'));
+        const teamColor = installationTeam ? getTeamColorFromName(installationTeam.team) : '';
+        
+        return {
+          ...assignment,
+          orderStatus: {
+            undeliveredCount,
+            allDelivered
+          },
+          teamColor
+        };
+      });
       
       // Merge with existing assignments
       setAllLoadingAssignments(prev => {
         const existingIds = new Set(prev.map(a => `${a.project.id}-${a.loading_date}`));
-        const newAssignments = weekLoadingAssignments.filter(
+        const newAssignments = enhancedAssignments.filter(
           a => !existingIds.has(`${a.project.id}-${a.loading_date}`)
         );
         return [...prev, ...newAssignments];
@@ -281,12 +326,12 @@ const Dashboard: React.FC = () => {
       const isCurrentWeek = today >= format(weekStart, 'yyyy-MM-dd') && today <= format(weekEnd, 'yyyy-MM-dd');
       
       if (isCurrentWeek) {
-        const todayLoadings = weekLoadingAssignments.filter(assignment => assignment.loading_date === today);
+        const todayLoadings = enhancedAssignments.filter(assignment => assignment.loading_date === today);
         
         // Calculate days to next loading
         let daysToNext = 0;
         if (todayLoadings.length === 0) {
-          const futureLoadings = weekLoadingAssignments.filter(assignment => {
+          const futureLoadings = enhancedAssignments.filter(assignment => {
             const loadingDate = new Date(assignment.loading_date);
             return loadingDate > new Date();
           }).sort((a, b) => new Date(a.loading_date).getTime() - new Date(b.loading_date).getTime());
@@ -338,6 +383,27 @@ const Dashboard: React.FC = () => {
       case 'completed': return 'bg-gray-100 text-gray-800 border-gray-300';
       default: return 'bg-orange-100 text-orange-800 border-orange-300';
     }
+  };
+
+  // Get team background color based on team name
+  const getTeamBackgroundColor = (teamColor?: string) => {
+    if (!teamColor) return '';
+    
+    switch (teamColor) {
+      case 'green': return 'bg-green-200';
+      case 'blue': return 'bg-blue-200';
+      case 'orange': return 'bg-orange-200';
+      default: return '';
+    }
+  };
+
+  // Determine team color from team name
+  const getTeamColorFromName = (teamName: string): string => {
+    const lowerTeamName = teamName.toLowerCase();
+    if (lowerTeamName.includes('groen')) return 'green';
+    if (lowerTeamName.includes('blauw')) return 'blue';  
+    if (lowerTeamName.includes('oranje')) return 'orange';
+    return '';
   };
 
   // Calculate statistics
@@ -486,11 +552,22 @@ const Dashboard: React.FC = () => {
                       <div
                         key={`${assignment.project.id}-${index}`}
                         className={cn(
-                          "p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity",
-                          getProjectColor(assignment.project.status)
+                          "p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity relative",
+                          getProjectColor(assignment.project.status),
+                          getTeamBackgroundColor(assignment.teamColor)
                         )}
                         onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}
                       >
+                        {/* Order status indicator */}
+                        {assignment.orderStatus && (
+                          <div className={cn(
+                            "absolute -top-1 -right-1 rounded-full text-xs font-bold text-white flex items-center justify-center min-w-[16px] h-4 px-1",
+                            assignment.orderStatus.allDelivered ? "bg-green-500" : "bg-red-500"
+                          )}>
+                            {assignment.orderStatus.allDelivered ? "✓" : assignment.orderStatus.undeliveredCount}
+                          </div>
+                        )}
+                        
                         <div className="font-medium truncate">{assignment.project.name}</div>
                         <div className="text-xs text-gray-500">
                           Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
