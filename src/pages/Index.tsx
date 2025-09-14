@@ -21,7 +21,7 @@ const Index = () => {
       </div>
       <div className="ml-64 w-full p-6">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6">Faseopvolging productie</h1>
+          <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
           <Dashboard />
           {(currentEmployee?.role === 'admin' || currentEmployee?.role === 'teamleader') && (
             <div className="mt-8 p-6 bg-slate-50 rounded-lg border border-slate-200">
