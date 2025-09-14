@@ -1,13 +1,13 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'react-router-dom';
-import { Play, Pause, Clock, Timer } from 'lucide-react';
+import { Play, Pause, Clock, Timer, Move, Minimize2, Maximize2, PictureInPicture } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 const TaskTimer = () => {
   const { currentEmployee } = useAuth();
@@ -15,6 +15,15 @@ const TaskTimer = () => {
   const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
   const location = useLocation();
+  
+  // Draggable and UI state
+  const [position, setPosition] = useState({ x: 0, y: 16 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [isPictureInPicture, setIsPictureInPicture] = useState(false);
+  const timerRef = useRef<HTMLDivElement>(null);
+  const pipWindow = useRef<Window | null>(null);
 
   // Don't render for workstation users or on general schedule page
   if (currentEmployee?.role === 'workstation' || location.pathname.includes('/general-schedule')) {
@@ -28,6 +37,87 @@ const TaskTimer = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Drag functionality
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.target instanceof Element && (e.target.closest('button') || e.target.closest('[role="button"]'))) {
+      return; // Don't start dragging when clicking on buttons
+    }
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging) return;
+    
+    const newX = e.clientX - dragStart.x;
+    const newY = e.clientY - dragStart.y;
+    
+    // Constrain to viewport
+    const maxX = window.innerWidth - (timerRef.current?.offsetWidth || 0);
+    const maxY = window.innerHeight - (timerRef.current?.offsetHeight || 0);
+    
+    setPosition({
+      x: Math.max(0, Math.min(newX, maxX)),
+      y: Math.max(0, Math.min(newY, maxY))
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Picture-in-picture functionality
+  const togglePictureInPicture = async () => {
+    if (isPictureInPicture && pipWindow.current) {
+      pipWindow.current.close();
+      setIsPictureInPicture(false);
+    } else {
+      try {
+        // Check if Document Picture-in-Picture API is supported
+        if ('documentPictureInPicture' in window) {
+          // @ts-ignore - Document Picture-in-Picture API is experimental
+          const pipWindowInstance = await window.documentPictureInPicture.requestWindow({
+            width: 320,
+            height: 120,
+          });
+          
+          pipWindow.current = pipWindowInstance;
+          setIsPictureInPicture(true);
+          
+          // Handle pip window close
+          pipWindowInstance.addEventListener('pagehide', () => {
+            setIsPictureInPicture(false);
+            pipWindow.current = null;
+          });
+        } else {
+          throw new Error('Picture-in-Picture not supported');
+        }
+      } catch (error) {
+        toast({
+          title: 'Picture-in-Picture not supported',
+          description: 'Your browser does not support Picture-in-Picture for documents',
+          variant: 'destructive'
+        });
+      }
+    }
+  };
+
+  // Event listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragStart.x, dragStart.y]);
 
   // Get active registration
   const { data: activeRegistration, isLoading } = useQuery({
@@ -199,73 +289,233 @@ const TaskTimer = () => {
     return null;
   }
 
+  // Render PiP content in the picture-in-picture window
+  if (isPictureInPicture && pipWindow.current) {
+    const pipDocument = pipWindow.current.document;
+    
+    // Create minimal timer content for PiP
+    const pipContent = `
+      <html>
+        <head>
+          <title>Task Timer</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 8px;
+              font-family: system-ui;
+              background: ${activeRegistration?.is_active ? '#dcfce7' : '#fef2f2'};
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              height: calc(100vh - 16px);
+            }
+            .timer-content {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              flex: 1;
+            }
+            .status-dot {
+              width: 12px;
+              height: 12px;
+              border-radius: 50%;
+              background: ${activeRegistration?.is_active ? '#22c55e' : '#ef4444'};
+            }
+            .task-info {
+              flex: 1;
+              min-width: 0;
+            }
+            .task-name {
+              font-size: 11px;
+              font-weight: 600;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .project-name {
+              font-size: 10px;
+              color: #666;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .time-display {
+              font-family: monospace;
+              font-size: 12px;
+              font-weight: bold;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="timer-content">
+            <div class="status-dot"></div>
+            <div class="task-info">
+              <div class="task-name">${taskDetails?.title || 'No Active Task'}</div>
+              <div class="project-name">${taskDetails?.project_name || 'Click to start'}</div>
+            </div>
+            <div class="time-display">
+              ${activeRegistration?.is_active ? formatDuration(activeRegistration.start_time) : '00:00:00'}
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    pipDocument.open();
+    pipDocument.write(pipContent);
+    pipDocument.close();
+    
+    // Update PiP content every second
+    setTimeout(() => {
+      if (pipWindow.current && !pipWindow.current.closed) {
+        const timeElement = pipDocument.querySelector('.time-display');
+        if (timeElement && activeRegistration?.is_active) {
+          timeElement.textContent = formatDuration(activeRegistration.start_time);
+        }
+      }
+    }, 1000);
+  }
+
   return (
-    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[9999] pointer-events-none">
+    <div 
+      ref={timerRef}
+      className={`fixed z-[9999] pointer-events-none transition-all duration-200 ${
+        isDragging ? 'cursor-grabbing' : 'cursor-grab'
+      } ${isPictureInPicture ? 'opacity-50' : ''}`}
+      style={{
+        left: position.x === 0 && position.y === 16 ? '50%' : `${position.x}px`,
+        top: `${position.y}px`,
+        transform: position.x === 0 && position.y === 16 ? 'translateX(-50%)' : 'none',
+      }}
+      onMouseDown={handleMouseDown}
+    >
       <div className="pointer-events-auto">
         <Card 
-          className={`cursor-pointer transition-colors max-w-sm ${
+          className={`transition-all duration-200 ${
             activeRegistration && activeRegistration.is_active 
               ? 'border-green-500 bg-green-50 hover:bg-green-100' 
               : 'border-red-500 bg-red-50 hover:bg-red-100'
-          }`}
-          onClick={handleTimerClick}
+          } ${isMinimized ? 'max-w-[200px]' : 'max-w-sm'} shadow-lg`}
         >
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between space-x-2">
-              <div className="flex items-center space-x-2 flex-1 min-w-0">
-                <div className={`p-1.5 rounded-full ${
+          <CardContent className={`${isMinimized ? 'p-2' : 'p-3'}`}>
+            {!isMinimized ? (
+              <div className="flex items-center justify-between space-x-2">
+                <div className="flex items-center space-x-2 flex-1 min-w-0">
+                  <div className={`p-1.5 rounded-full cursor-pointer ${
+                    activeRegistration && activeRegistration.is_active 
+                      ? 'bg-green-500 text-white' 
+                      : 'bg-red-500 text-white'
+                  }`} onClick={handleTimerClick}>
+                    {activeRegistration && activeRegistration.is_active ? 
+                      <Pause className="h-3 w-3" /> : 
+                      <Play className="h-3 w-3" />
+                    }
+                  </div>
+                  
+                  <div className="min-w-0 flex-1">
+                    {activeRegistration && taskDetails ? (
+                      <div>
+                        <p className="font-medium text-xs truncate">
+                          {taskDetails.project_name}
+                        </p>
+                        <p className="text-xs text-gray-600 truncate">
+                          {taskDetails.title}
+                        </p>
+                        {taskDetails.is_workstation_task && (
+                          <p className="text-xs text-blue-600">Workstation Task</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="font-medium text-xs text-gray-500">No Active Task</p>
+                        <p className="text-xs text-gray-400">Click to start</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex flex-col items-end space-y-1">
+                  <div className="flex items-center space-x-1">
+                    <Clock className="h-3 w-3 text-gray-500" />
+                    <span className="font-mono text-sm font-medium">
+                      {activeRegistration && activeRegistration.is_active 
+                        ? formatDuration(activeRegistration.start_time)
+                        : '00:00:00'
+                      }
+                    </span>
+                  </div>
+                  {activeRegistration && activeRegistration.is_active && taskDetails?.duration != null && (
+                    <div className="flex items-center space-x-1">
+                      <Timer className="h-3 w-3 text-gray-500" />
+                      <span className={`font-mono text-xs font-medium ${isTimeNegative(activeRegistration.start_time, taskDetails.duration) ? 'text-red-500' : ''}`}>
+                        {formatRemainingDuration(activeRegistration.start_time, taskDetails.duration)}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Control buttons */}
+                  <div className="flex items-center space-x-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePictureInPicture();
+                      }}
+                    >
+                      <PictureInPicture className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsMinimized(!isMinimized);
+                      }}
+                    >
+                      <Minimize2 className="h-3 w-3" />
+                    </Button>
+                    <div className="cursor-move p-1">
+                      <Move className="h-3 w-3 text-gray-400" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between space-x-2">
+                <div className={`p-1 rounded-full cursor-pointer ${
                   activeRegistration && activeRegistration.is_active 
                     ? 'bg-green-500 text-white' 
                     : 'bg-red-500 text-white'
-                }`}>
+                }`} onClick={handleTimerClick}>
                   {activeRegistration && activeRegistration.is_active ? 
-                    <Pause className="h-3 w-3" /> : 
-                    <Play className="h-3 w-3" />
+                    <Pause className="h-2 w-2" /> : 
+                    <Play className="h-2 w-2" />
                   }
                 </div>
                 
-                <div className="min-w-0 flex-1">
-                  {activeRegistration && taskDetails ? (
-                    <div>
-                      <p className="font-medium text-xs truncate">
-                        {taskDetails.project_name}
-                      </p>
-                      <p className="text-xs text-gray-600 truncate">
-                        {taskDetails.title}
-                      </p>
-                      {taskDetails.is_workstation_task && (
-                        <p className="text-xs text-blue-600">Workstation Task</p>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="font-medium text-xs text-gray-500">No Active Task</p>
-                      <p className="text-xs text-gray-400">Click to start</p>
-                    </div>
-                  )}
-                </div>
+                <span className="font-mono text-xs font-medium">
+                  {activeRegistration && activeRegistration.is_active 
+                    ? formatDuration(activeRegistration.start_time)
+                    : '00:00:00'
+                  }
+                </span>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsMinimized(false);
+                  }}
+                >
+                  <Maximize2 className="h-3 w-3" />
+                </Button>
               </div>
-              
-              <div className="flex flex-col items-end">
-                <div className="flex items-center space-x-1">
-                  <Clock className="h-3 w-3 text-gray-500" />
-                  <span className="font-mono text-sm font-medium">
-                    {activeRegistration && activeRegistration.is_active 
-                      ? formatDuration(activeRegistration.start_time)
-                      : '00:00:00'
-                    }
-                  </span>
-                </div>
-                {activeRegistration && activeRegistration.is_active && taskDetails?.duration != null && (
-                  <div className="flex items-center space-x-1">
-                    <Timer className="h-3 w-3 text-gray-500" />
-                    <span className={`font-mono text-xs font-medium ${isTimeNegative(activeRegistration.start_time, taskDetails.duration) ? 'text-red-500' : ''}`}>
-                      {formatRemainingDuration(activeRegistration.start_time, taskDetails.duration)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
