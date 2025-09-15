@@ -94,47 +94,53 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
         ? new Date(projectInfo.installation_date).toLocaleDateString()
         : 'Not set';
 
-      for (const item of deliveredItems) {
-        const labelContent = `
-          <div style="width: 89mm; height: 32mm; padding: 2mm; font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.2;">
-            <div style="font-weight: bold; font-size: 11pt; margin-bottom: 1mm;">${projectInfo?.name || 'Unknown Project'}</div>
-            <div style="margin-bottom: 1mm;">Article: ${item.article_code}</div>
-            <div style="margin-bottom: 1mm;">Qty: ${item.current_delivered_quantity}</div>
-            <div style="margin-bottom: 1mm;">Install: ${installationDate}</div>
-            ${item.stock_location ? `<div>Location: ${item.stock_location}</div>` : ''}
-          </div>
-        `;
+      // Create all label content in a single document
+      const allLabelsContent = deliveredItems.map(item => `
+        <div style="width: 89mm; height: 32mm; padding: 2mm; font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.2; page-break-after: always;">
+          <div style="font-weight: bold; font-size: 11pt; margin-bottom: 1mm;">${projectInfo?.name || 'Unknown Project'}</div>
+          <div style="margin-bottom: 1mm;">Article: ${item.article_code}</div>
+          <div style="margin-bottom: 1mm;">Qty: ${item.current_delivered_quantity}</div>
+          <div style="margin-bottom: 1mm;">Install: ${installationDate}</div>
+          ${item.stock_location ? `<div>Location: ${item.stock_location}</div>` : ''}
+        </div>
+      `).join('');
 
-        // Open print dialog with label content
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-          printWindow.document.write(`
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <title>Dymo Label Print</title>
-                <style>
-                  @page {
-                    size: 89mm 35mm;
-                    margin: 0;
-                  }
-                  body {
-                    margin: 0;
-                    padding: 0;
-                    width: 89mm;
-                    height: 35mm;
-                  }
-                </style>
-              </head>
-              <body>
-                ${labelContent}
-              </body>
-            </html>
-          `);
-          printWindow.document.close();
-          printWindow.print();
-          printWindow.close();
-        }
+      // Open single print window with all labels
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Dymo Label Print - ${deliveredItems.length} Labels</title>
+              <style>
+                @page {
+                  size: 89mm 35mm;
+                  margin: 0;
+                }
+                body {
+                  margin: 0;
+                  padding: 0;
+                  width: 89mm;
+                }
+                .label {
+                  width: 89mm;
+                  height: 32mm;
+                  page-break-after: always;
+                }
+                .label:last-child {
+                  page-break-after: auto;
+                }
+              </style>
+            </head>
+            <body>
+              ${allLabelsContent}
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.print();
+        printWindow.close();
       }
 
       toast({
