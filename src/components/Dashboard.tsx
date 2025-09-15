@@ -579,7 +579,7 @@ const Dashboard: React.FC = () => {
                           </div>
                         )}
                         
-                        <div className="font-medium truncate">{assignment.project.name}</div>
+                        <div className="font-medium break-words whitespace-normal leading-tight">{assignment.project.name}</div>
                         <div className="text-xs text-gray-500">
                           Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
                         </div>
