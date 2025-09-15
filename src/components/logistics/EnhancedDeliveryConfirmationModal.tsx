@@ -218,7 +218,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
         description: "Order delivery has been successfully confirmed.",
       });
 
-      // Show label dialog immediately
+      // Show label dialog immediately with delivery data
       setShowLabelDialog(true);
 
     } catch (error) {
@@ -533,6 +533,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
         <LabelPrintDialog
           order={order}
           orderItems={orderItems}
+          itemDeliveries={itemDeliveries}
           isOpen={showLabelDialog}
           onClose={() => {
             setShowLabelDialog(false);

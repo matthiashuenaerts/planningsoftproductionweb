@@ -9,9 +9,18 @@ import { Order, OrderItem } from '@/types/order';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
+interface ItemDelivery {
+  itemId: string;
+  deliveredQuantity: number;
+  stockLocation: string;
+  isFullyDelivered: boolean;
+  notDeliveredQuantity: number;
+}
+
 interface LabelPrintDialogProps {
   order: Order;
   orderItems: OrderItem[];
+  itemDeliveries?: ItemDelivery[];
   isOpen: boolean;
   onClose: () => void;
 }
@@ -24,6 +33,7 @@ interface ProjectInfo {
 export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
   order,
   orderItems,
+  itemDeliveries = [],
   isOpen,
   onClose
 }) => {
@@ -31,8 +41,20 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Filter only delivered items
-  const deliveredItems = orderItems.filter(item => (item.delivered_quantity || 0) > 0);
+  // Create items with delivery information
+  const itemsWithDelivery = orderItems.map(item => {
+    const delivery = itemDeliveries.find(d => d.itemId === item.id);
+    const deliveredQuantity = delivery?.deliveredQuantity || (item.delivered_quantity || 0);
+    
+    return {
+      ...item,
+      current_delivered_quantity: deliveredQuantity,
+      stock_location: delivery?.stockLocation || item.stock_location
+    };
+  });
+
+  // Filter only items that have been delivered (either from current session or previously)
+  const deliveredItems = itemsWithDelivery.filter(item => item.current_delivered_quantity > 0);
 
   React.useEffect(() => {
     const fetchProjectInfo = async () => {
@@ -77,7 +99,7 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
           <div style="width: 89mm; height: 32mm; padding: 2mm; font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.2;">
             <div style="font-weight: bold; font-size: 11pt; margin-bottom: 1mm;">${projectInfo?.name || 'Unknown Project'}</div>
             <div style="margin-bottom: 1mm;">Article: ${item.article_code}</div>
-            <div style="margin-bottom: 1mm;">Qty: ${item.delivered_quantity}</div>
+            <div style="margin-bottom: 1mm;">Qty: ${item.current_delivered_quantity}</div>
             <div style="margin-bottom: 1mm;">Install: ${installationDate}</div>
             ${item.stock_location ? `<div>Location: ${item.stock_location}</div>` : ''}
           </div>
@@ -161,7 +183,7 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
                 <div key={item.id} className="p-3 bg-blue-50 rounded-lg">
                   <div className="text-sm font-medium text-blue-900">{item.description}</div>
                   <div className="text-xs text-blue-700">
-                    Article: {item.article_code} • Qty: {item.delivered_quantity}
+                    Article: {item.article_code} • Qty: {item.current_delivered_quantity}
                     {item.stock_location && ` • Location: ${item.stock_location}`}
                   </div>
                 </div>
