@@ -1269,6 +1269,36 @@ export type Database = {
           },
         ]
       }
+      project_loading_overrides: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          original_loading_date: string
+          override_loading_date: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          original_loading_date: string
+          override_loading_date: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          original_loading_date?: string
+          override_loading_date?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       project_onedrive_configs: {
         Row: {
           access_token: string | null

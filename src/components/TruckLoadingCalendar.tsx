@@ -72,6 +72,20 @@ const TruckLoadingCalendar = () => {
         const holidaysData = await holidayService.getHolidays();
         setHolidays(holidaysData);
         
+        // Fetch existing overrides
+        const { data: overridesData, error: overridesError } = await supabase
+          .from('project_loading_overrides')
+          .select('project_id, override_loading_date');
+          
+        if (overridesError) throw overridesError;
+        
+        // Convert overrides to map
+        const overridesMap: Record<string, string> = {};
+        (overridesData || []).forEach(override => {
+          overridesMap[override.project_id] = override.override_loading_date;
+        });
+        setManualOverrides(overridesMap);
+        
         // Fetch all projects with installation dates
         const { data: projectsData, error: projectsError } = await supabase
           .from('projects')
@@ -169,7 +183,7 @@ const TruckLoadingCalendar = () => {
   };
 
   // Adjust loading date manually
-  const adjustLoadingDate = (projectId: string, direction: 'left' | 'right') => {
+  const adjustLoadingDate = async (projectId: string, direction: 'left' | 'right') => {
     const assignment = assignments.find(a => a.project.id === projectId);
     if (!assignment) return;
 
@@ -180,10 +194,56 @@ const TruckLoadingCalendar = () => {
     const newDate = addDays(currentDate, direction === 'right' ? 1 : -1);
     const newDateStr = format(newDate, 'yyyy-MM-dd');
     
-    setManualOverrides(prev => ({
-      ...prev,
-      [projectId]: newDateStr
-    }));
+    try {
+      // Check if override already exists
+      const { data: existingOverride } = await supabase
+        .from('project_loading_overrides')
+        .select('id')
+        .eq('project_id', projectId)
+        .maybeSingle();
+
+      if (existingOverride) {
+        // Update existing override
+        const { error } = await supabase
+          .from('project_loading_overrides')
+          .update({ 
+            override_loading_date: newDateStr,
+            updated_at: new Date().toISOString()
+          })
+          .eq('project_id', projectId);
+          
+        if (error) throw error;
+      } else {
+        // Create new override
+        const { error } = await supabase
+          .from('project_loading_overrides')
+          .insert({
+            project_id: projectId,
+            original_loading_date: assignment.loading_date,
+            override_loading_date: newDateStr
+          });
+          
+        if (error) throw error;
+      }
+
+      // Update local state
+      setManualOverrides(prev => ({
+        ...prev,
+        [projectId]: newDateStr
+      }));
+
+      toast({
+        title: "Loading date updated",
+        description: `Loading date changed to ${format(newDate, 'MMM d, yyyy')}`,
+      });
+    } catch (error) {
+      console.error('Error saving loading date override:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save loading date change",
+        variant: "destructive"
+      });
+    }
   };
 
   // Get project color for visual distinction
