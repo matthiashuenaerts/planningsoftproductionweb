@@ -1144,7 +1144,7 @@ const InstallationTeamCalendar = ({
           setIsCollapsed={(collapsed) => setTeamCollapsed('green', collapsed)}
         />
         <TeamCalendar 
-          team="04 - BLAUW PLAATSING - SPRINTER 11" 
+          team="04 - BLAUW PLAATSING - SPRINTER 1" 
           currentMonth={currentMonth} 
           projects={projects} 
           assignments={assignments} 
