@@ -33,6 +33,7 @@ const TruckLoadingCalendar = () => {
   const [assignments, setAssignments] = useState<LoadingAssignment[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
+  const [manualOverrides, setManualOverrides] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   // Calculate previous workday considering holidays
@@ -136,7 +137,10 @@ const TruckLoadingCalendar = () => {
   // Get assignments for today's loading
   const getTodayLoadingAssignments = () => {
     const today = format(new Date(), 'yyyy-MM-dd');
-    return assignments.filter(assignment => assignment.loading_date === today);
+    return assignments.filter(assignment => {
+      const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
+      return effectiveLoadingDate === today;
+    });
   };
 
   // Get upcoming loading assignments (next 7 days)
@@ -145,15 +149,41 @@ const TruckLoadingCalendar = () => {
     const weekFromNow = addDays(today, 7);
     
     return assignments.filter(assignment => {
-      const loadingDate = new Date(assignment.loading_date);
+      const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
+      const loadingDate = new Date(effectiveLoadingDate);
       return loadingDate > today && loadingDate <= weekFromNow;
-    }).sort((a, b) => new Date(a.loading_date).getTime() - new Date(b.loading_date).getTime());
+    }).sort((a, b) => {
+      const aDate = manualOverrides[a.project.id] || a.loading_date;
+      const bDate = manualOverrides[b.project.id] || b.loading_date;
+      return new Date(aDate).getTime() - new Date(bDate).getTime();
+    });
   };
 
   // Get assignments for a specific date
   const getAssignmentsForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return assignments.filter(assignment => assignment.loading_date === dateStr);
+    return assignments.filter(assignment => {
+      const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
+      return effectiveLoadingDate === dateStr;
+    });
+  };
+
+  // Adjust loading date manually
+  const adjustLoadingDate = (projectId: string, direction: 'left' | 'right') => {
+    const assignment = assignments.find(a => a.project.id === projectId);
+    if (!assignment) return;
+
+    const currentDate = manualOverrides[projectId] 
+      ? new Date(manualOverrides[projectId]) 
+      : new Date(assignment.loading_date);
+    
+    const newDate = addDays(currentDate, direction === 'right' ? 1 : -1);
+    const newDateStr = format(newDate, 'yyyy-MM-dd');
+    
+    setManualOverrides(prev => ({
+      ...prev,
+      [projectId]: newDateStr
+    }));
   };
 
   // Get project color for visual distinction
@@ -279,20 +309,43 @@ const TruckLoadingCalendar = () => {
                   </div>
                   
                   <div className="space-y-1">
-                    {dayAssignments.map((assignment, index) => (
-                      <div
-                        key={`${assignment.project.id}-${index}`}
-                        className={cn(
-                          "p-1 rounded text-xs border",
-                          getProjectColor(assignment.project.status)
-                        )}
-                      >
-                        <div className="font-medium truncate">{assignment.project.name}</div>
-                        <div className="text-xs text-gray-500">
-                          Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
+                    {dayAssignments.map((assignment, index) => {
+                      const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
+                      const isManuallyAdjusted = manualOverrides[assignment.project.id] !== undefined;
+                      
+                      return (
+                        <div
+                          key={`${assignment.project.id}-${index}`}
+                          className={cn(
+                            "p-1 rounded text-xs border group relative",
+                            getProjectColor(assignment.project.status),
+                            isManuallyAdjusted && "border-orange-400 bg-orange-50"
+                          )}
+                        >
+                          <div className="font-medium truncate">{assignment.project.name}</div>
+                          <div className="text-xs text-gray-500">
+                            Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
+                          </div>
+                          <div className="flex items-center justify-between mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => adjustLoadingDate(assignment.project.id, 'left')}
+                              className="text-xs text-blue-600 hover:text-blue-800"
+                            >
+                              ←
+                            </button>
+                            <span className="text-xs text-gray-600">
+                              {format(new Date(effectiveLoadingDate), 'MMM d')}
+                            </span>
+                            <button
+                              onClick={() => adjustLoadingDate(assignment.project.id, 'right')}
+                              className="text-xs text-blue-600 hover:text-blue-800"
+                            >
+                              →
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -312,34 +365,55 @@ const TruckLoadingCalendar = () => {
         <CardContent>
           {upcomingAssignments.length > 0 ? (
             <div className="space-y-3">
-              {upcomingAssignments.slice(0, 10).map((assignment, index) => (
-                <div
-                  key={`${assignment.project.id}-${index}`}
-                  className={cn(
-                    "p-3 rounded-lg border-l-4 bg-white border",
-                    getLoadingPriority(assignment.loading_date)
-                  )}
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge className={getProjectColor(assignment.project.status)}>
-                          {assignment.project.status.replace('_', ' ').toUpperCase()}
-                        </Badge>
-                        <span className="text-sm text-gray-600">
-                          Load: {format(new Date(assignment.loading_date), 'MMM d')}
-                        </span>
+              {upcomingAssignments.slice(0, 10).map((assignment, index) => {
+                const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
+                const isManuallyAdjusted = manualOverrides[assignment.project.id] !== undefined;
+                
+                return (
+                  <div
+                    key={`${assignment.project.id}-${index}`}
+                    className={cn(
+                      "p-3 rounded-lg border-l-4 bg-white border group",
+                      getLoadingPriority(effectiveLoadingDate),
+                      isManuallyAdjusted && "border-orange-400 bg-orange-50"
+                    )}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge className={getProjectColor(assignment.project.status)}>
+                            {assignment.project.status.replace('_', ' ').toUpperCase()}
+                          </Badge>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => adjustLoadingDate(assignment.project.id, 'left')}
+                              className="text-sm text-blue-600 hover:text-blue-800 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              ←
+                            </button>
+                            <span className="text-sm text-gray-600">
+                              Load: {format(new Date(effectiveLoadingDate), 'MMM d')}
+                              {isManuallyAdjusted && <span className="text-orange-600 ml-1">*</span>}
+                            </span>
+                            <button
+                              onClick={() => adjustLoadingDate(assignment.project.id, 'right')}
+                              className="text-sm text-blue-600 hover:text-blue-800 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              →
+                            </button>
+                          </div>
+                        </div>
+                        <h4 className="font-medium">{assignment.project.name}</h4>
+                        <p className="text-sm text-gray-600">{assignment.project.client}</p>
                       </div>
-                      <h4 className="font-medium">{assignment.project.name}</h4>
-                      <p className="text-sm text-gray-600">{assignment.project.client}</p>
-                    </div>
-                    <div className="text-xs text-gray-500 text-right">
-                      <div>Install:</div>
-                      <div>{format(new Date(assignment.project.installation_date), 'MMM d')}</div>
+                      <div className="text-xs text-gray-500 text-right">
+                        <div>Install:</div>
+                        <div>{format(new Date(assignment.project.installation_date), 'MMM d')}</div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               
               {upcomingAssignments.length > 10 && (
                 <div className="text-center py-2 text-sm text-gray-500">
