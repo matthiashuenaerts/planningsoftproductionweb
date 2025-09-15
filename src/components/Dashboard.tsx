@@ -81,6 +81,7 @@ const Dashboard: React.FC = () => {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loadedWeeks, setLoadedWeeks] = useState<Set<string>>(new Set());
   const [weekLoading, setWeekLoading] = useState(false);
+  const [manualOverrides, setManualOverrides] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const { createLocalizedPath } = useLanguage();
@@ -228,6 +229,22 @@ const Dashboard: React.FC = () => {
       const holidaysData = await holidayService.getHolidays();
       setHolidays(holidaysData);
       
+      // Fetch existing overrides
+      const { data: overridesData, error: overridesError } = await supabase
+        .from('project_loading_overrides')
+        .select('project_id, override_loading_date');
+        
+      if (overridesError) {
+        console.error('Error fetching loading overrides:', overridesError);
+      } else {
+        // Convert overrides to map
+        const overridesMap: Record<string, string> = {};
+        (overridesData || []).forEach(override => {
+          overridesMap[override.project_id] = override.override_loading_date;
+        });
+        setManualOverrides(overridesMap);
+      }
+      
       // Load current week data
       await loadWeekData(weekStartDate, holidaysData);
       
@@ -336,18 +353,27 @@ const Dashboard: React.FC = () => {
       const isCurrentWeek = today >= format(weekStart, 'yyyy-MM-dd') && today <= format(weekEnd, 'yyyy-MM-dd');
       
       if (isCurrentWeek) {
-        const todayLoadings = enhancedAssignments.filter(assignment => assignment.loading_date === today);
+        // Consider manual overrides when calculating today's loadings
+        const todayLoadings = enhancedAssignments.filter(assignment => {
+          const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
+          return effectiveLoadingDate === today;
+        });
         
-        // Calculate days to next loading
+        // Calculate days to next loading (also considering overrides)
         let daysToNext = 0;
         if (todayLoadings.length === 0) {
           const futureLoadings = enhancedAssignments.filter(assignment => {
-            const loadingDate = new Date(assignment.loading_date);
+            const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
+            const loadingDate = new Date(effectiveLoadingDate);
             return loadingDate > new Date();
-          }).sort((a, b) => new Date(a.loading_date).getTime() - new Date(b.loading_date).getTime());
+          }).sort((a, b) => {
+            const aDate = manualOverrides[a.project.id] || a.loading_date;
+            const bDate = manualOverrides[b.project.id] || b.loading_date;
+            return new Date(aDate).getTime() - new Date(bDate).getTime();
+          });
           
           if (futureLoadings.length > 0) {
-            const nextLoadingDate = new Date(futureLoadings[0].loading_date);
+            const nextLoadingDate = new Date(manualOverrides[futureLoadings[0].project.id] || futureLoadings[0].loading_date);
             const today = new Date();
             daysToNext = Math.ceil((nextLoadingDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
           }
@@ -382,7 +408,10 @@ const Dashboard: React.FC = () => {
   // Get assignments for a specific date
   const getAssignmentsForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return allLoadingAssignments.filter(assignment => assignment.loading_date === dateStr);
+    return allLoadingAssignments.filter(assignment => {
+      const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
+      return effectiveLoadingDate === dateStr;
+    });
   };
 
   // Get project color for visual distinction
@@ -559,32 +588,45 @@ const Dashboard: React.FC = () => {
                   </div>
                   
                   <div className="space-y-1">
-                    {dayAssignments.map((assignment, index) => (
-                      <div
-                        key={`${assignment.project.id}-${index}`}
-                        className={cn(
-                          "p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity relative",
-                          getProjectColor(assignment.project.status),
-                          getTeamBackgroundColor(assignment.teamColor)
-                        )}
-                        onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}
-                      >
-                        {/* Order status indicator */}
-                        {assignment.orderStatus && (
-                          <div className={cn(
-                            "absolute -top-1 -right-1 rounded-full text-xs font-bold text-white flex items-center justify-center min-w-[16px] h-4 px-1",
-                            assignment.orderStatus.allDelivered ? "bg-green-500" : "bg-red-500"
-                          )}>
-                            {assignment.orderStatus.allDelivered ? "✓" : assignment.orderStatus.undeliveredCount}
+                    {dayAssignments.map((assignment, index) => {
+                      const isManuallyAdjusted = manualOverrides[assignment.project.id] !== undefined;
+                      
+                      return (
+                        <div
+                          key={`${assignment.project.id}-${index}`}
+                          className={cn(
+                            "p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity relative",
+                            getProjectColor(assignment.project.status),
+                            getTeamBackgroundColor(assignment.teamColor),
+                            isManuallyAdjusted && "ring-2 ring-orange-400"
+                          )}
+                          onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}
+                        >
+                          {/* Order status indicator */}
+                          {assignment.orderStatus && (
+                            <div className={cn(
+                              "absolute -top-1 -right-1 rounded-full text-xs font-bold text-white flex items-center justify-center min-w-[16px] h-4 px-1",
+                              assignment.orderStatus.allDelivered ? "bg-green-500" : "bg-red-500"
+                            )}>
+                              {assignment.orderStatus.allDelivered ? "✓" : assignment.orderStatus.undeliveredCount}
+                            </div>
+                          )}
+                          
+                          {/* Manual override indicator */}
+                          {isManuallyAdjusted && (
+                            <div className="absolute -top-1 -left-1 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center min-w-[16px] h-4 px-1">
+                              ↻
+                            </div>
+                          )}
+                          
+                          <div className="font-medium break-words whitespace-normal leading-tight">{assignment.project.name}</div>
+                          <div className="text-xs text-gray-500">
+                            Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
+                            {isManuallyAdjusted && <span className="text-orange-600 ml-1 font-medium">*</span>}
                           </div>
-                        )}
-                        
-                        <div className="font-medium break-words whitespace-normal leading-tight">{assignment.project.name}</div>
-                        <div className="text-xs text-gray-500">
-                          Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
