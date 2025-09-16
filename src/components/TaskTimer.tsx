@@ -244,38 +244,25 @@ const TaskTimer = () => {
       extraMinutes: number 
     }) => {
       if (taskId) {
-        const { data: task } = await supabase
-          .from('tasks')
-          .select('duration')
-          .eq('id', taskId)
-          .single();
-        
-        const newDuration = (task?.duration || 0) + extraMinutes;
-        
+        // Set the task's duration to the selected extra time (in minutes)
         return supabase
           .from('tasks')
-          .update({ duration: newDuration })
+          .update({ duration: extraMinutes })
           .eq('id', taskId);
       } else if (workstationTaskId) {
-        const { data: task } = await supabase
-          .from('workstation_tasks')
-          .select('duration')
-          .eq('id', workstationTaskId)
-          .single();
-        
-        const newDuration = (task?.duration || 0) + extraMinutes;
-        
+        // Set the workstation task's duration to the selected extra time (in minutes)
         return supabase
           .from('workstation_tasks')
-          .update({ duration: newDuration })
+          .update({ duration: extraMinutes })
           .eq('id', workstationTaskId);
       }
     },
     onSuccess: () => {
       toast({
         title: 'Task Duration Updated',
-        description: 'Extra time has been added to the task duration',
+        description: 'Selected time saved; next countdown will use it.',
       });
+      // Invalidate any taskDetails queries to ensure fresh duration on next start
       queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
     },
     onError: (error) => {
