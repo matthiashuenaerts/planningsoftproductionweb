@@ -8,6 +8,7 @@ import { useLocation } from 'react-router-dom';
 import { Play, Pause, Clock, Timer, Move, Minimize2, Maximize2, PictureInPicture } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import TaskExtraTimeDialog from './TaskExtraTimeDialog';
 
 const TaskTimer = () => {
   const { currentEmployee } = useAuth();
@@ -22,6 +23,12 @@ const TaskTimer = () => {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isMinimized, setIsMinimized] = useState(false);
   const [isPictureInPicture, setIsPictureInPicture] = useState(false);
+  const [showExtraTimeDialog, setShowExtraTimeDialog] = useState(false);
+  const [pendingStopData, setPendingStopData] = useState<{
+    registrationId: string;
+    taskDetails: any;
+    overTimeMinutes: number;
+  } | null>(null);
   const timerRef = useRef<HTMLDivElement>(null);
   const pipWindow = useRef<Window | null>(null);
 
@@ -216,6 +223,7 @@ const TaskTimer = () => {
         title: 'Task Paused',
         description: 'Time tracking has been paused',
       });
+      setPendingStopData(null);
     },
     onError: (error) => {
       toast({
@@ -224,6 +232,59 @@ const TaskTimer = () => {
         variant: 'destructive'
       });
       console.error('Stop task error:', error);
+      setPendingStopData(null);
+    }
+  });
+
+  // Update task duration mutation
+  const updateTaskDurationMutation = useMutation({
+    mutationFn: async ({ taskId, workstationTaskId, extraMinutes }: { 
+      taskId?: string; 
+      workstationTaskId?: string; 
+      extraMinutes: number 
+    }) => {
+      if (taskId) {
+        const { data: task } = await supabase
+          .from('tasks')
+          .select('duration')
+          .eq('id', taskId)
+          .single();
+        
+        const newDuration = (task?.duration || 0) + extraMinutes;
+        
+        return supabase
+          .from('tasks')
+          .update({ duration: newDuration })
+          .eq('id', taskId);
+      } else if (workstationTaskId) {
+        const { data: task } = await supabase
+          .from('workstation_tasks')
+          .select('duration')
+          .eq('id', workstationTaskId)
+          .single();
+        
+        const newDuration = (task?.duration || 0) + extraMinutes;
+        
+        return supabase
+          .from('workstation_tasks')
+          .update({ duration: newDuration })
+          .eq('id', workstationTaskId);
+      }
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Task Duration Updated',
+        description: 'Extra time has been added to the task duration',
+      });
+      queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: 'Failed to update task duration',
+        variant: 'destructive'
+      });
+      console.error('Update task duration error:', error);
     }
   });
 
@@ -231,7 +292,26 @@ const TaskTimer = () => {
     if (!currentEmployee) return;
 
     if (activeRegistration && activeRegistration.is_active) {
-      // Stop the active task
+      // Check if task is over time before stopping
+      if (taskDetails?.duration && activeRegistration.start_time) {
+        const start = new Date(activeRegistration.start_time);
+        const now = new Date();
+        const elapsedMinutes = Math.floor((now.getTime() - start.getTime()) / (1000 * 60));
+        const overTime = elapsedMinutes - taskDetails.duration;
+        
+        if (overTime > 0) {
+          // Task is over time, show dialog
+          setPendingStopData({
+            registrationId: activeRegistration.id,
+            taskDetails,
+            overTimeMinutes: overTime
+          });
+          setShowExtraTimeDialog(true);
+          return;
+        }
+      }
+      
+      // Stop the active task normally
       stopTaskMutation.mutate(activeRegistration.id);
     } else {
       // Need to select a task to start - for now, show a message
@@ -240,6 +320,29 @@ const TaskTimer = () => {
         description: 'Start a task from the workstation or personal tasks page to begin time tracking',
       });
     }
+  };
+
+  const handleExtraTimeConfirm = (extraMinutes: number) => {
+    if (!pendingStopData) return;
+    
+    // Update task duration first
+    updateTaskDurationMutation.mutate({
+      taskId: activeRegistration?.task_id,
+      workstationTaskId: activeRegistration?.workstation_task_id,
+      extraMinutes
+    });
+    
+    // Then stop the task
+    stopTaskMutation.mutate(pendingStopData.registrationId);
+    setShowExtraTimeDialog(false);
+  };
+
+  const handleExtraTimeCancel = () => {
+    if (!pendingStopData) return;
+    
+    // Stop the task without updating duration
+    stopTaskMutation.mutate(pendingStopData.registrationId);
+    setShowExtraTimeDialog(false);
   };
 
   const formatDuration = (startTime: string) => {
@@ -377,18 +480,27 @@ const TaskTimer = () => {
   }
 
   return (
-    <div 
-      ref={timerRef}
-      className={`fixed z-[9999] pointer-events-none transition-all duration-200 ${
-        isDragging ? 'cursor-grabbing' : 'cursor-grab'
-      } ${isPictureInPicture ? 'opacity-50' : ''}`}
-      style={{
-        left: position.x === 0 && position.y === 16 ? '50%' : `${position.x}px`,
-        top: `${position.y}px`,
-        transform: position.x === 0 && position.y === 16 ? 'translateX(-50%)' : 'none',
-      }}
-      onMouseDown={handleMouseDown}
-    >
+    <>
+      <TaskExtraTimeDialog
+        isOpen={showExtraTimeDialog}
+        onClose={handleExtraTimeCancel}
+        onConfirm={handleExtraTimeConfirm}
+        taskTitle={pendingStopData?.taskDetails?.title || ''}
+        overTimeMinutes={pendingStopData?.overTimeMinutes || 0}
+      />
+      
+      <div 
+        ref={timerRef}
+        className={`fixed z-[9999] pointer-events-none transition-all duration-200 ${
+          isDragging ? 'cursor-grabbing' : 'cursor-grab'
+        } ${isPictureInPicture ? 'opacity-50' : ''}`}
+        style={{
+          left: position.x === 0 && position.y === 16 ? '50%' : `${position.x}px`,
+          top: `${position.y}px`,
+          transform: position.x === 0 && position.y === 16 ? 'translateX(-50%)' : 'none',
+        }}
+        onMouseDown={handleMouseDown}
+      >
       <div className="pointer-events-auto">
         <Card 
           className={`transition-all duration-200 ${
@@ -520,6 +632,7 @@ const TaskTimer = () => {
         </Card>
       </div>
     </div>
+    </>
   );
 };
 
