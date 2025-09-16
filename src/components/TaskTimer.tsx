@@ -16,6 +16,7 @@ const TaskTimer = () => {
   const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
   const location = useLocation();
+  const [activeUsersOnTask, setActiveUsersOnTask] = useState(1);
   
   // Draggable and UI state
   const [position, setPosition] = useState({ x: 0, y: 16 });
@@ -133,6 +134,60 @@ const TaskTimer = () => {
     enabled: !!currentEmployee,
     refetchInterval: 1000 // Refetch every second for real-time updates
   });
+
+  // Real-time tracking of active users on the same task
+  useEffect(() => {
+    if (!activeRegistration || !activeRegistration.is_active) {
+      setActiveUsersOnTask(1);
+      return;
+    }
+
+    const channel = supabase
+      .channel('active-task-users')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'time_registrations'
+        },
+        () => {
+          // Refetch active users count when time registrations change
+          fetchActiveUsersCount();
+        }
+      )
+      .subscribe();
+
+    const fetchActiveUsersCount = async () => {
+      try {
+        let query = supabase
+          .from('time_registrations')
+          .select('id')
+          .eq('is_active', true);
+
+        // Check if it's a regular task or workstation task
+        if (activeRegistration.task_id) {
+          query = query.eq('task_id', activeRegistration.task_id);
+        } else if (activeRegistration.workstation_task_id) {
+          query = query.eq('workstation_task_id', activeRegistration.workstation_task_id);
+        }
+
+        const { data, error } = await query;
+        
+        if (!error && data) {
+          setActiveUsersOnTask(Math.max(1, data.length));
+        }
+      } catch (error) {
+        console.error('Error fetching active users count:', error);
+      }
+    };
+
+    fetchActiveUsersCount();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeRegistration?.task_id, activeRegistration?.workstation_task_id, activeRegistration?.is_active]);
 
   // Get task details if there's an active registration
   const { data: taskDetails } = useQuery({
@@ -351,8 +406,9 @@ const TaskTimer = () => {
     const start = new Date(startTime);
     const now = currentTime;
     const elapsedMs = now.getTime() - start.getTime();
-    const durationMs = durationMinutes * 60 * 1000;
-    const remainingMs = durationMs - elapsedMs;
+    // Adjust duration based on number of active users (more users = faster completion)
+    const adjustedDurationMs = (durationMinutes * 60 * 1000) / activeUsersOnTask;
+    const remainingMs = adjustedDurationMs - elapsedMs;
 
     const isNegative = remainingMs < 0;
     const absRemainingMs = Math.abs(remainingMs);
@@ -371,8 +427,9 @@ const TaskTimer = () => {
     const start = new Date(startTime);
     const now = currentTime;
     const elapsedMs = now.getTime() - start.getTime();
-    const durationMs = durationMinutes * 60 * 1000;
-    return durationMs - elapsedMs < 0;
+    // Adjust duration based on number of active users
+    const adjustedDurationMs = (durationMinutes * 60 * 1000) / activeUsersOnTask;
+    return adjustedDurationMs - elapsedMs < 0;
   }
 
   if (isLoading || !currentEmployee) {
@@ -546,9 +603,10 @@ const TaskTimer = () => {
                   {activeRegistration && activeRegistration.is_active && taskDetails?.duration != null && (
                     <div className="flex items-center space-x-1">
                       <Timer className="h-3 w-3 text-gray-500" />
-                      <span className={`font-mono text-xs font-medium ${isTimeNegative(activeRegistration.start_time, taskDetails.duration) ? 'text-red-500' : ''}`}>
-                        {formatRemainingDuration(activeRegistration.start_time, taskDetails.duration)}
-                      </span>
+                       <span className={`font-mono text-xs font-medium ${isTimeNegative(activeRegistration.start_time, taskDetails.duration) ? 'text-red-500' : ''}`}>
+                         {formatRemainingDuration(activeRegistration.start_time, taskDetails.duration)}
+                         {activeUsersOnTask > 1 && <span className="text-blue-500 ml-1">({activeUsersOnTask}x)</span>}
+                       </span>
                     </div>
                   )}
                   
