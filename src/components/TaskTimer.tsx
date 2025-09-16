@@ -142,22 +142,6 @@ const TaskTimer = () => {
       return;
     }
 
-    const channel = supabase
-      .channel('active-task-users')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'time_registrations'
-        },
-        () => {
-          // Refetch active users count when time registrations change
-          fetchActiveUsersCount();
-        }
-      )
-      .subscribe();
-
     const fetchActiveUsersCount = async () => {
       try {
         let query = supabase
@@ -182,7 +166,25 @@ const TaskTimer = () => {
       }
     };
 
+    // Initial fetch
     fetchActiveUsersCount();
+
+    // Set up real-time subscription for immediate updates
+    const channel = supabase
+      .channel('active-task-users')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'time_registrations'
+        },
+        (payload) => {
+          // Immediately refetch when any time registration changes
+          fetchActiveUsersCount();
+        }
+      )
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
