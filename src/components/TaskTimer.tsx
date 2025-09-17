@@ -555,10 +555,10 @@ const TaskTimer = () => {
               : 'border-red-500 bg-red-50 hover:bg-red-100'
           } ${isMinimized ? 'max-w-[200px]' : 'max-w-sm'} shadow-lg`}
         >
-          <CardContent className={`${isMinimized ? 'p-2' : 'p-3'}`}>
+          <CardContent className={`${isMinimized ? 'p-1' : 'p-2'}`}>
             {!isMinimized ? (
               <div className="flex items-center justify-between space-x-2">
-                <div className="flex items-center space-x-2 flex-1 min-w-0">
+                <div className="flex items-center space-x-1 flex-1 min-w-0">
                   <div className={`p-1.5 rounded-full cursor-pointer ${
                     activeRegistration && activeRegistration.is_active 
                       ? 'bg-green-500 text-white' 
@@ -592,7 +592,7 @@ const TaskTimer = () => {
                   </div>
                 </div>
                 
-                <div className="flex flex-col items-end space-y-1">
+                <div className="flex flex-col items-end space-y-0">
                   <div className="flex items-center space-x-1">
                     <Clock className="h-3 w-3 text-gray-500" />
                     <span className="font-mono text-sm font-medium">
@@ -613,37 +613,37 @@ const TaskTimer = () => {
                   )}
                   
                   {/* Control buttons */}
-                  <div className="flex items-center space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        togglePictureInPicture();
-                      }}
-                    >
-                      <PictureInPicture className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsMinimized(!isMinimized);
-                      }}
-                    >
-                      <Minimize2 className="h-3 w-3" />
-                    </Button>
-                    <div className="cursor-move p-1">
-                      <Move className="h-3 w-3 text-gray-400" />
-                    </div>
-                  </div>
+                   <div className="flex items-center space-x-0.5">
+                     <Button
+                       variant="ghost"
+                       size="sm"
+                       className="h-5 w-5 p-0"
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         togglePictureInPicture();
+                       }}
+                     >
+                       <PictureInPicture className="h-2.5 w-2.5" />
+                     </Button>
+                     <Button
+                       variant="ghost"
+                       size="sm"
+                       className="h-5 w-5 p-0"
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         setIsMinimized(!isMinimized);
+                       }}
+                     >
+                       <Minimize2 className="h-2.5 w-2.5" />
+                     </Button>
+                     <div className="cursor-move p-0.5">
+                       <Move className="h-2.5 w-2.5 text-gray-400" />
+                     </div>
+                   </div>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-between space-x-2">
+              <div className="flex items-center justify-between space-x-1">
                 <div className={`p-1 rounded-full cursor-pointer ${
                   activeRegistration && activeRegistration.is_active 
                     ? 'bg-green-500 text-white' 
