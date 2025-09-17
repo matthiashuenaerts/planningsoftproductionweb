@@ -619,28 +619,25 @@ const TaskTimer = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-3 w-3 p-0"
+                      className="h-4 w-4 p-0"
                       onClick={(e) => {
                         e.stopPropagation();
                         togglePictureInPicture();
                       }}
                     >
-                      <PictureInPicture className="h-1.5 w-1.5" />
+                      <PictureInPicture className="h-2 w-2" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-3 w-3 p-0"
+                      className="h-4 w-4 p-0"
                       onClick={(e) => {
                         e.stopPropagation();
                         setIsMinimized(!isMinimized);
                       }}
                     >
-                      <Minimize2 className="h-1.5 w-1.5" />
+                      <Minimize2 className="h-2 w-2" />
                     </Button>
-                    <div className="cursor-move flex justify-center">
-                      <Move className="h-1.5 w-1.5 text-gray-400" />
-                    </div>
                   </div>
                 </div>
               </div>
