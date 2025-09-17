@@ -519,8 +519,6 @@ const PersonalTasks = () => {
     <div className="min-h-screen bg-gray-50 flex">
       <Navbar />
       <div className="flex-1 ml-64 p-6 max-w-none">
-        <TaskTimer />
-        
         {/* Date Navigation Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
