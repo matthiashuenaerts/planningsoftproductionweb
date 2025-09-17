@@ -96,7 +96,7 @@ const TaskCompletionChecklistDialog: React.FC<TaskCompletionChecklistDialogProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[80vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-primary" />
@@ -109,7 +109,7 @@ const TaskCompletionChecklistDialog: React.FC<TaskCompletionChecklistDialogProps
             Please complete the following checklist before marking this task as complete:
           </p>
 
-          <ScrollArea className="max-h-80 pr-4">
+          <ScrollArea className="h-72 max-h-[60vh] pr-2">
             <div className="space-y-3">
               {checklistItems.map((item) => (
                 <div key={item.id} className="flex items-start space-x-3">
