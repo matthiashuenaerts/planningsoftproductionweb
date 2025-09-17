@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { checklistService, ChecklistItem } from '@/services/checklistService';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle } from 'lucide-react';
@@ -108,32 +109,34 @@ const TaskCompletionChecklistDialog: React.FC<TaskCompletionChecklistDialogProps
             Please complete the following checklist before marking this task as complete:
           </p>
 
-          <div className="space-y-3">
-            {checklistItems.map((item) => (
-              <div key={item.id} className="flex items-start space-x-3">
-                <Checkbox
-                  id={item.id}
-                  checked={checkedItems[item.id] || false}
-                  onCheckedChange={(checked) => handleItemCheck(item.id, checked as boolean)}
-                  className="mt-1"
-                />
-                <div className="flex-1">
-                  <label 
-                    htmlFor={item.id} 
-                    className="text-sm cursor-pointer leading-relaxed"
-                  >
-                    {item.item_text}
+          <ScrollArea className="max-h-80 pr-4">
+            <div className="space-y-3">
+              {checklistItems.map((item) => (
+                <div key={item.id} className="flex items-start space-x-3">
+                  <Checkbox
+                    id={item.id}
+                    checked={checkedItems[item.id] || false}
+                    onCheckedChange={(checked) => handleItemCheck(item.id, checked as boolean)}
+                    className="mt-1"
+                  />
+                  <div className="flex-1">
+                    <label 
+                      htmlFor={item.id} 
+                      className="text-sm cursor-pointer leading-relaxed"
+                    >
+                      {item.item_text}
+                      {item.is_required && (
+                        <span className="text-destructive ml-1">*</span>
+                      )}
+                    </label>
                     {item.is_required && (
-                      <span className="text-destructive ml-1">*</span>
+                      <p className="text-xs text-muted-foreground mt-1">Required</p>
                     )}
-                  </label>
-                  {item.is_required && (
-                    <p className="text-xs text-muted-foreground mt-1">Required</p>
-                  )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </ScrollArea>
 
           {checklistItems.length === 0 && (
             <p className="text-muted-foreground text-center py-4">
