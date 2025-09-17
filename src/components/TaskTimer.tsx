@@ -592,54 +592,56 @@ const TaskTimer = () => {
                   </div>
                 </div>
                 
-                <div className="flex flex-col items-end space-y-0">
-                  <div className="flex items-center space-x-1">
-                    <Clock className="h-3 w-3 text-gray-500" />
-                    <span className="font-mono text-sm font-medium">
-                      {activeRegistration && activeRegistration.is_active 
-                        ? formatDuration(activeRegistration.start_time)
-                        : '00:00:00'
-                      }
-                    </span>
-                  </div>
-                  {activeRegistration && activeRegistration.is_active && taskDetails?.duration != null && (
+                <div className="flex items-center space-x-1">
+                  <div className="flex flex-col space-y-0">
                     <div className="flex items-center space-x-1">
-                      <Timer className="h-3 w-3 text-gray-500" />
-                       <span className={`font-mono text-xs font-medium ${isTimeNegative(activeRegistration.start_time, taskDetails.duration) ? 'text-red-500' : ''}`}>
-                         {formatRemainingDuration(activeRegistration.start_time, taskDetails.duration)}
-                         {activeUsersOnTask > 1 && <span className="text-blue-500 ml-1">({activeUsersOnTask}x)</span>}
-                       </span>
+                      <Clock className="h-2.5 w-2.5 text-gray-500" />
+                      <span className="font-mono text-xs font-medium">
+                        {activeRegistration && activeRegistration.is_active 
+                          ? formatDuration(activeRegistration.start_time)
+                          : '00:00:00'
+                        }
+                      </span>
                     </div>
-                  )}
+                    {activeRegistration && activeRegistration.is_active && taskDetails?.duration != null && (
+                      <div className="flex items-center space-x-1">
+                        <Timer className="h-2.5 w-2.5 text-gray-500" />
+                         <span className={`font-mono text-xs font-medium ${isTimeNegative(activeRegistration.start_time, taskDetails.duration) ? 'text-red-500' : ''}`}>
+                           {formatRemainingDuration(activeRegistration.start_time, taskDetails.duration)}
+                           {activeUsersOnTask > 1 && <span className="text-blue-500 ml-1">({activeUsersOnTask}x)</span>}
+                         </span>
+                      </div>
+                    )}
+                  </div>
                   
                   {/* Control buttons */}
-                   <div className="flex flex-col items-center space-y-0.5">
-                     <Button
-                       variant="ghost"
-                       size="sm"
-                       className="h-4 w-4 p-0"
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         togglePictureInPicture();
-                       }}
-                     >
-                       <PictureInPicture className="h-2 w-2" />
-                     </Button>
-                     <Button
-                       variant="ghost"
-                       size="sm"
-                       className="h-4 w-4 p-0"
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         setIsMinimized(!isMinimized);
-                       }}
-                     >
-                       <Minimize2 className="h-2 w-2" />
-                     </Button>
-                     <div className="cursor-move p-0.5">
-                       <Move className="h-2 w-2 text-gray-400" />
-                     </div>
-                   </div>
+                  <div className="flex flex-col space-y-0.5 ml-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-3 w-3 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePictureInPicture();
+                      }}
+                    >
+                      <PictureInPicture className="h-1.5 w-1.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-3 w-3 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsMinimized(!isMinimized);
+                      }}
+                    >
+                      <Minimize2 className="h-1.5 w-1.5" />
+                    </Button>
+                    <div className="cursor-move flex justify-center">
+                      <Move className="h-1.5 w-1.5 text-gray-400" />
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
