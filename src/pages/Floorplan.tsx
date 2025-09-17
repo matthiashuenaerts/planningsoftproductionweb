@@ -8,7 +8,7 @@ import { FloorplanToolbar } from '@/components/floorplan/FloorplanToolbar';
 import { AnimatedWorkstationDetailsDialog } from '@/components/floorplan/AnimatedWorkstationDetailsDialog';
 import { toast } from 'sonner';
 import Navbar from '@/components/Navbar';
-import GlobalComponents from '@/components/GlobalComponents';
+
 
 // Import the uploaded floorplan image
 const FLOORPLAN_IMAGE = "/lovable-uploads/a8ecb0d1-2146-481f-8c3a-31fa480e3aad.png";
@@ -189,8 +189,6 @@ const Floorplan: React.FC = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <GlobalComponents />
-      
       <div className="ml-64 relative w-[calc(100vw-16rem)] h-screen flex items-center justify-center overflow-hidden">
         {/* Image Container */}
         <div className="relative w-full h-full flex items-center justify-center">
