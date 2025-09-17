@@ -613,31 +613,31 @@ const TaskTimer = () => {
                   )}
                   
                   {/* Control buttons */}
-                   <div className="flex items-center space-x-0.5">
+                   <div className="flex flex-col items-center space-y-0.5">
                      <Button
                        variant="ghost"
                        size="sm"
-                       className="h-5 w-5 p-0"
+                       className="h-4 w-4 p-0"
                        onClick={(e) => {
                          e.stopPropagation();
                          togglePictureInPicture();
                        }}
                      >
-                       <PictureInPicture className="h-2.5 w-2.5" />
+                       <PictureInPicture className="h-2 w-2" />
                      </Button>
                      <Button
                        variant="ghost"
                        size="sm"
-                       className="h-5 w-5 p-0"
+                       className="h-4 w-4 p-0"
                        onClick={(e) => {
                          e.stopPropagation();
                          setIsMinimized(!isMinimized);
                        }}
                      >
-                       <Minimize2 className="h-2.5 w-2.5" />
+                       <Minimize2 className="h-2 w-2" />
                      </Button>
                      <div className="cursor-move p-0.5">
-                       <Move className="h-2.5 w-2.5 text-gray-400" />
+                       <Move className="h-2 w-2 text-gray-400" />
                      </div>
                    </div>
                 </div>
