@@ -95,13 +95,34 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
         : 'Not set';
 
       // Create all label content in a single document
+      const currentDate = new Date().toLocaleDateString('en-GB', { 
+        day: '2-digit', 
+        month: '2-digit', 
+        year: 'numeric' 
+      });
+
       const allLabelsContent = deliveredItems.map(item => `
-        <div style="width: 89mm; height: 32mm; padding: 2mm; font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.2; page-break-after: always;">
-          <div style="font-weight: bold; font-size: 11pt; margin-bottom: 1mm;">${projectInfo?.name || 'Unknown Project'}</div>
-          <div style="margin-bottom: 1mm;">Article: ${item.article_code}</div>
-          <div style="margin-bottom: 1mm;">Qty: ${item.current_delivered_quantity}</div>
-          <div style="margin-bottom: 1mm;">Install: ${installationDate}</div>
-          ${item.stock_location ? `<div>Location: ${item.stock_location}</div>` : ''}
+        <div style="width: 89mm; height: 32mm; padding: 1.5mm; font-family: Arial, sans-serif; line-height: 1.1; page-break-after: always; box-sizing: border-box;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 1mm;">
+            <div style="font-weight: bold; font-size: 9pt;">${projectInfo?.name || 'Unknown Project'}</div>
+            <div style="font-size: 8pt;">${order.supplier}</div>
+          </div>
+          
+          ${item.stock_location ? `
+          <div style="font-weight: bold; font-size: 14pt; text-align: center; margin: 1mm 0; border: 1px solid #ccc; padding: 1mm; background: #f0f0f0;">
+            ${item.stock_location}
+          </div>
+          ` : ''}
+          
+          <div style="display: flex; justify-content: space-between; font-size: 8pt; margin-bottom: 0.5mm;">
+            <div>Art: ${item.article_code}</div>
+            <div>Qty: ${item.current_delivered_quantity}</div>
+          </div>
+          
+          <div style="display: flex; justify-content: space-between; font-size: 8pt;">
+            <div>Completed: ${currentDate}</div>
+            <div>Install: ${installationDate}</div>
+          </div>
         </div>
       `).join('');
 
