@@ -10,6 +10,7 @@ import { projectService, taskService, Project, Task } from '@/services/dataServi
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { orderService } from '@/services/orderService';
 import { projectTeamAssignmentService } from '@/services/projectTeamAssignmentService';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
@@ -82,6 +83,7 @@ const Dashboard: React.FC = () => {
   const [loadedWeeks, setLoadedWeeks] = useState<Set<string>>(new Set());
   const [weekLoading, setWeekLoading] = useState(false);
   const [manualOverrides, setManualOverrides] = useState<Record<string, string>>({});
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const { createLocalizedPath } = useLanguage();
@@ -182,6 +184,9 @@ const Dashboard: React.FC = () => {
         // Fetch truck loading data
         await fetchInitialTruckLoadingData();
         
+        // Fetch upcoming external processing events
+        await fetchUpcomingExternalProcessingEvents();
+        
       } catch (error: any) {
         console.error('Error fetching dashboard data:', error);
         toast({
@@ -196,6 +201,70 @@ const Dashboard: React.FC = () => {
 
     fetchDashboardData();
   }, [toast]);
+
+  const fetchUpcomingExternalProcessingEvents = async () => {
+    try {
+      const logisticsOutOrders = await orderService.getLogisticsOutOrders();
+      const events: any[] = [];
+      
+      for (const order of logisticsOutOrders) {
+        try {
+          const allSteps = await orderService.getOrderSteps(order.id);
+          const processingSteps = allSteps.filter(step => 
+            step.supplier && step.supplier.trim() !== '' && step.start_date
+          );
+
+          const project = await projectService.getById(order.project_id);
+          const projectName = project?.name || "Unknown Project";
+
+          processingSteps.forEach(step => {
+            if (step.start_date && step.supplier) {
+              // Add start date event
+              const startDate = format(new Date(step.start_date), 'yyyy-MM-dd');
+              events.push({
+                date: startDate,
+                type: 'start',
+                title: `${step.name}`,
+                description: `${projectName} - ${step.supplier}`,
+                project_name: projectName
+              });
+              
+              // Add expected return date if duration is provided
+              if (step.expected_duration_days) {
+                const returnDate = addDays(new Date(step.start_date), step.expected_duration_days);
+                const returnDateStr = format(returnDate, 'yyyy-MM-dd');
+                events.push({
+                  date: returnDateStr,
+                  type: 'return',
+                  title: `${step.name}`,
+                  description: `${projectName} - ${step.supplier}`,
+                  project_name: projectName
+                });
+              }
+            }
+          });
+        } catch (error) {
+          console.error(`Error processing order ${order.id}:`, error);
+        }
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const upcomingEvents = events
+        .filter(event => {
+          const eventDate = new Date(event.date);
+          eventDate.setHours(0, 0, 0, 0);
+          return eventDate >= today;
+        })
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(0, 5);
+
+      setUpcomingEvents(upcomingEvents);
+    } catch (error) {
+      console.error('Error fetching external processing events:', error);
+    }
+  };
 
   // Calculate previous workday considering holidays
   const getPreviousWorkday = (date: Date, holidaysList: Holiday[]): Date => {
@@ -515,12 +584,6 @@ const Dashboard: React.FC = () => {
           icon={<Calendar className="h-5 w-5 text-blue-500" />}
         />
         <StatCard 
-          title="Project Completion" 
-          value={`${completedProjects}/${totalProjects}`} 
-          footer={`${inProgressProjects} in progress`} 
-          icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
-        />
-        <StatCard 
           title="Tasks Today" 
           value={todaysTasks.length.toString()} 
           footer={`${overdueCount} overdue`} 
@@ -532,6 +595,15 @@ const Dashboard: React.FC = () => {
           footer="Tasks fulfilled today" 
           icon={<CheckCircle2 className="h-5 w-5 text-green-600" />}
         />
+        {upcomingEvents.length > 0 && (
+          <StatCard
+            title="Externe Verwerking"
+            value={upcomingEvents.length.toString()}
+            footer="Upcoming events"
+            subtitle={upcomingEvents[0] ? `${upcomingEvents[0].title} - ${format(new Date(upcomingEvents[0].date), 'dd/MM')}` : ''}
+            icon={<Users className="h-5 w-5 text-purple-500" />}
+          />
+        )}
         <StatCard 
           title="Truck Loading" 
           value={truckLoadingData.todayLoadings.length > 0 ? truckLoadingData.todayLoadings.length.toString() : truckLoadingData.daysToNext.toString()}
@@ -886,9 +958,10 @@ interface StatCardProps {
   value: string;
   footer: string;
   icon?: React.ReactNode;
+  subtitle?: string;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, value, footer, icon }) => {
+const StatCard: React.FC<StatCardProps> = ({ title, value, footer, icon, subtitle }) => {
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -900,6 +973,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, footer, icon }) => {
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
         <p className="text-xs text-muted-foreground mt-1">{footer}</p>
+        {subtitle && <p className="text-xs text-muted-foreground mt-1 truncate font-medium">{subtitle}</p>}
       </CardContent>
     </Card>
   );
