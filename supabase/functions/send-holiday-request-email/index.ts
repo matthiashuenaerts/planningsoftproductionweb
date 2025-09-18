@@ -44,21 +44,26 @@ const handler = async (req: Request): Promise<Response> => {
       console.error('Error fetching admin emails:', adminError);
     }
 
-    // Collect all recipients
-    const recipients = [employeeEmail];
-    
-    // Add admin emails if they exist and are different from employee email
-    if (adminEmployees && adminEmployees.length > 0) {
-      adminEmployees.forEach(admin => {
-        if (admin.email && admin.email !== employeeEmail && !recipients.includes(admin.email)) {
-          recipients.push(admin.email);
-        }
-      });
-    }
+// Collect all recipients
+const recipients = [employeeEmail];
 
-    // For testing, send only to verified email address
-    const testEmail = 'matthias.huenaerts@gmail.com';
-    const finalRecipients = [testEmail, "productiesturing@thonon.be"];
+// Add admin emails if they exist and are different from employee email
+if (adminEmployees && adminEmployees.length > 0) {
+  adminEmployees.forEach(admin => {
+    if (admin.email && admin.email !== employeeEmail && !recipients.includes(admin.email)) {
+      recipients.push(admin.email);
+    }
+  });
+}
+
+// Always add productiesturing
+if (!recipients.includes("productiesturing@thonon.be")) {
+  recipients.push("productiesturing@thonon.be");
+}
+
+// Use full recipient list in productie
+const finalRecipients = recipients;
+
 
     console.log('Sending email to:', finalRecipients);
 
