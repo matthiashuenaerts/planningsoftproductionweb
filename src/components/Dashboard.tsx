@@ -599,7 +599,7 @@ const Dashboard: React.FC = () => {
           <StatCard
             title="Externe Verwerking"
             value={upcomingEvents.length.toString()}
-            footer={upcomingEvents.slice(0, 5).map(event => 
+            footer={upcomingEvents.slice(0, 2).map(event => 
               `${format(new Date(event.date), 'dd/MM')} - ${event.title}\n${event.description}`
             ).join('\n\n')}
             subtitle={upcomingEvents[0] ? `Next: ${format(new Date(upcomingEvents[0].date), 'dd/MM/yyyy')}` : ''}
