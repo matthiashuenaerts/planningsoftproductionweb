@@ -599,9 +599,12 @@ const Dashboard: React.FC = () => {
           <StatCard
             title="Externe Verwerking"
             value={upcomingEvents.length.toString()}
-            footer="Upcoming events"
-            subtitle={upcomingEvents[0] ? `${upcomingEvents[0].title} - ${format(new Date(upcomingEvents[0].date), 'dd/MM')}` : ''}
+            footer={upcomingEvents.slice(0, 5).map(event => 
+              `${format(new Date(event.date), 'dd/MM')} - ${event.title}\n${event.description}`
+            ).join('\n\n')}
+            subtitle={upcomingEvents[0] ? `Next: ${format(new Date(upcomingEvents[0].date), 'dd/MM/yyyy')}` : ''}
             icon={<Users className="h-5 w-5 text-purple-500" />}
+            onClick={() => navigate(createLocalizedPath('/logistics-out'))}
           />
         )}
         <StatCard 
@@ -959,11 +962,12 @@ interface StatCardProps {
   footer: string;
   icon?: React.ReactNode;
   subtitle?: string;
+  onClick?: () => void;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, value, footer, icon, subtitle }) => {
+const StatCard: React.FC<StatCardProps> = ({ title, value, footer, icon, subtitle, onClick }) => {
   return (
-    <Card>
+    <Card className={onClick ? "cursor-pointer hover:bg-accent/50 transition-colors" : ""} onClick={onClick}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
           {icon}
@@ -972,8 +976,12 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, footer, icon, subtitl
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground mt-1">{footer}</p>
-        {subtitle && <p className="text-xs text-muted-foreground mt-1 truncate font-medium">{subtitle}</p>}
+        <div className="text-xs text-muted-foreground mt-1 space-y-1">
+          {footer.split('\n').map((line, index) => (
+            <p key={index} className="break-words">{line}</p>
+          ))}
+        </div>
+        {subtitle && <p className="text-xs text-muted-foreground mt-1 break-words font-medium">{subtitle}</p>}
       </CardContent>
     </Card>
   );
