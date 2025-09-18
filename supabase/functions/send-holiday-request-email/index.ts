@@ -57,8 +57,8 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // For testing, send only to verified email address
-    const testEmail = 'matthias@thonon.be';
-    const finalRecipients = [testEmail];
+    const testEmail = 'matthias.huenaerts@gmail.com';
+    const finalRecipients = [testEmail, "productiesturing@thonon.be"];
 
     console.log('Sending email to:', finalRecipients);
 
