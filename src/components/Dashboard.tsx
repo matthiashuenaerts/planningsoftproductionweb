@@ -599,10 +599,10 @@ const Dashboard: React.FC = () => {
           <StatCard
             title="Externe Verwerking"
             value={upcomingEvents.length.toString()}
+            valueSubtext={upcomingEvents[0] ? `Next: ${format(new Date(upcomingEvents[0].date), 'dd/MM')}` : ''}
             footer={upcomingEvents.slice(0, 2).map(event => 
-              `${format(new Date(event.date), 'dd/MM')} - ${event.title}\n${event.description}`
-            ).join('\n\n')}
-            subtitle={upcomingEvents[0] ? `Next: ${format(new Date(upcomingEvents[0].date), 'dd/MM/yyyy')}` : ''}
+              `<span style="color: ${event.type === 'return' ? '#22c55e' : '#3b82f6'}">${format(new Date(event.date), 'dd/MM')} - ${event.project_name}</span>`
+            ).join('<br>')}
             icon={<Users className="h-5 w-5 text-purple-500" />}
             onClick={() => navigate(createLocalizedPath('/logistics-out'))}
           />
@@ -963,9 +963,10 @@ interface StatCardProps {
   icon?: React.ReactNode;
   subtitle?: string;
   onClick?: () => void;
+  valueSubtext?: string;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, value, footer, icon, subtitle, onClick }) => {
+const StatCard: React.FC<StatCardProps> = ({ title, value, footer, icon, subtitle, onClick, valueSubtext }) => {
   return (
     <Card className={onClick ? "cursor-pointer hover:bg-accent/50 transition-colors" : ""} onClick={onClick}>
       <CardHeader className="pb-2">
@@ -975,10 +976,13 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, footer, icon, subtitl
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        <div className="flex items-baseline gap-2">
+          <div className="text-2xl font-bold">{value}</div>
+          {valueSubtext && <div className="text-xs text-muted-foreground">{valueSubtext}</div>}
+        </div>
         <div className="text-xs text-muted-foreground mt-1 space-y-1">
           {footer.split('\n').map((line, index) => (
-            <p key={index} className="break-words">{line}</p>
+            <p key={index} className="break-words" dangerouslySetInnerHTML={{ __html: line }}></p>
           ))}
         </div>
         {subtitle && <p className="text-xs text-muted-foreground mt-1 break-words font-medium">{subtitle}</p>}
