@@ -55,6 +55,7 @@ export const EanBarcodeScanner: React.FC<EanBarcodeScannerProps> = ({
 
   const startCamera = async () => {
     try {
+      console.log('Starting camera...');
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
@@ -68,16 +69,20 @@ export const EanBarcodeScanner: React.FC<EanBarcodeScannerProps> = ({
         }
       };
 
+      console.log('Camera constraints:', constraints);
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
+      console.log('Camera stream obtained');
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        await videoRef.current.play();
+        console.log('Video playing, starting barcode scanning...');
         setIsScanning(true);
         
         // Start scanning for barcodes with higher frequency for automatic detection
-        scanIntervalRef.current = setInterval(scanForBarcode, 100);
+        scanIntervalRef.current = setInterval(scanForBarcode, 500);
+        console.log('Barcode scanning interval started');
       }
     } catch (error) {
       console.error('Error starting camera:', error);
@@ -86,46 +91,70 @@ export const EanBarcodeScanner: React.FC<EanBarcodeScannerProps> = ({
   };
 
   const scanForBarcode = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current) {
+      console.log('Missing video or canvas ref');
+      return;
+    }
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
 
-    if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) return;
+    if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) {
+      console.log('Video not ready or no context');
+      return;
+    }
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     try {
+      console.log('Attempting barcode scan...');
       // Use ZXing library for comprehensive barcode detection
       const { BrowserMultiFormatReader } = await import('@zxing/library');
       const codeReader = new BrowserMultiFormatReader();
       
-      // Try multiple detection methods for better accuracy
       let result = null;
       
-      // Method 1: High quality JPEG
+      // Method 1: Direct from video element
       try {
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-        result = await codeReader.decodeFromImage(dataUrl);
+        result = await codeReader.decodeFromVideoElement(video);
+        console.log('Video element detection successful');
       } catch (e) {
-        // Method 2: PNG format
+        console.log('Video element detection failed, trying image data');
+        
+        // Method 2: High quality JPEG from canvas
         try {
-          const dataUrl = canvas.toDataURL('image/png');
-          result = await codeReader.decodeFromImage(dataUrl);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+          result = await codeReader.decodeFromImageUrl(dataUrl);
+          console.log('JPEG detection successful');
         } catch (e2) {
-          // Method 3: Enhanced contrast for difficult barcodes
-          const tempCanvas = document.createElement('canvas');
-          const tempContext = tempCanvas.getContext('2d');
-          if (tempContext) {
-            tempCanvas.width = canvas.width;
-            tempCanvas.height = canvas.height;
-            tempContext.filter = 'contrast(200%) brightness(120%) grayscale(100%)';
-            tempContext.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
-            const enhancedDataUrl = tempCanvas.toDataURL('image/png');
-            result = await codeReader.decodeFromImage(enhancedDataUrl);
+          console.log('JPEG detection failed, trying PNG');
+          
+          // Method 3: PNG format from canvas
+          try {
+            const dataUrl = canvas.toDataURL('image/png');
+            result = await codeReader.decodeFromImageUrl(dataUrl);
+            console.log('PNG detection successful');
+          } catch (e3) {
+            console.log('PNG detection failed, trying enhanced image');
+            
+            // Method 4: Enhanced contrast for difficult barcodes
+            const tempCanvas = document.createElement('canvas');
+            const tempContext = tempCanvas.getContext('2d');
+            if (tempContext) {
+              tempCanvas.width = canvas.width;
+              tempCanvas.height = canvas.height;
+              
+              // Apply image enhancements
+              tempContext.filter = 'contrast(150%) brightness(120%) saturate(0%)';
+              tempContext.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+              
+              const enhancedDataUrl = tempCanvas.toDataURL('image/png');
+              result = await codeReader.decodeFromImageUrl(enhancedDataUrl);
+              console.log('Enhanced detection successful');
+            }
           }
         }
       }
@@ -143,9 +172,12 @@ export const EanBarcodeScanner: React.FC<EanBarcodeScannerProps> = ({
           onClose();
           toast.success(`Barcode scanned: ${detectedCode} (${format})`);
         }
+      } else {
+        console.log('No barcode detected in current frame');
       }
     } catch (error) {
-      // Silently continue scanning if no barcode is detected
+      console.error('Barcode scanning error:', error);
+      // Continue scanning despite errors
     }
   };
 
