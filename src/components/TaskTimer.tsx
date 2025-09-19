@@ -146,6 +146,7 @@ const TaskTimer = () => {
         .select(`
           task_id,
           workstation_task_id,
+          end_time,
           tasks (
             id,
             title,
@@ -162,13 +163,16 @@ const TaskTimer = () => {
         `)
         .eq('employee_id', currentEmployee.id)
         .eq('is_active', false)
-        .not('task_id', 'is', null)
-        .or('workstation_task_id.not.is.null')
+        .not('end_time', 'is', null)
+        .or('task_id.not.is.null,workstation_task_id.not.is.null')
         .order('end_time', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (error || !data) return null;
+      if (error || !data) {
+        console.log('Error fetching last worked task:', error);
+        return null;
+      }
 
       if (data.task_id && data.tasks) {
         return {
