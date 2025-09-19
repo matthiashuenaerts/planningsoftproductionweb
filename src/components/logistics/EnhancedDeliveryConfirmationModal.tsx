@@ -6,12 +6,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Camera, Upload, X, Package, MapPin, Printer } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Camera, Upload, X, Package, MapPin, Printer, ChevronDown } from 'lucide-react';
 import { Order, OrderItem } from '@/types/order';
 import { orderService } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { LabelPrintDialog } from './LabelPrintDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EnhancedDeliveryConfirmationModalProps {
   order: Order;
@@ -42,6 +44,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [showLabelDialog, setShowLabelDialog] = useState(false);
+  const [locationSuggestions, setLocationSuggestions] = useState<{[key: string]: string[]}>({});
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
@@ -52,6 +55,33 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
     queryFn: () => orderService.getOrderItems(order.id),
     enabled: isOpen
   });
+
+  // Fetch location suggestions for this project
+  const fetchLocationSuggestions = async (itemId: string) => {
+    if (!order.project_id || locationSuggestions[itemId]) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('order_items')
+        .select(`
+          stock_location,
+          orders!inner(project_id)
+        `)
+        .eq('orders.project_id', order.project_id)
+        .not('stock_location', 'is', null)
+        .neq('stock_location', '');
+
+      if (error) throw error;
+
+      const uniqueLocations = [...new Set(data.map(item => item.stock_location).filter(Boolean))];
+      setLocationSuggestions(prev => ({
+        ...prev,
+        [itemId]: uniqueLocations
+      }));
+    } catch (error) {
+      console.error('Error fetching location suggestions:', error);
+    }
+  };
 
   // Initialize item deliveries when order items are loaded
   useEffect(() => {
@@ -374,14 +404,60 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                                 <MapPin className="h-4 w-4" />
                                 Stock Location
                               </Label>
-                              <Input
-                                id={`location-${item.id}`}
-                                type="text"
-                                value={delivery.stockLocation}
-                                onChange={(e) => updateItemDelivery(item.id, 'stockLocation', e.target.value)}
-                                placeholder="e.g., A1-B2, Warehouse 1"
-                                className="mt-1"
-                              />
+                              <div className="flex gap-2 mt-1">
+                                <Input
+                                  id={`location-${item.id}`}
+                                  type="text"
+                                  value={delivery.stockLocation}
+                                  onChange={(e) => updateItemDelivery(item.id, 'stockLocation', e.target.value)}
+                                  placeholder="e.g., A1-B2, Warehouse 1"
+                                  className="flex-1"
+                                />
+                                {order.project_id && (
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => fetchLocationSuggestions(item.id)}
+                                        className="px-3"
+                                      >
+                                        <ChevronDown className="h-4 w-4" />
+                                        Suggestions
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-60 p-0">
+                                      <div className="p-2">
+                                        <div className="text-sm font-medium mb-2 text-muted-foreground">
+                                          Previously used locations for this project:
+                                        </div>
+                                        {locationSuggestions[item.id]?.length > 0 ? (
+                                          <div className="space-y-1">
+                                            {locationSuggestions[item.id].map((location, idx) => (
+                                              <Button
+                                                key={idx}
+                                                variant="ghost"
+                                                size="sm"
+                                                className="w-full justify-start text-left"
+                                                onClick={() => {
+                                                  updateItemDelivery(item.id, 'stockLocation', location);
+                                                }}
+                                              >
+                                                <MapPin className="h-3 w-3 mr-2" />
+                                                {location}
+                                              </Button>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <div className="text-sm text-muted-foreground py-2">
+                                            No previous locations found for this project
+                                          </div>
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
