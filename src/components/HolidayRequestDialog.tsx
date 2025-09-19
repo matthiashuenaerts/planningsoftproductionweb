@@ -55,8 +55,8 @@ const HolidayRequestDialog: React.FC<HolidayRequestDialogProps> = ({ children })
       await holidayRequestService.createRequest({
         user_id: currentEmployee.id,
         employee_name: currentEmployee.name,
-        start_date: dateRange.from.toISOString().split('T')[0],
-        end_date: dateRange.to.toISOString().split('T')[0],
+        start_date: dateRange.from.toLocaleDateString('en-CA'),
+        end_date: dateRange.to.toLocaleDateString('en-CA'),
         reason: reason.trim() || undefined
       });
 

@@ -93,7 +93,7 @@ const finalRecipients = recipients;
             <p><strong>Request ID:</strong> ${requestId}</p>
           </div>
           <p>This request has been submitted and is pending approval.</p>
-          <p><em>Note: This email was sent to ${testEmail} for testing purposes. Original recipients would be: ${recipients.join(', ')}</em></p>
+          <p><em>This holiday request notification was sent to: ${finalRecipients.join(', ')}</em></p>
         </div>
       `,
     });
