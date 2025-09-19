@@ -9,19 +9,28 @@ import { Play, Pause, Clock, Timer, Move, Minimize2, Maximize2, PictureInPicture
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import TaskExtraTimeDialog from './TaskExtraTimeDialog';
-
 const TaskTimer = () => {
-  const { currentEmployee } = useAuth();
-  const { toast } = useToast();
+  const {
+    currentEmployee
+  } = useAuth();
+  const {
+    toast
+  } = useToast();
   const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
   const location = useLocation();
   const [activeUsersOnTask, setActiveUsersOnTask] = useState(1);
-  
+
   // Draggable and UI state
-  const [position, setPosition] = useState({ x: 0, y: 16 });
+  const [position, setPosition] = useState({
+    x: 0,
+    y: 16
+  });
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dragStart, setDragStart] = useState({
+    x: 0,
+    y: 0
+  });
   const [isMinimized, setIsMinimized] = useState(false);
   const [isPictureInPicture, setIsPictureInPicture] = useState(false);
   const [showExtraTimeDialog, setShowExtraTimeDialog] = useState(false);
@@ -57,23 +66,19 @@ const TaskTimer = () => {
       y: e.clientY - position.y
     });
   };
-
   const handleMouseMove = (e: MouseEvent) => {
     if (!isDragging) return;
-    
     const newX = e.clientX - dragStart.x;
     const newY = e.clientY - dragStart.y;
-    
+
     // Constrain to viewport
     const maxX = window.innerWidth - (timerRef.current?.offsetWidth || 0);
     const maxY = window.innerHeight - (timerRef.current?.offsetHeight || 0);
-    
     setPosition({
       x: Math.max(0, Math.min(newX, maxX)),
       y: Math.max(0, Math.min(newY, maxY))
     });
   };
-
   const handleMouseUp = () => {
     setIsDragging(false);
   };
@@ -90,12 +95,11 @@ const TaskTimer = () => {
           // @ts-ignore - Document Picture-in-Picture API is experimental
           const pipWindowInstance = await window.documentPictureInPicture.requestWindow({
             width: 320,
-            height: 120,
+            height: 120
           });
-          
           pipWindow.current = pipWindowInstance;
           setIsPictureInPicture(true);
-          
+
           // Handle pip window close
           pipWindowInstance.addEventListener('pagehide', () => {
             setIsPictureInPicture(false);
@@ -119,7 +123,6 @@ const TaskTimer = () => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
-      
       return () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
@@ -128,7 +131,10 @@ const TaskTimer = () => {
   }, [isDragging, dragStart.x, dragStart.y]);
 
   // Get active registration
-  const { data: activeRegistration, isLoading } = useQuery({
+  const {
+    data: activeRegistration,
+    isLoading
+  } = useQuery({
     queryKey: ['activeTimeRegistration', currentEmployee?.id],
     queryFn: () => currentEmployee ? timeRegistrationService.getActiveRegistration(currentEmployee.id) : null,
     enabled: !!currentEmployee,
@@ -136,14 +142,16 @@ const TaskTimer = () => {
   });
 
   // Get last worked task when there's no active registration
-  const { data: lastWorkedTask } = useQuery({
+  const {
+    data: lastWorkedTask
+  } = useQuery({
     queryKey: ['lastWorkedTask', currentEmployee?.id],
     queryFn: async () => {
       if (!currentEmployee) return null;
-      
-      const { data, error } = await supabase
-        .from('time_registrations')
-        .select(`
+      const {
+        data,
+        error
+      } = await supabase.from('time_registrations').select(`
           task_id,
           workstation_task_id,
           end_time,
@@ -160,20 +168,13 @@ const TaskTimer = () => {
             task_name,
             workstations (name)
           )
-        `)
-        .eq('employee_id', currentEmployee.id)
-        .eq('is_active', false)
-        .not('end_time', 'is', null)
-        .or('task_id.not.is.null,workstation_task_id.not.is.null')
-        .order('end_time', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
+        `).eq('employee_id', currentEmployee.id).eq('is_active', false).not('end_time', 'is', null).or('task_id.not.is.null,workstation_task_id.not.is.null').order('end_time', {
+        ascending: false
+      }).limit(1).maybeSingle();
       if (error || !data) {
         console.log('Error fetching last worked task:', error);
         return null;
       }
-
       if (data.task_id && data.tasks) {
         return {
           id: data.task_id,
@@ -189,7 +190,6 @@ const TaskTimer = () => {
           is_workstation_task: true
         };
       }
-
       return null;
     },
     enabled: !!currentEmployee && (!activeRegistration || !activeRegistration.is_active)
@@ -201,13 +201,9 @@ const TaskTimer = () => {
       setActiveUsersOnTask(1);
       return;
     }
-
     const fetchActiveUsersCount = async () => {
       try {
-        let query = supabase
-          .from('time_registrations')
-          .select('id')
-          .eq('is_active', true);
+        let query = supabase.from('time_registrations').select('id').eq('is_active', true);
 
         // Check if it's a regular task or workstation task
         if (activeRegistration.task_id) {
@@ -215,9 +211,10 @@ const TaskTimer = () => {
         } else if (activeRegistration.workstation_task_id) {
           query = query.eq('workstation_task_id', activeRegistration.workstation_task_id);
         }
-
-        const { data, error } = await query;
-        
+        const {
+          data,
+          error
+        } = await query;
         if (!error && data) {
           setActiveUsersOnTask(Math.max(1, data.length));
         }
@@ -230,48 +227,40 @@ const TaskTimer = () => {
     fetchActiveUsersCount();
 
     // Set up real-time subscription for immediate updates
-    const channel = supabase
-      .channel('active-task-users')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'time_registrations'
-        },
-        (payload) => {
-          // Immediately refetch when any time registration changes
-          fetchActiveUsersCount();
-        }
-      )
-      .subscribe();
-
+    const channel = supabase.channel('active-task-users').on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'time_registrations'
+    }, payload => {
+      // Immediately refetch when any time registration changes
+      fetchActiveUsersCount();
+    }).subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [activeRegistration?.task_id, activeRegistration?.workstation_task_id, activeRegistration?.is_active]);
 
   // Get task details if there's an active registration
-  const { data: taskDetails } = useQuery({
+  const {
+    data: taskDetails
+  } = useQuery({
     queryKey: ['taskDetails', activeRegistration?.task_id, activeRegistration?.workstation_task_id],
     queryFn: async () => {
       if (!activeRegistration) return null;
-      
+
       // Handle regular tasks
       if (activeRegistration.task_id) {
-        const { data, error } = await supabase
-          .from('tasks')
-          .select(`
+        const {
+          data,
+          error
+        } = await supabase.from('tasks').select(`
             title,
             duration,
             phases (
               name,
               projects (name)
             )
-          `)
-          .eq('id', activeRegistration.task_id)
-          .single();
-        
+          `).eq('id', activeRegistration.task_id).single();
         if (error) throw error;
         return {
           title: data.title,
@@ -280,21 +269,18 @@ const TaskTimer = () => {
           is_workstation_task: false
         };
       }
-      
+
       // Handle workstation tasks
       if (activeRegistration.workstation_task_id) {
-        const { data: workstationTask, error: workstationError } = await supabase
-          .from('workstation_tasks')
-          .select(`
+        const {
+          data: workstationTask,
+          error: workstationError
+        } = await supabase.from('workstation_tasks').select(`
             task_name,
             duration,
             workstations (name)
-          `)
-          .eq('id', activeRegistration.workstation_task_id)
-          .single();
-        
+          `).eq('id', activeRegistration.workstation_task_id).single();
         if (workstationError) throw workstationError;
-        
         return {
           title: workstationTask.task_name,
           project_name: `Workstation: ${workstationTask.workstations?.name || 'Unknown'}`,
@@ -302,7 +288,6 @@ const TaskTimer = () => {
           is_workstation_task: true
         };
       }
-      
       return null;
     },
     enabled: !!activeRegistration && (!!activeRegistration.task_id || !!activeRegistration.workstation_task_id)
@@ -310,16 +295,23 @@ const TaskTimer = () => {
 
   // Start task mutation
   const startTaskMutation = useMutation({
-    mutationFn: ({ employeeId, taskId }: { employeeId: string; taskId: string }) =>
-      timeRegistrationService.startTask(employeeId, taskId),
+    mutationFn: ({
+      employeeId,
+      taskId
+    }: {
+      employeeId: string;
+      taskId: string;
+    }) => timeRegistrationService.startTask(employeeId, taskId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+      queryClient.invalidateQueries({
+        queryKey: ['activeTimeRegistration']
+      });
       toast({
         title: 'Task Started',
-        description: 'Time tracking has begun for this task',
+        description: 'Time tracking has begun for this task'
       });
     },
-    onError: (error) => {
+    onError: error => {
       toast({
         title: 'Error',
         description: 'Failed to start task timer',
@@ -331,18 +323,21 @@ const TaskTimer = () => {
 
   // Stop task mutation
   const stopTaskMutation = useMutation({
-    mutationFn: (registrationId: string) =>
-      timeRegistrationService.stopTask(registrationId),
+    mutationFn: (registrationId: string) => timeRegistrationService.stopTask(registrationId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
-      queryClient.invalidateQueries({ queryKey: ['workstationTasks'] });
+      queryClient.invalidateQueries({
+        queryKey: ['activeTimeRegistration']
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['workstationTasks']
+      });
       toast({
         title: 'Task Paused',
-        description: 'Time tracking has been paused',
+        description: 'Time tracking has been paused'
       });
       setPendingStopData(null);
     },
-    onError: (error) => {
+    onError: error => {
       toast({
         title: 'Error',
         description: 'Failed to pause task timer',
@@ -355,34 +350,38 @@ const TaskTimer = () => {
 
   // Update task duration mutation
   const updateTaskDurationMutation = useMutation({
-    mutationFn: async ({ taskId, workstationTaskId, extraMinutes }: { 
-      taskId?: string; 
-      workstationTaskId?: string; 
-      extraMinutes: number 
+    mutationFn: async ({
+      taskId,
+      workstationTaskId,
+      extraMinutes
+    }: {
+      taskId?: string;
+      workstationTaskId?: string;
+      extraMinutes: number;
     }) => {
       if (taskId) {
         // Set the task's duration to the selected extra time (in minutes)
-        return supabase
-          .from('tasks')
-          .update({ duration: extraMinutes })
-          .eq('id', taskId);
+        return supabase.from('tasks').update({
+          duration: extraMinutes
+        }).eq('id', taskId);
       } else if (workstationTaskId) {
         // Set the workstation task's duration to the selected extra time (in minutes)
-        return supabase
-          .from('workstation_tasks')
-          .update({ duration: extraMinutes })
-          .eq('id', workstationTaskId);
+        return supabase.from('workstation_tasks').update({
+          duration: extraMinutes
+        }).eq('id', workstationTaskId);
       }
     },
     onSuccess: () => {
       toast({
         title: 'Task Duration Updated',
-        description: 'Selected time saved; next countdown will use it.',
+        description: 'Selected time saved; next countdown will use it.'
       });
       // Invalidate any taskDetails queries to ensure fresh duration on next start
-      queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
+      queryClient.invalidateQueries({
+        queryKey: ['taskDetails']
+      });
     },
-    onError: (error) => {
+    onError: error => {
       toast({
         title: 'Error',
         description: 'Failed to update task duration',
@@ -391,10 +390,8 @@ const TaskTimer = () => {
       console.error('Update task duration error:', error);
     }
   });
-
   const handleTimerClick = () => {
     if (!currentEmployee) return;
-
     if (activeRegistration && activeRegistration.is_active) {
       // Check if task is over time before stopping
       if (taskDetails?.duration && activeRegistration.start_time) {
@@ -402,7 +399,6 @@ const TaskTimer = () => {
         const now = new Date();
         const elapsedMinutes = Math.floor((now.getTime() - start.getTime()) / (1000 * 60));
         const overTime = elapsedMinutes - taskDetails.duration;
-        
         if (overTime > 0) {
           // Task is over time, show dialog
           setPendingStopData({
@@ -414,7 +410,7 @@ const TaskTimer = () => {
           return;
         }
       }
-      
+
       // Stop the active task normally
       stopTaskMutation.mutate(activeRegistration.id);
     } else if (lastWorkedTask) {
@@ -423,7 +419,7 @@ const TaskTimer = () => {
         // For workstation tasks, we need to use a different service method
         toast({
           title: 'Workstation Task',
-          description: 'Please restart workstation tasks from the workstation page',
+          description: 'Please restart workstation tasks from the workstation page'
         });
       } else {
         // Start the previous regular task
@@ -436,79 +432,68 @@ const TaskTimer = () => {
       // No previous task found
       toast({
         title: 'No Previous Task',
-        description: 'Start a task from the workstation or personal tasks page to begin time tracking',
+        description: 'Start a task from the workstation or personal tasks page to begin time tracking'
       });
     }
   };
-
   const handleExtraTimeConfirm = (extraMinutes: number) => {
     if (!pendingStopData) return;
-    
+
     // Update task duration first
     updateTaskDurationMutation.mutate({
       taskId: activeRegistration?.task_id,
       workstationTaskId: activeRegistration?.workstation_task_id,
       extraMinutes
     });
-    
+
     // Then stop the task
     stopTaskMutation.mutate(pendingStopData.registrationId);
     setShowExtraTimeDialog(false);
   };
-
   const handleExtraTimeCancel = () => {
     if (!pendingStopData) return;
-    
+
     // Stop the task without updating duration
     stopTaskMutation.mutate(pendingStopData.registrationId);
     setShowExtraTimeDialog(false);
   };
-
   const formatDuration = (startTime: string) => {
     const start = new Date(startTime);
     const now = currentTime;
     const diffMs = now.getTime() - start.getTime();
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
-    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
-    
+    const minutes = Math.floor(diffMs % (1000 * 60 * 60) / (1000 * 60));
+    const seconds = Math.floor(diffMs % (1000 * 60) / 1000);
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
-
   const formatRemainingDuration = (startTime: string, durationMinutes: number | null | undefined) => {
     if (durationMinutes === null || typeof durationMinutes === 'undefined') {
-        return null;
+      return null;
     }
-
     const start = new Date(startTime);
     const now = currentTime;
     const elapsedMs = now.getTime() - start.getTime();
     // Adjust duration based on number of active users (more users = faster completion)
-    const adjustedDurationMs = (durationMinutes * 60 * 1000) / activeUsersOnTask;
+    const adjustedDurationMs = durationMinutes * 60 * 1000 / activeUsersOnTask;
     const remainingMs = adjustedDurationMs - elapsedMs;
-
     const isNegative = remainingMs < 0;
     const absRemainingMs = Math.abs(remainingMs);
-
     const hours = Math.floor(absRemainingMs / (1000 * 60 * 60));
-    const minutes = Math.floor((absRemainingMs % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((absRemainingMs % (1000 * 60)) / 1000);
-
+    const minutes = Math.floor(absRemainingMs % (1000 * 60 * 60) / (1000 * 60));
+    const seconds = Math.floor(absRemainingMs % (1000 * 60) / 1000);
     return `${isNegative ? '-' : ''}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  }
-
+  };
   const isTimeNegative = (startTime: string, durationMinutes: number | null | undefined) => {
     if (durationMinutes === null || typeof durationMinutes === 'undefined') {
-        return false;
+      return false;
     }
     const start = new Date(startTime);
     const now = currentTime;
     const elapsedMs = now.getTime() - start.getTime();
     // Adjust duration based on number of active users
-    const adjustedDurationMs = (durationMinutes * 60 * 1000) / activeUsersOnTask;
+    const adjustedDurationMs = durationMinutes * 60 * 1000 / activeUsersOnTask;
     return adjustedDurationMs - elapsedMs < 0;
-  }
-
+  };
   if (isLoading || !currentEmployee) {
     return null;
   }
@@ -516,7 +501,7 @@ const TaskTimer = () => {
   // Render PiP content in the picture-in-picture window
   if (isPictureInPicture && pipWindow.current) {
     const pipDocument = pipWindow.current.document;
-    
+
     // Create minimal timer content for PiP
     const pipContent = `
       <html>
@@ -584,11 +569,10 @@ const TaskTimer = () => {
         </body>
       </html>
     `;
-    
     pipDocument.open();
     pipDocument.write(pipContent);
     pipDocument.close();
-    
+
     // Update PiP content every second
     setTimeout(() => {
       if (pipWindow.current && !pipWindow.current.closed) {
@@ -599,77 +583,40 @@ const TaskTimer = () => {
       }
     }, 1000);
   }
-
-  return (
-    <>
-      <TaskExtraTimeDialog
-        isOpen={showExtraTimeDialog}
-        onClose={handleExtraTimeCancel}
-        onConfirm={handleExtraTimeConfirm}
-        taskTitle={pendingStopData?.taskDetails?.title || ''}
-        overTimeMinutes={pendingStopData?.overTimeMinutes || 0}
-      />
+  return <>
+      <TaskExtraTimeDialog isOpen={showExtraTimeDialog} onClose={handleExtraTimeCancel} onConfirm={handleExtraTimeConfirm} taskTitle={pendingStopData?.taskDetails?.title || ''} overTimeMinutes={pendingStopData?.overTimeMinutes || 0} />
       
-      <div 
-        ref={timerRef}
-        className={`fixed z-[9999] pointer-events-none transition-all duration-200 ${
-          isDragging ? 'cursor-grabbing' : 'cursor-grab'
-        } ${isPictureInPicture ? 'opacity-50' : ''}`}
-        style={{
-          left: position.x === 0 && position.y === 16 ? '50%' : `${position.x}px`,
-          top: `${position.y}px`,
-          transform: position.x === 0 && position.y === 16 ? 'translateX(-50%)' : 'none',
-        }}
-        onMouseDown={handleMouseDown}
-      >
+      <div ref={timerRef} className={`fixed z-[9999] pointer-events-none transition-all duration-200 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isPictureInPicture ? 'opacity-50' : ''}`} style={{
+      left: position.x === 0 && position.y === 16 ? '50%' : `${position.x}px`,
+      top: `${position.y}px`,
+      transform: position.x === 0 && position.y === 16 ? 'translateX(-50%)' : 'none'
+    }} onMouseDown={handleMouseDown}>
       <div className="pointer-events-auto">
-        <Card 
-          className={`transition-all duration-200 ${
-            activeRegistration && activeRegistration.is_active 
-              ? 'border-green-500 bg-green-50 hover:bg-green-100' 
-              : 'border-red-500 bg-red-50 hover:bg-red-100'
-          } ${isMinimized ? 'max-w-[200px]' : 'max-w-sm'} shadow-lg`}
-        >
+        <Card className={`transition-all duration-200 ${activeRegistration && activeRegistration.is_active ? 'border-green-500 bg-green-50 hover:bg-green-100' : 'border-red-500 bg-red-50 hover:bg-red-100'} ${isMinimized ? 'max-w-[200px]' : 'max-w-sm'} shadow-lg`}>
           <CardContent className={`${isMinimized ? 'p-1' : 'p-2'}`}>
-            {!isMinimized ? (
-              <div className="flex items-center justify-between space-x-2">
+            {!isMinimized ? <div className="flex items-center justify-between space-x-2">
                 <div className="flex items-center space-x-1 flex-1 min-w-0">
-                  <div className={`p-1.5 rounded-full cursor-pointer ${
-                    activeRegistration && activeRegistration.is_active 
-                      ? 'bg-green-500 text-white' 
-                      : 'bg-red-500 text-white'
-                  }`} onClick={handleTimerClick}>
-                    {activeRegistration && activeRegistration.is_active ? 
-                      <Pause className="h-3 w-3" /> : 
-                      <Play className="h-3 w-3" />
-                    }
+                  <div className={`p-1.5 rounded-full cursor-pointer ${activeRegistration && activeRegistration.is_active ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`} onClick={handleTimerClick}>
+                    {activeRegistration && activeRegistration.is_active ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
                   </div>
                   
                   <div className="min-w-0 flex-1">
-                    {activeRegistration && taskDetails ? (
-                      <div>
+                    {activeRegistration && taskDetails ? <div>
                         <p className="font-medium text-xs truncate">
                           {taskDetails.project_name}
                         </p>
                         <p className="text-xs text-gray-600 truncate">
                           {taskDetails.title}
                         </p>
-                        {taskDetails.is_workstation_task && (
-                          <p className="text-xs text-blue-600">Workstation Task</p>
-                        )}
-                      </div>
-                    ) : lastWorkedTask ? (
-                      <div>
+                        {taskDetails.is_workstation_task && <p className="text-xs text-blue-600">Workstation Task</p>}
+                      </div> : lastWorkedTask ? <div>
                         <p className="font-medium text-xs text-gray-500">{lastWorkedTask.project_name}</p>
                         <p className="text-xs text-gray-400">{lastWorkedTask.title}</p>
-                        <p className="text-xs text-blue-500">Click to restart</p>
-                      </div>
-                    ) : (
-                      <div>
+                        
+                      </div> : <div>
                         <p className="font-medium text-xs text-gray-500">No Previous Task</p>
                         <p className="text-xs text-gray-400">Start from tasks page</p>
-                      </div>
-                    )}
+                      </div>}
                   </div>
                 </div>
                 
@@ -678,89 +625,54 @@ const TaskTimer = () => {
                     <div className="flex items-center space-x-1">
                       <Clock className="h-2.5 w-2.5 text-gray-500" />
                       <span className="font-mono text-xs font-medium">
-                        {activeRegistration && activeRegistration.is_active 
-                          ? formatDuration(activeRegistration.start_time)
-                          : '00:00:00'
-                        }
+                        {activeRegistration && activeRegistration.is_active ? formatDuration(activeRegistration.start_time) : '00:00:00'}
                       </span>
                     </div>
-                    {activeRegistration && activeRegistration.is_active && taskDetails?.duration != null && (
-                      <div className="flex items-center space-x-1">
+                    {activeRegistration && activeRegistration.is_active && taskDetails?.duration != null && <div className="flex items-center space-x-1">
                         <Timer className="h-2.5 w-2.5 text-gray-500" />
                          <span className={`font-mono text-xs font-medium ${isTimeNegative(activeRegistration.start_time, taskDetails.duration) ? 'text-red-500' : ''}`}>
                            {formatRemainingDuration(activeRegistration.start_time, taskDetails.duration)}
                            {activeUsersOnTask > 1 && <span className="text-blue-500 ml-1">({activeUsersOnTask}x)</span>}
                          </span>
-                      </div>
-                    )}
+                      </div>}
                   </div>
                   
                   {/* Control buttons */}
                   <div className="flex flex-col space-y-0.5 ml-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-4 w-4 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        togglePictureInPicture();
-                      }}
-                    >
+                    <Button variant="ghost" size="sm" className="h-4 w-4 p-0" onClick={e => {
+                    e.stopPropagation();
+                    togglePictureInPicture();
+                  }}>
                       <PictureInPicture className="h-2 w-2" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-4 w-4 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsMinimized(!isMinimized);
-                      }}
-                    >
+                    <Button variant="ghost" size="sm" className="h-4 w-4 p-0" onClick={e => {
+                    e.stopPropagation();
+                    setIsMinimized(!isMinimized);
+                  }}>
                       <Minimize2 className="h-2 w-2" />
                     </Button>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between space-x-1">
-                <div className={`p-1 rounded-full cursor-pointer ${
-                  activeRegistration && activeRegistration.is_active 
-                    ? 'bg-green-500 text-white' 
-                    : 'bg-red-500 text-white'
-                }`} onClick={handleTimerClick}>
-                  {activeRegistration && activeRegistration.is_active ? 
-                    <Pause className="h-2 w-2" /> : 
-                    <Play className="h-2 w-2" />
-                  }
+              </div> : <div className="flex items-center justify-between space-x-1">
+                <div className={`p-1 rounded-full cursor-pointer ${activeRegistration && activeRegistration.is_active ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`} onClick={handleTimerClick}>
+                  {activeRegistration && activeRegistration.is_active ? <Pause className="h-2 w-2" /> : <Play className="h-2 w-2" />}
                 </div>
                 
                 <span className="font-mono text-xs font-medium">
-                  {activeRegistration && activeRegistration.is_active 
-                    ? formatDuration(activeRegistration.start_time)
-                    : '00:00:00'
-                  }
+                  {activeRegistration && activeRegistration.is_active ? formatDuration(activeRegistration.start_time) : '00:00:00'}
                 </span>
                 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsMinimized(false);
-                  }}
-                >
+                <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={e => {
+                e.stopPropagation();
+                setIsMinimized(false);
+              }}>
                   <Maximize2 className="h-3 w-3" />
                 </Button>
-              </div>
-            )}
+              </div>}
           </CardContent>
         </Card>
       </div>
     </div>
-    </>
-  );
+    </>;
 };
-
 export default TaskTimer;
