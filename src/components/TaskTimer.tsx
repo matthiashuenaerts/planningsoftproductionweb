@@ -135,6 +135,62 @@ const TaskTimer = () => {
     refetchInterval: 1000 // Refetch every second for real-time updates
   });
 
+  // Get last worked task when there's no active registration
+  const { data: lastWorkedTask } = useQuery({
+    queryKey: ['lastWorkedTask', currentEmployee?.id],
+    queryFn: async () => {
+      if (!currentEmployee) return null;
+      
+      const { data, error } = await supabase
+        .from('time_registrations')
+        .select(`
+          task_id,
+          workstation_task_id,
+          tasks (
+            id,
+            title,
+            phases (
+              name,
+              projects (name)
+            )
+          ),
+          workstation_tasks (
+            id,
+            task_name,
+            workstations (name)
+          )
+        `)
+        .eq('employee_id', currentEmployee.id)
+        .eq('is_active', false)
+        .not('task_id', 'is', null)
+        .or('workstation_task_id.not.is.null')
+        .order('end_time', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !data) return null;
+
+      if (data.task_id && data.tasks) {
+        return {
+          id: data.task_id,
+          title: data.tasks.title,
+          project_name: data.tasks.phases?.projects?.name || 'Unknown Project',
+          is_workstation_task: false
+        };
+      } else if (data.workstation_task_id && data.workstation_tasks) {
+        return {
+          id: data.workstation_task_id,
+          title: data.workstation_tasks.task_name,
+          project_name: `Workstation: ${data.workstation_tasks.workstations?.name || 'Unknown'}`,
+          is_workstation_task: true
+        };
+      }
+
+      return null;
+    },
+    enabled: !!currentEmployee && (!activeRegistration || !activeRegistration.is_active)
+  });
+
   // Real-time tracking of active users on the same task
   useEffect(() => {
     if (!activeRegistration || !activeRegistration.is_active) {
@@ -357,10 +413,25 @@ const TaskTimer = () => {
       
       // Stop the active task normally
       stopTaskMutation.mutate(activeRegistration.id);
+    } else if (lastWorkedTask) {
+      // Restart the last worked task
+      if (lastWorkedTask.is_workstation_task) {
+        // For workstation tasks, we need to use a different service method
+        toast({
+          title: 'Workstation Task',
+          description: 'Please restart workstation tasks from the workstation page',
+        });
+      } else {
+        // Start the previous regular task
+        startTaskMutation.mutate({
+          employeeId: currentEmployee.id,
+          taskId: lastWorkedTask.id
+        });
+      }
     } else {
-      // Need to select a task to start - for now, show a message
+      // No previous task found
       toast({
-        title: 'No Active Task',
+        title: 'No Previous Task',
         description: 'Start a task from the workstation or personal tasks page to begin time tracking',
       });
     }
@@ -583,10 +654,16 @@ const TaskTimer = () => {
                           <p className="text-xs text-blue-600">Workstation Task</p>
                         )}
                       </div>
+                    ) : lastWorkedTask ? (
+                      <div>
+                        <p className="font-medium text-xs text-gray-500">{lastWorkedTask.project_name}</p>
+                        <p className="text-xs text-gray-400">{lastWorkedTask.title}</p>
+                        <p className="text-xs text-blue-500">Click to restart</p>
+                      </div>
                     ) : (
                       <div>
-                        <p className="font-medium text-xs text-gray-500">No Active Task</p>
-                        <p className="text-xs text-gray-400">Click to start</p>
+                        <p className="font-medium text-xs text-gray-500">No Previous Task</p>
+                        <p className="text-xs text-gray-400">Start from tasks page</p>
                       </div>
                     )}
                   </div>
