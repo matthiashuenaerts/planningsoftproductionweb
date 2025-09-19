@@ -7,13 +7,13 @@ import { toast } from 'sonner';
 interface EanBarcodeScannerProps {
   isOpen: boolean;
   onClose: () => void;
-  onEanDetected: (ean: string) => void;
+  onEanDetected: (barcode: string) => void;
 }
 
 export const EanBarcodeScanner: React.FC<EanBarcodeScannerProps> = ({
   isOpen,
   onClose,
-  onEanDetected
+  onEanDetected: onBarcodeDetected
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -76,8 +76,8 @@ export const EanBarcodeScanner: React.FC<EanBarcodeScannerProps> = ({
         videoRef.current.play();
         setIsScanning(true);
         
-        // Start scanning for barcodes with higher frequency
-        scanIntervalRef.current = setInterval(scanForBarcode, 200);
+        // Start scanning for barcodes with higher frequency for automatic detection
+        scanIntervalRef.current = setInterval(scanForBarcode, 100);
       }
     } catch (error) {
       console.error('Error starting camera:', error);
@@ -132,22 +132,16 @@ export const EanBarcodeScanner: React.FC<EanBarcodeScannerProps> = ({
       
       if (result) {
         const detectedCode = result.getText();
-        console.log('Barcode detected:', detectedCode, 'Format:', result.getBarcodeFormat());
+        const format = result.getBarcodeFormat();
+        console.log('Barcode detected:', detectedCode, 'Format:', format);
         
-        // Accept EAN codes (8 or 13 digits) or any other valid barcode
-        if (/^\d{8}$|^\d{13}$/.test(detectedCode)) {
+        // Accept any valid barcode with content
+        if (detectedCode && detectedCode.length > 0) {
           setIsScanning(false);
           cleanup();
-          onEanDetected(detectedCode);
+          onBarcodeDetected(detectedCode);
           onClose();
-          toast.success(`EAN code scanned: ${detectedCode}`);
-        } else if (detectedCode.length > 0) {
-          // For non-EAN codes, still provide them but with a warning
-          setIsScanning(false);
-          cleanup();
-          onEanDetected(detectedCode);
-          onClose();
-          toast.success(`Barcode scanned: ${detectedCode}`);
+          toast.success(`Barcode scanned: ${detectedCode} (${format})`);
         }
       }
     } catch (error) {
@@ -188,7 +182,7 @@ export const EanBarcodeScanner: React.FC<EanBarcodeScannerProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Camera className="h-5 w-5" />
-            Scan EAN Barcode
+            Scan Barcode
           </DialogTitle>
         </DialogHeader>
 
@@ -205,7 +199,7 @@ export const EanBarcodeScanner: React.FC<EanBarcodeScannerProps> = ({
               <Camera className="mx-auto h-12 w-12 text-gray-400 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">Camera Access Required</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Please allow camera access to scan EAN barcodes.
+                Please allow camera access to scan barcodes automatically.
               </p>
               <Button onClick={requestCameraPermission} className="mb-2">
                 <Camera className="h-4 w-4 mr-2" />
@@ -261,10 +255,10 @@ export const EanBarcodeScanner: React.FC<EanBarcodeScannerProps> = ({
 
               <div className="text-center">
                 <p className="text-sm text-gray-600">
-                  Position the EAN barcode within the frame to scan
+                  Position any barcode within the frame for automatic detection
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Supports EAN-8 and EAN-13 barcodes
+                  Supports EAN, UPC, Code 128, QR codes and more
                 </p>
               </div>
             </div>

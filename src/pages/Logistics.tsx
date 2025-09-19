@@ -204,7 +204,7 @@ const Logistics = () => {
               className="flex items-center gap-2"
             >
               <Scan className="h-4 w-4" />
-              Scan EAN
+              Scan Barcode
             </Button>
           </div>
         </div>
