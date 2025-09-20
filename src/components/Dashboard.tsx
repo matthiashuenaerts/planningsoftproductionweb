@@ -495,13 +495,13 @@ const Dashboard: React.FC = () => {
 
   // Get team background color based on team name
   const getTeamBackgroundColor = (teamColor?: string) => {
-    if (!teamColor) return '';
+    if (!teamColor) return 'bg-gray-200/70';
     
     switch (teamColor) {
       case 'green': return 'bg-green-200/70';
       case 'blue': return 'bg-blue-200/70'; 
       case 'orange': return 'bg-orange-200/70';
-      default: return '';
+      default: return 'bg-gray-200/70';
     }
   };
 
