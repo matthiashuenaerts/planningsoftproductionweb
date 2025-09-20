@@ -232,54 +232,6 @@ export type Database = {
         }
         Relationships: []
       }
-      daily_team_assignments: {
-        Row: {
-          created_at: string
-          date: string
-          employee_id: string
-          id: string
-          is_available: boolean
-          notes: string | null
-          team_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          date: string
-          employee_id: string
-          id?: string
-          is_available?: boolean
-          notes?: string | null
-          team_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          date?: string
-          employee_id?: string
-          id?: string
-          is_available?: boolean
-          notes?: string | null
-          team_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "daily_team_assignments_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "daily_team_assignments_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "placement_teams"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       employee_workstation_links: {
         Row: {
           created_at: string
@@ -1155,72 +1107,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      placement_team_members: {
-        Row: {
-          created_at: string
-          employee_id: string
-          id: string
-          is_default: boolean
-          team_id: string
-        }
-        Insert: {
-          created_at?: string
-          employee_id: string
-          id?: string
-          is_default?: boolean
-          team_id: string
-        }
-        Update: {
-          created_at?: string
-          employee_id?: string
-          id?: string
-          is_default?: boolean
-          team_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "placement_team_members_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "placement_team_members_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "placement_teams"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      placement_teams: {
-        Row: {
-          color: string
-          created_at: string
-          id: string
-          is_active: boolean
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          color?: string
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          color?: string
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          name?: string
-          updated_at?: string
-        }
-        Relationships: []
       }
       production_flow_lines: {
         Row: {
