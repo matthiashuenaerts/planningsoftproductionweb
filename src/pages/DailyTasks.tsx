@@ -2,308 +2,414 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { format, addDays, parseISO } from 'date-fns';
-import { projectService } from '@/services/dataService';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Truck } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { format, isToday } from 'date-fns';
+import { CalendarDays, Users, UserPlus, UserMinus, AlertTriangle } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { placementTeamService, TeamWithMembers, DailyTeamAssignment } from '@/services/placementTeamService';
 import { supabase } from '@/integrations/supabase/client';
-import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import InstallationTeamCalendar from '@/components/InstallationTeamCalendar';
-import TruckLoadingCalendar from '@/components/TruckLoadingCalendar';
-interface Project {
+interface Employee {
   id: string;
   name: string;
-  client: string;
-  installation_date: string;
-  status: string;
-  progress: number;
-  [key: string]: any;
+  email: string;
+  role: string;
 }
 const DailyTasks: React.FC = () => {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [displayMode, setDisplayMode] = useState<'calendar' | 'teams' | 'trucks'>('calendar');
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [teams, setTeams] = useState<TeamWithMembers[]>([]);
+  const [dailyAssignments, setDailyAssignments] = useState<DailyTeamAssignment[]>([]);
+  const [availableEmployees, setAvailableEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
-  const [weekStart, setWeekStart] = useState<Date>(new Date());
-  const {
-    toast
-  } = useToast();
+  const [showAddMemberDialog, setShowAddMemberDialog] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+  const [memberNotes, setMemberNotes] = useState<string>('');
+  const { toast } = useToast();
 
-  // Format the selected date to match our date format in the database
-  const formattedSelectedDate = selectedDate ? selectedDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-
-  // Fetch all projects with installation dates
+  // Load data on mount and when date changes
   useEffect(() => {
-    const fetchAllProjects = async () => {
-      try {
-        setLoading(true);
+    loadData();
+  }, [selectedDate]);
 
-        // Get all projects with installation dates
-        const {
-          data,
-          error
-        } = await supabase.from('projects').select('*').not('installation_date', 'is', null).order('installation_date', {
-          ascending: true
-        });
-        if (error) throw error;
-        setAllProjects(data || []);
-
-        // Filter projects for the selected date
-        filterProjectsForSelectedDate(selectedDate, data || []);
-      } catch (error: any) {
-        console.error('Error fetching projects:', error);
-        toast({
-          title: "Error",
-          description: `Failed to load projects: ${error.message}`,
-          variant: "destructive"
-        });
-        setAllProjects([]);
-        setProjects([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAllProjects();
-  }, [toast]);
-
-  // Filter projects when selected date changes
-  useEffect(() => {
-    filterProjectsForSelectedDate(selectedDate, allProjects);
-  }, [selectedDate, allProjects]);
-
-  // Filter projects for selected date
-  const filterProjectsForSelectedDate = (date: Date | undefined, allProjectsData: Project[]) => {
-    if (!date) {
-      setProjects([]);
-      return;
-    }
-    const dateString = date.toISOString().split('T')[0];
-    const filtered = allProjectsData.filter(project => {
-      return project.installation_date === dateString;
-    });
-    setProjects(filtered);
-  };
-
-  // Generate week view dates
-  const getWeekDates = () => {
-    const dates = [];
-    for (let i = 0; i < 7; i++) {
-      dates.push(addDays(weekStart, i));
-    }
-    return dates;
-  };
-  const weekDates = getWeekDates();
-
-  // Navigate to previous week
-  const prevWeek = () => {
-    setWeekStart(addDays(weekStart, -7));
-  };
-
-  // Navigate to next week
-  const nextWeek = () => {
-    setWeekStart(addDays(weekStart, 7));
-  };
-
-  // Get projects for a specific date
-  const getProjectsForDate = (date: Date) => {
-    const dateString = date.toISOString().split('T')[0];
-    return allProjects.filter(project => project.installation_date === dateString);
-  };
-
-  // Helper function to format date
-  const formatDate = (dateString: string) => {
+  const loadData = async () => {
     try {
-      return format(new Date(dateString), 'MMMM d, yyyy');
-    } catch (error) {
-      return 'Invalid date';
+      setLoading(true);
+      
+      // Load teams with members
+      const teamsData = await placementTeamService.getTeamsWithMembers();
+      setTeams(teamsData);
+      
+      // Load or generate daily assignments for selected date
+      await placementTeamService.generateDefaultAssignments(selectedDate);
+      const assignments = await placementTeamService.getDailyAssignments(selectedDate);
+      setDailyAssignments(assignments);
+      
+      // Load available employees (those not assigned to any default team)
+      const { data: employees, error } = await supabase
+        .from('employees')
+        .select('id, name, email, role')
+        .order('name');
+      
+      if (error) throw error;
+      
+      // Filter out employees who are already default members of teams
+      const defaultMemberIds = new Set();
+      teamsData.forEach(team => {
+        team.members.filter(m => m.is_default).forEach(m => {
+          defaultMemberIds.add(m.employee_id);
+        });
+      });
+      
+      const available = (employees || []).filter(emp => !defaultMemberIds.has(emp.id));
+      setAvailableEmployees(available);
+      
+    } catch (error: any) {
+      console.error('Error loading data:', error);
+      toast({
+        title: "Error",
+        description: `Failed to load placement schedule: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Handler for clicking project
-  const handleProjectClick = (projectId: string) => {
-    window.location.href = `/projects/${projectId}`;
-  };
-
-  // Function to get status color
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'active':
-        return 'bg-green-100 text-green-800 border-green-300';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'completed':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800 border-red-300';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-300';
+  const handleAddMember = async () => {
+    if (!selectedTeamId || !selectedEmployeeId) return;
+    
+    try {
+      await placementTeamService.upsertDailyAssignment({
+        team_id: selectedTeamId,
+        employee_id: selectedEmployeeId,
+        date: selectedDate,
+        is_available: true,
+        notes: memberNotes
+      });
+      
+      toast({
+        title: "Success",
+        description: "Team member added successfully"
+      });
+      
+      setShowAddMemberDialog(false);
+      setSelectedTeamId('');
+      setSelectedEmployeeId('');
+      setMemberNotes('');
+      loadData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to add team member: ${error.message}`,
+        variant: "destructive"
+      });
     }
   };
-  return <div className="flex min-h-screen">
+
+  const handleRemoveMember = async (teamId: string, employeeId: string) => {
+    try {
+      await placementTeamService.removeDailyAssignment(teamId, employeeId, selectedDate);
+      
+      toast({
+        title: "Success",
+        description: "Team member removed successfully"
+      });
+      
+      loadData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to remove team member: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const toggleMemberAvailability = async (assignment: DailyTeamAssignment) => {
+    try {
+      await placementTeamService.upsertDailyAssignment({
+        team_id: assignment.team_id,
+        employee_id: assignment.employee_id,
+        date: selectedDate,
+        is_available: !assignment.is_available,
+        notes: assignment.notes
+      });
+      
+      toast({
+        title: "Success",
+        description: `Member marked as ${!assignment.is_available ? 'available' : 'unavailable'}`
+      });
+      
+      loadData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to update availability: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const getTeamAssignments = (teamId: string) => {
+    return dailyAssignments.filter(assignment => assignment.team_id === teamId);
+  };
+
+  const getTeamColor = (color: string) => {
+    const colors: { [key: string]: string } = {
+      blue: 'border-blue-200 bg-blue-50',
+      green: 'border-green-200 bg-green-50',
+      orange: 'border-orange-200 bg-orange-50',
+      purple: 'border-purple-200 bg-purple-50',
+      red: 'border-red-200 bg-red-50'
+    };
+    return colors[color] || 'border-gray-200 bg-gray-50';
+  };
+
+  const getBadgeColor = (isAvailable: boolean, isOnHoliday: boolean = false) => {
+    if (isOnHoliday) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+    if (!isAvailable) return 'bg-red-100 text-red-800 border-red-300';
+    return 'bg-green-100 text-green-800 border-green-300';
+  };
+
+  const getBadgeText = (isAvailable: boolean, isOnHoliday: boolean = false) => {
+    if (isOnHoliday) return 'On Holiday';
+    if (!isAvailable) return 'Unavailable';
+    return 'Available';
+  };
+  return (
+    <div className="flex min-h-screen">
       <div className="w-64 bg-sidebar fixed top-0 bottom-0">
         <Navbar />
       </div>
       <div className="ml-64 w-full p-6 my-[70px]">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold">Installation Calendar</h1>
-            
-            <div className="flex mt-4 md:mt-0 space-x-2">
-              <Button variant={displayMode === 'calendar' ? 'default' : 'outline'} onClick={() => setDisplayMode('calendar')}>
-                Calendar View
-              </Button>
-              <Button variant={displayMode === 'teams' ? 'default' : 'outline'} onClick={() => setDisplayMode('teams')}>
-                Team Planner
-              </Button>
-              <Button variant={displayMode === 'trucks' ? 'default' : 'outline'} onClick={() => setDisplayMode('trucks')}>
-                <Truck className="h-4 w-4 mr-2" />
-                Truck Loading
-              </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Placement Schedule</h1>
+              <p className="text-muted-foreground">Manage installation team assignments and availability</p>
             </div>
+            
+            <Dialog open={showAddMemberDialog} onOpenChange={setShowAddMemberDialog}>
+              <DialogTrigger asChild>
+                <Button>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add Team Member
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Team Member for {format(selectedDate, 'MMMM d, yyyy')}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="team">Team</Label>
+                    <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a team" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teams.map(team => (
+                          <SelectItem key={team.id} value={team.id}>
+                            {team.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="employee">Employee</Label>
+                    <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an employee" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableEmployees.map(employee => (
+                          <SelectItem key={employee.id} value={employee.id}>
+                            {employee.name} ({employee.role})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="notes">Notes (optional)</Label>
+                    <Textarea
+                      id="notes"
+                      value={memberNotes}
+                      onChange={(e) => setMemberNotes(e.target.value)}
+                      placeholder="Add any notes about this assignment..."
+                    />
+                  </div>
+                  
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setShowAddMemberDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleAddMember} disabled={!selectedTeamId || !selectedEmployeeId}>
+                      Add Member
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
           
-          {displayMode === 'calendar' ? <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Calendar */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <CalendarDays className="mr-2 h-5 w-5" />
+                  Calendar
+                </CardTitle>
+                <CardDescription>
+                  Select a date to manage team assignments
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  className="rounded-md border w-full"
+                />
+              </CardContent>
+            </Card>
+            
+            {/* Team Assignments */}
+            <div className="lg:col-span-3">
+              <Card className="h-full">
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <CalendarIcon className="mr-2 h-5 w-5" />
-                    Calendar
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Users className="mr-2 h-5 w-5" />
+                      Team Assignments for {format(selectedDate, 'MMMM d, yyyy')}
+                      {isToday(selectedDate) && (
+                        <Badge variant="outline" className="ml-2">Today</Badge>
+                      )}
+                    </div>
                   </CardTitle>
                   <CardDescription>
-                    Select a date to view installations
+                    Manage placement team members and their availability
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} className="rounded-md border w-full" modifiers={{
-                hasProjects: allProjects.map(p => new Date(p.installation_date))
-              }} modifiersClassNames={{
-                hasProjects: "relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:h-1 after:w-1 after:rounded-full after:bg-primary"
-              }} />
-                </CardContent>
-              </Card>
-              
-              <div className="lg:col-span-2">
-                <Card className="h-full">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center">
-                        <CalendarDays className="mr-2 h-5 w-5" />
-                        Installations for {selectedDate ? formatDate(formattedSelectedDate) : 'Today'}
-                      </CardTitle>
-                      <CardDescription>
-                        {projects.length} {projects.length === 1 ? 'project' : 'projects'} scheduled
-                      </CardDescription>
+                  {loading ? (
+                    <div className="flex justify-center p-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    {loading ? <div className="flex justify-center p-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                      </div> : projects.length > 0 ? <div className="grid gap-4 md:grid-cols-2">
-                        {projects.map(project => <div key={project.id} className="rounded-lg border overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleProjectClick(project.id)}>
-                            <div className="bg-primary/5 p-4">
-                              <div className="flex justify-between items-start">
-                                <h3 className="font-medium text-lg mb-1 truncate">{project.name}</h3>
-                                <Badge className={cn("ml-2", getStatusColor(project.status))}>
-                                  {project.status}
+                  ) : (
+                    <div className="space-y-6">
+                      {teams.map(team => {
+                        const teamAssignments = getTeamAssignments(team.id);
+                        const availableCount = teamAssignments.filter(a => a.is_available).length;
+                        const totalCount = teamAssignments.length;
+                        
+                        return (
+                          <div key={team.id} className={cn("rounded-lg border-2 p-4", getTeamColor(team.color))}>
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center space-x-3">
+                                <div className={cn("w-4 h-4 rounded-full", `bg-${team.color}-500`)} />
+                                <h3 className="text-lg font-semibold">{team.name}</h3>
+                                <Badge variant="outline">
+                                  {availableCount}/{totalCount} available
                                 </Badge>
                               </div>
-                              <p className="text-muted-foreground truncate">{project.client}</p>
                             </div>
                             
-                            <div className="p-4">
-                              <div className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-muted-foreground">Installation:</span>
-                                  <span className="font-medium">{formatDate(project.installation_date)}</span>
-                                </div>
-                                
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Progress:</span>
-                                    <span>{project.progress || 0}%</span>
-                                  </div>
-                                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-primary rounded-full" style={{
-                              width: `${project.progress || 0}%`
-                            }}></div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>)}
-                      </div> : <div className="text-center py-12 px-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                        <CalendarDays className="mx-auto h-10 w-10 text-gray-400 mb-3" />
-                        <p className="text-lg font-medium text-gray-600 mb-1">No installations scheduled</p>
-                        <p className="text-muted-foreground max-w-sm mx-auto">
-                          There are no projects scheduled for installation on this date.
-                          Select a different date or create a new project.
-                        </p>
-                        <Button variant="outline" className="mt-4" onClick={() => window.location.href = '/projects'}>
-                          View All Projects
-                        </Button>
-                      </div>}
-                  </CardContent>
-                </Card>
-              </div>
-            </div> : displayMode === 'teams' ? <InstallationTeamCalendar projects={allProjects} /> : <TruckLoadingCalendar />}
-          
-          {displayMode === 'calendar' && <div className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Upcoming Installations</CardTitle>
-                  <CardDescription>
-                    Projects scheduled for installation in the next 30 days
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? <div className="flex justify-center p-4">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                    </div> : <div className="relative">
-                      <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200" />
-                      
-                      {allProjects.length > 0 ? <div className="space-y-4">
-                          {allProjects.slice(0, 10).map(project => {
-                    const installationDate = new Date(project.installation_date);
-                    const isUpcoming = installationDate >= new Date();
-                    return <div key={project.id} className="relative pl-10 cursor-pointer hover:bg-gray-50 p-2 rounded" onClick={() => handleProjectClick(project.id)}>
-                                <div className={cn("absolute left-3 top-2 w-3 h-3 rounded-full border-2 border-white", isUpcoming ? "bg-primary" : "bg-gray-400")} />
-                                
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between">
-                                  <div>
-                                    <div className="text-sm text-muted-foreground">
-                                      {formatDate(project.installation_date)}
-                                    </div>
-                                    <div className="font-medium">{project.name}</div>
-                                    <div className="text-sm text-muted-foreground">{project.client}</div>
-                                  </div>
+                            {teamAssignments.length > 0 ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {teamAssignments.map(assignment => {
+                                  const isDefaultMember = team.members.some(
+                                    m => m.employee_id === assignment.employee_id && m.is_default
+                                  );
                                   
-                                  <div className="mt-2 sm:mt-0">
-                                    <Badge className={getStatusColor(project.status)}>
-                                      {project.status}
-                                    </Badge>
-                                  </div>
-                                </div>
-                              </div>;
-                  })}
-                        </div> : <div className="text-center py-8 text-muted-foreground">
-                          No upcoming installations found.
-                        </div>}
+                                  return (
+                                    <div key={`${assignment.team_id}-${assignment.employee_id}`} 
+                                         className="bg-white rounded-lg border p-3 space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                          <span className="font-medium">{assignment.employee.name}</span>
+                                          {isDefaultMember && (
+                                            <Badge variant="secondary" className="text-xs">Default</Badge>
+                                          )}
+                                        </div>
+                                        
+                                        {!isDefaultMember && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleRemoveMember(team.id, assignment.employee_id)}
+                                            className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                          >
+                                            <UserMinus className="h-3 w-3" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                      
+                                      <div className="text-sm text-muted-foreground">
+                                        {assignment.employee.role}
+                                      </div>
+                                      
+                                      <div className="flex items-center space-x-2">
+                                        <Badge 
+                                          className={cn("cursor-pointer", getBadgeColor(assignment.is_available))}
+                                          onClick={() => toggleMemberAvailability(assignment)}
+                                        >
+                                          {getBadgeText(assignment.is_available)}
+                                        </Badge>
+                                        
+                                        {!assignment.is_available && (
+                                          <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                        )}
+                                      </div>
+                                      
+                                      {assignment.notes && (
+                                        <div className="text-xs text-muted-foreground bg-gray-50 p-2 rounded">
+                                          {assignment.notes}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="text-center py-8 text-muted-foreground">
+                                <Users className="mx-auto h-8 w-8 mb-2 opacity-50" />
+                                <p>No team members assigned for this date</p>
+                                <p className="text-sm">Use "Add Team Member" to assign someone to this team</p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                       
-                      {allProjects.length > 10 && <div className="text-center mt-4">
-                          <Button variant="outline" onClick={() => window.location.href = '/projects'}>
-                            View All Projects
-                          </Button>
-                        </div>}
-                    </div>}
+                      {teams.length === 0 && (
+                        <div className="text-center py-12 px-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                          <Users className="mx-auto h-10 w-10 text-gray-400 mb-3" />
+                          <p className="text-lg font-medium text-gray-600 mb-1">No placement teams found</p>
+                          <p className="text-muted-foreground max-w-sm mx-auto">
+                            Create placement teams in the settings to start managing team assignments.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            </div>}
+            </div>
+          </div>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };
 export default DailyTasks;

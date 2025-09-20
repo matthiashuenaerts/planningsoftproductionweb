@@ -50,19 +50,19 @@ export interface TeamWithMembers extends PlacementTeam {
 export const placementTeamService = {
   // Get all placement teams
   async getTeams(): Promise<PlacementTeam[]> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('placement_teams')
       .select('*')
       .eq('is_active', true)
       .order('name');
     
     if (error) throw error;
-    return data || [];
+    return (data || []) as PlacementTeam[];
   },
 
   // Get team with members
   async getTeamWithMembers(teamId: string): Promise<TeamWithMembers | null> {
-    const { data: team, error: teamError } = await supabase
+    const { data: team, error: teamError } = await (supabase as any)
       .from('placement_teams')
       .select('*')
       .eq('id', teamId)
@@ -71,7 +71,7 @@ export const placementTeamService = {
     if (teamError) throw teamError;
     if (!team) return null;
 
-    const { data: members, error: membersError } = await supabase
+    const { data: members, error: membersError } = await (supabase as any)
       .from('placement_team_members')
       .select(`
         *,
@@ -83,14 +83,14 @@ export const placementTeamService = {
     if (membersError) throw membersError;
 
     return {
-      ...team,
-      members: members || []
+      ...(team as PlacementTeam),
+      members: (members || []) as TeamMember[]
     };
   },
 
   // Get all teams with their members
   async getTeamsWithMembers(): Promise<TeamWithMembers[]> {
-    const { data: teams, error: teamsError } = await supabase
+    const { data: teams, error: teamsError } = await (supabase as any)
       .from('placement_teams')
       .select('*')
       .eq('is_active', true)
@@ -99,8 +99,8 @@ export const placementTeamService = {
     if (teamsError) throw teamsError;
 
     const teamsWithMembers = await Promise.all(
-      (teams || []).map(async (team) => {
-        const { data: members, error: membersError } = await supabase
+      ((teams || []) as PlacementTeam[]).map(async (team) => {
+        const { data: members, error: membersError } = await (supabase as any)
           .from('placement_team_members')
           .select(`
             *,
@@ -113,7 +113,7 @@ export const placementTeamService = {
 
         return {
           ...team,
-          members: members || []
+          members: (members || []) as TeamMember[]
         };
       })
     );
@@ -125,7 +125,7 @@ export const placementTeamService = {
   async getDailyAssignments(date: Date): Promise<DailyTeamAssignment[]> {
     const dateStr = format(date, 'yyyy-MM-dd');
     
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('daily_team_assignments')
       .select(`
         *,
@@ -135,7 +135,7 @@ export const placementTeamService = {
       .eq('date', dateStr);
     
     if (error) throw error;
-    return data || [];
+    return (data || []) as DailyTeamAssignment[];
   },
 
   // Get daily assignments for a date range
@@ -143,7 +143,7 @@ export const placementTeamService = {
     const startDateStr = format(startDate, 'yyyy-MM-dd');
     const endDateStr = format(endDate, 'yyyy-MM-dd');
     
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('daily_team_assignments')
       .select(`
         *,
@@ -155,7 +155,7 @@ export const placementTeamService = {
       .order('date');
     
     if (error) throw error;
-    return data || [];
+    return (data || []) as DailyTeamAssignment[];
   },
 
   // Create or update daily team assignment
@@ -168,7 +168,7 @@ export const placementTeamService = {
   }): Promise<DailyTeamAssignment> {
     const dateStr = format(assignment.date, 'yyyy-MM-dd');
     
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('daily_team_assignments')
       .upsert({
         team_id: assignment.team_id,
@@ -187,14 +187,14 @@ export const placementTeamService = {
       .single();
     
     if (error) throw error;
-    return data;
+    return data as DailyTeamAssignment;
   },
 
   // Remove employee from team for a specific date
   async removeDailyAssignment(teamId: string, employeeId: string, date: Date): Promise<void> {
     const dateStr = format(date, 'yyyy-MM-dd');
     
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('daily_team_assignments')
       .delete()
       .eq('team_id', teamId)
@@ -206,7 +206,7 @@ export const placementTeamService = {
 
   // Add team member
   async addTeamMember(teamId: string, employeeId: string, isDefault: boolean = false): Promise<TeamMember> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('placement_team_members')
       .insert({
         team_id: teamId,
@@ -220,12 +220,12 @@ export const placementTeamService = {
       .single();
     
     if (error) throw error;
-    return data;
+    return data as TeamMember;
   },
 
   // Remove team member
   async removeTeamMember(teamId: string, employeeId: string): Promise<void> {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('placement_team_members')
       .delete()
       .eq('team_id', teamId)
@@ -256,7 +256,7 @@ export const placementTeamService = {
     const dateStr = format(date, 'yyyy-MM-dd');
     
     // Check if assignments already exist for this date
-    const { data: existing, error: existingError } = await supabase
+    const { data: existing, error: existingError } = await (supabase as any)
       .from('daily_team_assignments')
       .select('*')
       .eq('date', dateStr);
@@ -284,7 +284,7 @@ export const placementTeamService = {
       }
       
       if (assignments.length > 0) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('daily_team_assignments')
           .insert(assignments);
         
