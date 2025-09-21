@@ -244,111 +244,172 @@ const DailyTasks: React.FC = () => {
                     <div className="relative">
                       <div className="absolute left-6 top-0 bottom-0 w-px bg-border" />
                       
-                      {allProjects.length > 0 ? (() => {
-                        // Group projects by installation date
-                        const projectsByDate = allProjects.reduce((acc, project) => {
-                          const date = project.installation_date;
-                          if (!acc[date]) {
-                            acc[date] = [];
-                          }
-                          acc[date].push(project);
-                          return acc;
-                        }, {} as Record<string, ProjectWithTeam[]>);
+                      {(() => {
+                        // Generate date range (3 months from now)
+                        const startDate = new Date();
+                        const endDate = new Date();
+                        endDate.setMonth(endDate.getMonth() + 3);
+                        
+                        const dateRange = [];
+                        const currentDate = new Date(startDate);
+                        while (currentDate <= endDate) {
+                          dateRange.push(new Date(currentDate));
+                          currentDate.setDate(currentDate.getDate() + 1);
+                        }
 
-                        // Sort dates
-                        const sortedDates = Object.keys(projectsByDate).sort();
+                        // Create a map of projects with their duration
+                        const projectsWithDuration = allProjects.map(project => {
+                          const teamAssignment = project.project_team_assignments as any;
+                          const duration = teamAssignment?.duration || 1;
+                          const installationDate = new Date(project.installation_date);
+                          
+                          // Calculate end date based on duration
+                          const endDate = new Date(installationDate);
+                          endDate.setDate(endDate.getDate() + duration - 1);
+                          
+                          return {
+                            ...project,
+                            startDate: installationDate,
+                            endDate: endDate,
+                            duration: duration
+                          };
+                        });
 
                         return (
-                          <div className="space-y-8">
-                            {sortedDates.map((date) => {
-                              const projects = projectsByDate[date];
-                              const installationDate = new Date(date);
-                              const isUpcoming = installationDate >= new Date();
+                          <div className="space-y-2">
+                            {dateRange.map((date) => {
+                              const dateString = date.toISOString().split('T')[0];
+                              const isToday = date.toDateString() === new Date().toDateString();
+                              const isPast = date < new Date() && !isToday;
+                              
+                              // Find projects for this date (including multi-day projects)
+                              const projectsForDate = projectsWithDuration.filter(project => {
+                                return date >= project.startDate && date <= project.endDate;
+                              });
                               
                               return (
-                                <div key={date} className="relative pl-14">
+                                <div key={dateString} className="relative pl-14">
                                   {/* Date node */}
                                   <div className={cn(
                                     "absolute left-3 top-3 w-6 h-6 rounded-full border-4 border-background flex items-center justify-center",
-                                    isUpcoming ? "bg-primary" : "bg-muted"
+                                    isToday ? "bg-primary ring-2 ring-primary/30" : 
+                                    isPast ? "bg-muted" : "bg-secondary"
                                   )}>
                                     <div className={cn(
                                       "w-2 h-2 rounded-full",
-                                      isUpcoming ? "bg-primary-foreground" : "bg-muted-foreground"
+                                      isToday ? "bg-primary-foreground" :
+                                      isPast ? "bg-muted-foreground" : "bg-secondary-foreground"
                                     )} />
                                   </div>
                                   
-                                  {/* Date header */}
-                                  <div className="mb-4">
-                                    <div className="text-lg font-semibold">
-                                      {formatDate(date)}
+                                  {/* Date header and projects container */}
+                                  <div className={cn(
+                                    "min-h-[60px] border-b border-border/50 pb-2",
+                                    projectsForDate.length > 0 ? "bg-muted/20" : ""
+                                  )}>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div>
+                                        <div className={cn(
+                                          "font-medium",
+                                          isToday ? "text-primary font-semibold" : 
+                                          isPast ? "text-muted-foreground" : ""
+                                        )}>
+                                          {format(date, 'EEEE, MMM d')}
+                                          {isToday && <span className="ml-2 text-xs bg-primary text-primary-foreground px-2 py-1 rounded">Today</span>}
+                                        </div>
+                                        {projectsForDate.length > 0 && (
+                                          <div className="text-xs text-muted-foreground">
+                                            {projectsForDate.length} {projectsForDate.length === 1 ? 'project' : 'projects'}
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                    <div className="text-sm text-muted-foreground">
-                                      {projects.length} {projects.length === 1 ? 'project' : 'projects'}
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Projects for this date */}
-                                  <div className="space-y-3 ml-4">
-                                    {projects.map((project) => {
-                                      const teamName = getProjectTeam(project);
-                                      const teamColor = getTeamColor(teamName);
-                                      
-                                      return (
-                                        <div 
-                                          key={project.id} 
-                                          className={cn(
-                                            "p-4 rounded-lg border-l-4 cursor-pointer hover:bg-muted/50 transition-colors",
-                                            teamColor.project
-                                          )}
-                                          onClick={() => handleProjectClick(project.id)}
-                                        >
-                                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                            <div className="flex-1">
-                                              <div className="font-semibold text-base">{project.name}</div>
-                                              <div className="text-muted-foreground text-sm">{project.client}</div>
-                                            </div>
-                                            
-                                            <div className="flex flex-col sm:items-end gap-2">
-                                              <Badge className={cn(getStatusColor(project.status))}>
-                                                {project.status}
-                                              </Badge>
-                                              {teamName && (
-                                                <Badge variant="outline" className={cn(teamColor.text, teamColor.border)}>
-                                                  {teamName}
-                                                </Badge>
+                                    
+                                    {/* Projects for this date */}
+                                    {projectsForDate.length > 0 && (
+                                      <div className="space-y-2 ml-4">
+                                        {projectsForDate.map((project) => {
+                                          const teamName = getProjectTeam(project);
+                                          const teamColor = getTeamColor(teamName);
+                                          const isProjectStart = date.toDateString() === project.startDate.toDateString();
+                                          const isProjectEnd = date.toDateString() === project.endDate.toDateString();
+                                          const isMiddleDay = !isProjectStart && !isProjectEnd;
+                                          
+                                          return (
+                                            <div 
+                                              key={`${project.id}-${dateString}`} 
+                                              className={cn(
+                                                "p-3 border-l-4 cursor-pointer hover:bg-muted/50 transition-colors relative",
+                                                teamColor.project,
+                                                isProjectStart && "rounded-l-lg",
+                                                isProjectEnd && "rounded-r-lg",
+                                                isMiddleDay && "border-x-4",
+                                                project.duration > 1 && "border-b-2"
+                                              )}
+                                              onClick={() => handleProjectClick(project.id)}
+                                            >
+                                              {/* Only show full project details on start date */}
+                                              {isProjectStart ? (
+                                                <div>
+                                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                                    <div className="flex-1">
+                                                      <div className="font-semibold text-sm">{project.name}</div>
+                                                      <div className="text-muted-foreground text-xs">{project.client}</div>
+                                                      {project.duration > 1 && (
+                                                        <div className="text-xs text-primary font-medium mt-1">
+                                                          {project.duration} days installation
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                    
+                                                    <div className="flex flex-col sm:items-end gap-1">
+                                                      <Badge variant="secondary" className="text-xs">
+                                                        {project.status}
+                                                      </Badge>
+                                                      {teamName && (
+                                                        <Badge variant="outline" className={cn("text-xs", teamColor.text, teamColor.border)}>
+                                                          {teamName}
+                                                        </Badge>
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                  
+                                                  <div className="flex items-center gap-2 text-xs mt-2">
+                                                    <span className="text-muted-foreground">Progress:</span>
+                                                    <span className="font-medium">{project.progress || 0}%</span>
+                                                    <div className="flex-1 max-w-[150px] h-1.5 bg-background rounded-full overflow-hidden">
+                                                      <div 
+                                                        className="h-full bg-primary rounded-full transition-all duration-300" 
+                                                        style={{ width: `${project.progress || 0}%` }}
+                                                      />
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                // Continuation bar for multi-day projects
+                                                <div className="flex items-center gap-2">
+                                                  <div className="text-xs font-medium text-muted-foreground">
+                                                    {project.name} (continued)
+                                                  </div>
+                                                  {isProjectEnd && (
+                                                    <Badge variant="outline" className="text-xs">
+                                                      End
+                                                    </Badge>
+                                                  )}
+                                                </div>
                                               )}
                                             </div>
-                                          </div>
-                                          
-                                          <div className="flex items-center gap-2 text-sm mt-2">
-                                            <span className="text-muted-foreground">Progress:</span>
-                                            <span className="font-medium">{project.progress || 0}%</span>
-                                            <div className="flex-1 max-w-[200px] h-2 bg-background rounded-full overflow-hidden">
-                                              <div 
-                                                className="h-full bg-primary rounded-full transition-all duration-300" 
-                                                style={{ width: `${project.progress || 0}%` }}
-                                              />
-                                            </div>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
+                                          );
+                                        })}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               );
                             })}
                           </div>
                         );
-                      })() : (
-                        <div className="text-center py-12">
-                          <CalendarDays className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                          <p className="text-lg font-medium text-muted-foreground mb-2">No installations found</p>
-                          <p className="text-muted-foreground">
-                            No projects are currently scheduled for installation.
-                          </p>
-                        </div>
-                      )}
+                      })()}
                     </div>
                   </div>
                 )}
