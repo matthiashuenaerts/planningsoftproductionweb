@@ -226,142 +226,91 @@ const DailyTasks: React.FC = () => {
             </div>
           </div>
           
-          {displayMode === 'calendar' ? <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <CalendarIcon className="mr-2 h-5 w-5" />
-                    Calendar
-                  </CardTitle>
-                  <CardDescription>
-                    Select a date to view installations
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} className="rounded-md border w-full" modifiers={{
-                hasProjects: allProjects.map(p => new Date(p.installation_date))
-              }} modifiersClassNames={{
-                hasProjects: "relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:h-1 after:w-1 after:rounded-full after:bg-primary"
-              }} />
-                </CardContent>
-              </Card>
-              
-              <div className="lg:col-span-2">
-                <Card className="h-full">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center">
-                        <CalendarDays className="mr-2 h-5 w-5" />
-                        Installations for {selectedDate ? formatDate(formattedSelectedDate) : 'Today'}
-                      </CardTitle>
-                      <CardDescription>
-                        {projects.length} {projects.length === 1 ? 'project' : 'projects'} scheduled
-                      </CardDescription>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {loading ? <div className="flex justify-center p-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                      </div> : projects.length > 0 ? <div className="grid gap-4 md:grid-cols-2">
-                        {projects.map(project => <div key={project.id} className="rounded-lg border overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleProjectClick(project.id)}>
-                            <div className="bg-primary/5 p-4">
-                              <div className="flex justify-between items-start">
-                                <h3 className="font-medium text-lg mb-1 truncate">{project.name}</h3>
-                                <Badge className={cn("ml-2", getStatusColor(project.status))}>
-                                  {project.status}
-                                </Badge>
-                              </div>
-                              <p className="text-muted-foreground truncate">{project.client}</p>
-                            </div>
-                            
-                            <div className="p-4">
-                              <div className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-muted-foreground">Installation:</span>
-                                  <span className="font-medium">{formatDate(project.installation_date)}</span>
-                                </div>
-                                
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Progress:</span>
-                                    <span>{project.progress || 0}%</span>
-                                  </div>
-                                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-primary rounded-full" style={{
-                              width: `${project.progress || 0}%`
-                            }}></div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>)}
-                      </div> : <div className="text-center py-12 px-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                        <CalendarDays className="mx-auto h-10 w-10 text-gray-400 mb-3" />
-                        <p className="text-lg font-medium text-gray-600 mb-1">No installations scheduled</p>
-                        <p className="text-muted-foreground max-w-sm mx-auto">
-                          There are no projects scheduled for installation on this date.
-                          Select a different date or create a new project.
-                        </p>
-                        <Button variant="outline" className="mt-4" onClick={() => window.location.href = '/projects'}>
-                          View All Projects
-                        </Button>
-                      </div>}
-                  </CardContent>
-                </Card>
-              </div>
-            </div> : displayMode === 'teams' ? <InstallationTeamCalendar projects={allProjects} /> : <TruckLoadingCalendar />}
-          
-          {displayMode === 'calendar' && <div className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Upcoming Installations</CardTitle>
-                  <CardDescription>
-                    Projects scheduled for installation in the next 30 days
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? <div className="flex justify-center p-4">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                    </div> : <div className="relative">
-                      <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200" />
+          {displayMode === 'calendar' ? (
+            <Card className="h-[calc(100vh-250px)]">
+              <CardHeader>
+                <CardTitle>Installation Timeline</CardTitle>
+                <CardDescription>
+                  All projects scheduled for installation
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="h-full">
+                {loading ? (
+                  <div className="flex justify-center p-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  </div>
+                ) : (
+                  <div className="h-full overflow-y-auto">
+                    <div className="relative">
+                      <div className="absolute left-6 top-0 bottom-0 w-px bg-border" />
                       
-                      {allProjects.length > 0 ? <div className="space-y-4">
-                          {allProjects.slice(0, 10).map(project => {
-                    const installationDate = new Date(project.installation_date);
-                    const isUpcoming = installationDate >= new Date();
-                    return <div key={project.id} className="relative pl-10 cursor-pointer hover:bg-gray-50 p-2 rounded" onClick={() => handleProjectClick(project.id)}>
-                                <div className={cn("absolute left-3 top-2 w-3 h-3 rounded-full border-2 border-white", isUpcoming ? "bg-primary" : "bg-gray-400")} />
+                      {allProjects.length > 0 ? (
+                        <div className="space-y-6">
+                          {allProjects.map((project, index) => {
+                            const teamName = getProjectTeam(project);
+                            const teamColor = getTeamColor(teamName);
+                            const installationDate = new Date(project.installation_date);
+                            const isUpcoming = installationDate >= new Date();
+                            
+                            return (
+                              <div key={project.id} className="relative pl-14 cursor-pointer hover:bg-muted/50 p-3 rounded-lg transition-colors" onClick={() => handleProjectClick(project.id)}>
+                                <div className={cn(
+                                  "absolute left-4 top-6 w-4 h-4 rounded-full border-2 border-background",
+                                  isUpcoming ? teamColor.project.replace('bg-', 'bg-').replace('border-', 'border-') : "bg-muted border-muted-foreground"
+                                )} />
                                 
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between">
-                                  <div>
-                                    <div className="text-sm text-muted-foreground">
-                                      {formatDate(project.installation_date)}
+                                <div className="space-y-2">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div>
+                                      <div className="text-sm text-muted-foreground font-medium">
+                                        {formatDate(project.installation_date)}
+                                      </div>
+                                      <div className="font-semibold text-lg">{project.name}</div>
+                                      <div className="text-muted-foreground">{project.client}</div>
                                     </div>
-                                    <div className="font-medium">{project.name}</div>
-                                    <div className="text-sm text-muted-foreground">{project.client}</div>
+                                    
+                                    <div className="flex flex-col sm:items-end gap-2">
+                                      <Badge className={cn(getStatusColor(project.status))}>
+                                        {project.status}
+                                      </Badge>
+                                      {teamName && (
+                                        <Badge variant="outline" className={cn(teamColor.text, teamColor.border)}>
+                                          {teamName}
+                                        </Badge>
+                                      )}
+                                    </div>
                                   </div>
                                   
-                                  <div className="mt-2 sm:mt-0">
-                                    <Badge className={getStatusColor(project.status)}>
-                                      {project.status}
-                                    </Badge>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <span className="text-muted-foreground">Progress:</span>
+                                    <span className="font-medium">{project.progress || 0}%</span>
+                                    <div className="flex-1 max-w-[200px] h-2 bg-muted rounded-full overflow-hidden">
+                                      <div 
+                                        className="h-full bg-primary rounded-full transition-all duration-300" 
+                                        style={{ width: `${project.progress || 0}%` }}
+                                      />
+                                    </div>
                                   </div>
                                 </div>
-                              </div>;
-                  })}
-                        </div> : <div className="text-center py-8 text-muted-foreground">
-                          No upcoming installations found.
-                        </div>}
-                      
-                      {allProjects.length > 10 && <div className="text-center mt-4">
-                          <Button variant="outline" onClick={() => window.location.href = '/projects'}>
-                            View All Projects
-                          </Button>
-                        </div>}
-                    </div>}
-                </CardContent>
-              </Card>
-            </div>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <CalendarDays className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                          <p className="text-lg font-medium text-muted-foreground mb-2">No installations found</p>
+                          <p className="text-muted-foreground">
+                            No projects are currently scheduled for installation.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : displayMode === 'teams' ? <InstallationTeamCalendar projects={allProjects} /> : <TruckLoadingCalendar />}
         </div>
       </div>
     </div>;
