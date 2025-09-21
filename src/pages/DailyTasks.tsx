@@ -86,7 +86,9 @@ const DailyTasks: React.FC = () => {
           .select(`
             *,
             project_team_assignments!left (
-              team
+              team,
+              duration,
+              start_date
             )
           `)
           .not('installation_date', 'is', null)
