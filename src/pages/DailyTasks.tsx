@@ -3,7 +3,7 @@ import Navbar from '@/components/Navbar';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { format, addDays, parseISO } from 'date-fns';
+import { format, addDays, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, startOfWeek, endOfWeek, isSameDay } from 'date-fns';
 import { projectService } from '@/services/dataService';
 import { Button } from '@/components/ui/button';
 import { CalendarDays, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Truck } from 'lucide-react';
@@ -20,15 +20,50 @@ interface Project {
   installation_date: string;
   status: string;
   progress: number;
+  team?: string;
   [key: string]: any;
 }
+
+interface ProjectWithTeam extends Project {
+  project_team_assignments?: {
+    team: string;
+  } | null;
+}
+
+// Define team colors
+const teamColors = {
+  green: {
+    bg: 'bg-green-100',
+    border: 'border-green-300',
+    text: 'text-green-800',
+    project: 'bg-green-200 border-green-400'
+  },
+  blue: {
+    bg: 'bg-blue-100',
+    border: 'border-blue-300', 
+    text: 'text-blue-800',
+    project: 'bg-blue-200 border-blue-400'
+  },
+  orange: {
+    bg: 'bg-orange-100',
+    border: 'border-orange-300',
+    text: 'text-orange-800',
+    project: 'bg-orange-200 border-orange-400'
+  },
+  unassigned: {
+    bg: 'bg-gray-100',
+    border: 'border-gray-300',
+    text: 'text-gray-800',
+    project: 'bg-gray-200 border-gray-400'
+  }
+};
 const DailyTasks: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [displayMode, setDisplayMode] = useState<'calendar' | 'teams' | 'trucks'>('calendar');
   const [projects, setProjects] = useState<Project[]>([]);
-  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [allProjects, setAllProjects] = useState<ProjectWithTeam[]>([]);
   const [loading, setLoading] = useState(true);
-  const [weekStart, setWeekStart] = useState<Date>(new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const {
     toast
   } = useToast();
@@ -36,19 +71,29 @@ const DailyTasks: React.FC = () => {
   // Format the selected date to match our date format in the database
   const formattedSelectedDate = selectedDate ? selectedDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
-  // Fetch all projects with installation dates
+  // Fetch all projects with installation dates and team assignments
   useEffect(() => {
     const fetchAllProjects = async () => {
       try {
         setLoading(true);
 
-        // Get all projects with installation dates
+        // Get all projects with installation dates and their team assignments
         const {
           data,
           error
-        } = await supabase.from('projects').select('*').not('installation_date', 'is', null).order('installation_date', {
-          ascending: true
-        });
+        } = await supabase
+          .from('projects')
+          .select(`
+            *,
+            project_team_assignments!left (
+              team
+            )
+          `)
+          .not('installation_date', 'is', null)
+          .order('installation_date', {
+            ascending: true
+          });
+        
         if (error) throw error;
         setAllProjects(data || []);
 
@@ -76,7 +121,7 @@ const DailyTasks: React.FC = () => {
   }, [selectedDate, allProjects]);
 
   // Filter projects for selected date
-  const filterProjectsForSelectedDate = (date: Date | undefined, allProjectsData: Project[]) => {
+  const filterProjectsForSelectedDate = (date: Date | undefined, allProjectsData: ProjectWithTeam[]) => {
     if (!date) {
       setProjects([]);
       return;
@@ -88,24 +133,23 @@ const DailyTasks: React.FC = () => {
     setProjects(filtered);
   };
 
-  // Generate week view dates
-  const getWeekDates = () => {
-    const dates = [];
-    for (let i = 0; i < 7; i++) {
-      dates.push(addDays(weekStart, i));
-    }
-    return dates;
-  };
-  const weekDates = getWeekDates();
-
-  // Navigate to previous week
-  const prevWeek = () => {
-    setWeekStart(addDays(weekStart, -7));
+  // Navigation helpers for month view
+  const goToPreviousMonth = () => {
+    setCurrentMonth(addMonths(currentMonth, -1));
   };
 
-  // Navigate to next week
-  const nextWeek = () => {
-    setWeekStart(addDays(weekStart, 7));
+  const goToNextMonth = () => {
+    setCurrentMonth(addMonths(currentMonth, 1));
+  };
+
+  // Get calendar grid (6 weeks)
+  const getCalendarGrid = () => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    const startDate = startOfWeek(monthStart, { weekStartsOn: 1 }); // Start week on Monday
+    const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
+    
+    return eachDayOfInterval({ start: startDate, end: endDate });
   };
 
   // Get projects for a specific date
@@ -126,6 +170,22 @@ const DailyTasks: React.FC = () => {
   // Handler for clicking project
   const handleProjectClick = (projectId: string) => {
     window.location.href = `/projects/${projectId}`;
+  };
+
+  // Get team color based on team name
+  const getTeamColor = (teamName: string | null | undefined) => {
+    if (!teamName) return teamColors.unassigned;
+    
+    if (teamName.toLowerCase().includes('groen')) return teamColors.green;
+    if (teamName.toLowerCase().includes('blauw')) return teamColors.blue;
+    if (teamName.toLowerCase().includes('orange')) return teamColors.orange;
+    
+    return teamColors.unassigned;
+  };
+
+  // Get project's team assignment
+  const getProjectTeam = (project: ProjectWithTeam): string | null => {
+    return project.project_team_assignments?.team || null;
   };
 
   // Function to get status color
