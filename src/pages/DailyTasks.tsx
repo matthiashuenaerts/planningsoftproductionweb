@@ -244,59 +244,103 @@ const DailyTasks: React.FC = () => {
                     <div className="relative">
                       <div className="absolute left-6 top-0 bottom-0 w-px bg-border" />
                       
-                      {allProjects.length > 0 ? (
-                        <div className="space-y-6">
-                          {allProjects.map((project, index) => {
-                            const teamName = getProjectTeam(project);
-                            const teamColor = getTeamColor(teamName);
-                            const installationDate = new Date(project.installation_date);
-                            const isUpcoming = installationDate >= new Date();
-                            
-                            return (
-                              <div key={project.id} className="relative pl-14 cursor-pointer hover:bg-muted/50 p-3 rounded-lg transition-colors" onClick={() => handleProjectClick(project.id)}>
-                                <div className={cn(
-                                  "absolute left-4 top-6 w-4 h-4 rounded-full border-2 border-background",
-                                  isUpcoming ? teamColor.project.replace('bg-', 'bg-').replace('border-', 'border-') : "bg-muted border-muted-foreground"
-                                )} />
-                                
-                                <div className="space-y-2">
-                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                    <div>
-                                      <div className="text-sm text-muted-foreground font-medium">
-                                        {formatDate(project.installation_date)}
-                                      </div>
-                                      <div className="font-semibold text-lg">{project.name}</div>
-                                      <div className="text-muted-foreground">{project.client}</div>
+                      {allProjects.length > 0 ? (() => {
+                        // Group projects by installation date
+                        const projectsByDate = allProjects.reduce((acc, project) => {
+                          const date = project.installation_date;
+                          if (!acc[date]) {
+                            acc[date] = [];
+                          }
+                          acc[date].push(project);
+                          return acc;
+                        }, {} as Record<string, ProjectWithTeam[]>);
+
+                        // Sort dates
+                        const sortedDates = Object.keys(projectsByDate).sort();
+
+                        return (
+                          <div className="space-y-8">
+                            {sortedDates.map((date) => {
+                              const projects = projectsByDate[date];
+                              const installationDate = new Date(date);
+                              const isUpcoming = installationDate >= new Date();
+                              
+                              return (
+                                <div key={date} className="relative pl-14">
+                                  {/* Date node */}
+                                  <div className={cn(
+                                    "absolute left-3 top-3 w-6 h-6 rounded-full border-4 border-background flex items-center justify-center",
+                                    isUpcoming ? "bg-primary" : "bg-muted"
+                                  )}>
+                                    <div className={cn(
+                                      "w-2 h-2 rounded-full",
+                                      isUpcoming ? "bg-primary-foreground" : "bg-muted-foreground"
+                                    )} />
+                                  </div>
+                                  
+                                  {/* Date header */}
+                                  <div className="mb-4">
+                                    <div className="text-lg font-semibold">
+                                      {formatDate(date)}
                                     </div>
-                                    
-                                    <div className="flex flex-col sm:items-end gap-2">
-                                      <Badge className={cn(getStatusColor(project.status))}>
-                                        {project.status}
-                                      </Badge>
-                                      {teamName && (
-                                        <Badge variant="outline" className={cn(teamColor.text, teamColor.border)}>
-                                          {teamName}
-                                        </Badge>
-                                      )}
+                                    <div className="text-sm text-muted-foreground">
+                                      {projects.length} {projects.length === 1 ? 'project' : 'projects'}
                                     </div>
                                   </div>
                                   
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <span className="text-muted-foreground">Progress:</span>
-                                    <span className="font-medium">{project.progress || 0}%</span>
-                                    <div className="flex-1 max-w-[200px] h-2 bg-muted rounded-full overflow-hidden">
-                                      <div 
-                                        className="h-full bg-primary rounded-full transition-all duration-300" 
-                                        style={{ width: `${project.progress || 0}%` }}
-                                      />
-                                    </div>
+                                  {/* Projects for this date */}
+                                  <div className="space-y-3 ml-4">
+                                    {projects.map((project) => {
+                                      const teamName = getProjectTeam(project);
+                                      const teamColor = getTeamColor(teamName);
+                                      
+                                      return (
+                                        <div 
+                                          key={project.id} 
+                                          className={cn(
+                                            "p-4 rounded-lg border-l-4 cursor-pointer hover:bg-muted/50 transition-colors",
+                                            teamColor.project
+                                          )}
+                                          onClick={() => handleProjectClick(project.id)}
+                                        >
+                                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                            <div className="flex-1">
+                                              <div className="font-semibold text-base">{project.name}</div>
+                                              <div className="text-muted-foreground text-sm">{project.client}</div>
+                                            </div>
+                                            
+                                            <div className="flex flex-col sm:items-end gap-2">
+                                              <Badge className={cn(getStatusColor(project.status))}>
+                                                {project.status}
+                                              </Badge>
+                                              {teamName && (
+                                                <Badge variant="outline" className={cn(teamColor.text, teamColor.border)}>
+                                                  {teamName}
+                                                </Badge>
+                                              )}
+                                            </div>
+                                          </div>
+                                          
+                                          <div className="flex items-center gap-2 text-sm mt-2">
+                                            <span className="text-muted-foreground">Progress:</span>
+                                            <span className="font-medium">{project.progress || 0}%</span>
+                                            <div className="flex-1 max-w-[200px] h-2 bg-background rounded-full overflow-hidden">
+                                              <div 
+                                                className="h-full bg-primary rounded-full transition-all duration-300" 
+                                                style={{ width: `${project.progress || 0}%` }}
+                                              />
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
+                              );
+                            })}
+                          </div>
+                        );
+                      })() : (
                         <div className="text-center py-12">
                           <CalendarDays className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                           <p className="text-lg font-medium text-muted-foreground mb-2">No installations found</p>
