@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Users } from 'lucide-react';
+import { ProjectUserAssignmentDialog } from './ProjectUserAssignmentDialog';
 
 interface Team {
   id: string;
@@ -62,6 +63,21 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [selectedTeam, setSelectedTeam] = useState<string>('');
   const [selectedProject, setSelectedProject] = useState<string>('');
+  const [assignmentDialog, setAssignmentDialog] = useState<{
+    isOpen: boolean;
+    projectId: string;
+    projectName: string;
+    teamId: string;
+    teamName: string;
+    date: Date;
+  }>({
+    isOpen: false,
+    projectId: '',
+    projectName: '',
+    teamId: '',
+    teamName: '',
+    date: new Date()
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Fetch installation teams
@@ -149,6 +165,28 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     // Reset selections
     setSelectedTeam('');
     setSelectedProject('');
+  };
+
+  const openAssignmentDialog = (projectId: string, projectName: string, teamId: string, teamName: string, date: Date) => {
+    setAssignmentDialog({
+      isOpen: true,
+      projectId,
+      projectName,
+      teamId,
+      teamName,
+      date
+    });
+  };
+
+  const closeAssignmentDialog = () => {
+    setAssignmentDialog({
+      isOpen: false,
+      projectId: '',
+      projectName: '',
+      teamId: '',
+      teamName: '',
+      date: new Date()
+    });
   };
 
   return (
@@ -300,7 +338,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                           <div
                             key={`${team.id}-${project.id}`}
                             className={cn(
-                              "absolute top-2 h-12 rounded-md flex items-center px-2 text-white text-xs font-medium cursor-pointer hover:opacity-90 transition-opacity",
+                              "absolute top-2 h-12 rounded-md flex items-center px-2 text-white text-xs font-medium cursor-pointer hover:opacity-90 transition-opacity group",
                               teamColor
                             )}
                             style={{
@@ -308,16 +346,23 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                               width: position.width
                             }}
                             title={`${project.name} - ${project.client} (${position.duration} days)`}
+                            onClick={() => {
+                              const projectStartDate = new Date(project.project_team_assignments?.start_date || project.installation_date);
+                              openAssignmentDialog(project.id, project.name, team.id, team.name, projectStartDate);
+                            }}
                           >
                             <div className="truncate flex-1">
                               <div className="font-semibold truncate">{project.name}</div>
                               <div className="text-xs opacity-90 truncate">{project.client}</div>
                             </div>
-                            {project.progress > 0 && (
-                              <Badge variant="secondary" className="ml-2 text-xs">
-                                {project.progress}%
-                              </Badge>
-                            )}
+                            <div className="flex items-center gap-1">
+                              {project.progress > 0 && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {project.progress}%
+                                </Badge>
+                              )}
+                              <Users className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
                           </div>
                         );
                       })}
@@ -328,6 +373,16 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
           </div>
         </div>
       </CardContent>
+      
+      <ProjectUserAssignmentDialog
+        isOpen={assignmentDialog.isOpen}
+        onClose={closeAssignmentDialog}
+        projectId={assignmentDialog.projectId}
+        projectName={assignmentDialog.projectName}
+        teamId={assignmentDialog.teamId}
+        teamName={assignmentDialog.teamName}
+        date={assignmentDialog.date}
+      />
     </Card>
   );
 };
