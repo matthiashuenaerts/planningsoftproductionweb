@@ -192,8 +192,7 @@ export const orderService = {
           order_type: order.order_type as Order['order_type'],
           order_items_count: orderItemsCount,
         };
-      })
-      .filter(order => order.order_items_count === 0);
+      });
   },
 
   // Order Items
