@@ -79,10 +79,27 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
       }
       
       setTeams((data as unknown as Team[]) || []);
+      
+      // Add an "Unassigned" team at the end for projects without team assignments
+      setTeams(prev => [...prev, {
+        id: 'unassigned',
+        name: 'Unassigned',
+        color: '#6B7280',
+        is_active: true
+      }]);
     };
 
     fetchTeams();
   }, []);
+
+  // Debug: Log teams and projects
+  useEffect(() => {
+    console.log('Teams:', teams);
+    console.log('Projects with assignments:', projects.map(p => ({
+      name: p.name,
+      team: p.project_team_assignments?.team
+    })));
+  }, [teams, projects]);
 
   // Get date range for the Gantt chart (4 weeks)
   const getDateRange = () => {
@@ -260,7 +277,18 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                     {projects
                       .filter(project => {
                         const projectTeam = project.project_team_assignments?.team;
-                        return projectTeam === team.name;
+                        
+                        // Handle unassigned team
+                        if (team.id === 'unassigned') {
+                          return !projectTeam;
+                        }
+                        
+                        if (!projectTeam) return false;
+                        
+                        // Match team names (case insensitive)
+                        return projectTeam.toLowerCase() === team.name.toLowerCase() ||
+                               projectTeam.toLowerCase().includes(team.name.toLowerCase()) ||
+                               team.name.toLowerCase().includes(projectTeam.toLowerCase());
                       })
                       .map((project) => {
                         const position = getProjectPosition(project);
