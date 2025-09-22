@@ -34,21 +34,29 @@ export class DailyTeamAssignmentService {
   async getAssignmentsForProjectDate(projectId: string, date: string): Promise<DailyTeamAssignment[]> {
     // First get the team assigned to this project
     const { data: projectAssignment, error: projectError } = await supabase
-      .from('project_team_assignments')
+      .from('project_team_assignments' as any)
       .select('team')
       .eq('project_id', projectId)
-      .single();
+      .maybeSingle();
 
     if (projectError) throw projectError;
+
+    if (!projectAssignment) {
+      return []; // No team assignment found
+    }
 
     // Then get team members assigned for this date
     const { data: teamData, error: teamError } = await supabase
       .from('placement_teams' as any)
       .select('id')
-      .eq('name', projectAssignment.team)
-      .single();
+      .eq('name', (projectAssignment as any).team)
+      .maybeSingle();
 
     if (teamError) throw teamError;
+
+    if (!teamData) {
+      return []; // Team not found
+    }
 
     const { data, error } = await supabase
       .from('daily_team_assignments' as any)
@@ -74,7 +82,7 @@ export class DailyTeamAssignmentService {
       .eq('employee_id', employeeId)
       .eq('team_id', teamId)
       .eq('date', date)
-      .single();
+      .maybeSingle();
 
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found"
       throw checkError;

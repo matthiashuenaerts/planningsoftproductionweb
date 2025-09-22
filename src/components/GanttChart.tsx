@@ -94,15 +94,20 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
         return;
       }
       
-      setTeams((data as unknown as Team[]) || []);
+      const fetchedTeams = (data as unknown as Team[]) || [];
       
       // Add an "Unassigned" team at the end for projects without team assignments
-      setTeams(prev => [...prev, {
-        id: 'unassigned',
-        name: 'Unassigned',
-        color: '#6B7280',
-        is_active: true
-      }]);
+      const allTeams = [
+        ...fetchedTeams,
+        {
+          id: 'unassigned',
+          name: 'Unassigned',
+          color: '#6B7280',
+          is_active: true
+        }
+      ];
+      
+      setTeams(allTeams);
     };
 
     fetchTeams();
@@ -113,7 +118,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     console.log('Teams:', teams);
     console.log('Projects with assignments:', projects.map(p => ({
       name: p.name,
-      team: p.project_team_assignments?.team
+      team: p.project_team_assignments?.team,
+      hasAssignment: !!p.project_team_assignments
     })));
   }, [teams, projects]);
 
@@ -323,10 +329,17 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                         
                         if (!projectTeam) return false;
                         
-                        // Match team names (case insensitive)
-                        return projectTeam.toLowerCase() === team.name.toLowerCase() ||
-                               projectTeam.toLowerCase().includes(team.name.toLowerCase()) ||
-                               team.name.toLowerCase().includes(projectTeam.toLowerCase());
+                        // More flexible team name matching
+                        const teamNameLower = team.name.toLowerCase();
+                        const projectTeamLower = projectTeam.toLowerCase();
+                        
+                        return projectTeamLower === teamNameLower ||
+                               projectTeamLower.includes(teamNameLower) ||
+                               teamNameLower.includes(projectTeamLower) ||
+                               (teamNameLower.includes('groen') && projectTeamLower.includes('green')) ||
+                               (teamNameLower.includes('green') && projectTeamLower.includes('groen')) ||
+                               (teamNameLower.includes('blauw') && projectTeamLower.includes('blue')) ||
+                               (teamNameLower.includes('blue') && projectTeamLower.includes('blauw'));
                       })
                       .map((project) => {
                         const position = getProjectPosition(project);
