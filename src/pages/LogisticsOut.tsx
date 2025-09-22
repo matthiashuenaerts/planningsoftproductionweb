@@ -154,6 +154,12 @@ const LogisticsOut: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Create a map of date -> event count for calendar display
+  const eventCountByDate = calendarEvents.reduce((acc, event) => {
+    acc[event.date] = (acc[event.date] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
   const eventDays = [...new Set(calendarEvents.map(event => event.date))].map(dateStr => {
     const [year, month, day] = dateStr.split('-').map(Number);
     return new Date(year, month - 1, day);
@@ -313,6 +319,22 @@ const LogisticsOut: React.FC = () => {
                   modifiersClassNames={{
                     event: 'bg-sky-100 text-sky-800 rounded-md font-bold relative',
                   }}
+                  components={{
+                    DayContent: ({ date }) => {
+                      const dateStr = format(date, 'yyyy-MM-dd');
+                      const eventCount = eventCountByDate[dateStr];
+                      return (
+                        <div className="relative w-full h-full flex items-center justify-center">
+                          <span>{date.getDate()}</span>
+                          {eventCount && (
+                            <div className="absolute -top-1 -right-1 bg-sky-600 text-white text-xs rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                              {eventCount}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                  }}
                   weekStartsOn={1}
                 />
               </CardContent>
@@ -324,6 +346,11 @@ const LogisticsOut: React.FC = () => {
                 <CardTitle className="flex items-center gap-2">
                   <Package className="h-5 w-5" />
                   {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : t("select_date")}
+                  {selectedDayEvents.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {selectedDayEvents.length} {selectedDayEvents.length === 1 ? t("event") : t("events")}
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
