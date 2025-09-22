@@ -8,6 +8,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
+interface Team {
+  id: string;
+  name: string;
+  color: string;
+  is_active: boolean;
+}
+
 interface Employee {
   id: string;
   name: string;
@@ -51,29 +58,30 @@ const getTeamColor = (teamName: string | null | undefined) => {
 };
 
 const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('');
+  const [selectedTeam, setSelectedTeam] = useState<string>('');
   const [selectedProject, setSelectedProject] = useState<string>('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Fetch employees
+  // Fetch installation teams
   useEffect(() => {
-    const fetchEmployees = async () => {
+    const fetchTeams = async () => {
       const { data, error } = await supabase
-        .from('employees')
-        .select('id, name, role')
+        .from('placement_teams' as any)
+        .select('id, name, color, is_active')
+        .eq('is_active', true)
         .order('name');
       
       if (error) {
-        console.error('Error fetching employees:', error);
+        console.error('Error fetching teams:', error);
         return;
       }
       
-      setEmployees(data || []);
+      setTeams((data as unknown as Team[]) || []);
     };
 
-    fetchEmployees();
+    fetchTeams();
   }, []);
 
   // Get date range for the Gantt chart (4 weeks)
@@ -115,14 +123,14 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     setCurrentWeek(addDays(currentWeek, 7));
   };
 
-  // Handle project assignment
+  // Handle team assignment (for future implementation)
   const handleAssignProject = async () => {
-    if (!selectedEmployee || !selectedProject) return;
+    if (!selectedTeam || !selectedProject) return;
     
     // Here you would implement the assignment logic
-    console.log('Assigning project', selectedProject, 'to employee', selectedEmployee);
+    console.log('Assigning project', selectedProject, 'to team', selectedTeam);
     // Reset selections
-    setSelectedEmployee('');
+    setSelectedTeam('');
     setSelectedProject('');
   };
 
@@ -133,14 +141,14 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
           <CardTitle>Installation Gantt Chart</CardTitle>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+              <Select value={selectedTeam} onValueChange={setSelectedTeam}>
                 <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Select employee" />
+                  <SelectValue placeholder="Select team" />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
-                      {employee.name} ({employee.role})
+                  {teams.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -161,7 +169,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
               
               <Button 
                 onClick={handleAssignProject}
-                disabled={!selectedEmployee || !selectedProject}
+                disabled={!selectedTeam || !selectedProject}
                 size="sm"
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -186,19 +194,25 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
       
       <CardContent className="h-full overflow-hidden">
         <div className="flex h-full">
-          {/* Employee sidebar */}
+          {/* Teams sidebar */}
           <div className="w-48 border-r border-border bg-muted/20">
             <div className="h-12 border-b border-border bg-muted/40 flex items-center px-4 font-semibold text-sm">
-              Employees
+              Installation Teams
             </div>
             <div className="overflow-y-auto h-[calc(100%-48px)]">
-              {employees.map((employee) => (
+              {teams.map((team) => (
                 <div
-                  key={employee.id}
+                  key={team.id}
                   className="h-16 border-b border-border/50 px-4 flex flex-col justify-center hover:bg-muted/30 transition-colors"
                 >
-                  <div className="font-medium text-sm truncate">{employee.name}</div>
-                  <div className="text-xs text-muted-foreground">{employee.role}</div>
+                  <div className="font-medium text-sm truncate flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: team.color }}
+                    />
+                    {team.name}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Installation Team</div>
                 </div>
               ))}
             </div>
@@ -221,11 +235,11 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                 ))}
               </div>
               
-              {/* Employee rows with projects */}
+              {/* Team rows with projects */}
               <div className="relative">
-                {employees.map((employee, employeeIndex) => (
+                {teams.map((team, teamIndex) => (
                   <div
-                    key={employee.id}
+                    key={team.id}
                     className="h-16 border-b border-border/50 relative hover:bg-muted/10 transition-colors"
                   >
                     {/* Day grid */}
@@ -242,22 +256,21 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                       />
                     ))}
                     
-                    {/* Projects for this employee */}
+                    {/* Projects for this team */}
                     {projects
                       .filter(project => {
-                        // For now, show all projects. Later, filter by actual assignments
-                        return true;
+                        const projectTeam = project.project_team_assignments?.team;
+                        return projectTeam === team.name;
                       })
                       .map((project) => {
                         const position = getProjectPosition(project);
                         if (!position) return null;
                         
-                        const teamName = project.project_team_assignments?.team;
-                        const teamColor = getTeamColor(teamName);
+                        const teamColor = getTeamColor(team.name);
                         
                         return (
                           <div
-                            key={`${employee.id}-${project.id}`}
+                            key={`${team.id}-${project.id}`}
                             className={cn(
                               "absolute top-2 h-12 rounded-md flex items-center px-2 text-white text-xs font-medium cursor-pointer hover:opacity-90 transition-opacity",
                               teamColor
