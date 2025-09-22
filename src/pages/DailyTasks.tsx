@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import InstallationTeamCalendar from '@/components/InstallationTeamCalendar';
 import TruckLoadingCalendar from '@/components/TruckLoadingCalendar';
+import GanttChart from '@/components/GanttChart';
 interface Project {
   id: string;
   name: string;
@@ -27,6 +28,8 @@ interface Project {
 interface ProjectWithTeam extends Project {
   project_team_assignments?: {
     team: string;
+    duration: number;
+    start_date: string;
   } | null;
 }
 
@@ -59,7 +62,7 @@ const teamColors = {
 };
 const DailyTasks: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [displayMode, setDisplayMode] = useState<'calendar' | 'teams' | 'trucks'>('calendar');
+  const [displayMode, setDisplayMode] = useState<'calendar' | 'gantt' | 'teams' | 'trucks'>('calendar');
   const [projects, setProjects] = useState<Project[]>([]);
   const [allProjects, setAllProjects] = useState<ProjectWithTeam[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,7 +219,10 @@ const DailyTasks: React.FC = () => {
             
             <div className="flex mt-4 md:mt-0 space-x-2">
               <Button variant={displayMode === 'calendar' ? 'default' : 'outline'} onClick={() => setDisplayMode('calendar')}>
-                Calendar View
+                Timeline View
+              </Button>
+              <Button variant={displayMode === 'gantt' ? 'default' : 'outline'} onClick={() => setDisplayMode('gantt')}>
+                Gantt Chart
               </Button>
               <Button variant={displayMode === 'teams' ? 'default' : 'outline'} onClick={() => setDisplayMode('teams')}>
                 Team Planner
@@ -417,7 +423,13 @@ const DailyTasks: React.FC = () => {
                 )}
               </CardContent>
             </Card>
-          ) : displayMode === 'teams' ? <InstallationTeamCalendar projects={allProjects} /> : <TruckLoadingCalendar />}
+          ) : displayMode === 'gantt' ? (
+            <GanttChart projects={allProjects} />
+          ) : displayMode === 'teams' ? (
+            <InstallationTeamCalendar projects={allProjects} />
+          ) : (
+            <TruckLoadingCalendar />
+          )}
         </div>
       </div>
     </div>;
