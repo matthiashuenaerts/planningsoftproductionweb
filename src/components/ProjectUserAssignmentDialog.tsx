@@ -18,6 +18,7 @@ interface ProjectUserAssignmentDialogProps {
   teamId: string;
   teamName: string;
   date: Date;
+  onAssignmentUpdate?: () => void;
 }
 
 export const ProjectUserAssignmentDialog: React.FC<ProjectUserAssignmentDialogProps> = ({
@@ -27,7 +28,8 @@ export const ProjectUserAssignmentDialog: React.FC<ProjectUserAssignmentDialogPr
   projectName,
   teamId,
   teamName,
-  date
+  date,
+  onAssignmentUpdate
 }) => {
   const [availableEmployees, setAvailableEmployees] = useState<Employee[]>([]);
   const [currentAssignments, setCurrentAssignments] = useState<DailyTeamAssignment[]>([]);
@@ -94,6 +96,11 @@ export const ProjectUserAssignmentDialog: React.FC<ProjectUserAssignmentDialogPr
       // Reload data
       await loadData();
       
+      // Notify parent component to refresh
+      if (onAssignmentUpdate) {
+        onAssignmentUpdate();
+      }
+      
       // Reset form
       setSelectedEmployeeId('');
       setNotes('');
@@ -125,6 +132,11 @@ export const ProjectUserAssignmentDialog: React.FC<ProjectUserAssignmentDialogPr
 
       // Reload data
       await loadData();
+      
+      // Notify parent component to refresh
+      if (onAssignmentUpdate) {
+        onAssignmentUpdate();
+      }
     } catch (error: any) {
       console.error('Error removing employee:', error);
       toast({

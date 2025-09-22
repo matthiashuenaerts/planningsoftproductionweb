@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Plus, Users } from 'lucide-react';
 import { ProjectUserAssignmentDialog } from './ProjectUserAssignmentDialog';
+import { dailyTeamAssignmentService, DailyTeamAssignment, Employee as DailyEmployee } from '@/services/dailyTeamAssignmentService';
 
 interface Team {
   id: string;
@@ -60,6 +61,8 @@ const getTeamColor = (teamName: string | null | undefined) => {
 
 const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
   const [teams, setTeams] = useState<Team[]>([]);
+  const [employees, setEmployees] = useState<DailyEmployee[]>([]);
+  const [dailyAssignments, setDailyAssignments] = useState<DailyTeamAssignment[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [selectedTeam, setSelectedTeam] = useState<string>('');
   const [selectedProject, setSelectedProject] = useState<string>('');
@@ -80,48 +83,76 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
   });
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Fetch installation teams
+  // Fetch installation teams and employees
   useEffect(() => {
-    const fetchTeams = async () => {
-      const { data, error } = await supabase
-        .from('placement_teams' as any)
-        .select('id, name, color, is_active')
-        .eq('is_active', true)
-        .order('name');
-      
-      if (error) {
-        console.error('Error fetching teams:', error);
-        return;
+    const fetchTeamsAndEmployees = async () => {
+      try {
+        // Fetch teams
+        const { data: teamsData, error: teamsError } = await supabase
+          .from('placement_teams' as any)
+          .select('id, name, color, is_active')
+          .eq('is_active', true)
+          .order('name');
+        
+        if (teamsError) throw teamsError;
+        
+        const fetchedTeams = (teamsData as unknown as Team[]) || [];
+        
+        // Add an "Unassigned" team at the end for projects without team assignments
+        const allTeams = [
+          ...fetchedTeams,
+          {
+            id: 'unassigned',
+            name: 'Unassigned',
+            color: '#6B7280',
+            is_active: true
+          }
+        ];
+        
+        setTeams(allTeams);
+
+        // Fetch employees
+        const employeesData = await dailyTeamAssignmentService.getAvailableEmployees();
+        setEmployees(employeesData);
+      } catch (error) {
+        console.error('Error fetching teams and employees:', error);
       }
-      
-      const fetchedTeams = (data as unknown as Team[]) || [];
-      
-      // Add an "Unassigned" team at the end for projects without team assignments
-      const allTeams = [
-        ...fetchedTeams,
-        {
-          id: 'unassigned',
-          name: 'Unassigned',
-          color: '#6B7280',
-          is_active: true
-        }
-      ];
-      
-      setTeams(allTeams);
     };
 
-    fetchTeams();
+    fetchTeamsAndEmployees();
   }, []);
 
-  // Debug: Log teams and projects
+  // Fetch daily assignments for the current date range
+  useEffect(() => {
+    const fetchDailyAssignments = async () => {
+      if (teams.length === 0) return;
+
+      try {
+        const dateRange = getDateRange();
+        const startDate = format(dateRange[0], 'yyyy-MM-dd');
+        const endDate = format(dateRange[dateRange.length - 1], 'yyyy-MM-dd');
+        
+        const assignments = await dailyTeamAssignmentService.getAssignmentsForDateRange(startDate, endDate);
+        setDailyAssignments(assignments);
+      } catch (error) {
+        console.error('Error fetching daily assignments:', error);
+      }
+    };
+
+    fetchDailyAssignments();
+  }, [teams, currentWeek]);
+
+  // Debug: Log teams, employees and assignments
   useEffect(() => {
     console.log('Teams:', teams);
+    console.log('Employees:', employees);
+    console.log('Daily Assignments:', dailyAssignments);
     console.log('Projects with assignments:', projects.map(p => ({
       name: p.name,
       team: p.project_team_assignments?.team,
       hasAssignment: !!p.project_team_assignments
     })));
-  }, [teams, projects]);
+  }, [teams, employees, dailyAssignments, projects]);
 
   // Get date range for the Gantt chart (4 weeks)
   const getDateRange = () => {
@@ -195,6 +226,24 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     });
   };
 
+  const handleAssignmentUpdate = () => {
+    // Refresh daily assignments when assignment is updated
+    const fetchDailyAssignments = async () => {
+      try {
+        const dateRange = getDateRange();
+        const startDate = format(dateRange[0], 'yyyy-MM-dd');
+        const endDate = format(dateRange[dateRange.length - 1], 'yyyy-MM-dd');
+        
+        const assignments = await dailyTeamAssignmentService.getAssignmentsForDateRange(startDate, endDate);
+        setDailyAssignments(assignments);
+      } catch (error) {
+        console.error('Error fetching daily assignments:', error);
+      }
+    };
+
+    fetchDailyAssignments();
+  };
+
   return (
     <Card className="h-[calc(100vh-250px)]">
       <CardHeader>
@@ -258,24 +307,50 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
           {/* Teams sidebar */}
           <div className="w-48 border-r border-border bg-muted/20">
             <div className="h-12 border-b border-border bg-muted/40 flex items-center px-4 font-semibold text-sm">
-              Installation Teams
+              Teams & Employees
             </div>
             <div className="overflow-y-auto h-[calc(100%-48px)]">
-              {teams.map((team) => (
-                <div
-                  key={team.id}
-                  className="h-16 border-b border-border/50 px-4 flex flex-col justify-center hover:bg-muted/30 transition-colors"
-                >
-                  <div className="font-medium text-sm truncate flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: team.color }}
-                    />
-                    {team.name}
+              {teams.map((team) => {
+                // Get employees assigned to this team for any day in the date range
+                const teamEmployees = dailyAssignments
+                  .filter(assignment => assignment.team_id === team.id)
+                  .reduce((acc, assignment) => {
+                    const employee = employees.find(emp => emp.id === assignment.employee_id);
+                    if (employee && !acc.some(emp => emp.id === employee.id)) {
+                      acc.push(employee);
+                    }
+                    return acc;
+                  }, [] as DailyEmployee[]);
+
+                return (
+                  <div key={team.id}>
+                    {/* Team Header */}
+                    <div className="h-16 border-b border-border/50 px-4 flex flex-col justify-center hover:bg-muted/30 transition-colors bg-muted/10">
+                      <div className="font-medium text-sm truncate flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: team.color }}
+                        />
+                        {team.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Installation Team</div>
+                    </div>
+                    
+                    {/* Employee Rows */}
+                    {teamEmployees.map((employee) => (
+                      <div
+                        key={`${team.id}-${employee.id}`}
+                        className="h-16 border-b border-border/50 px-6 flex flex-col justify-center hover:bg-muted/30 transition-colors"
+                      >
+                        <div className="font-medium text-sm truncate">
+                          {employee.name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{employee.role}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="text-xs text-muted-foreground">Installation Team</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
           
@@ -298,89 +373,177 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
               
               {/* Team rows with projects */}
               <div className="relative">
-                {teams.map((team, teamIndex) => (
-                  <div
-                    key={team.id}
-                    className="h-16 border-b border-border/50 relative hover:bg-muted/10 transition-colors"
-                  >
-                    {/* Day grid */}
-                    {dateRange.map((date, dayIndex) => (
-                      <div
-                        key={dayIndex}
-                        className="absolute border-r border-border/30"
-                        style={{
-                          left: dayIndex * dayWidth,
-                          width: dayWidth,
-                          height: '100%',
-                          backgroundColor: date.getDay() === 0 || date.getDay() === 6 ? 'hsl(var(--muted)/0.5)' : 'transparent'
-                        }}
-                      />
-                    ))}
-                    
-                    {/* Projects for this team */}
-                    {projects
-                      .filter(project => {
-                        const projectTeam = project.project_team_assignments?.team;
+                {teams.map((team) => {
+                  // Get employees assigned to this team for any day in the date range
+                  const teamEmployees = dailyAssignments
+                    .filter(assignment => assignment.team_id === team.id)
+                    .reduce((acc, assignment) => {
+                      const employee = employees.find(emp => emp.id === assignment.employee_id);
+                      if (employee && !acc.some(emp => emp.id === employee.id)) {
+                        acc.push(employee);
+                      }
+                      return acc;
+                    }, [] as DailyEmployee[]);
+
+                  return (
+                    <div key={team.id}>
+                      {/* Team Row */}
+                      <div className="h-16 border-b border-border/50 relative hover:bg-muted/10 transition-colors bg-muted/10">
+                        {/* Day grid */}
+                        {dateRange.map((date, dayIndex) => (
+                          <div
+                            key={dayIndex}
+                            className="absolute border-r border-border/30"
+                            style={{
+                              left: dayIndex * dayWidth,
+                              width: dayWidth,
+                              height: '100%',
+                              backgroundColor: date.getDay() === 0 || date.getDay() === 6 ? 'hsl(var(--muted)/0.5)' : 'transparent'
+                            }}
+                          />
+                        ))}
                         
-                        // Handle unassigned team
-                        if (team.id === 'unassigned') {
-                          return !projectTeam;
-                        }
-                        
-                        if (!projectTeam) return false;
-                        
-                        // More flexible team name matching
-                        const teamNameLower = team.name.toLowerCase();
-                        const projectTeamLower = projectTeam.toLowerCase();
-                        
-                        return projectTeamLower === teamNameLower ||
-                               projectTeamLower.includes(teamNameLower) ||
-                               teamNameLower.includes(projectTeamLower) ||
-                               (teamNameLower.includes('groen') && projectTeamLower.includes('green')) ||
-                               (teamNameLower.includes('green') && projectTeamLower.includes('groen')) ||
-                               (teamNameLower.includes('blauw') && projectTeamLower.includes('blue')) ||
-                               (teamNameLower.includes('blue') && projectTeamLower.includes('blauw'));
-                      })
-                      .map((project) => {
-                        const position = getProjectPosition(project);
-                        if (!position) return null;
-                        
-                        const teamColor = getTeamColor(team.name);
-                        
+                        {/* Team-level projects */}
+                        {projects
+                          .filter(project => {
+                            const projectTeam = project.project_team_assignments?.team;
+                            
+                            // Handle unassigned team
+                            if (team.id === 'unassigned') {
+                              return !projectTeam;
+                            }
+                            
+                            if (!projectTeam) return false;
+                            
+                            // More flexible team name matching
+                            const teamNameLower = team.name.toLowerCase();
+                            const projectTeamLower = projectTeam.toLowerCase();
+                            
+                            return projectTeamLower === teamNameLower ||
+                                   projectTeamLower.includes(teamNameLower) ||
+                                   teamNameLower.includes(projectTeamLower) ||
+                                   (teamNameLower.includes('groen') && projectTeamLower.includes('green')) ||
+                                   (teamNameLower.includes('green') && projectTeamLower.includes('groen')) ||
+                                   (teamNameLower.includes('blauw') && projectTeamLower.includes('blue')) ||
+                                   (teamNameLower.includes('blue') && projectTeamLower.includes('blauw'));
+                          })
+                          .map((project) => {
+                            const position = getProjectPosition(project);
+                            if (!position) return null;
+                            
+                            const teamColor = getTeamColor(team.name);
+                            
+                            return (
+                              <div
+                                key={`${team.id}-${project.id}`}
+                                className={cn(
+                                  "absolute top-2 h-12 rounded-md flex items-center px-2 text-white text-xs font-medium cursor-pointer hover:opacity-90 transition-opacity group",
+                                  teamColor
+                                )}
+                                style={{
+                                  left: position.left,
+                                  width: position.width
+                                }}
+                                title={`${project.name} - ${project.client} (${position.duration} days)`}
+                                onClick={() => {
+                                  const projectStartDate = new Date(project.project_team_assignments?.start_date || project.installation_date);
+                                  openAssignmentDialog(project.id, project.name, team.id, team.name, projectStartDate);
+                                }}
+                              >
+                                <div className="truncate flex-1">
+                                  <div className="font-semibold truncate">{project.name}</div>
+                                  <div className="text-xs opacity-90 truncate">{project.client}</div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {project.progress > 0 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {project.progress}%
+                                    </Badge>
+                                  )}
+                                  <Users className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                      
+                      {/* Employee Rows */}
+                      {teamEmployees.map((employee) => {
                         return (
                           <div
-                            key={`${team.id}-${project.id}`}
-                            className={cn(
-                              "absolute top-2 h-12 rounded-md flex items-center px-2 text-white text-xs font-medium cursor-pointer hover:opacity-90 transition-opacity group",
-                              teamColor
-                            )}
-                            style={{
-                              left: position.left,
-                              width: position.width
-                            }}
-                            title={`${project.name} - ${project.client} (${position.duration} days)`}
-                            onClick={() => {
-                              const projectStartDate = new Date(project.project_team_assignments?.start_date || project.installation_date);
-                              openAssignmentDialog(project.id, project.name, team.id, team.name, projectStartDate);
-                            }}
+                            key={`${team.id}-${employee.id}`}
+                            className="h-16 border-b border-border/50 relative hover:bg-muted/10 transition-colors"
                           >
-                            <div className="truncate flex-1">
-                              <div className="font-semibold truncate">{project.name}</div>
-                              <div className="text-xs opacity-90 truncate">{project.client}</div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {project.progress > 0 && (
-                                <Badge variant="secondary" className="text-xs">
-                                  {project.progress}%
-                                </Badge>
-                              )}
-                              <Users className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
+                            {/* Day grid */}
+                            {dateRange.map((date, dayIndex) => (
+                              <div
+                                key={dayIndex}
+                                className="absolute border-r border-border/30"
+                                style={{
+                                  left: dayIndex * dayWidth,
+                                  width: dayWidth,
+                                  height: '100%',
+                                  backgroundColor: date.getDay() === 0 || date.getDay() === 6 ? 'hsl(var(--muted)/0.5)' : 'transparent'
+                                }}
+                              />
+                            ))}
+                            
+                            {/* Employee-specific project assignments */}
+                            {dateRange.map((date, dayIndex) => {
+                              const dateStr = format(date, 'yyyy-MM-dd');
+                              
+                              // Find assignment for this employee on this date
+                              const assignment = dailyAssignments.find(
+                                a => a.employee_id === employee.id && 
+                                     a.team_id === team.id && 
+                                     a.date === dateStr && 
+                                     a.is_available
+                              );
+                              
+                              if (!assignment) return null;
+                              
+                              // Find the project assigned to this team for this date
+                              const assignedProject = projects.find(project => {
+                                const teamAssignment = project.project_team_assignments;
+                                if (!teamAssignment) return false;
+                                
+                                const startDate = new Date(teamAssignment.start_date);
+                                const endDate = new Date(startDate);
+                                endDate.setDate(endDate.getDate() + teamAssignment.duration - 1);
+                                
+                                return date >= startDate && date <= endDate &&
+                                       teamAssignment.team === team.name;
+                              });
+                              
+                              if (!assignedProject) return null;
+                              
+                              const teamColor = getTeamColor(team.name);
+                              
+                              return (
+                                <div
+                                  key={`${employee.id}-${dateStr}-${assignedProject.id}`}
+                                  className={cn(
+                                    "absolute top-2 h-12 rounded-md flex items-center px-2 text-white text-xs font-medium",
+                                    teamColor
+                                  )}
+                                  style={{
+                                    left: dayIndex * dayWidth,
+                                    width: dayWidth - 2
+                                  }}
+                                  title={`${employee.name} - ${assignedProject.name}`}
+                                >
+                                  <div className="truncate flex-1">
+                                    <div className="font-semibold truncate text-xs">{assignedProject.name}</div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         );
                       })}
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -395,6 +558,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
         teamId={assignmentDialog.teamId}
         teamName={assignmentDialog.teamName}
         date={assignmentDialog.date}
+        onAssignmentUpdate={handleAssignmentUpdate}
       />
     </Card>
   );
