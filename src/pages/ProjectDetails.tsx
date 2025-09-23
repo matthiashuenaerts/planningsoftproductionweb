@@ -1301,7 +1301,7 @@ const ProjectDetails = () => {
                                           </div>}
                                       </div>
                                       <span className={cn("text-white px-2 py-1 rounded-full text-xs font-bold ml-2 shadow-sm", order.status === 'delivered' ? 'bg-gradient-to-r from-green-500 to-emerald-500' : order.status === 'pending' ? 'bg-gradient-to-r from-orange-500 to-amber-500' : order.status === 'delayed' ? 'bg-gradient-to-r from-red-500 to-rose-500' : order.status === 'canceled' ? 'bg-gradient-to-r from-gray-500 to-slate-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500')}>
-                                        {item.quantity}
+                                        {item.delivered_quantity || 0}/{item.quantity}
                                       </span>
                                     </div>)}
                                 </div>
