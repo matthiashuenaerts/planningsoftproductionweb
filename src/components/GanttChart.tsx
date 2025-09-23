@@ -8,7 +8,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Plus, Users, Minus } from 'lucide-react';
 import { ProjectUserAssignmentDialog } from './ProjectUserAssignmentDialog';
+import { TeamMembershipManager } from './TeamMembershipManager';
 import { dailyTeamAssignmentService, DailyTeamAssignment, Employee as DailyEmployee } from '@/services/dailyTeamAssignmentService';
+import { teamMembershipService } from '@/services/teamMembershipService';
 
 interface Team {
   id: string;
@@ -115,13 +117,16 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
         // Fetch employees
         const employeesData = await dailyTeamAssignmentService.getAvailableEmployees();
         setEmployees(employeesData);
+        
+        // Auto-assign permanent team members to current projects
+        await autoAssignTeamMembersToProjects(fetchedTeams);
       } catch (error) {
         console.error('Error fetching teams and employees:', error);
       }
     };
 
     fetchTeamsAndEmployees();
-  }, []);
+  }, [projects]);
 
   // Fetch daily assignments for the current date range
   useEffect(() => {
@@ -241,6 +246,34 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     });
   };
 
+  const autoAssignTeamMembersToProjects = async (teamsData: Team[]) => {
+    try {
+      for (const project of projects) {
+        const teamAssignment = project.project_team_assignments;
+        if (!teamAssignment) continue;
+
+        // Find the team for this project
+        const team = teamsData.find(t => {
+          const teamNameLower = t.name.toLowerCase();
+          const projectTeamLower = teamAssignment.team.toLowerCase();
+          return projectTeamLower === teamNameLower ||
+                 projectTeamLower.includes(teamNameLower) ||
+                 teamNameLower.includes(projectTeamLower);
+        });
+
+        if (team) {
+          await teamMembershipService.autoAssignTeamMembersToProject(
+            team.id,
+            teamAssignment.start_date,
+            teamAssignment.duration
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error auto-assigning team members:', error);
+    }
+  };
+
   const handleAssignmentUpdate = () => {
     // Refresh daily assignments when assignment is updated
     const fetchDailyAssignments = async () => {
@@ -257,6 +290,11 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     };
 
     fetchDailyAssignments();
+  };
+
+  const handleMembershipChange = () => {
+    // Refresh assignments when team membership changes
+    handleAssignmentUpdate();
   };
 
   return (
@@ -300,6 +338,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                 <Plus className="h-4 w-4 mr-2" />
                 Assign
               </Button>
+              
+              <TeamMembershipManager onMembershipChange={handleMembershipChange} />
             </div>
             
             <div className="flex items-center gap-2">
@@ -338,8 +378,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
             </div>
             <div className="overflow-y-auto h-[calc(100%-48px)]">
               {teams.map((team) => {
-                // Get employees assigned to this team for any day in the date range
-                const teamEmployees = dailyAssignments
+                // Get both assigned employees and permanent team members
+                const assignedEmployees = dailyAssignments
                   .filter(assignment => assignment.team_id === team.id)
                   .reduce((acc, assignment) => {
                     const employee = employees.find(emp => emp.id === assignment.employee_id);
@@ -359,18 +399,22 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                           style={{ backgroundColor: team.color }}
                         />
                         {team.name}
+                        <div className="text-xs text-muted-foreground">
+                          ({assignedEmployees.length} members)
+                        </div>
                       </div>
                       <div className="text-xs text-muted-foreground">Installation Team</div>
                     </div>
                     
                     {/* Employee Rows */}
-                    {teamEmployees.map((employee) => (
+                    {assignedEmployees.map((employee) => (
                       <div
                         key={`${team.id}-${employee.id}`}
                         className="h-16 border-b border-border/50 px-6 flex flex-col justify-center hover:bg-muted/30 transition-colors"
                       >
-                        <div className="font-medium text-sm truncate">
+                        <div className="font-medium text-sm truncate flex items-center gap-2">
                           {employee.name}
+                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Currently assigned" />
                         </div>
                         <div className="text-xs text-muted-foreground">{employee.role}</div>
                       </div>
@@ -401,8 +445,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
               {/* Team rows with projects */}
               <div className="relative">
                 {teams.map((team) => {
-                  // Get employees assigned to this team for any day in the date range
-                  const teamEmployees = dailyAssignments
+                  // Get assigned employees for this team
+                  const assignedEmployees = dailyAssignments
                     .filter(assignment => assignment.team_id === team.id)
                     .reduce((acc, assignment) => {
                       const employee = employees.find(emp => emp.id === assignment.employee_id);
@@ -495,7 +539,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                       </div>
                       
                       {/* Employee Rows */}
-                      {teamEmployees.map((employee) => {
+                      {assignedEmployees.map((employee) => {
                         return (
                           <div
                             key={`${team.id}-${employee.id}`}
@@ -515,7 +559,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                               />
                             ))}
                             
-                            {/* Employee-specific project assignments */}
+                            {/* Employee-specific project assignments with holiday checking */}
                             {projects
                               .filter(project => {
                                 const teamAssignment = project.project_team_assignments;
@@ -584,7 +628,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                                       left: left,
                                       width: width - 2
                                     }}
-                                    title={`${employee.name} - ${project.name} (${employeeAssignedDays.length} days)`}
+                                    title={`${employee.name} - ${project.name} (${employeeAssignedDays.length} days assigned, holidays excluded)`}
                                   >
                                     <div className="truncate flex-1">
                                       <div className="font-semibold truncate text-xs">{project.name}</div>
