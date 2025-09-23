@@ -888,6 +888,16 @@ const ProjectDetails = () => {
   const inStockAccessoriesCount = accessories.filter(acc => acc.status === 'in_stock').length;
   const deliveredAccessoriesCount = accessories.filter(acc => acc.status === 'delivered').length;
   const semiFinishedOrders = orders.filter(order => order.order_type === 'semi-finished');
+  
+  // Calculate total undelivered quantity across all order items
+  const totalUndeliveredQuantity = orders.reduce((total, order) => {
+    const items = orderItems[order.id] || [];
+    return total + items.reduce((orderTotal, item) => {
+      const undelivered = (item.quantity || 0) - (item.delivered_quantity || 0);
+      return orderTotal + Math.max(0, undelivered);
+    }, 0);
+  }, 0);
+  
   return <div className="flex min-h-screen">
       <div className="w-64 bg-sidebar fixed top-0 bottom-0">
         <Navbar />
@@ -909,11 +919,11 @@ const ProjectDetails = () => {
                 <Button variant={activeTab === 'home' ? 'default' : 'outline'} onClick={() => setActiveTab('home')}>
                   <Home className="mr-2 h-4 w-4" /> {t('home')}
                 </Button>
-                <Button variant={activeTab === 'orders' ? 'default' : 'outline'} onClick={() => setActiveTab('orders')} className={cn(activeTab === 'orders' ? '' : allOrdersDelivered ? "bg-green-500 text-white hover:bg-green-600" : unavailableAccessoriesCount > 0 ? "bg-red-500 text-white hover:bg-red-600" : "")}>
+                <Button variant={activeTab === 'orders' ? 'default' : 'outline'} onClick={() => setActiveTab('orders')} className={cn(activeTab === 'orders' ? '' : totalUndeliveredQuantity > 0 ? "bg-red-500 text-white hover:bg-red-600" : allOrdersDelivered ? "bg-green-500 text-white hover:bg-green-600" : "")}>
                   <Package className="mr-2 h-4 w-4" /> 
                   {t('orders')}
-                  {unavailableAccessoriesCount > 0 && <span className="ml-2 bg-white text-red-500 px-2 py-1 rounded-full text-xs font-bold">
-                      {unavailableAccessoriesCount}
+                  {totalUndeliveredQuantity > 0 && <span className="ml-2 bg-white text-red-500 px-2 py-1 rounded-full text-xs font-bold">
+                      {totalUndeliveredQuantity}
                     </span>}
                 </Button>
                 <Button variant={activeTab === 'parts' ? 'default' : 'outline'} onClick={() => setActiveTab('parts')}>
