@@ -909,7 +909,7 @@ const ProjectDetails = () => {
                 <Button variant={activeTab === 'home' ? 'default' : 'outline'} onClick={() => setActiveTab('home')}>
                   <Home className="mr-2 h-4 w-4" /> {t('home')}
                 </Button>
-                <Button variant={activeTab === 'orders' ? 'default' : 'outline'} onClick={() => setActiveTab('orders')} className={cn(activeTab === 'orders' ? '' : unavailableAccessoriesCount === 0 ? "bg-green-500 text-white hover:bg-green-600" : unavailableAccessoriesCount > 0 ? "bg-red-500 text-white hover:bg-red-600" : "")}>
+                <Button variant={activeTab === 'orders' ? 'default' : 'outline'} onClick={() => setActiveTab('orders')} className={cn(activeTab === 'orders' ? '' : allOrdersDelivered ? "bg-green-500 text-white hover:bg-green-600" : unavailableAccessoriesCount > 0 ? "bg-red-500 text-white hover:bg-red-600" : "")}>
                   <Package className="mr-2 h-4 w-4" /> 
                   {t('orders')}
                   {unavailableAccessoriesCount > 0 && <span className="ml-2 bg-white text-red-500 px-2 py-1 rounded-full text-xs font-bold">
