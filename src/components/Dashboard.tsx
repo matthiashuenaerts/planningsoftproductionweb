@@ -365,7 +365,7 @@ const Dashboard: React.FC = () => {
       // Fetch orders for projects
       const { data: ordersData } = await supabase
         .from('orders')
-        .select('project_id, status')
+        .select('id, project_id, status')
         .in('project_id', projectIds);
       
       // Fetch team assignments for projects  
@@ -376,37 +376,54 @@ const Dashboard: React.FC = () => {
         })
       );
 
-      // Enhance assignments with order status and team colors
-      const enhancedAssignments = weekLoadingAssignments.map(assignment => {
-        // Calculate order status
-        const projectOrders = ordersData?.filter(o => o.project_id === assignment.project.id) || [];
-        const undeliveredCount = projectOrders.filter(o => o.status !== 'delivered').length;
-        const allDelivered = projectOrders.length > 0 && undeliveredCount === 0;
-        
-        // Get team color
-        const teamAssignment = teamAssignments.find(ta => ta.projectId === assignment.project.id);
-        let teamColor = '';
-        
-        if (teamAssignment?.assignments && teamAssignment.assignments.length > 0) {
-          // Look for any team assignment that contains color keywords
-          for (const team of teamAssignment.assignments) {
-            const color = getTeamColorFromName(team.team);
-            if (color) {
-              teamColor = color;
-              break;
+        // Enhance assignments with order status and team colors
+        const enhancedAssignments = await Promise.all(weekLoadingAssignments.map(async (assignment) => {
+          // Calculate order status - count undelivered items instead of undelivered orders
+          const projectOrders = ordersData?.filter(o => o.project_id === assignment.project.id) || [];
+          
+          let undeliveredItemsCount = 0;
+          
+          // Count undelivered items from orders with certain statuses
+          for (const order of projectOrders) {
+            if (['pending', 'delayed', 'partially_delivered'].includes(order.status)) {
+              try {
+                const items = await orderService.getOrderItems(order.id);
+                const undeliveredItems = items.filter(item => 
+                  (item.quantity || 0) > (item.delivered_quantity || 0)
+                );
+                undeliveredItemsCount += undeliveredItems.length;
+              } catch (error) {
+                console.error(`Error loading order items for order ${order.id}:`, error);
+              }
             }
           }
-        }
-        
-        return {
-          ...assignment,
-          orderStatus: {
-            undeliveredCount,
-            allDelivered
-          },
-          teamColor
-        };
-      });
+          
+          const allOrdersDelivered = projectOrders.length > 0 && projectOrders.every(o => o.status === 'delivered');
+          
+          // Get team color
+          const teamAssignment = teamAssignments.find(ta => ta.projectId === assignment.project.id);
+          let teamColor = '';
+          
+          if (teamAssignment?.assignments && teamAssignment.assignments.length > 0) {
+            // Look for any team assignment that contains color keywords
+            for (const team of teamAssignment.assignments) {
+              const color = getTeamColorFromName(team.team);
+              if (color) {
+                teamColor = color;
+                break;
+              }
+            }
+          }
+          
+          return {
+            ...assignment,
+            orderStatus: {
+              undeliveredCount: undeliveredItemsCount,
+              allDelivered: allOrdersDelivered
+            },
+            teamColor
+          };
+        }));
       
       // Merge with existing assignments
       setAllLoadingAssignments(prev => {
