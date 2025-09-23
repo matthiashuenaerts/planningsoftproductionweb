@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Plus, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Users, Minus } from 'lucide-react';
 import { ProjectUserAssignmentDialog } from './ProjectUserAssignmentDialog';
 import { dailyTeamAssignmentService, DailyTeamAssignment, Employee as DailyEmployee } from '@/services/dailyTeamAssignmentService';
 
@@ -64,6 +64,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
   const [employees, setEmployees] = useState<DailyEmployee[]>([]);
   const [dailyAssignments, setDailyAssignments] = useState<DailyTeamAssignment[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [weeksToShow, setWeeksToShow] = useState(4);
   const [selectedTeam, setSelectedTeam] = useState<string>('');
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [assignmentDialog, setAssignmentDialog] = useState<{
@@ -81,7 +82,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     teamName: '',
     date: new Date()
   });
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   // Fetch installation teams and employees
   useEffect(() => {
@@ -154,15 +155,17 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     })));
   }, [teams, employees, dailyAssignments, projects]);
 
-  // Get date range for the Gantt chart (4 weeks)
+  // Get date range for the Gantt chart (dynamic weeks)
   const getDateRange = () => {
     const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(addDays(weekStart, 27), { weekStartsOn: 1 }); // 4 weeks
+    const weekEnd = endOfWeek(addDays(weekStart, (weeksToShow * 7) - 1), { weekStartsOn: 1 });
     return eachDayOfInterval({ start: weekStart, end: weekEnd });
   };
 
   const dateRange = getDateRange();
-  const dayWidth = 40; // Width per day in pixels
+  // Calculate dynamic day width based on available space (subtracting sidebar width and padding)
+  const availableWidth = typeof window !== 'undefined' ? window.innerWidth - 200 - 48 : 1200; // 200px sidebar, 48px padding
+  const dayWidth = Math.max(30, availableWidth / dateRange.length); // Minimum 30px per day
 
   // Get project position and width
   const getProjectPosition = (project: ProjectWithTeam) => {
@@ -191,6 +194,18 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
 
   const goToNextWeek = () => {
     setCurrentWeek(addDays(currentWeek, 7));
+  };
+
+  const zoomIn = () => {
+    if (weeksToShow > 1) {
+      setWeeksToShow(weeksToShow - 1);
+    }
+  };
+
+  const zoomOut = () => {
+    if (weeksToShow < 8) {
+      setWeeksToShow(weeksToShow + 1);
+    }
   };
 
   // Handle team assignment (for future implementation)
@@ -288,6 +303,18 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
             </div>
             
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={zoomOut} disabled={weeksToShow >= 8}>
+                <Minus className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={zoomIn} disabled={weeksToShow <= 1}>
+                <Plus className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {weeksToShow} week{weeksToShow > 1 ? 's' : ''}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -355,8 +382,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
           </div>
           
           {/* Timeline area */}
-          <div className="flex-1 overflow-x-auto" ref={scrollRef}>
-            <div style={{ width: dateRange.length * dayWidth }}>
+          <div className="flex-1 overflow-hidden" ref={timelineRef}>
+            <div style={{ width: '100%', minWidth: dateRange.length * dayWidth }}>
               {/* Time header */}
               <div className="h-12 border-b border-border bg-muted/40 flex">
                 {dateRange.map((date, index) => (
@@ -489,55 +516,83 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                             ))}
                             
                             {/* Employee-specific project assignments */}
-                            {dateRange.map((date, dayIndex) => {
-                              const dateStr = format(date, 'yyyy-MM-dd');
-                              
-                              // Find assignment for this employee on this date
-                              const assignment = dailyAssignments.find(
-                                a => a.employee_id === employee.id && 
-                                     a.team_id === team.id && 
-                                     a.date === dateStr && 
-                                     a.is_available
-                              );
-                              
-                              if (!assignment) return null;
-                              
-                              // Find the project assigned to this team for this date
-                              const assignedProject = projects.find(project => {
+                            {projects
+                              .filter(project => {
                                 const teamAssignment = project.project_team_assignments;
                                 if (!teamAssignment) return false;
                                 
-                                const startDate = new Date(teamAssignment.start_date);
-                                const endDate = new Date(startDate);
-                                endDate.setDate(endDate.getDate() + teamAssignment.duration - 1);
+                                // Check if this project is assigned to the current team
+                                const projectTeam = teamAssignment.team;
+                                const teamNameLower = team.name.toLowerCase();
+                                const projectTeamLower = projectTeam.toLowerCase();
                                 
-                                return date >= startDate && date <= endDate &&
-                                       teamAssignment.team === team.name;
-                              });
-                              
-                              if (!assignedProject) return null;
-                              
-                              const teamColor = getTeamColor(team.name);
-                              
-                              return (
-                                <div
-                                  key={`${employee.id}-${dateStr}-${assignedProject.id}`}
-                                  className={cn(
-                                    "absolute top-2 h-12 rounded-md flex items-center px-2 text-white text-xs font-medium",
-                                    teamColor
-                                  )}
-                                  style={{
-                                    left: dayIndex * dayWidth,
-                                    width: dayWidth - 2
-                                  }}
-                                  title={`${employee.name} - ${assignedProject.name}`}
-                                >
-                                  <div className="truncate flex-1">
-                                    <div className="font-semibold truncate text-xs">{assignedProject.name}</div>
+                                return projectTeamLower === teamNameLower ||
+                                       projectTeamLower.includes(teamNameLower) ||
+                                       teamNameLower.includes(projectTeamLower) ||
+                                       (teamNameLower.includes('groen') && projectTeamLower.includes('green')) ||
+                                       (teamNameLower.includes('green') && projectTeamLower.includes('groen')) ||
+                                       (teamNameLower.includes('blauw') && projectTeamLower.includes('blue')) ||
+                                       (teamNameLower.includes('blue') && projectTeamLower.includes('blauw'));
+                              })
+                              .map((project) => {
+                                const teamAssignment = project.project_team_assignments;
+                                if (!teamAssignment) return null;
+                                
+                                const projectStartDate = new Date(teamAssignment.start_date);
+                                const projectEndDate = new Date(projectStartDate);
+                                projectEndDate.setDate(projectEndDate.getDate() + teamAssignment.duration - 1);
+                                
+                                // Check if employee is assigned to this team during project period
+                                const employeeAssignedDays = dailyAssignments.filter(assignment => 
+                                  assignment.employee_id === employee.id &&
+                                  assignment.team_id === team.id &&
+                                  assignment.is_available &&
+                                  new Date(assignment.date) >= projectStartDate &&
+                                  new Date(assignment.date) <= projectEndDate
+                                );
+                                
+                                if (employeeAssignedDays.length === 0) return null;
+                                
+                                // Calculate position for this employee's assignment
+                                const firstAssignmentDate = new Date(Math.min(...employeeAssignedDays.map(a => new Date(a.date).getTime())));
+                                const lastAssignmentDate = new Date(Math.max(...employeeAssignedDays.map(a => new Date(a.date).getTime())));
+                                
+                                const startDayIndex = differenceInDays(firstAssignmentDate, dateRange[0]);
+                                const endDayIndex = differenceInDays(lastAssignmentDate, dateRange[0]);
+                                
+                                // Only show if assignment intersects with current view
+                                if (endDayIndex < 0 || startDayIndex >= dateRange.length) {
+                                  return null;
+                                }
+                                
+                                const left = Math.max(0, startDayIndex * dayWidth);
+                                const width = Math.min(
+                                  (endDayIndex - Math.max(0, startDayIndex) + 1) * dayWidth,
+                                  (dateRange.length - Math.max(0, startDayIndex)) * dayWidth
+                                );
+                                
+                                const teamColor = getTeamColor(team.name);
+                                
+                                return (
+                                  <div
+                                    key={`${employee.id}-${project.id}`}
+                                    className={cn(
+                                      "absolute top-2 h-12 rounded-md flex items-center px-2 text-white text-xs font-medium cursor-pointer hover:opacity-90 transition-opacity",
+                                      teamColor
+                                    )}
+                                    style={{
+                                      left: left,
+                                      width: width - 2
+                                    }}
+                                    title={`${employee.name} - ${project.name} (${employeeAssignedDays.length} days)`}
+                                  >
+                                    <div className="truncate flex-1">
+                                      <div className="font-semibold truncate text-xs">{project.name}</div>
+                                      <div className="text-xs opacity-75 truncate">{project.client}</div>
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
                           </div>
                         );
                       })}
