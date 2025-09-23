@@ -294,6 +294,19 @@ const ProjectDetails = () => {
         }));
         setOrders(ordersWithDetails);
 
+        // Load all order items upfront for undelivered quantity calculation
+        const allOrderItems: { [orderId: string]: any[] } = {};
+        await Promise.all(ordersWithDetails.map(async order => {
+          try {
+            const items = await orderService.getOrderItems(order.id);
+            allOrderItems[order.id] = items;
+          } catch (error) {
+            console.error(`Error loading order items for order ${order.id}:`, error);
+            allOrderItems[order.id] = [];
+          }
+        }));
+        setOrderItems(allOrderItems);
+
         // Fetch project efficiency from database (it should be updated by now)
         try {
           const {
