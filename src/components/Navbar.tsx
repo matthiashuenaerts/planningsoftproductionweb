@@ -62,7 +62,7 @@ const NavbarContent = ({
     <div className="h-full bg-sky-800 text-white flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 mb-2">
-        <h2 className="text-lg font-semibold">{t('demo_account')}</h2>
+        <h2 className="text-lg font-semibold">{t('THONON nv.')}</h2>
         <Button
           variant="ghost"
           size="sm"
