@@ -33,7 +33,7 @@ const Projects = () => {
   const [exportingProject, setExportingProject] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [projectProgress, setProjectProgress] = useState<Record<string, { earliestIncomplete: string | null, farthestTodo: string | null }>>({});
-  const isAdmin = ['admin', 'teamleader', 'preparater'].includes(currentEmployee?.role);
+  const isAdmin = ['admin', 'teamleader', 'preparater', 'manager'].includes(currentEmployee?.role);
 
 
   useEffect(() => {
