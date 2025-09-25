@@ -269,21 +269,32 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
         const teamAssignment = project.project_team_assignments;
         if (!teamAssignment) continue;
 
-        // Find the team for this project
+        // Improved team matching logic
         const team = teamsData.find(t => {
           const teamNameLower = t.name.toLowerCase();
           const projectTeamLower = teamAssignment.team.toLowerCase();
-          return projectTeamLower === teamNameLower ||
-                 projectTeamLower.includes(teamNameLower) ||
-                 teamNameLower.includes(projectTeamLower);
+          
+          // Exact match first
+          if (projectTeamLower === teamNameLower) return true;
+          
+          // Match by color keywords in project team name
+          if (teamNameLower.includes('blue') && (projectTeamLower.includes('blauw') || projectTeamLower.includes('blue'))) return true;
+          if (teamNameLower.includes('green') && (projectTeamLower.includes('groen') || projectTeamLower.includes('green'))) return true;
+          if (teamNameLower.includes('orange') && projectTeamLower.includes('orange')) return true;
+          
+          // Fallback - check if project team contains team name or vice versa
+          return projectTeamLower.includes(teamNameLower) || teamNameLower.includes(projectTeamLower);
         });
 
         if (team) {
+          console.log(`Auto-assigning members of team "${team.name}" to project "${project.name}" for ${teamAssignment.duration} days from ${teamAssignment.start_date}`);
           await teamMembershipService.autoAssignTeamMembersToProject(
             team.id,
             teamAssignment.start_date,
             teamAssignment.duration
           );
+        } else {
+          console.log(`No matching team found for project "${project.name}" with team assignment "${teamAssignment.team}"`);
         }
       }
     } catch (error) {
