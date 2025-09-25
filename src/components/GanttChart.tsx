@@ -263,6 +263,40 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     });
   };
 
+  // Helper function to assign an employee to a team for a date range
+  const assignEmployeeToTeamForPeriod = async (
+    employeeId: string,
+    teamId: string,
+    startDate: string,
+    endDate: string,
+    isAvailable: boolean = true,
+    notes?: string
+  ) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const assignments = [];
+
+    for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+      // Skip weekends for work assignments
+      if (date.getDay() === 0 || date.getDay() === 6) continue;
+      
+      try {
+        const assignment = await dailyTeamAssignmentService.assignEmployeeToTeamForDate(
+          employeeId,
+          teamId,
+          format(date, 'yyyy-MM-dd'),
+          isAvailable,
+          notes
+        );
+        assignments.push(assignment);
+      } catch (error) {
+        console.error(`Error assigning employee ${employeeId} to team ${teamId} on ${format(date, 'yyyy-MM-dd')}:`, error);
+      }
+    }
+    
+    return assignments;
+  };
+
   const autoAssignTeamMembersToProjects = async (teamsData: Team[]) => {
     try {
       for (const project of projects) {
@@ -275,15 +309,38 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
           const projectTeamLower = teamAssignment.team.toLowerCase();
           return projectTeamLower === teamNameLower ||
                  projectTeamLower.includes(teamNameLower) ||
-                 teamNameLower.includes(projectTeamLower);
+                 teamNameLower.includes(projectTeamLower) ||
+                 (teamNameLower.includes('groen') && projectTeamLower.includes('green')) ||
+                 (teamNameLower.includes('green') && projectTeamLower.includes('groen')) ||
+                 (teamNameLower.includes('blauw') && projectTeamLower.includes('blue')) ||
+                 (teamNameLower.includes('blue') && projectTeamLower.includes('blauw'));
         });
 
         if (team) {
-          await teamMembershipService.autoAssignTeamMembersToProject(
-            team.id,
-            teamAssignment.start_date,
-            teamAssignment.duration
-          );
+          // Get permanent team members
+          const { data: permanentMembers } = await supabase
+            .from('placement_team_members')
+            .select('employee_id, is_default')
+            .eq('team_id', team.id)
+            .eq('is_default', true);
+
+          if (permanentMembers && permanentMembers.length > 0) {
+            // Create daily assignments for each permanent member for the entire project duration
+            const startDate = new Date(teamAssignment.start_date);
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + teamAssignment.duration - 1);
+
+            for (const member of permanentMembers) {
+              await assignEmployeeToTeamForPeriod(
+                member.employee_id,
+                team.id,
+                format(startDate, 'yyyy-MM-dd'),
+                format(endDate, 'yyyy-MM-dd'),
+                true, // is_available
+                `Auto-assigned for project: ${project.name}`
+              );
+            }
+          }
         }
       }
     } catch (error) {
@@ -357,14 +414,60 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     }
   }, [resizing, dayWidth]);
 
-  const handleResizeEnd = useCallback(() => {
+  const handleResizeEnd = useCallback(async () => {
     if (!resizing) return;
     
-    // Here you would implement the actual data update to save the new assignment dates
-    console.log('Resize completed for:', resizing);
+    try {
+      // Calculate the new date range based on the visual resize
+      const element = document.querySelector(`[data-resize-id="${resizing.projectId}-${resizing.employeeId}"]`) as HTMLElement;
+      if (!element) return;
+
+      const currentLeft = parseInt(element.style.left);
+      const currentWidth = parseInt(element.style.width);
+      
+      const startDayIndex = Math.round(currentLeft / dayWidth);
+      const durationDays = Math.round(currentWidth / dayWidth);
+      
+      const newStartDate = dateRange[Math.max(0, startDayIndex)];
+      const newEndDate = new Date(newStartDate);
+      newEndDate.setDate(newEndDate.getDate() + durationDays - 1);
+
+      // Find the team for this employee assignment
+      const employeeAssignments = dailyAssignments.filter(
+        assignment => assignment.employee_id === resizing.employeeId
+      );
+      
+      if (employeeAssignments.length > 0) {
+        const teamId = employeeAssignments[0].team_id;
+        
+        // Delete existing assignments for this employee and project period
+        await supabase
+          .from('daily_team_assignments')
+          .delete()
+          .eq('employee_id', resizing.employeeId)
+          .eq('team_id', teamId)
+          .gte('date', format(new Date(Math.min(...employeeAssignments.map(a => new Date(a.date).getTime()))), 'yyyy-MM-dd'))
+          .lte('date', format(new Date(Math.max(...employeeAssignments.map(a => new Date(a.date).getTime()))), 'yyyy-MM-dd'));
+
+        // Create new assignments for the resized period
+        await assignEmployeeToTeamForPeriod(
+          resizing.employeeId,
+          teamId,
+          format(newStartDate, 'yyyy-MM-dd'),
+          format(newEndDate, 'yyyy-MM-dd'),
+          true,
+          `Manually adjusted assignment`
+        );
+
+        // Refresh the assignments
+        handleAssignmentUpdate();
+      }
+    } catch (error) {
+      console.error('Error saving resized assignment:', error);
+    }
     
     setResizing(null);
-  }, [resizing]);
+  }, [resizing, dayWidth, dateRange, dailyAssignments, handleAssignmentUpdate]);
 
   // Mouse event listeners for resizing
   useEffect(() => {
