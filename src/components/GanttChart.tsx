@@ -136,7 +136,9 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
         setEmployees(employeesData);
         
         // Auto-assign permanent team members to current projects
-        await autoAssignTeamMembersToProjects(fetchedTeams);
+        if (projects.length > 0) {
+          await autoAssignTeamMembersToProjects(fetchedTeams);
+        }
       } catch (error) {
         console.error('Error fetching teams and employees:', error);
       }
@@ -157,13 +159,22 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
         
         const assignments = await dailyTeamAssignmentService.getAssignmentsForDateRange(startDate, endDate);
         setDailyAssignments(assignments);
+
+        // Ensure permanent members are assigned to active projects
+        if (assignments.length === 0 && projects.length > 0) {
+          console.log('No assignments found, auto-assigning permanent members...');
+          await autoAssignTeamMembersToProjects(teams);
+          // Refetch assignments after auto-assignment
+          const newAssignments = await dailyTeamAssignmentService.getAssignmentsForDateRange(startDate, endDate);
+          setDailyAssignments(newAssignments);
+        }
       } catch (error) {
         console.error('Error fetching daily assignments:', error);
       }
     };
 
     fetchDailyAssignments();
-  }, [teams, currentWeek]);
+  }, [teams, currentWeek, projects]);
 
   // Debug: Log teams, employees and assignments
   useEffect(() => {
@@ -588,6 +599,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                 </div>
               </div>
               {teams.map((team) => {
+                // Get employees assigned to this team through daily assignments
                 const assignedEmployees = dailyAssignments
                   .filter(assignment => assignment.team_id === team.id)
                   .reduce((acc, assignment) => {
@@ -598,7 +610,16 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                     return acc;
                   }, [] as DailyEmployee[]);
 
-                return assignedEmployees.map((employee) => (
+                // Also include permanent team members even if they don't have daily assignments yet
+                const permanentMembers = employees.filter(employee => {
+                  // Check if this employee is a permanent member of this team but not already included
+                  return !assignedEmployees.some(assigned => assigned.id === employee.id);
+                });
+
+                // Combine both assigned and permanent members
+                const allTeamMembers = [...assignedEmployees];
+
+                return allTeamMembers.map((employee) => (
                   <div
                     key={`employee-${team.id}-${employee.id}`}
                     className="h-16 border-b border-border/50 px-6 flex flex-col justify-center hover:bg-muted/30 transition-colors"
