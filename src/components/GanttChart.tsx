@@ -287,14 +287,29 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
         });
 
         if (team) {
-          console.log(`Auto-assigning members of team "${team.name}" to project "${project.name}" for ${teamAssignment.duration} days from ${teamAssignment.start_date}`);
-          await teamMembershipService.autoAssignTeamMembersToProject(
-            team.id,
-            teamAssignment.start_date,
-            teamAssignment.duration
-          );
+          console.log(`Auto-assigning members of team "${team.name}" (ID: ${team.id}) to project "${project.name}" for ${teamAssignment.duration} days from ${teamAssignment.start_date}`);
+          
+          // Get team members first to check if there are any
+          const teamMembers = await teamMembershipService.getTeamMembers(team.id);
+          console.log(`Team "${team.name}" has ${teamMembers.length} permanent members:`, teamMembers.map(m => m.name));
+          
+          if (teamMembers.length === 0) {
+            console.warn(`Team "${team.name}" has no permanent members to auto-assign`);
+          } else {
+            try {
+              await teamMembershipService.autoAssignTeamMembersToProject(
+                team.id,
+                teamAssignment.start_date,
+                teamAssignment.duration
+              );
+              console.log(`Successfully auto-assigned ${teamMembers.length} members to project "${project.name}"`);
+            } catch (error) {
+              console.error(`Failed to auto-assign team members to project "${project.name}":`, error);
+            }
+          }
         } else {
           console.log(`No matching team found for project "${project.name}" with team assignment "${teamAssignment.team}"`);
+          console.log(`Available teams:`, teamsData.map(t => ({ id: t.id, name: t.name })));
         }
       }
     } catch (error) {
