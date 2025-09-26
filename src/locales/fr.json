@@ -94,6 +94,9 @@
   "status_completed": "Terminé",
   "status_unknown": "Inconnu",
 
+
+  "Tasks_Notes": "Tâches et notes",
+  
   "view_details": "Voir les détails",
   "edit": "Modifier",
   "delete": "Supprimer",
