@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Loader2, Circle, Eye, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Loader2, Circle, Eye, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -30,6 +30,8 @@ import { AccessoriesInlineView } from '@/components/AccessoriesInlineView';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import OrderEditModal from '@/components/OrderEditModal';
 import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
+import { ProjectChat } from '@/components/ProjectChat';
+import { projectChatService } from '@/services/projectChatService';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
@@ -91,6 +93,8 @@ const ProjectDetails = () => {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState('');
   const [savingDescription, setSavingDescription] = useState(false);
+  const [showProjectChat, setShowProjectChat] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
   const {
     currentEmployee
   } = useAuth();
@@ -339,6 +343,22 @@ const ProjectDetails = () => {
       loadPartsLists();
     }
   }, [projectId, refreshPartsKey]);
+
+  // Load unread chat count on component mount and when project changes
+  useEffect(() => {
+    const loadUnreadCount = async () => {
+      if (projectId) {
+        try {
+          const count = await projectChatService.getUnreadMessageCount(projectId);
+          setUnreadChatCount(count);
+        } catch (error) {
+          console.error('Error loading unread chat count:', error);
+        }
+      }
+    };
+    
+    loadUnreadCount();
+  }, [projectId]);
   const loadPartsLists = async () => {
     if (!projectId) return;
     setLoadingParts(true);
@@ -947,6 +967,15 @@ const ProjectDetails = () => {
                 <Button variant={activeTab === 'accessories' ? 'default' : 'outline'} onClick={() => setActiveTab('accessories')}>
                   <Settings className="mr-2 h-4 w-4" /> {t('accessories')}
                 </Button>
+                <Button variant="outline" onClick={() => setShowProjectChat(true)} className="relative">
+                  <MessageCircle className="mr-2 h-4 w-4" /> 
+                  Chat
+                  {unreadChatCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                      {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                    </span>
+                  )}
+                </Button>
                 <Button variant={activeTab === 'files' ? 'default' : 'outline'} onClick={() => setActiveTab('files')}>
                   <FileText className="mr-2 h-4 w-4" /> {t('files')}
                 </Button>
@@ -1503,6 +1532,18 @@ const ProjectDetails = () => {
       <ProjectBarcodeDialog isOpen={showBarcodeDialog} onClose={() => setShowBarcodeDialog(false)} projectId={projectId!} projectName={project?.name || ''} />
 
       {selectedOrderId && <OrderEditModal open={showOrderEditModal} onOpenChange={setShowOrderEditModal} orderId={selectedOrderId} onSuccess={handleOrderEditSuccess} />}
-    </div>;
+      
+      {/* Project Chat Dialog */}
+      {project && (
+        <ProjectChat
+          projectId={projectId!}
+          projectName={project.name}
+          isOpen={showProjectChat}
+          onClose={() => setShowProjectChat(false)}
+          onUnreadCountChange={setUnreadChatCount}
+        />
+      )}
+    </div>
+  );
 };
 export default ProjectDetails;

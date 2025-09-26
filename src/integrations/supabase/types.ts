@@ -1413,6 +1413,72 @@ export type Database = {
         }
         Relationships: []
       }
+      project_message_reads: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          last_read_at: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          last_read_at?: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          last_read_at?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      project_messages: {
+        Row: {
+          created_at: string
+          employee_id: string
+          file_name: string | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          is_image: boolean | null
+          message: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          is_image?: boolean | null
+          message: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          file_name?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          is_image?: boolean | null
+          message?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       project_onedrive_configs: {
         Row: {
           access_token: string | null
