@@ -117,6 +117,7 @@
   "team_members_assigned": "{{count}} teamleden toegewezen",
   "priority_critical": "KRITIEK",
   "priority_high": "HOOG",
+  "Tasks_Notes": "Taken & Notities",
 
   "loading_rush_order_details": "Spoedbestelling details laden...",
   "error_loading_rush_order": "Fout bij laden van Spoedbestelling",
