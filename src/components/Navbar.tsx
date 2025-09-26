@@ -110,7 +110,7 @@ const NavbarContent = ({
           <li>
             <NavLink to={createLocalizedPath("/notes-and-tasks")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
               <FileText className="w-5 h-5 text-white group-hover:text-white" />
-              <span className="ml-3">Notes & Tasks</span>
+              <span className="ml-3">{t('Tasks_Notes')}</span>
             </NavLink>
           </li>
           {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader'].includes(currentEmployee.role) && (
