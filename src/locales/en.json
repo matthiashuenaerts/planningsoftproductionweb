@@ -137,6 +137,8 @@
   "unknown_employee": "Unknown Employee",
   "priority_label": "PRIORITY",
 
+  "Tasks_Notes": "Tasks & notes",
+
   "error": "Error",
   "failed_to_load_projects": "Failed to load projects: {{message}}",
   "success": "Success",
