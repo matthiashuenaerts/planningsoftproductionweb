@@ -31,6 +31,7 @@ import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import OrderEditModal from '@/components/OrderEditModal';
 import OrderAttachmentUploader from '@/components/OrderAttachmentUploader';
 import { ProjectChat } from '@/components/ProjectChat';
+import { ProjectChatInline } from '@/components/ProjectChatInline';
 import { projectChatService } from '@/services/projectChatService';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -968,7 +969,7 @@ const ProjectDetails = () => {
                 <Button variant={activeTab === 'accessories' ? 'default' : 'outline'} onClick={() => setActiveTab('accessories')}>
                   <Settings className="mr-2 h-4 w-4" /> {t('accessories')}
                 </Button>
-                <Button variant="outline" onClick={() => setShowProjectChat(true)} className="relative">
+                <Button variant={activeTab === 'chat' ? 'default' : 'outline'} onClick={() => setActiveTab('chat')} className="relative">
                   <MessageCircle className="mr-2 h-4 w-4" /> 
                   Chat
                   {unreadChatCount > 0 && (
@@ -1014,7 +1015,7 @@ const ProjectDetails = () => {
             </Card>
           </div>
 
-          {activeTab === 'files' ? <ProjectFileManager projectId={projectId!} /> : activeTab === 'onedrive' ? <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} /> : activeTab === 'parts' ? <div className="space-y-4">
+          {activeTab === 'files' ? <ProjectFileManager projectId={projectId!} /> : activeTab === 'onedrive' ? <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} /> : activeTab === 'chat' ? <ProjectChatInline projectId={projectId!} projectName={project?.name || ''} onUnreadCountChange={setUnreadChatCount} /> : activeTab === 'parts' ? <div className="space-y-4">
               {partsLists.length > 0 ? <div className="space-y-4">
                   {/* Parts List Management Header */}
                   <Card>
@@ -1535,16 +1536,6 @@ const ProjectDetails = () => {
 
       {selectedOrderId && <OrderEditModal open={showOrderEditModal} onOpenChange={setShowOrderEditModal} orderId={selectedOrderId} onSuccess={handleOrderEditSuccess} />}
       
-      {/* Project Chat Dialog */}
-      {project && (
-        <ProjectChat
-          projectId={projectId!}
-          projectName={project.name}
-          isOpen={showProjectChat}
-          onClose={() => setShowProjectChat(false)}
-          onUnreadCountChange={setUnreadChatCount}
-        />
-      )}
     </div>
   );
 };
