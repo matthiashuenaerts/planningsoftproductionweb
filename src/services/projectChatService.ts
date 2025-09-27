@@ -70,8 +70,12 @@ export const projectChatService = {
     file?: File
   ): Promise<ProjectMessage> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      // Get current user from localStorage (custom auth system)
+      const storedSession = localStorage.getItem('employeeSession');
+      if (!storedSession) throw new Error('User not authenticated');
+      
+      const employee = JSON.parse(storedSession);
+      if (!employee?.id) throw new Error('User not authenticated');
 
       let file_url: string | null = null;
       let file_name: string | null = null;
@@ -104,7 +108,7 @@ export const projectChatService = {
         .from('project_messages')
         .insert({
           project_id: projectId,
-          employee_id: user.id,
+          employee_id: employee.id,
           message,
           file_url,
           file_name,
@@ -116,16 +120,9 @@ export const projectChatService = {
 
       if (error) throw error;
 
-      // Get employee name
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('name')
-        .eq('id', user.id)
-        .single();
-
       return {
         ...data,
-        employee_name: employee?.name || 'Unknown'
+        employee_name: employee.name || 'Unknown'
       };
     } catch (error) {
       console.error('Error sending message:', error);
@@ -136,15 +133,19 @@ export const projectChatService = {
   // Get unread message count for a project
   async getUnreadMessageCount(projectId: string): Promise<number> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return 0;
+      // Get current user from localStorage (custom auth system)
+      const storedSession = localStorage.getItem('employeeSession');
+      if (!storedSession) return 0;
+      
+      const employee = JSON.parse(storedSession);
+      if (!employee?.id) return 0;
 
       // Get last read timestamp for this user and project
       const { data: readData } = await supabase
         .from('project_message_reads')
         .select('last_read_at')
         .eq('project_id', projectId)
-        .eq('employee_id', user.id)
+        .eq('employee_id', employee.id)
         .single();
 
       const lastRead = readData?.last_read_at;
@@ -173,14 +174,18 @@ export const projectChatService = {
   // Mark messages as read for current user
   async markMessagesAsRead(projectId: string): Promise<void> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // Get current user from localStorage (custom auth system)
+      const storedSession = localStorage.getItem('employeeSession');
+      if (!storedSession) return;
+      
+      const employee = JSON.parse(storedSession);
+      if (!employee?.id) return;
 
       const { error } = await supabase
         .from('project_message_reads')
         .upsert({
           project_id: projectId,
-          employee_id: user.id,
+          employee_id: employee.id,
           last_read_at: new Date().toISOString()
         }, {
           onConflict: 'project_id,employee_id'
