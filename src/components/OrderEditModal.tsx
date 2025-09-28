@@ -30,7 +30,7 @@ import {
 import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { orderService } from '@/services/orderService';
-import { Order, OrderItem } from '@/types/order';
+import { Order, OrderItem, OrderStep } from '@/types/order';
 
 interface OrderEditModalProps {
   open: boolean;
@@ -44,12 +44,14 @@ const OrderEditModal = ({ open, onOpenChange, orderId, onSuccess }: OrderEditMod
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [orderSteps, setOrderSteps] = useState<OrderStep[]>([]);
   const [formData, setFormData] = useState({
     supplier: '',
     expected_delivery: '',
     status: 'pending' as Order['status'],
     notes: '',
-    order_reference: ''
+    order_reference: '',
+    order_date: ''
   });
 
   useEffect(() => {
@@ -66,12 +68,21 @@ const OrderEditModal = ({ open, onOpenChange, orderId, onSuccess }: OrderEditMod
       
       setOrder(orderData);
       setOrderItems(itemsData);
+      
+      // Load order steps if it's a semi-finished order
+      let stepsData: OrderStep[] = [];
+      if (orderData.order_type === 'semi-finished') {
+        stepsData = await orderService.getOrderSteps(orderId);
+        setOrderSteps(stepsData);
+      }
+      
       setFormData({
         supplier: orderData.supplier,
         expected_delivery: new Date(orderData.expected_delivery).toISOString().split('T')[0],
         status: orderData.status,
-        notes: '',
-        order_reference: ''
+        notes: orderData.notes || '',
+        order_reference: '',
+        order_date: new Date(orderData.order_date).toISOString().split('T')[0]
       });
     } catch (error: any) {
       toast({
@@ -93,8 +104,52 @@ const OrderEditModal = ({ open, onOpenChange, orderId, onSuccess }: OrderEditMod
       await orderService.update(orderId, {
         supplier: formData.supplier,
         expected_delivery: new Date(formData.expected_delivery).toISOString(),
-        status: formData.status
+        order_date: new Date(formData.order_date).toISOString(),
+        status: formData.status,
+        notes: formData.notes
       });
+
+      // Handle order steps for semi-finished orders
+      if (order?.order_type === 'semi-finished') {
+        const existingSteps = await orderService.getOrderSteps(orderId);
+        
+        // Delete removed steps
+        const currentStepIds = orderSteps.filter(step => step.id).map(step => step.id);
+        const stepsToDelete = existingSteps.filter(step => !currentStepIds.includes(step.id));
+        
+        for (const step of stepsToDelete) {
+          await orderService.deleteOrderStep(step.id);
+        }
+
+        // Update existing steps and create new ones
+        for (const step of orderSteps) {
+          if (step.id) {
+            // Update existing step
+            await orderService.updateOrderStep(step.id, {
+              name: step.name,
+              supplier: step.supplier,
+              status: step.status,
+              start_date: step.start_date,
+              end_date: step.end_date,
+              expected_duration_days: step.expected_duration_days,
+              notes: step.notes
+            });
+          } else {
+            // Create new step
+            await orderService.createOrderStep({
+              order_id: orderId,
+              step_number: step.step_number,
+              name: step.name,
+              supplier: step.supplier,
+              status: step.status,
+              start_date: step.start_date,
+              end_date: step.end_date,
+              expected_duration_days: step.expected_duration_days,
+              notes: step.notes
+            });
+          }
+        }
+      }
 
       // Get existing order items
       const existingItems = await orderService.getOrderItems(orderId);
@@ -163,6 +218,34 @@ const OrderEditModal = ({ open, onOpenChange, orderId, onSuccess }: OrderEditMod
     ));
   };
 
+  const addOrderStep = () => {
+    const newStepNumber = Math.max(0, ...orderSteps.map(s => s.step_number)) + 1;
+    setOrderSteps(prev => [...prev, {
+      id: '',
+      order_id: orderId,
+      step_number: newStepNumber,
+      name: '',
+      supplier: '',
+      status: 'pending',
+      start_date: null,
+      end_date: null,
+      expected_duration_days: null,
+      notes: null,
+      created_at: '',
+      updated_at: ''
+    }]);
+  };
+
+  const updateOrderStep = (index: number, field: keyof OrderStep, value: string | number | null) => {
+    setOrderSteps(prev => prev.map((step, i) => 
+      i === index ? { ...step, [field]: value } : step
+    ));
+  };
+
+  const removeOrderStep = (index: number) => {
+    setOrderSteps(prev => prev.filter((_, i) => i !== index));
+  };
+
   const removeOrderItem = (index: number) => {
     setOrderItems(prev => prev.filter((_, i) => i !== index));
   };
@@ -223,7 +306,17 @@ const OrderEditModal = ({ open, onOpenChange, orderId, onSuccess }: OrderEditMod
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="order_date">Order Date *</Label>
+              <Input
+                id="order_date"
+                type="date"
+                value={formData.order_date}
+                onChange={(e) => setFormData(prev => ({ ...prev, order_date: e.target.value }))}
+                required
+              />
+            </div>
             <div>
               <Label htmlFor="expected_delivery">Expected Delivery *</Label>
               <Input
@@ -248,6 +341,7 @@ const OrderEditModal = ({ open, onOpenChange, orderId, onSuccess }: OrderEditMod
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="canceled">Canceled</SelectItem>
                   <SelectItem value="delayed">Delayed</SelectItem>
+                  <SelectItem value="partially_delivered">Partially Delivered</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -262,6 +356,129 @@ const OrderEditModal = ({ open, onOpenChange, orderId, onSuccess }: OrderEditMod
               placeholder="Additional notes about this order..."
             />
           </div>
+
+          {/* Order Steps for Semi-finished Orders */}
+          {order?.order_type === 'semi-finished' && (
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>Processing Steps</CardTitle>
+                  <Button type="button" onClick={addOrderStep} variant="outline" size="sm">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Step
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {orderSteps.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">
+                    No processing steps defined. Click "Add Step" to get started.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {orderSteps.map((step, index) => (
+                      <Card key={step.id || index} className="p-4">
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <Label htmlFor={`step-name-${index}`}>Step Name *</Label>
+                            <Input
+                              id={`step-name-${index}`}
+                              value={step.name}
+                              onChange={(e) => updateOrderStep(index, 'name', e.target.value)}
+                              placeholder="e.g., Cutting, Assembly, Finishing"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`step-supplier-${index}`}>Supplier</Label>
+                            <Input
+                              id={`step-supplier-${index}`}
+                              value={step.supplier || ''}
+                              onChange={(e) => updateOrderStep(index, 'supplier', e.target.value)}
+                              placeholder="Step supplier (optional)"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-4 gap-4 mb-4">
+                          <div>
+                            <Label htmlFor={`step-status-${index}`}>Status</Label>
+                            <Select
+                              value={step.status}
+                              onValueChange={(value: OrderStep['status']) => updateOrderStep(index, 'status', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="delayed">Delayed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label htmlFor={`step-start-${index}`}>Start Date</Label>
+                            <Input
+                              id={`step-start-${index}`}
+                              type="date"
+                              value={step.start_date ? new Date(step.start_date).toISOString().split('T')[0] : ''}
+                              onChange={(e) => updateOrderStep(index, 'start_date', e.target.value || null)}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`step-end-${index}`}>End Date</Label>
+                            <Input
+                              id={`step-end-${index}`}
+                              type="date"
+                              value={step.end_date ? new Date(step.end_date).toISOString().split('T')[0] : ''}
+                              onChange={(e) => updateOrderStep(index, 'end_date', e.target.value || null)}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`step-duration-${index}`}>Duration (days)</Label>
+                            <Input
+                              id={`step-duration-${index}`}
+                              type="number"
+                              min="1"
+                              value={step.expected_duration_days || ''}
+                              onChange={(e) => updateOrderStep(index, 'expected_duration_days', parseInt(e.target.value) || null)}
+                              placeholder="Days"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-4">
+                          <div className="flex-1">
+                            <Label htmlFor={`step-notes-${index}`}>Notes</Label>
+                            <Textarea
+                              id={`step-notes-${index}`}
+                              value={step.notes || ''}
+                              onChange={(e) => updateOrderStep(index, 'notes', e.target.value)}
+                              placeholder="Additional notes for this step..."
+                              rows={2}
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeOrderStep(index)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
