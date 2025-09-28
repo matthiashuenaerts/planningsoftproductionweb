@@ -27,16 +27,9 @@ export interface ProjectMessageRead {
 }
 
 export const projectChatService = {
-  // Get messages for a project (only messages user can see)
+  // Get messages for a project (all users can see all messages)
   async getProjectMessages(projectId: string): Promise<ProjectMessage[]> {
     try {
-      // Get current user
-      const storedSession = localStorage.getItem('employeeSession');
-      if (!storedSession) return [];
-      
-      const employee = JSON.parse(storedSession);
-      if (!employee?.id) return [];
-
       const { data: messages, error } = await supabase
         .from('project_messages')
         .select('*')
@@ -49,10 +42,8 @@ export const projectChatService = {
         return [];
       }
 
-      // Filter messages - show if no target users or if current user is in target
-      const visibleMessages = messages.filter(msg => 
-        !msg.target_user_ids || msg.target_user_ids.includes(employee.id)
-      );
+      // Show ALL messages - everyone can see everything
+      const visibleMessages = messages;
 
       // Get employee names separately
       const employeeIds = [...new Set(visibleMessages.map(msg => msg.employee_id))];
@@ -144,6 +135,7 @@ export const projectChatService = {
       if (error) throw error;
 
       // Send notifications only to targeted users if specified
+      // If no target users specified, don't send any notifications (broadcast message)
       if (targetUserIds && targetUserIds.length > 0) {
         await this.sendTargetedNotifications(projectId, targetUserIds, message, employee.name);
       }
