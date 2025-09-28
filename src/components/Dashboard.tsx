@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ProjectCard from './ProjectCard';
 import TaskList from './TaskList';
 import SeedDataButton from './SeedDataButton';
-import HolidayRequestsList from './HolidayRequestsList';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { projectService, taskService, Project, Task } from '@/services/dataService';
@@ -13,8 +11,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { orderService } from '@/services/orderService';
 import { projectTeamAssignmentService } from '@/services/projectTeamAssignmentService';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldCheck, Calendar, CheckCircle2, Clock, AlertCircle, Users, BarChart3, ListTodo, Truck, ChevronLeft, ChevronRight } from "lucide-react";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { ShieldCheck, Calendar, CheckCircle2, Clock, Users, BarChart3, ListTodo, Truck, ChevronLeft, ChevronRight } from "lucide-react";
 import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { format, startOfToday, isToday, subDays, parseISO, addDays, isWeekend, startOfWeek } from 'date-fns';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -497,7 +494,6 @@ const Dashboard: React.FC = () => {
     'In Progress': '#f59e0b',
     'Completed': '#4ade80'
   };
-  const canManageRequests = currentEmployee?.role === 'admin' || currentEmployee?.role === 'teamleader' || currentEmployee?.role === 'manager';
   if (loading) {
     return <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
@@ -655,12 +651,6 @@ const Dashboard: React.FC = () => {
       </div>
 
       
-
-      {/* Holiday Requests Section */}
-      
-
-      
-
       <TaskList tasks={todaysTasks} title="Today's Tasks" onTaskStatusChange={async (taskId, status) => {
       try {
         const now = new Date().toISOString();
