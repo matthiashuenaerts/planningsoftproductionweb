@@ -722,6 +722,7 @@ export type Database = {
           order_date: string
           order_type: string
           project_id: string | null
+          source: string | null
           status: string
           supplier: string
           updated_at: string
@@ -735,6 +736,7 @@ export type Database = {
           order_date?: string
           order_type?: string
           project_id?: string | null
+          source?: string | null
           status: string
           supplier: string
           updated_at?: string
@@ -748,6 +750,7 @@ export type Database = {
           order_date?: string
           order_type?: string
           project_id?: string | null
+          source?: string | null
           status?: string
           supplier?: string
           updated_at?: string

@@ -163,7 +163,8 @@ serve(async (req) => {
             expected_delivery: deliveryDate,
             status: orderStatus,
             order_type: 'standard',
-            notes: externalOrder.referentie || null
+            notes: externalOrder.referentie || null,
+            source: 'external database'
           };
 
           if (existingOrder) {
@@ -182,6 +183,7 @@ serve(async (req) => {
                   status: orderData.status,
                   supplier: orderData.supplier,
                   notes: orderData.notes,
+                  source: 'external database',
                   updated_at: new Date().toISOString()
                 })
                 .eq('id', existingOrder.id);
