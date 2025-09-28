@@ -163,6 +163,9 @@ export const orderService = {
       if (allItemsDelivered) {
         await this.updateLinkedAccessoriesStatus(orderId, 'delivered');
         await this.updateOrderStatus(orderId, 'delivered');
+        
+        // Check if order is from external database and send confirmation
+        await this.sendExternalDeliveryConfirmation(orderId);
       } else if (someItemsDelivered) {
         await this.updateOrderStatus(orderId, 'partially_delivered');
       }
@@ -170,6 +173,38 @@ export const orderService = {
       // Legacy behavior - mark everything as delivered
       await this.updateLinkedAccessoriesStatus(orderId, 'delivered');
       await this.updateOrderStatus(orderId, 'delivered');
+      
+      // Check if order is from external database and send confirmation
+      await this.sendExternalDeliveryConfirmation(orderId);
+    }
+  },
+
+  async sendExternalDeliveryConfirmation(orderId: string): Promise<void> {
+    try {
+      // Get order to check if it's from external database
+      const { data: order } = await supabase
+        .from('orders')
+        .select('source, external_order_number')
+        .eq('id', orderId)
+        .single();
+
+      if (order?.source === 'external database' && order.external_order_number) {
+        console.log(`Sending external delivery confirmation for order ${orderId}`);
+        
+        // Call the external delivery confirmation edge function
+        const { data, error } = await supabase.functions.invoke('external-delivery-confirmation', {
+          body: { orderId }
+        });
+
+        if (error) {
+          console.error('Failed to send external delivery confirmation:', error);
+        } else {
+          console.log('External delivery confirmation sent successfully:', data);
+        }
+      }
+    } catch (error) {
+      console.error('Error sending external delivery confirmation:', error);
+      // Don't throw error to avoid disrupting the main delivery confirmation flow
     }
   },
 

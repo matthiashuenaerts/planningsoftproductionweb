@@ -190,5 +190,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.orders-import]
 verify_jwt = false
-[functions.orders-sync]
+[functions.external-delivery-confirmation]
 verify_jwt = false

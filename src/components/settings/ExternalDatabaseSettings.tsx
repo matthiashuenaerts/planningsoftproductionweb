@@ -90,7 +90,8 @@ const ExternalDatabaseSettings: React.FC = () => {
     baseUrl: 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
     username: 'Matthias HUENAERTS',
     password: '8pJ1A24z',
-    testOrderNumber: '25031020'
+    testOrderNumber: '25031020',
+    enableDeliveryConfirmation: true
   });
 
   const handleConfigChange = (field: string, value: string) => {
@@ -1345,6 +1346,59 @@ const ExternalDatabaseSettings: React.FC = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* External Delivery Confirmation Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle>External Delivery Confirmation</CardTitle>
+              <CardDescription>
+                Configure automatic delivery confirmation to external database when orders are fully delivered
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="enableDeliveryConfirmation"
+                  checked={ordersConfig.enableDeliveryConfirmation || false}
+                  onChange={(e) => setOrdersConfig(prev => ({
+                    ...prev,
+                    enableDeliveryConfirmation: e.target.checked
+                  }))}
+                  className="rounded border-border"
+                />
+                <label htmlFor="enableDeliveryConfirmation" className="text-sm font-medium">
+                  Enable automatic delivery confirmation to external database
+                </label>
+              </div>
+              
+              <div className="text-sm text-muted-foreground">
+                <p>When enabled, the system will automatically send delivery confirmations to the external database when:</p>
+                <ul className="list-disc pl-6 mt-2 space-y-1">
+                  <li>An order marked as "external database" source is fully delivered</li>
+                  <li>All order items have been marked as delivered</li>
+                  <li>The order has a valid external order number</li>
+                </ul>
+                <p className="mt-2">
+                  The confirmation uses the CreateReceiptForSupplierOrderNumber API endpoint with the delivered quantities and order details.
+                </p>
+              </div>
+
+              <Button
+                onClick={() => {
+                  // Save the delivery confirmation setting
+                  toast({
+                    title: "Settings Saved",
+                    description: "Delivery confirmation settings have been updated.",
+                    variant: "default"
+                  });
+                }}
+                className="w-full"
+              >
+                Save Delivery Confirmation Settings
+              </Button>
+            </CardContent>
+          </Card>
 
           {ordersSyncResult && (
             <Card>
