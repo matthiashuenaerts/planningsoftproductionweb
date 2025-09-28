@@ -10,6 +10,9 @@ export interface ProjectMessage {
   file_name?: string;
   file_type?: string;
   is_image?: boolean;
+  target_user_ids?: string[] | null;
+  reply_to_message_id?: string | null;
+  reply_to_message?: ProjectMessage | null;
   created_at: string;
   updated_at: string;
 }
@@ -24,9 +27,16 @@ export interface ProjectMessageRead {
 }
 
 export const projectChatService = {
-  // Get messages for a project
+  // Get messages for a project (only messages user can see)
   async getProjectMessages(projectId: string): Promise<ProjectMessage[]> {
     try {
+      // Get current user
+      const storedSession = localStorage.getItem('employeeSession');
+      if (!storedSession) return [];
+      
+      const employee = JSON.parse(storedSession);
+      if (!employee?.id) return [];
+
       const { data: messages, error } = await supabase
         .from('project_messages')
         .select('*')
@@ -39,8 +49,13 @@ export const projectChatService = {
         return [];
       }
 
+      // Filter messages - show if no target users or if current user is in target
+      const visibleMessages = messages.filter(msg => 
+        !msg.target_user_ids || msg.target_user_ids.includes(employee.id)
+      );
+
       // Get employee names separately
-      const employeeIds = [...new Set(messages.map(msg => msg.employee_id))];
+      const employeeIds = [...new Set(visibleMessages.map(msg => msg.employee_id))];
       const { data: employees, error: employeeError } = await supabase
         .from('employees')
         .select('id, name')
@@ -48,14 +63,18 @@ export const projectChatService = {
 
       if (employeeError) {
         console.error('Error fetching employee names:', employeeError);
-        return messages.map(msg => ({ ...msg, employee_name: 'Unknown' }));
+        return visibleMessages.map(msg => ({ ...msg, employee_name: 'Unknown' }));
       }
 
       const employeeMap = new Map(employees?.map(emp => [emp.id, emp.name]) || []);
 
-      return messages.map(msg => ({
+      // Build message map for replies
+      const messageMap = new Map(visibleMessages.map(msg => [msg.id, msg]));
+
+      return visibleMessages.map(msg => ({
         ...msg,
-        employee_name: employeeMap.get(msg.employee_id) || 'Unknown'
+        employee_name: employeeMap.get(msg.employee_id) || 'Unknown',
+        reply_to_message: msg.reply_to_message_id ? messageMap.get(msg.reply_to_message_id) : null
       }));
     } catch (error) {
       console.error('Error fetching project messages:', error);
@@ -67,7 +86,9 @@ export const projectChatService = {
   async sendMessage(
     projectId: string, 
     message: string, 
-    file?: File
+    file?: File,
+    targetUserIds?: string[],
+    replyToMessageId?: string
   ): Promise<ProjectMessage> {
     try {
       // Get current user from localStorage (custom auth system)
@@ -113,12 +134,19 @@ export const projectChatService = {
           file_url,
           file_name,
           file_type,
-          is_image
+          is_image,
+          target_user_ids: targetUserIds || null,
+          reply_to_message_id: replyToMessageId || null
         })
         .select('*')
         .single();
 
       if (error) throw error;
+
+      // Send notifications only to targeted users if specified
+      if (targetUserIds && targetUserIds.length > 0) {
+        await this.sendTargetedNotifications(projectId, targetUserIds, message, employee.name);
+      }
 
       return {
         ...data,
@@ -127,6 +155,40 @@ export const projectChatService = {
     } catch (error) {
       console.error('Error sending message:', error);
       throw error;
+    }
+  },
+
+  // Send notifications to specific users
+  async sendTargetedNotifications(projectId: string, targetUserIds: string[], message: string, senderName: string): Promise<void> {
+    try {
+      const notifications = targetUserIds.map(userId => ({
+        user_id: userId,
+        message: `New message from ${senderName}: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`,
+        link: `/projects/${projectId}`
+      }));
+
+      await supabase
+        .from('notifications')
+        .insert(notifications);
+    } catch (error) {
+      console.error('Error sending targeted notifications:', error);
+    }
+  },
+
+  // Get project team members for user selection
+  async getProjectTeamMembers(projectId: string): Promise<{id: string, name: string}[]> {
+    try {
+      const { data: employees, error } = await supabase
+        .from('employees')
+        .select('id, name')
+        .neq('role', 'workstation') // Exclude workstation users
+        .order('name');
+
+      if (error) throw error;
+      return employees || [];
+    } catch (error) {
+      console.error('Error fetching team members:', error);
+      return [];
     }
   },
 

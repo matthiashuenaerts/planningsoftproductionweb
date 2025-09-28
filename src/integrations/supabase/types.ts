@@ -1451,6 +1451,8 @@ export type Database = {
           is_image: boolean | null
           message: string
           project_id: string
+          reply_to_message_id: string | null
+          target_user_ids: string[] | null
           updated_at: string
         }
         Insert: {
@@ -1463,6 +1465,8 @@ export type Database = {
           is_image?: boolean | null
           message: string
           project_id: string
+          reply_to_message_id?: string | null
+          target_user_ids?: string[] | null
           updated_at?: string
         }
         Update: {
@@ -1475,9 +1479,19 @@ export type Database = {
           is_image?: boolean | null
           message?: string
           project_id?: string
+          reply_to_message_id?: string | null
+          target_user_ids?: string[] | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "project_messages_reply_to_message_id_fkey"
+            columns: ["reply_to_message_id"]
+            isOneToOne: false
+            referencedRelation: "project_messages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_onedrive_configs: {
         Row: {
