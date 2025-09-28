@@ -10,41 +10,37 @@ import { holidayRequestService, HolidayRequest } from '@/services/holidayRequest
 import { CalendarDays, Clock, User, CheckCircle, XCircle, RefreshCw, Eye } from 'lucide-react';
 import { format, parseISO, isAfter, startOfToday, isBefore, isToday } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-
 interface HolidayRequestsListProps {
   showAllRequests?: boolean;
 }
-
-const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllRequests = false }) => {
+const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({
+  showAllRequests = false
+}) => {
   const [requests, setRequests] = useState<HolidayRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<HolidayRequest | null>(null);
   const [adminNotes, setAdminNotes] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const { currentEmployee } = useAuth();
-  const { toast } = useToast();
-
-  const canManageRequests = currentEmployee?.role === 'admin' || 
-                           currentEmployee?.role === 'teamleader' || 
-                           currentEmployee?.role === 'manager';
-
+  const {
+    currentEmployee
+  } = useAuth();
+  const {
+    toast
+  } = useToast();
+  const canManageRequests = currentEmployee?.role === 'admin' || currentEmployee?.role === 'teamleader' || currentEmployee?.role === 'manager';
   useEffect(() => {
     fetchRequests();
   }, [currentEmployee, showAllRequests]);
-
   const fetchRequests = async () => {
     if (!currentEmployee) {
       console.log('No current employee, skipping fetch');
       setLoading(false);
       return;
     }
-    
     try {
       setLoading(true);
       console.log('Fetching requests for user:', currentEmployee.id, 'showAllRequests:', showAllRequests);
-      
       let data: HolidayRequest[];
-      
       if (showAllRequests && canManageRequests) {
         console.log('Fetching all requests for admin/manager');
         data = await holidayRequestService.getAllRequests();
@@ -52,13 +48,8 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
         console.log('Fetching user requests for:', currentEmployee.id);
         data = await holidayRequestService.getUserRequests(currentEmployee.id);
       }
-      
       console.log('Fetched holiday requests:', data);
-      
-      const sortedData = data.sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-      
+      const sortedData = data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setRequests(sortedData);
     } catch (error) {
       console.error('Error fetching holiday requests:', error);
@@ -72,7 +63,6 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
       setLoading(false);
     }
   };
-
   const handleStatusUpdate = async (requestId: string, status: 'approved' | 'rejected') => {
     if (!currentEmployee || !canManageRequests) {
       toast({
@@ -82,22 +72,18 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
       });
       return;
     }
-
     setProcessingId(requestId);
     try {
-      console.log('Updating request status:', { requestId, status, adminNotes: adminNotes.trim() });
-      
-      await holidayRequestService.updateRequestStatus(
+      console.log('Updating request status:', {
         requestId,
         status,
-        adminNotes.trim() || undefined
-      );
-
+        adminNotes: adminNotes.trim()
+      });
+      await holidayRequestService.updateRequestStatus(requestId, status, adminNotes.trim() || undefined);
       toast({
         title: "Success",
-        description: `Holiday request ${status} successfully`,
+        description: `Holiday request ${status} successfully`
       });
-
       setSelectedRequest(null);
       setAdminNotes('');
       await fetchRequests();
@@ -112,7 +98,6 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
       setProcessingId(null);
     }
   };
-
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'approved':
@@ -123,7 +108,6 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
         return 'secondary';
     }
   };
-
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'approved':
@@ -134,24 +118,16 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
         return <Clock className="h-4 w-4" />;
     }
   };
-
   const today = startOfToday();
-  
   const upcomingRequests = requests.filter(request => {
     const startDate = parseISO(request.start_date);
     return isAfter(startDate, today) || isToday(startDate) || request.status === 'pending';
   });
-  
   const pastRequests = requests.filter(request => {
     const startDate = parseISO(request.start_date);
     return isBefore(startDate, today) && request.status !== 'pending';
   });
-
-  const renderRequestCard = (request: HolidayRequest) => (
-    <div
-      key={request.id}
-      className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-    >
+  const renderRequestCard = (request: HolidayRequest) => <div key={request.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <User className="h-5 w-5 text-gray-500" />
@@ -167,18 +143,12 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
             {getStatusIcon(request.status)}
             {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
           </Badge>
-          {canManageRequests && showAllRequests && request.status === 'pending' && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSelectedRequest(request);
-                setAdminNotes('');
-              }}
-            >
+          {canManageRequests && showAllRequests && request.status === 'pending' && <Button variant="outline" size="sm" onClick={() => {
+          setSelectedRequest(request);
+          setAdminNotes('');
+        }}>
               Review
-            </Button>
-          )}
+            </Button>}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
@@ -200,12 +170,10 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
                     {format(parseISO(request.start_date), 'MMMM dd, yyyy')} - {format(parseISO(request.end_date), 'MMMM dd, yyyy')}
                   </p>
                 </div>
-                {request.reason && (
-                  <div>
+                {request.reason && <div>
                     <label className="text-sm font-medium">Reason</label>
                     <p className="text-sm text-gray-600">{request.reason}</p>
-                  </div>
-                )}
+                  </div>}
                 <div>
                   <label className="text-sm font-medium">Status</label>
                   <div className="flex items-center gap-2 mt-1">
@@ -215,17 +183,13 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
                     </Badge>
                   </div>
                 </div>
-                {request.admin_notes && (
-                  <div>
+                {request.admin_notes && <div>
                     <label className="text-sm font-medium">Admin Notes</label>
                     <p className="text-sm text-gray-600 bg-blue-50 p-2 rounded">{request.admin_notes}</p>
-                  </div>
-                )}
+                  </div>}
                 <div className="text-xs text-gray-500">
                   <p>Submitted: {format(parseISO(request.created_at), 'MMM dd, yyyy HH:mm')}</p>
-                  {request.updated_at !== request.created_at && (
-                    <p>Updated: {format(parseISO(request.updated_at), 'MMM dd, yyyy HH:mm')}</p>
-                  )}
+                  {request.updated_at !== request.created_at && <p>Updated: {format(parseISO(request.updated_at), 'MMM dd, yyyy HH:mm')}</p>}
                 </div>
               </div>
             </DialogContent>
@@ -233,34 +197,25 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
         </div>
       </div>
       
-      {request.reason && (
-        <div className="mb-2">
+      {request.reason && <div className="mb-2">
           <p className="text-sm text-gray-600">
             <strong>Reason:</strong> {request.reason}
           </p>
-        </div>
-      )}
+        </div>}
       
-      {request.admin_notes && (
-        <div className="bg-blue-50 p-3 rounded border-l-4 border-blue-400">
+      {request.admin_notes && <div className="bg-blue-50 p-3 rounded border-l-4 border-blue-400">
           <p className="text-sm text-blue-800">
             <strong>Admin Notes:</strong> {request.admin_notes}
           </p>
-        </div>
-      )}
+        </div>}
       
       <div className="flex justify-between text-xs text-gray-500 mt-2">
         <span>Requested: {format(parseISO(request.created_at), 'MMM dd, yyyy HH:mm')}</span>
-        {request.updated_at !== request.created_at && (
-          <span>Updated: {format(parseISO(request.updated_at), 'MMM dd, yyyy HH:mm')}</span>
-        )}
+        {request.updated_at !== request.created_at && <span>Updated: {format(parseISO(request.updated_at), 'MMM dd, yyyy HH:mm')}</span>}
       </div>
-    </div>
-  );
-
+    </div>;
   if (loading) {
-    return (
-      <Card>
+    return <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5" />
@@ -272,77 +227,12 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           </div>
         </CardContent>
-      </Card>
-    );
+      </Card>;
   }
+  return <>
+      
 
-  return (
-    <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5" />
-              {showAllRequests ? 'All Holiday Requests' : 'My Holiday Requests'}
-            </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchRequests}
-              disabled={loading}
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {requests.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <CalendarDays className="mx-auto h-12 w-12 mb-4 opacity-30" />
-              <p>No holiday requests found</p>
-              {!showAllRequests && (
-                <p className="text-sm mt-2">Submit your first holiday request to see it here</p>
-              )}
-            </div>
-          ) : (
-            <Tabs defaultValue="upcoming" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="upcoming">
-                  Upcoming ({upcomingRequests.length})
-                </TabsTrigger>
-                <TabsTrigger value="past">
-                  Past ({pastRequests.length})
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="upcoming" className="space-y-4 mt-4">
-                {upcomingRequests.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <CalendarDays className="mx-auto h-8 w-8 mb-2 opacity-30" />
-                    <p>No upcoming holiday requests</p>
-                  </div>
-                ) : (
-                  upcomingRequests.map(renderRequestCard)
-                )}
-              </TabsContent>
-              
-              <TabsContent value="past" className="space-y-4 mt-4">
-                {pastRequests.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <CalendarDays className="mx-auto h-8 w-8 mb-2 opacity-30" />
-                    <p>No past holiday requests</p>
-                  </div>
-                ) : (
-                  pastRequests.map(renderRequestCard)
-                )}
-              </TabsContent>
-            </Tabs>
-          )}
-        </CardContent>
-      </Card>
-
-      {selectedRequest && (
-        <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
+      {selectedRequest && <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Review Holiday Request</DialogTitle>
@@ -362,51 +252,30 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
                 </div>
               </div>
               
-              {selectedRequest.reason && (
-                <div>
+              {selectedRequest.reason && <div>
                   <label className="text-sm font-medium">Reason</label>
                   <p className="text-sm text-gray-600">{selectedRequest.reason}</p>
-                </div>
-              )}
+                </div>}
               
               <div>
                 <label className="text-sm font-medium mb-2 block">Admin Notes (Optional)</label>
-                <Textarea
-                  placeholder="Add notes about this request..."
-                  value={adminNotes}
-                  onChange={(e) => setAdminNotes(e.target.value)}
-                  rows={3}
-                />
+                <Textarea placeholder="Add notes about this request..." value={adminNotes} onChange={e => setAdminNotes(e.target.value)} rows={3} />
               </div>
               
               <div className="flex justify-end gap-3 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => setSelectedRequest(null)}
-                  disabled={processingId === selectedRequest.id}
-                >
+                <Button variant="outline" onClick={() => setSelectedRequest(null)} disabled={processingId === selectedRequest.id}>
                   Cancel
                 </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => handleStatusUpdate(selectedRequest.id, 'rejected')}
-                  disabled={processingId === selectedRequest.id}
-                >
+                <Button variant="destructive" onClick={() => handleStatusUpdate(selectedRequest.id, 'rejected')} disabled={processingId === selectedRequest.id}>
                   {processingId === selectedRequest.id ? 'Processing...' : 'Reject'}
                 </Button>
-                <Button
-                  onClick={() => handleStatusUpdate(selectedRequest.id, 'approved')}
-                  disabled={processingId === selectedRequest.id}
-                >
+                <Button onClick={() => handleStatusUpdate(selectedRequest.id, 'approved')} disabled={processingId === selectedRequest.id}>
                   {processingId === selectedRequest.id ? 'Processing...' : 'Approve'}
                 </Button>
               </div>
             </div>
           </DialogContent>
-        </Dialog>
-      )}
-    </>
-  );
+        </Dialog>}
+    </>;
 };
-
 export default HolidayRequestsList;

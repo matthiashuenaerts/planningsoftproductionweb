@@ -13,42 +13,14 @@ import { useLanguage } from '@/context/LanguageContext';
 import { orderService } from '@/services/orderService';
 import { projectTeamAssignmentService } from '@/services/projectTeamAssignmentService';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { 
-  ShieldCheck, 
-  Calendar, 
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  Users,
-  BarChart3,
-  ListTodo,
-  Truck,
-  ChevronLeft,
-  ChevronRight
-} from "lucide-react";
+import { ShieldCheck, Calendar, CheckCircle2, Clock, AlertCircle, Users, BarChart3, ListTodo, Truck, ChevronLeft, ChevronRight } from "lucide-react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import {
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-} from 'recharts';
+import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { format, startOfToday, isToday, subDays, parseISO, addDays, isWeekend, startOfWeek } from 'date-fns';
-import { 
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent
-} from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { supabase } from '@/integrations/supabase/client';
 import { holidayService, Holiday } from '@/services/holidayService';
 import { cn } from '@/lib/utils';
-
 interface LoadingAssignment {
   project: {
     id: string;
@@ -64,7 +36,6 @@ interface LoadingAssignment {
   };
   teamColor?: string;
 }
-
 const Dashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [todaysTasks, setTodaysTasks] = useState<Task[]>([]);
@@ -73,10 +44,18 @@ const Dashboard: React.FC = () => {
   const [tasksByPriority, setTasksByPriority] = useState<any[]>([]);
   const [tasksByStatus, setTasksByStatus] = useState<any[]>([]);
   const [taskCompletionTrend, setTaskCompletionTrend] = useState<any[]>([]);
-  const [truckLoadingData, setTruckLoadingData] = useState<{ todayLoadings: LoadingAssignment[], daysToNext: number }>({ todayLoadings: [], daysToNext: 0 });
+  const [truckLoadingData, setTruckLoadingData] = useState<{
+    todayLoadings: LoadingAssignment[];
+    daysToNext: number;
+  }>({
+    todayLoadings: [],
+    daysToNext: 0
+  });
   const [weekStartDate, setWeekStartDate] = useState(() => {
     const today = new Date();
-    return startOfWeek(today, { weekStartsOn: 1 });
+    return startOfWeek(today, {
+      weekStartsOn: 1
+    });
   });
   const [allLoadingAssignments, setAllLoadingAssignments] = useState<LoadingAssignment[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -84,27 +63,32 @@ const Dashboard: React.FC = () => {
   const [weekLoading, setWeekLoading] = useState(false);
   const [manualOverrides, setManualOverrides] = useState<Record<string, string>>({});
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
-  const { toast } = useToast();
-  const { currentEmployee } = useAuth();
-  const { createLocalizedPath } = useLanguage();
+  const {
+    toast
+  } = useToast();
+  const {
+    currentEmployee
+  } = useAuth();
+  const {
+    createLocalizedPath
+  } = useLanguage();
   const navigate = useNavigate();
-  
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        
+
         // Fetch projects
         const projectsData = await projectService.getAll();
         setProjects(projectsData);
-        
+
         // Fetch today's tasks
         const todaysTasksData = await taskService.getTodaysTasks();
         setTodaysTasks(todaysTasksData);
-        
+
         // Fetch all tasks (for chart data)
         const allTasks = await taskService.getAll();
-        
+
         // Create priority distribution data
         const priorityCount = {
           Low: 0,
@@ -112,51 +96,43 @@ const Dashboard: React.FC = () => {
           High: 0,
           Urgent: 0
         };
-        
         allTasks.forEach(task => {
           if (task.priority in priorityCount) {
             priorityCount[task.priority as keyof typeof priorityCount]++;
           }
         });
-        
         const priorityData = Object.entries(priorityCount).map(([name, value]) => ({
           name,
           value
         }));
-        
         setTasksByPriority(priorityData);
-        
+
         // Create status distribution data
         const statusCount = {
           TODO: 0,
           IN_PROGRESS: 0,
           COMPLETED: 0
         };
-        
         allTasks.forEach(task => {
           if (task.status in statusCount) {
             statusCount[task.status as keyof typeof statusCount]++;
           }
         });
-        
         const statusData = Object.entries(statusCount).map(([name, value]) => ({
           name: name === 'TODO' ? 'To Do' : name === 'IN_PROGRESS' ? 'In Progress' : 'Completed',
           value
         }));
-        
         setTasksByStatus(statusData);
-        
+
         // Get recently completed tasks (with valid completed_at timestamps)
-        const completedTasks = allTasks
-          .filter(task => task.status === 'COMPLETED' && task.completed_at)
-          .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())
-          .slice(0, 250);
-          
+        const completedTasks = allTasks.filter(task => task.status === 'COMPLETED' && task.completed_at).sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime()).slice(0, 250);
         setRecentCompletedTasks(completedTasks);
-        
+
         // Create task completion trend (last 7 days)
         const today = startOfToday();
-        const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const last7Days = Array.from({
+          length: 7
+        }, (_, i) => {
           const date = subDays(today, 6 - i);
           return {
             date,
@@ -164,29 +140,24 @@ const Dashboard: React.FC = () => {
             count: 0
           };
         });
-        
+
         // Count completed tasks per day
         completedTasks.forEach(task => {
           if (task.completed_at) {
             const completedDate = parseISO(task.completed_at);
-            const dayIndex = last7Days.findIndex(day => 
-              format(day.date, 'yyyy-MM-dd') === format(completedDate, 'yyyy-MM-dd')
-            );
-            
+            const dayIndex = last7Days.findIndex(day => format(day.date, 'yyyy-MM-dd') === format(completedDate, 'yyyy-MM-dd'));
             if (dayIndex !== -1) {
               last7Days[dayIndex].count++;
             }
           }
         });
-        
         setTaskCompletionTrend(last7Days);
-        
+
         // Fetch truck loading data
         await fetchInitialTruckLoadingData();
-        
+
         // Fetch upcoming external processing events
         await fetchUpcomingExternalProcessingEvents();
-        
       } catch (error: any) {
         console.error('Error fetching dashboard data:', error);
         toast({
@@ -198,25 +169,18 @@ const Dashboard: React.FC = () => {
         setLoading(false);
       }
     };
-
     fetchDashboardData();
   }, [toast]);
-
   const fetchUpcomingExternalProcessingEvents = async () => {
     try {
       const logisticsOutOrders = await orderService.getLogisticsOutOrders();
       const events: any[] = [];
-      
       for (const order of logisticsOutOrders) {
         try {
           const allSteps = await orderService.getOrderSteps(order.id);
-          const processingSteps = allSteps.filter(step => 
-            step.supplier && step.supplier.trim() !== '' && step.start_date
-          );
-
+          const processingSteps = allSteps.filter(step => step.supplier && step.supplier.trim() !== '' && step.start_date);
           const project = await projectService.getById(order.project_id);
           const projectName = project?.name || "Unknown Project";
-
           processingSteps.forEach(step => {
             if (step.start_date && step.supplier) {
               // Add start date event
@@ -228,7 +192,7 @@ const Dashboard: React.FC = () => {
                 description: `${projectName} - ${step.supplier}`,
                 project_name: projectName
               });
-              
+
               // Add expected return date if duration is provided
               if (step.expected_duration_days) {
                 const returnDate = addDays(new Date(step.start_date), step.expected_duration_days);
@@ -247,19 +211,13 @@ const Dashboard: React.FC = () => {
           console.error(`Error processing order ${order.id}:`, error);
         }
       }
-
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-
-      const upcomingEvents = events
-        .filter(event => {
-          const eventDate = new Date(event.date);
-          eventDate.setHours(0, 0, 0, 0);
-          return eventDate >= today;
-        })
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        .slice(0, 5);
-
+      const upcomingEvents = events.filter(event => {
+        const eventDate = new Date(event.date);
+        eventDate.setHours(0, 0, 0, 0);
+        return eventDate >= today;
+      }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 5);
       setUpcomingEvents(upcomingEvents);
     } catch (error) {
       console.error('Error fetching external processing events:', error);
@@ -269,40 +227,35 @@ const Dashboard: React.FC = () => {
   // Calculate previous workday considering holidays
   const getPreviousWorkday = (date: Date, holidaysList: Holiday[]): Date => {
     let previousDay = subDays(date, 1);
-    
     while (true) {
       // Skip weekends
       if (isWeekend(previousDay)) {
         previousDay = subDays(previousDay, 1);
         continue;
       }
-      
+
       // Skip production holidays
       const dateStr = format(previousDay, 'yyyy-MM-dd');
       const isHoliday = holidaysList.some(h => h.date === dateStr && h.team === 'production');
-      
       if (isHoliday) {
         previousDay = subDays(previousDay, 1);
         continue;
       }
-      
       break;
     }
-    
     return previousDay;
   };
-
   const fetchInitialTruckLoadingData = async () => {
     try {
       // Fetch holidays
       const holidaysData = await holidayService.getHolidays();
       setHolidays(holidaysData);
-      
+
       // Fetch existing overrides
-      const { data: overridesData, error: overridesError } = await supabase
-        .from('project_loading_overrides')
-        .select('project_id, override_loading_date');
-        
+      const {
+        data: overridesData,
+        error: overridesError
+      } = await supabase.from('project_loading_overrides').select('project_id, override_loading_date');
       if (overridesError) {
         console.error('Error fetching loading overrides:', overridesError);
       } else {
@@ -313,46 +266,38 @@ const Dashboard: React.FC = () => {
         });
         setManualOverrides(overridesMap);
       }
-      
+
       // Load current week data
       await loadWeekData(weekStartDate, holidaysData);
-      
     } catch (error) {
       console.error('Error fetching initial truck loading data:', error);
     }
   };
-
   const loadWeekData = async (weekStart: Date, holidaysData?: Holiday[]) => {
     const weekKey = format(weekStart, 'yyyy-MM-dd');
-    
+
     // Skip if week already loaded
     if (loadedWeeks.has(weekKey)) return;
-    
     try {
       setWeekLoading(true);
-      
       const weekEnd = addDays(weekStart, 6);
       const holidaysList = holidaysData || holidays;
-      
+
       // Fetch projects for this week range
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select('id, name, client, status, installation_date')
-        .not('installation_date', 'is', null)
-        .gte('installation_date', format(subDays(weekStart, 10), 'yyyy-MM-dd')) // Buffer for loading date calculation
-        .lte('installation_date', format(addDays(weekEnd, 10), 'yyyy-MM-dd'))
-        .order('installation_date');
-        
+      const {
+        data: projectsData,
+        error: projectsError
+      } = await supabase.from('projects').select('id, name, client, status, installation_date').not('installation_date', 'is', null).gte('installation_date', format(subDays(weekStart, 10), 'yyyy-MM-dd')) // Buffer for loading date calculation
+      .lte('installation_date', format(addDays(weekEnd, 10), 'yyyy-MM-dd')).order('installation_date');
       if (projectsError) throw projectsError;
-      
+
       // Calculate loading dates for projects
       const weekLoadingAssignments: LoadingAssignment[] = (projectsData || []).map(project => {
         const installationDate = new Date(project.installation_date);
         const loadingDate = getPreviousWorkday(installationDate, holidaysList);
-        
         return {
           project,
-          loading_date: format(loadingDate, 'yyyy-MM-dd'),
+          loading_date: format(loadingDate, 'yyyy-MM-dd')
         };
       }).filter(assignment => {
         const loadingDate = new Date(assignment.loading_date);
@@ -361,90 +306,81 @@ const Dashboard: React.FC = () => {
 
       // Fetch additional data for each project
       const projectIds = weekLoadingAssignments.map(a => a.project.id);
-      
-      // Fetch orders for projects
-      const { data: ordersData } = await supabase
-        .from('orders')
-        .select('id, project_id, status')
-        .in('project_id', projectIds);
-      
-      // Fetch team assignments for projects  
-      const teamAssignments = await Promise.all(
-        projectIds.map(async (projectId) => {
-          const assignments = await projectTeamAssignmentService.getByProject(projectId);
-          return { projectId, assignments };
-        })
-      );
 
-        // Enhance assignments with order status and team colors
-        const enhancedAssignments = await Promise.all(weekLoadingAssignments.map(async (assignment) => {
-          // Calculate order status - count undelivered items instead of undelivered orders
-          const projectOrders = ordersData?.filter(o => o.project_id === assignment.project.id) || [];
-          
-          let undeliveredItemsCount = 0;
-          
-          // Count undelivered items from orders with certain statuses
-          for (const order of projectOrders) {
-            if (['pending', 'delayed', 'partially_delivered'].includes(order.status)) {
-              try {
-                const items = await orderService.getOrderItems(order.id);
-                const undeliveredItems = items.filter(item => 
-                  (item.quantity || 0) > (item.delivered_quantity || 0)
-                );
-                undeliveredItemsCount += undeliveredItems.length;
-              } catch (error) {
-                console.error(`Error loading order items for order ${order.id}:`, error);
-              }
+      // Fetch orders for projects
+      const {
+        data: ordersData
+      } = await supabase.from('orders').select('id, project_id, status').in('project_id', projectIds);
+
+      // Fetch team assignments for projects  
+      const teamAssignments = await Promise.all(projectIds.map(async projectId => {
+        const assignments = await projectTeamAssignmentService.getByProject(projectId);
+        return {
+          projectId,
+          assignments
+        };
+      }));
+
+      // Enhance assignments with order status and team colors
+      const enhancedAssignments = await Promise.all(weekLoadingAssignments.map(async assignment => {
+        // Calculate order status - count undelivered items instead of undelivered orders
+        const projectOrders = ordersData?.filter(o => o.project_id === assignment.project.id) || [];
+        let undeliveredItemsCount = 0;
+
+        // Count undelivered items from orders with certain statuses
+        for (const order of projectOrders) {
+          if (['pending', 'delayed', 'partially_delivered'].includes(order.status)) {
+            try {
+              const items = await orderService.getOrderItems(order.id);
+              const undeliveredItems = items.filter(item => (item.quantity || 0) > (item.delivered_quantity || 0));
+              undeliveredItemsCount += undeliveredItems.length;
+            } catch (error) {
+              console.error(`Error loading order items for order ${order.id}:`, error);
             }
           }
-          
-          const allOrdersDelivered = projectOrders.length > 0 && projectOrders.every(o => o.status === 'delivered');
-          
-          // Get team color
-          const teamAssignment = teamAssignments.find(ta => ta.projectId === assignment.project.id);
-          let teamColor = '';
-          
-          if (teamAssignment?.assignments && teamAssignment.assignments.length > 0) {
-            // Look for any team assignment that contains color keywords
-            for (const team of teamAssignment.assignments) {
-              const color = getTeamColorFromName(team.team);
-              if (color) {
-                teamColor = color;
-                break;
-              }
+        }
+        const allOrdersDelivered = projectOrders.length > 0 && projectOrders.every(o => o.status === 'delivered');
+
+        // Get team color
+        const teamAssignment = teamAssignments.find(ta => ta.projectId === assignment.project.id);
+        let teamColor = '';
+        if (teamAssignment?.assignments && teamAssignment.assignments.length > 0) {
+          // Look for any team assignment that contains color keywords
+          for (const team of teamAssignment.assignments) {
+            const color = getTeamColorFromName(team.team);
+            if (color) {
+              teamColor = color;
+              break;
             }
           }
-          
-          return {
-            ...assignment,
-            orderStatus: {
-              undeliveredCount: undeliveredItemsCount,
-              allDelivered: allOrdersDelivered
-            },
-            teamColor
-          };
-        }));
-      
+        }
+        return {
+          ...assignment,
+          orderStatus: {
+            undeliveredCount: undeliveredItemsCount,
+            allDelivered: allOrdersDelivered
+          },
+          teamColor
+        };
+      }));
+
       // Merge with existing assignments
       setAllLoadingAssignments(prev => {
         const existingIds = new Set(prev.map(a => `${a.project.id}-${a.loading_date}`));
-        const newAssignments = enhancedAssignments.filter(
-          a => !existingIds.has(`${a.project.id}-${a.loading_date}`)
-        );
+        const newAssignments = enhancedAssignments.filter(a => !existingIds.has(`${a.project.id}-${a.loading_date}`));
         return [...prev, ...newAssignments];
       });
-      
+
       // Update today's loading stats if current week
       const today = format(new Date(), 'yyyy-MM-dd');
       const isCurrentWeek = today >= format(weekStart, 'yyyy-MM-dd') && today <= format(weekEnd, 'yyyy-MM-dd');
-      
       if (isCurrentWeek) {
         // Consider manual overrides when calculating today's loadings
         const todayLoadings = enhancedAssignments.filter(assignment => {
           const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
           return effectiveLoadingDate === today;
         });
-        
+
         // Calculate days to next loading (also considering overrides)
         let daysToNext = 0;
         if (todayLoadings.length === 0) {
@@ -457,20 +393,20 @@ const Dashboard: React.FC = () => {
             const bDate = manualOverrides[b.project.id] || b.loading_date;
             return new Date(aDate).getTime() - new Date(bDate).getTime();
           });
-          
           if (futureLoadings.length > 0) {
             const nextLoadingDate = new Date(manualOverrides[futureLoadings[0].project.id] || futureLoadings[0].loading_date);
             const today = new Date();
             daysToNext = Math.ceil((nextLoadingDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
           }
         }
-        
-        setTruckLoadingData({ todayLoadings, daysToNext });
+        setTruckLoadingData({
+          todayLoadings,
+          daysToNext
+        });
       }
-      
+
       // Mark week as loaded
       setLoadedWeeks(prev => new Set([...prev, weekKey]));
-      
     } catch (error) {
       console.error('Error loading week data:', error);
     } finally {
@@ -484,7 +420,6 @@ const Dashboard: React.FC = () => {
     setWeekStartDate(newWeekStart);
     await loadWeekData(newWeekStart);
   };
-
   const nextWeek = async () => {
     const newWeekStart = addDays(weekStartDate, 7);
     setWeekStartDate(newWeekStart);
@@ -503,22 +438,29 @@ const Dashboard: React.FC = () => {
   // Get project color for visual distinction
   const getProjectColor = (status: string) => {
     switch (status) {
-      case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'planned': return 'bg-green-100 text-green-800 border-green-300';
-      case 'completed': return 'bg-gray-100 text-gray-800 border-gray-300';
-      default: return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'planned':
+        return 'bg-green-100 text-green-800 border-green-300';
+      case 'completed':
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+      default:
+        return 'bg-orange-100 text-orange-800 border-orange-300';
     }
   };
 
   // Get team background color based on team name
   const getTeamBackgroundColor = (teamColor?: string) => {
     if (!teamColor) return 'bg-gray-200/70';
-    
     switch (teamColor) {
-      case 'green': return 'bg-green-200/70';
-      case 'blue': return 'bg-blue-200/70'; 
-      case 'orange': return 'bg-orange-200/70';
-      default: return 'bg-gray-200/70';
+      case 'green':
+        return 'bg-green-200/70';
+      case 'blue':
+        return 'bg-blue-200/70';
+      case 'orange':
+        return 'bg-orange-200/70';
+      default:
+        return 'bg-gray-200/70';
     }
   };
 
@@ -527,7 +469,7 @@ const Dashboard: React.FC = () => {
     if (!teamName) return '';
     const lowerTeamName = teamName.toLowerCase();
     if (lowerTeamName.includes('groen')) return 'green';
-    if (lowerTeamName.includes('blauw')) return 'blue';  
+    if (lowerTeamName.includes('blauw')) return 'blue';
     if (lowerTeamName.includes('oranje')) return 'orange';
     return '';
   };
@@ -536,16 +478,10 @@ const Dashboard: React.FC = () => {
   const totalProjects = projects.length;
   const completedProjects = projects.filter(p => p.status === 'completed').length;
   const inProgressProjects = projects.filter(p => p.status === 'in_progress').length;
-  
-  const overdueCount = todaysTasks.filter(task => 
-    new Date(task.due_date) < new Date() && 
-    task.status !== 'COMPLETED'
-  ).length;
-  
+  const overdueCount = todaysTasks.filter(task => new Date(task.due_date) < new Date() && task.status !== 'COMPLETED').length;
+
   // Tasks completed today
-  const todayCompletedCount = recentCompletedTasks.filter(task => 
-    task.completed_at && isToday(parseISO(task.completed_at))
-  ).length;
+  const todayCompletedCount = recentCompletedTasks.filter(task => task.completed_at && isToday(parseISO(task.completed_at))).length;
 
   // Priority colors for charts
   const PRIORITY_COLORS = {
@@ -554,85 +490,39 @@ const Dashboard: React.FC = () => {
     High: '#f97316',
     Urgent: '#ef4444'
   };
-  
+
   // Status colors for charts
   const STATUS_COLORS = {
     'To Do': '#60a5fa',
     'In Progress': '#f59e0b',
     'Completed': '#4ade80'
   };
-
-  const canManageRequests = currentEmployee?.role === 'admin' || 
-                           currentEmployee?.role === 'teamleader' || 
-                           currentEmployee?.role === 'manager';
-
+  const canManageRequests = currentEmployee?.role === 'admin' || currentEmployee?.role === 'teamleader' || currentEmployee?.role === 'manager';
   if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
+    return <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div>
-      {currentEmployee?.role === 'admin' && (
-        <Alert className="mb-6 bg-blue-50 border border-blue-200">
+  return <div>
+      {currentEmployee?.role === 'admin' && <Alert className="mb-6 bg-blue-50 border border-blue-200">
           <ShieldCheck className="h-5 w-5 text-blue-600" />
           <AlertTitle className="text-blue-800">Administrator Account</AlertTitle>
           <AlertDescription className="text-blue-700">
             You are logged in as an administrator. You have access to user management functionality.
           </AlertDescription>
-        </Alert>
-      )}
+        </Alert>}
 
-      {projects.length === 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md mb-6">
+      {projects.length === 0 && <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md mb-6">
           <p className="text-yellow-800">No projects found. Initialize the database with sample data to get started.</p>
           <SeedDataButton />
-        </div>
-      )}
+        </div>}
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <StatCard 
-          title="Total Projects" 
-          value={totalProjects.toString()} 
-          footer="Projects managed" 
-          icon={<Calendar className="h-5 w-5 text-blue-500" />}
-        />
-        <StatCard 
-          title="Tasks Today" 
-          value={todaysTasks.length.toString()} 
-          footer={`${overdueCount} overdue`} 
-          icon={<Clock className="h-5 w-5 text-amber-500" />}
-        />
-        <StatCard 
-          title="Completed Today" 
-          value={todayCompletedCount.toString()}
-          footer="Tasks fulfilled today" 
-          icon={<CheckCircle2 className="h-5 w-5 text-green-600" />}
-        />
-        {upcomingEvents.length > 0 && (
-          <StatCard
-            title="Logistiek Uitgaand"
-            value={upcomingEvents.length.toString()}
-            valueSubtext={upcomingEvents[0] ? `Next: ${format(new Date(upcomingEvents[0].date), 'dd/MM')}` : ''}
-            footer={upcomingEvents.slice(0, 2).map(event => 
-              `<span style="color: ${event.type === 'return' ? '#22c55e' : '#3b82f6'}">${format(new Date(event.date), 'dd/MM')} - ${event.project_name}</span>`
-            ).join('<br>')}
-            icon={<Users className="h-5 w-5 text-purple-500" />}
-            onClick={() => navigate(createLocalizedPath('/logistics-out'))}
-          />
-        )}
-        <StatCard 
-          title="Truck Loading" 
-          value={truckLoadingData.todayLoadings.length > 0 ? truckLoadingData.todayLoadings.length.toString() : truckLoadingData.daysToNext.toString()}
-          footer={truckLoadingData.todayLoadings.length > 0 ? 
-            `Loading today: ${truckLoadingData.todayLoadings.map(l => l.project.name).join(', ')}` : 
-            truckLoadingData.daysToNext > 0 ? `${truckLoadingData.daysToNext} days to next loading` : 'No upcoming loadings'
-          } 
-          icon={<Truck className="h-5 w-5 text-orange-500" />}
-        />
+        <StatCard title="Total Projects" value={totalProjects.toString()} footer="Projects managed" icon={<Calendar className="h-5 w-5 text-blue-500" />} />
+        <StatCard title="Tasks Today" value={todaysTasks.length.toString()} footer={`${overdueCount} overdue`} icon={<Clock className="h-5 w-5 text-amber-500" />} />
+        <StatCard title="Completed Today" value={todayCompletedCount.toString()} footer="Tasks fulfilled today" icon={<CheckCircle2 className="h-5 w-5 text-green-600" />} />
+        {upcomingEvents.length > 0 && <StatCard title="Logistiek Uitgaand" value={upcomingEvents.length.toString()} valueSubtext={upcomingEvents[0] ? `Next: ${format(new Date(upcomingEvents[0].date), 'dd/MM')}` : ''} footer={upcomingEvents.slice(0, 2).map(event => `<span style="color: ${event.type === 'return' ? '#22c55e' : '#3b82f6'}">${format(new Date(event.date), 'dd/MM')} - ${event.project_name}</span>`).join('<br>')} icon={<Users className="h-5 w-5 text-purple-500" />} onClick={() => navigate(createLocalizedPath('/logistics-out'))} />}
+        <StatCard title="Truck Loading" value={truckLoadingData.todayLoadings.length > 0 ? truckLoadingData.todayLoadings.length.toString() : truckLoadingData.daysToNext.toString()} footer={truckLoadingData.todayLoadings.length > 0 ? `Loading today: ${truckLoadingData.todayLoadings.map(l => l.project.name).join(', ')}` : truckLoadingData.daysToNext > 0 ? `${truckLoadingData.daysToNext} days to next loading` : 'No upcoming loadings'} icon={<Truck className="h-5 w-5 text-orange-500" />} />
       </div>
       
       {/* Weekly Loading Schedule */}
@@ -659,70 +549,41 @@ const Dashboard: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-7 gap-2">
-            {Array.from({ length: 7 }, (_, i) => addDays(weekStartDate, i)).map((date, index) => {
-              const dayAssignments = getAssignmentsForDate(date);
-              const isCurrentDay = isToday(date);
-              
-              return (
-                <div
-                  key={index}
-                  className={cn(
-                    "min-h-[120px] border rounded p-2",
-                    isCurrentDay ? "border-red-500 bg-red-50" : "border-gray-200"
-                  )}
-                >
-                  <div className={cn(
-                    "text-center text-sm font-medium mb-2",
-                    isCurrentDay ? "text-red-700" : "text-gray-700"
-                  )}>
+            {Array.from({
+            length: 7
+          }, (_, i) => addDays(weekStartDate, i)).map((date, index) => {
+            const dayAssignments = getAssignmentsForDate(date);
+            const isCurrentDay = isToday(date);
+            return <div key={index} className={cn("min-h-[120px] border rounded p-2", isCurrentDay ? "border-red-500 bg-red-50" : "border-gray-200")}>
+                  <div className={cn("text-center text-sm font-medium mb-2", isCurrentDay ? "text-red-700" : "text-gray-700")}>
                     <div>{format(date, 'EEE')}</div>
                     <div className="text-lg">{format(date, 'd')}</div>
                   </div>
                   
                   <div className="space-y-1">
                     {dayAssignments.map((assignment, index) => {
-                      const isManuallyAdjusted = manualOverrides[assignment.project.id] !== undefined;
-                      
-                      return (
-                        <div
-                          key={`${assignment.project.id}-${index}`}
-                          className={cn(
-                            "p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity relative",
-                            getProjectColor(assignment.project.status),
-                            getTeamBackgroundColor(assignment.teamColor),
-                            isManuallyAdjusted && "ring-2 ring-orange-400"
-                          )}
-                          onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}
-                        >
+                  const isManuallyAdjusted = manualOverrides[assignment.project.id] !== undefined;
+                  return <div key={`${assignment.project.id}-${index}`} className={cn("p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity relative", getProjectColor(assignment.project.status), getTeamBackgroundColor(assignment.teamColor), isManuallyAdjusted && "ring-2 ring-orange-400")} onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}>
                           {/* Order status indicator */}
-                          {assignment.orderStatus && (
-                            <div className={cn(
-                              "absolute -top-1 -right-1 rounded-full text-xs font-bold text-white flex items-center justify-center min-w-[16px] h-4 px-1",
-                              assignment.orderStatus.allDelivered ? "bg-green-500" : "bg-red-500"
-                            )}>
+                          {assignment.orderStatus && <div className={cn("absolute -top-1 -right-1 rounded-full text-xs font-bold text-white flex items-center justify-center min-w-[16px] h-4 px-1", assignment.orderStatus.allDelivered ? "bg-green-500" : "bg-red-500")}>
                               {assignment.orderStatus.allDelivered ? "✓" : assignment.orderStatus.undeliveredCount}
-                            </div>
-                          )}
+                            </div>}
                           
                           {/* Manual override indicator */}
-                          {isManuallyAdjusted && (
-                            <div className="absolute -top-1 -left-1 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center min-w-[16px] h-4 px-1">
+                          {isManuallyAdjusted && <div className="absolute -top-1 -left-1 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center min-w-[16px] h-4 px-1">
                               ↻
-                            </div>
-                          )}
+                            </div>}
                           
                           <div className="font-medium break-words whitespace-normal leading-tight">{assignment.project.name}</div>
                           <div className="text-xs text-gray-500">
                             Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
                             {isManuallyAdjusted && <span className="text-orange-600 ml-1 font-medium">*</span>}
                           </div>
-                        </div>
-                      );
-                    })}
+                        </div>;
+                })}
                   </div>
-                </div>
-              );
-            })}
+                </div>;
+          })}
           </div>
         </CardContent>
       </Card>
@@ -740,29 +601,24 @@ const Dashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="h-80">
-              <ChartContainer
-                config={{
-                  completed: { label: "Completed", theme: { light: "#4ade80", dark: "#4ade80" } }
-                }}
-              >
+              <ChartContainer config={{
+              completed: {
+                label: "Completed",
+                theme: {
+                  light: "#4ade80",
+                  dark: "#4ade80"
+                }
+              }
+            }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={taskCompletionTrend}>
                     <XAxis dataKey="dateString" />
                     <YAxis allowDecimals={false} />
-                    <Tooltip
-                      content={({ active, payload }) => (
-                        <ChartTooltipContent
-                          active={active}
-                          payload={payload}
-                          labelFormatter={(value) => `${value}`}
-                        />
-                      )}
-                    />
-                    <Bar
-                      dataKey="count"
-                      name="completed"
-                      fill="var(--color-completed, #4ade80)"
-                    />
+                    <Tooltip content={({
+                    active,
+                    payload
+                  }) => <ChartTooltipContent active={active} payload={payload} labelFormatter={value => `${value}`} />} />
+                    <Bar dataKey="count" name="completed" fill="var(--color-completed, #4ade80)" />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -783,23 +639,13 @@ const Dashboard: React.FC = () => {
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={tasksByStatus}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={100}
-                    dataKey="value"
-                    label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {tasksByStatus.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={STATUS_COLORS[entry.name as keyof typeof STATUS_COLORS]} 
-                      />
-                    ))}
+                  <Pie data={tasksByStatus} cx="50%" cy="50%" labelLine={false} outerRadius={100} dataKey="value" label={({
+                  name,
+                  percent
+                }) => `${name}: ${(percent * 100).toFixed(0)}%`}>
+                    {tasksByStatus.map((entry, index) => <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name as keyof typeof STATUS_COLORS]} />)}
                   </Pie>
-                  <Tooltip formatter={(value) => [`${value} tasks`, 'Count']} />
+                  <Tooltip formatter={value => [`${value} tasks`, 'Count']} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
@@ -808,171 +654,61 @@ const Dashboard: React.FC = () => {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Tasks by Priority */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-amber-500" />
-              Tasks by Priority
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={tasksByPriority}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    dataKey="value"
-                    label={({name, value}) => `${name}: ${value}`}
-                  >
-                    {tasksByPriority.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={PRIORITY_COLORS[entry.name as keyof typeof PRIORITY_COLORS]} 
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => [`${value} tasks`, 'Count']} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recently Completed Tasks */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
-              Recently Completed Tasks
-            </CardTitle>
-            <CardDescription>Tasks that have been completed recently</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentCompletedTasks.length > 0 ? (
-              <div className="overflow-auto max-h-64">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Task</TableHead>
-                      <TableHead>Completed</TableHead>
-                      <TableHead className="hidden md:table-cell">Priority</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentCompletedTasks.slice(0, 5).map((task) => (
-                      <TableRow key={task.id}>
-                        <TableCell className="font-medium">{task.title}</TableCell>
-                        <TableCell>
-                          {task.completed_at ? format(parseISO(task.completed_at), 'MMM dd, HH:mm') : 'Unknown'}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            task.priority === 'High' || task.priority === 'Urgent' 
-                              ? 'bg-red-100 text-red-800' 
-                              : task.priority === 'Medium'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-green-100 text-green-800'
-                          }`}>
-                            {task.priority}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <CheckCircle2 className="mx-auto h-8 w-8 mb-2 opacity-30" />
-                <p>No completed tasks found</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      
 
       {/* Holiday Requests Section */}
-      <div className="mb-6">
-        <HolidayRequestsList showAllRequests={canManageRequests} />
-      </div>
+      
 
-      <div className="mb-6">
-        <h2 className="text-xl font-bold mb-4">Active Projects</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.slice(0, 3).map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
-      </div>
+      
 
-      <TaskList 
-        tasks={todaysTasks} 
-        title="Today's Tasks" 
-        onTaskStatusChange={async (taskId, status) => {
-          try {
-            const now = new Date().toISOString();
-            await taskService.update(taskId, { 
+      <TaskList tasks={todaysTasks} title="Today's Tasks" onTaskStatusChange={async (taskId, status) => {
+      try {
+        const now = new Date().toISOString();
+        await taskService.update(taskId, {
+          status,
+          ...(status === 'COMPLETED' ? {
+            completed_at: now,
+            completed_by: currentEmployee?.id
+          } : {})
+        });
+
+        // Update local state
+        setTodaysTasks(todaysTasks.map(task => task.id === taskId ? {
+          ...task,
+          status,
+          ...(status === 'COMPLETED' ? {
+            completed_at: now,
+            completed_by: currentEmployee?.id
+          } : {})
+        } : task));
+        toast({
+          title: "Task updated",
+          description: "Task status has been successfully updated."
+        });
+
+        // If it was completed, also update the completed tasks list
+        if (status === 'COMPLETED') {
+          const updatedTask = todaysTasks.find(task => task.id === taskId);
+          if (updatedTask) {
+            const updatedCompletedTask = {
+              ...updatedTask,
               status,
-              ...(status === 'COMPLETED' ? { 
-                completed_at: now,
-                completed_by: currentEmployee?.id 
-              } : {})
-            });
-            
-            // Update local state
-            setTodaysTasks(todaysTasks.map(task => 
-              task.id === taskId ? { 
-                ...task, 
-                status,
-                ...(status === 'COMPLETED' ? { 
-                  completed_at: now,
-                  completed_by: currentEmployee?.id 
-                } : {})
-              } : task
-            ));
-            
-            toast({
-              title: "Task updated",
-              description: "Task status has been successfully updated."
-            });
-
-            // If it was completed, also update the completed tasks list
-            if (status === 'COMPLETED') {
-              const updatedTask = todaysTasks.find(task => task.id === taskId);
-              if (updatedTask) {
-                const updatedCompletedTask = {
-                  ...updatedTask,
-                  status,
-                  completed_at: now,
-                  completed_by: currentEmployee?.id
-                };
-                
-                setRecentCompletedTasks([
-                  updatedCompletedTask,
-                  ...recentCompletedTasks.slice(0, 9)
-                ]);
-              }
-            }
-          } catch (error: any) {
-            toast({
-              title: "Error",
-              description: `Failed to update task: ${error.message}`,
-              variant: "destructive"
-            });
+              completed_at: now,
+              completed_by: currentEmployee?.id
+            };
+            setRecentCompletedTasks([updatedCompletedTask, ...recentCompletedTasks.slice(0, 9)]);
           }
-        }}
-      />
-    </div>
-  );
+        }
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: `Failed to update task: ${error.message}`,
+          variant: "destructive"
+        });
+      }
+    }} />
+    </div>;
 };
-
 interface StatCardProps {
   title: string;
   value: string;
@@ -982,10 +718,16 @@ interface StatCardProps {
   onClick?: () => void;
   valueSubtext?: string;
 }
-
-const StatCard: React.FC<StatCardProps> = ({ title, value, footer, icon, subtitle, onClick, valueSubtext }) => {
-  return (
-    <Card className={onClick ? "cursor-pointer hover:bg-accent/50 transition-colors" : ""} onClick={onClick}>
+const StatCard: React.FC<StatCardProps> = ({
+  title,
+  value,
+  footer,
+  icon,
+  subtitle,
+  onClick,
+  valueSubtext
+}) => {
+  return <Card className={onClick ? "cursor-pointer hover:bg-accent/50 transition-colors" : ""} onClick={onClick}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
           {icon}
@@ -998,14 +740,12 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, footer, icon, subtitl
           {valueSubtext && <div className="text-xs text-muted-foreground">{valueSubtext}</div>}
         </div>
         <div className="text-xs text-muted-foreground mt-1 space-y-1">
-          {footer.split('\n').map((line, index) => (
-            <p key={index} className="break-words" dangerouslySetInnerHTML={{ __html: line }}></p>
-          ))}
+          {footer.split('\n').map((line, index) => <p key={index} className="break-words" dangerouslySetInnerHTML={{
+          __html: line
+        }}></p>)}
         </div>
         {subtitle && <p className="text-xs text-muted-foreground mt-1 break-words font-medium">{subtitle}</p>}
       </CardContent>
-    </Card>
-  );
+    </Card>;
 };
-
 export default Dashboard;
