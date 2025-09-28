@@ -77,7 +77,7 @@ serve(async (req) => {
         status: 200,
       }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in bucket creation:", error);
     
     return new Response(
@@ -94,7 +94,7 @@ serve(async (req) => {
 });
 
 // Function to set up comprehensive storage policies for a bucket
-async function setupBucketPolicies(supabase, bucketName) {
+async function setupBucketPolicies(supabase: any, bucketName: string) {
   try {
     // Create policy for SELECT access (view files)
     const { error: selectError } = await supabase.rpc('create_storage_policy', {

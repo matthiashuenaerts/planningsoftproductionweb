@@ -249,7 +249,7 @@ serve(async (req) => {
           syncedCount++;
         }
 
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Error syncing project ${project.name}:`, error);
         errorCount++;
         errors.push(`Project ${project.name}: ${error.message}`);
@@ -298,7 +298,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in orders sync function:', error);
     
     return new Response(JSON.stringify({ 

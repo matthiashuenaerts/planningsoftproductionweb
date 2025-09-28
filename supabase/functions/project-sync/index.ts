@@ -252,7 +252,7 @@ if (planningStartRaw || rawPlacementDate) {
 
             // Calculate the date difference for task updates
             let daysDifference = 0;
-            if (normalizedCurrent) {
+            if (normalizedCurrent && normalizedExternal) {
               const currentDate = new Date(normalizedCurrent);
               const newDate = new Date(normalizedExternal);
               daysDifference = Math.round((newDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -359,26 +359,28 @@ if (planningStartRaw || rawPlacementDate) {
                     }
 
                     const dayCounter = standardTask?.day_counter || 0;
-                    const installationDate = new Date(normalizedExternal);
-                    const dueDate = new Date(installationDate);
-                    dueDate.setDate(dueDate.getDate() - dayCounter);
-                    const newDueDate = dueDate.toISOString().split('T')[0];
-                    
-                    console.log(`Updating task ${task.id} due date to ${newDueDate} (installation: ${normalizedExternal}, day_counter: ${dayCounter})`);
-                    
-                    const { error: updateTaskError } = await supabase
-                      .from('tasks')
-                      .update({ 
-                        due_date: newDueDate,
-                        updated_at: new Date().toISOString()
-                      })
-                      .eq('id', task.id);
+                    if (normalizedExternal) {
+                      const installationDate = new Date(normalizedExternal);
+                      const dueDate = new Date(installationDate);
+                      dueDate.setDate(dueDate.getDate() - dayCounter);
+                      const newDueDate = dueDate.toISOString().split('T')[0];
+                      
+                      console.log(`Updating task ${task.id} due date to ${newDueDate} (installation: ${normalizedExternal}, day_counter: ${dayCounter})`);
+                      
+                      const { error: updateTaskError } = await supabase
+                        .from('tasks')
+                        .update({
+                          due_date: newDueDate,
+                          updated_at: new Date().toISOString()
+                        })
+                        .eq('id', task.id);
 
-                    if (updateTaskError) {
-                      console.error(`Failed to update task ${task.id}: ${updateTaskError.message}`);
-                    } else {
-                      updatedTasksCount++;
-                      console.log(`Successfully updated task ${task.id} due date`);
+                      if (updateTaskError) {
+                        console.error(`Failed to update task ${task.id}: ${updateTaskError.message}`);
+                      } else {
+                        console.log(`Successfully updated task ${task.id} due date`);
+                        // tasksUpdated counter will be handled at higher level
+                      }
                     }
                   }
                 }
