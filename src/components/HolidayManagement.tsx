@@ -1,375 +1,412 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Plus, Trash2, User, CalendarDays } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { holidayRequestService, HolidayRequest } from '@/services/holidayRequestService';
+import { CalendarDays, Clock, User, CheckCircle, XCircle, RefreshCw, Eye } from 'lucide-react';
+import { format, parseISO, isAfter, startOfToday, isBefore, isToday } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
-interface Holiday {
-  id: string;
-  employee_id: string;
-  start_date: string;
-  end_date: string;
-  reason: string | null;
-  approved: boolean;
-  employee?: {
-    name: string;
-  };
+interface HolidayRequestsListProps {
+  showAllRequests?: boolean;
 }
 
-interface Employee {
-  id: string;
-  name: string;
-}
-
-const HolidayManagement: React.FC = () => {
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [reason, setReason] = useState('');
+const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllRequests = false }) => {
+  const [requests, setRequests] = useState<HolidayRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedRequest, setSelectedRequest] = useState<HolidayRequest | null>(null);
+  const [adminNotes, setAdminNotes] = useState('');
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const { currentEmployee } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  // Fetch employees
-  const { data: employees = [] } = useQuery<Employee[]>({
-    queryKey: ['employees'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('id, name')
-        .order('name');
-      
-      if (error) throw error;
-      return data;
+  const canManageRequests = currentEmployee?.role === 'admin' || 
+                           currentEmployee?.role === 'teamleader' || 
+                           currentEmployee?.role === 'manager';
+
+  useEffect(() => {
+    fetchRequests();
+  }, [currentEmployee, showAllRequests]);
+
+  const fetchRequests = async () => {
+    if (!currentEmployee) {
+      console.log('No current employee, skipping fetch');
+      setLoading(false);
+      return;
     }
-  });
-
-  // Fetch holidays
-  const { data: holidays = [], isLoading } = useQuery<Holiday[]>({
-    queryKey: ['holidays'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('holiday_requests')
-        .select('id, user_id, start_date, end_date, reason, status, employee_name')
-        .order('start_date', { ascending: false });
+    
+    try {
+      setLoading(true);
+      console.log('Fetching requests for user:', currentEmployee.id, 'showAllRequests:', showAllRequests);
       
-      if (error) throw error;
-      return data.map(item => ({
-        id: item.id,
-        employee_id: item.user_id,
-        start_date: item.start_date,
-        end_date: item.end_date,
-        reason: item.reason,
-        approved: item.status === 'approved',
-        employee: { name: item.employee_name }
-      }));
-    }
-  });
-
-  // Add holiday mutation
-  const addHolidayMutation = useMutation({
-    mutationFn: async (holidayData: {
-      employee_id: string;
-      start_date: string;
-      end_date: string;
-      reason: string;
-    }) => {
-      const { data, error } = await supabase
-        .from('holiday_requests')
-        .insert([{
-          ...holidayData,
-          user_id: holidayData.employee_id,
-          employee_name: employees.find(e => e.id === holidayData.employee_id)?.name || '',
-          status: 'approved'
-        }])
-        .select()
-        .single();
+      let data: HolidayRequest[];
       
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['holidays'] });
-      toast({
-        title: 'Success',
-        description: 'Holiday added successfully'
-      });
-      setShowAddDialog(false);
-      resetForm();
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: `Failed to add holiday: ${error.message}`,
-        variant: 'destructive'
-      });
-    }
-  });
-
-  // Delete holiday mutation
-  const deleteHolidayMutation = useMutation({
-    mutationFn: async (holidayId: string) => {
-      const { error } = await supabase
-        .from('holiday_requests')
-        .delete()
-        .eq('id', holidayId);
+      if (showAllRequests && canManageRequests) {
+        console.log('Fetching all requests for admin/manager');
+        data = await holidayRequestService.getAllRequests();
+      } else {
+        console.log('Fetching user requests for:', currentEmployee.id);
+        data = await holidayRequestService.getUserRequests(currentEmployee.id);
+      }
       
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['holidays'] });
-      toast({
-        title: 'Success',
-        description: 'Holiday deleted successfully'
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: `Failed to delete holiday: ${error.message}`,
-        variant: 'destructive'
-      });
-    }
-  });
-
-  // Toggle approval mutation
-  const toggleApprovalMutation = useMutation({
-    mutationFn: async ({ holidayId, approved }: { holidayId: string; approved: boolean }) => {
-      const { error } = await supabase
-        .from('holiday_requests')
-        .update({ status: approved ? 'approved' : 'pending' })
-        .eq('id', holidayId);
+      console.log('Fetched holiday requests:', data);
       
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['holidays'] });
+      const sortedData = data.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      
+      setRequests(sortedData);
+    } catch (error) {
+      console.error('Error fetching holiday requests:', error);
       toast({
-        title: 'Success',
-        description: 'Holiday approval status updated'
+        title: "Error",
+        description: "Failed to load holiday requests. Please try again.",
+        variant: "destructive"
       });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Error',
-        description: `Failed to update approval status: ${error.message}`,
-        variant: 'destructive'
-      });
+      setRequests([]);
+    } finally {
+      setLoading(false);
     }
-  });
-
-  const resetForm = () => {
-    setSelectedEmployee('');
-    setStartDate('');
-    setEndDate('');
-    setReason('');
   };
 
-  const handleAddHoliday = () => {
-    if (!selectedEmployee || !startDate || !endDate) {
+  const handleStatusUpdate = async (requestId: string, status: 'approved' | 'rejected') => {
+    if (!currentEmployee || !canManageRequests) {
       toast({
-        title: 'Error',
-        description: 'Please fill in all required fields',
-        variant: 'destructive'
+        title: "Error",
+        description: "You don't have permission to update request status",
+        variant: "destructive"
       });
       return;
     }
 
-    if (new Date(startDate) > new Date(endDate)) {
+    setProcessingId(requestId);
+    try {
+      console.log('Updating request status:', { requestId, status, adminNotes: adminNotes.trim() });
+      
+      await holidayRequestService.updateRequestStatus(
+        requestId,
+        status,
+        adminNotes.trim() || undefined
+      );
+
       toast({
-        title: 'Error',
-        description: 'Start date cannot be after end date',
-        variant: 'destructive'
+        title: "Success",
+        description: `Holiday request ${status} successfully`,
       });
-      return;
+
+      setSelectedRequest(null);
+      setAdminNotes('');
+      await fetchRequests();
+    } catch (error) {
+      console.error('Error updating request status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update request status. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setProcessingId(null);
     }
-
-    addHolidayMutation.mutate({
-      employee_id: selectedEmployee,
-      start_date: startDate,
-      end_date: endDate,
-      reason: reason || ''
-    });
   };
 
-  const handleDeleteHoliday = (holidayId: string) => {
-    if (window.confirm('Are you sure you want to delete this holiday?')) {
-      deleteHolidayMutation.mutate(holidayId);
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return 'default';
+      case 'rejected':
+        return 'destructive';
+      default:
+        return 'secondary';
     }
   };
 
-  const handleToggleApproval = (holidayId: string, currentApproval: boolean) => {
-    toggleApprovalMutation.mutate({
-      holidayId,
-      approved: !currentApproval
-    });
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'rejected':
+        return <XCircle className="h-4 w-4" />;
+      default:
+        return <Clock className="h-4 w-4" />;
+    }
   };
 
-  if (isLoading) {
+  const today = startOfToday();
+  
+  const upcomingRequests = requests.filter(request => {
+    const startDate = parseISO(request.start_date);
+    return isAfter(startDate, today) || isToday(startDate) || request.status === 'pending';
+  });
+  
+  const pastRequests = requests.filter(request => {
+    const startDate = parseISO(request.start_date);
+    return isBefore(startDate, today) && request.status !== 'pending';
+  });
+
+  const renderRequestCard = (request: HolidayRequest) => (
+    <div
+      key={request.id}
+      className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <User className="h-5 w-5 text-gray-500" />
+          <div>
+            <p className="font-medium">{request.employee_name}</p>
+            <p className="text-sm text-gray-500">
+              {format(parseISO(request.start_date), 'MMM dd')} - {format(parseISO(request.end_date), 'MMM dd, yyyy')}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant={getStatusBadgeVariant(request.status)} className="flex items-center gap-1">
+            {getStatusIcon(request.status)}
+            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+          </Badge>
+          {canManageRequests && showAllRequests && request.status === 'pending' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedRequest(request);
+                setAdminNotes('');
+              }}
+            >
+              Review
+            </Button>
+          )}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Eye className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Request Details</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Employee</label>
+                  <p className="text-sm text-gray-600">{request.employee_name}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Dates</label>
+                  <p className="text-sm text-gray-600">
+                    {format(parseISO(request.start_date), 'MMMM dd, yyyy')} - {format(parseISO(request.end_date), 'MMMM dd, yyyy')}
+                  </p>
+                </div>
+                {request.reason && (
+                  <div>
+                    <label className="text-sm font-medium">Reason</label>
+                    <p className="text-sm text-gray-600">{request.reason}</p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-sm font-medium">Status</label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge variant={getStatusBadgeVariant(request.status)} className="flex items-center gap-1">
+                      {getStatusIcon(request.status)}
+                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                    </Badge>
+                  </div>
+                </div>
+                {request.admin_notes && (
+                  <div>
+                    <label className="text-sm font-medium">Admin Notes</label>
+                    <p className="text-sm text-gray-600 bg-blue-50 p-2 rounded">{request.admin_notes}</p>
+                  </div>
+                )}
+                <div className="text-xs text-gray-500">
+                  <p>Submitted: {format(parseISO(request.created_at), 'MMM dd, yyyy HH:mm')}</p>
+                  {request.updated_at !== request.created_at && (
+                    <p>Updated: {format(parseISO(request.updated_at), 'MMM dd, yyyy HH:mm')}</p>
+                  )}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+      
+      {request.reason && (
+        <div className="mb-2">
+          <p className="text-sm text-gray-600">
+            <strong>Reason:</strong> {request.reason}
+          </p>
+        </div>
+      )}
+      
+      {request.admin_notes && (
+        <div className="bg-blue-50 p-3 rounded border-l-4 border-blue-400">
+          <p className="text-sm text-blue-800">
+            <strong>Admin Notes:</strong> {request.admin_notes}
+          </p>
+        </div>
+      )}
+      
+      <div className="flex justify-between text-xs text-gray-500 mt-2">
+        <span>Requested: {format(parseISO(request.created_at), 'MMM dd, yyyy HH:mm')}</span>
+        {request.updated_at !== request.created_at && (
+          <span>Updated: {format(parseISO(request.updated_at), 'MMM dd, yyyy HH:mm')}</span>
+        )}
+      </div>
+    </div>
+  );
+
+  if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Holiday Management</h2>
-        <Button onClick={() => setShowAddDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Holiday
-        </Button>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5" />
-            Employee Holidays
+            Holiday Requests
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {holidays.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No holidays scheduled</p>
-          ) : (
-            <div className="space-y-4">
-              {holidays.map((holiday) => (
-                <div
-                  key={holiday.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <User className="h-4 w-4" />
-                      <span className="font-medium">{holiday.employee?.name}</span>
-                      <Badge variant={holiday.approved ? 'default' : 'secondary'}>
-                        {holiday.approved ? 'Approved' : 'Pending'}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Calendar className="h-4 w-4" />
-                      <span>
-                        {format(new Date(holiday.start_date), 'MMM dd, yyyy')} - {format(new Date(holiday.end_date), 'MMM dd, yyyy')}
-                      </span>
-                    </div>
-                    {holiday.reason && (
-                      <p className="text-sm text-gray-600 mt-1">
-                        Reason: {holiday.reason}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant={holiday.approved ? 'outline' : 'default'}
-                      size="sm"
-                      onClick={() => handleToggleApproval(holiday.id, holiday.approved)}
-                    >
-                      {holiday.approved ? 'Unapprove' : 'Approve'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteHoliday(holiday.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5" />
+              {showAllRequests ? 'All Holiday Requests' : 'My Holiday Requests'}
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchRequests}
+              disabled={loading}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {requests.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <CalendarDays className="mx-auto h-12 w-12 mb-4 opacity-30" />
+              <p>No holiday requests found</p>
+              {!showAllRequests && (
+                <p className="text-sm mt-2">Submit your first holiday request to see it here</p>
+              )}
             </div>
+          ) : (
+            <Tabs defaultValue="upcoming" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="upcoming">
+                  Upcoming ({upcomingRequests.length})
+                </TabsTrigger>
+                <TabsTrigger value="past">
+                  Past ({pastRequests.length})
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="upcoming" className="space-y-4 mt-4">
+                {upcomingRequests.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <CalendarDays className="mx-auto h-8 w-8 mb-2 opacity-30" />
+                    <p>No upcoming holiday requests</p>
+                  </div>
+                ) : (
+                  upcomingRequests.map(renderRequestCard)
+                )}
+              </TabsContent>
+              
+              <TabsContent value="past" className="space-y-4 mt-4">
+                {pastRequests.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <CalendarDays className="mx-auto h-8 w-8 mb-2 opacity-30" />
+                    <p>No past holiday requests</p>
+                  </div>
+                ) : (
+                  pastRequests.map(renderRequestCard)
+                )}
+              </TabsContent>
+            </Tabs>
           )}
         </CardContent>
       </Card>
 
-      {/* Add Holiday Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Employee Holiday</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="employee">Employee</Label>
-              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select an employee" />
-                </SelectTrigger>
-                <SelectContent>
-                  {employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
-                      {employee.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {selectedRequest && (
+        <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Review Holiday Request</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Employee</label>
+                  <p className="text-sm text-gray-600">{selectedRequest.employee_name}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Dates</label>
+                  <p className="text-sm text-gray-600">
+                    {format(parseISO(selectedRequest.start_date), 'MMM dd')} - {format(parseISO(selectedRequest.end_date), 'MMM dd, yyyy')}
+                  </p>
+                </div>
+              </div>
+              
+              {selectedRequest.reason && (
+                <div>
+                  <label className="text-sm font-medium">Reason</label>
+                  <p className="text-sm text-gray-600">{selectedRequest.reason}</p>
+                </div>
+              )}
+              
+              <div>
+                <label className="text-sm font-medium mb-2 block">Admin Notes (Optional)</label>
+                <Textarea
+                  placeholder="Add notes about this request..."
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedRequest(null)}
+                  disabled={processingId === selectedRequest.id}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => handleStatusUpdate(selectedRequest.id, 'rejected')}
+                  disabled={processingId === selectedRequest.id}
+                >
+                  {processingId === selectedRequest.id ? 'Processing...' : 'Reject'}
+                </Button>
+                <Button
+                  onClick={() => handleStatusUpdate(selectedRequest.id, 'approved')}
+                  disabled={processingId === selectedRequest.id}
+                >
+                  {processingId === selectedRequest.id ? 'Processing...' : 'Approve'}
+                </Button>
+              </div>
             </div>
-            <div>
-              <Label htmlFor="start-date">Start Date</Label>
-              <Input
-                id="start-date"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="end-date">End Date</Label>
-              <Input
-                id="end-date"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="reason">Reason (Optional)</Label>
-              <Textarea
-                id="reason"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Enter reason for holiday..."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAddHoliday}
-              disabled={addHolidayMutation.isPending}
-            >
-              {addHolidayMutation.isPending ? 'Adding...' : 'Add Holiday'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 };
 
-export default HolidayManagement;
+export default HolidayRequestsList;
