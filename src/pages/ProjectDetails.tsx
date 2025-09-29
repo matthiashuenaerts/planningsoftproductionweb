@@ -214,13 +214,16 @@ const ProjectDetails = () => {
   const fetchAndSetSortedTasks = useCallback(async (pId: string) => {
     console.log('Fetching and sorting tasks for project:', pId);
     const phaseData = await projectService.getProjectPhases(pId);
+    console.log('Found phases:', phaseData?.length || 0, phaseData);
     const standardTasks = await standardTasksService.getAll();
     const standardTaskMap = new Map(standardTasks.map(st => [st.id, st.task_number]));
     let allTasks: TaskWithTimeData[] = [];
     for (const phase of phaseData) {
       const phaseTasks = await taskService.getByPhase(phase.id);
+      console.log(`Phase ${phase.name} has ${phaseTasks.length} tasks:`, phaseTasks);
       allTasks = [...allTasks, ...phaseTasks];
     }
+    console.log('Total tasks found:', allTasks.length, allTasks);
     allTasks.sort((a, b) => {
       const taskA_number = a.standard_task_id ? standardTaskMap.get(a.standard_task_id) : undefined;
       const taskB_number = b.standard_task_id ? standardTaskMap.get(b.standard_task_id) : undefined;
@@ -244,6 +247,7 @@ const ProjectDetails = () => {
         return updatedTask || task;
       });
     }
+    console.log('Setting tasks in state:', allTasks.length, 'total tasks');
     setTasks(allTasks);
   }, [calculateAndSaveTaskEfficiency]);
   // Handle URL parameters for tab and order navigation
@@ -915,6 +919,14 @@ const ProjectDetails = () => {
   const inProgressTasks = tasks.filter(task => task.status === 'IN_PROGRESS');
   const completedTasks = tasks.filter(task => task.status === 'COMPLETED');
   const openTasks = [...todoTasks, ...holdTasks];
+  
+  console.log('Task filtering results:');
+  console.log('- Total tasks:', tasks.length);
+  console.log('- TODO tasks:', todoTasks.length);
+  console.log('- HOLD tasks:', holdTasks.length);
+  console.log('- IN_PROGRESS tasks:', inProgressTasks.length);
+  console.log('- COMPLETED tasks:', completedTasks.length);
+  console.log('- Open tasks:', openTasks.length);
   const openOrdersCount = orders.filter(order => order.status === 'pending').length;
   const undeliveredOrdersCount = orders.filter(order => order.status !== 'delivered').length;
   const allOrdersDelivered = orders.length > 0 && undeliveredOrdersCount === 0;
