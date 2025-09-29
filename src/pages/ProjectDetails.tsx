@@ -1535,8 +1535,7 @@ const ProjectDetails = () => {
                   </Tabs>
                 </CardContent>
               </Card>
-            </div>
-          }
+            </div>}
         </div>
       </div>
 
