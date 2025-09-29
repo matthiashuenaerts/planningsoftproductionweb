@@ -946,8 +946,8 @@ const ProjectDetails = () => {
       return total + undeliveredItems.length;
     }, 0);
   
-  return (
-    <div className="flex min-h-screen">
+
+return <div className="flex min-h-screen">
       <div className="w-64 bg-sidebar fixed top-0 bottom-0">
         <Navbar />
       </div>
