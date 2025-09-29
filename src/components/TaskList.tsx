@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,7 @@ import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loa
 import { differenceInDays, isBefore } from 'date-fns';
 import TaskCompletionChecklistDialog from './TaskCompletionChecklistDialog';
 import { checklistService } from '@/services/checklistService';
+
 interface ExtendedTask extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
@@ -15,6 +17,7 @@ interface ExtendedTask extends Task {
   efficiency_percentage?: number;
   total_duration?: number;
 }
+
 interface TaskListProps {
   tasks: ExtendedTask[];
   onTaskUpdate?: (task: ExtendedTask) => void;
@@ -26,16 +29,17 @@ interface TaskListProps {
   showEfficiencyData?: boolean;
   onTaskStatusChange?: (taskId: string, status: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => Promise<void>;
 }
-const TaskList: React.FC<TaskListProps> = ({
-  tasks,
-  onTaskUpdate,
-  showRushOrderBadge = false,
-  title,
+
+const TaskList: React.FC<TaskListProps> = ({ 
+  tasks, 
+  onTaskUpdate, 
+  showRushOrderBadge = false, 
+  title, 
   compact = false,
   showCountdownTimer = false,
   showCompleteButton = false,
   showEfficiencyData = false,
-  onTaskStatusChange
+  onTaskStatusChange 
 }) => {
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
   const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
@@ -44,10 +48,12 @@ const TaskList: React.FC<TaskListProps> = ({
     standardTaskId: string;
     taskName: string;
   } | null>(null);
+
   const getUrgencyClass = (dueDate: string) => {
     const today = new Date();
     const due = new Date(dueDate);
     const daysUntilDue = differenceInDays(due, today);
+    
     if (isBefore(due, today)) {
       return {
         class: 'overdue',
@@ -80,34 +86,27 @@ const TaskList: React.FC<TaskListProps> = ({
       };
     }
   };
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'TODO':
-        return 'bg-blue-500';
-      case 'IN_PROGRESS':
-        return 'bg-yellow-500';
-      case 'COMPLETED':
-        return 'bg-green-500';
-      case 'HOLD':
-        return 'bg-orange-500';
-      default:
-        return 'bg-gray-500';
+      case 'TODO': return 'bg-blue-500';
+      case 'IN_PROGRESS': return 'bg-yellow-500';
+      case 'COMPLETED': return 'bg-green-500';
+      case 'HOLD': return 'bg-orange-500';
+      default: return 'bg-gray-500';
     }
   };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'TODO':
-        return <Clock className="h-4 w-4" />;
-      case 'IN_PROGRESS':
-        return <AlertCircle className="h-4 w-4" />;
-      case 'COMPLETED':
-        return <CheckCircle className="h-4 w-4" />;
-      case 'HOLD':
-        return <Pause className="h-4 w-4" />;
-      default:
-        return <Clock className="h-4 w-4" />;
+      case 'TODO': return <Clock className="h-4 w-4" />;
+      case 'IN_PROGRESS': return <AlertCircle className="h-4 w-4" />;
+      case 'COMPLETED': return <CheckCircle className="h-4 w-4" />;
+      case 'HOLD': return <Pause className="h-4 w-4" />;
+      default: return <Clock className="h-4 w-4" />;
     }
   };
+
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
@@ -116,18 +115,20 @@ const TaskList: React.FC<TaskListProps> = ({
     }
     return `${mins}m`;
   };
+
   const handleStatusChange = async (task: ExtendedTask, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     if (newStatus === 'COMPLETED') {
       // Check if task has a standard_task_id and checklist items before completing
       if (task.standard_task_id) {
         try {
           const checklistItems = await checklistService.getChecklistItems(task.standard_task_id);
+          
           if (checklistItems.length > 0) {
             // Show checklist dialog - user must complete checklist before task completion
-            setChecklistDialogTask({
-              taskId: task.id,
-              standardTaskId: task.standard_task_id,
-              taskName: task.title
+            setChecklistDialogTask({ 
+              taskId: task.id, 
+              standardTaskId: task.standard_task_id, 
+              taskName: task.title 
             });
             return; // Don't complete the task yet - wait for checklist completion
           }
@@ -136,23 +137,22 @@ const TaskList: React.FC<TaskListProps> = ({
           // Continue with normal completion if checklist check fails
         }
       }
-
+      
       // No checklist or empty checklist - proceed with normal completion
       setLoadingTasks(prev => new Set(prev).add(task.id));
     }
+
     try {
       if (onTaskStatusChange) {
         await onTaskStatusChange(task.id, newStatus);
       } else if (onTaskUpdate) {
-        const updatedTask = {
-          ...task,
-          status: newStatus
-        };
+        const updatedTask = { ...task, status: newStatus };
         if (newStatus === 'COMPLETED') {
           updatedTask.completed_at = new Date().toISOString();
         }
         onTaskUpdate(updatedTask);
       }
+
       if (newStatus === 'COMPLETED') {
         // Show completion animation
         setLoadingTasks(prev => {
@@ -161,7 +161,7 @@ const TaskList: React.FC<TaskListProps> = ({
           return newSet;
         });
         setCompletingTasks(prev => new Set(prev).add(task.id));
-
+        
         // Remove completion animation after 1 second
         setTimeout(() => {
           setCompletingTasks(prev => {
@@ -183,20 +183,19 @@ const TaskList: React.FC<TaskListProps> = ({
       throw error;
     }
   };
+
   const handleChecklistComplete = async () => {
     if (!checklistDialogTask) return;
+    
     try {
       setLoadingTasks(prev => new Set(prev).add(checklistDialogTask.taskId));
+      
       if (onTaskStatusChange) {
         await onTaskStatusChange(checklistDialogTask.taskId, 'COMPLETED');
       } else if (onTaskUpdate) {
         const task = tasks.find(t => t.id === checklistDialogTask.taskId);
         if (task) {
-          const updatedTask = {
-            ...task,
-            status: 'COMPLETED' as const,
-            completed_at: new Date().toISOString()
-          };
+          const updatedTask = { ...task, status: 'COMPLETED' as const, completed_at: new Date().toISOString() };
           onTaskUpdate(updatedTask);
         }
       }
@@ -208,7 +207,7 @@ const TaskList: React.FC<TaskListProps> = ({
         return newSet;
       });
       setCompletingTasks(prev => new Set(prev).add(checklistDialogTask.taskId));
-
+      
       // Remove completion animation after 1 second
       setTimeout(() => {
         setCompletingTasks(prev => {
@@ -217,6 +216,7 @@ const TaskList: React.FC<TaskListProps> = ({
           return newSet;
         });
       }, 1000);
+      
       setChecklistDialogTask(null);
     } catch (error) {
       console.error('Error completing task:', error);
@@ -227,11 +227,242 @@ const TaskList: React.FC<TaskListProps> = ({
       });
     }
   };
+
   if (tasks.length === 0) {
-    return <div className="text-center text-gray-500 py-8">
+    return (
+      <div className="text-center text-gray-500 py-8">
         No tasks found
-      </div>;
+      </div>
+    );
   }
-  return;
+
+  return (
+    <div className="space-y-4">
+      {title && <h3 className="text-lg font-semibold">{title}</h3>}
+      {tasks.map((task) => {
+        const isLoading = loadingTasks.has(task.id);
+        const isCompleting = completingTasks.has(task.id);
+        
+        return (
+          <Card 
+            key={task.id} 
+            className={`
+              ${task.is_rush_order && showRushOrderBadge ? 'border-red-500 border-2' : ''} 
+              ${task.status === 'HOLD' ? 'border-orange-300' : ''} 
+              ${compact ? 'p-2' : ''}
+              ${isCompleting ? 'animate-pulse bg-green-50 border-green-300' : ''}
+              transition-all duration-300
+            `}
+          >
+            <CardHeader className={compact ? "pb-2" : "pb-3"}>
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  {task.project_name && (
+                    <CardTitle className={`${compact ? "text-lg" : "text-xl"} text-primary font-bold mb-1`}>
+                      {task.project_name}
+                    </CardTitle>
+                  )}
+                  <h4 className={`${compact ? "text-sm" : "text-base"} font-medium text-gray-700`}>
+                    {task.title}
+                  </h4>
+                  
+                  {/* Countdown Timer for IN_PROGRESS tasks */}
+                  {task.status === 'IN_PROGRESS' && task.timeRemaining && task.total_duration && (
+                    <div className={`mt-2 flex items-center gap-2 text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-blue-600'}`}>
+                      <Timer className="h-4 w-4" />
+                      <span className={task.isOvertime ? 'font-bold' : ''}>
+                        {task.isOvertime ? 'OVERTIME: ' : 'Time remaining: '}
+                        {task.timeRemaining}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Efficiency data for completed tasks */}
+                  {showEfficiencyData && task.status === 'COMPLETED' && task.actual_duration_minutes !== undefined && task.efficiency_percentage !== undefined && (
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="h-4 w-4 text-gray-500" />
+                        <span className="text-gray-600">
+                          Planned: {formatDuration(task.actual_duration_minutes)}
+                          {task.total_duration && ` / Total: ${formatDuration(task.total_duration)}`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        {task.efficiency_percentage >= 0 ? (
+                          <TrendingUp className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <TrendingDown className="h-4 w-4 text-red-600" />
+                        )}
+                        <span className={`font-medium ${task.efficiency_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {task.efficiency_percentage >= 0 ? '+' : ''}{task.efficiency_percentage}% efficiency
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          ({task.efficiency_percentage >= 0 ? 'faster' : 'slower'} than planned)
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {task.is_rush_order && showRushOrderBadge && (
+                    <Badge variant="destructive" className="flex items-center gap-1">
+                      <Zap className="h-3 w-3" />
+                      Rush Order
+                    </Badge>
+                  )}
+                  {task.due_date && (() => {
+                    const urgency = getUrgencyClass(task.due_date);
+                    return (
+                      <Badge variant={urgency.variant} className="flex items-center gap-1">
+                        {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3" />}
+                        {urgency.label}
+                      </Badge>
+                    );
+                  })()}
+                  <Badge 
+                    className={`${getStatusColor(task.status)} text-white flex items-center gap-1`}
+                  >
+                    {getStatusIcon(task.status)}
+                    {task.status === 'HOLD' ? 'On Hold' : task.status.replace('_', ' ')}
+                  </Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {task.description && !compact && (
+                <p className="text-gray-600 mb-4">{task.description}</p>
+              )}
+              
+              {task.status === 'HOLD' && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+                  <p className="text-orange-800 text-sm flex items-center gap-2">
+                    <Pause className="h-4 w-4" />
+                    This task is on hold because required limit phases are not yet completed.
+                  </p>
+                </div>
+              )}
+              
+              {!compact && (
+                <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-4 w-4" />
+                    <span>Due: {new Date(task.due_date).toLocaleDateString()}</span>
+                  </div>
+                  {task.status === 'IN_PROGRESS' && task.assignee_name && (
+                    <div className="flex items-center gap-1">
+                      <User className="h-4 w-4" />
+                      <span>Started by: {task.assignee_name}</span>
+                    </div>
+                  )}
+                  {task.total_duration && (
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      <span>Duration: {task.total_duration}min</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {(onTaskUpdate || onTaskStatusChange) && (
+                <div className="flex gap-2">
+                  {task.status === 'TODO' && (
+                    <>
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleStatusChange(task, 'IN_PROGRESS')}
+                      >
+                        Start Task
+                      </Button>
+                      {showCompleteButton && (
+                        <Button 
+                          size="sm" 
+                          onClick={() => handleStatusChange(task, 'COMPLETED')}
+                          className="bg-green-600 hover:bg-green-700 relative"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <>
+                              <Loader className="h-4 w-4 animate-spin mr-2" />
+                              Processing...
+                            </>
+                          ) : (
+                            'Complete'
+                          )}
+                        </Button>
+                      )}
+                    </>
+                  )}
+                  {task.status === 'IN_PROGRESS' && (
+                    <>
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleStatusChange(task, 'COMPLETED')}
+                        className="bg-green-600 hover:bg-green-700 relative"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader className="h-4 w-4 animate-spin mr-2" />
+                            Processing...
+                          </>
+                        ) : (
+                          'Complete'
+                        )}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleStatusChange(task, 'TODO')}
+                      >
+                        Back to Todo
+                      </Button>
+                    </>
+                  )}
+                  {task.status === 'COMPLETED' && task.completed_at && (
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm text-gray-500">
+                        Completed: {new Date(task.completed_at).toLocaleString()}
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleStatusChange(task, 'TODO')}
+                      >
+                        Back to Todo
+                      </Button>
+                    </div>
+                  )}
+                  {task.status === 'HOLD' && (
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      disabled
+                      className="opacity-50"
+                    >
+                      Waiting for Limit Phases
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
+      
+      {/* Checklist Dialog */}
+      {checklistDialogTask && (
+        <TaskCompletionChecklistDialog
+          open={!!checklistDialogTask}
+          onOpenChange={(open) => {
+            if (!open) setChecklistDialogTask(null);
+          }}
+          standardTaskId={checklistDialogTask.standardTaskId}
+          taskName={checklistDialogTask.taskName}
+          onComplete={handleChecklistComplete}
+        />
+      )}
+    </div>
+  );
 };
+
 export default TaskList;
