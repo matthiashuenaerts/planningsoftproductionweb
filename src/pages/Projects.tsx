@@ -13,7 +13,7 @@ import { projectService, taskService, Project, Task } from '@/services/dataServi
 import { workstationService, Workstation } from '@/services/workstationService';
 import { useAuth } from '@/context/AuthContext';
 import NewProjectModal from '@/components/NewProjectModal';
-import { exportProjectData } from '@/services/projectExportService';
+import { exportProjectData, exportProjectDataAsZip } from '@/services/projectExportService';
 import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -87,16 +87,24 @@ const Projects = () => {
       setIsLoading(false);
     }
   };
-  const handleExportProject = async (project: Project, e: React.MouseEvent) => {
+  const handleExportProject = async (project: Project, e: React.MouseEvent, format: 'pdf' | 'zip' = 'pdf') => {
     e.stopPropagation();
     setExportingProject(project.id);
     
     try {
-      await exportProjectData(project);
-      toast({
-        title: t('success'),
-        description: t('project_exported_successfully', { name: project.name })
-      });
+      if (format === 'pdf') {
+        await exportProjectData(project);
+        toast({
+          title: t('success'),
+          description: t('project_exported_pdf_successfully', { name: project.name })
+        });
+      } else {
+        await exportProjectDataAsZip(project);
+        toast({
+          title: t('success'),
+          description: t('project_exported_zip_successfully', { name: project.name })
+        });
+      }
     } catch (error: any) {
       toast({
         title: t('error'),
@@ -400,12 +408,22 @@ const Projects = () => {
                                 <DropdownMenuItem 
                                   onClick={e => {
                                     e.stopPropagation();
-                                    handleExportProject(project, e);
+                                    handleExportProject(project, e, 'pdf');
                                   }}
                                   disabled={exportingProject === project.id}
                                 >
                                   <Download className="mr-2 h-4 w-4" />
-                                  {exportingProject === project.id ? t('exporting_project') : t('export_project')}
+                                  {exportingProject === project.id ? t('exporting_project') : t('export_comprehensive_pdf')}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    handleExportProject(project, e, 'zip');
+                                  }}
+                                  disabled={exportingProject === project.id}
+                                >
+                                  <Package className="mr-2 h-4 w-4" />
+                                  {exportingProject === project.id ? t('exporting_project') : t('export_zip_archive')}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={e => {
                                   e.stopPropagation();

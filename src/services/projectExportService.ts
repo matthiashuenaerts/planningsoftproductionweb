@@ -32,6 +32,19 @@ const downloadBlob = (blob: Blob, filename: string) => {
 
 export const exportProjectData = async (project: Project): Promise<void> => {
   try {
+    // Import the PDF export service
+    const { exportProjectToPDF } = await import('./projectPdfExportService');
+    
+    // Export as comprehensive PDF
+    await exportProjectToPDF(project);
+  } catch (error) {
+    console.error('Error exporting project data:', error);
+    throw error;
+  }
+};
+
+export const exportProjectDataAsZip = async (project: Project): Promise<void> => {
+  try {
     // Collect all project data
     const exportData = await collectProjectData(project.id);
     

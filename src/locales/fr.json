@@ -33,6 +33,8 @@
   "new_project": "Nouveau projet",
   "search_projects_placeholder": "Rechercher des projets par nom ou client...",
   "export_project": "Exporter le projet",
+  "export_comprehensive_pdf": "Exporter PDF complet",
+  "export_zip_archive": "Exporter archive ZIP",
   "exporting_project": "Exportation...",
   "edit_project": "Modifier le projet",
   "delete_project": "Supprimer le projet",
@@ -147,6 +149,8 @@
   "project_deleted_successfully": "Projet supprimé avec succès",
   "failed_to_delete_project": "Échec de la suppression du projet : {{message}}",
   "project_exported_successfully": "Projet \"{{name}}\" exporté avec succès",
+  "project_exported_pdf_successfully": "Projet \"{{name}}\" exporté en PDF complet avec succès",
+  "project_exported_zip_successfully": "Projet \"{{name}}\" exporté en archive ZIP avec succès",
   "failed_to_export_project": "Échec de l'exportation du projet : {{message}}",
 
   "back_to_projects": "Retour aux projets",

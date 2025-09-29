@@ -36,6 +36,8 @@
   "new_project": "Nieuw Project",
   "search_projects_placeholder": "Zoek projecten op naam of klant...",
   "export_project": "Exporteer Project",
+  "export_comprehensive_pdf": "Exporteer Uitgebreid PDF",
+  "export_zip_archive": "Exporteer ZIP Archief",
   "exporting_project": "Exporteren...",
   "edit_project": "Bewerk Project",
   "delete_project": "Verwijder Project",
@@ -148,6 +150,8 @@
   "project_deleted_successfully": "Project succesvol verwijderd",
   "failed_to_delete_project": "Verwijderen van project mislukt: {{message}}",
   "project_exported_successfully": "Project \"{{name}}\" succesvol geëxporteerd",
+  "project_exported_pdf_successfully": "Project \"{{name}}\" succesvol geëxporteerd als uitgebreid PDF",
+  "project_exported_zip_successfully": "Project \"{{name}}\" succesvol geëxporteerd als ZIP archief",
   "failed_to_export_project": "Exporteren van project mislukt: {{message}}",
   
   "back_to_projects": "Terug naar Projecten",
