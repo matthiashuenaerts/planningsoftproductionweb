@@ -28,6 +28,21 @@ interface ComprehensiveExportData {
 }
 
 export const exportProjectToPDF = async (project: Project): Promise<void> => {
+  const pdfBlob = await generateProjectPDFBlob(project);
+  const fileName = `${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_Complete_Export_${new Date().toISOString().split('T')[0]}.pdf`;
+  
+  // Download the PDF
+  const url = URL.createObjectURL(pdfBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+export const generateProjectPDFBlob = async (project: Project): Promise<Blob> => {
   try {
     // Collect all comprehensive project data
     const exportData = await collectComprehensiveProjectData(project.id);
@@ -130,12 +145,11 @@ export const exportProjectToPDF = async (project: Project): Promise<void> => {
       currentY = addDocumentsData(pdf, exportData.documents, currentY, margin, contentWidth);
     }
 
-    // Save PDF
-    const fileName = `${exportData.project.name.replace(/[^a-zA-Z0-9]/g, '_')}_Complete_Export_${new Date().toISOString().split('T')[0]}.pdf`;
-    pdf.save(fileName);
+    // Return PDF as blob instead of saving
+    return new Blob([pdf.output('blob')], { type: 'application/pdf' });
 
   } catch (error) {
-    console.error('Error exporting project to PDF:', error);
+    console.error('Error generating project PDF:', error);
     throw error;
   }
 };

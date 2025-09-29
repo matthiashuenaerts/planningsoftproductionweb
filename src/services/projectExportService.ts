@@ -48,8 +48,21 @@ export const exportProjectDataAsZip = async (project: Project): Promise<void> =>
     // Collect all project data
     const exportData = await collectProjectData(project.id);
     
+    // Generate comprehensive PDF and add it to ZIP
+    const { generateProjectPDFBlob } = await import('./projectPdfExportService');
+    
     // Generate ZIP file
     const zip = new JSZip();
+    
+    // Add comprehensive PDF to ZIP
+    try {
+      const pdfBlob = await generateProjectPDFBlob(project);
+      const pdfFileName = `${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_Complete_Report.pdf`;
+      zip.file(pdfFileName, pdfBlob);
+    } catch (error) {
+      console.error('Failed to generate PDF for ZIP:', error);
+      // Continue with export even if PDF generation fails
+    }
     
     // Add main project documentation
     const projectDoc = generateProjectDocumentation(exportData);
