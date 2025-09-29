@@ -228,10 +228,90 @@ const TaskList: React.FC<TaskListProps> = ({
     }
   };
   if (tasks.length === 0) {
-    return <div className="text-center text-gray-500 py-8">
+    return (
+      <div className="text-center text-muted-foreground py-8">
         No tasks found
-      </div>;
+      </div>
+    );
   }
-  return;
+
+  return (
+    <div className={compact ? 'space-y-2' : 'space-y-4'}>
+      {title && (
+        <div className="text-sm font-medium text-muted-foreground mb-2">{title}</div>
+      )}
+      <div className="grid gap-2">
+        {tasks.map((task) => (
+          <Card key={task.id} className={`${completingTasks.has(task.id) ? 'opacity-60' : ''} transition-opacity`}>
+            <CardContent className={compact ? 'p-3' : 'p-4'}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2 w-2 rounded-full ${getStatusColor(task.status)}`} />
+                    <div className="font-medium truncate">{task.title}</div>
+                    {showRushOrderBadge && task.rush_order_id && (
+                      <Badge variant="destructive">Rush</Badge>
+                    )}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground flex flex-wrap gap-3">
+                    {task.due_date && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {new Date(task.due_date).toLocaleDateString()}
+                      </span>
+                    )}
+                    {task.due_date && (
+                      <Badge variant={getUrgencyClass(task.due_date).variant}>
+                        {getUrgencyClass(task.due_date).label}
+                      </Badge>
+                    )}
+                    {typeof task.duration === 'number' && (
+                      <span className="flex items-center gap-1">
+                        <Timer className="h-3 w-3" />
+                        {formatDuration(task.duration)}
+                      </span>
+                    )}
+                    {showEfficiencyData && typeof task.efficiency_percentage === 'number' && (
+                      <span className="flex items-center gap-1">
+                        <Loader className="h-3 w-3" />
+                        Eff: {task.efficiency_percentage}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {showCompleteButton && task.status !== 'COMPLETED' && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleStatusChange(task, 'COMPLETED')}
+                      disabled={loadingTasks.has(task.id)}
+                    >
+                      {loadingTasks.has(task.id) ? (
+                        <Loader className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                      )}
+                      Complete
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {checklistDialogTask && (
+        <TaskCompletionChecklistDialog
+          open={true}
+          onOpenChange={(open) => !open && setChecklistDialogTask(null)}
+          standardTaskId={checklistDialogTask.standardTaskId}
+          taskName={checklistDialogTask.taskName}
+          onComplete={handleChecklistComplete}
+        />
+      )}
+    </div>
+  );
+
 };
 export default TaskList;
