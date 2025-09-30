@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
+import { standardTasksService } from '@/services/standardTasksService';
 import { RushOrder, EditRushOrderPayload } from '@/types/rushOrder';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,10 +16,20 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { CheckboxCard } from '@/components/settings/CheckboxCard';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EditRushOrderFormProps {
   rushOrder: RushOrder;
   onSuccess: () => void;
+}
+
+interface Employee {
+  id: string;
+  name: string;
+  role: string;
 }
 
 const formSchema = z.object({
@@ -32,6 +43,40 @@ const EditRushOrderForm: React.FC<EditRushOrderFormProps> = ({ rushOrder, onSucc
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+
+  // Fetch standard tasks
+  const { data: standardTasks, isLoading: loadingTasks } = useQuery({
+    queryKey: ['standardTasks'],
+    queryFn: standardTasksService.getAll
+  });
+
+  // Fetch employees
+  const { data: employees, isLoading: loadingEmployees } = useQuery({
+    queryKey: ['employees'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .in('role', ['admin', 'manager', 'worker', 'installation_team']);
+      
+      if (error) throw error;
+      return data as Employee[];
+    }
+  });
+
+  // Initialize selected tasks and users from rush order
+  useEffect(() => {
+    if (rushOrder.tasks) {
+      const taskIds = rushOrder.tasks.map((t: any) => t.standard_task_id).filter(Boolean);
+      setSelectedTaskIds(taskIds);
+    }
+    if (rushOrder.assignments) {
+      const userIds = rushOrder.assignments.map((a: any) => a.employee_id).filter(Boolean);
+      setSelectedUserIds(userIds);
+    }
+  }, [rushOrder]);
 
   const form = useForm<EditRushOrderPayload>({
     resolver: zodResolver(formSchema),
@@ -57,15 +102,70 @@ const EditRushOrderForm: React.FC<EditRushOrderFormProps> = ({ rushOrder, onSucc
     },
   });
 
-  const onSubmit = (data: EditRushOrderPayload) => {
-    updateMutation.mutate({
-      id: rushOrder.id,
-      formData: data,
-      originalImageUrl: rushOrder.image_url,
-    });
+  const onSubmit = async (data: EditRushOrderPayload) => {
+    try {
+      // Update rush order
+      await updateMutation.mutateAsync({
+        id: rushOrder.id,
+        formData: data,
+        originalImageUrl: rushOrder.image_url,
+      });
+
+      // Update task assignments
+      // First, delete existing task assignments
+      await supabase
+        .from('rush_order_tasks')
+        .delete()
+        .eq('rush_order_id', rushOrder.id);
+
+      // Then add new ones
+      if (selectedTaskIds.length > 0) {
+        await rushOrderService.assignTasksToRushOrder(rushOrder.id, selectedTaskIds, rushOrder.project_id || undefined);
+      }
+
+      // Update user assignments
+      // First, delete existing user assignments
+      await supabase
+        .from('rush_order_assignments')
+        .delete()
+        .eq('rush_order_id', rushOrder.id);
+
+      // Then add new ones
+      if (selectedUserIds.length > 0) {
+        await rushOrderService.assignUsersToRushOrder(rushOrder.id, selectedUserIds);
+      }
+
+      toast({ title: 'Success', description: 'Rush order updated successfully.' });
+      queryClient.invalidateQueries({ queryKey: ['rushOrders'] });
+      queryClient.invalidateQueries({ queryKey: ['rushOrder', rushOrder.id] });
+      onSuccess();
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to update rush order.',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleTaskToggle = (taskId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedTaskIds(prev => [...prev, taskId]);
+    } else {
+      setSelectedTaskIds(prev => prev.filter(id => id !== taskId));
+    }
+  };
+
+  const handleUserToggle = (userId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedUserIds(prev => [...prev, userId]);
+    } else {
+      setSelectedUserIds(prev => prev.filter(id => id !== userId));
+    }
   };
 
   const isImage = (fileName: string) => /\.(jpg|jpeg|png|gif|svg|webp)$/i.test(fileName);
+  
   
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -78,6 +178,9 @@ const EditRushOrderForm: React.FC<EditRushOrderFormProps> = ({ rushOrder, onSucc
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-6"
+          >
         <FormField
           control={form.control}
           name="title"
@@ -180,6 +283,68 @@ const EditRushOrderForm: React.FC<EditRushOrderFormProps> = ({ rushOrder, onSucc
           </div>
           <FormMessage />
         </FormItem>
+        </div>
+
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium">Required Tasks</label>
+            <Card>
+              <CardHeader className="p-4">
+                <CardTitle className="text-md">Standard Tasks</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                {loadingTasks ? (
+                  <div className="flex justify-center p-4">Loading tasks...</div>
+                ) : (
+                  <ScrollArea className="h-[200px]">
+                    <div className="grid grid-cols-1 gap-2">
+                      {standardTasks?.map((task) => (
+                        <CheckboxCard
+                          key={task.id}
+                          id={task.id}
+                          title={task.task_name}
+                          description={`Task #${task.task_number}`}
+                          checked={selectedTaskIds.includes(task.id)}
+                          onCheckedChange={(checked) => handleTaskToggle(task.id, checked)}
+                        />
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium">Assigned Members</label>
+            <Card>
+              <CardHeader className="p-4">
+                <CardTitle className="text-md">Team Members</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                {loadingEmployees ? (
+                  <div className="flex justify-center p-4">Loading users...</div>
+                ) : (
+                  <ScrollArea className="h-[200px]">
+                    <div className="grid grid-cols-1 gap-2">
+                      {employees?.map((employee) => (
+                        <CheckboxCard
+                          key={employee.id}
+                          id={employee.id}
+                          title={employee.name}
+                          description={employee.role}
+                          checked={selectedUserIds.includes(employee.id)}
+                          onCheckedChange={(checked) => handleUserToggle(employee.id, checked)}
+                        />
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+        </div>
         
         <div className="flex justify-end">
           <Button type="submit" disabled={updateMutation.isPending}>
