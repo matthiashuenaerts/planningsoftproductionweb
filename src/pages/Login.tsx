@@ -109,7 +109,7 @@ const Login: React.FC = () => {
         <div className="text-center space-y-6">
           <div className="relative inline-block">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full blur-lg opacity-20 animate-pulse"></div>
-            <img src="https://static.wixstatic.com/media/99c033_7c36758b8bdb474990f30ed2fec2807f~mv2.png/v1/fill/w_954,h_660,al_c,q_90,usm_0.66_1.00_0.01,enc_avif,quality_auto/99c033_7c36758b8bdb474990f30ed2fec2807f~mv2.png" alt="Company Logo" className="relative w-32 h-auto mx-auto rounded-lg shadow-lg hover:scale-105 transition-transform duration-300" />
+            <img src="https://static.wixstatic.com/media/99c033_1c671424e9ff4dbcbc6ce73524c076c8~mv2.png" alt="Company Logo" className="relative w-32 h-auto mx-auto rounded-lg shadow-lg hover:scale-105 transition-transform duration-300" />
           </div>
           
           <div className="space-y-2">
