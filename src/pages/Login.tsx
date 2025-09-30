@@ -121,7 +121,7 @@ const Login: React.FC = () => {
               </h1>
             </div>
 
-            <p className="text-[#42A5DB] text-lg">
+            <p className="text-[#42A5DB] text-lg font-bold">
               Guiding your production to perfection!
             </p>
           </div>
