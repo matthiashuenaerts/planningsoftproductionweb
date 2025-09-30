@@ -67,21 +67,14 @@ serve(async (req) => {
       throw new Error('Order missing external order number');
     }
 
-    // First, authenticate with the external API
+    // First, authenticate with the external API using Basic Auth
+    const credentials = btoa(`${username}:${password}`);
     const authResponse = await fetch(`${baseUrl}/sessions`, {
       method: 'POST',
       headers: {
+        'Authorization': `Basic ${credentials}`,
         'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        fmDataSource: [
-          {
-            database: 'CrownBasePro-Thonon',
-            username: username,
-            password: password
-          }
-        ]
-      })
+      }
     });
 
     if (!authResponse.ok) {
