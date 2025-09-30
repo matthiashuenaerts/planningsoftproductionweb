@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -9,15 +8,19 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { User, Lock, Building2 } from 'lucide-react';
-
 const Login: React.FC = () => {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { login, isAuthenticated } = useAuth();
+  const {
+    toast
+  } = useToast();
+  const {
+    login,
+    isAuthenticated
+  } = useAuth();
 
   // Trigger entrance animation
   useEffect(() => {
@@ -31,10 +34,8 @@ const Login: React.FC = () => {
       navigate('/');
     }
   }, [isAuthenticated, navigate]);
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!name || !password) {
       toast({
         title: "Error",
@@ -43,37 +44,32 @@ const Login: React.FC = () => {
       });
       return;
     }
-
     try {
       setLoading(true);
-      
+
       // Query the employees table by name
-      const { data: employees, error: queryError } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('name', name)
-        .limit(1);
-      
+      const {
+        data: employees,
+        error: queryError
+      } = await supabase.from('employees').select('*').eq('name', name).limit(1);
       if (queryError) {
         console.error('Database query error:', queryError);
         throw new Error('Failed to connect to database');
       }
-      
       if (!employees || employees.length === 0) {
         throw new Error('Employee not found');
       }
-      
       const employee = employees[0];
-      
+
       // Simple password check (in a real app, you would use proper hashing)
       if (employee.password !== password) {
         throw new Error('Incorrect password');
       }
-      
+
       // Ensure role is a valid type
       const validRoles = ['workstation', 'admin', 'manager', 'worker', 'installation_team', 'preparater', 'teamleader'] as const;
       const employeeRole = validRoles.includes(employee.role as any) ? employee.role as typeof validRoles[number] : 'workstation';
-      
+
       // Use the login function from AuthContext
       login({
         id: employee.id,
@@ -81,12 +77,11 @@ const Login: React.FC = () => {
         role: employeeRole,
         workstation: employee.workstation
       });
-      
       toast({
         title: "Login successful",
         description: `Welcome, ${employee.name}!`
       });
-      
+
       // Navigate based on role
       navigate('/');
     } catch (error: any) {
@@ -100,9 +95,7 @@ const Login: React.FC = () => {
       setLoading(false);
     }
   };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center p-4 relative overflow-hidden">
+  return <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-[fade-in_2s_ease-out]"></div>
@@ -110,25 +103,17 @@ const Login: React.FC = () => {
         <div className="absolute top-40 left-40 w-60 h-60 bg-amber-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-[fade-in_2s_ease-out_1s_both]"></div>
       </div>
 
-      <div className={`w-full max-w-md space-y-8 relative z-10 transform transition-all duration-1000 ${
-        isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
-      }`}>
+      <div className={`w-full max-w-md space-y-8 relative z-10 transform transition-all duration-1000 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
         
         {/* Logo Section */}
         <div className="text-center space-y-6">
           <div className="relative inline-block">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full blur-lg opacity-20 animate-pulse"></div>
-            <img 
-              src="https://static.wixstatic.com/media/99c033_7c36758b8bdb474990f30ed2fec2807f~mv2.png/v1/fill/w_954,h_660,al_c,q_90,usm_0.66_1.00_0.01,enc_avif,quality_auto/99c033_7c36758b8bdb474990f30ed2fec2807f~mv2.png" 
-              alt="Company Logo"
-              className="relative w-32 h-auto mx-auto rounded-lg shadow-lg hover:scale-105 transition-transform duration-300"
-            />
+            <img src="https://static.wixstatic.com/media/99c033_7c36758b8bdb474990f30ed2fec2807f~mv2.png/v1/fill/w_954,h_660,al_c,q_90,usm_0.66_1.00_0.01,enc_avif,quality_auto/99c033_7c36758b8bdb474990f30ed2fec2807f~mv2.png" alt="Company Logo" className="relative w-32 h-auto mx-auto rounded-lg shadow-lg hover:scale-105 transition-transform duration-300" />
           </div>
           
           <div className="space-y-2">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              PlanningSoftProduction
-            </h1>
+            <h1 className="font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-4xl text-[#195f85]">AutoMattiOn Compass</h1>
             <p className="text-gray-600 text-lg">
               Planningssoftware voor productieomgeving
             </p>
@@ -157,15 +142,7 @@ const Login: React.FC = () => {
                 </Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input 
-                    id="name" 
-                    type="text" 
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter your employee name"
-                    disabled={loading}
-                    className="pl-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-colors duration-200"
-                  />
+                  <Input id="name" type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Enter your employee name" disabled={loading} className="pl-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-colors duration-200" />
                 </div>
               </div>
               
@@ -175,33 +152,17 @@ const Login: React.FC = () => {
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input 
-                    id="password" 
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    disabled={loading}
-                    className="pl-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-colors duration-200"
-                  />
+                  <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" disabled={loading} className="pl-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-colors duration-200" />
                 </div>
               </div>
             </CardContent>
             
             <CardFooter className="pt-6 pb-8">
-              <Button 
-                className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none" 
-                type="submit"
-                disabled={loading}
-              >
-                {loading ? (
-                  <div className="flex items-center space-x-2">
+              <Button className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none" type="submit" disabled={loading}>
+                {loading ? <div className="flex items-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Signing in...</span>
-                  </div>
-                ) : (
-                  "Sign in"
-                )}
+                  </div> : "Sign in"}
               </Button>
             </CardFooter>
           </form>
@@ -212,8 +173,6 @@ const Login: React.FC = () => {
           <p>Secure access to your production planning system</p>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default Login;
