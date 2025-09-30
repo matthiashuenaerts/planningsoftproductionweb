@@ -63,7 +63,7 @@ const NavbarContent = ({
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 mb-2">
         <h2 className="text-lg font-semibold">{t('THONON nv.')}</h2>
-        <img src="https://static.wixstatic.com/media/99c033_9dfac27aa7cb42dcb84c0ede3bd689be~mv2.png" alt="Company Logo" className="relative w-32 h-auto mx-auto rounded-lg shadow-lg hover:scale-75 transition-transform duration-300" />
+        <img src="https://static.wixstatic.com/media/99c033_9dfac27aa7cb42dcb84c0ede3bd689be~mv2.png" alt="Company Logo" className="relative w-16 h-auto mx-auto rounded-lg shadow-lg hover:scale-108 transition-transform duration-300" />
         <Button variant="ghost" size="sm" onClick={() => setHelpDialogOpen(true)} className="p-2 text-white hover:bg-sky-700" title="Help">
           <HelpCircle className="h-4 w-4" />
         </Button>
