@@ -11,7 +11,7 @@ import Navbar from '@/components/Navbar';
 
 
 // Import the uploaded floorplan image
-const FLOORPLAN_IMAGE = "/lovable-uploads/a8ecb0d1-2146-481f-8c3a-31fa480e3aad.png";
+const FLOORPLAN_IMAGE = "/lovable-uploads/grondplan_page-0001.jpg";
 
 const Floorplan: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
