@@ -88,11 +88,24 @@ serve(async (req) => {
       throw new Error('No token received from external API');
     }
 
-    // Prepare the receipt data
-    const artikelen = order.order_items.map((item: any) => ({
-      SKU: item.article_code || item.ean || item.description,
-      aantal: item.delivered_quantity
-    }));
+    // Prepare the receipt data - only include items that have been delivered
+    const artikelen = order.order_items
+      .filter((item: any) => item.delivered_quantity > 0)
+      .map((item: any) => ({
+        SKU: item.article_code || item.ean || item.description,
+        aantal: item.delivered_quantity
+      }));
+
+    // If no items have been delivered, don't send confirmation
+    if (artikelen.length === 0) {
+      return new Response(JSON.stringify({
+        success: false,
+        message: 'No items have been delivered yet'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      });
+    }
 
     const receiptData = {
       SupplierOrderNumber: order.external_order_number,

@@ -168,6 +168,9 @@ export const orderService = {
         await this.sendExternalDeliveryConfirmation(orderId);
       } else if (someItemsDelivered) {
         await this.updateOrderStatus(orderId, 'partially_delivered');
+        
+        // Send confirmation for partially delivered items
+        await this.sendExternalDeliveryConfirmation(orderId);
       }
     } else {
       // Legacy behavior - mark everything as delivered
