@@ -113,6 +113,7 @@ const Login: React.FC = () => {
           
           <div className="space-y-2">
             <h1 className="font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-4xl text-[#195f85]">AutoMattiOn Compass</h1>
+            <h1 className="font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-4xl text-[#42A5DB]">Compass</h1>
             <p className="text-[#42A5DB] text-lg">
               Guiding your production to perfection!
             </p>
