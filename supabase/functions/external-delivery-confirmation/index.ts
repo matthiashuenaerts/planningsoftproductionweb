@@ -89,15 +89,13 @@ serve(async (req) => {
     }
 
     // Prepare the receipt data - only include items that have been delivered
-    const artikelen = order.order_items
-      .filter((item: any) => item.delivered_quantity > 0)
-      .map((item: any) => ({
-        SKU: item.article_code || item.ean || item.description,
-        aantal: item.delivered_quantity
-      }));
-
+    const deliveredItems = order.order_items.filter((item: any) => item.delivered_quantity > 0);
+    
+    console.log(`Found ${deliveredItems.length} delivered items out of ${order.order_items.length} total items`);
+    
     // If no items have been delivered, don't send confirmation
-    if (artikelen.length === 0) {
+    if (deliveredItems.length === 0) {
+      console.log('No items have been delivered yet, skipping external confirmation');
       return new Response(JSON.stringify({
         success: false,
         message: 'No items have been delivered yet'
@@ -106,6 +104,14 @@ serve(async (req) => {
         status: 400
       });
     }
+
+    const artikelen = deliveredItems.map((item: any) => {
+      console.log(`Including item: ${item.article_code || item.ean} with delivered quantity: ${item.delivered_quantity}`);
+      return {
+        SKU: item.article_code || item.ean || item.description,
+        aantal: item.delivered_quantity
+      };
+    });
 
     const receiptData = {
       SupplierOrderNumber: order.external_order_number,
