@@ -108,7 +108,6 @@ const Login: React.FC = () => {
         {/* Logo Section */}
         <div className="text-center space-y-6">
           <div className="relative inline-block">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full blur-lg opacity-20 animate-pulse"></div>
             <img src="https://static.wixstatic.com/media/99c033_1c671424e9ff4dbcbc6ce73524c076c8~mv2.png" alt="Company Logo" className="relative w-32 h-auto mx-auto rounded-lg shadow-lg hover:scale-105 transition-transform duration-300" />
           </div>
           
