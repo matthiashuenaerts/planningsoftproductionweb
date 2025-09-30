@@ -130,11 +130,7 @@ const Login: React.FC = () => {
         {/* Login Card */}
         <Card className="backdrop-blur-sm bg-white/80 border-0 shadow-2xl ring-1 ring-gray-200/50 hover:shadow-3xl transition-all duration-500">
           <CardHeader className="space-y-1 text-center pb-8">
-            <div className="flex items-center justify-center mb-4">
-              <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full">
-                <Building2 className="h-6 w-6 text-white" />
-              </div>
-            </div>
+            
             <CardTitle className="text-2xl font-semibold text-gray-800">Welcome Back</CardTitle>
             <CardDescription className="text-gray-600">
               Sign in to access your workspace
