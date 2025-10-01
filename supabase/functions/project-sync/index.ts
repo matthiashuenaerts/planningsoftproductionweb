@@ -336,6 +336,57 @@ if (planningStartRaw || rawPlacementDate) {
             
             console.log(`Successfully updated project ${project.name} installation date to ${normalizedExternal}`);
 
+            // Update truck loading date if truck assignment exists
+            // Loading should be scheduled one business day before the installation START date
+            if (startFromPlanning) {
+              console.log(`Checking truck assignment for project ${project.name}...`);
+              
+              const { data: truckAssignment, error: truckFetchError } = await supabase
+                .from('project_truck_assignments')
+                .select('id, loading_date')
+                .eq('project_id', project.id)
+                .maybeSingle();
+              
+              if (truckFetchError) {
+                console.warn(`Failed to fetch truck assignment for project ${project.name}: ${truckFetchError.message}`);
+              } else if (truckAssignment) {
+                // Calculate loading date (one business day before installation START)
+                const startDate = new Date(startFromPlanning);
+                const loadingDate = new Date(startDate);
+                
+                // Move back one day initially
+                loadingDate.setDate(loadingDate.getDate() - 1);
+                
+                // Weekend adjustment - if loading falls on weekend, move to Friday
+                if (loadingDate.getDay() === 0) {
+                  // Sunday - move to Friday
+                  loadingDate.setDate(loadingDate.getDate() - 2);
+                } else if (loadingDate.getDay() === 6) {
+                  // Saturday - move to Friday
+                  loadingDate.setDate(loadingDate.getDate() - 1);
+                }
+                
+                const loadingDateStr = loadingDate.toISOString().split('T')[0];
+                console.log(`Updating truck loading date for project ${project.name}: installation start=${startFromPlanning}, loading=${loadingDateStr}`);
+                
+                const { error: truckUpdateError } = await supabase
+                  .from('project_truck_assignments')
+                  .update({
+                    loading_date: loadingDateStr,
+                    installation_date: normalizedExternal,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', truckAssignment.id);
+                
+                if (truckUpdateError) {
+                  console.warn(`Failed to update truck loading date for project ${project.name}: ${truckUpdateError.message}`);
+                } else {
+                  console.log(`Successfully updated truck loading date for project ${project.name} to ${loadingDateStr}`);
+                }
+              } else {
+                console.log(`No truck assignment found for project ${project.name}`);
+              }
+            }
 
             // Get all tasks for this project and update their due dates based on standard task day_counter
             const { data: phases, error: phasesError } = await supabase
