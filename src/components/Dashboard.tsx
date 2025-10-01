@@ -253,25 +253,24 @@ const Dashboard: React.FC = () => {
         data: overridesData,
         error: overridesError
       } = await supabase.from('project_loading_overrides').select('project_id, override_loading_date');
-      
-      let overridesMap: Record<string, string> = {};
       if (overridesError) {
         console.error('Error fetching loading overrides:', overridesError);
       } else {
         // Convert overrides to map
+        const overridesMap: Record<string, string> = {};
         (overridesData || []).forEach(override => {
           overridesMap[override.project_id] = override.override_loading_date;
         });
         setManualOverrides(overridesMap);
       }
 
-      // Load current week data with both holidays and overrides
-      await loadWeekData(weekStartDate, holidaysData, overridesMap);
+      // Load current week data
+      await loadWeekData(weekStartDate, holidaysData);
     } catch (error) {
       console.error('Error fetching initial truck loading data:', error);
     }
   };
-  const loadWeekData = async (weekStart: Date, holidaysData?: Holiday[], overridesData?: Record<string, string>) => {
+  const loadWeekData = async (weekStart: Date, holidaysData?: Holiday[]) => {
     const weekKey = format(weekStart, 'yyyy-MM-dd');
 
     // Skip if week already loaded
@@ -280,7 +279,6 @@ const Dashboard: React.FC = () => {
       setWeekLoading(true);
       const weekEnd = addDays(weekStart, 6);
       const holidaysList = holidaysData || holidays;
-      const overridesList = overridesData || manualOverrides;
 
       // Fetch projects for this week range
       const {
@@ -376,7 +374,7 @@ const Dashboard: React.FC = () => {
       if (isCurrentWeek) {
         // Consider manual overrides when calculating today's loadings
         const todayLoadings = enhancedAssignments.filter(assignment => {
-          const effectiveLoadingDate = overridesList[assignment.project.id] || assignment.loading_date;
+          const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
           return effectiveLoadingDate === today;
         });
 
@@ -384,16 +382,16 @@ const Dashboard: React.FC = () => {
         let daysToNext = 0;
         if (todayLoadings.length === 0) {
           const futureLoadings = enhancedAssignments.filter(assignment => {
-            const effectiveLoadingDate = overridesList[assignment.project.id] || assignment.loading_date;
+            const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
             const loadingDate = new Date(effectiveLoadingDate);
             return loadingDate > new Date();
           }).sort((a, b) => {
-            const aDate = overridesList[a.project.id] || a.loading_date;
-            const bDate = overridesList[b.project.id] || b.loading_date;
+            const aDate = manualOverrides[a.project.id] || a.loading_date;
+            const bDate = manualOverrides[b.project.id] || b.loading_date;
             return new Date(aDate).getTime() - new Date(bDate).getTime();
           });
           if (futureLoadings.length > 0) {
-            const nextLoadingDate = new Date(overridesList[futureLoadings[0].project.id] || futureLoadings[0].loading_date);
+            const nextLoadingDate = new Date(manualOverrides[futureLoadings[0].project.id] || futureLoadings[0].loading_date);
             const today = new Date();
             daysToNext = Math.ceil((nextLoadingDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
           }
