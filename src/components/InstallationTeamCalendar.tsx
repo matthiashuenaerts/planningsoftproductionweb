@@ -722,14 +722,14 @@ const InstallationTeamCalendar = ({
   }, [toast]);
 
   // Helper function to update truck loading date - enhanced version
-  const updateTruckLoadingDate = async (projectId: string, installationDateStr: string) => {
+  const updateTruckLoadingDate = async (projectId: string, installationDateStr: string, startDateStr: string) => {
     const truckAssignmentIndex = truckAssignments.findIndex(ta => ta.project_id === projectId);
     if (truckAssignmentIndex >= 0) {
       const truckAssignment = truckAssignments[truckAssignmentIndex];
 
-      // Calculate new loading date (one business day before installation)
-      const installationDate = new Date(installationDateStr);
-      const loadingDate = new Date(installationDate);
+      // Calculate new loading date (one business day before installation START)
+      const startDate = new Date(startDateStr);
+      const loadingDate = new Date(startDate);
       
       // Move back one day initially
       loadingDate.setDate(loadingDate.getDate() - 1);
@@ -850,6 +850,7 @@ const InstallationTeamCalendar = ({
           const startDate = new Date(updateData.start_date || existingAssignment.start_date);
           const installationDate = addBusinessDays(startDate, existingAssignment.duration - 1);
           const installationDateStr = format(installationDate, 'yyyy-MM-dd');
+          const startDateStr = format(startDate, 'yyyy-MM-dd');
 
           // Update project installation_date
           const { error: projectError } = await supabase
@@ -859,7 +860,7 @@ const InstallationTeamCalendar = ({
           if (projectError) throw projectError;
 
           // Update truck assignment loading date if exists
-          await updateTruckLoadingDate(projectId, installationDateStr);
+          await updateTruckLoadingDate(projectId, installationDateStr, startDateStr);
           
           toast({
             title: "Team Updated",
@@ -888,6 +889,7 @@ const InstallationTeamCalendar = ({
           const startDate = new Date(newAssignment.start_date);
           const installationDate = addBusinessDays(startDate, newAssignment.duration - 1);
           const installationDateStr = format(installationDate, 'yyyy-MM-dd');
+          const startDateStr = format(startDate, 'yyyy-MM-dd');
 
           // Update project installation_date
           const { error: projectError } = await supabase
@@ -897,7 +899,7 @@ const InstallationTeamCalendar = ({
           if (projectError) throw projectError;
 
           // Update truck assignment loading date if exists (for newly assigned projects)
-          await updateTruckLoadingDate(projectId, installationDateStr);
+          await updateTruckLoadingDate(projectId, installationDateStr, startDateStr);
           
           toast({
             title: "Team Assigned",
@@ -944,6 +946,7 @@ const InstallationTeamCalendar = ({
       const startDate = new Date(assignment.start_date);
       const installationDate = addBusinessDays(startDate, newDuration - 1);
       const installationDateStr = format(installationDate, 'yyyy-MM-dd');
+      const startDateStr = format(startDate, 'yyyy-MM-dd');
 
       // Update project installation_date
       const { error: projectError } = await supabase
@@ -953,7 +956,7 @@ const InstallationTeamCalendar = ({
       if (projectError) throw projectError;
 
       // Update truck assignment loading date if exists
-      await updateTruckLoadingDate(assignment.project_id, installationDateStr);
+      await updateTruckLoadingDate(assignment.project_id, installationDateStr, startDateStr);
       
       toast({
         title: "Duration Updated",
