@@ -222,25 +222,21 @@ let planningTeams: string[] = [];
           });
         }
 
-        // Process the placement date if found
-        // CRITICAL: Match the manual button logic exactly - use ONLY plaatsingsdatum
-        // The manual button uses: convertWeekNumberToDate(orderData.order.plaatsingsdatum)
-        if (rawPlacementDate) {
-          console.log(`Raw placement date (plaatsingsdatum) for project ${project.name}: ${rawPlacementDate}`);
-          console.log(`Placement date type: ${typeof rawPlacementDate}, value: "${rawPlacementDate}"`);
+        // Process the installation date
+        // CRITICAL: Use datum_start from planning array as installation date (NOT plaatsingsdatum!)
+        // The datum_start is the actual start date of the installation in DD/MM/YYYY format
+        if (planningStartRaw) {
+          console.log(`Raw planning START date (datum_start) for project ${project.name}: ${planningStartRaw}`);
           
-          // Convert placement date using the same logic as the manual button
-          const placementConverted = convertWeekNumberToDate(rawPlacementDate);
-          
-          // Use placement date as installation date (exactly as the manual button does)
-          const externalInstallationDate = placementConverted;
-          const currentInstallationDate = project.installation_date;
-          
-          // Also parse planning dates for team assignments and truck loading
-          const startFromPlanning = planningStartRaw ? parseExternalDate(planningStartRaw) : null;
+          // Parse the start date from planning (this is the installation start date)
+          const startFromPlanning = parseExternalDate(planningStartRaw);
           const endFromPlanning = planningEndRaw ? parseExternalDate(planningEndRaw) : null;
+          
+          // Use datum_start as the installation date
+          const externalInstallationDate = startFromPlanning;
+          const currentInstallationDate = project.installation_date;
 
-          console.log(`Project ${project.name}: Current installation date: ${currentInstallationDate}, External installation date (using plaatsingsdatum): ${externalInstallationDate}`);
+          console.log(`Project ${project.name}: Current installation date: ${currentInstallationDate}, External installation date (using datum_start): ${externalInstallationDate}`);
 
           // Normalize dates for comparison
           const normalizedExternal = externalInstallationDate ? new Date(externalInstallationDate).toISOString().split('T')[0] : null;
