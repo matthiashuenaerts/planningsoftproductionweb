@@ -223,29 +223,24 @@ let planningTeams: string[] = [];
         }
 
         // Process the placement date if found
-if (planningStartRaw || rawPlacementDate) {
-          if (planningStartRaw) {
-            console.log(`Raw planning START date (datum_start) for project ${project.name}: ${planningStartRaw}`);
-          }
-          if (planningEndRaw) {
-            console.log(`Raw planning END date (datum_einde) for project ${project.name}: ${planningEndRaw}`);
-          }
-          if (rawPlacementDate) {
-            console.log(`Raw placement date for project ${project.name}: ${rawPlacementDate}`);
-            console.log(`Placement date type: ${typeof rawPlacementDate}, value: "${rawPlacementDate}"`);
-          }
+        // CRITICAL: Match the manual button logic exactly - use ONLY plaatsingsdatum
+        // The manual button uses: convertWeekNumberToDate(orderData.order.plaatsingsdatum)
+        if (rawPlacementDate) {
+          console.log(`Raw placement date (plaatsingsdatum) for project ${project.name}: ${rawPlacementDate}`);
+          console.log(`Placement date type: ${typeof rawPlacementDate}, value: "${rawPlacementDate}"`);
           
-          // CRITICAL: Use planning START date (datum_start) as installation date, NOT the end date (datum_einde)
-          // This ensures the installation date in the system matches the START of the installation period
+          // Convert placement date using the same logic as the manual button
+          const placementConverted = convertWeekNumberToDate(rawPlacementDate);
+          
+          // Use placement date as installation date (exactly as the manual button does)
+          const externalInstallationDate = placementConverted;
+          const currentInstallationDate = project.installation_date;
+          
+          // Also parse planning dates for team assignments and truck loading
           const startFromPlanning = planningStartRaw ? parseExternalDate(planningStartRaw) : null;
           const endFromPlanning = planningEndRaw ? parseExternalDate(planningEndRaw) : null;
-          const placementConverted = rawPlacementDate ? convertWeekNumberToDate(rawPlacementDate) : null;
-          
-          // Installation date = START date from planning (datum_start), fallback to placement week number
-          const externalInstallationDate = startFromPlanning || placementConverted;
-          const currentInstallationDate = project.installation_date;
 
-          console.log(`Project ${project.name}: Current installation date: ${currentInstallationDate}, External installation date (using START date from datum_start): ${externalInstallationDate}`);
+          console.log(`Project ${project.name}: Current installation date: ${currentInstallationDate}, External installation date (using plaatsingsdatum): ${externalInstallationDate}`);
 
           // Normalize dates for comparison
           const normalizedExternal = externalInstallationDate ? new Date(externalInstallationDate).toISOString().split('T')[0] : null;
