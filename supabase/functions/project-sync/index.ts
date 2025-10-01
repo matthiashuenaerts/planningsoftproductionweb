@@ -246,17 +246,79 @@ if (planningStartRaw || rawPlacementDate) {
           const normalizedExternal = externalInstallationDate ? new Date(externalInstallationDate).toISOString().split('T')[0] : null;
           const normalizedCurrent = currentInstallationDate ? new Date(currentInstallationDate).toISOString().split('T')[0] : null;
 
+          // ALWAYS update team assignments based on external data, regardless of date changes
+          console.log(`Verifying team assignments for project ${project.name}...`);
+          try {
+            if (startFromPlanning && endFromPlanning && planningTeams && planningTeams.length > 0) {
+              const durationDays = daysBetweenInclusive(startFromPlanning, endFromPlanning);
+              
+              // Get current team assignments
+              const { data: currentAssignments } = await supabase
+                .from('project_team_assignments')
+                .select('*')
+                .eq('project_id', project.id);
+              
+              console.log(`Current team assignments for project ${project.name}:`, currentAssignments);
+              console.log(`External teams for project ${project.name}:`, planningTeams);
+              
+              // Check if assignments need updating
+              const needsUpdate = !currentAssignments || 
+                currentAssignments.length !== planningTeams.length ||
+                currentAssignments.some((ca, idx) => 
+                  ca.team !== planningTeams[idx] ||
+                  ca.start_date !== startFromPlanning ||
+                  ca.duration !== durationDays
+                );
+              
+              if (needsUpdate) {
+                console.log(`Team assignments differ from external data for project ${project.name} - updating...`);
+                
+                // Delete all existing team assignments for this project
+                const { error: deleteError } = await supabase
+                  .from('project_team_assignments')
+                  .delete()
+                  .eq('project_id', project.id);
+                
+                if (deleteError) {
+                  console.warn(`Failed to delete existing team assignments for project ${project.name}: ${deleteError.message}`);
+                } else {
+                  console.log(`Deleted existing team assignments for project ${project.name}`);
+                }
+                
+                // Insert new team assignments for each team
+                for (const teamName of planningTeams) {
+                  const payload = {
+                    project_id: project.id,
+                    team: teamName,
+                    start_date: startFromPlanning,
+                    duration: durationDays,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  };
+                  
+                  const { error: insertError } = await supabase
+                    .from('project_team_assignments')
+                    .insert(payload);
+                  
+                  if (insertError) {
+                    console.warn(`Failed to insert team assignment for project ${project.name}, team ${teamName}: ${insertError.message}`);
+                  } else {
+                    console.log(`Inserted team assignment for project ${project.name} (team: ${teamName}, start: ${startFromPlanning}, duration: ${durationDays})`);
+                  }
+                }
+              } else {
+                console.log(`Team assignments already up-to-date for project ${project.name}`);
+              }
+            } else {
+              console.log(`No valid planning data for team assignments for project ${project.name}`);
+            }
+          } catch (ptaErr) {
+            console.warn(`Team assignment verification failed for project ${project.name}:`, ptaErr);
+          }
+
           // Check if dates are different
           if (normalizedExternal !== normalizedCurrent) {
             console.log(`Updating project ${project.name} installation date from ${normalizedCurrent} to ${normalizedExternal}`);
-
-            // Calculate the date difference for task updates
-            let daysDifference = 0;
-            if (normalizedCurrent && normalizedExternal) {
-              const currentDate = new Date(normalizedCurrent);
-              const newDate = new Date(normalizedExternal);
-              daysDifference = Math.round((newDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
-            }
 
             // Update project installation date
             const { error: updateProjectError } = await supabase
@@ -274,47 +336,6 @@ if (planningStartRaw || rawPlacementDate) {
             
             console.log(`Successfully updated project ${project.name} installation date to ${normalizedExternal}`);
 
-            // Upsert/update project_team_assignments based on planning
-            try {
-              if (startFromPlanning && endFromPlanning) {
-                const durationDays = daysBetweenInclusive(startFromPlanning, endFromPlanning);
-                const teamName = (planningTeams && planningTeams.length > 0) ? planningTeams[0] : 'INSTALLATION TEAM';
-                const payload = {
-                  project_id: project.id,
-                  team: teamName,
-                  start_date: startFromPlanning,
-                  duration: durationDays,
-                  updated_at: new Date().toISOString()
-                };
-                const { error: upsertPtaError } = await supabase
-                  .from('project_team_assignments')
-                  .upsert(payload, { onConflict: 'project_id' });
-                if (upsertPtaError) {
-                  console.warn(`Failed to upsert team assignment for project ${project.name}: ${upsertPtaError.message}`);
-                } else {
-                  console.log(`Upserted team assignment for project ${project.name} (team: ${teamName}, start: ${startFromPlanning}, duration: ${durationDays})`);
-                  // After PTA upsert, ensure installation_date remains the START date
-                  try {
-                    const normalizedStart = startFromPlanning ? new Date(startFromPlanning).toISOString().slice(0, 10) : null;
-                    if (normalizedStart) {
-                      const { error: enforceInstallError } = await supabase
-                        .from('projects')
-                        .update({ installation_date: normalizedStart, updated_at: new Date().toISOString() })
-                        .eq('id', project.id);
-                      if (enforceInstallError) {
-                        console.warn(`Failed to enforce installation_date to start date for project ${project.name}: ${enforceInstallError.message}`);
-                      } else {
-                        console.log(`Ensured project ${project.name} installation_date set to start date ${normalizedStart}`);
-                      }
-                    }
-                  } catch (enforceErr) {
-                    console.warn(`Post-PTA install_date enforcement failed for project ${project.name}:`, enforceErr);
-                  }
-                }
-              }
-            } catch (ptaErr) {
-              console.warn(`PTA upsert failed for project ${project.name}:`, ptaErr);
-            }
 
             // Get all tasks for this project and update their due dates based on standard task day_counter
             const { data: phases, error: phasesError } = await supabase
@@ -379,7 +400,7 @@ if (planningStartRaw || rawPlacementDate) {
                         console.error(`Failed to update task ${task.id}: ${updateTaskError.message}`);
                       } else {
                         console.log(`Successfully updated task ${task.id} due date`);
-                        // tasksUpdated counter will be handled at higher level
+                        updatedTasksCount++;
                       }
                     }
                   }
