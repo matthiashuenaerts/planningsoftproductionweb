@@ -5,6 +5,7 @@ import Navbar from '@/components/Navbar';
 import { useLanguage } from '@/context/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { useAuth } from '@/context/AuthContext';
 import { Clock, Users, Calendar, BarChart3, Download, Filter, DollarSign, Plus, Edit, FileText } from 'lucide-react';
@@ -33,6 +34,11 @@ const TimeRegistrations = () => {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [selectedRegistration, setSelectedRegistration] = useState<any>(null);
+  const [showMonthlyReportDialog, setShowMonthlyReportDialog] = useState(false);
+  const [monthlyReportDates, setMonthlyReportDates] = useState({
+    startDate: format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd'),
+    endDate: format(new Date(), 'yyyy-MM-dd')
+  });
 
   // Check if user is admin or manager
   const canViewAllRegistrations = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
@@ -193,11 +199,19 @@ const TimeRegistrations = () => {
 
   const activeRegistrations = filteredRegistrations.filter((reg: any) => reg.is_active);
 
-  const exportMonthlyReport = () => {
+  const generateMonthlyReport = () => {
     try {
       // Define regular working hours
       const REGULAR_START_HOUR = 8;
       const REGULAR_END_HOUR = 17;
+
+      // Filter registrations by selected date range
+      const reportRegistrations = (canViewAllRegistrations ? allRegistrations : myRegistrations).filter((reg: any) => {
+        const regDate = new Date(reg.start_time);
+        const start = new Date(monthlyReportDates.startDate);
+        const end = new Date(monthlyReportDates.endDate + 'T23:59:59');
+        return regDate >= start && regDate <= end;
+      });
 
       // Group registrations by employee and date
       type DailyData = {
@@ -211,8 +225,9 @@ const TimeRegistrations = () => {
       };
 
       const dailyDataMap = new Map<string, DailyData>();
+      const employeeTotals = new Map<string, { totalMinutes: number; overtimeMinutes: number }>();
 
-      filteredRegistrations.forEach((reg: any) => {
+      reportRegistrations.forEach((reg: any) => {
         if (!reg.start_time || !reg.end_time) return;
 
         const employeeName = reg.employees?.name || t("unknown_employee");
@@ -258,6 +273,14 @@ const TimeRegistrations = () => {
           const overtimeHours = Math.min(endHour - REGULAR_END_HOUR, (reg.duration_minutes || 0) / 60);
           dailyData.overtimeMinutes += overtimeHours * 60;
         }
+
+        // Update employee totals
+        if (!employeeTotals.has(employeeName)) {
+          employeeTotals.set(employeeName, { totalMinutes: 0, overtimeMinutes: 0 });
+        }
+        const totals = employeeTotals.get(employeeName)!;
+        totals.totalMinutes += reg.duration_minutes || 0;
+        totals.overtimeMinutes += dailyData.overtimeMinutes;
       });
 
       // Sort by employee name and date
@@ -277,31 +300,80 @@ const TimeRegistrations = () => {
         t("overtime_hours")
       ];
 
-      // Prepare CSV data
-      const csvData = sortedData.map((data) => [
-        data.employeeName,
-        format(new Date(data.date), 'dd/MM/yyyy'),
-        data.earliestStart ? format(data.earliestStart, 'HH:mm') : '-',
-        data.latestEnd ? format(data.latestEnd, 'HH:mm') : '-',
-        formatDuration(data.totalMinutes),
-        formatDuration(Math.round(data.overtimeMinutes))
+      // Prepare CSV data with daily entries
+      const csvRows: string[][] = [];
+      let currentEmployee = '';
+      
+      sortedData.forEach((data) => {
+        // Add employee total row before switching to new employee
+        if (currentEmployee && currentEmployee !== data.employeeName) {
+          const totals = employeeTotals.get(currentEmployee)!;
+          csvRows.push([
+            `${currentEmployee} - TOTAL`,
+            '',
+            '',
+            '',
+            formatDuration(totals.totalMinutes),
+            formatDuration(Math.round(totals.overtimeMinutes))
+          ]);
+          csvRows.push([]); // Empty row for separation
+        }
+        
+        currentEmployee = data.employeeName;
+        
+        csvRows.push([
+          data.employeeName,
+          format(new Date(data.date), 'dd/MM/yyyy'),
+          data.earliestStart ? format(data.earliestStart, 'HH:mm') : '-',
+          data.latestEnd ? format(data.latestEnd, 'HH:mm') : '-',
+          formatDuration(data.totalMinutes),
+          formatDuration(Math.round(data.overtimeMinutes))
+        ]);
+      });
+
+      // Add final employee total
+      if (currentEmployee) {
+        const totals = employeeTotals.get(currentEmployee)!;
+        csvRows.push([
+          `${currentEmployee} - TOTAL`,
+          '',
+          '',
+          '',
+          formatDuration(totals.totalMinutes),
+          formatDuration(Math.round(totals.overtimeMinutes))
+        ]);
+      }
+
+      // Add grand total
+      csvRows.push([]);
+      const grandTotalMinutes = Array.from(employeeTotals.values()).reduce((sum, emp) => sum + emp.totalMinutes, 0);
+      const grandTotalOvertime = Array.from(employeeTotals.values()).reduce((sum, emp) => sum + emp.overtimeMinutes, 0);
+      csvRows.push([
+        'GRAND TOTAL',
+        '',
+        '',
+        '',
+        formatDuration(grandTotalMinutes),
+        formatDuration(Math.round(grandTotalOvertime))
       ]);
 
       const csvContent = [
         headers.join(','),
-        ...csvData.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        ...csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
       ].join('\n');
 
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `monthly_report_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      link.setAttribute('download', `monthly_report_${monthlyReportDates.startDate}_to_${monthlyReportDates.endDate}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
+      setShowMonthlyReportDialog(false);
+      
       toast({
         title: t("success"),
         description: t("monthly_report_exported"),
@@ -527,7 +599,7 @@ const TimeRegistrations = () => {
                   <Download className="h-4 w-4 mr-2" />
                   {t("export_filtered_data")}
                 </Button>
-                <Button onClick={exportMonthlyReport} variant="outline">
+                <Button onClick={() => setShowMonthlyReportDialog(true)} variant="outline">
                   <FileText className="h-4 w-4 mr-2" />
                   {t("monthly_report")}
                 </Button>
@@ -544,7 +616,7 @@ const TimeRegistrations = () => {
                     <Download className="h-4 w-4 mr-2" />
                     {t("export_timesheet")}
                   </Button>
-                  <Button onClick={exportMonthlyReport} variant="outline" size="sm">
+                  <Button onClick={() => setShowMonthlyReportDialog(true)} variant="outline" size="sm">
                     <FileText className="h-4 w-4 mr-2" />
                     {t("monthly_report")}
                   </Button>
@@ -796,7 +868,7 @@ const TimeRegistrations = () => {
                 <Download className="h-4 w-4 mr-2" />
                 {t("export_filtered_data")}
               </Button>
-              <Button onClick={exportMonthlyReport} variant="outline">
+              <Button onClick={() => setShowMonthlyReportDialog(true)} variant="outline">
                 <FileText className="h-4 w-4 mr-2" />
                 {t("monthly_report")}
               </Button>
@@ -896,6 +968,45 @@ const TimeRegistrations = () => {
           onOpenChange={setShowEditDialog} 
           registration={selectedRegistration}
         />
+
+        {/* Monthly Report Dialog */}
+        <Dialog open={showMonthlyReportDialog} onOpenChange={setShowMonthlyReportDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t("monthly_report")}</DialogTitle>
+              <CardDescription>{t("select_report_period")}</CardDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="report-start-date">{t("start_date")}</Label>
+                <Input
+                  id="report-start-date"
+                  type="date"
+                  value={monthlyReportDates.startDate}
+                  onChange={(e) => setMonthlyReportDates(prev => ({ ...prev, startDate: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="report-end-date">{t("end_date")}</Label>
+                <Input
+                  id="report-end-date"
+                  type="date"
+                  value={monthlyReportDates.endDate}
+                  onChange={(e) => setMonthlyReportDates(prev => ({ ...prev, endDate: e.target.value }))}
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setShowMonthlyReportDialog(false)}>
+                  {t("cancel")}
+                </Button>
+                <Button onClick={generateMonthlyReport}>
+                  <Download className="h-4 w-4 mr-2" />
+                  {t("generate_report")}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

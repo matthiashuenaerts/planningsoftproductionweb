@@ -257,5 +257,7 @@
   "earliest_start": "Earliest Start",
   "latest_finish": "Latest Finish",
   "overtime_hours": "Overtime Hours",
-  "monthly_report_exported": "Monthly report exported successfully"
+  "monthly_report_exported": "Monthly report exported successfully",
+  "select_report_period": "Select report period",
+  "generate_report": "Generate report"
 }

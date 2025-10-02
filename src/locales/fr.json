@@ -353,6 +353,8 @@
   "latest_finish": "Fin la plus tardive",
   "overtime_hours": "Heures supplémentaires",
   "monthly_report_exported": "Rapport mensuel exporté avec succès",
+  "select_report_period": "Sélectionner la période du rapport",
+  "generate_report": "Générer le rapport",
   "employee": "Employé",
   "cost": "Coût",
   "active": "Actif",
