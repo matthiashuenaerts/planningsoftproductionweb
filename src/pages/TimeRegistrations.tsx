@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { useAuth } from '@/context/AuthContext';
-import { Clock, Users, Calendar, BarChart3, Download, Filter, DollarSign, Plus, Edit } from 'lucide-react';
+import { Clock, Users, Calendar, BarChart3, Download, Filter, DollarSign, Plus, Edit, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { ManualTimeRegistrationDialog } from '@/components/ManualTimeRegistrationDialog';
 import { EditTimeRegistrationDialog } from '@/components/EditTimeRegistrationDialog';
 
@@ -192,6 +192,128 @@ const TimeRegistrations = () => {
   );
 
   const activeRegistrations = filteredRegistrations.filter((reg: any) => reg.is_active);
+
+  const exportMonthlyReport = () => {
+    try {
+      // Define regular working hours
+      const REGULAR_START_HOUR = 8;
+      const REGULAR_END_HOUR = 17;
+
+      // Group registrations by employee and date
+      type DailyData = {
+        date: string;
+        employeeName: string;
+        totalMinutes: number;
+        earliestStart: Date | null;
+        latestEnd: Date | null;
+        overtimeMinutes: number;
+        registrations: any[];
+      };
+
+      const dailyDataMap = new Map<string, DailyData>();
+
+      filteredRegistrations.forEach((reg: any) => {
+        if (!reg.start_time || !reg.end_time) return;
+
+        const employeeName = reg.employees?.name || t("unknown_employee");
+        const startDate = new Date(reg.start_time);
+        const endDate = new Date(reg.end_time);
+        const dateKey = format(startDate, 'yyyy-MM-dd');
+        const mapKey = `${reg.employee_id}_${dateKey}`;
+
+        if (!dailyDataMap.has(mapKey)) {
+          dailyDataMap.set(mapKey, {
+            date: dateKey,
+            employeeName,
+            totalMinutes: 0,
+            earliestStart: null,
+            latestEnd: null,
+            overtimeMinutes: 0,
+            registrations: []
+          });
+        }
+
+        const dailyData = dailyDataMap.get(mapKey)!;
+        dailyData.totalMinutes += reg.duration_minutes || 0;
+        dailyData.registrations.push(reg);
+
+        // Track earliest start and latest end
+        if (!dailyData.earliestStart || startDate < dailyData.earliestStart) {
+          dailyData.earliestStart = startDate;
+        }
+        if (!dailyData.latestEnd || endDate > dailyData.latestEnd) {
+          dailyData.latestEnd = endDate;
+        }
+
+        // Calculate overtime (before 8:00 or after 17:00)
+        const startHour = startDate.getHours() + startDate.getMinutes() / 60;
+        const endHour = endDate.getHours() + endDate.getMinutes() / 60;
+        
+        if (startHour < REGULAR_START_HOUR) {
+          const overtimeHours = Math.min(REGULAR_START_HOUR - startHour, (reg.duration_minutes || 0) / 60);
+          dailyData.overtimeMinutes += overtimeHours * 60;
+        }
+        
+        if (endHour > REGULAR_END_HOUR) {
+          const overtimeHours = Math.min(endHour - REGULAR_END_HOUR, (reg.duration_minutes || 0) / 60);
+          dailyData.overtimeMinutes += overtimeHours * 60;
+        }
+      });
+
+      // Sort by employee name and date
+      const sortedData = Array.from(dailyDataMap.values()).sort((a, b) => {
+        const nameCompare = a.employeeName.localeCompare(b.employeeName);
+        if (nameCompare !== 0) return nameCompare;
+        return a.date.localeCompare(b.date);
+      });
+
+      // Prepare CSV headers
+      const headers = [
+        t("employee"),
+        t("date"),
+        t("earliest_start"),
+        t("latest_finish"),
+        t("total_hours"),
+        t("overtime_hours")
+      ];
+
+      // Prepare CSV data
+      const csvData = sortedData.map((data) => [
+        data.employeeName,
+        format(new Date(data.date), 'dd/MM/yyyy'),
+        data.earliestStart ? format(data.earliestStart, 'HH:mm') : '-',
+        data.latestEnd ? format(data.latestEnd, 'HH:mm') : '-',
+        formatDuration(data.totalMinutes),
+        formatDuration(Math.round(data.overtimeMinutes))
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...csvData.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `monthly_report_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: t("success"),
+        description: t("monthly_report_exported"),
+      });
+    } catch (error) {
+      toast({
+        title: t("error"),
+        description: t("export_failed"),
+        variant: "destructive"
+      });
+    }
+  };
 
   const exportToCSV = () => {
     try {
@@ -401,6 +523,14 @@ const TimeRegistrations = () => {
                 >
                   {t("clear_filters")}
                 </Button>
+                <Button onClick={exportToCSV} variant="outline">
+                  <Download className="h-4 w-4 mr-2" />
+                  {t("export_filtered_data")}
+                </Button>
+                <Button onClick={exportMonthlyReport} variant="outline">
+                  <FileText className="h-4 w-4 mr-2" />
+                  {t("monthly_report")}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -413,6 +543,10 @@ const TimeRegistrations = () => {
                   <Button onClick={exportToCSV} variant="outline" size="sm">
                     <Download className="h-4 w-4 mr-2" />
                     {t("export_timesheet")}
+                  </Button>
+                  <Button onClick={exportMonthlyReport} variant="outline" size="sm">
+                    <FileText className="h-4 w-4 mr-2" />
+                    {t("monthly_report")}
                   </Button>
                 </div>
               </div>
@@ -661,6 +795,10 @@ const TimeRegistrations = () => {
               <Button onClick={exportToCSV} variant="outline">
                 <Download className="h-4 w-4 mr-2" />
                 {t("export_filtered_data")}
+              </Button>
+              <Button onClick={exportMonthlyReport} variant="outline">
+                <FileText className="h-4 w-4 mr-2" />
+                {t("monthly_report")}
               </Button>
             </div>
           </CardContent>

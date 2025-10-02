@@ -251,6 +251,11 @@
   "failed_to_update_task_error": "Failed to update task",
   "timer_started_ws_desc": "Time tracking has begun for this workstation task",
   "failed_to_start_ws_task_timer_error": "Failed to start task timer",
-  "project_info_not_available_error": "Project information not available for this task",
-  "failed_to_start_ws_task_error": "Failed to start workstation task"
+   "project_info_not_available_error": "Project information not available for this task",
+  "failed_to_start_ws_task_error": "Failed to start workstation task",
+  "monthly_report": "Monthly Report",
+  "earliest_start": "Earliest Start",
+  "latest_finish": "Latest Finish",
+  "overtime_hours": "Overtime Hours",
+  "monthly_report_exported": "Monthly report exported successfully"
 }
