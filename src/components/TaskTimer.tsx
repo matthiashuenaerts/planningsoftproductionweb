@@ -608,28 +608,48 @@ const TaskTimer = () => {
                   <div className="min-w-0 flex-1">
                     {activeRegistration && taskDetails ? <div>
                         <p 
-                          className={`font-medium text-xs truncate ${!taskDetails.is_workstation_task && taskDetails.project_id ? 'cursor-pointer hover:underline' : ''}`}
-                          onClick={() => !taskDetails.is_workstation_task && taskDetails.project_id && navigate(`/projects/${taskDetails.project_id}`)}
+                          className={`font-medium text-xs truncate ${!taskDetails.is_workstation_task && taskDetails.project_id ? 'cursor-pointer' : ''}`}
+                          onClick={(e) => {
+                            if (!taskDetails.is_workstation_task && taskDetails.project_id) {
+                              e.stopPropagation();
+                              navigate(`/projects/${taskDetails.project_id}`);
+                            }
+                          }}
                         >
                           {taskDetails.project_name}
                         </p>
                         <p 
-                          className={`text-xs text-gray-600 truncate ${!taskDetails.is_workstation_task && taskDetails.project_id ? 'cursor-pointer hover:underline' : ''}`}
-                          onClick={() => !taskDetails.is_workstation_task && taskDetails.project_id && navigate(`/projects/${taskDetails.project_id}`)}
+                          className={`text-xs text-gray-600 truncate ${!taskDetails.is_workstation_task && taskDetails.project_id ? 'cursor-pointer' : ''}`}
+                          onClick={(e) => {
+                            if (!taskDetails.is_workstation_task && taskDetails.project_id) {
+                              e.stopPropagation();
+                              navigate(`/projects/${taskDetails.project_id}`);
+                            }
+                          }}
                         >
                           {taskDetails.title}
                         </p>
                         {taskDetails.is_workstation_task && <p className="text-xs text-blue-600">Workstation Task</p>}
                       </div> : lastWorkedTask ? <div>
                         <p 
-                          className={`font-medium text-xs text-gray-500 ${!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id ? 'cursor-pointer hover:underline' : ''}`}
-                          onClick={() => !lastWorkedTask.is_workstation_task && lastWorkedTask.project_id && navigate(`/projects/${lastWorkedTask.project_id}`)}
+                          className={`font-medium text-xs text-gray-500 ${!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id ? 'cursor-pointer' : ''}`}
+                          onClick={(e) => {
+                            if (!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id) {
+                              e.stopPropagation();
+                              navigate(`/projects/${lastWorkedTask.project_id}`);
+                            }
+                          }}
                         >
                           {lastWorkedTask.project_name}
                         </p>
                         <p 
-                          className={`text-xs text-gray-400 ${!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id ? 'cursor-pointer hover:underline' : ''}`}
-                          onClick={() => !lastWorkedTask.is_workstation_task && lastWorkedTask.project_id && navigate(`/projects/${lastWorkedTask.project_id}`)}
+                          className={`text-xs text-gray-400 ${!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id ? 'cursor-pointer' : ''}`}
+                          onClick={(e) => {
+                            if (!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id) {
+                              e.stopPropagation();
+                              navigate(`/projects/${lastWorkedTask.project_id}`);
+                            }
+                          }}
                         >
                           {lastWorkedTask.title}
                         </p>
