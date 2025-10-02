@@ -1279,6 +1279,7 @@ export type Database = {
           name: string
           qr_code: string | null
           standard_order_quantity: number | null
+          storage_code: string | null
           supplier: string | null
           updated_at: string
           website_link: string | null
@@ -1294,6 +1295,7 @@ export type Database = {
           name: string
           qr_code?: string | null
           standard_order_quantity?: number | null
+          storage_code?: string | null
           supplier?: string | null
           updated_at?: string
           website_link?: string | null
@@ -1309,6 +1311,7 @@ export type Database = {
           name?: string
           qr_code?: string | null
           standard_order_quantity?: number | null
+          storage_code?: string | null
           supplier?: string | null
           updated_at?: string
           website_link?: string | null
@@ -2130,6 +2133,60 @@ export type Database = {
         }
         Relationships: []
       }
+      storage_system: {
+        Row: {
+          article_number: string | null
+          compartment: string | null
+          container: string | null
+          created_at: string
+          depth_compartment: string | null
+          discription: string | null
+          ean_code: string | null
+          fifo: string | null
+          id: number
+          lift: string | null
+          minimum_storage: string | null
+          product_name: string | null
+          product_number: string | null
+          storage: string | null
+          tray: string | null
+        }
+        Insert: {
+          article_number?: string | null
+          compartment?: string | null
+          container?: string | null
+          created_at?: string
+          depth_compartment?: string | null
+          discription?: string | null
+          ean_code?: string | null
+          fifo?: string | null
+          id?: number
+          lift?: string | null
+          minimum_storage?: string | null
+          product_name?: string | null
+          product_number?: string | null
+          storage?: string | null
+          tray?: string | null
+        }
+        Update: {
+          article_number?: string | null
+          compartment?: string | null
+          container?: string | null
+          created_at?: string
+          depth_compartment?: string | null
+          discription?: string | null
+          ean_code?: string | null
+          fifo?: string | null
+          id?: number
+          lift?: string | null
+          minimum_storage?: string | null
+          product_name?: string | null
+          product_number?: string | null
+          storage?: string | null
+          tray?: string | null
+        }
+        Relationships: []
+      }
       suppliers: {
         Row: {
           address: string | null
@@ -2516,6 +2573,42 @@ export type Database = {
           id?: string
           segment_name?: string
           start_time?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      working_hours: {
+        Row: {
+          break_minutes: number
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          is_active: boolean
+          start_time: string
+          team: string
+          updated_at: string
+        }
+        Insert: {
+          break_minutes?: number
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_active?: boolean
+          start_time: string
+          team: string
+          updated_at?: string
+        }
+        Update: {
+          break_minutes?: number
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_active?: boolean
+          start_time?: string
+          team?: string
           updated_at?: string
         }
         Relationships: []

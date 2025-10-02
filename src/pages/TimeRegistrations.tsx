@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { ManualTimeRegistrationDialog } from '@/components/ManualTimeRegistrationDialog';
 import { EditTimeRegistrationDialog } from '@/components/EditTimeRegistrationDialog';
+import { workingHoursService, WorkingHours } from '@/services/workingHoursService';
 
 const TimeRegistrations = () => {
   const { currentEmployee } = useAuth();
@@ -53,6 +54,11 @@ const TimeRegistrations = () => {
     queryKey: ['myTimeRegistrations', currentEmployee?.id],
     queryFn: () => currentEmployee ? timeRegistrationService.getRegistrationsByEmployee(currentEmployee.id) : [],
     enabled: !!currentEmployee
+  });
+
+  const { data: workingHours = [] } = useQuery<WorkingHours[]>({
+    queryKey: ['workingHours'],
+    queryFn: () => workingHoursService.getWorkingHours(),
   });
 
   const isFilterActive = React.useMemo(() => (
@@ -201,9 +207,24 @@ const TimeRegistrations = () => {
 
   const generateMonthlyReport = () => {
     try {
-      // Define regular working hours
-      const REGULAR_START_HOUR = 8;
-      const REGULAR_END_HOUR = 17;
+      // Get working hours configuration for overtime calculation
+      const getWorkingHoursForDate = (date: Date, team: 'production' | 'installation' | 'preparation') => {
+        const dayOfWeek = date.getDay();
+        const hours = workingHoursService.getWorkingHoursForDay(workingHours, team, dayOfWeek);
+        
+        if (hours) {
+          const [startHour, startMin] = hours.start_time.split(':').map(Number);
+          const [endHour, endMin] = hours.end_time.split(':').map(Number);
+          return {
+            startHour: startHour + startMin / 60,
+            endHour: endHour + endMin / 60,
+            breakMinutes: hours.break_minutes,
+          };
+        }
+        
+        // Default to 8:00-17:00 if not configured
+        return { startHour: 8, endHour: 17, breakMinutes: 0 };
+      };
 
       // Filter registrations by selected date range
       const reportRegistrations = (canViewAllRegistrations ? allRegistrations : myRegistrations).filter((reg: any) => {
@@ -260,17 +281,25 @@ const TimeRegistrations = () => {
           dailyData.latestEnd = endDate;
         }
 
-        // Calculate overtime (before 8:00 or after 17:00)
+        // Calculate overtime based on configured working hours
+        // Try to determine team from employee's workstation or default to production
+        const team = (reg.employees?.workstation?.toLowerCase().includes('install') ? 'installation' : 
+                     reg.employees?.workstation?.toLowerCase().includes('prep') ? 'preparation' : 
+                     'production') as 'production' | 'installation' | 'preparation';
+        
+        const workingHoursConfig = getWorkingHoursForDate(startDate, team);
         const startHour = startDate.getHours() + startDate.getMinutes() / 60;
         const endHour = endDate.getHours() + endDate.getMinutes() / 60;
         
-        if (startHour < REGULAR_START_HOUR) {
-          const overtimeHours = Math.min(REGULAR_START_HOUR - startHour, (reg.duration_minutes || 0) / 60);
+        // Calculate overtime before work hours
+        if (startHour < workingHoursConfig.startHour) {
+          const overtimeHours = Math.min(workingHoursConfig.startHour - startHour, (reg.duration_minutes || 0) / 60);
           dailyData.overtimeMinutes += overtimeHours * 60;
         }
         
-        if (endHour > REGULAR_END_HOUR) {
-          const overtimeHours = Math.min(endHour - REGULAR_END_HOUR, (reg.duration_minutes || 0) / 60);
+        // Calculate overtime after work hours
+        if (endHour > workingHoursConfig.endHour) {
+          const overtimeHours = Math.min(endHour - workingHoursConfig.endHour, (reg.duration_minutes || 0) / 60);
           dailyData.overtimeMinutes += overtimeHours * 60;
         }
 
