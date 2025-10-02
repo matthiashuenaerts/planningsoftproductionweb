@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Play, Pause, Clock, Timer, Move, Minimize2, Maximize2, PictureInPicture } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ const TaskTimer = () => {
   const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
   const location = useLocation();
+  const navigate = useNavigate();
   const [activeUsersOnTask, setActiveUsersOnTask] = useState(1);
 
   // Draggable and UI state
@@ -160,7 +161,8 @@ const TaskTimer = () => {
             title,
             phases (
               name,
-              projects (name)
+              project_id,
+              projects (name, id)
             )
           ),
           workstation_tasks (
@@ -180,6 +182,7 @@ const TaskTimer = () => {
           id: data.task_id,
           title: data.tasks.title,
           project_name: data.tasks.phases?.projects?.name || 'Unknown Project',
+          project_id: data.tasks.phases?.projects?.id,
           is_workstation_task: false
         };
       } else if (data.workstation_task_id && data.workstation_tasks) {
@@ -258,13 +261,15 @@ const TaskTimer = () => {
             duration,
             phases (
               name,
-              projects (name)
+              project_id,
+              projects (name, id)
             )
           `).eq('id', activeRegistration.task_id).single();
         if (error) throw error;
         return {
           title: data.title,
           project_name: data.phases?.projects?.name || 'Unknown Project',
+          project_id: data.phases?.projects?.id,
           duration: data.duration,
           is_workstation_task: false
         };
@@ -602,16 +607,32 @@ const TaskTimer = () => {
                   
                   <div className="min-w-0 flex-1">
                     {activeRegistration && taskDetails ? <div>
-                        <p className="font-medium text-xs truncate">
+                        <p 
+                          className={`font-medium text-xs truncate ${!taskDetails.is_workstation_task && taskDetails.project_id ? 'cursor-pointer hover:underline' : ''}`}
+                          onClick={() => !taskDetails.is_workstation_task && taskDetails.project_id && navigate(`/projects/${taskDetails.project_id}`)}
+                        >
                           {taskDetails.project_name}
                         </p>
-                        <p className="text-xs text-gray-600 truncate">
+                        <p 
+                          className={`text-xs text-gray-600 truncate ${!taskDetails.is_workstation_task && taskDetails.project_id ? 'cursor-pointer hover:underline' : ''}`}
+                          onClick={() => !taskDetails.is_workstation_task && taskDetails.project_id && navigate(`/projects/${taskDetails.project_id}`)}
+                        >
                           {taskDetails.title}
                         </p>
                         {taskDetails.is_workstation_task && <p className="text-xs text-blue-600">Workstation Task</p>}
                       </div> : lastWorkedTask ? <div>
-                        <p className="font-medium text-xs text-gray-500">{lastWorkedTask.project_name}</p>
-                        <p className="text-xs text-gray-400">{lastWorkedTask.title}</p>
+                        <p 
+                          className={`font-medium text-xs text-gray-500 ${!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id ? 'cursor-pointer hover:underline' : ''}`}
+                          onClick={() => !lastWorkedTask.is_workstation_task && lastWorkedTask.project_id && navigate(`/projects/${lastWorkedTask.project_id}`)}
+                        >
+                          {lastWorkedTask.project_name}
+                        </p>
+                        <p 
+                          className={`text-xs text-gray-400 ${!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id ? 'cursor-pointer hover:underline' : ''}`}
+                          onClick={() => !lastWorkedTask.is_workstation_task && lastWorkedTask.project_id && navigate(`/projects/${lastWorkedTask.project_id}`)}
+                        >
+                          {lastWorkedTask.title}
+                        </p>
                         
                       </div> : <div>
                         <p className="font-medium text-xs text-gray-500">No Previous Task</p>
