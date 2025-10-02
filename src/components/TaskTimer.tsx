@@ -5,6 +5,7 @@ import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useLanguage } from '@/context/LanguageContext';
 import { Play, Pause, Clock, Timer, Move, Minimize2, Maximize2, PictureInPicture } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +20,8 @@ const TaskTimer = () => {
   const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
   const location = useLocation();
-  const navigate = useNavigate();
+const navigate = useNavigate();
+  const { createLocalizedPath } = useLanguage();
   const [activeUsersOnTask, setActiveUsersOnTask] = useState(1);
 
   // Draggable and UI state
@@ -612,7 +614,7 @@ const TaskTimer = () => {
                           onClick={(e) => {
                             if (!taskDetails.is_workstation_task && taskDetails.project_id) {
                               e.stopPropagation();
-                              navigate(`/projects/${taskDetails.project_id}`);
+                              navigate(createLocalizedPath(`/projects/${taskDetails.project_id}`));
                             }
                           }}
                         >
@@ -623,7 +625,7 @@ const TaskTimer = () => {
                           onClick={(e) => {
                             if (!taskDetails.is_workstation_task && taskDetails.project_id) {
                               e.stopPropagation();
-                              navigate(`/projects/${taskDetails.project_id}`);
+                              navigate(createLocalizedPath(`/projects/${taskDetails.project_id}`));
                             }
                           }}
                         >
@@ -636,7 +638,7 @@ const TaskTimer = () => {
                           onClick={(e) => {
                             if (!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id) {
                               e.stopPropagation();
-                              navigate(`/projects/${lastWorkedTask.project_id}`);
+                              navigate(createLocalizedPath(`/projects/${lastWorkedTask.project_id}`));
                             }
                           }}
                         >
@@ -647,7 +649,7 @@ const TaskTimer = () => {
                           onClick={(e) => {
                             if (!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id) {
                               e.stopPropagation();
-                              navigate(`/projects/${lastWorkedTask.project_id}`);
+                              navigate(createLocalizedPath(`/projects/${lastWorkedTask.project_id}`));
                             }
                           }}
                         >
