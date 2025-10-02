@@ -971,12 +971,109 @@ const TimeRegistrations = () => {
 
         {/* Monthly Report Dialog */}
         <Dialog open={showMonthlyReportDialog} onOpenChange={setShowMonthlyReportDialog}>
-          <DialogContent>
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>{t("monthly_report")}</DialogTitle>
               <CardDescription>{t("select_report_period")}</CardDescription>
             </DialogHeader>
             <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>{t("quick_select")}</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const today = format(new Date(), 'yyyy-MM-dd');
+                      setMonthlyReportDates({ startDate: today, endDate: today });
+                    }}
+                  >
+                    {t("today")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd');
+                      setMonthlyReportDates({ startDate: yesterday, endDate: yesterday });
+                    }}
+                  >
+                    {t("yesterday")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date();
+                      const startOfWeek = format(new Date(now.setDate(now.getDate() - now.getDay() + 1)), 'yyyy-MM-dd');
+                      const endOfWeek = format(new Date(), 'yyyy-MM-dd');
+                      setMonthlyReportDates({ startDate: startOfWeek, endDate: endOfWeek });
+                    }}
+                  >
+                    {t("this_week")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date();
+                      const lastWeekStart = format(new Date(now.setDate(now.getDate() - now.getDay() - 6)), 'yyyy-MM-dd');
+                      const lastWeekEnd = format(new Date(now.setDate(now.getDate() + 6)), 'yyyy-MM-dd');
+                      setMonthlyReportDates({ startDate: lastWeekStart, endDate: lastWeekEnd });
+                    }}
+                  >
+                    {t("last_week")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date();
+                      const startOfMonth = format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd');
+                      const endOfMonth = format(new Date(), 'yyyy-MM-dd');
+                      setMonthlyReportDates({ startDate: startOfMonth, endDate: endOfMonth });
+                    }}
+                  >
+                    {t("this_month")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date();
+                      const startOfLastMonth = format(new Date(now.getFullYear(), now.getMonth() - 1, 1), 'yyyy-MM-dd');
+                      const endOfLastMonth = format(new Date(now.getFullYear(), now.getMonth(), 0), 'yyyy-MM-dd');
+                      setMonthlyReportDates({ startDate: startOfLastMonth, endDate: endOfLastMonth });
+                    }}
+                  >
+                    {t("last_month")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date();
+                      const startOfYear = format(new Date(now.getFullYear(), 0, 1), 'yyyy-MM-dd');
+                      const endOfYear = format(new Date(), 'yyyy-MM-dd');
+                      setMonthlyReportDates({ startDate: startOfYear, endDate: endOfYear });
+                    }}
+                  >
+                    {t("this_year")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const now = new Date();
+                      const startOfLastYear = format(new Date(now.getFullYear() - 1, 0, 1), 'yyyy-MM-dd');
+                      const endOfLastYear = format(new Date(now.getFullYear() - 1, 11, 31), 'yyyy-MM-dd');
+                      setMonthlyReportDates({ startDate: startOfLastYear, endDate: endOfLastYear });
+                    }}
+                  >
+                    {t("last_year")}
+                  </Button>
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="report-start-date">{t("start_date")}</Label>
                 <Input

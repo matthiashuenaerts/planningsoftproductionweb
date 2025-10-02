@@ -259,5 +259,14 @@
   "overtime_hours": "Overtime Hours",
   "monthly_report_exported": "Monthly report exported successfully",
   "select_report_period": "Select report period",
-  "generate_report": "Generate report"
+  "generate_report": "Generate report",
+  "quick_select": "Quick select",
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "this_week": "This week",
+  "last_week": "Last week",
+  "this_month": "This month",
+  "last_month": "Last month",
+  "this_year": "This year",
+  "last_year": "Last year"
 }
