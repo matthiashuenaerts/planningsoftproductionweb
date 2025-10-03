@@ -32,7 +32,7 @@ export const useNativeNotifications = () => {
         icon: icon || '/favicon_New.ico',
         badge: '/favicon_New.ico',
         tag: 'app-notification',
-        requireInteraction: false,
+        requireInteraction: true, // Keep notification visible until user interacts
         silent: false, // Use system sound
       });
 
@@ -40,9 +40,6 @@ export const useNativeNotifications = () => {
         window.focus();
         notification.close();
       };
-
-      // Auto-close after 5 seconds
-      setTimeout(() => notification.close(), 5000);
     } else if (Notification.permission === 'default') {
       // Request permission and retry
       Notification.requestPermission().then(permission => {
