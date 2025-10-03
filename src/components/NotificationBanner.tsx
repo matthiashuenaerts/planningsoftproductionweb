@@ -22,8 +22,22 @@ const NotificationBanner = () => {
     queryKey: ['notifications', currentEmployee?.id],
     queryFn: () => notificationService.getUserNotifications(currentEmployee!.id),
     enabled: !!currentEmployee,
-    refetchInterval: 15000
+    refetchInterval: 15000,
+    refetchIntervalInBackground: true // Keep polling even when tab is in background
   });
+
+  // Handle visibility change - check for notifications when page becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Page became visible, refetch notifications
+        queryClient.invalidateQueries({ queryKey: ['notifications', currentEmployee?.id] });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [currentEmployee?.id, queryClient]);
 
   useEffect(() => {
     if (isSuccess && notifications) {
@@ -33,7 +47,7 @@ const NotificationBanner = () => {
         // Only update if it's a new notification
         if (latest.id !== latestUnread?.id) {
           setLatestUnread(latest);
-          // Show native OS notification with sound
+          // Show native OS notification with sound (works even when minimized)
           showNotification('AutoMattiOn Compass - New Notification', latest.message);
         }
       } else {
