@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { X, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { useNativeNotifications } from '@/hooks/useNativeNotifications';
 
 const NotificationBanner = () => {
   const { currentEmployee } = useAuth();
@@ -15,6 +16,7 @@ const NotificationBanner = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [latestUnread, setLatestUnread] = useState<Notification | null>(null);
+  const { showNotification } = useNativeNotifications();
 
   const { data: notifications, isSuccess } = useQuery({
     queryKey: ['notifications', currentEmployee?.id],
@@ -31,12 +33,14 @@ const NotificationBanner = () => {
         // Only update if it's a new notification
         if (latest.id !== latestUnread?.id) {
           setLatestUnread(latest);
+          // Show native OS notification with sound
+          showNotification('AutoMattiOn Compass - New Notification', latest.message);
         }
       } else {
         setLatestUnread(null);
       }
     }
-  }, [notifications, isSuccess, latestUnread?.id]);
+  }, [notifications, isSuccess, latestUnread?.id, showNotification]);
 
   const handleClose = async (e?: React.MouseEvent) => {
     e?.stopPropagation();
