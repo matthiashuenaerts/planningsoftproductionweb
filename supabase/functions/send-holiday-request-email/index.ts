@@ -1,9 +1,6 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-
-const resend = new Resend("re_R48e6VdF_G4kUfNeBa9C7Zi8e7ds6PnfW");
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,7 +31,24 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get admin emails (handle multiple admin users)
+    // Get email configuration
+    const { data: emailConfig, error: configError } = await supabase
+      .from('email_config')
+      .select('*')
+      .single();
+
+    if (configError || !emailConfig) {
+      console.error('Error fetching email config:', configError);
+      return new Response(
+        JSON.stringify({ error: 'Email configuration not set up. Please configure email settings in Settings > Mail.' }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
+    // Get admin emails
     const { data: adminEmployees, error: adminError } = await supabase
       .from('employees')
       .select('email')
@@ -44,33 +58,44 @@ const handler = async (req: Request): Promise<Response> => {
       console.error('Error fetching admin emails:', adminError);
     }
 
-// Collect all recipients
-const recipients = [employeeEmail];
+    // Collect all recipients
+    const recipients = [employeeEmail];
 
-// Add admin emails if they exist and are different from employee email
-if (adminEmployees && adminEmployees.length > 0) {
-  adminEmployees.forEach(admin => {
-    if (admin.email && admin.email !== employeeEmail && !recipients.includes(admin.email)) {
-      recipients.push(admin.email);
+    // Add admin emails
+    if (adminEmployees && adminEmployees.length > 0) {
+      adminEmployees.forEach(admin => {
+        if (admin.email && admin.email !== employeeEmail && !recipients.includes(admin.email)) {
+          recipients.push(admin.email);
+        }
+      });
     }
-  });
-}
 
-// Always add productiesturing
-if (!recipients.includes("productiesturing@thonon.be")) {
-  recipients.push("productiesturing@thonon.be");
-}
+    // Always add productiesturing
+    if (!recipients.includes("productiesturing@thonon.be")) {
+      recipients.push("productiesturing@thonon.be");
+    }
 
-// Use full recipient list in productie
-const finalRecipients = recipients;
+    console.log('Sending email to:', recipients);
 
+    // Create SMTP client
+    const client = new SMTPClient({
+      connection: {
+        hostname: emailConfig.smtp_host,
+        port: emailConfig.smtp_port,
+        tls: emailConfig.smtp_secure,
+        auth: {
+          username: emailConfig.smtp_user,
+          password: emailConfig.smtp_password,
+        },
+      },
+    });
 
-    console.log('Sending email to:', finalRecipients);
-
-    const emailResponse = await resend.emails.send({
-      from: "Holiday System <onboarding@resend.dev>",
-      to: finalRecipients,
+    // Send email to all recipients
+    await client.send({
+      from: `${emailConfig.from_name} <${emailConfig.from_email}>`,
+      to: recipients.join(', '),
       subject: `Holiday Request from ${employeeName}`,
+      content: "auto",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #333;">Holiday Request Submitted</h2>
@@ -93,14 +118,16 @@ const finalRecipients = recipients;
             <p><strong>Request ID:</strong> ${requestId}</p>
           </div>
           <p>This request has been submitted and is pending approval.</p>
-          <p><em>This holiday request notification was sent to: ${finalRecipients.join(', ')}</em></p>
+          <p><em>This holiday request notification was sent to: ${recipients.join(', ')}</em></p>
         </div>
       `,
     });
 
-    console.log("Holiday request email sent successfully:", emailResponse);
+    await client.close();
 
-    return new Response(JSON.stringify(emailResponse), {
+    console.log("Holiday request email sent successfully");
+
+    return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
