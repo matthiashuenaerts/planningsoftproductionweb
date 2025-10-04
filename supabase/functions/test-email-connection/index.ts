@@ -33,12 +33,12 @@ const handler = async (req: Request): Promise<Response> => {
       user: config.smtp_user
     });
 
-    // Create SMTP client with proper STARTTLS handling
+    // Create SMTP client with proper STARTTLS handling for port 587
     const client = new SMTPClient({
       connection: {
         hostname: config.smtp_host,
         port: config.smtp_port,
-        tls: config.smtp_secure,
+        tls: config.smtp_secure, // false for port 587 (STARTTLS), true for port 465 (SSL/TLS)
         auth: {
           username: config.smtp_user,
           password: config.smtp_password,
@@ -46,9 +46,15 @@ const handler = async (req: Request): Promise<Response> => {
       },
     });
 
-    // Try to connect
-    await client.connect();
-    console.log('SMTP connection successful');
+    // Send a test email to verify the connection
+    await client.send({
+      from: config.from_email,
+      to: config.smtp_user, // Send test to the configured email
+      subject: "Test Email - SMTP Configuration",
+      content: "This is a test email to verify your SMTP configuration is working correctly.",
+    });
+    
+    console.log('SMTP connection and test email sent successfully');
     await client.close();
 
     return new Response(JSON.stringify({ success: true }), {

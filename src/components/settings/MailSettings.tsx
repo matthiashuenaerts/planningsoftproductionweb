@@ -180,10 +180,11 @@ const MailSettings: React.FC = () => {
                 checked={config.smtp_secure}
                 onCheckedChange={(checked) => setConfig({ ...config, smtp_secure: checked })}
               />
-              <Label htmlFor="smtp_secure">Use SSL/TLS (for port 465)</Label>
+              <Label htmlFor="smtp_secure">Use SSL/TLS (for port 465 only)</Label>
             </div>
             <p className="text-xs text-muted-foreground">
-              Leave OFF for port 587 (STARTTLS). Turn ON only for port 465 (SSL/TLS).
+              <strong>Port 587 (Proximus relay):</strong> Keep this OFF - uses STARTTLS automatically.<br/>
+              <strong>Port 465:</strong> Turn ON for SSL/TLS encryption.
             </p>
           </div>
         </CardContent>
