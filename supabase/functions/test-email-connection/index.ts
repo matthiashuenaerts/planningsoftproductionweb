@@ -33,24 +33,41 @@ const handler = async (req: Request): Promise<Response> => {
       user: config.smtp_user
     });
 
-    // Create SMTP client with proper STARTTLS handling for port 587
+    // Determine security mode: TLS only for 465, STARTTLS for everything else (e.g. 587)
+    const useTls = config.smtp_port === 465;
+
+    // Normalize addresses (avoid validation errors due to stray spaces)
+    const fromEmail = (config.from_email || '').trim();
+    const toEmail = (config.smtp_user || '').trim();
+
     const client = new SMTPClient({
       connection: {
         hostname: config.smtp_host,
         port: config.smtp_port,
-        tls: config.smtp_secure, // false for port 587 (STARTTLS), true for port 465 (SSL/TLS)
+        // TLS true = implicit TLS (465). TLS false = STARTTLS (recommended for 587)
+        tls: useTls,
         auth: {
           username: config.smtp_user,
           password: config.smtp_password,
         },
       },
+      // Helpful diagnostics in Edge Function logs
+      debug: {
+        log: true,
+        allowUnsecure: false,
+        noStartTLS: false,
+        encodeLB: false,
+      },
+      client: {
+        warning: 'ignore',
+      },
     });
 
     // Send a test email to verify the connection
     await client.send({
-      from: config.from_email,
-      to: config.smtp_user, // Send test to the configured email
-      subject: "Test Email - SMTP Configuration",
+      from: fromEmail,
+      to: toEmail,
+      subject: "Test Email - SMTP Configuration (STARTTLS/TLS)",
       content: "This is a test email to verify your SMTP configuration is working correctly.",
     });
     
