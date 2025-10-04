@@ -44,21 +44,23 @@ const handler = async (req: Request): Promise<Response> => {
       console.error('Error fetching admin emails:', adminError);
     }
 
-// Collect all recipients
-const recipients = [employeeEmail];
+// Collect all recipients and trim whitespace
+const recipients = [employeeEmail.trim()];
 
 // Add admin emails if they exist and are different from employee email
 if (adminEmployees && adminEmployees.length > 0) {
   adminEmployees.forEach(admin => {
-    if (admin.email && admin.email !== employeeEmail && !recipients.includes(admin.email)) {
-      recipients.push(admin.email);
+    const trimmedEmail = admin.email?.trim();
+    if (trimmedEmail && trimmedEmail !== employeeEmail.trim() && !recipients.includes(trimmedEmail)) {
+      recipients.push(trimmedEmail);
     }
   });
 }
 
 // Always add productiesturing
-if (!recipients.includes("productiesturing@thonon.be")) {
-  recipients.push("productiesturing@thonon.be");
+const productiesturingEmail = "productiesturing@thonon.be";
+if (!recipients.includes(productiesturingEmail)) {
+  recipients.push(productiesturingEmail);
 }
 
 // Use full recipient list in productie
