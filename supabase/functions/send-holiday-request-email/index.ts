@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
-const resend = new Resend("re_R48e6VdF_G4kUfNeBa9C7Zi8e7ds6PnfW");
+const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -68,7 +68,7 @@ const finalRecipients = recipients;
     console.log('Sending email to:', finalRecipients);
 
     const emailResponse = await resend.emails.send({
-      from: "Holiday System <onboarding@resend.dev>",
+      from: "Holiday System <noreply@send.holiday>",
       to: finalRecipients,
       subject: `Holiday Request from ${employeeName}`,
       html: `
