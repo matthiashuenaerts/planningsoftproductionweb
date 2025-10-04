@@ -46,16 +46,10 @@ const handler = async (req: Request): Promise<Response> => {
       },
     });
 
-    // Try to send a lightweight test email (uses STARTTLS automatically when tls=false)
-    await client.send({
-      from: `${config.from_name} <${config.from_email}>`,
-      to: config.from_email,
-      subject: "SMTP Test",
-      content: "auto",
-      html: `<p>This is a test email to verify SMTP settings.</p>`,
-    });
+    // Try to connect
+    await client.connect();
+    console.log('SMTP connection successful');
     await client.close();
-
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
