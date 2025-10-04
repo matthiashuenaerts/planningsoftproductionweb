@@ -77,7 +77,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Sending email to:', recipients);
 
-    // Create SMTP client
+    // Create SMTP client with proper STARTTLS handling
+    // For port 587, tls should be false to use STARTTLS
+    // For port 465, tls should be true for implicit SSL/TLS
     const client = new SMTPClient({
       connection: {
         hostname: emailConfig.smtp_host,

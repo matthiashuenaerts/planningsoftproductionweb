@@ -173,13 +173,18 @@ const MailSettings: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="smtp_secure"
-              checked={config.smtp_secure}
-              onCheckedChange={(checked) => setConfig({ ...config, smtp_secure: checked })}
-            />
-            <Label htmlFor="smtp_secure">Use SSL/TLS (port 465)</Label>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="smtp_secure"
+                checked={config.smtp_secure}
+                onCheckedChange={(checked) => setConfig({ ...config, smtp_secure: checked })}
+              />
+              <Label htmlFor="smtp_secure">Use SSL/TLS (for port 465)</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Leave OFF for port 587 (STARTTLS). Turn ON only for port 465 (SSL/TLS).
+            </p>
           </div>
         </CardContent>
       </Card>
