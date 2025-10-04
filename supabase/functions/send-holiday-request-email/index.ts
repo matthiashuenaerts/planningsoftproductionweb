@@ -70,7 +70,7 @@ const finalRecipients = recipients;
     console.log('Sending email to:', finalRecipients);
 
     const emailResponse = await resend.emails.send({
-      from: "Holiday System <noreply@send.holiday>",
+      from: "Holiday System <noreply@automattion-compass.com>",
       to: finalRecipients,
       subject: `Holiday Request from ${employeeName}`,
       html: `
