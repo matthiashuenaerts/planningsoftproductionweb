@@ -50,11 +50,12 @@ const MailSettings: React.FC = () => {
     const email = newEmails[configId]?.trim();
     if (!email) return;
 
-    // Simple email validation
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    // More permissive email validation
+    const emailRegex = /^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
       toast({
         title: 'Invalid Email',
-        description: 'Please enter a valid email address',
+        description: 'Please enter a valid email address (e.g., user@example.com)',
         variant: 'destructive',
       });
       return;
