@@ -133,6 +133,32 @@ export const holidayRequestService = {
 
   async updateRequestStatus(id: string, status: 'approved' | 'rejected', adminNotes?: string) {
     console.log('Updating request status:', { id, status, adminNotes });
+    
+    // First get the request details
+    const { data: request, error: fetchError } = await supabase
+      .from('holiday_requests')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !request) {
+      console.error('Error fetching request:', fetchError);
+      throw new Error('Request not found');
+    }
+
+    // Get employee email
+    const { data: employee, error: employeeError } = await supabase
+      .from('employees')
+      .select('email')
+      .eq('id', request.user_id)
+      .single();
+
+    if (employeeError || !employee) {
+      console.error('Employee not found:', employeeError);
+      throw new Error('Employee not found');
+    }
+
+    // Update the status
     const { data, error } = await supabase
       .from('holiday_requests')
       .update({ 
@@ -148,7 +174,29 @@ export const holidayRequestService = {
       console.error('Error updating request status:', error);
       throw error;
     }
+    
     console.log('Request status updated successfully:', data);
+
+    // Send status notification email
+    try {
+      await supabase.functions.invoke('send-holiday-status-email', {
+        body: {
+          employeeName: request.employee_name,
+          employeeEmail: employee.email || 'no-email@company.com',
+          startDate: request.start_date,
+          endDate: request.end_date,
+          reason: request.reason,
+          status: status,
+          adminNotes: adminNotes,
+          requestId: id,
+        },
+      });
+      console.log('Status notification email sent successfully');
+    } catch (emailError) {
+      console.error('Error sending status notification email:', emailError);
+      // Don't throw error here to prevent blocking the status update
+    }
+
     return data;
   },
 
