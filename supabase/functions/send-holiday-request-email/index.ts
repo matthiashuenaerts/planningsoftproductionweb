@@ -34,37 +34,32 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get admin emails (handle multiple admin users)
-    const { data: adminEmployees, error: adminError } = await supabase
-      .from('employees')
-      .select('email')
-      .eq('role', 'admin');
+    // Fetch email configuration from database
+    const { data: emailConfig, error: configError } = await supabase
+      .from('email_configurations')
+      .select('recipient_emails')
+      .eq('function_name', 'holiday_request')
+      .single();
 
-    if (adminError) {
-      console.error('Error fetching admin emails:', adminError);
+    if (configError) {
+      console.error('Error fetching email configuration:', configError);
     }
 
-// Collect all recipients and trim whitespace
-const recipients = [employeeEmail.trim()];
+    // Get configured recipient emails or use default
+    const configuredEmails = emailConfig?.recipient_emails || ['productiesturing@thonon.be'];
 
-// Add admin emails if they exist and are different from employee email
-if (adminEmployees && adminEmployees.length > 0) {
-  adminEmployees.forEach(admin => {
-    const trimmedEmail = admin.email?.trim();
-    if (trimmedEmail && trimmedEmail !== employeeEmail.trim() && !recipients.includes(trimmedEmail)) {
-      recipients.push(trimmedEmail);
-    }
-  });
-}
+    // Collect all recipients and trim whitespace
+    const recipients = [employeeEmail.trim()];
 
-// Always add productiesturing
-const productiesturingEmail = "productiesturing@thonon.be";
-if (!recipients.includes(productiesturingEmail)) {
-  recipients.push(productiesturingEmail);
-}
+    // Add configured emails
+    configuredEmails.forEach(email => {
+      const trimmedEmail = email.trim();
+      if (trimmedEmail && !recipients.includes(trimmedEmail)) {
+        recipients.push(trimmedEmail);
+      }
+    });
 
-// Use full recipient list in productie
-const finalRecipients = recipients;
+    const finalRecipients = recipients;
 
 
     console.log('Sending email to:', finalRecipients);

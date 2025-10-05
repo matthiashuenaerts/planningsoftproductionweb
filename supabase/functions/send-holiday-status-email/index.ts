@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
@@ -38,11 +39,36 @@ const handler = async (req: Request): Promise<Response> => {
       requestId 
     }: HolidayStatusEmailData = await req.json();
 
-    // Recipients: productiesturing@thonon.be and the employee
-    const productiesturingEmail = "productiesturing@thonon.be";
-    const recipients = [employeeEmail.trim(), productiesturingEmail].filter((email, index, arr) => 
-      email && arr.indexOf(email) === index
+    // Create Supabase client
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    // Fetch email configuration from database
+    const { data: emailConfig, error: configError } = await supabase
+      .from('email_configurations')
+      .select('recipient_emails')
+      .eq('function_name', 'holiday_status')
+      .single();
+
+    if (configError) {
+      console.error('Error fetching email configuration:', configError);
+    }
+
+    // Get configured recipient emails or use default
+    const configuredEmails = emailConfig?.recipient_emails || ['productiesturing@thonon.be'];
+
+    // Collect all recipients and trim whitespace
+    const recipients = [employeeEmail.trim()];
+
+    // Add configured emails
+    configuredEmails.forEach(email => {
+      const trimmedEmail = email.trim();
+      if (trimmedEmail && !recipients.includes(trimmedEmail)) {
+        recipients.push(trimmedEmail);
+      }
+    });
 
     console.log('Sending status email to:', recipients);
 

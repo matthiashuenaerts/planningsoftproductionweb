@@ -280,6 +280,33 @@ export type Database = {
           },
         ]
       }
+      email_configurations: {
+        Row: {
+          created_at: string
+          description: string | null
+          function_name: string
+          id: string
+          recipient_emails: string[]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          function_name: string
+          id?: string
+          recipient_emails?: string[]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          function_name?: string
+          id?: string
+          recipient_emails?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       employee_workstation_links: {
         Row: {
           created_at: string
