@@ -99,20 +99,34 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
           .not('due_date', 'is', null)
           .order('due_date');
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching tasks:', error);
+          throw error;
+        }
+
+        console.log('Raw tasks data:', tasksData);
+        console.log('Number of raw tasks:', tasksData?.length || 0);
 
         // Transform the data to match our Task interface
-        const transformedTasks = tasksData?.map((task: any) => ({
-          id: task.id,
-          title: task.title,
-          description: task.description,
-          duration: task.duration,
-          status: task.status,
-          due_date: task.due_date,
-          phase_id: task.phase_id,
-          phases: task.phases,
-          workstations: task.task_workstation_links?.map((link: any) => link.workstations).filter(Boolean) || []
-        })) || [];
+        const transformedTasks = tasksData?.map((task: any) => {
+          const workstations = task.task_workstation_links?.map((link: any) => link.workstations).filter(Boolean) || [];
+          console.log(`Task ${task.title}: ${workstations.length} workstations`, workstations);
+          
+          return {
+            id: task.id,
+            title: task.title,
+            description: task.description,
+            duration: task.duration,
+            status: task.status,
+            due_date: task.due_date,
+            phase_id: task.phase_id,
+            phases: task.phases,
+            workstations: workstations
+          };
+        }) || [];
+
+        console.log('Transformed tasks:', transformedTasks);
+        console.log('Total tasks fetched:', transformedTasks.length);
 
         setTasks(transformedTasks);
       } catch (error) {
@@ -138,9 +152,11 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
   // Get tasks for a specific workstation
   const getTasksForWorkstation = (workstationId: string): Task[] => {
-    return tasks.filter(task => 
+    const filteredTasks = tasks.filter(task => 
       task.workstations?.some(ws => ws.id === workstationId)
     );
+    console.log(`Workstation ${workstationId}: ${filteredTasks.length} tasks`);
+    return filteredTasks;
   };
 
   // Calculate task position and width
@@ -231,7 +247,10 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
             .not('due_date', 'is', null)
             .order('due_date');
 
-          if (error) throw error;
+          if (error) {
+            console.error('Error refreshing tasks:', error);
+            throw error;
+          }
 
           const transformedTasks = tasksData?.map((task: any) => ({
             id: task.id,
@@ -244,6 +263,8 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
             phases: task.phases,
             workstations: task.task_workstation_links?.map((link: any) => link.workstations).filter(Boolean) || []
           })) || [];
+
+          console.log('Refreshed tasks:', transformedTasks.length);
 
           setTasks(transformedTasks);
         } catch (error) {
