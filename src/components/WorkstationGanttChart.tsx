@@ -95,7 +95,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
               )
             )
           `)
-          .in('status', ['TODO', 'ON_HOLD'])
+          .in('status', ['TODO', 'HOLD'])
           .not('due_date', 'is', null)
           .order('due_date');
 
@@ -246,7 +246,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                 )
               )
             `)
-            .in('status', ['TODO', 'ON_HOLD'])
+            .in('status', ['TODO', 'HOLD'])
             .not('due_date', 'is', null)
             .order('due_date');
 
@@ -428,7 +428,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                                   top: `${row * rowHeight + 8}px`,
                                   height: `${rowHeight - 16}px`,
                                   backgroundColor: getProjectColor(projectId),
-                                  border: task.status === 'ON_HOLD' ? '2px dashed rgba(255,255,255,0.7)' : '2px solid rgba(255,255,255,0.2)',
+                                  border: task.status === 'HOLD' ? '2px dashed rgba(255,255,255,0.7)' : '2px solid rgba(255,255,255,0.2)',
                                   boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
                                   zIndex: 5
                                 }}
