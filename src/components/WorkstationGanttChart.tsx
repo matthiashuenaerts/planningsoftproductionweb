@@ -164,12 +164,15 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     const taskDate = startOfDay(parseISO(task.due_date));
     const daysDiff = differenceInDays(taskDate, selectedDate);
     
-    if (daysDiff < 0 || daysDiff >= daysToShow) return null; // Task is outside visible range
+    // Show tasks that fall within or near the visible range
+    if (daysDiff < -5 || daysDiff >= daysToShow + 5) return null;
     
-    const left = daysDiff * dayWidth;
-    const width = (task.duration / (8 * 60)) * dayWidth; // duration in minutes, 8 hours per day
+    const left = Math.max(0, daysDiff * dayWidth);
+    // Duration in minutes, assume 8-hour workday (480 minutes)
+    const durationInDays = task.duration / 480;
+    const width = Math.max(20, durationInDays * dayWidth); // Minimum width of 20px
     
-    return { left, width };
+    return { left, width, daysDiff };
   };
 
   // Detect overlapping tasks for the same workstation
@@ -397,43 +400,56 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                     <TooltipProvider>
                       {workstationTasks.map((task) => {
                         const position = getTaskPosition(task);
-                        if (!position) return null;
+                        if (!position) {
+                          console.log(`Task ${task.title} is outside visible range`);
+                          return null;
+                        }
 
                         const row = getTaskRow(task, workstationTasks);
                         const projectId = task.phases?.projects?.id || '';
                         const projectName = task.phases?.projects?.name || 'Unknown Project';
                         const phaseName = task.phases?.name || '';
 
+                        console.log(`Rendering task: ${projectName} - ${task.title}`, {
+                          left: position.left,
+                          width: position.width,
+                          daysDiff: position.daysDiff,
+                          row
+                        });
+
                         return (
                           <Tooltip key={task.id}>
                             <TooltipTrigger asChild>
                               <div
-                                className="absolute rounded px-2 py-1 text-xs font-medium text-white cursor-pointer hover:opacity-80 transition-opacity overflow-hidden"
+                                className="absolute rounded-md px-3 py-2 text-xs font-medium text-white cursor-pointer hover:brightness-110 hover:shadow-lg transition-all overflow-hidden shadow-md"
                                 style={{
                                   left: `${position.left}px`,
                                   width: `${position.width}px`,
                                   top: `${row * rowHeight + 8}px`,
                                   height: `${rowHeight - 16}px`,
                                   backgroundColor: getProjectColor(projectId),
-                                  border: task.status === 'ON_HOLD' ? '2px dashed rgba(255,255,255,0.5)' : 'none'
+                                  border: task.status === 'ON_HOLD' ? '2px dashed rgba(255,255,255,0.7)' : '2px solid rgba(255,255,255,0.2)',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                  zIndex: 5
                                 }}
                               >
-                                <div className="truncate font-semibold">{projectName}</div>
-                                <div className="truncate text-[10px] opacity-90">{task.title}</div>
+                                <div className="truncate font-bold text-sm">{projectName}</div>
+                                <div className="truncate text-[11px] opacity-90 mt-0.5">{task.title}</div>
                               </div>
                             </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-xs">
+                            <TooltipContent side="top" className="max-w-xs z-50 bg-popover">
                               <div className="space-y-1">
-                                <div className="font-semibold">{projectName}</div>
-                                <div className="text-sm">{phaseName}</div>
+                                <div className="font-semibold text-base">{projectName}</div>
+                                <div className="text-sm text-muted-foreground">{phaseName}</div>
                                 <div className="text-sm font-medium">{task.title}</div>
                                 {task.description && (
-                                  <div className="text-xs text-muted-foreground">{task.description}</div>
+                                  <div className="text-xs text-muted-foreground mt-1">{task.description}</div>
                                 )}
-                                <div className="text-xs space-y-0.5 pt-1 border-t">
-                                  <div>Due: {format(parseISO(task.due_date), 'PPP')}</div>
-                                  <div>Duration: {Math.round(task.duration / 60)} hours</div>
-                                  <div>Status: {task.status}</div>
+                                <div className="text-xs space-y-0.5 pt-2 border-t">
+                                  <div><strong>Due:</strong> {format(parseISO(task.due_date), 'PPP')}</div>
+                                  <div><strong>Duration:</strong> {Math.round(task.duration / 60)} hours ({(task.duration / 480).toFixed(1)} days)</div>
+                                  <div><strong>Status:</strong> {task.status}</div>
+                                  <div><strong>Workstations:</strong> {task.workstations?.map(ws => ws.name).join(', ')}</div>
                                 </div>
                               </div>
                             </TooltipContent>
