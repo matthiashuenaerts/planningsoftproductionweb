@@ -44,6 +44,7 @@ import StandardTaskAssignment from '@/components/StandardTaskAssignment';
 import { supabase } from '@/integrations/supabase/client';
 import DraggableScheduleItem from '@/components/DraggableScheduleItem';
 import WorkstationScheduleView from '@/components/WorkstationScheduleView';
+import WorkstationGanttChart from '@/components/WorkstationGanttChart';
 
 interface WorkerTask {
   id: string;
@@ -100,7 +101,7 @@ const Planning = () => {
   const [taskConflicts, setTaskConflicts] = useState<any[]>([]);
   const [excludedTasksPerUser, setExcludedTasksPerUser] = useState<Record<string, string[]>>({});
   const [showStandardTaskAssignment, setShowStandardTaskAssignment] = useState(false);
-  const [showWorkstationView, setShowWorkstationView] = useState(false);
+  const [activeView, setActiveView] = useState<'worker' | 'workstation' | 'gantt'>('worker');
   const [holidays, setHolidays] = useState<any[]>([]);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
@@ -1854,23 +1855,32 @@ const Planning = () => {
             <div className="mb-6">
               <div className="flex space-x-2">
                 <Button
-                  onClick={() => setShowWorkstationView(false)}
-                  variant={!showWorkstationView ? "default" : "outline"}
+                  onClick={() => setActiveView('worker')}
+                  variant={activeView === 'worker' ? "default" : "outline"}
                 >
                   <Users className="mr-2 h-4 w-4" />
                   Worker Schedules
                 </Button>
                 <Button
-                  onClick={() => setShowWorkstationView(true)}
-                  variant={showWorkstationView ? "default" : "outline"}
+                  onClick={() => setActiveView('workstation')}
+                  variant={activeView === 'workstation' ? "default" : "outline"}
                 >
                   <Settings className="mr-2 h-4 w-4" />
                   Workstation Schedules
                 </Button>
+                <Button
+                  onClick={() => setActiveView('gantt')}
+                  variant={activeView === 'gantt' ? "default" : "outline"}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  Gantt Chart – Workstations
+                </Button>
               </div>
             </div>
 
-            {showWorkstationView ? (
+            {activeView === 'gantt' ? (
+              <WorkstationGanttChart selectedDate={selectedDate} />
+            ) : activeView === 'workstation' ? (
               <WorkstationScheduleView selectedDate={selectedDate} />
             ) : (
               <>
