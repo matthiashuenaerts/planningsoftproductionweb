@@ -47,17 +47,17 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
   const headerHeight = 80;
   const workstationLabelWidth = 200;
 
-  // Generate project colors
-  const getProjectColor = (projectId: string): string => {
-    const colors = [
-      'hsl(var(--chart-1))',
-      'hsl(var(--chart-2))',
-      'hsl(var(--chart-3))',
-      'hsl(var(--chart-4))',
-      'hsl(var(--chart-5))',
-    ];
+  // Generate vibrant project color dynamically
+  const getProjectColor = (projectId: string): { bg: string; text: string } => {
+    if (!projectId) {
+      return { bg: '#999', text: '#fff' };
+    }
+    // Generate a hash and derive hue
     const hash = projectId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return colors[hash % colors.length];
+    const hue = hash % 360;
+    const bg = `hsl(${hue}, 70%, 50%)`;
+    const text = `hsl(${hue}, 100%, 95%)`;
+    return { bg, text };
   };
 
   // Fetch workstations and tasks
@@ -98,18 +98,19 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
         if (error) throw error;
 
-        const transformedTasks = tasksData?.map((task: any) => ({
-          id: task.id,
-          title: task.title,
-          description: task.description,
-          duration: task.duration,
-          status: task.status,
-          due_date: task.due_date,
-          phase_id: task.phase_id,
-          phases: task.phases,
-          workstations:
-            task.task_workstation_links?.map((link: any) => link.workstations).filter(Boolean) || [],
-        })) || [];
+        const transformedTasks =
+          tasksData?.map((task: any) => ({
+            id: task.id,
+            title: task.title,
+            description: task.description,
+            duration: task.duration,
+            status: task.status,
+            due_date: task.due_date,
+            phase_id: task.phase_id,
+            phases: task.phases,
+            workstations:
+              task.task_workstation_links?.map((link: any) => link.workstations).filter(Boolean) || [],
+          })) || [];
 
         setTasks(transformedTasks);
       } catch (error) {
@@ -203,7 +204,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
       <CardContent>
         <div className="text-sm text-muted-foreground mb-4">
-          Tasks are scheduled sequentially — no overlaps possible.
+          Tasks are scheduled sequentially — no overlaps possible. Each project has a distinct color.
         </div>
 
         <div
@@ -278,26 +279,28 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                         const daysDiff = differenceInDays(start, selectedDate);
                         const left = Math.max(0, daysDiff * dayWidth);
                         const width = Math.max(20, differenceInDays(end, start) * dayWidth);
-
                         const projectId = task.phases?.projects?.id || '';
                         const projectName = task.phases?.projects?.name || 'Unknown Project';
                         const phaseName = task.phases?.name || '';
+                        const { bg, text } = getProjectColor(projectId);
 
                         return (
                           <Tooltip key={task.id}>
                             <TooltipTrigger asChild>
                               <div
-                                className="absolute rounded-md px-3 py-2 text-xs font-medium text-white cursor-pointer hover:brightness-110 hover:shadow-lg transition-all overflow-hidden shadow-md"
+                                className="absolute rounded-md px-3 py-2 text-xs font-medium cursor-pointer hover:brightness-105 hover:shadow-lg transition-all overflow-hidden shadow-md"
                                 style={{
                                   left: `${left}px`,
                                   width: `${width}px`,
                                   top: `8px`,
                                   height: `${rowHeight - 16}px`,
-                                  backgroundColor: getProjectColor(projectId),
+                                  backgroundColor: bg,
+                                  color: text,
                                   border:
                                     task.status === 'HOLD'
-                                      ? '2px dashed rgba(255,255,255,0.7)'
-                                      : '2px solid rgba(255,255,255,0.2)',
+                                      ? '2px dashed rgba(255,255,255,0.8)'
+                                      : '1px solid rgba(0,0,0,0.2)',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
                                   zIndex: 5,
                                 }}
                               >
