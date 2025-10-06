@@ -5,10 +5,6 @@ import {
   differenceInMinutes,
   startOfDay,
   parseISO,
-  isWeekend,
-  addDays,
-  setHours,
-  setMinutes,
 } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { workstationService, Workstation } from '@/services/workstationService';
@@ -22,7 +18,7 @@ interface Task {
   id: string;
   title: string;
   description?: string;
-  duration: number;
+  duration: number; // minuten
   status: string;
   due_date: string;
   phase_id: string;
@@ -33,135 +29,87 @@ interface Task {
       name: string;
     };
   };
-  workstations?: Array<{ id: string; name: string }>;
+  workstations?: Array<{
+    id: string;
+    name: string;
+  }>;
 }
 
 interface WorkstationGanttChartProps {
-  selectedDate: Date;
-}
-
-// ------------------------------
-// 📆 Werkrooster configuratie
-// ------------------------------
-const WORK_START_HOUR = 8;
-const WORK_END_HOUR = 17;
-const BREAKS = [
-  { start: { h: 10, m: 0 }, end: { h: 10, m: 15 } },
-  { start: { h: 12, m: 30 }, end: { h: 13, m: 0 } },
-];
-
-function getNextWorkingTime(current: Date): Date {
-  let date = new Date(current);
-
-  while (true) {
-    if (isWeekend(date)) {
-      // volgende maandag 08:00
-      date = startOfDay(addDays(date, 1));
-      continue;
-    }
-
-    const start = setMinutes(setHours(startOfDay(date), WORK_START_HOUR), 0);
-    const end = setMinutes(setHours(startOfDay(date), WORK_END_HOUR), 0);
-
-    if (date < start) {
-      date = start;
-      continue;
-    }
-
-    if (date >= end) {
-      // volgende dag om 08:00
-      date = startOfDay(addDays(date, 1));
-      continue;
-    }
-
-    // check pauzes
-    for (const br of BREAKS) {
-      const brStart = setMinutes(setHours(startOfDay(date), br.start.h), br.start.m);
-      const brEnd = setMinutes(setHours(startOfDay(date), br.end.h), br.end.m);
-      if (date >= brStart && date < brEnd) {
-        date = brEnd;
-        continue;
-      }
-    }
-
-    return date;
-  }
-}
-
-// ✅ Hulpfunctie: voeg werkminuten toe, oversla pauzes/weekends
-function addWorkingMinutes(start: Date, minutes: number): Date {
-  let remaining = minutes;
-  let current = new Date(start);
-
-  while (remaining > 0) {
-    current = getNextWorkingTime(current);
-
-    const startOfWork = setMinutes(setHours(startOfDay(current), WORK_START_HOUR), 0);
-    const endOfWork = setMinutes(setHours(startOfDay(current), WORK_END_HOUR), 0);
-
-    // bepaal volgende pauze
-    let nextBreakStart = endOfWork;
-    let nextBreakEnd = endOfWork;
-    for (const br of BREAKS) {
-      const brStart = setMinutes(setHours(startOfDay(current), br.start.h), br.start.m);
-      const brEnd = setMinutes(setHours(startOfDay(current), br.end.h), br.end.m);
-      if (brStart > current) {
-        nextBreakStart = brStart;
-        nextBreakEnd = brEnd;
-        break;
-      }
-    }
-
-    const untilBreak = differenceInMinutes(nextBreakStart, current);
-    const untilEnd = differenceInMinutes(endOfWork, current);
-    const usable = Math.min(untilBreak, untilEnd, remaining);
-
-    if (usable <= 0) {
-      // naar volgende dag of na pauze
-      current = getNextWorkingTime(addMinutes(current, 1));
-      continue;
-    }
-
-    current = addMinutes(current, usable);
-    remaining -= usable;
-
-    if (current >= nextBreakStart && current < nextBreakEnd) {
-      current = nextBreakEnd;
-    }
-
-    if (current >= endOfWork) {
-      // naar volgende werkdag
-      current = getNextWorkingTime(addDays(current, 1));
-    }
-  }
-
-  return current;
+  selectedDate: Date; // referentiedatum (we gebruiken startOfDay(selectedDate) als timeline-start)
 }
 
 const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedDate }) => {
   const [workstations, setWorkstations] = useState<Workstation[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(1); // hogere waarde = meer inzoomen (meer detail)
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const rowHeight = 60;
   const headerHeight = 80;
   const workstationLabelWidth = 200;
 
-  // consistent minutenbasis
+  // ---------- schaalconfiguratie (consistent in minuten) ----------
   const getScaleConfig = () => {
+    // We gebruiken unitInMinutes (consistent) + unitWidth (px per unit)
+    // Visible range (hoeveel tijd in view) verschilt per schaal
     if (zoom >= 2) {
-      return { label: 'minutes', unitInMinutes: 15, unitWidth: 8 * zoom, visibleRangeMinutes: 24 * 60 * 3 };
+      // minuten-niveau: 15-min units
+      const unitInMinutes = 15;
+      const unitWidth = 8 * zoom; // px per 15 min
+      const visibleRangeMinutes = 24 * 60 * 3; // standaard 3 dagen zichtbaar (kan je aanpassen)
+      const totalUnits = Math.ceil(visibleRangeMinutes / unitInMinutes);
+      return {
+        label: 'minutes',
+        unitInMinutes,
+        unitWidth,
+        totalUnits,
+        formatLabel: (date: Date) => format(date, 'HH:mm'),
+      };
     } else if (zoom >= 1) {
-      return { label: 'hours', unitInMinutes: 60, unitWidth: 40 * zoom, visibleRangeMinutes: 24 * 60 * 3 };
+      // uur-niveau: 60-min units
+      const unitInMinutes = 60;
+      const unitWidth = 40 * zoom; // px per hour
+      const visibleRangeMinutes = 24 * 60 * 3; // 3 dagen zichtbaar
+      const totalUnits = Math.ceil(visibleRangeMinutes / unitInMinutes);
+      return {
+        label: 'hours',
+        unitInMinutes,
+        unitWidth,
+        totalUnits,
+        formatLabel: (date: Date) => format(date, 'HH:mm'),
+      };
     } else {
-      return { label: 'days', unitInMinutes: 24 * 60, unitWidth: 120 * zoom, visibleRangeMinutes: 24 * 60 * 10 };
+      // dag-niveau: 1440-min units (1 dag)
+      const unitInMinutes = 24 * 60;
+      const unitWidth = 120 * zoom; // px per day
+      const visibleRangeDays = 10; // 10 dagen zichtbaar
+      const totalUnits = visibleRangeDays;
+      return {
+        label: 'days',
+        unitInMinutes,
+        unitWidth,
+        totalUnits,
+        formatLabel: (date: Date) => format(date, 'dd MMM'),
+      };
     }
   };
 
   const scale = getScaleConfig();
 
+  // ---------- kleurgenerator ----------
+  const getProjectColor = (projectId: string): { bg: string; text: string } => {
+    if (!projectId) return { bg: '#888', text: '#fff' };
+    const hash = projectId.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    const hue = hash % 360;
+    const bg = `hsl(${hue}, 65%, 45%)`;
+    // bepaal of tekst wit of donker moet zijn a.d.h.v. luminantie (eenvoudig)
+    const text = `hsl(${hue}, 100%, 95%)`;
+    return { bg, text };
+  };
+
+  // ---------- data fetch ----------
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -181,9 +129,17 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
             phase_id,
             phases (
               name,
-              projects ( id, name )
+              projects (
+                id,
+                name
+              )
             ),
-            task_workstation_links ( workstations ( id, name ) )
+            task_workstation_links (
+              workstations (
+                id,
+                name
+              )
+            )
           `)
           .in('status', ['TODO', 'HOLD'])
           .not('due_date', 'is', null)
@@ -193,8 +149,16 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
         const transformed =
           (tasksData || []).map((t: any) => ({
-            ...t,
-            workstations: t.task_workstation_links?.map((l: any) => l.workstations).filter(Boolean) || [],
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            duration: t.duration,
+            status: t.status,
+            due_date: t.due_date,
+            phase_id: t.phase_id,
+            phases: t.phases,
+            workstations:
+              t.task_workstation_links?.map((l: any) => l.workstations).filter(Boolean) || [],
           })) || [];
 
         setTasks(transformed);
@@ -204,40 +168,56 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
         setLoading(false);
       }
     };
+
     fetchData();
   }, [selectedDate]);
 
-  const timelineStart = startOfDay(selectedDate);
-  const totalUnits = Math.ceil(scale.visibleRangeMinutes / scale.unitInMinutes);
-  const timeline = Array.from({ length: totalUnits }, (_, i) =>
-    addMinutes(timelineStart, i * scale.unitInMinutes)
-  );
+  // ---------- timeline (array van datums: iedere unit) ----------
+  const timelineStart = startOfDay(selectedDate); // vaste referentie
+  const timeline = (() => {
+    const arr: Date[] = [];
+    for (let i = 0; i < scale.totalUnits; i++) {
+      arr.push(addMinutes(timelineStart, i * scale.unitInMinutes));
+    }
+    return arr;
+  })();
+  const timelineEnd = addMinutes(timelineStart, scale.totalUnits * scale.unitInMinutes);
 
-  const getTasksForWorkstation = (wsId: string) =>
+  // ---------- taken per workstation (gesorteerd) ----------
+  const getTasksForWorkstation = (workstationId: string) =>
     tasks
-      .filter((t) => t.workstations?.some((ws) => ws.id === wsId))
+      .filter((t) => t.workstations?.some((ws) => ws.id === workstationId))
       .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
-  // ✅ nieuwe planner: alleen binnen werkuren
+  // ---------- schedule berekenen (geen overlap, minute-precise) ----------
   const computeTaskSchedule = (workstationId: string) => {
     const wsTasks = getTasksForWorkstation(workstationId);
-    let current = getNextWorkingTime(timelineStart);
+    let currentTime = timelineStart; // start opeenvolgend plannen vanaf timelineStart
     const scheduled: Array<{ task: Task; start: Date; end: Date }> = [];
 
     for (const task of wsTasks) {
-      const start = getNextWorkingTime(current);
-      const end = addWorkingMinutes(start, Math.max(1, Math.round(task.duration)));
+      // start = currentTime, end = start + duration (in minuten)
+      const start = currentTime;
+      const end = addMinutes(start, Math.max(1, Math.round(task.duration ?? 0))); // minimaal 1 minuut
       scheduled.push({ task, start, end });
-      current = end;
+      currentTime = end; // volgende taak start wanneer deze eindigt
     }
+
     return scheduled;
   };
 
+  // ---------- controls ----------
   const handleZoomIn = () => setZoom((z) => Math.min(z * 1.5, 6));
   const handleZoomOut = () => setZoom((z) => Math.max(z / 1.5, 0.25));
-  const handleRefresh = () => setLoading(true);
+  const handleRefresh = () => {
+    setLoading(true);
+    // eenvoudige refresh (kan je vervangen door her-fetch)
+    setTimeout(() => {
+      setLoading(false);
+    }, 200);
+  };
 
-  if (loading)
+  if (loading) {
     return (
       <Card>
         <CardContent className="p-6">
@@ -247,22 +227,25 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
         </CardContent>
       </Card>
     );
+  }
 
-  if (workstations.length === 0)
+  if (workstations.length === 0) {
     return (
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>No Workstations</AlertTitle>
-        <AlertDescription>Add workstations to view scheduling.</AlertDescription>
+        <AlertDescription>No workstations found. Please configure them first.</AlertDescription>
       </Alert>
     );
+  }
 
+  // ---------- render ----------
   return (
     <Card className="w-full">
       <CardHeader>
-        <div className="flex justify-between items-center">
-          <CardTitle>Workstation Gantt Chart (met werkuren & pauzes)</CardTitle>
-          <div className="flex gap-2">
+        <div className="flex items-center justify-between">
+          <CardTitle>Workstation Gantt Chart (precies op minuten)</CardTitle>
+          <div className="flex space-x-2">
             <Button variant="outline" size="sm" onClick={handleZoomOut}>
               <ZoomOut className="h-4 w-4" />
             </Button>
@@ -277,6 +260,10 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       </CardHeader>
 
       <CardContent>
+        <div className="text-sm text-muted-foreground mb-4">
+          Zoom in voor uur/minuut-resolutie. Schaal en positionering zijn nu consistent op minutenbasis.
+        </div>
+
         <div
           ref={scrollContainerRef}
           className="overflow-auto border rounded-lg bg-background"
@@ -295,11 +282,20 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                 <div
                   key={idx}
                   className="border-r flex flex-col items-center justify-center text-xs font-medium"
-                  style={{ width: `${scale.unitWidth}px` }}
+                  style={{
+                    width: `${scale.unitWidth}px`,
+                    minWidth: `${scale.unitWidth}px`,
+                  }}
                 >
-                  {scale.label === 'days'
-                    ? format(t, 'dd MMM')
-                    : format(t, 'HH:mm')}
+                  {scale.label === 'days' ? (
+                    <>
+                      <div>{format(t, 'EEE')}</div>
+                      <div className="text-lg font-semibold">{format(t, 'd')}</div>
+                      <div className="text-muted-foreground">{format(t, 'MMM')}</div>
+                    </>
+                  ) : (
+                    <div className="text-xs">{scale.formatLabel(t)}</div>
+                  )}
                 </div>
               ))}
             </div>
@@ -309,16 +305,23 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
           <div className="relative">
             {workstations.map((ws) => {
               const scheduled = computeTaskSchedule(ws.id);
+              const height = rowHeight;
+
               return (
-                <div key={ws.id} className="relative border-b" style={{ height: `${rowHeight}px` }}>
+                <div key={ws.id} className="relative border-b" style={{ height: `${height}px` }}>
+                  {/* workstation label */}
                   <div
                     className="absolute left-0 top-0 bottom-0 bg-muted border-r flex items-center px-4 font-medium z-10"
                     style={{ width: `${workstationLabelWidth}px` }}
                   >
-                    {ws.name}
+                    <div className="truncate">{ws.name}</div>
                   </div>
 
-                  <div className="absolute top-0 bottom-0" style={{ left: `${workstationLabelWidth}px`, right: 0 }}>
+                  {/* timeline grid + tasks */}
+                  <div
+                    className="absolute top-0 bottom-0"
+                    style={{ left: `${workstationLabelWidth}px`, right: 0 }}
+                  >
                     {timeline.map((_, i) => (
                       <div
                         key={i}
@@ -329,32 +332,63 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
                     <TooltipProvider>
                       {scheduled.map(({ task, start, end }) => {
+                        // bereken positie t.o.v. timelineStart (in minuten)
                         const minutesFromStart = differenceInMinutes(start, timelineStart);
-                        const duration = differenceInMinutes(end, start);
-                        const left = (minutesFromStart / scale.unitInMinutes) * scale.unitWidth;
-                        const width = (duration / scale.unitInMinutes) * scale.unitWidth;
+                        const taskMinutes = Math.max(1, differenceInMinutes(end, start)); // minstens 1 min
+                        // pixelpositie en breedte
+                        const rawLeft = (minutesFromStart / scale.unitInMinutes) * scale.unitWidth;
+                        const rawWidth = (taskMinutes / scale.unitInMinutes) * scale.unitWidth;
+                        const left = Math.round(rawLeft);
+                        const width = Math.max(6, Math.round(rawWidth)); // min breedte
+
+                        // skip volledig buiten zichtbare range (of render clipped items if je wilt)
+                        if (end <= timelineStart) return null;
+                        if (start >= timelineEnd) return null;
+
+                        const projectId = task.phases?.projects?.id || '';
+                        const projectName = task.phases?.projects?.name || 'Unknown Project';
+                        const phaseName = task.phases?.name || '';
+                        const { bg, text } = getProjectColor(projectId);
+
                         return (
                           <Tooltip key={task.id}>
                             <TooltipTrigger asChild>
                               <div
-                                className="absolute rounded-md px-2 py-1 text-xs font-medium shadow-md"
+                                className="absolute rounded-md px-3 py-2 text-xs font-medium cursor-pointer hover:brightness-110 hover:shadow-lg transition-all overflow-hidden shadow-md"
                                 style={{
                                   left: `${left}px`,
-                                  width: `${Math.max(6, width)}px`,
+                                  width: `${width}px`,
                                   top: `8px`,
                                   height: `${rowHeight - 16}px`,
-                                  backgroundColor: '#4e79a7',
-                                  color: '#fff',
+                                  backgroundColor: bg,
+                                  color: text,
+                                  border:
+                                    task.status === 'HOLD'
+                                      ? '2px dashed rgba(255,255,255,0.8)'
+                                      : '1px solid rgba(0,0,0,0.12)',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                                  zIndex: 5,
                                 }}
                               >
-                                {task.title}
+                                <div className="truncate font-bold text-sm">{projectName}</div>
+                                <div className="truncate text-[11px] opacity-90 mt-0.5">{task.title}</div>
                               </div>
                             </TooltipTrigger>
-                            <TooltipContent>
-                              <div>
-                                <div className="font-semibold">{task.title}</div>
-                                <div>Start: {format(start, 'PPpp')}</div>
-                                <div>Einde: {format(end, 'PPpp')}</div>
+                            <TooltipContent side="top" className="max-w-xs z-50 bg-popover">
+                              <div className="space-y-1">
+                                <div className="font-semibold text-base">{projectName}</div>
+                                <div className="text-sm text-muted-foreground">{phaseName}</div>
+                                <div className="text-sm font-medium">{task.title}</div>
+                                {task.description && (
+                                  <div className="text-xs text-muted-foreground mt-1">{task.description}</div>
+                                )}
+                                <div className="text-xs space-y-0.5 pt-2 border-t">
+                                  <div><strong>Start:</strong> {format(start, 'PPPp')}</div>
+                                  <div><strong>End:</strong> {format(end, 'PPPp')}</div>
+                                  <div><strong>Duration:</strong> {task.duration} minutes</div>
+                                  <div><strong>Status:</strong> {task.status}</div>
+                                  <div><strong>Workstations:</strong> {task.workstations?.map(w => w.name).join(', ')}</div>
+                                </div>
                               </div>
                             </TooltipContent>
                           </Tooltip>
