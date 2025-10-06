@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { format, addDays, differenceInDays, startOfDay, parseISO, subDays } from 'date-fns';
+import { format, addDays, differenceInDays, startOfDay, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { workstationService, Workstation } from '@/services/workstationService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,12 +40,14 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
   const [zoom, setZoom] = useState(1);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Timeline configuration
   const daysToShow = Math.ceil(30 / zoom);
   const dayWidth = 120 * zoom;
   const rowHeight = 60;
   const headerHeight = 80;
   const workstationLabelWidth = 200;
 
+  // Generate project colors
   const getProjectColor = (projectId: string): string => {
     const colors = [
       'hsl(var(--chart-1))',
@@ -58,6 +60,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     return colors[hash % colors.length];
   };
 
+  // Fetch workstations and tasks
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -104,7 +107,8 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
           due_date: task.due_date,
           phase_id: task.phase_id,
           phases: task.phases,
-          workstations: task.task_workstation_links?.map((link: any) => link.workstations).filter(Boolean) || []
+          workstations:
+            task.task_workstation_links?.map((link: any) => link.workstations).filter(Boolean) || [],
         })) || [];
 
         setTasks(transformedTasks);
@@ -118,6 +122,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     fetchData();
   }, [selectedDate]);
 
+  // Build date range
   const getDateRange = () => {
     const dates: Date[] = [];
     for (let i = 0; i < daysToShow; i++) {
@@ -128,69 +133,31 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
   const dateRange = getDateRange();
 
+  // Tasks per workstation
   const getTasksForWorkstation = (workstationId: string): Task[] => {
-    return tasks.filter(task =>
-      task.workstations?.some(ws => ws.id === workstationId)
-    );
+    const wsTasks = tasks.filter((t) => t.workstations?.some((ws) => ws.id === workstationId));
+    return wsTasks.sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
   };
 
-  const getTaskPosition = (task: Task) => {
-    const dueDate = startOfDay(parseISO(task.due_date));
-    const durationInDays = task.duration / 480; // 480 minuten = 1 dag
-    const startDate = subDays(dueDate, Math.ceil(durationInDays) - 1);
+  // Compute adjusted (non-overlapping) positions
+  const computeTaskSchedule = (workstationId: string) => {
+    const wsTasks = getTasksForWorkstation(workstationId);
+    let currentDate = startOfDay(selectedDate);
+    const scheduledTasks: Array<{ task: Task; start: Date; end: Date }> = [];
 
-    const daysDiff = differenceInDays(startDate, selectedDate);
-    const left = daysDiff * dayWidth;
-    const width = Math.max(20, durationInDays * dayWidth);
-
-    // toon alleen taken die in of dichtbij bereik vallen
-    if (daysDiff + durationInDays < -5 || daysDiff >= daysToShow + 5) return null;
-
-    return { left, width, startDate, endDate: dueDate };
-  };
-
-  // NIEUWE LOGICA: nooit overlap
-  const assignTaskRows = (tasks: Task[]) => {
-    const sortedTasks = [...tasks].sort(
-      (a, b) => parseISO(a.due_date).getTime() - parseISO(b.due_date).getTime()
-    );
-
-    const rowAssignments: { [taskId: string]: number } = {};
-    const rows: { start: Date; end: Date }[][] = [];
-
-    sortedTasks.forEach(task => {
-      const durationInDays = task.duration / 480;
-      const endDate = startOfDay(parseISO(task.due_date));
-      const startDate = subDays(endDate, Math.ceil(durationInDays) - 1);
-
-      let assigned = false;
-
-      // zoek beschikbare rij
-      for (let r = 0; r < rows.length; r++) {
-        const overlaps = rows[r].some(existing =>
-          startDate <= existing.end && endDate >= existing.start
-        );
-        if (!overlaps) {
-          rows[r].push({ start: startDate, end: endDate });
-          rowAssignments[task.id] = r;
-          assigned = true;
-          break;
-        }
-      }
-
-      // geen vrije rij → nieuwe rij maken
-      if (!assigned) {
-        rows.push([{ start: startDate, end: endDate }]);
-        rowAssignments[task.id] = rows.length - 1;
-      }
+    wsTasks.forEach((task) => {
+      const durationDays = task.duration / 480; // 8h = 1 day
+      const start = currentDate;
+      const end = addDays(start, durationDays);
+      scheduledTasks.push({ task, start, end });
+      currentDate = end; // next starts after previous ends
     });
 
-    return rowAssignments;
+    return scheduledTasks;
   };
 
-  const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.5, 3));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.5, 0.3));
-
+  const handleZoomIn = () => setZoom((prev) => Math.min(prev * 1.5, 3));
+  const handleZoomOut = () => setZoom((prev) => Math.max(prev / 1.5, 0.3));
   const handleRefresh = () => window.location.reload();
 
   if (loading) {
@@ -210,9 +177,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>No Workstations</AlertTitle>
-        <AlertDescription>
-          No workstations found. Please configure workstations in settings.
-        </AlertDescription>
+        <AlertDescription>No workstations found. Please configure them first.</AlertDescription>
       </Alert>
     );
   }
@@ -235,9 +200,10 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
           </div>
         </div>
       </CardHeader>
+
       <CardContent>
         <div className="text-sm text-muted-foreground mb-4">
-          Showing tasks with status TODO or ON_HOLD. Use zoom controls to adjust view.
+          Tasks are scheduled sequentially — no overlaps possible.
         </div>
 
         <div
@@ -250,7 +216,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
             className="sticky top-0 z-20 bg-muted border-b"
             style={{
               marginLeft: `${workstationLabelWidth}px`,
-              height: `${headerHeight}px`
+              height: `${headerHeight}px`,
             }}
           >
             <div className="flex" style={{ height: '100%' }}>
@@ -260,7 +226,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                   className="border-r flex flex-col items-center justify-center text-xs font-medium"
                   style={{
                     width: `${dayWidth}px`,
-                    minWidth: `${dayWidth}px`
+                    minWidth: `${dayWidth}px`,
                   }}
                 >
                   <div>{format(date, 'EEE')}</div>
@@ -271,21 +237,19 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
             </div>
           </div>
 
-          {/* Chart body */}
+          {/* Body */}
           <div className="relative">
             {workstations.map((workstation) => {
-              const workstationTasks = getTasksForWorkstation(workstation.id);
-              const rowAssignments = assignTaskRows(workstationTasks);
-              const maxRow = Math.max(0, ...Object.values(rowAssignments));
-              const totalHeight = (maxRow + 1) * rowHeight;
+              const scheduled = computeTaskSchedule(workstation.id);
+              const height = rowHeight;
 
               return (
                 <div
                   key={workstation.id}
                   className="relative border-b"
-                  style={{ height: `${totalHeight}px` }}
+                  style={{ height: `${height}px` }}
                 >
-                  {/* Workstation Label */}
+                  {/* Label */}
                   <div
                     className="absolute left-0 top-0 bottom-0 bg-muted border-r flex items-center px-4 font-medium z-10"
                     style={{ width: `${workstationLabelWidth}px` }}
@@ -293,12 +257,12 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                     <div className="truncate">{workstation.name}</div>
                   </div>
 
-                  {/* Timeline Grid */}
+                  {/* Timeline */}
                   <div
                     className="absolute top-0 bottom-0"
                     style={{
                       left: `${workstationLabelWidth}px`,
-                      right: 0
+                      right: 0,
                     }}
                   >
                     {dateRange.map((_, idx) => (
@@ -309,13 +273,12 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                       />
                     ))}
 
-                    {/* Tasks */}
                     <TooltipProvider>
-                      {workstationTasks.map(task => {
-                        const position = getTaskPosition(task);
-                        if (!position) return null;
+                      {scheduled.map(({ task, start, end }) => {
+                        const daysDiff = differenceInDays(start, selectedDate);
+                        const left = Math.max(0, daysDiff * dayWidth);
+                        const width = Math.max(20, differenceInDays(end, start) * dayWidth);
 
-                        const row = rowAssignments[task.id] ?? 0;
                         const projectId = task.phases?.projects?.id || '';
                         const projectName = task.phases?.projects?.name || 'Unknown Project';
                         const phaseName = task.phases?.name || '';
@@ -326,17 +289,16 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                               <div
                                 className="absolute rounded-md px-3 py-2 text-xs font-medium text-white cursor-pointer hover:brightness-110 hover:shadow-lg transition-all overflow-hidden shadow-md"
                                 style={{
-                                  left: `${position.left}px`,
-                                  width: `${position.width}px`,
-                                  top: `${row * rowHeight + 8}px`,
+                                  left: `${left}px`,
+                                  width: `${width}px`,
+                                  top: `8px`,
                                   height: `${rowHeight - 16}px`,
                                   backgroundColor: getProjectColor(projectId),
                                   border:
                                     task.status === 'HOLD'
                                       ? '2px dashed rgba(255,255,255,0.7)'
                                       : '2px solid rgba(255,255,255,0.2)',
-                                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                                  zIndex: 5
+                                  zIndex: 5,
                                 }}
                               >
                                 <div className="truncate font-bold text-sm">{projectName}</div>
@@ -357,10 +319,14 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                                 )}
                                 <div className="text-xs space-y-0.5 pt-2 border-t">
                                   <div>
-                                    <strong>Due:</strong> {format(parseISO(task.due_date), 'PPP')}
+                                    <strong>Start:</strong> {format(start, 'PPP')}
                                   </div>
                                   <div>
-                                    <strong>Duration:</strong> {Math.round(task.duration / 60)} hours (
+                                    <strong>End:</strong> {format(end, 'PPP')}
+                                  </div>
+                                  <div>
+                                    <strong>Duration:</strong>{' '}
+                                    {Math.round(task.duration / 60)} hours (
                                     {(task.duration / 480).toFixed(1)} days)
                                   </div>
                                   <div>
@@ -368,7 +334,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                                   </div>
                                   <div>
                                     <strong>Workstations:</strong>{' '}
-                                    {task.workstations?.map(ws => ws.name).join(', ')}
+                                    {task.workstations?.map((ws) => ws.name).join(', ')}
                                   </div>
                                 </div>
                               </div>
