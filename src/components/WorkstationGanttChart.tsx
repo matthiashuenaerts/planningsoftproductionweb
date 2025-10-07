@@ -120,97 +120,125 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
   const isWorkingDay = (date: Date) => {
     const day = getDay(date);
-    return !isWeekend(date) && workingHoursMap.has(day) && !holidaySet.has(format(date, 'yyyy-MM-dd'));
+    if (!workingHoursMap.has(day)) return false;
+    if (holidaySet.has(format(date, 'yyyy-MM-dd'))) return false;
+    return !isWeekend(date);
   };
 
+  // ✅ beveiligd tegen oneindige loop
   const getNextWorkday = (date: Date) => {
     let d = addDays(date, 1);
-    while (!isWorkingDay(d)) d = addDays(d, 1);
+    let counter = 0;
+    while (!isWorkingDay(d)) {
+      d = addDays(d, 1);
+      counter++;
+      if (counter > 30) {
+        console.warn("⚠️ No valid workday found within 30 days after", date);
+        break;
+      }
+    }
     return d;
   };
 
   const getWorkHours = (date: Date) => {
     const wh = workingHoursMap.get(getDay(date));
     if (!wh) return null;
-    const [sh, sm] = wh.start_time.split(':').map(Number);
-    const [eh, em] = wh.end_time.split(':').map(Number);
+
+    const [sh, sm] = (wh.start_time || "08:00").split(":").map(Number);
+    const [eh, em] = (wh.end_time || "17:00").split(":").map(Number);
+
     const s = setMinutes(setHours(startOfDay(date), sh), sm);
     const e = setMinutes(setHours(startOfDay(date), eh), em);
     return { start: s, end: e };
   };
 
+  // ✅ veiliger splitsing van taken over dagen
   const getTaskSlots = (from: Date, duration: number) => {
     const res: { start: Date; end: Date }[] = [];
     let remaining = duration;
     let cur = from;
-    let wh = getWorkHours(cur);
-    if (!wh) {
-      cur = getNextWorkday(cur);
-      wh = getWorkHours(cur);
-    }
-    if (cur < wh!.start) cur = wh!.start;
+    let guard = 0;
 
-    while (remaining > 0) {
-      const endToday = wh!.end;
-      const available = differenceInMinutes(endToday, cur);
+    while (remaining > 0 && guard < 1000) {
+      guard++;
+      let wh = getWorkHours(cur);
+      if (!wh) {
+        cur = getNextWorkday(cur);
+        continue;
+      }
+      if (cur < wh.start) cur = wh.start;
+      if (cur >= wh.end) {
+        cur = getNextWorkday(cur);
+        continue;
+      }
+
+      const available = differenceInMinutes(wh.end, cur);
       const used = Math.min(remaining, available);
       res.push({ start: cur, end: addMinutes(cur, used) });
       remaining -= used;
-      if (remaining > 0) {
+      cur = addMinutes(cur, used);
+
+      if (cur >= wh.end && remaining > 0) {
         cur = getNextWorkday(cur);
-        wh = getWorkHours(cur);
-        cur = wh!.start;
       }
     }
+
+    if (guard >= 1000) console.warn("⚠️ Task splitting loop exceeded 1000 iterations for task duration:", duration);
     return res;
   };
 
-  const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
-
+  // ✅ crash-safe scheduling logica
   const schedule = useMemo(() => {
-    const all = new Map<string, { task: Task; start: Date; end: Date }[]>();
-    const projectTaskEndTimes = new Map<string, Date>(); // keyed by standard_task_id
-    const getLimitEnd = (limitIds: string[]) => {
-      const ends = limitIds
-        .map((id) => projectTaskEndTimes.get(id))
-        .filter(Boolean)
-        .sort((a, b) => a!.getTime() - b!.getTime());
-      return ends.length ? ends[ends.length - 1]! : null;
-    };
+    try {
+      const all = new Map<string, { task: Task; start: Date; end: Date }[]>();
+      const projectTaskEndTimes = new Map<string, Date>();
 
-    for (const ws of workstations) {
-      const wsTasks = tasks
-        .filter((t) => t.workstations?.some((x) => x.id === ws.id))
-        .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+      const getLimitEnd = (limitIds: string[]) => {
+        const ends = limitIds
+          .map((id) => projectTaskEndTimes.get(id))
+          .filter((d): d is Date => !!d)
+          .sort((a, b) => a.getTime() - b.getTime());
+        return ends.length ? ends[ends.length - 1] : null;
+      };
 
-      let cursor = timelineStart;
-      const list: { task: Task; start: Date; end: Date }[] = [];
+      for (const ws of workstations) {
+        const wsTasks = tasks
+          .filter((t) => t.workstations?.some((x) => x.id === ws.id))
+          .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
-      for (const task of wsTasks) {
-        let startTime = cursor;
+        let cursor = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
+        const list: { task: Task; start: Date; end: Date }[] = [];
 
-        // HOLD-taken: wacht op limit tasks
-        if (task.status === 'HOLD' && task.standard_task_id) {
-          const limits = limitPhases
-            .filter((lp) => lp.standard_task_id === task.standard_task_id)
-            .map((lp) => lp.limit_standard_task_id);
-          const limitEnd = getLimitEnd(limits);
-          if (limitEnd && isBefore(startTime, limitEnd)) startTime = limitEnd;
+        for (const task of wsTasks) {
+          let startTime = cursor;
+
+          // HANDLE LIMIT PHASE LOGIC
+          if (task.status === 'HOLD' && task.standard_task_id) {
+            const limits = limitPhases
+              .filter((lp) => lp.standard_task_id === task.standard_task_id)
+              .map((lp) => lp.limit_standard_task_id);
+            const limitEnd = getLimitEnd(limits);
+            if (limitEnd && isBefore(startTime, limitEnd)) startTime = limitEnd;
+          }
+
+          const slots = getTaskSlots(startTime, task.duration);
+          if (slots.length === 0) continue;
+
+          slots.forEach((s) => list.push({ task, ...s }));
+          const taskEnd = list[list.length - 1].end;
+          cursor = taskEnd;
+
+          if (task.standard_task_id) projectTaskEndTimes.set(task.standard_task_id, taskEnd);
         }
 
-        const slots = getTaskSlots(startTime, task.duration);
-        slots.forEach((s) => list.push({ task, ...s }));
-        const taskEnd = list[list.length - 1].end;
-        cursor = taskEnd;
-
-        if (task.standard_task_id) {
-          projectTaskEndTimes.set(task.standard_task_id, taskEnd);
-        }
+        all.set(ws.id, list);
       }
 
-      all.set(ws.id, list);
+      return all;
+    } catch (err) {
+      console.error("❌ Error computing schedule:", err);
+      return new Map();
     }
-    return all;
   }, [tasks, workstations, selectedDate, limitPhases, workingHoursMap, holidaySet]);
 
   if (loading)
