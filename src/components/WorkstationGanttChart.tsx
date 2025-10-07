@@ -160,59 +160,72 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
   const getNextWorkingSlot = (from: Date, durationMinutes: number): { start: Date; end: Date } => {
     let currentDate = new Date(from);
-    let remainingMinutes = durationMinutes;
-    let startTime: Date | null = null;
     let currentTime = new Date(from);
 
-    // Find next working day if we're not on one
-    while (!isWorkingDay(currentDate)) {
+    const advanceToNextDay = () => {
       currentDate = addDays(startOfDay(currentDate), 1);
       currentTime = currentDate;
+    };
+
+    const findWorkHoursForCurrentDay = () => getWorkingHoursForDate(currentDate);
+
+    // Ensure we are on a day that is a working day AND has configured working hours
+    let workHours = findWorkHoursForCurrentDay();
+    while (!isWorkingDay(currentDate) || !workHours) {
+      advanceToNextDay();
+      workHours = findWorkHoursForCurrentDay();
     }
 
+    // Clamp current time into today's working window
+    if (currentTime < workHours.start) currentTime = new Date(workHours.start);
+    if (currentTime >= workHours.end) {
+      // Move to next day with working hours
+      advanceToNextDay();
+      workHours = findWorkHoursForCurrentDay();
+      while (!isWorkingDay(currentDate) || !workHours) {
+        advanceToNextDay();
+        workHours = findWorkHoursForCurrentDay();
+      }
+      currentTime = new Date(workHours.start);
+    }
+
+    // If duration is zero, just return the aligned start point
+    if (durationMinutes <= 0) {
+      return { start: new Date(currentTime), end: new Date(currentTime) };
+    }
+
+    // Schedule across days as needed
+    let remainingMinutes = Math.max(0, Math.round(durationMinutes));
+    const startTime = new Date(currentTime);
+
     while (remainingMinutes > 0) {
-      const workHours = getWorkingHoursForDate(currentDate);
-      
-      if (!workHours) {
-        // Move to next day
-        currentDate = addDays(startOfDay(currentDate), 1);
-        currentTime = currentDate;
+      workHours = findWorkHoursForCurrentDay();
+
+      // If no working hours for this day or not a working day, skip to next day
+      if (!workHours || !isWorkingDay(currentDate)) {
+        advanceToNextDay();
         continue;
       }
 
-      // If current time is before work start, move to work start
-      if (currentTime < workHours.start) {
-        currentTime = new Date(workHours.start);
-      }
-
-      // If current time is after work end, move to next day
+      // Ensure we are within today's window
+      if (currentTime < workHours.start) currentTime = new Date(workHours.start);
       if (currentTime >= workHours.end) {
-        currentDate = addDays(startOfDay(currentDate), 1);
-        currentTime = currentDate;
+        advanceToNextDay();
         continue;
       }
 
-      // Set start time if not set yet
-      if (!startTime) {
-        startTime = new Date(currentTime);
-      }
-
-      // Calculate available minutes until end of work day
       const availableMinutes = differenceInMinutes(workHours.end, currentTime);
-      
+
       if (remainingMinutes <= availableMinutes) {
-        // Task fits in current day
         currentTime = addMinutes(currentTime, remainingMinutes);
         remainingMinutes = 0;
       } else {
-        // Task continues to next day
         remainingMinutes -= availableMinutes;
-        currentDate = addDays(startOfDay(currentDate), 1);
-        currentTime = currentDate;
+        advanceToNextDay();
       }
     }
 
-    return { start: startTime!, end: currentTime };
+    return { start: startTime, end: currentTime };
   };
 
   // ---------- data fetch ----------
