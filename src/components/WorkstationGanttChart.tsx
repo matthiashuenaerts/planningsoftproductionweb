@@ -226,6 +226,10 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
           holidayService.getHolidays(),
         ]);
 
+        console.log('[Gantt] Workstations:', workstationData?.length);
+        console.log('[Gantt] Working hours:', workingHoursData);
+        console.log('[Gantt] Holidays:', holidaysData);
+
         setWorkstations(workstationData || []);
         setWorkingHours(workingHoursData || []);
         setHolidays(holidaysData || []);
@@ -256,10 +260,14 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
             )
           `)
           .in('status', ['TODO', 'HOLD'])
-          .not('due_date', 'is', null)
           .order('due_date');
 
-        if (error) throw error;
+        if (error) {
+          console.error('[Gantt] Error fetching tasks:', error);
+          throw error;
+        }
+
+        console.log('[Gantt] Raw tasks fetched:', tasksData?.length);
 
         const transformed =
           (tasksData || []).map((t: any) => ({
@@ -276,6 +284,9 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
               t.task_workstation_links?.map((l: any) => l.workstations).filter(Boolean) || [],
           })) || [];
 
+        console.log('[Gantt] Transformed tasks:', transformed.length);
+        console.log('[Gantt] Sample task:', transformed[0]);
+
         setTasks(transformed);
 
         // Fetch limit phases
@@ -285,9 +296,10 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
         
         if (!limitError) {
           setLimitPhases(limitPhasesData || []);
+          console.log('[Gantt] Limit phases:', limitPhasesData?.length);
         }
       } catch (err) {
-        console.error('Error fetching data', err);
+        console.error('[Gantt] Error fetching data', err);
       } finally {
         setLoading(false);
       }
@@ -339,17 +351,27 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
   // ---------- schedule berekenen (respect working hours, handle HOLD tasks) ----------
   const computeTaskSchedule = (workstationId: string) => {
     const wsTasks = getTasksForWorkstation(workstationId);
+    console.log(`[Gantt] Computing schedule for workstation ${workstationId}, found ${wsTasks.length} tasks`);
+    
     const scheduled: Array<{ task: Task; start: Date; end: Date }> = [];
     const completedTaskIds = new Set<string>();
+
+    if (wsTasks.length === 0) {
+      return scheduled;
+    }
 
     // Get first working slot
     let currentTime = timelineStart;
     const firstWorkingSlot = getNextWorkingSlot(currentTime, 0);
     currentTime = firstWorkingSlot.start;
 
+    console.log(`[Gantt] First working slot starts at: ${format(currentTime, 'PPpp')}`);
+
     // Separate TODO and HOLD tasks
     const todoTasks = wsTasks.filter(t => t.status === 'TODO');
     const holdTasks = wsTasks.filter(t => t.status === 'HOLD');
+
+    console.log(`[Gantt] TODO tasks: ${todoTasks.length}, HOLD tasks: ${holdTasks.length}`);
 
     // Schedule TODO tasks first
     for (const task of todoTasks) {
@@ -358,6 +380,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       scheduled.push({ task, start, end });
       completedTaskIds.add(task.id);
       currentTime = end;
+      console.log(`[Gantt] Scheduled TODO task "${task.title}" from ${format(start, 'PPp')} to ${format(end, 'PPp')}`);
     }
 
     // Schedule HOLD tasks - wait for their limit phases
@@ -377,7 +400,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       }
 
       if (schedulableHoldTasks.length === 0) {
-        // No more tasks can be scheduled, break to avoid infinite loop
+        console.log(`[Gantt] No more HOLD tasks can be scheduled. ${holdTasksRemaining.length} tasks remaining blocked.`);
         break;
       }
 
@@ -388,12 +411,14 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
         scheduled.push({ task, start, end });
         completedTaskIds.add(task.id);
         currentTime = end;
+        console.log(`[Gantt] Scheduled HOLD task "${task.title}" from ${format(start, 'PPp')} to ${format(end, 'PPp')}`);
 
         // Remove from remaining
         holdTasksRemaining = holdTasksRemaining.filter(t => t.id !== task.id);
       }
     }
 
+    console.log(`[Gantt] Total scheduled tasks for workstation: ${scheduled.length}`);
     return scheduled;
   };
 
@@ -530,12 +555,24 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                         const rawLeft = (minutesFromStart / scale.unitInMinutes) * scale.unitWidth;
                         const rawWidth = (taskMinutes / scale.unitInMinutes) * scale.unitWidth;
                         const left = Math.round(rawLeft);
-                        const width = Math.max(6, Math.round(rawWidth)); // min breedte
+                        const width = Math.max(20, Math.round(rawWidth)); // min breedte 20px for visibility
 
-                        // skip volledig buiten zichtbare range (of render clipped items if je wilt)
-                        if (end <= timelineStart) return null;
-                        if (start >= timelineEnd) return null;
+                        // Log positioning for debugging
+                        if (scheduled.indexOf({ task, start, end }) === 0) {
+                          console.log(`[Gantt] First task positioning:`, {
+                            taskTitle: task.title,
+                            start: format(start, 'PPpp'),
+                            end: format(end, 'PPpp'),
+                            minutesFromStart,
+                            taskMinutes,
+                            left,
+                            width,
+                            timelineStart: format(timelineStart, 'PPpp'),
+                            timelineEnd: format(timelineEnd, 'PPpp'),
+                          });
+                        }
 
+                        // Render even if partially outside visible range
                         const projectId = task.phases?.projects?.id || '';
                         const projectName = task.phases?.projects?.name || 'Unknown Project';
                         const phaseName = task.phases?.name || '';
