@@ -58,6 +58,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
   const [loading, setLoading] = useState(true);
   const [zoom, setZoom] = useState(1);
   const scrollRef = useRef<HTMLDivElement>(null);
+
   const rowHeight = 60;
   const headerHeight = 80;
   const workstationLabelWidth = 200;
@@ -96,12 +97,10 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
         ...t,
         workstations: t.task_workstation_links?.map((x: any) => x.workstations).filter(Boolean) || [],
       }));
-
       setTasks(mapped);
 
       const { data: lp } = await supabase.from('standard_task_limit_phases').select('*');
       setLimitPhases(lp || []);
-
       setLoading(false);
     })();
   }, [selectedDate]);
@@ -149,6 +148,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     let safety = 0;
 
     const seekNextWorkingDay = () => {
+      // advance day-by-day until a day with working hours is found (with safety cap)
       while (safety < 365) {
         cur = addDays(startOfDay(cur), 1);
         const nextWh = getWorkHours(cur);
@@ -159,15 +159,16 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     };
 
     let wh = getWorkHours(cur);
-
+    // If no working hours at the starting date, move forward to find one
     if (!wh) {
       wh = seekNextWorkingDay();
-      if (!wh) return res;
+      if (!wh) return res; // give up if none found
     }
-
+    // If before start of working hours, align to start
     if (cur < wh.start) cur = wh.start;
 
     while (remaining > 0 && safety < 365) {
+      // If we've reached/passed today's end, jump to next working day
       if (cur >= wh.end) {
         wh = seekNextWorkingDay();
         if (!wh) break;
@@ -176,6 +177,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
       const available = Math.max(0, differenceInMinutes(wh.end, cur));
       if (available <= 0) {
+        // no time left today, go to next day
         wh = seekNextWorkingDay();
         if (!wh) break;
         if (cur < wh.start) cur = wh.start;
@@ -185,7 +187,6 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       const used = Math.min(remaining, available);
       const slotStart = cur;
       const slotEnd = addMinutes(cur, used);
-
       if (used > 0) res.push({ start: slotStart, end: slotEnd });
 
       remaining -= used;
@@ -200,8 +201,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
   const schedule = useMemo(() => {
     const all = new Map<string, { task: Task; start: Date; end: Date }[]>();
-    const projectTaskEndTimes = new Map<string, Date>();
-
+    const projectTaskEndTimes = new Map<string, Date>(); // keyed by standard_task_id
     const getLimitEnd = (limitIds: string[]) => {
       const ends = limitIds
         .map((id) => projectTaskEndTimes.get(id))
@@ -221,6 +221,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       for (const task of wsTasks) {
         let startTime = cursor;
 
+        // HOLD-taken: wacht op limit tasks
         if (task.status === 'HOLD' && task.standard_task_id) {
           const limits = limitPhases
             .filter((lp) => lp.standard_task_id === task.standard_task_id)
@@ -230,10 +231,11 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
         }
 
         const slots = getTaskSlots(startTime, task.duration);
-        if (slots.length === 0) continue;
-
+        if (slots.length === 0) {
+          // No available working hours to schedule this task now
+          continue;
+        }
         slots.forEach((s) => list.push({ task, ...s }));
-
         const taskEnd = list[list.length - 1].end;
         cursor = taskEnd;
 
@@ -244,7 +246,6 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
       all.set(ws.id, list);
     }
-
     return all;
   }, [tasks, workstations, selectedDate, limitPhases, workingHoursMap, holidaySet]);
 
@@ -288,6 +289,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
               </div>
             ))}
           </div>
+
           {workstations.map((ws) => {
             const wsTasks = schedule.get(ws.id) || [];
             return (
