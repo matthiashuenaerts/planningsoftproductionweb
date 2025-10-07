@@ -190,6 +190,10 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
     for (const t of wsTasks) {
       const slots = scheduleTaskStrict(cursor, t.duration);
+      if (slots.length === 0) {
+        console.warn(`No slots scheduled for task ${t.id} (${t.title})`);
+        continue;
+      }
       slots.forEach(s => planned.push({ task: t, start: s.start, end: s.end }));
       cursor = addMinutes(slots[slots.length - 1].end, 1);
     }
