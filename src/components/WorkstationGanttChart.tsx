@@ -141,27 +141,59 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
   const getTaskSlots = (from: Date, duration: number) => {
     const res: { start: Date; end: Date }[] = [];
-    let remaining = duration;
-    let cur = from;
-    let wh = getWorkHours(cur);
-    if (!wh) {
-      cur = getNextWorkday(cur);
-      wh = getWorkHours(cur);
-    }
-    if (cur < wh!.start) cur = wh!.start;
+    if (duration <= 0) return res;
 
-    while (remaining > 0) {
-      const endToday = wh!.end;
-      const available = differenceInMinutes(endToday, cur);
-      const used = Math.min(remaining, available);
-      res.push({ start: cur, end: addMinutes(cur, used) });
-      remaining -= used;
-      if (remaining > 0) {
-        cur = getNextWorkday(cur);
-        wh = getWorkHours(cur);
-        cur = wh!.start;
+    let remaining = duration;
+    let cur = new Date(from);
+    let safety = 0;
+
+    const seekNextWorkingDay = () => {
+      // advance day-by-day until a day with working hours is found (with safety cap)
+      while (safety < 365) {
+        cur = addDays(startOfDay(cur), 1);
+        const nextWh = getWorkHours(cur);
+        safety++;
+        if (nextWh) return nextWh;
       }
+      return null;
+    };
+
+    let wh = getWorkHours(cur);
+    // If no working hours at the starting date, move forward to find one
+    if (!wh) {
+      wh = seekNextWorkingDay();
+      if (!wh) return res; // give up if none found
     }
+    // If before start of working hours, align to start
+    if (cur < wh.start) cur = wh.start;
+
+    while (remaining > 0 && safety < 365) {
+      // If we've reached/passed today's end, jump to next working day
+      if (cur >= wh.end) {
+        wh = seekNextWorkingDay();
+        if (!wh) break;
+        if (cur < wh.start) cur = wh.start;
+      }
+
+      const available = Math.max(0, differenceInMinutes(wh.end, cur));
+      if (available <= 0) {
+        // no time left today, go to next day
+        wh = seekNextWorkingDay();
+        if (!wh) break;
+        if (cur < wh.start) cur = wh.start;
+        continue;
+      }
+
+      const used = Math.min(remaining, available);
+      const slotStart = cur;
+      const slotEnd = addMinutes(cur, used);
+      if (used > 0) res.push({ start: slotStart, end: slotEnd });
+
+      remaining -= used;
+      cur = slotEnd;
+      safety++;
+    }
+
     return res;
   };
 
@@ -199,6 +231,10 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
         }
 
         const slots = getTaskSlots(startTime, task.duration);
+        if (slots.length === 0) {
+          // No available working hours to schedule this task now
+          continue;
+        }
         slots.forEach((s) => list.push({ task, ...s }));
         const taskEnd = list[list.length - 1].end;
         cursor = taskEnd;
