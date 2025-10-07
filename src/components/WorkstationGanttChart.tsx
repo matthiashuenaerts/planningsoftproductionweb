@@ -5,9 +5,19 @@ import {
   differenceInMinutes,
   startOfDay,
   parseISO,
+  isWeekend,
+  setHours,
+  setMinutes,
+  addDays,
+  isSameDay,
+  getDay,
+  parse,
 } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { workstationService, Workstation } from '@/services/workstationService';
+import { workingHoursService, WorkingHours } from '@/services/workingHoursService';
+import { holidayService, Holiday } from '@/services/holidayService';
+import { standardTasksService } from '@/services/standardTasksService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, RefreshCw, AlertCircle } from 'lucide-react';
@@ -22,6 +32,7 @@ interface Task {
   status: string;
   due_date: string;
   phase_id: string;
+  standard_task_id?: string;
   phases?: {
     name: string;
     projects: {
@@ -35,6 +46,12 @@ interface Task {
   }>;
 }
 
+interface LimitPhase {
+  id: string;
+  standard_task_id: string;
+  limit_standard_task_id: string;
+}
+
 interface WorkstationGanttChartProps {
   selectedDate: Date; // referentiedatum (we gebruiken startOfDay(selectedDate) als timeline-start)
 }
@@ -42,6 +59,9 @@ interface WorkstationGanttChartProps {
 const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedDate }) => {
   const [workstations, setWorkstations] = useState<Workstation[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [workingHours, setWorkingHours] = useState<WorkingHours[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [limitPhases, setLimitPhases] = useState<LimitPhase[]>([]);
   const [loading, setLoading] = useState(true);
   const [zoom, setZoom] = useState(1); // hogere waarde = meer inzoomen (meer detail)
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -109,13 +129,106 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     return { bg, text };
   };
 
+  // ---------- helper functions for working hours ----------
+  const isHoliday = (date: Date): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return holidays.some(h => h.date === dateStr && h.team === 'production');
+  };
+
+  const isWorkingDay = (date: Date): boolean => {
+    if (isWeekend(date)) return false;
+    if (isHoliday(date)) return false;
+    return true;
+  };
+
+  const getWorkingHoursForDate = (date: Date): { start: Date; end: Date; breakMinutes: number } | null => {
+    if (!isWorkingDay(date)) return null;
+    
+    const dayOfWeek = getDay(date); // 0 = Sunday, 6 = Saturday
+    const wh = workingHours.find(w => w.team === 'production' && w.day_of_week === dayOfWeek && w.is_active);
+    
+    if (!wh) return null;
+
+    const [startHour, startMin] = wh.start_time.split(':').map(Number);
+    const [endHour, endMin] = wh.end_time.split(':').map(Number);
+    
+    const start = setMinutes(setHours(date, startHour), startMin);
+    const end = setMinutes(setHours(date, endHour), endMin);
+    
+    return { start, end, breakMinutes: wh.break_minutes };
+  };
+
+  const getNextWorkingSlot = (from: Date, durationMinutes: number): { start: Date; end: Date } => {
+    let currentDate = new Date(from);
+    let remainingMinutes = durationMinutes;
+    let startTime: Date | null = null;
+    let currentTime = new Date(from);
+
+    // Find next working day if we're not on one
+    while (!isWorkingDay(currentDate)) {
+      currentDate = addDays(startOfDay(currentDate), 1);
+      currentTime = currentDate;
+    }
+
+    while (remainingMinutes > 0) {
+      const workHours = getWorkingHoursForDate(currentDate);
+      
+      if (!workHours) {
+        // Move to next day
+        currentDate = addDays(startOfDay(currentDate), 1);
+        currentTime = currentDate;
+        continue;
+      }
+
+      // If current time is before work start, move to work start
+      if (currentTime < workHours.start) {
+        currentTime = new Date(workHours.start);
+      }
+
+      // If current time is after work end, move to next day
+      if (currentTime >= workHours.end) {
+        currentDate = addDays(startOfDay(currentDate), 1);
+        currentTime = currentDate;
+        continue;
+      }
+
+      // Set start time if not set yet
+      if (!startTime) {
+        startTime = new Date(currentTime);
+      }
+
+      // Calculate available minutes until end of work day
+      const availableMinutes = differenceInMinutes(workHours.end, currentTime);
+      
+      if (remainingMinutes <= availableMinutes) {
+        // Task fits in current day
+        currentTime = addMinutes(currentTime, remainingMinutes);
+        remainingMinutes = 0;
+      } else {
+        // Task continues to next day
+        remainingMinutes -= availableMinutes;
+        currentDate = addDays(startOfDay(currentDate), 1);
+        currentTime = currentDate;
+      }
+    }
+
+    return { start: startTime!, end: currentTime };
+  };
+
   // ---------- data fetch ----------
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const workstationData = await workstationService.getAll();
+        const [workstationData, workingHoursData, holidaysData] = await Promise.all([
+          workstationService.getAll(),
+          workingHoursService.getWorkingHours(),
+          holidayService.getHolidays(),
+        ]);
+
         setWorkstations(workstationData || []);
+        setWorkingHours(workingHoursData || []);
+        setHolidays(holidaysData || []);
 
         const { data: tasksData, error } = await supabase
           .from('tasks')
@@ -127,6 +240,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
             status,
             due_date,
             phase_id,
+            standard_task_id,
             phases (
               name,
               projects (
@@ -156,12 +270,22 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
             status: t.status,
             due_date: t.due_date,
             phase_id: t.phase_id,
+            standard_task_id: t.standard_task_id,
             phases: t.phases,
             workstations:
               t.task_workstation_links?.map((l: any) => l.workstations).filter(Boolean) || [],
           })) || [];
 
         setTasks(transformed);
+
+        // Fetch limit phases
+        const { data: limitPhasesData, error: limitError } = await supabase
+          .from('standard_task_limit_phases')
+          .select('*');
+        
+        if (!limitError) {
+          setLimitPhases(limitPhasesData || []);
+        }
       } catch (err) {
         console.error('Error fetching data', err);
       } finally {
@@ -189,18 +313,85 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       .filter((t) => t.workstations?.some((ws) => ws.id === workstationId))
       .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
-  // ---------- schedule berekenen (geen overlap, minute-precise) ----------
+  // ---------- check if limit phases are completed ----------
+  const areLimitPhasesCompleted = (task: Task, completedTasks: Set<string>): boolean => {
+    if (!task.standard_task_id) return true;
+    
+    const limits = limitPhases.filter(lp => lp.standard_task_id === task.standard_task_id);
+    if (limits.length === 0) return true;
+
+    // Find all tasks with the limit standard_task_ids in the same project
+    const projectId = task.phases?.projects?.id;
+    if (!projectId) return true;
+
+    const projectTasks = tasks.filter(t => t.phases?.projects?.id === projectId);
+
+    for (const limit of limits) {
+      const limitTask = projectTasks.find(t => t.standard_task_id === limit.limit_standard_task_id);
+      if (limitTask && !completedTasks.has(limitTask.id)) {
+        return false; // A limit task is not yet completed
+      }
+    }
+
+    return true;
+  };
+
+  // ---------- schedule berekenen (respect working hours, handle HOLD tasks) ----------
   const computeTaskSchedule = (workstationId: string) => {
     const wsTasks = getTasksForWorkstation(workstationId);
-    let currentTime = timelineStart; // start opeenvolgend plannen vanaf timelineStart
     const scheduled: Array<{ task: Task; start: Date; end: Date }> = [];
+    const completedTaskIds = new Set<string>();
 
-    for (const task of wsTasks) {
-      // start = currentTime, end = start + duration (in minuten)
-      const start = currentTime;
-      const end = addMinutes(start, Math.max(1, Math.round(task.duration ?? 0))); // minimaal 1 minuut
+    // Get first working slot
+    let currentTime = timelineStart;
+    const firstWorkingSlot = getNextWorkingSlot(currentTime, 0);
+    currentTime = firstWorkingSlot.start;
+
+    // Separate TODO and HOLD tasks
+    const todoTasks = wsTasks.filter(t => t.status === 'TODO');
+    const holdTasks = wsTasks.filter(t => t.status === 'HOLD');
+
+    // Schedule TODO tasks first
+    for (const task of todoTasks) {
+      const durationMinutes = Math.max(1, Math.round(task.duration ?? 0));
+      const { start, end } = getNextWorkingSlot(currentTime, durationMinutes);
       scheduled.push({ task, start, end });
-      currentTime = end; // volgende taak start wanneer deze eindigt
+      completedTaskIds.add(task.id);
+      currentTime = end;
+    }
+
+    // Schedule HOLD tasks - wait for their limit phases
+    let holdTasksRemaining = [...holdTasks];
+    let maxIterations = holdTasks.length * 10; // Prevent infinite loops
+    let iterations = 0;
+
+    while (holdTasksRemaining.length > 0 && iterations < maxIterations) {
+      iterations++;
+      const schedulableHoldTasks: Task[] = [];
+
+      // Find HOLD tasks whose limit phases are completed
+      for (const task of holdTasksRemaining) {
+        if (areLimitPhasesCompleted(task, completedTaskIds)) {
+          schedulableHoldTasks.push(task);
+        }
+      }
+
+      if (schedulableHoldTasks.length === 0) {
+        // No more tasks can be scheduled, break to avoid infinite loop
+        break;
+      }
+
+      // Schedule the tasks that are now ready
+      for (const task of schedulableHoldTasks) {
+        const durationMinutes = Math.max(1, Math.round(task.duration ?? 0));
+        const { start, end } = getNextWorkingSlot(currentTime, durationMinutes);
+        scheduled.push({ task, start, end });
+        completedTaskIds.add(task.id);
+        currentTime = end;
+
+        // Remove from remaining
+        holdTasksRemaining = holdTasksRemaining.filter(t => t.id !== task.id);
+      }
     }
 
     return scheduled;
