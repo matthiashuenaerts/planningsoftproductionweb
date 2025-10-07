@@ -368,9 +368,20 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     
     const scheduled: Array<{ task: Task; start: Date; end: Date }> = [];
     const completedTaskIds = new Set<string>();
+    const scheduledPerProject = new Map<string, Set<string>>(); // track scheduled tasks per project
 
     if (wsTasks.length === 0) {
       return scheduled;
+    }
+
+    // Group tasks by project for proper ordering
+    const tasksByProject = new Map<string, Task[]>();
+    for (const task of wsTasks) {
+      const projectId = task.phases?.projects?.id || 'unknown';
+      if (!tasksByProject.has(projectId)) {
+        tasksByProject.set(projectId, []);
+      }
+      tasksByProject.get(projectId)!.push(task);
     }
 
     // Get first working slot
@@ -379,60 +390,101 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     currentTime = firstWorkingSlot.start;
 
     console.log(`[Gantt] First working slot starts at: ${format(currentTime, 'PPpp')}`);
+    console.log(`[Gantt] Projects found: ${tasksByProject.size}`);
 
-    // Separate TODO and HOLD tasks
-    const todoTasks = wsTasks.filter(t => t.status === 'TODO');
-    const holdTasks = wsTasks.filter(t => t.status === 'HOLD');
+    // Schedule tasks project by project to respect dependencies
+    for (const [projectId, projectTasks] of tasksByProject) {
+      console.log(`[Gantt] Scheduling project ${projectId} with ${projectTasks.length} tasks`);
+      
+      const projectScheduledTaskIds = new Set<string>();
+      scheduledPerProject.set(projectId, projectScheduledTaskIds);
 
-    console.log(`[Gantt] TODO tasks: ${todoTasks.length}, HOLD tasks: ${holdTasks.length}`);
+      // Sort tasks: TODO first, then HOLD
+      const todoTasks = projectTasks.filter(t => t.status === 'TODO').sort((a, b) => 
+        new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+      );
+      const holdTasks = projectTasks.filter(t => t.status === 'HOLD').sort((a, b) => 
+        new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+      );
 
-    // Schedule TODO tasks first
-    for (const task of todoTasks) {
-      const durationMinutes = Math.max(1, Math.round(task.duration ?? 0));
-      const { start, end } = getNextWorkingSlot(currentTime, durationMinutes);
-      scheduled.push({ task, start, end });
-      completedTaskIds.add(task.id);
-      currentTime = end;
-      console.log(`[Gantt] Scheduled TODO task "${task.title}" from ${format(start, 'PPp')} to ${format(end, 'PPp')}`);
-    }
+      console.log(`[Gantt] Project ${projectId}: ${todoTasks.length} TODO, ${holdTasks.length} HOLD`);
 
-    // Schedule HOLD tasks - wait for their limit phases
-    let holdTasksRemaining = [...holdTasks];
-    let maxIterations = holdTasks.length * 10; // Prevent infinite loops
-    let iterations = 0;
-
-    while (holdTasksRemaining.length > 0 && iterations < maxIterations) {
-      iterations++;
-      const schedulableHoldTasks: Task[] = [];
-
-      // Find HOLD tasks whose limit phases are completed
-      for (const task of holdTasksRemaining) {
-        if (areLimitPhasesCompleted(task, completedTaskIds)) {
-          schedulableHoldTasks.push(task);
-        }
-      }
-
-      if (schedulableHoldTasks.length === 0) {
-        console.log(`[Gantt] No more HOLD tasks can be scheduled. ${holdTasksRemaining.length} tasks remaining blocked.`);
-        break;
-      }
-
-      // Schedule the tasks that are now ready
-      for (const task of schedulableHoldTasks) {
+      // Schedule TODO tasks first
+      for (const task of todoTasks) {
         const durationMinutes = Math.max(1, Math.round(task.duration ?? 0));
         const { start, end } = getNextWorkingSlot(currentTime, durationMinutes);
         scheduled.push({ task, start, end });
         completedTaskIds.add(task.id);
+        projectScheduledTaskIds.add(task.id);
         currentTime = end;
-        console.log(`[Gantt] Scheduled HOLD task "${task.title}" from ${format(start, 'PPp')} to ${format(end, 'PPp')}`);
+        console.log(`[Gantt] Scheduled TODO task "${task.title}" from ${format(start, 'PPp')} to ${format(end, 'PPp')}`);
+      }
 
-        // Remove from remaining
-        holdTasksRemaining = holdTasksRemaining.filter(t => t.id !== task.id);
+      // Schedule HOLD tasks - wait for their limit phases within the same project
+      let holdTasksRemaining = [...holdTasks];
+      let maxIterations = holdTasks.length * 10;
+      let iterations = 0;
+
+      while (holdTasksRemaining.length > 0 && iterations < maxIterations) {
+        iterations++;
+        const schedulableHoldTasks: Task[] = [];
+
+        // Find HOLD tasks whose limit phases are completed within this project
+        for (const task of holdTasksRemaining) {
+          if (areLimitPhasesCompletedForProject(task, projectTasks, projectScheduledTaskIds)) {
+            schedulableHoldTasks.push(task);
+          }
+        }
+
+        if (schedulableHoldTasks.length === 0) {
+          console.log(`[Gantt] Project ${projectId}: No more HOLD tasks can be scheduled. ${holdTasksRemaining.length} remaining blocked.`);
+          break;
+        }
+
+        // Schedule the tasks that are now ready
+        for (const task of schedulableHoldTasks) {
+          const durationMinutes = Math.max(1, Math.round(task.duration ?? 0));
+          const { start, end } = getNextWorkingSlot(currentTime, durationMinutes);
+          scheduled.push({ task, start, end });
+          completedTaskIds.add(task.id);
+          projectScheduledTaskIds.add(task.id);
+          currentTime = end;
+          console.log(`[Gantt] Scheduled HOLD task "${task.title}" from ${format(start, 'PPp')} to ${format(end, 'PPp')}`);
+
+          holdTasksRemaining = holdTasksRemaining.filter(t => t.id !== task.id);
+        }
       }
     }
 
     console.log(`[Gantt] Total scheduled tasks for workstation: ${scheduled.length}`);
     return scheduled;
+  };
+
+  // Updated limit phase check for project-specific scheduling
+  const areLimitPhasesCompletedForProject = (
+    task: Task, 
+    projectTasks: Task[], 
+    completedInProject: Set<string>
+  ): boolean => {
+    if (!task.standard_task_id) return true;
+    
+    const limits = limitPhases.filter(lp => lp.standard_task_id === task.standard_task_id);
+    if (limits.length === 0) return true;
+
+    console.log(`[Gantt] Checking limit phases for task "${task.title}" (${task.standard_task_id})`);
+    console.log(`[Gantt] Found ${limits.length} limit phases`);
+
+    for (const limit of limits) {
+      const limitTask = projectTasks.find(t => t.standard_task_id === limit.limit_standard_task_id);
+      if (limitTask) {
+        if (!completedInProject.has(limitTask.id)) {
+          console.log(`[Gantt] Task "${task.title}" blocked by "${limitTask.title}"`);
+          return false;
+        }
+      }
+    }
+
+    return true;
   };
 
   // ---------- controls ----------
@@ -559,6 +611,30 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                       />
                     ))}
 
+                    {/* Working hours visualization */}
+                    {timeline.map((date, idx) => {
+                      const workHours = getWorkingHoursForDate(date);
+                      if (!workHours) return null;
+
+                      const startMinutes = differenceInMinutes(workHours.start, timelineStart);
+                      const endMinutes = differenceInMinutes(workHours.end, timelineStart);
+                      const durationMinutes = differenceInMinutes(workHours.end, workHours.start);
+
+                      const startLeft = (startMinutes / scale.unitInMinutes) * scale.unitWidth;
+                      const workWidth = (durationMinutes / scale.unitInMinutes) * scale.unitWidth;
+
+                      return (
+                        <div
+                          key={`work-${idx}`}
+                          className="absolute top-0 bottom-0 bg-green-500/5 pointer-events-none"
+                          style={{
+                            left: `${startLeft}px`,
+                            width: `${workWidth}px`,
+                          }}
+                        />
+                      );
+                    })}
+
                     <TooltipProvider>
                       {scheduled.map(({ task, start, end }) => {
                         // bereken positie t.o.v. timelineStart (in minuten)
@@ -570,26 +646,18 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                         const left = Math.round(rawLeft);
                         const width = Math.max(20, Math.round(rawWidth)); // min breedte 20px for visibility
 
-                        // Log positioning for debugging
-                        if (scheduled.indexOf({ task, start, end }) === 0) {
-                          console.log(`[Gantt] First task positioning:`, {
-                            taskTitle: task.title,
-                            start: format(start, 'PPpp'),
-                            end: format(end, 'PPpp'),
-                            minutesFromStart,
-                            taskMinutes,
-                            left,
-                            width,
-                            timelineStart: format(timelineStart, 'PPpp'),
-                            timelineEnd: format(timelineEnd, 'PPpp'),
-                          });
-                        }
+                        // Check if task exceeds due date
+                        const isOverdue = task.due_date && end > new Date(task.due_date);
 
                         // Render even if partially outside visible range
                         const projectId = task.phases?.projects?.id || '';
                         const projectName = task.phases?.projects?.name || 'Unknown Project';
                         const phaseName = task.phases?.name || '';
                         const { bg, text } = getProjectColor(projectId);
+
+                        // Override color if overdue
+                        const finalBg = isOverdue ? 'hsl(0, 85%, 55%)' : bg;
+                        const finalText = isOverdue ? '#fff' : text;
 
                         return (
                           <Tooltip key={task.id}>
@@ -601,17 +669,23 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                                   width: `${width}px`,
                                   top: `8px`,
                                   height: `${rowHeight - 16}px`,
-                                  backgroundColor: bg,
-                                  color: text,
+                                  backgroundColor: finalBg,
+                                  color: finalText,
                                   border:
                                     task.status === 'HOLD'
                                       ? '2px dashed rgba(255,255,255,0.8)'
+                                      : isOverdue
+                                      ? '2px solid rgba(255,255,255,0.9)'
                                       : '1px solid rgba(0,0,0,0.12)',
-                                  boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-                                  zIndex: 5,
+                                  boxShadow: isOverdue 
+                                    ? '0 4px 12px rgba(220, 38, 38, 0.4)' 
+                                    : '0 2px 8px rgba(0,0,0,0.12)',
+                                  zIndex: isOverdue ? 6 : 5,
                                 }}
                               >
-                                <div className="truncate font-bold text-sm">{projectName}</div>
+                                <div className="truncate font-bold text-sm">
+                                  {isOverdue && '⚠️ '}{projectName}
+                                </div>
                                 <div className="truncate text-[11px] opacity-90 mt-0.5">{task.title}</div>
                               </div>
                             </TooltipTrigger>
@@ -624,8 +698,12 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                                   <div className="text-xs text-muted-foreground mt-1">{task.description}</div>
                                 )}
                                 <div className="text-xs space-y-0.5 pt-2 border-t">
-                                  <div><strong>Start:</strong> {format(start, 'PPPp')}</div>
-                                  <div><strong>End:</strong> {format(end, 'PPPp')}</div>
+                                  <div><strong>Scheduled Start:</strong> {format(start, 'PPPp')}</div>
+                                  <div><strong>Scheduled End:</strong> {format(end, 'PPPp')}</div>
+                                  <div><strong>Due Date:</strong> {task.due_date ? format(new Date(task.due_date), 'PPPp') : 'N/A'}</div>
+                                  {isOverdue && (
+                                    <div className="text-red-500 font-semibold">⚠️ OVERDUE - Exceeds due date!</div>
+                                  )}
                                   <div><strong>Duration:</strong> {task.duration} minutes</div>
                                   <div><strong>Status:</strong> {task.status}</div>
                                   <div><strong>Workstations:</strong> {task.workstations?.map(w => w.name).join(', ')}</div>
