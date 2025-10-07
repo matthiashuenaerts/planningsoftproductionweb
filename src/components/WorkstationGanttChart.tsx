@@ -9,7 +9,6 @@ import {
   setMinutes,
   addDays,
   getDay,
-  isBefore,
 } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { workstationService, Workstation } from '@/services/workstationService';
@@ -64,13 +63,12 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
   const workstationLabelWidth = 200;
 
   const scale = useMemo(() => {
-    if (zoom >= 2)
-      return { unitInMinutes: 15, unitWidth: 8 * zoom, totalUnits: (24 * 60 * 3) / 15, format: (d: Date) => format(d, 'HH:mm') };
-    if (zoom >= 1)
-      return { unitInMinutes: 60, unitWidth: 40 * zoom, totalUnits: 24 * 3, format: (d: Date) => format(d, 'HH:mm') };
+    if (zoom >= 2) return { unitInMinutes: 15, unitWidth: 8 * zoom, totalUnits: (24 * 60 * 3) / 15, format: (d: Date) => format(d, 'HH:mm') };
+    if (zoom >= 1) return { unitInMinutes: 60, unitWidth: 40 * zoom, totalUnits: 24 * 3, format: (d: Date) => format(d, 'HH:mm') };
     return { unitInMinutes: 1440, unitWidth: 120 * zoom, totalUnits: 10, format: (d: Date) => format(d, 'dd MMM') };
   }, [zoom]);
 
+  // fetch all once
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -82,8 +80,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       setWorkstations(ws || []);
       setWorkingHours(wh || []);
       setHolidays(hd || []);
-
-      const { data: taskData } = await supabase
+      const { data } = await supabase
         .from('tasks')
         .select(`
           id, title, description, duration, status, due_date, phase_id, standard_task_id,
@@ -92,19 +89,18 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
         `)
         .in('status', ['TODO', 'HOLD'])
         .order('due_date');
-
-      const mapped = (taskData || []).map((t: any) => ({
-        ...t,
-        workstations: t.task_workstation_links?.map((x: any) => x.workstations).filter(Boolean) || [],
+      const t = (data || []).map((d: any) => ({
+        ...d,
+        workstations: d.task_workstation_links?.map((x: any) => x.workstations).filter(Boolean) || [],
       }));
-      setTasks(mapped);
-
+      setTasks(t);
       const { data: lp } = await supabase.from('standard_task_limit_phases').select('*');
       setLimitPhases(lp || []);
       setLoading(false);
     })();
   }, [selectedDate]);
 
+  // precomputed lookup structures
   const workingHoursMap = useMemo(() => {
     const m = new Map<number, WorkingHours>();
     workingHours
@@ -113,10 +109,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     return m;
   }, [workingHours]);
 
-  const holidaySet = useMemo(
-    () => new Set(holidays.filter((h) => h.team === 'production').map((h) => h.date)),
-    [holidays]
-  );
+  const holidaySet = useMemo(() => new Set(holidays.filter((h) => h.team === 'production').map((h) => h.date)), [holidays]);
 
   const isWorkingDay = (date: Date) => {
     const day = getDay(date);
@@ -139,115 +132,58 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     return { start: s, end: e };
   };
 
+  // split task across days — optimized loop
   const getTaskSlots = (from: Date, duration: number) => {
     const res: { start: Date; end: Date }[] = [];
-    if (duration <= 0) return res;
-
     let remaining = duration;
-    let cur = new Date(from);
-    let safety = 0;
-
-    const seekNextWorkingDay = () => {
-      // advance day-by-day until a day with working hours is found (with safety cap)
-      while (safety < 365) {
-        cur = addDays(startOfDay(cur), 1);
-        const nextWh = getWorkHours(cur);
-        safety++;
-        if (nextWh) return nextWh;
-      }
-      return null;
-    };
-
+    let cur = from;
     let wh = getWorkHours(cur);
-    // If no working hours at the starting date, move forward to find one
     if (!wh) {
-      wh = seekNextWorkingDay();
-      if (!wh) return res; // give up if none found
+      cur = getNextWorkday(cur);
+      wh = getWorkHours(cur);
     }
-    // If before start of working hours, align to start
-    if (cur < wh.start) cur = wh.start;
+    if (cur < wh!.start) cur = wh!.start;
 
-    while (remaining > 0 && safety < 365) {
-      // If we've reached/passed today's end, jump to next working day
-      if (cur >= wh.end) {
-        wh = seekNextWorkingDay();
-        if (!wh) break;
-        if (cur < wh.start) cur = wh.start;
-      }
-
-      const available = Math.max(0, differenceInMinutes(wh.end, cur));
-      if (available <= 0) {
-        // no time left today, go to next day
-        wh = seekNextWorkingDay();
-        if (!wh) break;
-        if (cur < wh.start) cur = wh.start;
-        continue;
-      }
-
+    while (remaining > 0) {
+      const endToday = wh!.end;
+      const available = differenceInMinutes(endToday, cur);
       const used = Math.min(remaining, available);
-      const slotStart = cur;
-      const slotEnd = addMinutes(cur, used);
-      if (used > 0) res.push({ start: slotStart, end: slotEnd });
-
+      res.push({ start: cur, end: addMinutes(cur, used) });
       remaining -= used;
-      cur = slotEnd;
-      safety++;
+      if (remaining > 0) {
+        cur = getNextWorkday(cur);
+        wh = getWorkHours(cur);
+        cur = wh!.start;
+      }
     }
-
     return res;
   };
 
-  const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
-
+  // memoize full schedule for all workstations
   const schedule = useMemo(() => {
     const all = new Map<string, { task: Task; start: Date; end: Date }[]>();
-    const projectTaskEndTimes = new Map<string, Date>(); // keyed by standard_task_id
-    const getLimitEnd = (limitIds: string[]) => {
-      const ends = limitIds
-        .map((id) => projectTaskEndTimes.get(id))
-        .filter(Boolean)
-        .sort((a, b) => a!.getTime() - b!.getTime());
-      return ends.length ? ends[ends.length - 1]! : null;
-    };
+    const done = new Set<string>();
+    const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
 
     for (const ws of workstations) {
       const wsTasks = tasks
         .filter((t) => t.workstations?.some((x) => x.id === ws.id))
         .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
-
       let cursor = timelineStart;
       const list: { task: Task; start: Date; end: Date }[] = [];
 
       for (const task of wsTasks) {
-        let startTime = cursor;
-
-        // HOLD-taken: wacht op limit tasks
-        if (task.status === 'HOLD' && task.standard_task_id) {
-          const limits = limitPhases
-            .filter((lp) => lp.standard_task_id === task.standard_task_id)
-            .map((lp) => lp.limit_standard_task_id);
-          const limitEnd = getLimitEnd(limits);
-          if (limitEnd && isBefore(startTime, limitEnd)) startTime = limitEnd;
-        }
-
-        const slots = getTaskSlots(startTime, task.duration);
-        if (slots.length === 0) {
-          // No available working hours to schedule this task now
-          continue;
-        }
+        const slots = getTaskSlots(cursor, task.duration);
         slots.forEach((s) => list.push({ task, ...s }));
-        const taskEnd = list[list.length - 1].end;
-        cursor = taskEnd;
-
-        if (task.standard_task_id) {
-          projectTaskEndTimes.set(task.standard_task_id, taskEnd);
-        }
+        cursor = list[list.length - 1]?.end || cursor;
       }
-
       all.set(ws.id, list);
     }
     return all;
-  }, [tasks, workstations, selectedDate, limitPhases, workingHoursMap, holidaySet]);
+  }, [tasks, workstations, selectedDate, workingHoursMap, holidaySet]);
+
+  const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
+  const timeline = Array.from({ length: scale.totalUnits }, (_, i) => addMinutes(timelineStart, i * scale.unitInMinutes));
 
   if (loading)
     return (
@@ -263,13 +199,11 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     return { bg: `hsl(${hue},65%,45%)`, text: `hsl(${hue},100%,95%)` };
   };
 
-  const timeline = Array.from({ length: scale.totalUnits }, (_, i) => addMinutes(timelineStart, i * scale.unitInMinutes));
-
   return (
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
-          <CardTitle>Workstation Gantt Chart — Limit Phases toegepast</CardTitle>
+          <CardTitle>Workstation Gantt Chart (snel & opgesplitst)</CardTitle>
           <div className="flex gap-2">
             <Button onClick={() => setZoom((z) => Math.max(0.25, z / 1.5))} variant="outline" size="sm">
               <ZoomOut className="w-4 h-4" />
@@ -282,7 +216,11 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       </CardHeader>
       <CardContent>
         <div ref={scrollRef} className="overflow-auto border rounded-lg" style={{ maxHeight: 600 }}>
-          <div className="sticky top-0 z-10 flex border-b bg-muted" style={{ marginLeft: workstationLabelWidth, height: headerHeight }}>
+          {/* header */}
+          <div
+            className="sticky top-0 z-10 flex border-b bg-muted"
+            style={{ marginLeft: workstationLabelWidth, height: headerHeight }}
+          >
             {timeline.map((t, i) => (
               <div key={i} style={{ width: scale.unitWidth }} className="flex flex-col justify-center items-center border-r text-xs">
                 {scale.format(t)}
@@ -290,8 +228,9 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
             ))}
           </div>
 
+          {/* rows */}
           {workstations.map((ws) => {
-            const wsTasks = schedule.get(ws.id) || [];
+            const tasks = schedule.get(ws.id) || [];
             return (
               <div key={ws.id} className="relative border-b" style={{ height: rowHeight }}>
                 <div
@@ -305,12 +244,11 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                     <div key={i} className="absolute top-0 bottom-0 border-r border-border/40" style={{ left: i * scale.unitWidth }} />
                   ))}
                   <TooltipProvider>
-                    {wsTasks.map(({ task, start, end }) => {
+                    {tasks.map(({ task, start, end }) => {
                       const pid = task.phases?.projects?.id || '';
                       const { bg, text } = getColor(pid);
                       const left = (differenceInMinutes(start, timelineStart) / scale.unitInMinutes) * scale.unitWidth;
                       const width = (differenceInMinutes(end, start) / scale.unitInMinutes) * scale.unitWidth;
-                      const opacity = task.status === 'HOLD' ? 0.6 : 1;
                       return (
                         <Tooltip key={`${task.id}-${start.toISOString()}`}>
                           <TooltipTrigger asChild>
@@ -323,7 +261,6 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                                 height: rowHeight - 16,
                                 background: bg,
                                 color: text,
-                                opacity,
                                 border: '1px solid rgba(0,0,0,0.2)',
                               }}
                             >
@@ -334,6 +271,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                             <div className="text-xs space-y-1">
                               <div><b>Start:</b> {format(start, 'dd MMM HH:mm')}</div>
                               <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
+                              <div><b>Duur:</b> {task.duration} min</div>
                               <div><b>Status:</b> {task.status}</div>
                             </div>
                           </TooltipContent>
