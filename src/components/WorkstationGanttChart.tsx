@@ -199,26 +199,52 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       all.set(ws.id, []);
     });
 
-    // Sort all tasks by due date (most urgent first)
-    const sortedTasks = [...tasks]
-      .filter((t) => t.workstations && t.workstations.length > 0)
+    // Separate TODO and HOLD tasks
+    const todoTasks = tasks
+      .filter((t) => t.status === 'TODO' && t.workstations && t.workstations.length > 0)
+      .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+    
+    const holdTasks = tasks
+      .filter((t) => t.status === 'HOLD' && t.workstations && t.workstations.length > 0)
       .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
-    const remainingTasks = new Set(sortedTasks.map((t) => t.id));
-    let maxIterations = sortedTasks.length * 2; // Prevent infinite loops
+    // PHASE 1: Schedule all TODO tasks first (by urgency)
+    for (const task of todoTasks) {
+      // Schedule on all assigned workstations
+      for (const ws of task.workstations || []) {
+        const cursor = workstationCursors.get(ws.id) || timelineStart;
+        const slots = getTaskSlots(cursor, task.duration);
+        
+        if (slots.length > 0) {
+          const taskList = all.get(ws.id) || [];
+          slots.forEach((s) => taskList.push({ task, ...s }));
+          all.set(ws.id, taskList);
+          
+          // Update cursor to end of this task
+          const lastSlot = slots[slots.length - 1];
+          workstationCursors.set(ws.id, lastSlot.end);
+        }
+      }
+      
+      // Mark as completed for dependency tracking
+      completedTasks.add(task.id);
+    }
+
+    // PHASE 2: Schedule HOLD tasks with limit phase checking
+    const remainingHoldTasks = new Set(holdTasks.map((t) => t.id));
+    let maxIterations = holdTasks.length * 3;
     let iteration = 0;
 
-    // Multi-pass scheduling: keep iterating until no more tasks can be scheduled
-    while (remainingTasks.size > 0 && iteration < maxIterations) {
+    while (remainingHoldTasks.size > 0 && iteration < maxIterations) {
       iteration++;
       let scheduledInThisPass = false;
 
-      for (const task of sortedTasks) {
-        if (!remainingTasks.has(task.id)) continue;
+      for (const task of holdTasks) {
+        if (!remainingHoldTasks.has(task.id)) continue;
 
         const projectId = task.phases?.projects?.id || '';
         
-        // Check if all limit tasks are completed
+        // Check if all limit tasks in the same project are completed
         if (!canScheduleTask(task, completedTasks, projectId)) {
           continue;
         }
@@ -241,7 +267,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
         // Mark task as completed and remove from remaining
         completedTasks.add(task.id);
-        remainingTasks.delete(task.id);
+        remainingHoldTasks.delete(task.id);
         scheduledInThisPass = true;
       }
 
