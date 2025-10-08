@@ -90,7 +90,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (!projects || projects.length === 0) {
       // Send email indicating no projects in the forecast period
       await resend.emails.send({
-        from: "Project Forecast <noreply@automattion-compass.com",
+        from: "Project Forecast <noreply@automattion-compass.com>",
         to: recipients,
         subject: `Project Forecast - No Projects in Next ${forecastWeeks} Weeks`,
         html: `
