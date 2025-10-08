@@ -526,13 +526,23 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   };
 
-  const getBottleneckStyle = (wsId: string) => {
-    const found = workstationBottlenecks.find((b) => b.id === wsId);
-    if (!found) return {};
-    if (found.rank === 1) return { background: 'rgba(255,200,200,0.18)', borderLeft: '4px solid hsl(0,75%,50%)' };
-    if (found.rank === 2) return { background: 'rgba(255,230,180,0.18)', borderLeft: '4px solid hsl(30,75%,45%)' };
+ const getBottleneckStyle = (id: string) => {
+  if (bottleneck.rank === 1) {
+    return { background: 'rgba(255,200,200,0.15)', borderLeft: '4px solid hsl(0,75%,45%)' };
+  }
+  if (bottleneck.rank === 2) {
+    return { background: 'rgba(255,220,180,0.14)', borderLeft: '4px solid hsl(25,75%,45%)' };
+  }
+  if (bottleneck.rank === 3) {
     return { background: 'rgba(255,245,200,0.14)', borderLeft: '4px solid hsl(45,75%,45%)' };
-  };
+  }
+  return {}; // fallback style
+}; // ✅ Close the helper function properly
+
+return (
+  <Card>
+    …
+
 
   return (
     <Card>
