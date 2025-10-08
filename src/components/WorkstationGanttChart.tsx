@@ -10,10 +10,12 @@ import {
   addDays,
   getDay,
 } from 'date-fns';
-import { supabase } from '@/integrations/supabase/client';
-import { workstationService, Workstation } from '@/services/workstationService';
-import { workingHoursService, WorkingHours } from '@/services/workingHoursService';
-import { holidayService, Holiday } from '@/services/holidayService';
+// NOTE: dynamic imports are used below for services and supabase to avoid build-time resolution errors
+// Define simple local interfaces for data shapes so the file doesn't depend on path aliases at compile-time.
+interface Workstation { id: string; name: string; }
+interface WorkingHours { day_of_week: number; start_time: string; end_time: string; team?: string; is_active?: boolean }
+interface Holiday { date: string; team?: string }
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -445,6 +447,172 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                               <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
                               <div><b>Duur:</b> {task.duration} min</div>
                               <div><b>Status:</b> {task.status}</div>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                  </TooltipProvider>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+  // Compute workstation bottlenecks (top 3 by total delay)
+  const workstationBottlenecks = useMemo(() => {
+    const delayMap = new Map<string, number>();
+
+    for (const [wsId, scheduled] of schedule.entries()) {
+      let totalDelay = 0;
+      scheduled.forEach(({ task, end }) => {
+        const due = task.due_date ? new Date(task.due_date) : null;
+        if (due && end > due) {
+          totalDelay += differenceInMinutes(end, due);
+        }
+      });
+      if (totalDelay > 0) delayMap.set(wsId, totalDelay);
+    }
+
+    const sorted = Array.from(delayMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    return sorted.map(([id, minutes], idx) => ({ id, minutes, rank: idx + 1 }));
+  }, [schedule]);
+
+  const formatDelay = (mins: number) => {
+    if (!mins || mins <= 0) return '0m';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+
+  const getBottleneckStyle = (wsId: string) => {
+    const found = workstationBottlenecks.find((b) => b.id === wsId);
+    if (!found) return {};
+    if (found.rank === 1) return { background: 'rgba(255,200,200,0.18)', borderLeft: '4px solid hsl(0,75%,50%)' };
+    if (found.rank === 2) return { background: 'rgba(255,230,180,0.18)', borderLeft: '4px solid hsl(30,75%,45%)' };
+    return { background: 'rgba(255,245,200,0.14)', borderLeft: '4px solid hsl(45,75%,45%)' };
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex justify-between items-center gap-4">
+          <CardTitle>Workstation Gantt Chart (snel & opgesplitst)</CardTitle>
+          <div className="flex gap-2 items-center">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Zoek project..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 w-64"
+              />
+            </div>
+            <Button onClick={() => setZoom((z) => Math.max(0.25, z / 1.5))} variant="outline" size="sm">
+              <ZoomOut className="w-4 h-4" />
+            </Button>
+            <Button onClick={() => setZoom((z) => Math.min(6, z * 1.5))} variant="outline" size="sm">
+              <ZoomIn className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+        {/* Bottleneck summary panel */}
+        <div className="mt-3">
+          <div className="flex gap-3 items-center">
+            {workstationBottlenecks.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No bottlenecks detected</div>
+            ) : (
+              workstationBottlenecks.map((b) => {
+                const ws = workstations.find((w) => w.id === b.id);
+                return (
+                  <div key={b.id} className="px-3 py-1 rounded-md border" style={{ minWidth: 180 }}>
+                    <div className="text-sm font-medium">
+                      {b.rank === 1 ? '🥇' : b.rank === 2 ? '🥈' : '🥉'} {ws?.name || b.id}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Total delay: {formatDelay(b.minutes)}</div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div ref={scrollRef} className="overflow-auto border rounded-lg" style={{ maxHeight: 600 }}>
+          {/* header */}
+          <div
+            className="sticky top-0 z-10 flex border-b bg-muted"
+            style={{ marginLeft: workstationLabelWidth, height: headerHeight }}
+          >
+            {timeline.map((t, i) => (
+              <div key={i} style={{ width: scale.unitWidth }} className="flex flex-col justify-center items-center border-r text-xs">
+                {scale.format(t)}
+              </div>
+            ))}
+          </div>
+
+          {/* rows */}
+          {workstations.map((ws) => {
+            const tasks = schedule.get(ws.id) || [];
+            return (
+              <div key={ws.id} className="relative border-b" style={{ height: rowHeight }}>
+                <div
+                  className="absolute left-0 top-0 bottom-0 flex items-center border-r bg-muted px-3 font-medium"
+                  style={{ width: workstationLabelWidth, ...(getBottleneckStyle(ws.id) as React.CSSProperties) }}
+                >
+                  {ws.name}
+                </div>
+                <div className="absolute top-0 bottom-0" style={{ left: workstationLabelWidth, right: 0 }}>
+                  {timeline.map((_, i) => (
+                    <div key={i} className="absolute top-0 bottom-0 border-r border-border/40" style={{ left: i * scale.unitWidth }} />
+                  ))}
+                  <TooltipProvider>
+                    {tasks.map(({ task, start, end, isVisible }) => {
+                      if (!isVisible) return null;
+
+                      const pid = task.phases?.projects?.id || '';
+                      const { bg, text } = getColor(pid);
+                      const left = (differenceInMinutes(start, timelineStart) / scale.unitInMinutes) * scale.unitWidth;
+                      const width = (differenceInMinutes(end, start) / scale.unitInMinutes) * scale.unitWidth;
+                      // highlight if this task passes its due date
+                      const due = task.due_date ? new Date(task.due_date) : null;
+                      const isLate = due ? end > due : false;
+                      const lateBadge = isLate ? (
+                        <div className="absolute -top-2 -right-2 text-xs font-bold rounded-full px-1 py-0" style={{ background: 'rgba(255,0,0,0.9)', color: '#fff' }}>
+                          !
+                        </div>
+                      ) : null;
+
+                      return (
+                        <Tooltip key={`${task.id}-${start.toISOString()}`}>
+                          <TooltipTrigger asChild>
+                            <div
+                              className="absolute rounded-md px-2 py-1 text-xs font-medium overflow-hidden"
+                              style={{
+                                left,
+                                width,
+                                top: 8,
+                                height: rowHeight - 16,
+                                background: bg,
+                                color: text,
+                                border: '1px solid rgba(0,0,0,0.2)',
+                              }}
+                            >
+                              {lateBadge}
+                              {task.phases?.projects?.name || 'Project'} – {task.title}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="text-xs space-y-1">
+                              <div><b>Start:</b> {format(start, 'dd MMM HH:mm')}</div>
+                              <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
+                              <div><b>Duur:</b> {task.duration} min</div>
+                              <div><b>Status:</b> {task.status}</div>
+                              {isLate && due && <div><b>Delay:</b> {formatDelay(differenceInMinutes(end, due))}</div>}
                             </div>
                           </TooltipContent>
                         </Tooltip>
