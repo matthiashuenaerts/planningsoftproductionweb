@@ -190,7 +190,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
   // memoize full schedule for all workstations with dependency resolution
   const schedule = useMemo(() => {
-    const all = new Map<string, { task: Task; start: Date; end: Date }[]>();
+    const all = new Map<string, { task: Task; start: Date; end: Date; isVisible: boolean }[]>();
     const workstationCursors = new Map<string, Date>();
     const completedTasks = new Set<string>();
     const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
@@ -201,24 +201,25 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       all.set(ws.id, []);
     });
 
-  // Filter tasks by search term
-    const filteredTasks = searchTerm
-      ? tasks.filter((t) => 
-          t.phases?.projects?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      : tasks;
-
-    // Separate TODO and HOLD tasks
-    const todoTasks = filteredTasks
+    // Separate TODO and HOLD tasks (use ALL tasks for positioning)
+    const todoTasks = tasks
       .filter((t) => t.status === 'TODO' && t.workstations && t.workstations.length > 0)
       .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
     
-    const holdTasks = filteredTasks
+    const holdTasks = tasks
       .filter((t) => t.status === 'HOLD' && t.workstations && t.workstations.length > 0)
       .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
+    // Check if task matches search filter
+    const isTaskVisible = (task: Task) => {
+      if (!searchTerm) return true;
+      return task.phases?.projects?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    };
+
     // PHASE 1: Schedule all TODO tasks first (by urgency)
     for (const task of todoTasks) {
+      const isVisible = isTaskVisible(task);
+      
       // Schedule on all assigned workstations
       for (const ws of task.workstations || []) {
         const cursor = workstationCursors.get(ws.id) || timelineStart;
@@ -226,7 +227,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
         
         if (slots.length > 0) {
           const taskList = all.get(ws.id) || [];
-          slots.forEach((s) => taskList.push({ task, ...s }));
+          slots.forEach((s) => taskList.push({ task, ...s, isVisible }));
           all.set(ws.id, taskList);
           
           // Update cursor to end of this task
@@ -252,6 +253,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
         if (!remainingHoldTasks.has(task.id)) continue;
 
         const projectId = task.phases?.projects?.id || '';
+        const isVisible = isTaskVisible(task);
         
         // Check if all limit tasks in the same project are completed
         if (!canScheduleTask(task, completedTasks, projectId)) {
@@ -265,7 +267,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
           
           if (slots.length > 0) {
             const taskList = all.get(ws.id) || [];
-            slots.forEach((s) => taskList.push({ task, ...s }));
+            slots.forEach((s) => taskList.push({ task, ...s, isVisible }));
             all.set(ws.id, taskList);
             
             // Update cursor to end of this task
@@ -358,7 +360,9 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                     <div key={i} className="absolute top-0 bottom-0 border-r border-border/40" style={{ left: i * scale.unitWidth }} />
                   ))}
                   <TooltipProvider>
-                    {tasks.map(({ task, start, end }) => {
+                    {tasks.map(({ task, start, end, isVisible }) => {
+                      if (!isVisible) return null;
+                      
                       const pid = task.phases?.projects?.id || '';
                       const { bg, text } = getColor(pid);
                       const left = (differenceInMinutes(start, timelineStart) / scale.unitInMinutes) * scale.unitWidth;
