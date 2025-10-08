@@ -16,7 +16,8 @@ import { workingHoursService, WorkingHours } from '@/services/workingHoursServic
 import { holidayService, Holiday } from '@/services/holidayService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, RefreshCw } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ZoomIn, ZoomOut, RefreshCw, Search } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Task {
@@ -56,6 +57,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
   const [limitPhases, setLimitPhases] = useState<LimitPhase[]>([]);
   const [loading, setLoading] = useState(true);
   const [zoom, setZoom] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const rowHeight = 60;
@@ -199,12 +201,19 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       all.set(ws.id, []);
     });
 
+  // Filter tasks by search term
+    const filteredTasks = searchTerm
+      ? tasks.filter((t) => 
+          t.phases?.projects?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      : tasks;
+
     // Separate TODO and HOLD tasks
-    const todoTasks = tasks
+    const todoTasks = filteredTasks
       .filter((t) => t.status === 'TODO' && t.workstations && t.workstations.length > 0)
       .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
     
-    const holdTasks = tasks
+    const holdTasks = filteredTasks
       .filter((t) => t.status === 'HOLD' && t.workstations && t.workstations.length > 0)
       .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
@@ -276,7 +285,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     }
 
     return all;
-  }, [tasks, workstations, selectedDate, workingHoursMap, holidaySet, limitTaskMap]);
+  }, [tasks, workstations, selectedDate, workingHoursMap, holidaySet, limitTaskMap, searchTerm]);
 
   const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
   const timeline = Array.from({ length: scale.totalUnits }, (_, i) => addMinutes(timelineStart, i * scale.unitInMinutes));
@@ -298,9 +307,18 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
   return (
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-4">
           <CardTitle>Workstation Gantt Chart (snel & opgesplitst)</CardTitle>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Zoek project..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 w-64"
+              />
+            </div>
             <Button onClick={() => setZoom((z) => Math.max(0.25, z / 1.5))} variant="outline" size="sm">
               <ZoomOut className="w-4 h-4" />
             </Button>
