@@ -636,7 +636,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       const { error } = await supabase
         .storage
         .from('project_files')
-        .upload(filePath, new Blob([pdfBytes], { type: 'application/pdf' }), { 
+        .upload(filePath, new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' }), { 
           upsert: true 
         });
 
@@ -750,7 +750,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
 
       // Download the annotated PDF
       const pdfBytes = await newPdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       
       const link = document.createElement('a');
