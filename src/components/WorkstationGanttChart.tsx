@@ -159,28 +159,98 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     return res;
   };
 
-  // memoize full schedule for all workstations
+  // Build limit task dependencies map
+  const limitTaskMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    limitPhases.forEach((lp) => {
+      const limits = map.get(lp.standard_task_id) || [];
+      limits.push(lp.limit_standard_task_id);
+      map.set(lp.standard_task_id, limits);
+    });
+    return map;
+  }, [limitPhases]);
+
+  // Check if all limit tasks for a given task are completed
+  const canScheduleTask = (task: Task, completedTasks: Set<string>, projectId: string) => {
+    if (!task.standard_task_id) return true;
+    
+    const limitTaskIds = limitTaskMap.get(task.standard_task_id);
+    if (!limitTaskIds || limitTaskIds.length === 0) return true;
+
+    // Check if all limit tasks in the same project are completed
+    return limitTaskIds.every((limitStdTaskId) => {
+      const limitTask = tasks.find(
+        (t) => t.standard_task_id === limitStdTaskId && t.phases?.projects?.id === projectId
+      );
+      return !limitTask || completedTasks.has(limitTask.id);
+    });
+  };
+
+  // memoize full schedule for all workstations with dependency resolution
   const schedule = useMemo(() => {
     const all = new Map<string, { task: Task; start: Date; end: Date }[]>();
-    const done = new Set<string>();
+    const workstationCursors = new Map<string, Date>();
+    const completedTasks = new Set<string>();
     const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
 
-    for (const ws of workstations) {
-      const wsTasks = tasks
-        .filter((t) => t.workstations?.some((x) => x.id === ws.id))
-        .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
-      let cursor = timelineStart;
-      const list: { task: Task; start: Date; end: Date }[] = [];
+    // Initialize cursors for all workstations
+    workstations.forEach((ws) => {
+      workstationCursors.set(ws.id, timelineStart);
+      all.set(ws.id, []);
+    });
 
-      for (const task of wsTasks) {
-        const slots = getTaskSlots(cursor, task.duration);
-        slots.forEach((s) => list.push({ task, ...s }));
-        cursor = list[list.length - 1]?.end || cursor;
+    // Sort all tasks by due date (most urgent first)
+    const sortedTasks = [...tasks]
+      .filter((t) => t.workstations && t.workstations.length > 0)
+      .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+
+    const remainingTasks = new Set(sortedTasks.map((t) => t.id));
+    let maxIterations = sortedTasks.length * 2; // Prevent infinite loops
+    let iteration = 0;
+
+    // Multi-pass scheduling: keep iterating until no more tasks can be scheduled
+    while (remainingTasks.size > 0 && iteration < maxIterations) {
+      iteration++;
+      let scheduledInThisPass = false;
+
+      for (const task of sortedTasks) {
+        if (!remainingTasks.has(task.id)) continue;
+
+        const projectId = task.phases?.projects?.id || '';
+        
+        // Check if all limit tasks are completed
+        if (!canScheduleTask(task, completedTasks, projectId)) {
+          continue;
+        }
+
+        // Schedule on all assigned workstations
+        for (const ws of task.workstations || []) {
+          const cursor = workstationCursors.get(ws.id) || timelineStart;
+          const slots = getTaskSlots(cursor, task.duration);
+          
+          if (slots.length > 0) {
+            const taskList = all.get(ws.id) || [];
+            slots.forEach((s) => taskList.push({ task, ...s }));
+            all.set(ws.id, taskList);
+            
+            // Update cursor to end of this task
+            const lastSlot = slots[slots.length - 1];
+            workstationCursors.set(ws.id, lastSlot.end);
+          }
+        }
+
+        // Mark task as completed and remove from remaining
+        completedTasks.add(task.id);
+        remainingTasks.delete(task.id);
+        scheduledInThisPass = true;
       }
-      all.set(ws.id, list);
+
+      // If nothing was scheduled in this pass, break to prevent infinite loop
+      if (!scheduledInThisPass) break;
     }
+
     return all;
-  }, [tasks, workstations, selectedDate, workingHoursMap, holidaySet]);
+  }, [tasks, workstations, selectedDate, workingHoursMap, holidaySet, limitTaskMap]);
 
   const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
   const timeline = Array.from({ length: scale.totalUnits }, (_, i) => addMinutes(timelineStart, i * scale.unitInMinutes));
