@@ -173,18 +173,31 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
   }, [limitPhases]);
 
   // Check if all limit tasks for a given task are completed
-  const canScheduleTask = (task: Task, completedTasks: Set<string>, projectId: string) => {
+  const canScheduleTask = (
+    task: Task, 
+    scheduledTaskEndTimes: Map<string, Date>, 
+    projectId: string,
+    currentStartTime: Date
+  ) => {
     if (!task.standard_task_id) return true;
     
     const limitTaskIds = limitTaskMap.get(task.standard_task_id);
     if (!limitTaskIds || limitTaskIds.length === 0) return true;
 
-    // Check if all limit tasks in the same project are completed
+    // Check if all limit tasks in the same project are completed (end time is before current start)
     return limitTaskIds.every((limitStdTaskId) => {
       const limitTask = tasks.find(
         (t) => t.standard_task_id === limitStdTaskId && t.phases?.projects?.id === projectId
       );
-      return !limitTask || completedTasks.has(limitTask.id);
+      
+      // If limit task doesn't exist in this project, that's fine
+      if (!limitTask) return true;
+      
+      // Check if limit task has been scheduled and its end time is before our start time
+      const limitTaskEndTime = scheduledTaskEndTimes.get(limitTask.id);
+      if (!limitTaskEndTime) return false; // Limit task not scheduled yet
+      
+      return limitTaskEndTime <= currentStartTime;
     });
   };
 
@@ -192,7 +205,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
   const schedule = useMemo(() => {
     const all = new Map<string, { task: Task; start: Date; end: Date; isVisible: boolean }[]>();
     const workstationCursors = new Map<string, Date>();
-    const completedTasks = new Set<string>();
+    const scheduledTaskEndTimes = new Map<string, Date>(); // Track when each task ends
     const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
 
     // Initialize cursors for all workstations
@@ -221,6 +234,8 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       const isVisible = isTaskVisible(task);
       
       // Schedule on all assigned workstations
+      let latestEndTime: Date | null = null;
+      
       for (const ws of task.workstations || []) {
         const cursor = workstationCursors.get(ws.id) || timelineStart;
         const slots = getTaskSlots(cursor, task.duration);
@@ -233,11 +248,18 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
           // Update cursor to end of this task
           const lastSlot = slots[slots.length - 1];
           workstationCursors.set(ws.id, lastSlot.end);
+          
+          // Track the latest end time across all workstations
+          if (!latestEndTime || lastSlot.end > latestEndTime) {
+            latestEndTime = lastSlot.end;
+          }
         }
       }
       
-      // Mark as completed for dependency tracking
-      completedTasks.add(task.id);
+      // Store the end time for dependency checking
+      if (latestEndTime) {
+        scheduledTaskEndTimes.set(task.id, latestEndTime);
+      }
     }
 
     // PHASE 2: Schedule HOLD tasks with limit phase checking
@@ -255,12 +277,23 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
         const projectId = task.phases?.projects?.id || '';
         const isVisible = isTaskVisible(task);
         
-        // Check if all limit tasks in the same project are completed
-        if (!canScheduleTask(task, completedTasks, projectId)) {
+        // Find the earliest possible start time across all workstations
+        let earliestStart: Date | null = null;
+        for (const ws of task.workstations || []) {
+          const cursor = workstationCursors.get(ws.id) || timelineStart;
+          if (!earliestStart || cursor < earliestStart) {
+            earliestStart = cursor;
+          }
+        }
+        
+        // Check if all limit tasks in the same project are completed before this start time
+        if (!canScheduleTask(task, scheduledTaskEndTimes, projectId, earliestStart || timelineStart)) {
           continue;
         }
 
         // Schedule on all assigned workstations
+        let latestEndTime: Date | null = null;
+        
         for (const ws of task.workstations || []) {
           const cursor = workstationCursors.get(ws.id) || timelineStart;
           const slots = getTaskSlots(cursor, task.duration);
@@ -273,11 +306,19 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
             // Update cursor to end of this task
             const lastSlot = slots[slots.length - 1];
             workstationCursors.set(ws.id, lastSlot.end);
+            
+            // Track the latest end time
+            if (!latestEndTime || lastSlot.end > latestEndTime) {
+              latestEndTime = lastSlot.end;
+            }
           }
         }
 
-        // Mark task as completed and remove from remaining
-        completedTasks.add(task.id);
+        // Store the end time for dependency checking
+        if (latestEndTime) {
+          scheduledTaskEndTimes.set(task.id, latestEndTime);
+        }
+        
         remainingHoldTasks.delete(task.id);
         scheduledInThisPass = true;
       }
