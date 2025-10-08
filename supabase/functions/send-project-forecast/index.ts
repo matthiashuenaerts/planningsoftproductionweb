@@ -230,7 +230,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Send email
     console.log(`Sending forecast email to ${recipients.length} recipient(s)`);
     const emailResponse = await resend.emails.send({
-      from: "Project Forecast <onboarding@resend.dev>",
+      from: "Project Forecast <noreply@automattion-compass.com>",
       to: recipients,
       subject: `Project Forecast - ${projectsWithOrders.length} Projects in Next ${forecastWeeks} Weeks`,
       html: emailHtml,
