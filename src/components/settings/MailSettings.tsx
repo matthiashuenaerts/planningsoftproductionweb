@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Plus, X, Mail, Clock, Calendar } from 'lucide-react';
+import { Loader2, Plus, X, Mail, Clock, Calendar, Send } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface EmailConfiguration {
@@ -30,6 +30,7 @@ const MailSettings: React.FC = () => {
   const [scheduleConfigs, setScheduleConfigs] = useState<{ [key: string]: ScheduleConfig }>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [triggering, setTriggering] = useState<string | null>(null);
   const [newEmails, setNewEmails] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
@@ -186,6 +187,33 @@ const MailSettings: React.FC = () => {
     }
   };
 
+  const handleTriggerEmail = async (functionName: string) => {
+    setTriggering(functionName);
+    try {
+      const { data, error } = await supabase.functions.invoke(functionName.replace(/_/g, '-'), {
+        body: {},
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Email Sent',
+        description: data?.projectCount 
+          ? `Successfully sent forecast for ${data.projectCount} project(s) to ${data.recipients} recipient(s)`
+          : 'Email sent successfully',
+      });
+    } catch (error) {
+      console.error('Error triggering email:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to send email. Please check the logs for details.',
+        variant: 'destructive',
+      });
+    } finally {
+      setTriggering(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
@@ -276,10 +304,30 @@ const MailSettings: React.FC = () => {
               {/* Schedule configuration for project forecast */}
               {config.function_name === 'send_project_forecast' && scheduleConfigs[config.function_name] && (
                 <div className="space-y-4 mt-6 pt-6 border-t">
-                  <h4 className="font-semibold flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Schedule Configuration
-                  </h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Schedule Configuration
+                    </h4>
+                    <Button
+                      onClick={() => handleTriggerEmail(config.function_name)}
+                      disabled={triggering === config.function_name}
+                      variant="outline"
+                      size="sm"
+                    >
+                      {triggering === config.function_name ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" />
+                          Send Now
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   
                   <div className="grid gap-4 md:grid-cols-3">
                     <div className="space-y-2">
