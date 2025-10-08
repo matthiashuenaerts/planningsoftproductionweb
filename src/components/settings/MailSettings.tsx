@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Plus, X, Mail } from 'lucide-react';
+import { Loader2, Plus, X, Mail, Clock, Calendar } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface EmailConfiguration {
   id: string;
@@ -14,9 +15,19 @@ interface EmailConfiguration {
   description: string;
 }
 
+interface ScheduleConfig {
+  id: string;
+  function_name: string;
+  schedule_day: string;
+  schedule_time: string;
+  forecast_weeks: number;
+  is_active: boolean;
+}
+
 const MailSettings: React.FC = () => {
   const { toast } = useToast();
   const [configs, setConfigs] = useState<EmailConfiguration[]>([]);
+  const [scheduleConfigs, setScheduleConfigs] = useState<{ [key: string]: ScheduleConfig }>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [newEmails, setNewEmails] = useState<{ [key: string]: string }>({});
@@ -34,6 +45,19 @@ const MailSettings: React.FC = () => {
 
       if (error) throw error;
       setConfigs(data || []);
+
+      // Fetch schedule configurations
+      const { data: schedules, error: schedError } = await supabase
+        .from('email_schedule_configs')
+        .select('*');
+
+      if (schedError) throw schedError;
+      
+      const scheduleMap: { [key: string]: ScheduleConfig } = {};
+      (schedules || []).forEach(schedule => {
+        scheduleMap[schedule.function_name] = schedule;
+      });
+      setScheduleConfigs(scheduleMap);
     } catch (error) {
       console.error('Error fetching email configurations:', error);
       toast({
@@ -131,6 +155,37 @@ const MailSettings: React.FC = () => {
     }
   };
 
+  const handleUpdateSchedule = async (functionName: string, field: string, value: any) => {
+    try {
+      const schedule = scheduleConfigs[functionName];
+      if (!schedule) return;
+
+      const { error } = await supabase
+        .from('email_schedule_configs')
+        .update({ [field]: value })
+        .eq('function_name', functionName);
+
+      if (error) throw error;
+
+      setScheduleConfigs(prev => ({
+        ...prev,
+        [functionName]: { ...prev[functionName], [field]: value }
+      }));
+
+      toast({
+        title: 'Success',
+        description: 'Schedule updated successfully',
+      });
+    } catch (error) {
+      console.error('Error updating schedule:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update schedule',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
@@ -217,6 +272,67 @@ const MailSettings: React.FC = () => {
                   </Button>
                 </div>
               </div>
+
+              {/* Schedule configuration for project forecast */}
+              {config.function_name === 'send_project_forecast' && scheduleConfigs[config.function_name] && (
+                <div className="space-y-4 mt-6 pt-6 border-t">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Schedule Configuration
+                  </h4>
+                  
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label>Day of Week</Label>
+                      <Select
+                        value={scheduleConfigs[config.function_name].schedule_day}
+                        onValueChange={(value) => handleUpdateSchedule(config.function_name, 'schedule_day', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monday">Monday</SelectItem>
+                          <SelectItem value="tuesday">Tuesday</SelectItem>
+                          <SelectItem value="wednesday">Wednesday</SelectItem>
+                          <SelectItem value="thursday">Thursday</SelectItem>
+                          <SelectItem value="friday">Friday</SelectItem>
+                          <SelectItem value="saturday">Saturday</SelectItem>
+                          <SelectItem value="sunday">Sunday</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Time</Label>
+                      <Input
+                        type="time"
+                        value={scheduleConfigs[config.function_name].schedule_time}
+                        onChange={(e) => handleUpdateSchedule(config.function_name, 'schedule_time', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Forecast Weeks</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="12"
+                        value={scheduleConfigs[config.function_name].forecast_weeks}
+                        onChange={(e) => handleUpdateSchedule(config.function_name, 'forecast_weeks', parseInt(e.target.value))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    <span>
+                      Email will be sent every {scheduleConfigs[config.function_name].schedule_day} at {scheduleConfigs[config.function_name].schedule_time} 
+                      with a {scheduleConfigs[config.function_name].forecast_weeks}-week forecast
+                    </span>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}

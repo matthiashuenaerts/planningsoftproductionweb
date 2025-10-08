@@ -307,6 +307,39 @@ export type Database = {
         }
         Relationships: []
       }
+      email_schedule_configs: {
+        Row: {
+          created_at: string
+          forecast_weeks: number
+          function_name: string
+          id: string
+          is_active: boolean
+          schedule_day: string
+          schedule_time: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          forecast_weeks?: number
+          function_name: string
+          id?: string
+          is_active?: boolean
+          schedule_day?: string
+          schedule_time?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          forecast_weeks?: number
+          function_name?: string
+          id?: string
+          is_active?: boolean
+          schedule_day?: string
+          schedule_time?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       employee_workstation_links: {
         Row: {
           created_at: string
