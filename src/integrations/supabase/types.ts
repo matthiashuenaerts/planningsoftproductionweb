@@ -314,6 +314,7 @@ export type Database = {
           function_name: string
           id: string
           is_active: boolean
+          language: string
           schedule_day: string
           schedule_time: string
           updated_at: string
@@ -324,6 +325,7 @@ export type Database = {
           function_name: string
           id?: string
           is_active?: boolean
+          language?: string
           schedule_day?: string
           schedule_time?: string
           updated_at?: string
@@ -334,6 +336,7 @@ export type Database = {
           function_name?: string
           id?: string
           is_active?: boolean
+          language?: string
           schedule_day?: string
           schedule_time?: string
           updated_at?: string
@@ -2870,6 +2873,10 @@ export type Database = {
       table_exists: {
         Args: { table_name: string }
         Returns: boolean
+      }
+      trigger_project_forecast_email: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
     }
     Enums: {

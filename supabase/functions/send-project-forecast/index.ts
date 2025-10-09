@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
+import { Resend } from "npm:resend@4.0.0";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4';
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
@@ -56,6 +56,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     const forecastWeeks = scheduleConfig.forecast_weeks || 2;
     const recipients = emailConfig.recipient_emails || [];
+    const language = scheduleConfig.language || 'nl';
+
+    console.log(`Using language: ${language} for email generation`);
 
     if (recipients.length === 0) {
       console.log('No recipients configured, skipping email');
@@ -85,6 +88,105 @@ const handler = async (req: Request): Promise<Response> => {
       throw projectsError;
     }
 
+    // Define translations
+    const translations: Record<string, any> = {
+      nl: {
+        subject: (count: number, weeks: number) => count === 0 
+          ? `Project Prognose - Geen Projecten in de Komende ${weeks} Weken`
+          : `Project Prognose - ${count} Projecten in de Komende ${weeks} Weken`,
+        title: (weeks: number) => `📊 Project Prognose - Komende ${weeks} Weken`,
+        period: 'Periode:',
+        totalProjects: 'Totaal Projecten:',
+        totalOrders: 'Totaal Openstaande Bestellingen:',
+        client: 'Klant:',
+        installationDate: 'Plaatsingsdatum:',
+        status: 'Status:',
+        description: 'Beschrijving:',
+        undeliveredOrders: (count: number) => `📦 Openstaande Bestellingen (${count})`,
+        supplier: 'Leverancier:',
+        orderType: 'Besteltype:',
+        orderDate: 'Besteldatum:',
+        expectedDelivery: 'Verwachte Levering:',
+        orderNumber: 'Bestelnummer:',
+        notes: 'Notities:',
+        items: (count: number) => `Items (${count})`,
+        articleCode: 'Artikelcode:',
+        ean: 'EAN:',
+        ordered: 'Besteld:',
+        delivered: 'Geleverd:',
+        remaining: 'Resterend:',
+        location: 'Locatie:',
+        noItems: 'Geen items vermeld',
+        noOrders: '✅ Geen openstaande bestellingen',
+        noProjects: (weeks: number) => `Er zijn geen projecten gepland voor plaatsing in de komende ${weeks} weken.`,
+        noteFooter: 'Dit is een geautomatiseerde wekelijkse prognose. Controleer alle bestellingen en neem indien nodig contact op met leveranciers.'
+      },
+      en: {
+        subject: (count: number, weeks: number) => count === 0 
+          ? `Project Forecast - No Projects in Next ${weeks} Weeks`
+          : `Project Forecast - ${count} Projects in Next ${weeks} Weeks`,
+        title: (weeks: number) => `📊 Project Forecast - Next ${weeks} Weeks`,
+        period: 'Period:',
+        totalProjects: 'Total Projects:',
+        totalOrders: 'Total Undelivered Orders:',
+        client: 'Client:',
+        installationDate: 'Installation Date:',
+        status: 'Status:',
+        description: 'Description:',
+        undeliveredOrders: (count: number) => `📦 Undelivered Orders (${count})`,
+        supplier: 'Supplier:',
+        orderType: 'Order Type:',
+        orderDate: 'Order Date:',
+        expectedDelivery: 'Expected Delivery:',
+        orderNumber: 'Order Number:',
+        notes: 'Notes:',
+        items: (count: number) => `Items (${count})`,
+        articleCode: 'Article Code:',
+        ean: 'EAN:',
+        ordered: 'Ordered:',
+        delivered: 'Delivered:',
+        remaining: 'Remaining:',
+        location: 'Location:',
+        noItems: 'No items listed',
+        noOrders: '✅ No undelivered orders',
+        noProjects: (weeks: number) => `There are no projects scheduled for installation in the next ${weeks} weeks.`,
+        noteFooter: 'This is an automated weekly forecast. Please review all orders and contact suppliers if needed.'
+      },
+      fr: {
+        subject: (count: number, weeks: number) => count === 0 
+          ? `Prévision Projet - Aucun Projet dans les ${weeks} Prochaines Semaines`
+          : `Prévision Projet - ${count} Projets dans les ${weeks} Prochaines Semaines`,
+        title: (weeks: number) => `📊 Prévision Projet - ${weeks} Prochaines Semaines`,
+        period: 'Période:',
+        totalProjects: 'Total Projets:',
+        totalOrders: 'Total Commandes Non Livrées:',
+        client: 'Client:',
+        installationDate: 'Date d\'Installation:',
+        status: 'Statut:',
+        description: 'Description:',
+        undeliveredOrders: (count: number) => `📦 Commandes Non Livrées (${count})`,
+        supplier: 'Fournisseur:',
+        orderType: 'Type de Commande:',
+        orderDate: 'Date de Commande:',
+        expectedDelivery: 'Livraison Prévue:',
+        orderNumber: 'Numéro de Commande:',
+        notes: 'Notes:',
+        items: (count: number) => `Articles (${count})`,
+        articleCode: 'Code Article:',
+        ean: 'EAN:',
+        ordered: 'Commandé:',
+        delivered: 'Livré:',
+        remaining: 'Restant:',
+        location: 'Emplacement:',
+        noItems: 'Aucun article répertorié',
+        noOrders: '✅ Aucune commande non livrée',
+        noProjects: (weeks: number) => `Il n'y a aucun projet prévu pour installation dans les ${weeks} prochaines semaines.`,
+        noteFooter: 'Ceci est une prévision hebdomadaire automatisée. Veuillez vérifier toutes les commandes et contacter les fournisseurs si nécessaire.'
+      }
+    };
+
+    const t = translations[language];
+
     console.log(`Found ${projects?.length || 0} projects in forecast period`);
 
     if (!projects || projects.length === 0) {
@@ -92,11 +194,11 @@ const handler = async (req: Request): Promise<Response> => {
       await resend.emails.send({
         from: "Project Forecast <noreply@automattion-compass.com>",
         to: recipients,
-        subject: `Project Forecast - No Projects in Next ${forecastWeeks} Weeks`,
+        subject: t.subject(0, forecastWeeks),
         html: `
-          <h1>Project Forecast</h1>
-          <p>There are no projects scheduled for installation in the next ${forecastWeeks} weeks.</p>
-          <p>Period: ${today.toLocaleDateString()} - ${futureDate.toLocaleDateString()}</p>
+          <h1>${t.title(forecastWeeks)}</h1>
+          <p>${t.noProjects(forecastWeeks)}</p>
+          <p>${t.period} ${today.toLocaleDateString()} - ${futureDate.toLocaleDateString()}</p>
         `,
       });
 
@@ -170,57 +272,57 @@ const handler = async (req: Request): Promise<Response> => {
       </head>
       <body>
         <div class="container">
-          <h1>📊 Project Forecast - Next ${forecastWeeks} Weeks</h1>
+          <h1>${t.title(forecastWeeks)}</h1>
           <div class="summary">
-            <strong>Period:</strong> ${today.toLocaleDateString()} - ${futureDate.toLocaleDateString()}<br>
-            <strong>Total Projects:</strong> ${projectsWithOrders.length}<br>
-            <strong>Total Undelivered Orders:</strong> ${projectsWithOrders.reduce((acc, p) => acc + p.orders.length, 0)}
+            <strong>${t.period}</strong> ${today.toLocaleDateString()} - ${futureDate.toLocaleDateString()}<br>
+            <strong>${t.totalProjects}</strong> ${projectsWithOrders.length}<br>
+            <strong>${t.totalOrders}</strong> ${projectsWithOrders.reduce((acc, p) => acc + p.orders.length, 0)}
           </div>
 
           ${projectsWithOrders.map(project => `
             <div class="project">
               <h2>🏗️ ${project.name}</h2>
               <table>
-                <tr><th>Client:</th><td>${project.client || 'N/A'}</td></tr>
-                <tr><th>Installation Date:</th><td>${new Date(project.installation_date).toLocaleDateString()}</td></tr>
-                <tr><th>Status:</th><td><span class="status status-${project.status}">${project.status}</span></td></tr>
-                ${project.description ? `<tr><th>Description:</th><td>${project.description}</td></tr>` : ''}
+                <tr><th>${t.client}</th><td>${project.client || 'N/A'}</td></tr>
+                <tr><th>${t.installationDate}</th><td>${new Date(project.installation_date).toLocaleDateString()}</td></tr>
+                <tr><th>${t.status}</th><td><span class="status status-${project.status}">${project.status}</span></td></tr>
+                ${project.description ? `<tr><th>${t.description}</th><td>${project.description}</td></tr>` : ''}
               </table>
 
               ${project.orders.length > 0 ? `
-                <h3>📦 Undelivered Orders (${project.orders.length})</h3>
+                <h3>${t.undeliveredOrders(project.orders.length)}</h3>
                 ${project.orders.map(order => `
                   <div class="order">
-                    <strong>Supplier:</strong> ${order.supplier}<br>
-                    <strong>Order Type:</strong> ${order.order_type}<br>
-                    <strong>Order Date:</strong> ${new Date(order.order_date).toLocaleDateString()}<br>
-                    <strong>Expected Delivery:</strong> ${new Date(order.expected_delivery).toLocaleDateString()}<br>
-                    <strong>Status:</strong> <span class="status status-${order.status}">${order.status}</span><br>
-                    ${order.external_order_number ? `<strong>Order Number:</strong> ${order.external_order_number}<br>` : ''}
-                    ${order.notes ? `<strong>Notes:</strong> ${order.notes}<br>` : ''}
+                    <strong>${t.supplier}</strong> ${order.supplier}<br>
+                    <strong>${t.orderType}</strong> ${order.order_type}<br>
+                    <strong>${t.orderDate}</strong> ${new Date(order.order_date).toLocaleDateString()}<br>
+                    <strong>${t.expectedDelivery}</strong> ${new Date(order.expected_delivery).toLocaleDateString()}<br>
+                    <strong>${t.status}</strong> <span class="status status-${order.status}">${order.status}</span><br>
+                    ${order.external_order_number ? `<strong>${t.orderNumber}</strong> ${order.external_order_number}<br>` : ''}
+                    ${order.notes ? `<strong>${t.notes}</strong> ${order.notes}<br>` : ''}
 
                     ${order.order_items && order.order_items.length > 0 ? `
-                      <h4>Items (${order.order_items.length})</h4>
+                      <h4>${t.items(order.order_items.length)}</h4>
                       ${order.order_items.map(item => `
                         <div class="order-item">
                           <strong>${item.description}</strong><br>
-                          ${item.article_code ? `Article Code: ${item.article_code}<br>` : ''}
-                          ${item.ean ? `EAN: ${item.ean}<br>` : ''}
-                          Ordered: ${item.quantity} | Delivered: ${item.delivered_quantity || 0} | 
-                          <strong>Remaining: ${item.quantity - (item.delivered_quantity || 0)}</strong><br>
-                          ${item.stock_location ? `Location: ${item.stock_location}<br>` : ''}
-                          ${item.notes ? `Notes: ${item.notes}` : ''}
+                          ${item.article_code ? `${t.articleCode} ${item.article_code}<br>` : ''}
+                          ${item.ean ? `${t.ean} ${item.ean}<br>` : ''}
+                          ${t.ordered} ${item.quantity} | ${t.delivered} ${item.delivered_quantity || 0} | 
+                          <strong>${t.remaining} ${item.quantity - (item.delivered_quantity || 0)}</strong><br>
+                          ${item.stock_location ? `${t.location} ${item.stock_location}<br>` : ''}
+                          ${item.notes ? `${t.notes} ${item.notes}` : ''}
                         </div>
                       `).join('')}
-                    ` : '<p>No items listed</p>'}
+                    ` : `<p>${t.noItems}</p>`}
                   </div>
                 `).join('')}
-              ` : '<p>✅ No undelivered orders</p>'}
+              ` : `<p>${t.noOrders}</p>`}
             </div>
           `).join('')}
 
           <div class="summary">
-            <p><strong>Note:</strong> This is an automated weekly forecast. Please review all orders and contact suppliers if needed.</p>
+            <p><strong>${t.notes}</strong> ${t.noteFooter}</p>
           </div>
         </div>
       </body>
@@ -232,7 +334,7 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResponse = await resend.emails.send({
       from: "Project Forecast <noreply@automattion-compass.com>",
       to: recipients,
-      subject: `Project Forecast - ${projectsWithOrders.length} Projects in Next ${forecastWeeks} Weeks`,
+      subject: t.subject(projectsWithOrders.length, forecastWeeks),
       html: emailHtml,
     });
 

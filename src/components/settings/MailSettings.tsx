@@ -22,6 +22,7 @@ interface ScheduleConfig {
   schedule_time: string;
   forecast_weeks: number;
   is_active: boolean;
+  language: string;
 }
 
 const MailSettings: React.FC = () => {
@@ -329,7 +330,7 @@ const MailSettings: React.FC = () => {
                     </Button>
                   </div>
                   
-                  <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-4 md:grid-cols-4">
                     <div className="space-y-2">
                       <Label>Day of Week</Label>
                       <Select
@@ -369,6 +370,23 @@ const MailSettings: React.FC = () => {
                         value={scheduleConfigs[config.function_name].forecast_weeks}
                         onChange={(e) => handleUpdateSchedule(config.function_name, 'forecast_weeks', parseInt(e.target.value))}
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Language</Label>
+                      <Select
+                        value={scheduleConfigs[config.function_name].language}
+                        onValueChange={(value) => handleUpdateSchedule(config.function_name, 'language', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="nl">Nederlands</SelectItem>
+                          <SelectItem value="en">English</SelectItem>
+                          <SelectItem value="fr">Français</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
