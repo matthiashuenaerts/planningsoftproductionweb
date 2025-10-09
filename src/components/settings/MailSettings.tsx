@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Plus, X, Mail, Clock, Calendar, Send } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 interface EmailConfiguration {
   id: string;
@@ -310,24 +311,35 @@ const MailSettings: React.FC = () => {
                       <Clock className="h-4 w-4" />
                       Schedule Configuration
                     </h4>
-                    <Button
-                      onClick={() => handleTriggerEmail(config.function_name)}
-                      disabled={triggering === config.function_name}
-                      variant="outline"
-                      size="sm"
-                    >
-                      {triggering === config.function_name ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="h-4 w-4 mr-2" />
-                          Send Now
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={scheduleConfigs[config.function_name].is_active}
+                          onCheckedChange={(checked) => handleUpdateSchedule(config.function_name, 'is_active', checked)}
+                        />
+                        <Label className="text-sm font-normal">
+                          {scheduleConfigs[config.function_name].is_active ? 'Enabled' : 'Disabled'}
+                        </Label>
+                      </div>
+                      <Button
+                        onClick={() => handleTriggerEmail(config.function_name)}
+                        disabled={triggering === config.function_name}
+                        variant="outline"
+                        size="sm"
+                      >
+                        {triggering === config.function_name ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Send Now
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                   
                   <div className="grid gap-4 md:grid-cols-4">
