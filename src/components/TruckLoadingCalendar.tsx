@@ -382,7 +382,7 @@ const TruckLoadingCalendar = () => {
                             isManuallyAdjusted && "border-orange-400 bg-orange-50"
                           )}
                         >
-                          <div className="font-medium leading-tight">
+                          <div className="font-medium leading-tight break-words">
                             {assignment.project.name}
                           </div>
                           <div className="text-xs text-gray-500">
