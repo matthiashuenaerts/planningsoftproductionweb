@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { projectCalculationService, ProjectCalculationVariables } from '@/services/projectCalculationService';
+import { projectCalculationService, ProjectCalculationVariables, evaluateFormula } from '@/services/projectCalculationService';
+import { supabase } from '@/integrations/supabase/client';
+import { Upload } from 'lucide-react';
 
 interface ProjectCalculationVariablesProps {
   projectId: string;
@@ -56,15 +58,50 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
   const handleSave = async () => {
     try {
       setSaving(true);
+      
+      // Save the variables
       await projectCalculationService.createOrUpdateVariables(projectId, variables);
+      
+      // Get all calculation relationships
+      const relationships = await projectCalculationService.getAllTaskRelationships();
+      
+      // Get all phases for this project
+      const { data: phases, error: phasesError } = await supabase
+        .from('phases')
+        .select('id')
+        .eq('project_id', projectId);
+      
+      if (phasesError) throw phasesError;
+      
+      const phaseIds = phases?.map(p => p.id) || [];
+      
+      // Update task durations based on formulas
+      for (const rel of relationships) {
+        if (rel.formula && phaseIds.length > 0) {
+          // Evaluate the formula with current variables
+          const calculatedMinutes = evaluateFormula(rel.formula, variables as Record<string, number>);
+          
+          // Update all tasks in this project with this standard_task_id
+          const { error } = await supabase
+            .from('tasks')
+            .update({ duration: calculatedMinutes })
+            .eq('standard_task_id', rel.standard_task_id)
+            .in('phase_id', phaseIds);
+          
+          if (error) {
+            console.error(`Failed to update tasks for standard_task_id ${rel.standard_task_id}:`, error);
+          }
+        }
+      }
+      
       toast({
         title: 'Success',
-        description: 'Calculation variables saved successfully'
+        description: 'Variables saved and task durations updated'
       });
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: `Failed to save calculation variables: ${error.message}`,
+        description: `Failed to save: ${error.message}`,
         variant: 'destructive'
       });
     } finally {
@@ -75,6 +112,68 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
   const handleInputChange = (field: keyof ProjectCalculationVariables, value: string) => {
     const numValue = parseInt(value) || 0;
     setVariables(prev => ({ ...prev, [field]: numValue }));
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      parseCSVFile(file);
+    }
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files[0];
+    if (file && file.name.endsWith('.csv')) {
+      parseCSVFile(file);
+    } else {
+      toast({
+        title: 'Invalid file',
+        description: 'Please upload a CSV file',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+  };
+
+  const parseCSVFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      const newVariables: Record<string, number> = {};
+      
+      lines.forEach(line => {
+        const [key, value] = line.split(',').map(s => s.trim());
+        if (key && value && !isNaN(parseInt(value))) {
+          // Match the key to our variable names
+          if (key in variables) {
+            newVariables[key] = parseInt(value);
+          }
+        }
+      });
+      
+      if (Object.keys(newVariables).length > 0) {
+        setVariables(prev => ({ ...prev, ...newVariables }));
+        toast({
+          title: 'Success',
+          description: `Imported ${Object.keys(newVariables).length} variables from CSV`
+        });
+      } else {
+        toast({
+          title: 'No data imported',
+          description: 'No matching variables found in CSV file',
+          variant: 'destructive'
+        });
+      }
+    };
+    reader.readAsText(file);
   };
 
   if (loading) {
@@ -93,6 +192,27 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
         <CardTitle>Project Berekening Variabelen</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div
+          className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">
+            Drag and drop a CSV file here, or click to select
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            CSV format: variable_name,value (one per line)
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="aantal_objecten">Aantal Objecten</Label>
