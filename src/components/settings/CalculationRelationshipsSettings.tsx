@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { projectCalculationService, CalculationTaskRelationship } from '@/services/projectCalculationService';
 import { standardTasksService } from '@/services/standardTasksService';
@@ -43,7 +44,8 @@ const CalculationRelationshipsSettings: React.FC = () => {
     variable_name: '',
     standard_task_id: '',
     multiplier: 1.0,
-    base_duration_minutes: 0
+    base_duration_minutes: 0,
+    formula: ''
   });
 
   useEffect(() => {
@@ -89,7 +91,8 @@ const CalculationRelationshipsSettings: React.FC = () => {
         variable_name: '',
         standard_task_id: '',
         multiplier: 1.0,
-        base_duration_minutes: 0
+        base_duration_minutes: 0,
+        formula: ''
       });
       toast({
         title: 'Success',
@@ -109,8 +112,11 @@ const CalculationRelationshipsSettings: React.FC = () => {
   const handleUpdateRelationship = async (id: string, field: string, value: string | number) => {
     try {
       setSaving(id);
-      const numValue = typeof value === 'string' ? (field === 'multiplier' ? parseFloat(value) : parseInt(value)) : value;
-      const updated = await projectCalculationService.updateTaskRelationship(id, { [field]: numValue });
+      let updateValue = value;
+      if (field !== 'formula' && typeof value === 'string') {
+        updateValue = field === 'multiplier' ? parseFloat(value) : parseInt(value);
+      }
+      const updated = await projectCalculationService.updateTaskRelationship(id, { [field]: updateValue });
       
       setRelationships(prev => prev.map(rel => rel.id === id ? updated : rel));
       toast({
@@ -170,60 +176,53 @@ const CalculationRelationshipsSettings: React.FC = () => {
           <CardTitle>Add New Calculation Relationship</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="variable_name">Variable</Label>
-              <Select value={newRelationship.variable_name} onValueChange={(value) => setNewRelationship(prev => ({ ...prev, variable_name: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select variable" />
-                </SelectTrigger>
-                <SelectContent>
-                  {VARIABLE_OPTIONS.map(variable => (
-                    <SelectItem key={variable} value={variable}>
-                      {variable.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="variable_name">Variable</Label>
+                <Select value={newRelationship.variable_name} onValueChange={(value) => setNewRelationship(prev => ({ ...prev, variable_name: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select variable" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VARIABLE_OPTIONS.map(variable => (
+                      <SelectItem key={variable} value={variable}>
+                        {variable.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="standard_task_id">Standard Task</Label>
+                <Select value={newRelationship.standard_task_id} onValueChange={(value) => setNewRelationship(prev => ({ ...prev, standard_task_id: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select standard task" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {standardTasks.map(task => (
+                      <SelectItem key={task.id} value={task.id}>
+                        {task.task_number} - {task.task_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            
+
             <div>
-              <Label htmlFor="standard_task_id">Standard Task</Label>
-              <Select value={newRelationship.standard_task_id} onValueChange={(value) => setNewRelationship(prev => ({ ...prev, standard_task_id: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select standard task" />
-                </SelectTrigger>
-                <SelectContent>
-                  {standardTasks.map(task => (
-                    <SelectItem key={task.id} value={task.id}>
-                      {task.task_number} - {task.task_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label htmlFor="multiplier">Multiplier</Label>
-              <Input
-                id="multiplier"
-                type="number"
-                step="0.1"
-                min="0"
-                value={newRelationship.multiplier}
-                onChange={(e) => setNewRelationship(prev => ({ ...prev, multiplier: parseFloat(e.target.value) || 0 }))}
+              <Label htmlFor="formula">Formula (use variable names like aantal_kasten, aantal_objecten)</Label>
+              <Textarea
+                id="formula"
+                placeholder="Example: aantal_kasten * 2 + aantal_objecten / 3"
+                value={newRelationship.formula}
+                onChange={(e) => setNewRelationship(prev => ({ ...prev, formula: e.target.value }))}
+                className="font-mono"
               />
-            </div>
-            
-            <div>
-              <Label htmlFor="base_duration_minutes">Base Duration (minutes)</Label>
-              <Input
-                id="base_duration_minutes"
-                type="number"
-                min="0"
-                value={newRelationship.base_duration_minutes}
-                onChange={(e) => setNewRelationship(prev => ({ ...prev, base_duration_minutes: parseInt(e.target.value) || 0 }))}
-              />
+              <p className="text-sm text-muted-foreground mt-1">
+                Available variables: {VARIABLE_OPTIONS.join(', ')}
+              </p>
             </div>
           </div>
           
@@ -241,58 +240,50 @@ const CalculationRelationshipsSettings: React.FC = () => {
           <CardTitle>Existing Calculation Relationships</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Variable</TableHead>
-                <TableHead>Standard Task</TableHead>
-                <TableHead>Multiplier</TableHead>
-                <TableHead>Base Duration (min)</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {relationships.map((relationship) => (
-                <TableRow key={relationship.id}>
-                  <TableCell>
-                    {relationship.variable_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                  </TableCell>
-                  <TableCell>{getTaskName(relationship.standard_task_id)}</TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={relationship.multiplier}
-                      onChange={(e) => handleUpdateRelationship(relationship.id, 'multiplier', e.target.value)}
+          <div className="space-y-4">
+            {relationships.map((relationship) => (
+              <Card key={relationship.id} className="p-4">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium">Variable</Label>
+                      <p className="text-sm">
+                        {relationship.variable_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Standard Task</Label>
+                      <p className="text-sm">{getTaskName(relationship.standard_task_id)}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor={`formula-${relationship.id}`}>Formula</Label>
+                    <Textarea
+                      id={`formula-${relationship.id}`}
+                      value={relationship.formula || ''}
+                      onChange={(e) => handleUpdateRelationship(relationship.id, 'formula', e.target.value)}
                       disabled={saving === relationship.id}
-                      className="w-20"
+                      className="font-mono"
+                      placeholder="Example: aantal_kasten * 2 + aantal_objecten / 3"
                     />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={relationship.base_duration_minutes}
-                      onChange={(e) => handleUpdateRelationship(relationship.id, 'base_duration_minutes', e.target.value)}
-                      disabled={saving === relationship.id}
-                      className="w-24"
-                    />
-                  </TableCell>
-                  <TableCell>
+                  </div>
+
+                  <div className="flex justify-end">
                     <Button
                       variant="destructive"
                       size="sm"
                       onClick={() => handleDeleteRelationship(relationship.id)}
                       disabled={saving === relationship.id}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
                     </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>

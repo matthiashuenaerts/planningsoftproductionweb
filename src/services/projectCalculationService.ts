@@ -27,8 +27,34 @@ export interface CalculationTaskRelationship {
   standard_task_id: string;
   multiplier: number;
   base_duration_minutes: number;
+  formula: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Evaluate a formula with given variables
+export function evaluateFormula(formula: string, variables: Record<string, number>): number {
+  try {
+    // Replace variable names in formula with their values
+    let expression = formula;
+    for (const [key, value] of Object.entries(variables)) {
+      const regex = new RegExp(`\\b${key}\\b`, 'g');
+      expression = expression.replace(regex, value.toString());
+    }
+    
+    // Evaluate the mathematical expression safely
+    // Only allow numbers, operators, parentheses, and whitespace
+    if (!/^[\d+\-*/().\s]+$/.test(expression)) {
+      throw new Error('Invalid formula: contains unauthorized characters');
+    }
+    
+    // Use Function constructor for safe evaluation
+    const result = new Function('return ' + expression)();
+    return typeof result === 'number' && !isNaN(result) ? Math.round(result) : 0;
+  } catch (error) {
+    console.error('Formula evaluation error:', error);
+    return 0;
+  }
 }
 
 export class ProjectCalculationService {

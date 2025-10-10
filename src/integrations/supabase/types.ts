@@ -136,6 +136,7 @@ export type Database = {
         Row: {
           base_duration_minutes: number
           created_at: string
+          formula: string | null
           id: string
           multiplier: number
           standard_task_id: string
@@ -145,6 +146,7 @@ export type Database = {
         Insert: {
           base_duration_minutes?: number
           created_at?: string
+          formula?: string | null
           id?: string
           multiplier?: number
           standard_task_id: string
@@ -154,6 +156,7 @@ export type Database = {
         Update: {
           base_duration_minutes?: number
           created_at?: string
+          formula?: string | null
           id?: string
           multiplier?: number
           standard_task_id?: string
