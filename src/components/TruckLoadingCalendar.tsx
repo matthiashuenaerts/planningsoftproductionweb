@@ -383,8 +383,8 @@ const TruckLoadingCalendar = () => {
                           )}
                         >
                           <div className="font-medium overflow-hidden relative">
-                            <div className="animate-marquee whitespace-nowrap">
-                              {assignment.project.name}
+                            <div className="animate-marquee whitespace-nowrap inline-block">
+                              {assignment.project.name} • {assignment.project.name} • {assignment.project.name}
                             </div>
                           </div>
                           <div className="text-xs text-gray-500">
