@@ -17,8 +17,9 @@ import { holidayService, Holiday } from '@/services/holidayService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ZoomIn, ZoomOut, RefreshCw, Search } from 'lucide-react';
+import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 
 interface Task {
   id: string;
@@ -62,7 +63,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
   const rowHeight = 60;
   const headerHeight = 80;
-  const workstationLabelWidth = 200;
+  const workstationLabelWidth = 250;
 
   const scale = useMemo(() => {
     if (zoom >= 2) return { unitInMinutes: 15, unitWidth: 8 * zoom, totalUnits: (24 * 60 * 3) / 15, format: (d: Date) => format(d, 'HH:mm') };
@@ -251,17 +252,45 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     return maxEnd || new Date(0);
   };
 
-  // memoize full schedule for all workstations with dependency resolution
+  // Handler for updating active workers count
+  const handleUpdateWorkers = async (workstationId: string, delta: number) => {
+    const ws = workstations.find(w => w.id === workstationId);
+    if (!ws) return;
+    
+    const newCount = Math.max(1, Math.min(10, ws.active_workers + delta));
+    if (newCount === ws.active_workers) return;
+    
+    try {
+      await workstationService.updateActiveWorkers(workstationId, newCount);
+      setWorkstations(prev => prev.map(w => 
+        w.id === workstationId ? { ...w, active_workers: newCount } : w
+      ));
+      toast.success(`Werknemers bijgewerkt naar ${newCount}`);
+    } catch (error) {
+      toast.error('Fout bij het bijwerken van werknemers');
+    }
+  };
+
+  // memoize full schedule for all workstations with multi-worker support and dependency resolution
   const schedule = useMemo(() => {
-    const all = new Map<string, { task: Task; start: Date; end: Date; isVisible: boolean }[]>();
-    const workstationCursors = new Map<string, Date>();
+    // Map: workstationId -> workerIndex -> tasks
+    const all = new Map<string, Map<number, { task: Task; start: Date; end: Date; isVisible: boolean }[]>>();
+    // Map: workstationId -> array of cursors (one per worker)
+    const workstationCursors = new Map<string, Date[]>();
     const scheduledTaskEndTimes = new Map<string, Date>(); // Track when each task ends
     const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
 
-    // Initialize cursors for all workstations
+    // Initialize cursors for all workstations (one cursor per active worker)
     workstations.forEach((ws) => {
-      workstationCursors.set(ws.id, timelineStart);
-      all.set(ws.id, []);
+      const workerCount = ws.active_workers || 1;
+      const cursors = Array(workerCount).fill(timelineStart);
+      workstationCursors.set(ws.id, cursors);
+      
+      const workerMap = new Map<number, { task: Task; start: Date; end: Date; isVisible: boolean }[]>();
+      for (let i = 0; i < workerCount; i++) {
+        workerMap.set(i, []);
+      }
+      all.set(ws.id, workerMap);
     });
 
     // Separate TODO and HOLD tasks (use ALL tasks for positioning)
@@ -287,17 +316,30 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       let latestEndTime: Date | null = null;
 
       for (const ws of task.workstations || []) {
-        const cursor = workstationCursors.get(ws.id) || timelineStart;
-        const slots = getTaskSlots(cursor, task.duration);
+        const cursors = workstationCursors.get(ws.id) || [timelineStart];
+        const workerMap = all.get(ws.id)!;
+        
+        // Find the worker with the earliest cursor
+        let earliestWorkerIndex = 0;
+        let earliestTime = cursors[0];
+        for (let i = 1; i < cursors.length; i++) {
+          if (cursors[i] < earliestTime) {
+            earliestTime = cursors[i];
+            earliestWorkerIndex = i;
+          }
+        }
+        
+        const slots = getTaskSlots(cursors[earliestWorkerIndex], task.duration);
 
         if (slots.length > 0) {
-          const taskList = all.get(ws.id) || [];
+          const taskList = workerMap.get(earliestWorkerIndex) || [];
           slots.forEach((s) => taskList.push({ task, ...s, isVisible }));
-          all.set(ws.id, taskList);
+          workerMap.set(earliestWorkerIndex, taskList);
 
-          // Update cursor to end of this task
+          // Update cursor to end of this task for this worker
           const lastSlot = slots[slots.length - 1];
-          workstationCursors.set(ws.id, lastSlot.end);
+          cursors[earliestWorkerIndex] = lastSlot.end;
+          workstationCursors.set(ws.id, cursors);
 
           // Track the latest end time across all workstations
           if (!latestEndTime || lastSlot.end > latestEndTime) {
@@ -314,7 +356,7 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
     // PHASE 2: Schedule HOLD tasks with limit phase checking
     const remainingHoldTasks = new Set(holdTasks.map((t) => t.id));
-    let maxIterations = holdTasks.length * 5; // give it a few more passes to resolve dependencies
+    let maxIterations = holdTasks.length * 5;
     let iteration = 0;
 
     while (remainingHoldTasks.size > 0 && iteration < maxIterations) {
@@ -324,45 +366,57 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       for (const task of holdTasks) {
         if (!remainingHoldTasks.has(task.id)) continue;
 
-        const projectId = task.phases?.projects?.id || '';
         const isVisible = isTaskVisible(task);
 
-        // Determine the earliest cursor among assigned workstations
+        // Determine the earliest cursor among all workers in assigned workstations
         let earliestCursor: Date | null = null;
         for (const ws of task.workstations || []) {
-          const cursor = workstationCursors.get(ws.id) || timelineStart;
-          if (!earliestCursor || cursor < earliestCursor) earliestCursor = cursor;
+          const cursors = workstationCursors.get(ws.id) || [timelineStart];
+          const minCursor = Math.min(...cursors.map(c => c.getTime()));
+          const minDate = new Date(minCursor);
+          if (!earliestCursor || minDate < earliestCursor) earliestCursor = minDate;
         }
         if (!earliestCursor) earliestCursor = timelineStart;
 
-        // Check dependency requirement: get the maximum end time of limit tasks in the same project
+        // Check dependency requirement
         const dependencyEnd = getRequiredDependencyEndForTask(task, scheduledTaskEndTimes);
         if (dependencyEnd === null) {
-          // Some limit task exists but hasn't been scheduled yet — skip this task for now
           continue;
         }
 
         // The actual start must be after both the earliest cursor and dependency end
         const earliestStart = dependencyEnd > earliestCursor ? dependencyEnd : earliestCursor;
 
-        // Schedule on all assigned workstations starting from earliestStart (each workstation uses its own cursor >= earliestStart)
+        // Schedule on all assigned workstations
         let latestEndTime: Date | null = null;
 
-        // We will compute slots per workstation, but ensure each workstation's cursor is bumped to at least earliestStart first
         for (const ws of task.workstations || []) {
-          const originalCursor = workstationCursors.get(ws.id) || timelineStart;
-          const startCursor = originalCursor > earliestStart ? originalCursor : earliestStart;
-
+          const cursors = workstationCursors.get(ws.id) || [timelineStart];
+          const workerMap = all.get(ws.id)!;
+          
+          // Find the worker with the earliest cursor >= earliestStart
+          let bestWorkerIndex = 0;
+          let bestTime = cursors[0] > earliestStart ? cursors[0] : earliestStart;
+          for (let i = 1; i < cursors.length; i++) {
+            const workerTime = cursors[i] > earliestStart ? cursors[i] : earliestStart;
+            if (workerTime < bestTime) {
+              bestTime = workerTime;
+              bestWorkerIndex = i;
+            }
+          }
+          
+          const startCursor = cursors[bestWorkerIndex] > earliestStart ? cursors[bestWorkerIndex] : earliestStart;
           const slots = getTaskSlots(startCursor, task.duration);
 
           if (slots.length > 0) {
-            const taskList = all.get(ws.id) || [];
+            const taskList = workerMap.get(bestWorkerIndex) || [];
             slots.forEach((s) => taskList.push({ task, ...s, isVisible }));
-            all.set(ws.id, taskList);
+            workerMap.set(bestWorkerIndex, taskList);
 
-            // Update cursor to end of this task
+            // Update cursor to end of this task for this worker
             const lastSlot = slots[slots.length - 1];
-            workstationCursors.set(ws.id, lastSlot.end);
+            cursors[bestWorkerIndex] = lastSlot.end;
+            workstationCursors.set(ws.id, cursors);
 
             // Track the latest end time
             if (!latestEndTime || lastSlot.end > latestEndTime) {
@@ -444,58 +498,112 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
           {/* rows */}
           {workstations.map((ws) => {
-            const tasks = schedule.get(ws.id) || [];
+            const workerMap = schedule.get(ws.id);
+            if (!workerMap) return null;
+            
+            const workerCount = ws.active_workers || 1;
+            const totalHeight = rowHeight * workerCount;
+            
             return (
-              <div key={ws.id} className="relative border-b" style={{ height: rowHeight }}>
+              <div key={ws.id} className="relative border-b" style={{ height: totalHeight }}>
                 <div
-                  className="absolute left-0 top-0 bottom-0 flex items-center border-r bg-muted px-3 font-medium"
+                  className="absolute left-0 top-0 bottom-0 flex flex-col justify-between border-r bg-muted px-3 py-2"
                   style={{ width: workstationLabelWidth }}
                 >
-                  {ws.name}
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{ws.name}</span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0"
+                        onClick={() => handleUpdateWorkers(ws.id, -1)}
+                        disabled={workerCount <= 1}
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <span className="text-xs text-muted-foreground px-1">{workerCount}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0"
+                        onClick={() => handleUpdateWorkers(ws.id, 1)}
+                        disabled={workerCount >= 10}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  {workerCount > 1 && (
+                    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      {Array.from({ length: workerCount }).map((_, i) => (
+                        <div key={i}>Worker {i + 1}</div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="absolute top-0 bottom-0" style={{ left: workstationLabelWidth, right: 0 }}>
-                  {timeline.map((_, i) => (
-                    <div key={i} className="absolute top-0 bottom-0 border-r border-border/40" style={{ left: i * scale.unitWidth }} />
-                  ))}
-                  <TooltipProvider>
-                    {tasks.map(({ task, start, end, isVisible }) => {
-                      if (!isVisible) return null;
+                
+                {/* Render each worker lane */}
+                {Array.from({ length: workerCount }).map((_, workerIndex) => {
+                  const tasks = workerMap.get(workerIndex) || [];
+                  const laneTop = workerIndex * rowHeight;
+                  
+                  return (
+                    <div
+                      key={workerIndex}
+                      className="absolute"
+                      style={{
+                        left: workstationLabelWidth,
+                        right: 0,
+                        top: laneTop,
+                        height: rowHeight,
+                        borderTop: workerIndex > 0 ? '1px dashed hsl(var(--border) / 0.3)' : undefined
+                      }}
+                    >
+                      {timeline.map((_, i) => (
+                        <div key={i} className="absolute top-0 bottom-0 border-r border-border/40" style={{ left: i * scale.unitWidth }} />
+                      ))}
+                      <TooltipProvider>
+                        {tasks.map(({ task, start, end, isVisible }) => {
+                          if (!isVisible) return null;
 
-                      const pid = task.phases?.projects?.id || '';
-                      const { bg, text } = getColor(pid);
-                      const left = (differenceInMinutes(start, timelineStart) / scale.unitInMinutes) * scale.unitWidth;
-                      const width = (differenceInMinutes(end, start) / scale.unitInMinutes) * scale.unitWidth;
-                      return (
-                        <Tooltip key={`${task.id}-${start.toISOString()}`}>
-                          <TooltipTrigger asChild>
-                            <div
-                              className="absolute rounded-md px-2 py-1 text-xs font-medium overflow-hidden"
-                              style={{
-                                left,
-                                width,
-                                top: 8,
-                                height: rowHeight - 16,
-                                background: bg,
-                                color: text,
-                                border: '1px solid rgba(0,0,0,0.2)',
-                              }}
-                            >
-                              {task.phases?.projects?.name || 'Project'} – {task.title}
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="text-xs space-y-1">
-                              <div><b>Start:</b> {format(start, 'dd MMM HH:mm')}</div>
-                              <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
-                              <div><b>Duur:</b> {task.duration} min</div>
-                              <div><b>Status:</b> {task.status}</div>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })}
-                  </TooltipProvider>
-                </div>
+                          const pid = task.phases?.projects?.id || '';
+                          const { bg, text } = getColor(pid);
+                          const left = (differenceInMinutes(start, timelineStart) / scale.unitInMinutes) * scale.unitWidth;
+                          const width = (differenceInMinutes(end, start) / scale.unitInMinutes) * scale.unitWidth;
+                          return (
+                            <Tooltip key={`${task.id}-${start.toISOString()}-${workerIndex}`}>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className="absolute rounded-md px-2 py-1 text-xs font-medium overflow-hidden"
+                                  style={{
+                                    left,
+                                    width,
+                                    top: 8,
+                                    height: rowHeight - 16,
+                                    background: bg,
+                                    color: text,
+                                    border: '1px solid rgba(0,0,0,0.2)',
+                                  }}
+                                >
+                                  {task.phases?.projects?.name || 'Project'} – {task.title}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="text-xs space-y-1">
+                                  <div><b>Start:</b> {format(start, 'dd MMM HH:mm')}</div>
+                                  <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
+                                  <div><b>Duur:</b> {task.duration} min</div>
+                                  <div><b>Status:</b> {task.status}</div>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                      </TooltipProvider>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}

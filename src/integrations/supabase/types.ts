@@ -2843,6 +2843,7 @@ export type Database = {
       }
       workstations: {
         Row: {
+          active_workers: number
           created_at: string
           description: string | null
           icon_path: string | null
@@ -2852,6 +2853,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active_workers?: number
           created_at?: string
           description?: string | null
           icon_path?: string | null
@@ -2861,6 +2863,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active_workers?: number
           created_at?: string
           description?: string | null
           icon_path?: string | null

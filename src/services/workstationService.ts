@@ -7,6 +7,7 @@ export interface Workstation {
   description: string | null;
   image_path: string | null;
   icon_path: string | null;
+  active_workers: number;
   created_at: string;
   updated_at: string;
 }
@@ -170,5 +171,20 @@ export const workstationService = {
     if (error) {
       throw new Error(`Failed to unlink employee from workstation: ${error.message}`);
     }
+  },
+
+  async updateActiveWorkers(id: string, activeWorkers: number): Promise<Workstation> {
+    const { data, error } = await supabase
+      .from('workstations')
+      .update({ active_workers: activeWorkers })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      throw new Error(`Failed to update active workers: ${error.message}`);
+    }
+    
+    return data;
   }
 };
