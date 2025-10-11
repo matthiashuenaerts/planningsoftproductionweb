@@ -131,10 +131,23 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     const [eh, em] = wh.end_time.split(':').map(Number);
     const s = setMinutes(setHours(startOfDay(date), sh), sm);
     const e = setMinutes(setHours(startOfDay(date), eh), em);
-    return { start: s, end: e };
+    
+    // Parse breaks and convert to Date objects for this specific day
+    const breaks = (wh.breaks || [])
+      .map(b => {
+        const [bsh, bsm] = b.start_time.split(':').map(Number);
+        const [beh, bem] = b.end_time.split(':').map(Number);
+        return {
+          start: setMinutes(setHours(startOfDay(date), bsh), bsm),
+          end: setMinutes(setHours(startOfDay(date), beh), bem)
+        };
+      })
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
+    
+    return { start: s, end: e, breaks };
   };
 
-  // split task across days — optimized loop
+  // split task across days and breaks — optimized loop
   const getTaskSlots = (from: Date, duration: number) => {
     const res: { start: Date; end: Date }[] = [];
     let remaining = duration;
@@ -148,14 +161,45 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
 
     while (remaining > 0) {
       const endToday = wh!.end;
-      const available = differenceInMinutes(endToday, cur);
-      const used = Math.min(remaining, available);
-      res.push({ start: cur, end: addMinutes(cur, used) });
-      remaining -= used;
-      if (remaining > 0) {
-        cur = getNextWorkday(cur);
-        wh = getWorkHours(cur);
-        cur = wh!.start;
+      const breaks = wh!.breaks || [];
+      
+      // Find the next break that starts at or after current position
+      const nextBreak = breaks.find(b => b.start >= cur);
+      
+      if (nextBreak && nextBreak.start < endToday) {
+        // There's a break before end of day
+        const availableBeforeBreak = differenceInMinutes(nextBreak.start, cur);
+        
+        if (availableBeforeBreak > 0) {
+          // Schedule work before the break
+          const used = Math.min(remaining, availableBeforeBreak);
+          res.push({ start: cur, end: addMinutes(cur, used) });
+          remaining -= used;
+          
+          if (remaining > 0) {
+            // Continue after the break
+            cur = nextBreak.end;
+          }
+        } else {
+          // We're at or past the break start, skip to after break
+          cur = nextBreak.end;
+        }
+      } else {
+        // No more breaks today, use remaining time until end of day
+        const available = differenceInMinutes(endToday, cur);
+        const used = Math.min(remaining, available);
+        
+        if (used > 0) {
+          res.push({ start: cur, end: addMinutes(cur, used) });
+          remaining -= used;
+        }
+        
+        if (remaining > 0) {
+          // Move to next workday
+          cur = getNextWorkday(cur);
+          wh = getWorkHours(cur);
+          cur = wh!.start;
+        }
       }
     }
     return res;
