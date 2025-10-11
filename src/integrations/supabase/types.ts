@@ -2679,6 +2679,41 @@ export type Database = {
         }
         Relationships: []
       }
+      working_hours_breaks: {
+        Row: {
+          created_at: string
+          end_time: string
+          id: string
+          start_time: string
+          updated_at: string
+          working_hours_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_time: string
+          id?: string
+          start_time: string
+          updated_at?: string
+          working_hours_id: string
+        }
+        Update: {
+          created_at?: string
+          end_time?: string
+          id?: string
+          start_time?: string
+          updated_at?: string
+          working_hours_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "working_hours_breaks_working_hours_id_fkey"
+            columns: ["working_hours_id"]
+            isOneToOne: false
+            referencedRelation: "working_hours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workstation_positions: {
         Row: {
           created_at: string

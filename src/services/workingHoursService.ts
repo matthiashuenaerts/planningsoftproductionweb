@@ -1,5 +1,14 @@
 import { supabase } from '@/integrations/supabase/client';
 
+export interface WorkingHoursBreak {
+  id: string;
+  working_hours_id: string;
+  start_time: string; // HH:MM format
+  end_time: string; // HH:MM format
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WorkingHours {
   id: string;
   team: 'production' | 'installation' | 'preparation';
@@ -10,13 +19,17 @@ export interface WorkingHours {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  breaks?: WorkingHoursBreak[];
 }
 
 export const workingHoursService = {
   async getWorkingHours(): Promise<WorkingHours[]> {
     const { data, error } = await supabase
       .from('working_hours')
-      .select('*')
+      .select(`
+        *,
+        breaks:working_hours_breaks(*)
+      `)
       .eq('is_active', true)
       .order('team')
       .order('day_of_week');
@@ -58,5 +71,41 @@ export const workingHoursService = {
     dayOfWeek: number
   ): WorkingHours | null {
     return allWorkingHours.find((wh) => wh.team === team && wh.day_of_week === dayOfWeek) || null;
+  },
+
+  async addBreak(workingHoursId: string, startTime: string, endTime: string): Promise<WorkingHoursBreak> {
+    const { data, error } = await supabase
+      .from('working_hours_breaks')
+      .insert({
+        working_hours_id: workingHoursId,
+        start_time: startTime,
+        end_time: endTime,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data as WorkingHoursBreak;
+  },
+
+  async deleteBreak(breakId: string): Promise<void> {
+    const { error } = await supabase
+      .from('working_hours_breaks')
+      .delete()
+      .eq('id', breakId);
+    if (error) throw error;
+  },
+
+  async updateBreak(breakId: string, startTime: string, endTime: string): Promise<WorkingHoursBreak> {
+    const { data, error } = await supabase
+      .from('working_hours_breaks')
+      .update({
+        start_time: startTime,
+        end_time: endTime,
+      })
+      .eq('id', breakId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as WorkingHoursBreak;
   },
 };

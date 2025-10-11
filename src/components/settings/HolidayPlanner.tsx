@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Plus, Trash2 } from 'lucide-react';
 
 const HolidayPlanner: React.FC = () => {
   const queryClient = useQueryClient();
@@ -62,6 +63,37 @@ const HolidayPlanner: React.FC = () => {
       toast({
         title: 'Error',
         description: `Failed to update working hours: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const addBreakMutation = useMutation({
+    mutationFn: ({ workingHoursId, startTime, endTime }: { workingHoursId: string, startTime: string, endTime: string }) =>
+      workingHoursService.addBreak(workingHoursId, startTime, endTime),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workingHours'] });
+      toast({ title: 'Success', description: 'Break added successfully.' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: `Failed to add break: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteBreakMutation = useMutation({
+    mutationFn: (breakId: string) => workingHoursService.deleteBreak(breakId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workingHours'] });
+      toast({ title: 'Success', description: 'Break deleted successfully.' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: `Failed to delete break: ${error.message}`,
         variant: 'destructive',
       });
     },
@@ -166,45 +198,102 @@ const HolidayPlanner: React.FC = () => {
 
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Weekly Schedule for {editingTeam.charAt(0).toUpperCase() + editingTeam.slice(1)} Team</h3>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {daysOfWeek.map((dayName, dayIndex) => {
                     const dayHours = workingHoursService.getWorkingHoursForDay(workingHours, editingTeam, dayIndex);
                     return (
-                      <div key={dayIndex} className="grid grid-cols-4 gap-4 items-end p-4 border rounded-lg">
-                        <div>
-                          <Label className="text-sm font-medium">{dayName}</Label>
+                      <div key={dayIndex} className="p-4 border rounded-lg space-y-3">
+                        <div className="grid grid-cols-4 gap-4 items-end">
+                          <div>
+                            <Label className="text-sm font-medium">{dayName}</Label>
+                          </div>
+                          <div>
+                            <Label htmlFor={`start-${dayIndex}`} className="text-xs">Start Time</Label>
+                            <Input
+                              id={`start-${dayIndex}`}
+                              type="time"
+                              value={dayHours?.start_time || '08:00'}
+                              onChange={(e) => handleWorkingHoursChange(dayIndex, 'start_time', e.target.value)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`end-${dayIndex}`} className="text-xs">End Time</Label>
+                            <Input
+                              id={`end-${dayIndex}`}
+                              type="time"
+                              value={dayHours?.end_time || '17:00'}
+                              onChange={(e) => handleWorkingHoursChange(dayIndex, 'end_time', e.target.value)}
+                              className="mt-1"
+                            />
+                          </div>
                         </div>
-                        <div>
-                          <Label htmlFor={`start-${dayIndex}`} className="text-xs">Start Time</Label>
-                          <Input
-                            id={`start-${dayIndex}`}
-                            type="time"
-                            value={dayHours?.start_time || '08:00'}
-                            onChange={(e) => handleWorkingHoursChange(dayIndex, 'start_time', e.target.value)}
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor={`end-${dayIndex}`} className="text-xs">End Time</Label>
-                          <Input
-                            id={`end-${dayIndex}`}
-                            type="time"
-                            value={dayHours?.end_time || '17:00'}
-                            onChange={(e) => handleWorkingHoursChange(dayIndex, 'end_time', e.target.value)}
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor={`break-${dayIndex}`} className="text-xs">Break (min)</Label>
-                          <Input
-                            id={`break-${dayIndex}`}
-                            type="number"
-                            min="0"
-                            step="15"
-                            value={dayHours?.break_minutes || 0}
-                            onChange={(e) => handleWorkingHoursChange(dayIndex, 'break_minutes', e.target.value)}
-                            className="mt-1"
-                          />
+                        
+                        {/* Breaks Section */}
+                        <div className="space-y-2 pl-4">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm font-medium">Breaks</Label>
+                            {dayHours && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  addBreakMutation.mutate({
+                                    workingHoursId: dayHours.id,
+                                    startTime: '12:00',
+                                    endTime: '12:30',
+                                  });
+                                }}
+                              >
+                                <Plus className="h-4 w-4 mr-1" />
+                                Add Break
+                              </Button>
+                            )}
+                          </div>
+                          
+                          {dayHours?.breaks && dayHours.breaks.length > 0 ? (
+                            <div className="space-y-2">
+                              {dayHours.breaks.map((breakItem) => (
+                                <div key={breakItem.id} className="flex gap-2 items-end">
+                                  <div className="flex-1">
+                                    <Label htmlFor={`break-start-${breakItem.id}`} className="text-xs">From</Label>
+                                    <Input
+                                      id={`break-start-${breakItem.id}`}
+                                      type="time"
+                                      value={breakItem.start_time}
+                                      onChange={(e) => {
+                                        workingHoursService.updateBreak(breakItem.id, e.target.value, breakItem.end_time)
+                                          .then(() => queryClient.invalidateQueries({ queryKey: ['workingHours'] }));
+                                      }}
+                                      className="mt-1"
+                                    />
+                                  </div>
+                                  <div className="flex-1">
+                                    <Label htmlFor={`break-end-${breakItem.id}`} className="text-xs">To</Label>
+                                    <Input
+                                      id={`break-end-${breakItem.id}`}
+                                      type="time"
+                                      value={breakItem.end_time}
+                                      onChange={(e) => {
+                                        workingHoursService.updateBreak(breakItem.id, breakItem.start_time, e.target.value)
+                                          .then(() => queryClient.invalidateQueries({ queryKey: ['workingHours'] }));
+                                      }}
+                                      className="mt-1"
+                                    />
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => deleteBreakMutation.mutate(breakItem.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">No breaks configured</p>
+                          )}
                         </div>
                       </div>
                     );
