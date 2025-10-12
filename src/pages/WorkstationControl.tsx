@@ -51,31 +51,40 @@ const WorkstationControl: React.FC = () => {
 
       // Get time registrations for today
       const today = new Date().toISOString().split('T')[0];
-      supabase
+      
+      // @ts-expect-error - Supabase type inference issue
+      const timeRegistrationsQuery = supabase
         .from('time_registrations')
         .select('*')
         .eq('workstation_id', workstationId)
         .gte('start_time', `${today}T00:00:00`)
-        .order('start_time', { ascending: false })
-        .then(res => setTimeRegistrations(res.data || []));
+        .order('start_time', { ascending: false });
+      
+      const timeResult = await timeRegistrationsQuery;
+      if (timeResult.data) setTimeRegistrations(timeResult.data);
 
       // Get broken parts
-      supabase
+      const brokenPartsQuery = supabase
         .from('broken_parts')
         .select('*')
         .eq('workstation_id', workstationId)
         .order('created_at', { ascending: false })
-        .limit(10)
-        .then(res => setBrokenParts(res.data || []));
+        .limit(10);
+      
+      const brokenResult = await brokenPartsQuery;
+      if (brokenResult.data) setBrokenParts(brokenResult.data);
 
       // Get current tasks
-      supabase
+      // @ts-expect-error - Supabase type inference issue
+      const currentTasksQuery = supabase
         .from('tasks')
         .select('*')
-        .eq('workstation_id', workstationId)
-        .in('status', ['IN_PROGRESS', 'TODO'])
-        .order('created_at', { ascending: true })
-        .then(res => setCurrentTasks(res.data || []));
+        .eq('workstation_id', workstationId);
+      
+      const tasksInProgressQuery = currentTasksQuery.in('status', ['IN_PROGRESS', 'TODO']);
+      const tasksOrderedQuery = tasksInProgressQuery.order('created_at', { ascending: true });
+      const tasksResult = await tasksOrderedQuery;
+      if (tasksResult.data) setCurrentTasks(tasksResult.data);
 
     } catch (error) {
       console.error('Error loading workstation data:', error);
