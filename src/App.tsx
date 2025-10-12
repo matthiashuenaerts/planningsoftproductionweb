@@ -24,6 +24,8 @@ import GeneralSchedule from './pages/GeneralSchedule';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import NotesAndTasks from './pages/NotesAndTasks';
+import ControlPanel from './pages/ControlPanel';
+import WorkstationControl from './pages/WorkstationControl';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -81,6 +83,8 @@ function App() {
                 <Route path="/:lang/time-registrations" element={<ProtectedRoute><TimeRegistrations /></ProtectedRoute>} />
                 <Route path="/:lang/general-schedule" element={<ProtectedRoute><GeneralSchedule /></ProtectedRoute>} />
                 <Route path="/:lang/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/:lang/control-panel" element={<ProtectedRoute><ControlPanel /></ProtectedRoute>} />
+                <Route path="/:lang/control-panel/:workstationId" element={<ProtectedRoute><WorkstationControl /></ProtectedRoute>} />
               </Routes>
               <Toaster />
             </LanguageProvider>
