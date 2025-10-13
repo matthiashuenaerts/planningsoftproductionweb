@@ -6,11 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { workstationService } from '@/services/workstationService';
 import { workstationTasksService, WorkstationTask } from '@/services/workstationTasksService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
-import { ArrowLeft, Package, Wrench, Warehouse, Scissors, CheckCircle, PackageCheck, Calendar, Cog, Settings, MoreVertical, Play, Hammer, Drill, Zap, Truck, Factory, Map, QrCode } from 'lucide-react';
+import { workstationErrorService } from '@/services/workstationErrorService';
+import { ArrowLeft, Package, Wrench, Warehouse, Scissors, CheckCircle, PackageCheck, Calendar, Cog, Settings, MoreVertical, Play, Hammer, Drill, Zap, Truck, Factory, Map, QrCode, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +40,10 @@ const Workstations: React.FC = () => {
   const [workstationTasks, setWorkstationTasks] = useState<WorkstationTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState<string | null>(null);
+  const [showErrorDialog, setShowErrorDialog] = useState<string | null>(null);
+  const [newErrorMessage, setNewErrorMessage] = useState('');
+  const [newErrorType, setNewErrorType] = useState('general');
+  const [newErrorNotes, setNewErrorNotes] = useState('');
   const {
     toast
   } = useToast();
@@ -227,6 +235,25 @@ const Workstations: React.FC = () => {
     }
   };
 
+  const handleCreateError = async () => {
+    if (!showErrorDialog || !currentEmployee || !newErrorMessage.trim()) {
+      return;
+    }
+    
+    await workstationErrorService.createError(
+      showErrorDialog,
+      newErrorMessage,
+      newErrorType,
+      currentEmployee.id,
+      newErrorNotes || undefined
+    );
+    
+    setNewErrorMessage('');
+    setNewErrorType('general');
+    setNewErrorNotes('');
+    setShowErrorDialog(null);
+  };
+
   const getPriorityBadge = (priority: string) => {
     switch (priority.toLowerCase()) {
       case 'high':
@@ -298,6 +325,13 @@ const Workstations: React.FC = () => {
                       }}>
                                  <QrCode className="mr-2 h-4 w-4" />
                                  Scan QR-code
+                               </DropdownMenuItem>
+                               <DropdownMenuItem onClick={e => {
+                        e.stopPropagation();
+                        setShowErrorDialog(workstation.id);
+                      }}>
+                                 <AlertTriangle className="mr-2 h-4 w-4" />
+                                 Foutmelding Toevoegen
                                </DropdownMenuItem>
                              </DropdownMenuContent>
                           </DropdownMenu>
@@ -383,6 +417,76 @@ const Workstations: React.FC = () => {
         onQRCodeDetected={handleQRCodeDetected}
         workstationName={workstations.find(ws => ws.id === showQRScanner)?.name || ''}
       />
+
+      {/* Create Error Dialog */}
+      <Dialog open={!!showErrorDialog} onOpenChange={() => setShowErrorDialog(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Foutmelding Toevoegen</DialogTitle>
+            <DialogDescription>
+              Maak een nieuwe foutmelding aan voor {workstations.find(ws => ws.id === showErrorDialog)?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="errorMessage">Foutmelding *</Label>
+              <Input
+                id="errorMessage"
+                value={newErrorMessage}
+                onChange={(e) => setNewErrorMessage(e.target.value)}
+                placeholder="Beschrijf de fout..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="errorType">Type</Label>
+              <select
+                id="errorType"
+                value={newErrorType}
+                onChange={(e) => setNewErrorType(e.target.value)}
+                className="w-full p-2 rounded-md border border-input bg-background"
+              >
+                <option value="general">Algemeen</option>
+                <option value="mechanical">Mechanisch</option>
+                <option value="electrical">Elektrisch</option>
+                <option value="software">Software</option>
+                <option value="material">Materiaal</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="errorNotes">Notities (optioneel)</Label>
+              <Textarea
+                id="errorNotes"
+                value={newErrorNotes}
+                onChange={(e) => setNewErrorNotes(e.target.value)}
+                placeholder="Extra informatie..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleCreateError} 
+              className="flex-1"
+              disabled={!newErrorMessage.trim()}
+            >
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              Foutmelding Aanmaken
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowErrorDialog(null);
+                setNewErrorMessage('');
+                setNewErrorType('general');
+                setNewErrorNotes('');
+              }} 
+              className="flex-1"
+            >
+              Annuleren
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>;
 };
 export default Workstations;
