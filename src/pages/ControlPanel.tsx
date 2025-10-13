@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { workstationService } from '@/services/workstationService';
 import { floorplanService, WorkstationStatus } from '@/services/floorplanService';
-import { ArrowRight, Activity, AlertCircle, CheckCircle2, Clock, Users } from 'lucide-react';
+import { workstationErrorService } from '@/services/workstationErrorService';
+import { ArrowRight, Activity, AlertCircle, CheckCircle2, Clock, Users, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +14,7 @@ const ControlPanel: React.FC = () => {
   const navigate = useNavigate();
   const { t, createLocalizedPath } = useLanguage();
   const [workstationStatuses, setWorkstationStatuses] = useState<WorkstationStatus[]>([]);
+  const [workstationErrors, setWorkstationErrors] = useState<Record<string, number>>({});
 
   const { data: workstations = [] } = useQuery({
     queryKey: ['workstations'],
@@ -34,10 +36,26 @@ const ControlPanel: React.FC = () => {
   const loadStatuses = async () => {
     const statuses = await floorplanService.getWorkstationStatuses();
     setWorkstationStatuses(statuses);
+
+    // Load error counts for each workstation
+    const errors = await workstationErrorService.getAllActiveErrors();
+    const errorCounts: Record<string, number> = {};
+    errors.forEach((error) => {
+      errorCounts[error.workstation_id] = (errorCounts[error.workstation_id] || 0) + 1;
+    });
+    setWorkstationErrors(errorCounts);
   };
 
   const getWorkstationStatus = (workstationId: string) => {
-    return workstationStatuses.find(s => s.workstation_id === workstationId);
+    const status = workstationStatuses.find(s => s.workstation_id === workstationId);
+    const errorCount = workstationErrors[workstationId] || 0;
+    
+    // Override has_error if there are active errors
+    if (status && errorCount > 0) {
+      return { ...status, has_error: true, errorCount };
+    }
+    
+    return status;
   };
 
   const getStatusColor = (status?: WorkstationStatus) => {
@@ -56,8 +74,11 @@ const ControlPanel: React.FC = () => {
     return 'Idle';
   };
 
-  const totalActive = workstationStatuses.filter(s => s.is_active && s.active_users_count > 0).length;
-  const totalErrors = workstationStatuses.filter(s => s.has_error).length;
+  const totalActive = workstations.filter(w => {
+    const status = getWorkstationStatus(w.id);
+    return status?.is_active && status?.active_users_count > 0 && !(status as any).errorCount;
+  }).length;
+  const totalErrors = Object.values(workstationErrors).reduce((sum, count) => sum + count, 0);
   const totalUsers = workstationStatuses.reduce((sum, s) => sum + s.active_users_count, 0);
 
   return (
@@ -175,15 +196,16 @@ const ControlPanel: React.FC = () => {
 
                         {status && status.active_tasks.length > 0 && (
                           <div className="text-xs text-slate-400">
-                            {status.active_tasks.length} tasks
+                           {status.active_tasks.length} tasks
                           </div>
                         )}
                       </div>
                     </Card>
                     
                     {status?.has_error && (
-                      <div className="absolute -top-2 -right-2">
-                        <AlertCircle className="w-6 h-6 text-red-500 animate-pulse" />
+                      <div className="absolute -top-2 -right-2 flex items-center gap-1 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg">
+                        <AlertTriangle className="w-4 h-4" />
+                        {(status as any).errorCount || 1}
                       </div>
                     )}
                   </button>

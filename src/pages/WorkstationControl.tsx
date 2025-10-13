@@ -3,11 +3,17 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { workstationService } from '@/services/workstationService';
 import { floorplanService, WorkstationStatus } from '@/services/floorplanService';
+import { workstationErrorService, WorkstationError } from '@/services/workstationErrorService';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Activity, AlertTriangle, CheckCircle2, Clock, Users, Package, TrendingUp, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
@@ -17,10 +23,16 @@ const WorkstationControl: React.FC = () => {
   const { workstationId } = useParams<{ workstationId: string }>();
   const navigate = useNavigate();
   const { t, createLocalizedPath } = useLanguage();
+  const { currentEmployee } = useAuth();
   const [workstationStatus, setWorkstationStatus] = useState<WorkstationStatus | null>(null);
   const [timeRegistrations, setTimeRegistrations] = useState<any[]>([]);
   const [brokenParts, setBrokenParts] = useState<any[]>([]);
   const [currentTasks, setCurrentTasks] = useState<any[]>([]);
+  const [activeErrors, setActiveErrors] = useState<WorkstationError[]>([]);
+  const [newErrorMessage, setNewErrorMessage] = useState('');
+  const [newErrorType, setNewErrorType] = useState('general');
+  const [newErrorNotes, setNewErrorNotes] = useState('');
+  const [showAddError, setShowAddError] = useState(false);
 
   const { data: workstation } = useQuery({
     queryKey: ['workstation', workstationId],
@@ -86,6 +98,10 @@ const WorkstationControl: React.FC = () => {
       const tasksResult = await tasksOrderedQuery;
       if (tasksResult.data) setCurrentTasks(tasksResult.data);
 
+      // Get active errors
+      const errors = await workstationErrorService.getActiveErrors(workstationId);
+      setActiveErrors(errors);
+
     } catch (error) {
       console.error('Error loading workstation data:', error);
     }
@@ -93,6 +109,7 @@ const WorkstationControl: React.FC = () => {
 
   const getStatusColor = () => {
     if (!workstationStatus) return 'bg-gray-400';
+    if (activeErrors.length > 0) return 'bg-red-500';
     if (workstationStatus.has_error) return 'bg-red-500';
     if (workstationStatus.is_active && workstationStatus.active_users_count > 0) return 'bg-green-500';
     if (workstationStatus.is_active) return 'bg-yellow-500';
@@ -101,6 +118,7 @@ const WorkstationControl: React.FC = () => {
 
   const getStatusText = () => {
     if (!workstationStatus) return 'Unknown';
+    if (activeErrors.length > 0) return 'Error';
     if (workstationStatus.has_error) return 'Error';
     if (workstationStatus.is_active && workstationStatus.active_users_count > 0) return 'Active - Running';
     if (workstationStatus.is_active) return 'Ready - Idle';
@@ -119,6 +137,31 @@ const WorkstationControl: React.FC = () => {
       user: 'Worker'
     };
   });
+
+  const handleAddError = async () => {
+    if (!workstationId || !currentEmployee || !newErrorMessage.trim()) return;
+    
+    await workstationErrorService.createError(
+      workstationId,
+      newErrorMessage,
+      newErrorType,
+      currentEmployee.id,
+      newErrorNotes || undefined
+    );
+    
+    setNewErrorMessage('');
+    setNewErrorType('general');
+    setNewErrorNotes('');
+    setShowAddError(false);
+    loadWorkstationData();
+  };
+
+  const handleResolveError = async (errorId: string) => {
+    if (!currentEmployee) return;
+    
+    await workstationErrorService.resolveError(errorId, currentEmployee.id);
+    loadWorkstationData();
+  };
 
   if (!workstation) {
     return (
@@ -218,15 +261,15 @@ const WorkstationControl: React.FC = () => {
                 <AlertTriangle className="w-8 h-8 text-red-500" />
               </div>
               <div>
-                <p className="text-slate-400 text-sm">Broken Parts</p>
-                <p className="text-3xl font-bold text-white">{brokenParts.length}</p>
+                <p className="text-slate-400 text-sm">Actieve Fouten</p>
+                <p className="text-3xl font-bold text-white">{activeErrors.length}</p>
               </div>
             </div>
           </Card>
         </div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-3 gap-6">
           {/* Open Tasks */}
           <Card className="bg-slate-800/50 border-slate-700">
             <CardHeader>
@@ -294,6 +337,118 @@ const WorkstationControl: React.FC = () => {
                   <Bar dataKey="duration" fill="#3b82f6" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Active Errors */}
+          <Card className="bg-slate-800/50 border-slate-700">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5" />
+                  Actieve Foutmeldingen
+                </CardTitle>
+                <Dialog open={showAddError} onOpenChange={setShowAddError}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" variant="destructive">
+                      Foutmelding Toevoegen
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-slate-800 text-white border-slate-700">
+                    <DialogHeader>
+                      <DialogTitle>Nieuwe Foutmelding</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="errorMessage">Foutmelding</Label>
+                        <Input
+                          id="errorMessage"
+                          value={newErrorMessage}
+                          onChange={(e) => setNewErrorMessage(e.target.value)}
+                          placeholder="Beschrijf de fout..."
+                          className="bg-slate-700 border-slate-600 text-white"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="errorType">Type</Label>
+                        <select
+                          id="errorType"
+                          value={newErrorType}
+                          onChange={(e) => setNewErrorType(e.target.value)}
+                          className="w-full p-2 rounded-md bg-slate-700 border-slate-600 text-white"
+                        >
+                          <option value="general">Algemeen</option>
+                          <option value="mechanical">Mechanisch</option>
+                          <option value="electrical">Elektrisch</option>
+                          <option value="software">Software</option>
+                          <option value="material">Materiaal</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label htmlFor="errorNotes">Notities (optioneel)</Label>
+                        <Textarea
+                          id="errorNotes"
+                          value={newErrorNotes}
+                          onChange={(e) => setNewErrorNotes(e.target.value)}
+                          placeholder="Extra informatie..."
+                          className="bg-slate-700 border-slate-600 text-white"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={handleAddError} className="flex-1">
+                          Opslaan
+                        </Button>
+                        <Button variant="outline" onClick={() => setShowAddError(false)} className="flex-1">
+                          Annuleren
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[300px]">
+                <div className="space-y-3">
+                  {activeErrors.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <CheckCircle2 className="w-12 h-12 text-green-500 mb-3" />
+                      <p className="text-slate-400 text-sm">Geen actieve foutmeldingen</p>
+                    </div>
+                  ) : (
+                    activeErrors.map((error) => (
+                      <Card key={error.id} className="bg-red-900/20 border-red-500/50 p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant="destructive" className="text-xs">
+                                {error.error_type}
+                              </Badge>
+                            </div>
+                            <p className="text-white font-medium">{error.error_message}</p>
+                            {error.notes && (
+                              <p className="text-slate-400 text-sm mt-1">{error.notes}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-red-500/30">
+                          <div className="text-slate-400 text-xs">
+                            {format(new Date(error.created_at), 'dd/MM/yyyy HH:mm')}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleResolveError(error.id)}
+                            className="border-green-500 text-green-500 hover:bg-green-500/10"
+                          >
+                            Reset
+                          </Button>
+                        </div>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
             </CardContent>
           </Card>
 

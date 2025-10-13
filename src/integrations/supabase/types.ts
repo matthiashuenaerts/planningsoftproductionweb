@@ -2714,6 +2714,67 @@ export type Database = {
           },
         ]
       }
+      workstation_errors: {
+        Row: {
+          created_at: string
+          error_message: string
+          error_type: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          reported_by: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          workstation_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message: string
+          error_type?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          reported_by?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          workstation_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string
+          error_type?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          reported_by?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          workstation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workstation_errors_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workstation_errors_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workstation_errors_workstation_id_fkey"
+            columns: ["workstation_id"]
+            isOneToOne: false
+            referencedRelation: "workstations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workstation_positions: {
         Row: {
           created_at: string
