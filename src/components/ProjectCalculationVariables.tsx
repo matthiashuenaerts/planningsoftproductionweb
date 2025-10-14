@@ -3,8 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { projectCalculationService, ProjectCalculationVariables, evaluateFormula } from '@/services/projectCalculationService';
+import { standardTasksService } from '@/services/standardTasksService';
 import { supabase } from '@/integrations/supabase/client';
 import { Upload } from 'lucide-react';
 
@@ -16,6 +18,8 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [standardTasks, setStandardTasks] = useState<any[]>([]);
+  const [taskExclusions, setTaskExclusions] = useState<Map<string, boolean>>(new Map());
   const [variables, setVariables] = useState<Partial<ProjectCalculationVariables>>({
     aantal_objecten: 0,
     aantal_kasten: 0,
@@ -35,7 +39,22 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
 
   useEffect(() => {
     loadVariables();
+    loadStandardTasks();
   }, [projectId]);
+
+  const loadStandardTasks = async () => {
+    try {
+      const tasks = await standardTasksService.getAll();
+      setStandardTasks(tasks);
+      
+      // Initialize all tasks as enabled (not excluded)
+      const exclusions = new Map<string, boolean>();
+      tasks.forEach(task => exclusions.set(task.id, false));
+      setTaskExclusions(exclusions);
+    } catch (error: any) {
+      console.error('Failed to load standard tasks:', error);
+    }
+  };
 
   const loadVariables = async () => {
     try {
@@ -75,9 +94,52 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
       
       const phaseIds = phases?.map(p => p.id) || [];
       
-      // Update task durations based on formulas
+      // Get limit phases to check dependencies
+      const limitPhasesMap = new Map<string, string[]>();
+      for (const task of standardTasks) {
+        const limitPhases = await standardTasksService.getLimitPhases(task.id);
+        if (limitPhases.length > 0) {
+          limitPhasesMap.set(task.id, limitPhases.map(lp => lp.standard_task_id));
+        }
+      }
+      
+      // Determine which tasks should exist based on exclusions and limit phases
+      const tasksToDelete: string[] = [];
+      const tasksToCreate: string[] = [];
+      
+      for (const task of standardTasks) {
+        const isExcluded = taskExclusions.get(task.id) || false;
+        
+        if (isExcluded) {
+          tasksToDelete.push(task.id);
+        } else {
+          // Check if this task has limit phases that are all excluded
+          const limitPhases = limitPhasesMap.get(task.id) || [];
+          const allLimitPhasesExcluded = limitPhases.length > 0 && 
+            limitPhases.every(lpId => taskExclusions.get(lpId) === true);
+          
+          if (!allLimitPhasesExcluded) {
+            tasksToCreate.push(task.id);
+          }
+        }
+      }
+      
+      // Delete excluded tasks
+      if (tasksToDelete.length > 0 && phaseIds.length > 0) {
+        const { error } = await supabase
+          .from('tasks')
+          .delete()
+          .in('standard_task_id', tasksToDelete)
+          .in('phase_id', phaseIds);
+        
+        if (error) {
+          console.error('Failed to delete excluded tasks:', error);
+        }
+      }
+      
+      // Update task durations based on formulas for included tasks
       for (const rel of relationships) {
-        if (rel.formula && phaseIds.length > 0) {
+        if (rel.formula && phaseIds.length > 0 && tasksToCreate.includes(rel.standard_task_id)) {
           // Evaluate the formula with current variables
           const calculatedMinutes = evaluateFormula(rel.formula, variables as Record<string, number>);
           
@@ -148,27 +210,46 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
       const lines = text.split('\n').filter(line => line.trim());
       
       const newVariables: Record<string, number> = {};
+      const newExclusions = new Map<string, boolean>(taskExclusions);
       
       lines.forEach(line => {
         const [key, value] = line.split(',').map(s => s.trim());
-        if (key && value && !isNaN(parseInt(value))) {
-          // Match the key to our variable names
-          if (key in variables) {
+        if (key && value) {
+          // Check if it's a variable
+          if (key in variables && !isNaN(parseInt(value))) {
             newVariables[key] = parseInt(value);
+          } else {
+            // Check if it's a task exclusion (by task_number or task_name)
+            const task = standardTasks.find(t => 
+              t.task_number === key || t.task_name === key
+            );
+            if (task && (value === '0' || value === '1')) {
+              newExclusions.set(task.id, value === '0');
+            }
           }
         }
       });
       
+      let importCount = Object.keys(newVariables).length;
+      
       if (Object.keys(newVariables).length > 0) {
         setVariables(prev => ({ ...prev, ...newVariables }));
+      }
+      
+      if (newExclusions.size > 0) {
+        setTaskExclusions(newExclusions);
+        importCount += newExclusions.size;
+      }
+      
+      if (importCount > 0) {
         toast({
           title: 'Success',
-          description: `Imported ${Object.keys(newVariables).length} variables from CSV`
+          description: `Imported ${importCount} items from CSV`
         });
       } else {
         toast({
           title: 'No data imported',
-          description: 'No matching variables found in CSV file',
+          description: 'No matching variables or tasks found in CSV file',
           variant: 'destructive'
         });
       }
@@ -191,7 +272,7 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
       <CardHeader>
         <CardTitle>Project Berekening Variabelen</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         <div
           className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors"
           onDrop={handleDrop}
@@ -203,7 +284,7 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
             Drag and drop a CSV file here, or click to select
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            CSV format: variable_name,value (one per line)
+            CSV format: variable_name,value OR task_number,1/0 (one per line)
           </p>
           <input
             ref={fileInputRef}
@@ -212,6 +293,33 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
             onChange={handleFileSelect}
             className="hidden"
           />
+        </div>
+        
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold">Taken Configuratie</h3>
+          <p className="text-sm text-muted-foreground">
+            Schakel taken in of uit voor dit project
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+            {standardTasks.map((task) => (
+              <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex-1">
+                  <Label htmlFor={`task-${task.id}`} className="text-sm font-medium cursor-pointer">
+                    {task.task_number} - {task.task_name}
+                  </Label>
+                </div>
+                <Switch
+                  id={`task-${task.id}`}
+                  checked={!taskExclusions.get(task.id)}
+                  onCheckedChange={(checked) => {
+                    const newExclusions = new Map(taskExclusions);
+                    newExclusions.set(task.id, !checked);
+                    setTaskExclusions(newExclusions);
+                  }}
+                />
+              </div>
+            ))}
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
