@@ -105,13 +105,13 @@ const ControlPanel: React.FC = () => {
   const totalUsers = workstationStatuses.reduce((sum, s) => sum + s.active_users_count, 0);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="h-screen overflow-hidden flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
-      <div className="bg-slate-900/50 border-b border-slate-700 px-8 py-6">
+      <div className="bg-slate-900/50 border-b border-slate-700 px-8 py-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-white mb-2">{t('control_panel')}</h1>
-            <p className="text-slate-400">Production Overview & Monitoring</p>
+            <h1 className="text-3xl font-bold text-white mb-1">{t('control_panel')}</h1>
+            <p className="text-slate-400 text-sm">Production Overview & Monitoring</p>
           </div>
           <Button 
             variant="outline" 
@@ -124,60 +124,60 @@ const ControlPanel: React.FC = () => {
       </div>
 
       {/* Stats Overview */}
-      <div className="px-8 py-6">
-        <div className="grid grid-cols-4 gap-6 mb-8">
-          <Card className="bg-slate-800/50 border-slate-700 p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-green-500/10">
-                <Activity className="w-8 h-8 text-green-500" />
+      <div className="flex-1 overflow-y-auto px-8 py-4">
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <Card className="bg-slate-800/50 border-slate-700 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-green-500/10">
+                <Activity className="w-6 h-6 text-green-500" />
               </div>
               <div>
-                <p className="text-slate-400 text-sm">Active Machines</p>
-                <p className="text-3xl font-bold text-white">{totalActive}</p>
+                <p className="text-slate-400 text-xs">Active Machines</p>
+                <p className="text-2xl font-bold text-white">{totalActive}</p>
               </div>
             </div>
           </Card>
           
-          <Card className="bg-slate-800/50 border-slate-700 p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-blue-500/10">
-                <Users className="w-8 h-8 text-blue-500" />
+          <Card className="bg-slate-800/50 border-slate-700 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-500/10">
+                <Users className="w-6 h-6 text-blue-500" />
               </div>
               <div>
-                <p className="text-slate-400 text-sm">Active Workers</p>
-                <p className="text-3xl font-bold text-white">{totalUsers}</p>
+                <p className="text-slate-400 text-xs">Active Workers</p>
+                <p className="text-2xl font-bold text-white">{totalUsers}</p>
               </div>
             </div>
           </Card>
 
-          <Card className="bg-slate-800/50 border-slate-700 p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-purple-500/10">
-                <Clock className="w-8 h-8 text-purple-500" />
+          <Card className="bg-slate-800/50 border-slate-700 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-purple-500/10">
+                <Clock className="w-6 h-6 text-purple-500" />
               </div>
               <div>
-                <p className="text-slate-400 text-sm">Total Machines</p>
-                <p className="text-3xl font-bold text-white">{workstations.length}</p>
+                <p className="text-slate-400 text-xs">Total Machines</p>
+                <p className="text-2xl font-bold text-white">{workstations.length}</p>
               </div>
             </div>
           </Card>
 
-          <Card className="bg-slate-800/50 border-slate-700 p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-red-500/10">
-                <AlertCircle className="w-8 h-8 text-red-500" />
+          <Card className="bg-slate-800/50 border-slate-700 p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-red-500/10">
+                <AlertCircle className="w-6 h-6 text-red-500" />
               </div>
               <div>
-                <p className="text-slate-400 text-sm">Errors</p>
-                <p className="text-3xl font-bold text-white">{totalErrors}</p>
+                <p className="text-slate-400 text-xs">Errors</p>
+                <p className="text-2xl font-bold text-white">{totalErrors}</p>
               </div>
             </div>
           </Card>
         </div>
 
         {/* Production Flow */}
-        <Card className="bg-slate-800/50 border-slate-700 p-8">
-          <h2 className="text-2xl font-bold text-white mb-6">Production Flow</h2>
+        <Card className="bg-slate-800/50 border-slate-700 p-6">
+          <h2 className="text-xl font-bold text-white mb-4">Production Flow</h2>
           
           <div className="flex items-center justify-center gap-4 flex-wrap">
             {workstations.map((workstation, index) => {
@@ -198,7 +198,7 @@ const ControlPanel: React.FC = () => {
                   >
                     <Card 
                       className={`
-                        w-48 h-32 border-2 transition-all duration-300
+                        w-40 h-28 border-2 transition-all duration-300
                         ${statusColor === 'bg-green-500' ? 'border-green-500 bg-green-500/20' : ''}
                         ${statusColor === 'bg-yellow-500' ? 'border-yellow-500 bg-yellow-500/20' : ''}
                         ${statusColor === 'bg-red-500' ? 'border-red-500 bg-red-500/20' : ''}
@@ -206,20 +206,20 @@ const ControlPanel: React.FC = () => {
                         hover:scale-105 hover:shadow-xl cursor-pointer
                       `}
                     >
-                      <div className="p-4 h-full flex flex-col justify-between">
+                      <div className="p-3 h-full flex flex-col justify-between">
                         <div className="flex items-start justify-between">
-                          <div className={`w-3 h-3 rounded-full ${statusColor} animate-pulse`} />
+                          <div className={`w-2.5 h-2.5 rounded-full ${statusColor} animate-pulse`} />
                           {status && status.active_users_count > 0 && (
-                            <Badge variant="secondary" className="bg-slate-900/50 text-white text-xs">
-                              <Users className="w-3 h-3 mr-1" />
+                            <Badge variant="secondary" className="bg-slate-900/50 text-white text-xs px-1.5 py-0">
+                              <Users className="w-2.5 h-2.5 mr-0.5" />
                               {status.active_users_count}
                             </Badge>
                           )}
                         </div>
                         
-                        <div>
-                          <h3 className="text-white font-bold text-lg mb-1">{workstation.name}</h3>
-                          <p className="text-slate-400 text-sm">{statusText}</p>
+                        <div className="flex-1 flex flex-col justify-center">
+                          <h3 className="text-white font-bold text-sm leading-tight break-words">{workstation.name}</h3>
+                          <p className="text-slate-400 text-xs mt-0.5">{statusText}</p>
                         </div>
 
                         {status && status.active_tasks.length > 0 && (
@@ -239,12 +239,12 @@ const ControlPanel: React.FC = () => {
                   </button>
                   
                   {index < workstations.length - 1 && (
-                    <div className="flex flex-col items-center gap-2">
-                      <ArrowRight className="w-8 h-8 text-slate-600 flex-shrink-0" />
+                    <div className="flex flex-col items-center gap-1.5">
+                      <ArrowRight className="w-6 h-6 text-slate-600 flex-shrink-0" />
                       {bufferMinutes > 0 && (
-                        <div className="flex flex-col items-center bg-slate-700/50 px-3 py-1.5 rounded-lg border border-slate-600">
-                          <Clock className="w-4 h-4 text-blue-400 mb-1" />
-                          <span className="text-white font-semibold text-sm">
+                        <div className="flex flex-col items-center bg-slate-700/50 px-2 py-1 rounded-lg border border-slate-600">
+                          <Clock className="w-3 h-3 text-blue-400 mb-0.5" />
+                          <span className="text-white font-semibold text-xs">
                             {bufferHours > 0 && `${bufferHours}h `}
                             {remainingMinutes > 0 && `${remainingMinutes}m`}
                           </span>
@@ -259,22 +259,22 @@ const ControlPanel: React.FC = () => {
           </div>
 
           {/* Legend */}
-          <div className="mt-8 pt-6 border-t border-slate-700">
-            <div className="flex items-center gap-8 justify-center text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-500" />
+          <div className="mt-6 pt-4 border-t border-slate-700">
+            <div className="flex items-center gap-6 justify-center text-xs">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
                 <span className="text-slate-400">Active</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-yellow-500" />
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
                 <span className="text-slate-400">Ready</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-gray-400" />
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-gray-400" />
                 <span className="text-slate-400">Idle</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500" />
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
                 <span className="text-slate-400">Error</span>
               </div>
             </div>
