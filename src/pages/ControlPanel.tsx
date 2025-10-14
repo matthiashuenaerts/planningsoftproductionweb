@@ -9,12 +9,14 @@ import { useLanguage } from '@/context/LanguageContext';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
 
 const ControlPanel: React.FC = () => {
   const navigate = useNavigate();
   const { t, createLocalizedPath } = useLanguage();
   const [workstationStatuses, setWorkstationStatuses] = useState<WorkstationStatus[]>([]);
   const [workstationErrors, setWorkstationErrors] = useState<Record<string, number>>({});
+  const [workstationBufferTimes, setWorkstationBufferTimes] = useState<Record<string, number>>({});
 
   const { data: workstations = [] } = useQuery({
     queryKey: ['workstations'],
@@ -44,6 +46,27 @@ const ControlPanel: React.FC = () => {
       errorCounts[error.workstation_id] = (errorCounts[error.workstation_id] || 0) + 1;
     });
     setWorkstationErrors(errorCounts);
+
+    // Load buffer times (TODO tasks duration) for each workstation
+    const { data: todoTasks } = await supabase
+      .from('tasks')
+      .select(`
+        id,
+        duration,
+        task_workstation_links!inner(
+          workstation_id
+        )
+      `)
+      .eq('status', 'TODO');
+
+    const bufferTimes: Record<string, number> = {};
+    todoTasks?.forEach((task: any) => {
+      task.task_workstation_links?.forEach((link: any) => {
+        const workstationId = link.workstation_id;
+        bufferTimes[workstationId] = (bufferTimes[workstationId] || 0) + (task.duration || 0);
+      });
+    });
+    setWorkstationBufferTimes(bufferTimes);
   };
 
   const getWorkstationStatus = (workstationId: string) => {
@@ -162,6 +185,11 @@ const ControlPanel: React.FC = () => {
               const statusColor = getStatusColor(status);
               const statusText = getStatusText(status);
               
+              // Get buffer time (TODO tasks duration) for this workstation
+              const bufferMinutes = workstationBufferTimes[workstation.id] || 0;
+              const bufferHours = Math.floor(bufferMinutes / 60);
+              const remainingMinutes = bufferMinutes % 60;
+              
               return (
                 <React.Fragment key={workstation.id}>
                   <button
@@ -211,7 +239,19 @@ const ControlPanel: React.FC = () => {
                   </button>
                   
                   {index < workstations.length - 1 && (
-                    <ArrowRight className="w-8 h-8 text-slate-600 flex-shrink-0" />
+                    <div className="flex flex-col items-center gap-2">
+                      <ArrowRight className="w-8 h-8 text-slate-600 flex-shrink-0" />
+                      {bufferMinutes > 0 && (
+                        <div className="flex flex-col items-center bg-slate-700/50 px-3 py-1.5 rounded-lg border border-slate-600">
+                          <Clock className="w-4 h-4 text-blue-400 mb-1" />
+                          <span className="text-white font-semibold text-sm">
+                            {bufferHours > 0 && `${bufferHours}h `}
+                            {remainingMinutes > 0 && `${remainingMinutes}m`}
+                          </span>
+                          <span className="text-slate-400 text-xs">buffer</span>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </React.Fragment>
               );
