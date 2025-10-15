@@ -47,17 +47,15 @@ const ControlPanel: React.FC = () => {
     });
     setWorkstationErrors(errorCounts);
 
-    // Load buffer times (TODO tasks duration) for each workstation
-    const { data: todoTasks } = await supabase
-      .from('tasks')
-      .select('id, duration, workstation_id')
-      .eq('status', 'TODO')
-      .not('workstation_id', 'is', null);
+    // Load buffer times (sum of all workstation_tasks duration) for each workstation
+    const { data: workstationTasks } = await supabase
+      .from('workstation_tasks')
+      .select('workstation_id, duration');
 
     const bufferTimes: Record<string, number> = {};
-    todoTasks?.forEach((task: any) => {
-      if (task.workstation_id) {
-        bufferTimes[task.workstation_id] = (bufferTimes[task.workstation_id] || 0) + (task.duration || 0);
+    workstationTasks?.forEach((task: any) => {
+      if (task.workstation_id && task.duration) {
+        bufferTimes[task.workstation_id] = (bufferTimes[task.workstation_id] || 0) + task.duration;
       }
     });
     setWorkstationBufferTimes(bufferTimes);
