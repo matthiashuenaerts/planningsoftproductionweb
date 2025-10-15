@@ -50,21 +50,15 @@ const ControlPanel: React.FC = () => {
     // Load buffer times (TODO tasks duration) for each workstation
     const { data: todoTasks } = await supabase
       .from('tasks')
-      .select(`
-        id,
-        duration,
-        task_workstation_links!inner(
-          workstation_id
-        )
-      `)
-      .eq('status', 'TODO');
+      .select('id, duration, workstation_id')
+      .eq('status', 'TODO')
+      .not('workstation_id', 'is', null);
 
     const bufferTimes: Record<string, number> = {};
     todoTasks?.forEach((task: any) => {
-      task.task_workstation_links?.forEach((link: any) => {
-        const workstationId = link.workstation_id;
-        bufferTimes[workstationId] = (bufferTimes[workstationId] || 0) + (task.duration || 0);
-      });
+      if (task.workstation_id) {
+        bufferTimes[task.workstation_id] = (bufferTimes[task.workstation_id] || 0) + (task.duration || 0);
+      }
     });
     setWorkstationBufferTimes(bufferTimes);
   };
