@@ -37,6 +37,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 interface TaskWithTimeData extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
@@ -96,6 +97,7 @@ const ProjectDetails = () => {
   const [savingDescription, setSavingDescription] = useState(false);
   const [showProjectChat, setShowProjectChat] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const {
     currentEmployee
   } = useAuth();
@@ -788,21 +790,25 @@ const ProjectDetails = () => {
       });
     }
   };
-  const handleDeleteOrder = async (orderId: string) => {
+  const handleDeleteOrder = async () => {
+    if (!orderToDelete) return;
+    
     try {
-      await orderService.delete(orderId);
+      await orderService.delete(orderToDelete);
       const updatedOrders = await orderService.getByProject(projectId!);
       setOrders(updatedOrders);
       toast({
         title: t('success'),
         description: t('order_deleted_successfully')
       });
+      setOrderToDelete(null);
     } catch (error: any) {
       toast({
         title: t('error'),
         description: error.message,
         variant: "destructive"
       });
+      setOrderToDelete(null);
     }
   };
   const handleEditOrder = (orderId: string) => {
@@ -1287,7 +1293,7 @@ const ProjectDetails = () => {
                                   <Edit3 className="h-3 w-3" />
                                 </Button>
                                 
-                                <Button size="sm" variant="outline" onClick={() => handleDeleteOrder(order.id)} className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-red-50" title="Delete order">
+                                <Button size="sm" variant="outline" onClick={() => setOrderToDelete(order.id)} className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-red-50" title="Delete order">
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
                               </div>
@@ -1547,6 +1553,22 @@ const ProjectDetails = () => {
 
       {selectedOrderId && <OrderEditModal open={showOrderEditModal} onOpenChange={setShowOrderEditModal} orderId={selectedOrderId} onSuccess={handleOrderEditSuccess} />}
       
+      <AlertDialog open={!!orderToDelete} onOpenChange={(open) => !open && setOrderToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('confirm_deletion') || 'Confirm Deletion'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('delete_order_confirmation') || 'Are you sure you want to delete this order? This action cannot be undone.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('cancel') || 'Cancel'}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteOrder}>
+              {t('delete') || 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
