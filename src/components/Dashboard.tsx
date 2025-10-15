@@ -25,6 +25,7 @@ interface LoadingAssignment {
     client: string;
     status: string;
     installation_date: string;
+    progress: number;
   };
   loading_date: string;
   orderStatus?: {
@@ -284,7 +285,7 @@ const Dashboard: React.FC = () => {
       const {
         data: projectsData,
         error: projectsError
-      } = await supabase.from('projects').select('id, name, client, status, installation_date').not('installation_date', 'is', null).gte('installation_date', format(subDays(weekStart, 10), 'yyyy-MM-dd')) // Buffer for loading date calculation
+      } = await supabase.from('projects').select('id, name, client, status, installation_date, progress').not('installation_date', 'is', null).gte('installation_date', format(subDays(weekStart, 10), 'yyyy-MM-dd')) // Buffer for loading date calculation
       .lte('installation_date', format(addDays(weekEnd, 10), 'yyyy-MM-dd')).order('installation_date');
       if (projectsError) throw projectsError;
 
@@ -572,7 +573,7 @@ const Dashboard: React.FC = () => {
                           
                           <div className="font-medium break-words whitespace-normal leading-tight">{assignment.project.name}</div>
                           <div className="text-xs text-gray-500">
-                            Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
+                            Install: {format(new Date(assignment.project.installation_date), 'MMM d')} | {assignment.project.progress}%
                             {isManuallyAdjusted && <span className="text-orange-600 ml-1 font-medium">*</span>}
                           </div>
                         </div>;
