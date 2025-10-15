@@ -25,7 +25,7 @@ interface LoadingAssignment {
     client: string;
     status: string;
     installation_date: string;
-    progress: number;
+    progress: number | null;
   };
   loading_date: string;
   orderStatus?: {
@@ -573,7 +573,7 @@ const Dashboard: React.FC = () => {
                           
                           <div className="font-medium break-words whitespace-normal leading-tight">{assignment.project.name}</div>
                           <div className="text-xs text-gray-500">
-                            Install: {format(new Date(assignment.project.installation_date), 'MMM d')} | {assignment.project.progress}%
+                            Install: {format(new Date(assignment.project.installation_date), 'MMM d')} | {assignment.project.progress || 0}%
                             {isManuallyAdjusted && <span className="text-orange-600 ml-1 font-medium">*</span>}
                           </div>
                         </div>;
