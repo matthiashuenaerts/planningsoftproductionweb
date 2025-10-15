@@ -21,6 +21,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Plus, Trash2, ExternalLink, Edit, ShoppingCart, QrCode, Upload, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { accessoriesService, Accessory } from '@/services/accessoriesService';
@@ -53,6 +63,7 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
   
   const [showQrCodeDialog, setShowQrCodeDialog] = useState(false);
   const [sortedAccessoriesForQr, setSortedAccessoriesForQr] = useState<Accessory[]>([]);
+  const [accessoryToDelete, setAccessoryToDelete] = useState<string | null>(null);
   
   const [editingStatusAccessoryId, setEditingStatusAccessoryId] = useState<string | null>(null);
   const [statusUpdateInfo, setStatusUpdateInfo] = useState<{status: Accessory['status'], quantity: number}>({status: 'to_check', quantity: 1});
@@ -192,10 +203,12 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async () => {
+    if (!accessoryToDelete) return;
+    
     try {
       setLoading(true);
-      await accessoriesService.delete(id);
+      await accessoriesService.delete(accessoryToDelete);
       await loadAccessories();
       
       toast({
@@ -210,6 +223,7 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
       });
     } finally {
       setLoading(false);
+      setAccessoryToDelete(null);
     }
   };
 
@@ -909,7 +923,7 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleDelete(accessory.id)}
+                          onClick={() => setAccessoryToDelete(accessory.id)}
                           className="h-7 w-7 p-0 text-destructive hover:text-destructive"
                           title="Delete accessory"
                         >
@@ -961,6 +975,21 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
         accessories={sortedAccessoriesForQr}
         onAccessoryUpdate={loadAccessories}
       />
+
+      <AlertDialog open={!!accessoryToDelete} onOpenChange={(open) => !open && setAccessoryToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this accessory. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
