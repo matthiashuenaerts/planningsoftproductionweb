@@ -82,8 +82,14 @@ const Login: React.FC = () => {
         description: `Welcome, ${employee.name}!`
       });
 
-      // Navigate based on role
-      navigate('/');
+      // Navigate to the originally requested page or home
+      const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+      if (redirectPath) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        navigate(redirectPath);
+      } else {
+        navigate('/');
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       toast({

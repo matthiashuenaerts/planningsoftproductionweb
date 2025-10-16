@@ -28,6 +28,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }, []);
 
   if (!isAuthenticated) {
+    // Store the current location so we can redirect back after login
+    const currentPath = window.location.pathname + window.location.search;
+    sessionStorage.setItem('redirectAfterLogin', currentPath);
     return <Navigate to="/login" replace />;
   }
 
