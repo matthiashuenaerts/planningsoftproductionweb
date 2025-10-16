@@ -16,8 +16,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Activity, AlertTriangle, CheckCircle2, Clock, Users, Package, TrendingUp, Calendar } from 'lucide-react';
-import { format } from 'date-fns';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { format, startOfWeek, endOfWeek, startOfDay, parseISO, addDays } from 'date-fns';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, ComposedChart } from 'recharts';
 
 const WorkstationControl: React.FC = () => {
   const { workstationId } = useParams<{ workstationId: string }>();
@@ -26,8 +26,11 @@ const WorkstationControl: React.FC = () => {
   const { currentEmployee } = useAuth();
   const [workstationStatus, setWorkstationStatus] = useState<WorkstationStatus | null>(null);
   const [timeRegistrations, setTimeRegistrations] = useState<any[]>([]);
+  const [weekTimeRegistrations, setWeekTimeRegistrations] = useState<any[]>([]);
   const [brokenParts, setBrokenParts] = useState<any[]>([]);
   const [currentTasks, setCurrentTasks] = useState<any[]>([]);
+  const [todayTasks, setTodayTasks] = useState<any[]>([]);
+  const [activeUserTasks, setActiveUserTasks] = useState<Map<string, any[]>>(new Map());
   const [activeErrors, setActiveErrors] = useState<WorkstationError[]>([]);
   const [newErrorMessage, setNewErrorMessage] = useState('');
   const [newErrorType, setNewErrorType] = useState('general');
@@ -67,13 +70,28 @@ const WorkstationControl: React.FC = () => {
       // @ts-expect-error - Supabase type inference issue
       const timeRegistrationsQuery = supabase
         .from('time_registrations')
-        .select('*')
+        .select('*, employees(name)')
         .eq('workstation_id', workstationId)
         .gte('start_time', `${today}T00:00:00`)
         .order('start_time', { ascending: false });
       
       const timeResult = await timeRegistrationsQuery;
       if (timeResult.data) setTimeRegistrations(timeResult.data);
+
+      // Get time registrations for this week
+      const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
+      
+      const weekTimeRegistrationsQuery = supabase
+        .from('time_registrations')
+        .select('*, employees(name)')
+        .eq('workstation_id', workstationId)
+        .gte('start_time', weekStart.toISOString())
+        .lte('start_time', weekEnd.toISOString())
+        .order('start_time', { ascending: true });
+      
+      const weekResult = await weekTimeRegistrationsQuery;
+      if (weekResult.data) setWeekTimeRegistrations(weekResult.data);
 
       // Get broken parts
       const brokenPartsQuery = supabase
@@ -86,17 +104,64 @@ const WorkstationControl: React.FC = () => {
       const brokenResult = await brokenPartsQuery;
       if (brokenResult.data) setBrokenParts(brokenResult.data);
 
-      // Get current tasks
-      // @ts-expect-error - Supabase type inference issue
-      const currentTasksQuery = supabase
+      // Get current tasks with workstation links
+      const { data: tasksData } = await supabase
         .from('tasks')
-        .select('*')
-        .eq('workstation_id', workstationId);
+        .select(`
+          *,
+          phases(name, projects(id, name)),
+          task_workstation_links!inner(workstation_id)
+        `)
+        .eq('task_workstation_links.workstation_id', workstationId)
+        .in('status', ['IN_PROGRESS', 'TODO'])
+        .order('due_date', { ascending: true });
       
-      const tasksInProgressQuery = currentTasksQuery.in('status', ['IN_PROGRESS', 'TODO']);
-      const tasksOrderedQuery = tasksInProgressQuery.order('created_at', { ascending: true });
-      const tasksResult = await tasksOrderedQuery;
-      if (tasksResult.data) setCurrentTasks(tasksResult.data);
+      if (tasksData) setCurrentTasks(tasksData);
+
+      // Get today's tasks
+      const { data: todayTasksData } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          phases(name, projects(id, name)),
+          task_workstation_links!inner(workstation_id)
+        `)
+        .eq('task_workstation_links.workstation_id', workstationId)
+        .eq('status', 'IN_PROGRESS')
+        .gte('due_date', today)
+        .order('due_date', { ascending: true });
+      
+      if (todayTasksData) setTodayTasks(todayTasksData);
+
+      // Get active user tasks
+      if (status?.active_user_names && status.active_user_names.length > 0) {
+        const userTasksMap = new Map<string, any[]>();
+        
+        for (const userName of status.active_user_names) {
+          const { data: userTasks } = await supabase
+            .from('time_registrations')
+            .select(`
+              *,
+              tasks(
+                id,
+                title,
+                description,
+                status,
+                phases(name, projects(id, name))
+              )
+            `)
+            .eq('workstation_id', workstationId)
+            .gte('start_time', `${today}T00:00:00`)
+            .is('end_time', null)
+            .order('start_time', { ascending: false });
+          
+          if (userTasks && userTasks.length > 0) {
+            userTasksMap.set(userName, userTasks);
+          }
+        }
+        
+        setActiveUserTasks(userTasksMap);
+      }
 
       // Get active errors
       const errors = await workstationErrorService.getActiveErrors(workstationId);
@@ -125,8 +190,8 @@ const WorkstationControl: React.FC = () => {
     return 'Idle';
   };
 
-  // Prepare chart data for time registrations
-  const chartData = timeRegistrations.slice(0, 10).map(reg => {
+  // Prepare chart data for today's time registrations
+  const todayChartData = timeRegistrations.slice(0, 10).map(reg => {
     const duration = reg.end_time 
       ? (new Date(reg.end_time).getTime() - new Date(reg.start_time).getTime()) / (1000 * 60)
       : (new Date().getTime() - new Date(reg.start_time).getTime()) / (1000 * 60);
@@ -134,9 +199,35 @@ const WorkstationControl: React.FC = () => {
     return {
       time: format(new Date(reg.start_time), 'HH:mm'),
       duration: Math.round(duration),
-      user: 'Worker'
+      name: 'Today'
     };
   });
+
+  // Prepare chart data for weekly time registrations
+  const weekChartData: any[] = [];
+  const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  
+  for (let i = 0; i < 7; i++) {
+    const day = addDays(weekStart, i);
+    const dayStr = format(day, 'yyyy-MM-dd');
+    const dayRegs = weekTimeRegistrations.filter(reg => 
+      format(new Date(reg.start_time), 'yyyy-MM-dd') === dayStr
+    );
+    
+    const totalMinutes = dayRegs.reduce((sum, reg) => {
+      const duration = reg.end_time 
+        ? (new Date(reg.end_time).getTime() - new Date(reg.start_time).getTime()) / (1000 * 60)
+        : 0;
+      return sum + duration;
+    }, 0);
+    
+    weekChartData.push({
+      day: daysOfWeek[i],
+      hours: Math.round(totalMinutes / 60 * 10) / 10,
+      registrations: dayRegs.length
+    });
+  }
 
   const handleAddError = async () => {
     if (!workstationId || !currentEmployee || !newErrorMessage.trim()) return;
@@ -172,7 +263,7 @@ const WorkstationControl: React.FC = () => {
   }
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className={`h-screen overflow-hidden flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 ${activeErrors.length > 0 ? 'ring-4 ring-red-500 ring-inset' : ''}`}>
       {/* Header */}
       <div className="bg-slate-900/50 border-b border-slate-700 px-8 py-4 flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
@@ -270,42 +361,86 @@ const WorkstationControl: React.FC = () => {
 
         {/* Main Grid */}
         <div className="grid grid-cols-3 gap-4">
-          {/* Open Tasks */}
+          {/* Open Tasks Timeline */}
           <Card className="bg-slate-800/50 border-slate-700">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
                 <Package className="w-5 h-5" />
-                Open Tasks
+                Today's Task Timeline
               </CardTitle>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[250px]">
-                <div className="space-y-3">
-                  {currentTasks.length === 0 ? (
-                    <p className="text-slate-400 text-sm">No open tasks</p>
+                <div className="space-y-2">
+                  {todayTasks.length === 0 ? (
+                    <p className="text-slate-400 text-sm">No tasks scheduled for today</p>
                   ) : (
-                    currentTasks.map((task) => (
-                      <Card key={task.id} className="bg-slate-700/50 border-slate-600 p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1">
-                            <h4 className="text-white font-medium">{task.name}</h4>
-                            <p className="text-slate-400 text-sm">Task #{task.id.slice(0, 8)}</p>
+                    todayTasks.map((task, index) => {
+                      const startTime = task.due_date ? new Date(task.due_date) : new Date();
+                      const endTime = task.duration ? new Date(startTime.getTime() + task.duration * 60000) : new Date(startTime.getTime() + 60 * 60000);
+                      const projectName = task.phases?.projects?.name || 'Unknown Project';
+                      
+                      return (
+                        <div key={task.id} className="relative">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="text-xs text-slate-400 w-20">
+                              {format(startTime, 'HH:mm')}
+                            </div>
+                            <div className="flex-1 bg-slate-700/50 border border-slate-600 rounded-lg p-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <Badge 
+                                      variant={task.status === 'IN_PROGRESS' ? 'default' : 'secondary'}
+                                      className="text-xs"
+                                    >
+                                      {task.status}
+                                    </Badge>
+                                    <span className="text-white text-sm font-medium">{task.title}</span>
+                                  </div>
+                                  <p className="text-slate-400 text-xs mt-1">{projectName}</p>
+                                </div>
+                                <div className="flex items-center gap-2 text-slate-400 text-xs">
+                                  <Clock className="w-3 h-3" />
+                                  {format(endTime, 'HH:mm')}
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <Badge 
-                            variant={task.status === 'IN_PROGRESS' ? 'default' : 'secondary'}
-                            className="ml-2"
-                          >
-                            {task.status}
-                          </Badge>
+                          {index < todayTasks.length - 1 && (
+                            <div className="w-0.5 h-2 bg-slate-600 ml-10"></div>
+                          )}
                         </div>
-                        {task.estimated_duration && (
-                          <div className="flex items-center gap-2 text-slate-400 text-sm">
-                            <Clock className="w-4 h-4" />
-                            {task.estimated_duration} min
-                          </div>
-                        )}
-                      </Card>
-                    ))
+                      );
+                    })
+                  )}
+                  
+                  {/* Show all other open tasks */}
+                  {currentTasks.filter(t => t.status === 'TODO').length > 0 && (
+                    <>
+                      <div className="pt-3 mt-3 border-t border-slate-600">
+                        <p className="text-slate-400 text-xs mb-2">Upcoming Tasks</p>
+                      </div>
+                      {currentTasks
+                        .filter(t => t.status === 'TODO')
+                        .slice(0, 5)
+                        .map((task) => (
+                          <Card key={task.id} className="bg-slate-700/30 border-slate-600 p-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <p className="text-white text-sm">{task.title}</p>
+                                <p className="text-slate-400 text-xs">
+                                  {task.phases?.projects?.name || 'Unknown Project'}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1 text-slate-400 text-xs">
+                                <Clock className="w-3 h-3" />
+                                {task.duration || 60}m
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                    </>
                   )}
                 </div>
               </ScrollArea>
@@ -317,26 +452,51 @@ const WorkstationControl: React.FC = () => {
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
                 <TrendingUp className="w-5 h-5" />
-                Today's Activity
+                Activity Overview
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis dataKey="time" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#1e293b', 
-                      border: '1px solid #334155',
-                      borderRadius: '8px'
-                    }}
-                    labelStyle={{ color: '#fff' }}
-                  />
-                  <Bar dataKey="duration" fill="#3b82f6" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="mb-4">
+                <p className="text-slate-400 text-xs mb-2">This Week</p>
+                <ResponsiveContainer width="100%" height={120}>
+                  <ComposedChart data={weekChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="day" stroke="#94a3b8" style={{ fontSize: '10px' }} />
+                    <YAxis stroke="#94a3b8" style={{ fontSize: '10px' }} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#1e293b', 
+                        border: '1px solid #334155',
+                        borderRadius: '8px',
+                        fontSize: '12px'
+                      }}
+                      labelStyle={{ color: '#fff' }}
+                    />
+                    <Bar dataKey="hours" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Line type="monotone" dataKey="registrations" stroke="#10b981" strokeWidth={2} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs mb-2">Today</p>
+                <ResponsiveContainer width="100%" height={120}>
+                  <BarChart data={todayChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="time" stroke="#94a3b8" style={{ fontSize: '10px' }} />
+                    <YAxis stroke="#94a3b8" style={{ fontSize: '10px' }} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#1e293b', 
+                        border: '1px solid #334155',
+                        borderRadius: '8px',
+                        fontSize: '12px'
+                      }}
+                      labelStyle={{ color: '#fff' }}
+                    />
+                    <Bar dataKey="duration" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
 
@@ -467,17 +627,30 @@ const WorkstationControl: React.FC = () => {
                     <p className="text-slate-400 text-sm">No broken parts reported</p>
                   ) : (
                     brokenParts.map((part) => (
-                      <Card key={part.id} className="bg-slate-700/50 border-slate-600 p-4">
-                        <div className="flex items-start justify-between mb-2">
+                      <Card key={part.id} className="bg-slate-700/50 border-slate-600 p-3">
+                        <div className="flex gap-3">
+                          {part.image_path && (
+                            <div className="flex-shrink-0">
+                              <img 
+                                src={`https://pqzfmphitzlgwnmexrbx.supabase.co/storage/v1/object/public/${part.image_path}`}
+                                alt="Broken part"
+                                className="w-16 h-16 rounded-lg object-cover border border-slate-600"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          )}
                           <div className="flex-1">
-                            <p className="text-white text-sm">{part.description}</p>
+                            <p className="text-white text-sm font-medium">{part.description}</p>
                             <p className="text-slate-400 text-xs mt-1">
                               Report #{part.id.slice(0, 8)}
                             </p>
+                            <div className="flex items-center gap-2 text-slate-400 text-xs mt-2">
+                              <Clock className="w-3 h-3" />
+                              <span>{format(new Date(part.created_at), 'dd/MM/yyyy HH:mm')}</span>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-2 text-slate-400 text-xs mt-2">
-                          <span>{format(new Date(part.created_at), 'dd/MM/yyyy HH:mm')}</span>
                         </div>
                       </Card>
                     ))
@@ -492,7 +665,7 @@ const WorkstationControl: React.FC = () => {
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
                 <Users className="w-5 h-5" />
-                Active Users
+                Active Users & Tasks
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -501,19 +674,48 @@ const WorkstationControl: React.FC = () => {
                   {workstationStatus?.active_user_names.length === 0 || !workstationStatus ? (
                     <p className="text-slate-400 text-sm">No active users</p>
                   ) : (
-                    workstationStatus.active_user_names.map((userName, index) => (
-                      <Card key={index} className="bg-slate-700/50 border-slate-600 p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                            <Users className="w-5 h-5 text-blue-500" />
+                    workstationStatus.active_user_names.map((userName, index) => {
+                      const userTasks = workstationStatus.active_tasks || [];
+                      
+                      return (
+                        <Card key={index} className="bg-slate-700/50 border-slate-600 p-3">
+                          <div className="flex items-start gap-3 mb-2">
+                            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                              <Users className="w-5 h-5 text-blue-500" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-white font-medium">{userName}</p>
+                              <p className="text-slate-400 text-xs">Working now</p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Activity className="w-4 h-4 text-green-500 animate-pulse" />
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-white font-medium">{userName}</p>
-                            <p className="text-slate-400 text-xs">Working now</p>
-                          </div>
-                        </div>
-                      </Card>
-                    ))
+                          
+                          {userTasks.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-slate-600">
+                              <p className="text-slate-400 text-xs mb-1.5">Current Tasks:</p>
+                              <div className="space-y-1.5">
+                                {userTasks.slice(0, 2).map((task: any, taskIndex: number) => (
+                                  <div key={taskIndex} className="bg-slate-800/50 rounded p-1.5">
+                                    <div className="flex items-center gap-2">
+                                      <Package className="w-3 h-3 text-blue-400" />
+                                      <span className="text-white text-xs flex-1">{task.title || `Task ${taskIndex + 1}`}</span>
+                                    </div>
+                                    {task.project_name && (
+                                      <p className="text-slate-400 text-xs ml-5 mt-0.5">{task.project_name}</p>
+                                    )}
+                                  </div>
+                                ))}
+                                {userTasks.length > 2 && (
+                                  <p className="text-slate-400 text-xs ml-5">+{userTasks.length - 2} more</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </Card>
+                      );
+                    })
                   )}
                 </div>
               </ScrollArea>
