@@ -34,6 +34,19 @@ const Login: React.FC = () => {
       navigate('/');
     }
   }, [isAuthenticated, navigate]);
+
+  // Global Enter key handler
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !loading) {
+        e.preventDefault();
+        handleLogin(e as any);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [name, password, loading]);
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !password) {
