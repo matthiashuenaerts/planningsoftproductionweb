@@ -40,13 +40,16 @@ const Login: React.FC = () => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && !loading) {
         e.preventDefault();
-        handleLogin(e as any);
+        const form = document.querySelector('form');
+        if (form) {
+          form.requestSubmit();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [name, password, loading]);
+  }, [loading]);
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !password) {
