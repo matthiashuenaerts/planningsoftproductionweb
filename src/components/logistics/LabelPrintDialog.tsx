@@ -102,18 +102,30 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
       });
 
 const allLabelsContent = deliveredItems.map(item => `
-  <div style="width: 89mm; height: 32mm; padding: 1.5mm; font-family: Arial, sans-serif; line-height: 1.1; page-break-after: always; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
-    
-    <!-- Project Name (Full Width, Top, Scaled Font) -->
+  <div style="
+    width: 89mm; 
+    height: 32mm; 
+    padding: 1.5mm; 
+    font-family: Arial, sans-serif; 
+    line-height: 1.1; 
+    page-break-after: always; 
+    box-sizing: border-box; 
+    display: flex; 
+    flex-direction: column; 
+    justify-content: space-between;
+  ">
+
+    <!-- Project Name (Full Width, Top, Wrapping, Scaled Font) -->
     <div style="
       width: 100%;
       text-align: center;
       font-weight: bold;
-      font-size: clamp(10pt, 6vw, 18pt);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: clamp(10pt, 5vw, 16pt);
+      line-height: 1.1;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
       margin-bottom: 1mm;
+      white-space: normal;
     ">
       ${projectInfo?.name || 'Unknown Project'}
     </div>
@@ -134,17 +146,30 @@ const allLabelsContent = deliveredItems.map(item => `
     ` : ''}
 
     <!-- Item Details -->
-    <div style="font-size: 8pt; display: flex; justify-content: space-between;">
+    <div style="font-size: 8pt; display: flex; justify-content: space-between; margin-bottom: 0.5mm;">
       <div>Art: ${item.article_code}</div>
       <div>Qty: ${item.current_delivered_quantity}</div>
     </div>
 
+    <!-- Dates -->
     <div style="font-size: 8pt; display: flex; justify-content: space-between;">
       <div>Completed: ${currentDate}</div>
       <div>Install: ${installationDate}</div>
     </div>
+
+    <!-- Supplier (Bottom) -->
+    <div style="
+      font-size: 8pt; 
+      text-align: right; 
+      margin-top: 1mm; 
+      border-top: 1px solid #ccc; 
+      padding-top: 0.5mm;
+    ">
+      ${order.supplier || ''}
+    </div>
   </div>
 `).join('');
+
 
 
       // Open single print window with all labels
