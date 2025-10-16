@@ -192,6 +192,22 @@ const ControlPanel: React.FC = () => {
               
               return (
                 <React.Fragment key={workstation.id}>
+                  {index > 0 && (
+                    <div className="flex flex-col items-center gap-1.5">
+                      {bufferMinutes > 0 && (
+                        <div className="flex flex-col items-center bg-slate-700/50 px-2 py-1 rounded-lg border border-slate-600">
+                          <Clock className="w-3 h-3 text-blue-400 mb-0.5" />
+                          <span className="text-white font-semibold text-xs">
+                            {bufferHours > 0 && `${bufferHours}h `}
+                            {remainingMinutes > 0 && `${remainingMinutes}m`}
+                          </span>
+                          <span className="text-slate-400 text-xs">buffer</span>
+                        </div>
+                      )}
+                      <ArrowRight className="w-6 h-6 text-slate-600 flex-shrink-0" />
+                    </div>
+                  )}
+                  
                   <button
                     onClick={() => navigate(createLocalizedPath(`/control-panel/${workstation.id}`))}
                     className="group relative"
@@ -237,22 +253,6 @@ const ControlPanel: React.FC = () => {
                       </div>
                     )}
                   </button>
-                  
-                  {index < workstations.length - 1 && (
-                    <div className="flex flex-col items-center gap-1.5">
-                      <ArrowRight className="w-6 h-6 text-slate-600 flex-shrink-0" />
-                      {bufferMinutes > 0 && (
-                        <div className="flex flex-col items-center bg-slate-700/50 px-2 py-1 rounded-lg border border-slate-600">
-                          <Clock className="w-3 h-3 text-blue-400 mb-0.5" />
-                          <span className="text-white font-semibold text-xs">
-                            {bufferHours > 0 && `${bufferHours}h `}
-                            {remainingMinutes > 0 && `${remainingMinutes}m`}
-                          </span>
-                          <span className="text-slate-400 text-xs">buffer</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </React.Fragment>
               );
             })}
