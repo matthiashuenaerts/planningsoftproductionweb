@@ -101,30 +101,51 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
         year: 'numeric' 
       });
 
-      const allLabelsContent = deliveredItems.map(item => `
-        <div style="width: 89mm; height: 32mm; padding: 1.5mm; font-family: Arial, sans-serif; line-height: 1.1; page-break-after: always; box-sizing: border-box;">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 1mm;">
-            <div style="font-weight: bold; font-size: 9pt;">${projectInfo?.name || 'Unknown Project'}</div>
-            <div style="font-size: 8pt;">${order.supplier}</div>
-          </div>
-          
-          ${item.stock_location ? `
-          <div style="font-weight: bold; font-size: 14pt; text-align: center; margin: 1mm 0; border: 1px solid #ccc; padding: 1mm; background: #f0f0f0;">
-            ${item.stock_location}
-          </div>
-          ` : ''}
-          
-          <div style="display: flex; justify-content: space-between; font-size: 8pt; margin-bottom: 0.5mm;">
-            <div>Art: ${item.article_code}</div>
-            <div>Qty: ${item.current_delivered_quantity}</div>
-          </div>
-          
-          <div style="display: flex; justify-content: space-between; font-size: 8pt;">
-            <div>Completed: ${currentDate}</div>
-            <div>Install: ${installationDate}</div>
-          </div>
-        </div>
-      `).join('');
+const allLabelsContent = deliveredItems.map(item => `
+  <div style="width: 89mm; height: 32mm; padding: 1.5mm; font-family: Arial, sans-serif; line-height: 1.1; page-break-after: always; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
+    
+    <!-- Project Name (Full Width, Top, Scaled Font) -->
+    <div style="
+      width: 100%;
+      text-align: center;
+      font-weight: bold;
+      font-size: clamp(10pt, 6vw, 18pt);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 1mm;
+    ">
+      ${projectInfo?.name || 'Unknown Project'}
+    </div>
+
+    <!-- Stock Location (if any) -->
+    ${item.stock_location ? `
+    <div style="
+      font-weight: bold;
+      font-size: 14pt;
+      text-align: center;
+      border: 1px solid #ccc;
+      padding: 1mm;
+      background: #f0f0f0;
+      margin-bottom: 1mm;
+    ">
+      ${item.stock_location}
+    </div>
+    ` : ''}
+
+    <!-- Item Details -->
+    <div style="font-size: 8pt; display: flex; justify-content: space-between;">
+      <div>Art: ${item.article_code}</div>
+      <div>Qty: ${item.current_delivered_quantity}</div>
+    </div>
+
+    <div style="font-size: 8pt; display: flex; justify-content: space-between;">
+      <div>Completed: ${currentDate}</div>
+      <div>Install: ${installationDate}</div>
+    </div>
+  </div>
+`).join('');
+
 
       // Open single print window with all labels
       const printWindow = window.open('', '_blank');
