@@ -51,11 +51,12 @@ interface WorkstationGanttChartProps {
   selectedDate: Date;
 }
 
-interface WorkerAssignment {
+interface DailyEmployeeAssignment {
+  date: string; // ISO date string
   workstationId: string;
   workerIndex: number;
-  employeeId: string | null;
-  employeeName: string | null;
+  employeeId: string;
+  employeeName: string;
 }
 
 const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedDate }) => {
@@ -67,8 +68,8 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
   const [loading, setLoading] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const [workerAssignments, setWorkerAssignments] = useState<WorkerAssignment[]>([]);
-  const [availableEmployees, setAvailableEmployees] = useState<Array<{ id: string; name: string; email: string | null }>>([]);
+  const [dailyAssignments, setDailyAssignments] = useState<DailyEmployeeAssignment[]>([]);
+  const [workstationEmployeeLinks, setWorkstationEmployeeLinks] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const rowHeight = 60;
@@ -94,12 +95,13 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       setWorkingHours(wh || []);
       setHolidays(hd || []);
       
-      // Fetch all employees
-      const { data: allEmps } = await supabase
-        .from('employees')
-        .select('id, name, email')
-        .order('name');
-      setAvailableEmployees(allEmps || []);
+      // Fetch workstation-employee links
+      const linksMap = new Map<string, Array<{ id: string; name: string }>>();
+      for (const workstation of ws || []) {
+        const employees = await workstationService.getEmployeesForWorkstation(workstation.id);
+        linksMap.set(workstation.id, employees);
+      }
+      setWorkstationEmployeeLinks(linksMap);
       
       const { data } = await supabase
         .from('tasks')
@@ -284,69 +286,100 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
         w.id === workstationId ? { ...w, active_workers: newCount } : w
       ));
       
-      // Remove assignments for workers that no longer exist
-      setWorkerAssignments(prev => 
-        prev.filter(a => !(a.workstationId === workstationId && a.workerIndex >= newCount))
-      );
-      
       toast.success(`Werknemers bijgewerkt naar ${newCount}`);
     } catch (error) {
       toast.error('Fout bij het bijwerken van werknemers');
     }
   };
 
-  // Auto-assign employees to workstations based on their workstation links
-  const handleAutoAssign = async () => {
-    try {
-      const newAssignments: WorkerAssignment[] = [];
-      
-      for (const ws of workstations) {
-        const linkedEmployees = await workstationService.getEmployeesForWorkstation(ws.id);
-        
-        // Assign linked employees to workers (round-robin style)
-        for (let i = 0; i < ws.active_workers; i++) {
-          if (linkedEmployees[i]) {
-            newAssignments.push({
-              workstationId: ws.id,
-              workerIndex: i,
-              employeeId: linkedEmployees[i].id,
-              employeeName: linkedEmployees[i].name,
-            });
-          }
+  // Calculate daily workload for each workstation
+  const calculateDailyWorkload = (
+    date: Date,
+    workstationId: string,
+    scheduleMap: Map<string, Map<number, { task: Task; start: Date; end: Date; isVisible: boolean }[]>>
+  ): number => {
+    const workerMap = scheduleMap.get(workstationId);
+    if (!workerMap) return 0;
+
+    const dateStr = format(date, 'yyyy-MM-dd');
+    let totalMinutes = 0;
+
+    workerMap.forEach((tasks) => {
+      tasks.forEach(({ start, end }) => {
+        const taskDateStr = format(start, 'yyyy-MM-dd');
+        if (taskDateStr === dateStr) {
+          totalMinutes += differenceInMinutes(end, start);
         }
-      }
+      });
+    });
+
+    return totalMinutes;
+  };
+
+  // Auto-assign employees daily based on workload optimization
+  const handleAutoAssign = () => {
+    try {
+      const newAssignments: DailyEmployeeAssignment[] = [];
+      const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
       
-      setWorkerAssignments(newAssignments);
-      toast.success('Werknemers automatisch toegewezen');
+      // Generate timeline for next 30 days
+      const daysToOptimize = 30;
+      const dates = Array.from({ length: daysToOptimize }, (_, i) => addDays(timelineStart, i));
+
+      // For each day, optimize employee assignments
+      dates.forEach((date) => {
+        if (!isWorkingDay(date)) return;
+
+        const dateStr = format(date, 'yyyy-MM-dd');
+        
+        // Calculate workload per workstation for this day
+        const workstationWorkloads = workstations
+          .map((ws) => ({
+            workstation: ws,
+            workload: calculateDailyWorkload(date, ws.id, schedule),
+          }))
+          .filter((w) => w.workload > 0)
+          .sort((a, b) => b.workload - a.workload); // Highest workload first
+
+        // Track which employees are assigned on this day
+        const assignedEmployees = new Set<string>();
+
+        // Assign employees to workstations
+        workstationWorkloads.forEach(({ workstation, workload }) => {
+          const linkedEmployees = workstationEmployeeLinks.get(workstation.id) || [];
+          const availableEmployees = linkedEmployees.filter((emp) => !assignedEmployees.has(emp.id));
+
+          // Assign up to active_workers employees
+          const workersNeeded = Math.min(workstation.active_workers, availableEmployees.length);
+          
+          for (let i = 0; i < workersNeeded; i++) {
+            if (availableEmployees[i]) {
+              newAssignments.push({
+                date: dateStr,
+                workstationId: workstation.id,
+                workerIndex: i,
+                employeeId: availableEmployees[i].id,
+                employeeName: availableEmployees[i].name,
+              });
+              assignedEmployees.add(availableEmployees[i].id);
+            }
+          }
+        });
+      });
+
+      setDailyAssignments(newAssignments);
+      toast.success('Werknemers automatisch toegewezen per dag');
     } catch (error) {
       toast.error('Fout bij automatisch toewijzen');
     }
   };
 
-  // Manually assign an employee to a specific worker
-  const handleManualAssign = (workstationId: string, workerIndex: number, employeeId: string | null) => {
-    setWorkerAssignments(prev => {
-      const filtered = prev.filter(a => !(a.workstationId === workstationId && a.workerIndex === workerIndex));
-      
-      if (employeeId) {
-        const employee = availableEmployees.find(e => e.id === employeeId);
-        if (employee) {
-          return [...filtered, {
-            workstationId,
-            workerIndex,
-            employeeId: employee.id,
-            employeeName: employee.name,
-          }];
-        }
-      }
-      
-      return filtered;
-    });
-  };
-
-  // Get assigned employee for a specific worker
-  const getAssignedEmployee = (workstationId: string, workerIndex: number) => {
-    return workerAssignments.find(a => a.workstationId === workstationId && a.workerIndex === workerIndex);
+  // Get assigned employee for a specific worker on a specific date
+  const getAssignedEmployee = (date: Date, workstationId: string, workerIndex: number) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return dailyAssignments.find(
+      (a) => a.date === dateStr && a.workstationId === workstationId && a.workerIndex === workerIndex
+    );
   };
 
   // memoize full schedule for all workstations with multi-worker support and dependency resolution
@@ -519,6 +552,13 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
     return all;
   }, [tasks, workstations, selectedDate, workingHoursMap, holidaySet, limitTaskMap, searchTerm]);
 
+  // Auto-assign on mount and when dependencies change
+  useEffect(() => {
+    if (workstations.length > 0 && workstationEmployeeLinks.size > 0 && schedule.size > 0) {
+      handleAutoAssign();
+    }
+  }, [workstations, workstationEmployeeLinks, schedule]);
+
   const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
   const timeline = Array.from({ length: scale.totalUnits }, (_, i) => addMinutes(timelineStart, i * scale.unitInMinutes));
 
@@ -614,34 +654,9 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                         <Plus className="h-3 w-3" />
                       </Button>
                     </div>
-                  </div>
-                  <div className="flex flex-col gap-1 mt-2">
-                    {Array.from({ length: workerCount }).map((_, i) => {
-                      const assignment = getAssignedEmployee(ws.id, i);
-                      return (
-                        <div key={i} className="flex items-center gap-2">
-                          {workerCount > 1 && (
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">W{i + 1}:</span>
-                          )}
-                          <Select
-                            value={assignment?.employeeId || 'unassigned'}
-                            onValueChange={(value) => handleManualAssign(ws.id, i, value === 'unassigned' ? null : value)}
-                          >
-                            <SelectTrigger className="h-6 text-xs w-full">
-                              <SelectValue placeholder="Niet toegewezen" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="unassigned">Niet toegewezen</SelectItem>
-                              {availableEmployees.map((emp) => (
-                                <SelectItem key={emp.id} value={emp.id}>
-                                  {emp.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      );
-                    })}
+                   </div>
+                  <div className="text-xs text-muted-foreground mt-2">
+                    {workerCount} werker{workerCount !== 1 ? 's' : ''} (auto per dag)
                   </div>
                 </div>
                 
@@ -673,6 +688,10 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                           const { bg, text } = getColor(pid);
                           const left = (differenceInMinutes(start, timelineStart) / scale.unitInMinutes) * scale.unitWidth;
                           const width = (differenceInMinutes(end, start) / scale.unitInMinutes) * scale.unitWidth;
+                          
+                          // Get assigned employee for this date
+                          const assignment = getAssignedEmployee(start, ws.id, workerIndex);
+                          
                           return (
                             <Tooltip key={`${task.id}-${start.toISOString()}-${workerIndex}`}>
                               <TooltipTrigger asChild>
@@ -688,7 +707,14 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                                     border: '1px solid rgba(0,0,0,0.2)',
                                   }}
                                 >
-                                  {task.phases?.projects?.name || 'Project'} – {task.title}
+                                  <div className="truncate">
+                                    {task.phases?.projects?.name || 'Project'} – {task.title}
+                                  </div>
+                                  {assignment && (
+                                    <div className="text-[10px] opacity-80 truncate mt-0.5">
+                                      👤 {assignment.employeeName}
+                                    </div>
+                                  )}
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent>
@@ -697,6 +723,9 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                                   <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
                                   <div><b>Duur:</b> {task.duration} min</div>
                                   <div><b>Status:</b> {task.status}</div>
+                                  {assignment && (
+                                    <div><b>Werknemer:</b> {assignment.employeeName}</div>
+                                  )}
                                 </div>
                               </TooltipContent>
                             </Tooltip>
