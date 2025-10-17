@@ -23,6 +23,16 @@ import {
   Settings,
   ArrowRight,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import Navbar from '@/components/Navbar';
 import { employeeService } from '@/services/dataService';
@@ -103,6 +113,8 @@ const Planning = () => {
   const [showStandardTaskAssignment, setShowStandardTaskAssignment] = useState(false);
   const [activeView, setActiveView] = useState<'worker' | 'workstation' | 'gantt'>('worker');
   const [holidays, setHolidays] = useState<any[]>([]);
+  const [showSchedulingMethodDialog, setShowSchedulingMethodDialog] = useState(false);
+  const ganttChartRef = useRef<any>(null);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const isAdmin = currentEmployee?.role === 'admin';
@@ -1312,6 +1324,189 @@ const Planning = () => {
     }
   };
 
+  const generateSchedulesFromGantt = async () => {
+    try {
+      setGeneratingSchedule(true);
+      saveScrollPosition();
+      
+      if (!ganttChartRef.current) {
+        toast({
+          title: "Error",
+          description: "Please switch to Gantt Chart view first to generate schedules from it.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log('🎯 Generating schedules from Gantt chart for the following week...');
+      
+      // Get the Gantt chart data
+      const { getDailyAssignments, getSchedule, getTasks, getWorkstations } = ganttChartRef.current;
+      
+      if (!getDailyAssignments || !getSchedule || !getTasks || !getWorkstations) {
+        toast({
+          title: "Error",
+          description: "Gantt chart data not available. Please ensure the chart is loaded.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const dailyAssignments = getDailyAssignments();
+      const schedule = getSchedule();
+      const tasks = getTasks();
+      const workstations = getWorkstations();
+
+      console.log('Daily assignments:', dailyAssignments.length);
+      console.log('Schedule entries:', schedule.size);
+
+      // Generate schedules for the next 7 days
+      const startDate = startOfDay(selectedDate);
+      const scheduleInserts = [];
+      const workstationScheduleInserts = [];
+
+      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+        const currentDate = addDays(startDate, dayOffset);
+        const dateStr = format(currentDate, 'yyyy-MM-dd');
+
+        console.log(`Processing date: ${dateStr}`);
+
+        // Get assignments for this date
+        const dateAssignments = dailyAssignments.filter((a: any) => a.date === dateStr);
+        
+        console.log(`Assignments for ${dateStr}:`, dateAssignments.length);
+
+        // Process each workstation
+        for (const [workstationId, workerMap] of schedule.entries()) {
+          const workstation = workstations.find((ws: any) => ws.id === workstationId);
+          if (!workstation) continue;
+
+          // Process each worker in this workstation
+          for (const [workerIndex, taskSlots] of workerMap.entries()) {
+            // Get employee assignment for this worker on this date
+            const assignment = dateAssignments.find(
+              (a: any) => a.workstationId === workstationId && a.workerIndex === workerIndex
+            );
+
+            if (!assignment) continue;
+
+            // Create schedule entries for tasks assigned to this worker
+            for (const slot of taskSlots) {
+              const slotDateStr = format(slot.start, 'yyyy-MM-dd');
+              
+              // Only create schedule for the current date being processed
+              if (slotDateStr === dateStr) {
+                // Add worker schedule
+                scheduleInserts.push({
+                  employee_id: assignment.employeeId,
+                  task_id: slot.task.id,
+                  title: slot.task.title,
+                  description: slot.task.description,
+                  start_time: slot.start.toISOString(),
+                  end_time: slot.end.toISOString(),
+                  is_auto_generated: true,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                });
+
+                // Add workstation schedule
+                workstationScheduleInserts.push({
+                  workstation_id: workstationId,
+                  task_id: slot.task.id,
+                  task_title: slot.task.title,
+                  user_name: assignment.employeeName,
+                  start_time: slot.start.toISOString(),
+                  end_time: slot.end.toISOString(),
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                });
+              }
+            }
+          }
+        }
+      }
+
+      console.log(`Total schedule inserts: ${scheduleInserts.length}`);
+      console.log(`Total workstation schedule inserts: ${workstationScheduleInserts.length}`);
+
+      if (scheduleInserts.length === 0) {
+        toast({
+          title: "No schedules to generate",
+          description: "The Gantt chart doesn't have any task assignments for the following week.",
+          variant: "default"
+        });
+        return;
+      }
+
+      // Delete existing schedules for the week
+      const endDate = addDays(startDate, 7);
+      await supabase
+        .from('schedules')
+        .delete()
+        .gte('start_time', startDate.toISOString())
+        .lt('start_time', endDate.toISOString())
+        .eq('is_auto_generated', true);
+
+      await supabase
+        .from('workstation_schedules')
+        .delete()
+        .gte('start_time', startDate.toISOString())
+        .lt('start_time', endDate.toISOString());
+
+      // Insert new schedules in batches
+      const batchSize = 100;
+      for (let i = 0; i < scheduleInserts.length; i += batchSize) {
+        const batch = scheduleInserts.slice(i, i + batchSize);
+        const { error: insertError } = await supabase
+          .from('schedules')
+          .insert(batch);
+        
+        if (insertError) {
+          console.error('Error inserting schedule batch:', insertError);
+          throw insertError;
+        }
+      }
+
+      for (let i = 0; i < workstationScheduleInserts.length; i += batchSize) {
+        const batch = workstationScheduleInserts.slice(i, i + batchSize);
+        const { error: insertError } = await supabase
+          .from('workstation_schedules')
+          .insert(batch);
+        
+        if (insertError) {
+          console.error('Error inserting workstation schedule batch:', insertError);
+          throw insertError;
+        }
+      }
+
+      await fetchAllData();
+
+      toast({
+        title: "Schedules Generated from Gantt Chart",
+        description: `Successfully created ${scheduleInserts.length} worker schedules and ${workstationScheduleInserts.length} workstation schedules for the next 7 days.`,
+      });
+
+    } catch (error: any) {
+      console.error('Error generating schedules from Gantt:', error);
+      toast({
+        title: "Error",
+        description: `Failed to generate schedules from Gantt chart: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setGeneratingSchedule(false);
+    }
+  };
+
+  const handleSchedulingMethodChoice = (method: 'algorithm' | 'gantt') => {
+    setShowSchedulingMethodDialog(false);
+    if (method === 'algorithm') {
+      generateAllSchedules();
+    } else {
+      generateSchedulesFromGantt();
+    }
+  };
+
   const generateWorkstationSchedulesFromWorkerSchedules = async () => {
     if (!selectedDate) return;
 
@@ -1808,7 +2003,7 @@ const Planning = () => {
                       Add Standard Task
                     </Button>
                     <Button
-                      onClick={generateAllSchedules}
+                      onClick={() => setShowSchedulingMethodDialog(true)}
                       disabled={generatingSchedule || isSelectedDateHoliday()}
                       className="whitespace-nowrap"
                     >
@@ -1879,7 +2074,7 @@ const Planning = () => {
             </div>
 
             {activeView === 'gantt' ? (
-              <WorkstationGanttChart selectedDate={selectedDate} />
+              <WorkstationGanttChart ref={ganttChartRef} selectedDate={selectedDate} />
             ) : activeView === 'workstation' ? (
               <WorkstationScheduleView selectedDate={selectedDate} />
             ) : (
@@ -2297,6 +2492,41 @@ const Planning = () => {
                 setShowStandardTaskAssignment(false);
               }}
             />
+
+            {/* Scheduling Method Dialog */}
+            <AlertDialog open={showSchedulingMethodDialog} onOpenChange={setShowSchedulingMethodDialog}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Choose Scheduling Method</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    How would you like to generate schedules?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Current Algorithm</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Uses the intelligent task assignment algorithm to generate schedules based on priorities, continuity, and workload balancing.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Gantt Chart</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Uses the Gantt chart's optimized daily employee assignments to create worker and workstation schedules for the following week.
+                    </p>
+                  </div>
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handleSchedulingMethodChoice('algorithm')}>
+                    Use Algorithm
+                  </AlertDialogAction>
+                  <AlertDialogAction onClick={() => handleSchedulingMethodChoice('gantt')}>
+                    Use Gantt Chart
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </div>

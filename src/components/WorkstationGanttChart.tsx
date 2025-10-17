@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
 import {
   format,
   addMinutes,
@@ -59,7 +59,14 @@ interface DailyEmployeeAssignment {
   employeeName: string;
 }
 
-const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedDate }) => {
+export interface WorkstationGanttChartRef {
+  getDailyAssignments: () => DailyEmployeeAssignment[];
+  getSchedule: () => Map<string, Map<number, { task: Task; start: Date; end: Date; isVisible: boolean }[]>>;
+  getTasks: () => Task[];
+  getWorkstations: () => Workstation[];
+}
+
+const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGanttChartProps>(({ selectedDate }, ref) => {
   const [workstations, setWorkstations] = useState<Workstation[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [workingHours, setWorkingHours] = useState<WorkingHours[]>([]);
@@ -381,6 +388,14 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       (a) => a.date === dateStr && a.workstationId === workstationId && a.workerIndex === workerIndex
     );
   };
+
+  // Expose data via ref for external access
+  useImperativeHandle(ref, () => ({
+    getDailyAssignments: () => dailyAssignments,
+    getSchedule: () => schedule,
+    getTasks: () => tasks,
+    getWorkstations: () => workstations,
+  }));
 
   // memoize full schedule for all workstations with multi-worker support and dependency resolution
   const schedule = useMemo(() => {
@@ -742,6 +757,8 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       </CardContent>
     </Card>
   );
-};
+});
+
+WorkstationGanttChart.displayName = 'WorkstationGanttChart';
 
 export default WorkstationGanttChart;
