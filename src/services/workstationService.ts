@@ -186,5 +186,24 @@ export const workstationService = {
     }
     
     return data;
+  },
+
+  async getEmployeesForWorkstation(workstationId: string): Promise<Array<{ id: string; name: string; email: string | null }>> {
+    const { data, error } = await supabase
+      .from('employee_workstation_links')
+      .select(`
+        employees (
+          id,
+          name,
+          email
+        )
+      `)
+      .eq('workstation_id', workstationId);
+    
+    if (error) {
+      throw new Error(`Failed to fetch employees for workstation: ${error.message}`);
+    }
+    
+    return data?.map(item => item.employees).filter(Boolean) as Array<{ id: string; name: string; email: string | null }> || [];
   }
 };

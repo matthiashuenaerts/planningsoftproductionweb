@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
 interface Task {
@@ -50,6 +51,13 @@ interface WorkstationGanttChartProps {
   selectedDate: Date;
 }
 
+interface WorkerAssignment {
+  workstationId: string;
+  workerIndex: number;
+  employeeId: string | null;
+  employeeName: string | null;
+}
+
 const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedDate }) => {
   const [workstations, setWorkstations] = useState<Workstation[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -59,6 +67,8 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
   const [loading, setLoading] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const [workerAssignments, setWorkerAssignments] = useState<WorkerAssignment[]>([]);
+  const [availableEmployees, setAvailableEmployees] = useState<Array<{ id: string; name: string; email: string | null }>>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const rowHeight = 60;
@@ -83,6 +93,14 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       setWorkstations(ws || []);
       setWorkingHours(wh || []);
       setHolidays(hd || []);
+      
+      // Fetch all employees
+      const { data: allEmps } = await supabase
+        .from('employees')
+        .select('id, name, email')
+        .order('name');
+      setAvailableEmployees(allEmps || []);
+      
       const { data } = await supabase
         .from('tasks')
         .select(`
@@ -265,10 +283,70 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
       setWorkstations(prev => prev.map(w => 
         w.id === workstationId ? { ...w, active_workers: newCount } : w
       ));
+      
+      // Remove assignments for workers that no longer exist
+      setWorkerAssignments(prev => 
+        prev.filter(a => !(a.workstationId === workstationId && a.workerIndex >= newCount))
+      );
+      
       toast.success(`Werknemers bijgewerkt naar ${newCount}`);
     } catch (error) {
       toast.error('Fout bij het bijwerken van werknemers');
     }
+  };
+
+  // Auto-assign employees to workstations based on their workstation links
+  const handleAutoAssign = async () => {
+    try {
+      const newAssignments: WorkerAssignment[] = [];
+      
+      for (const ws of workstations) {
+        const linkedEmployees = await workstationService.getEmployeesForWorkstation(ws.id);
+        
+        // Assign linked employees to workers (round-robin style)
+        for (let i = 0; i < ws.active_workers; i++) {
+          if (linkedEmployees[i]) {
+            newAssignments.push({
+              workstationId: ws.id,
+              workerIndex: i,
+              employeeId: linkedEmployees[i].id,
+              employeeName: linkedEmployees[i].name,
+            });
+          }
+        }
+      }
+      
+      setWorkerAssignments(newAssignments);
+      toast.success('Werknemers automatisch toegewezen');
+    } catch (error) {
+      toast.error('Fout bij automatisch toewijzen');
+    }
+  };
+
+  // Manually assign an employee to a specific worker
+  const handleManualAssign = (workstationId: string, workerIndex: number, employeeId: string | null) => {
+    setWorkerAssignments(prev => {
+      const filtered = prev.filter(a => !(a.workstationId === workstationId && a.workerIndex === workerIndex));
+      
+      if (employeeId) {
+        const employee = availableEmployees.find(e => e.id === employeeId);
+        if (employee) {
+          return [...filtered, {
+            workstationId,
+            workerIndex,
+            employeeId: employee.id,
+            employeeName: employee.name,
+          }];
+        }
+      }
+      
+      return filtered;
+    });
+  };
+
+  // Get assigned employee for a specific worker
+  const getAssignedEmployee = (workstationId: string, workerIndex: number) => {
+    return workerAssignments.find(a => a.workstationId === workstationId && a.workerIndex === workerIndex);
   };
 
   // memoize full schedule for all workstations with multi-worker support and dependency resolution
@@ -464,6 +542,9 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
         <div className="flex justify-between items-center gap-4">
           <CardTitle>Workstation Gantt Chart (snel & opgesplitst)</CardTitle>
           <div className="flex gap-2 items-center">
+            <Button onClick={handleAutoAssign} variant="outline" size="sm">
+              Auto-toewijzen werknemers
+            </Button>
             <div className="relative">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -534,13 +615,34 @@ const WorkstationGanttChart: React.FC<WorkstationGanttChartProps> = ({ selectedD
                       </Button>
                     </div>
                   </div>
-                  {workerCount > 1 && (
-                    <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                      {Array.from({ length: workerCount }).map((_, i) => (
-                        <div key={i}>Worker {i + 1}</div>
-                      ))}
-                    </div>
-                  )}
+                  <div className="flex flex-col gap-1 mt-2">
+                    {Array.from({ length: workerCount }).map((_, i) => {
+                      const assignment = getAssignedEmployee(ws.id, i);
+                      return (
+                        <div key={i} className="flex items-center gap-2">
+                          {workerCount > 1 && (
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">W{i + 1}:</span>
+                          )}
+                          <Select
+                            value={assignment?.employeeId || 'unassigned'}
+                            onValueChange={(value) => handleManualAssign(ws.id, i, value === 'unassigned' ? null : value)}
+                          >
+                            <SelectTrigger className="h-6 text-xs w-full">
+                              <SelectValue placeholder="Niet toegewezen" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unassigned">Niet toegewezen</SelectItem>
+                              {availableEmployees.map((emp) => (
+                                <SelectItem key={emp.id} value={emp.id}>
+                                  {emp.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
                 
                 {/* Render each worker lane */}
