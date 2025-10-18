@@ -335,142 +335,132 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   };
 
   // Smart auto-assign employees with project prioritization
-  // Algorithm optimizes for fastest completion by:
-  // 1. Only scheduling projects where start_date <= today
-  // 2. Prioritizing by installation urgency
-  // 3. Assigning workers to same workstation throughout period
-  // 4. Ensuring all tasks have workers assigned
+  // Algorithm optimizes employee distribution based on:
+  // 1. Project start date (only active projects)
+  // 2. Installation urgency (earlier = higher priority)
+  // 3. Project status (in_progress > planned > on_hold)
+  // 4. Task priority (high > medium > low)
+  // 5. Task due date urgency
   const handleAutoAssign = () => {
     try {
-      const today = format(new Date(), 'yyyy-MM-dd');
-      const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
-      
-      // Calculate total workload per workstation across all active projects
-      const workstationWorkloads = new Map<string, {
-        totalMinutes: number;
-        priorityScore: number;
-        taskCount: number;
-        workstation: Workstation;
-      }>();
-
-      // Analyze schedule to calculate workload
-      workstations.forEach((ws) => {
-        const workerMap = schedule.get(ws.id);
-        if (!workerMap) return;
-
-        let totalMinutes = 0;
-        let totalPriorityScore = 0;
-        let taskCount = 0;
-
-        workerMap.forEach((tasks) => {
-          tasks.forEach(({ task, start, end }) => {
-            const project = task.phases?.projects;
-            if (!project) return;
-
-            // Only count tasks from projects that have started
-            if (project.start_date > today) return;
-
-            const minutes = differenceInMinutes(end, start);
-            
-            // Calculate priority score
-            let score = 0;
-            const daysUntilInstallation = differenceInMinutes(
-              new Date(project.installation_date), 
-              new Date()
-            ) / (24 * 60);
-            score += Math.max(0, 100 - daysUntilInstallation);
-            
-            if (project.status === 'in_progress') score += 50;
-            else if (project.status === 'planned') score += 30;
-            
-            if (task.priority === 'high') score += 30;
-            else if (task.priority === 'medium') score += 15;
-            
-            if (score > 0) {
-              totalMinutes += minutes;
-              totalPriorityScore += score * minutes;
-              taskCount++;
-            }
-          });
-        });
-
-        if (taskCount > 0) {
-          workstationWorkloads.set(ws.id, {
-            totalMinutes,
-            priorityScore: totalPriorityScore / totalMinutes,
-            taskCount,
-            workstation: ws,
-          });
-        }
-      });
-
-      // Sort workstations by priority and workload
-      const sortedWorkstations = Array.from(workstationWorkloads.values())
-        .sort((a, b) => {
-          const priorityDiff = b.priorityScore - a.priorityScore;
-          return priorityDiff !== 0 ? priorityDiff : b.totalMinutes - a.totalMinutes;
-        });
-
-      // Track which employees are globally assigned
-      const globalAssignedEmployees = new Set<string>();
-      const workstationEmployeeAssignments = new Map<string, Array<{ id: string; name: string }>>();
-
-      // Assign employees to workstations for entire planning period
-      sortedWorkstations.forEach(({ workstation, totalMinutes }) => {
-        const linkedEmployees = workstationEmployeeLinks.get(workstation.id) || [];
-        const availableEmployees = linkedEmployees.filter((emp) => !globalAssignedEmployees.has(emp.id));
-
-        // Calculate optimal worker count based on workload
-        const avgWorkdayMinutes = 8 * 60; // 8 hour workday
-        const planningDays = 30;
-        const totalAvailableMinutes = avgWorkdayMinutes * planningDays;
-        const optimalWorkers = Math.ceil(totalMinutes / totalAvailableMinutes);
-        const workersNeeded = Math.min(
-          optimalWorkers,
-          workstation.active_workers,
-          availableEmployees.length
-        );
-
-        const assignedToWorkstation: Array<{ id: string; name: string }> = [];
-        
-        for (let i = 0; i < workersNeeded; i++) {
-          if (availableEmployees[i]) {
-            assignedToWorkstation.push(availableEmployees[i]);
-            globalAssignedEmployees.add(availableEmployees[i].id);
-          }
-        }
-
-        workstationEmployeeAssignments.set(workstation.id, assignedToWorkstation);
-      });
-
-      // Generate daily assignments for next 30 days, keeping workers in same workstation
       const newAssignments: DailyEmployeeAssignment[] = [];
-      const daysToOptimize = 30;
+      const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
+      const today = format(new Date(), 'yyyy-MM-dd');
       
-      for (let dayOffset = 0; dayOffset < daysToOptimize; dayOffset++) {
-        const date = addDays(timelineStart, dayOffset);
-        if (!isWorkingDay(date)) continue;
+      // Generate timeline for next 30 days
+      const daysToOptimize = 30;
+      const dates = Array.from({ length: daysToOptimize }, (_, i) => addDays(timelineStart, i));
+
+      // Create project priority scores
+      const getProjectPriorityScore = (task: Task): number => {
+        const project = task.phases?.projects;
+        if (!project) return 0;
+
+        let score = 0;
+        
+        // 1. Project must have started (start_date <= today)
+        if (project.start_date > today) return -1000; // Exclude future projects
+        
+        // 2. Installation urgency (earlier installation = higher priority)
+        const daysUntilInstallation = differenceInMinutes(
+          new Date(project.installation_date), 
+          new Date()
+        ) / (24 * 60);
+        score += Math.max(0, 100 - daysUntilInstallation); // More urgent = higher score
+        
+        // 3. Project status priority
+        if (project.status === 'in_progress') score += 50;
+        else if (project.status === 'planned') score += 30;
+        else if (project.status === 'on_hold') score -= 20;
+        
+        // 4. Task priority
+        if (task.priority === 'high') score += 30;
+        else if (task.priority === 'medium') score += 15;
+        else if (task.priority === 'low') score += 5;
+        
+        // 5. Task due date urgency
+        const daysUntilDue = differenceInMinutes(
+          new Date(task.due_date), 
+          new Date()
+        ) / (24 * 60);
+        score += Math.max(0, 50 - daysUntilDue);
+        
+        return score;
+      };
+
+      // For each day, optimize employee assignments based on prioritized workload
+      dates.forEach((date) => {
+        if (!isWorkingDay(date)) return;
 
         const dateStr = format(date, 'yyyy-MM-dd');
+        
+        // Calculate workload per workstation with priority weighting
+        const workstationWorkloads = workstations
+          .map((ws) => {
+            const workerMap = schedule.get(ws.id);
+            if (!workerMap) return { workstation: ws, workload: 0, priorityScore: 0 };
 
-        // Assign the same workers to their workstations every day
-        workstationEmployeeAssignments.forEach((employees, workstationId) => {
-          employees.forEach((employee, workerIndex) => {
-            newAssignments.push({
-              date: dateStr,
-              workstationId,
-              workerIndex,
-              employeeId: employee.id,
-              employeeName: employee.name,
+            let totalMinutes = 0;
+            let totalPriorityScore = 0;
+            let taskCount = 0;
+
+            workerMap.forEach((tasks) => {
+              tasks.forEach(({ task, start, end }) => {
+                const taskDateStr = format(start, 'yyyy-MM-dd');
+                if (taskDateStr === dateStr) {
+                  const minutes = differenceInMinutes(end, start);
+                  const priorityScore = getProjectPriorityScore(task);
+                  
+                  if (priorityScore > 0) { // Only include tasks from active projects
+                    totalMinutes += minutes;
+                    totalPriorityScore += priorityScore * minutes; // Weight by duration
+                    taskCount++;
+                  }
+                }
+              });
             });
+
+            return {
+              workstation: ws,
+              workload: totalMinutes,
+              priorityScore: taskCount > 0 ? totalPriorityScore / totalMinutes : 0,
+            };
+          })
+          .filter((w) => w.workload > 0 && w.priorityScore > 0)
+          .sort((a, b) => {
+            // Sort by priority score first, then by workload
+            const priorityDiff = b.priorityScore - a.priorityScore;
+            return priorityDiff !== 0 ? priorityDiff : b.workload - a.workload;
           });
+
+        // Track which employees are assigned on this day
+        const assignedEmployees = new Set<string>();
+
+        // Assign employees to workstations based on priority
+        workstationWorkloads.forEach(({ workstation }) => {
+          const linkedEmployees = workstationEmployeeLinks.get(workstation.id) || [];
+          const availableEmployees = linkedEmployees.filter((emp) => !assignedEmployees.has(emp.id));
+
+          // Assign up to active_workers employees
+          const workersNeeded = Math.min(workstation.active_workers, availableEmployees.length);
+          
+          for (let i = 0; i < workersNeeded; i++) {
+            if (availableEmployees[i]) {
+              newAssignments.push({
+                date: dateStr,
+                workstationId: workstation.id,
+                workerIndex: i,
+                employeeId: availableEmployees[i].id,
+                employeeName: availableEmployees[i].name,
+              });
+              assignedEmployees.add(availableEmployees[i].id);
+            }
+          }
         });
-      }
+      });
 
       setDailyAssignments(newAssignments);
-      
-      const totalAssigned = globalAssignedEmployees.size;
-      toast.success(`${totalAssigned} werknemers toegewezen aan werkstations voor optimale planning`);
+      toast.success('Werknemers slim toegewezen op basis van projectprioriteit');
     } catch (error) {
       console.error('Auto-assign error:', error);
       toast.error('Fout bij automatisch toewijzen');
