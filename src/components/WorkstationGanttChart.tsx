@@ -22,6 +22,15 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
+interface Project {
+  id: string;
+  name: string;
+  start_date: string;
+  installation_date: string;
+  status: string;
+  client: string;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -31,12 +40,10 @@ interface Task {
   due_date: string;
   phase_id: string;
   standard_task_id?: string;
+  priority: string;
   phases?: {
     name: string;
-    projects: {
-      id: string;
-      name: string;
-    };
+    projects: Project;
   };
   workstations?: Array<{ id: string; name: string }>;
 }
@@ -77,6 +84,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [searchTerm, setSearchTerm] = useState('');
   const [dailyAssignments, setDailyAssignments] = useState<DailyEmployeeAssignment[]>([]);
   const [workstationEmployeeLinks, setWorkstationEmployeeLinks] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
+  const [showCriticalPath, setShowCriticalPath] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const rowHeight = 60;
@@ -113,8 +121,11 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       const { data } = await supabase
         .from('tasks')
         .select(`
-          id, title, description, duration, status, due_date, phase_id, standard_task_id,
-          phases ( name, projects ( id, name ) ),
+          id, title, description, duration, status, due_date, phase_id, standard_task_id, priority,
+          phases ( 
+            name, 
+            projects ( id, name, start_date, installation_date, status, client ) 
+          ),
           task_workstation_links ( workstations ( id, name ) )
         `)
         .in('status', ['TODO', 'HOLD'])
@@ -323,36 +334,110 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     return totalMinutes;
   };
 
-  // Auto-assign employees daily based on workload optimization
+  // Smart auto-assign employees with project prioritization
+  // Algorithm optimizes employee distribution based on:
+  // 1. Project start date (only active projects)
+  // 2. Installation urgency (earlier = higher priority)
+  // 3. Project status (in_progress > planned > on_hold)
+  // 4. Task priority (high > medium > low)
+  // 5. Task due date urgency
   const handleAutoAssign = () => {
     try {
       const newAssignments: DailyEmployeeAssignment[] = [];
       const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
+      const today = format(new Date(), 'yyyy-MM-dd');
       
       // Generate timeline for next 30 days
       const daysToOptimize = 30;
       const dates = Array.from({ length: daysToOptimize }, (_, i) => addDays(timelineStart, i));
 
-      // For each day, optimize employee assignments
+      // Create project priority scores
+      const getProjectPriorityScore = (task: Task): number => {
+        const project = task.phases?.projects;
+        if (!project) return 0;
+
+        let score = 0;
+        
+        // 1. Project must have started (start_date <= today)
+        if (project.start_date > today) return -1000; // Exclude future projects
+        
+        // 2. Installation urgency (earlier installation = higher priority)
+        const daysUntilInstallation = differenceInMinutes(
+          new Date(project.installation_date), 
+          new Date()
+        ) / (24 * 60);
+        score += Math.max(0, 100 - daysUntilInstallation); // More urgent = higher score
+        
+        // 3. Project status priority
+        if (project.status === 'in_progress') score += 50;
+        else if (project.status === 'planned') score += 30;
+        else if (project.status === 'on_hold') score -= 20;
+        
+        // 4. Task priority
+        if (task.priority === 'high') score += 30;
+        else if (task.priority === 'medium') score += 15;
+        else if (task.priority === 'low') score += 5;
+        
+        // 5. Task due date urgency
+        const daysUntilDue = differenceInMinutes(
+          new Date(task.due_date), 
+          new Date()
+        ) / (24 * 60);
+        score += Math.max(0, 50 - daysUntilDue);
+        
+        return score;
+      };
+
+      // For each day, optimize employee assignments based on prioritized workload
       dates.forEach((date) => {
         if (!isWorkingDay(date)) return;
 
         const dateStr = format(date, 'yyyy-MM-dd');
         
-        // Calculate workload per workstation for this day
+        // Calculate workload per workstation with priority weighting
         const workstationWorkloads = workstations
-          .map((ws) => ({
-            workstation: ws,
-            workload: calculateDailyWorkload(date, ws.id, schedule),
-          }))
-          .filter((w) => w.workload > 0)
-          .sort((a, b) => b.workload - a.workload); // Highest workload first
+          .map((ws) => {
+            const workerMap = schedule.get(ws.id);
+            if (!workerMap) return { workstation: ws, workload: 0, priorityScore: 0 };
+
+            let totalMinutes = 0;
+            let totalPriorityScore = 0;
+            let taskCount = 0;
+
+            workerMap.forEach((tasks) => {
+              tasks.forEach(({ task, start, end }) => {
+                const taskDateStr = format(start, 'yyyy-MM-dd');
+                if (taskDateStr === dateStr) {
+                  const minutes = differenceInMinutes(end, start);
+                  const priorityScore = getProjectPriorityScore(task);
+                  
+                  if (priorityScore > 0) { // Only include tasks from active projects
+                    totalMinutes += minutes;
+                    totalPriorityScore += priorityScore * minutes; // Weight by duration
+                    taskCount++;
+                  }
+                }
+              });
+            });
+
+            return {
+              workstation: ws,
+              workload: totalMinutes,
+              priorityScore: taskCount > 0 ? totalPriorityScore / totalMinutes : 0,
+            };
+          })
+          .filter((w) => w.workload > 0 && w.priorityScore > 0)
+          .sort((a, b) => {
+            // Sort by priority score first, then by workload
+            const priorityDiff = b.priorityScore - a.priorityScore;
+            return priorityDiff !== 0 ? priorityDiff : b.workload - a.workload;
+          });
 
         // Track which employees are assigned on this day
         const assignedEmployees = new Set<string>();
 
-        // Assign employees to workstations
-        workstationWorkloads.forEach(({ workstation, workload }) => {
+        // Assign employees to workstations based on priority
+        workstationWorkloads.forEach(({ workstation }) => {
           const linkedEmployees = workstationEmployeeLinks.get(workstation.id) || [];
           const availableEmployees = linkedEmployees.filter((emp) => !assignedEmployees.has(emp.id));
 
@@ -375,8 +460,9 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       });
 
       setDailyAssignments(newAssignments);
-      toast.success('Werknemers automatisch toegewezen per dag');
+      toast.success('Werknemers slim toegewezen op basis van projectprioriteit');
     } catch (error) {
+      console.error('Auto-assign error:', error);
       toast.error('Fout bij automatisch toewijzen');
     }
   };
@@ -419,14 +505,58 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       all.set(ws.id, workerMap);
     });
 
-    // Separate TODO and HOLD tasks (use ALL tasks for positioning)
+    // Separate TODO and HOLD tasks with smart prioritization
+    const getTaskPriorityScore = (task: Task): number => {
+      const project = task.phases?.projects;
+      if (!project) return 0;
+
+      const today = format(new Date(), 'yyyy-MM-dd');
+      let score = 0;
+      
+      // Skip future projects
+      if (project.start_date > today) return -1000;
+      
+      // Installation urgency
+      const daysUntilInstallation = differenceInMinutes(
+        new Date(project.installation_date), 
+        new Date()
+      ) / (24 * 60);
+      score += Math.max(0, 100 - daysUntilInstallation);
+      
+      // Project status
+      if (project.status === 'in_progress') score += 50;
+      else if (project.status === 'planned') score += 30;
+      else if (project.status === 'on_hold') score -= 20;
+      
+      // Task priority
+      if (task.priority === 'high') score += 30;
+      else if (task.priority === 'medium') score += 15;
+      else if (task.priority === 'low') score += 5;
+      
+      // Task due date urgency
+      const daysUntilDue = differenceInMinutes(new Date(task.due_date), new Date()) / (24 * 60);
+      score += Math.max(0, 50 - daysUntilDue);
+      
+      return score;
+    };
+
     const todoTasks = tasks
       .filter((t) => t.status === 'TODO' && t.workstations && t.workstations.length > 0)
-      .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+      .sort((a, b) => {
+        const scoreA = getTaskPriorityScore(a);
+        const scoreB = getTaskPriorityScore(b);
+        if (scoreA !== scoreB) return scoreB - scoreA; // Higher score first
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime(); // Then by due date
+      });
 
     const holdTasks = tasks
       .filter((t) => t.status === 'HOLD' && t.workstations && t.workstations.length > 0)
-      .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+      .sort((a, b) => {
+        const scoreA = getTaskPriorityScore(a);
+        const scoreB = getTaskPriorityScore(b);
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      });
 
     // Check if task matches search filter
     const isTaskVisible = (task: Task) => {
@@ -586,6 +716,49 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       </Card>
     );
 
+  // Enhanced color coding based on project status and priority
+  const getTaskColor = (task: Task) => {
+    const project = task.phases?.projects;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    
+    // Default color from project ID
+    const pid = project?.id || '';
+    const hue = pid.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+    
+    // Status-based color modifications
+    let saturation = 65;
+    let lightness = 45;
+    let border = 'rgba(0,0,0,0.2)';
+    
+    if (project) {
+      // Future project (not yet started)
+      if (project.start_date > today) {
+        saturation = 30;
+        lightness = 60;
+        border = 'rgba(0,0,0,0.1)';
+      }
+      // High priority or urgent installation
+      else if (task.priority === 'high' || 
+               differenceInMinutes(new Date(project.installation_date), new Date()) / (24 * 60) < 7) {
+        saturation = 80;
+        lightness = 40;
+        border = 'rgba(255,0,0,0.3)';
+      }
+      // Delayed/blocked
+      else if (task.status === 'HOLD') {
+        saturation = 45;
+        lightness = 55;
+        border = 'rgba(255,165,0,0.4)';
+      }
+    }
+    
+    return {
+      bg: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+      text: `hsl(${hue}, 100%, 95%)`,
+      border,
+    };
+  };
+
   const getColor = (id: string) => {
     const hue = id.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
     return { bg: `hsl(${hue},65%,45%)`, text: `hsl(${hue},100%,95%)` };
@@ -594,11 +767,18 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   return (
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-center gap-4">
-          <CardTitle>Workstation Gantt Chart (snel & opgesplitst)</CardTitle>
-          <div className="flex gap-2 items-center">
+        <div className="flex justify-between items-center gap-4 flex-wrap">
+          <CardTitle>Workstation Gantt Chart (Slim Gepland)</CardTitle>
+          <div className="flex gap-2 items-center flex-wrap">
             <Button onClick={handleAutoAssign} variant="outline" size="sm">
-              Auto-toewijzen werknemers
+              🎯 Slim Auto-toewijzen
+            </Button>
+            <Button 
+              onClick={() => setShowCriticalPath(!showCriticalPath)} 
+              variant={showCriticalPath ? "default" : "outline"} 
+              size="sm"
+            >
+              {showCriticalPath ? '✓' : ''} Kritiek pad
             </Button>
             <div className="relative">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -615,6 +795,24 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             <Button onClick={() => setZoom((z) => Math.min(6, z * 1.5))} variant="outline" size="sm">
               <ZoomIn className="w-4 h-4" />
             </Button>
+          </div>
+        </div>
+        <div className="flex gap-4 text-xs text-muted-foreground mt-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded" style={{ background: 'hsl(220, 80%, 40%)' }}></div>
+            <span>🔴 Hoge prioriteit / Urgent</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded" style={{ background: 'hsl(220, 65%, 45%)' }}></div>
+            <span>🟢 Actief project</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded" style={{ background: 'hsl(220, 45%, 55%)' }}></div>
+            <span>🟠 Geblokkeerd (HOLD)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded" style={{ background: 'hsl(220, 30%, 60%)' }}></div>
+            <span>⚪ Toekomstig project</span>
           </div>
         </div>
       </CardHeader>
@@ -699,13 +897,16 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                         {tasks.map(({ task, start, end, isVisible }) => {
                           if (!isVisible) return null;
 
-                          const pid = task.phases?.projects?.id || '';
-                          const { bg, text } = getColor(pid);
+                          const project = task.phases?.projects;
+                          const { bg, text, border } = getTaskColor(task);
                           const left = (differenceInMinutes(start, timelineStart) / scale.unitInMinutes) * scale.unitWidth;
                           const width = (differenceInMinutes(end, start) / scale.unitInMinutes) * scale.unitWidth;
                           
                           // Get assigned employee for this date
                           const assignment = getAssignedEmployee(start, ws.id, workerIndex);
+                          
+                          // Critical path styling (thicker border)
+                          const isCritical = showCriticalPath && task.priority === 'high';
                           
                           return (
                             <Tooltip key={`${task.id}-${start.toISOString()}-${workerIndex}`}>
@@ -719,11 +920,18 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                                     height: rowHeight - 16,
                                     background: bg,
                                     color: text,
-                                    border: '1px solid rgba(0,0,0,0.2)',
+                                    border: isCritical ? `3px solid ${border}` : `1px solid ${border}`,
+                                    boxShadow: isCritical ? '0 0 8px rgba(255,0,0,0.3)' : 'none',
                                   }}
                                 >
-                                  <div className="truncate">
-                                    {task.phases?.projects?.name || 'Project'} – {task.title}
+                                  <div className="truncate font-semibold">
+                                    {project?.name || 'Project'} – {task.title}
+                                  </div>
+                                  <div className="text-[9px] opacity-75 truncate">
+                                    {task.priority === 'high' && '🔴 '}
+                                    {task.priority === 'medium' && '🟡 '}
+                                    {task.priority === 'low' && '🟢 '}
+                                    {task.status === 'HOLD' && '🟠 HOLD '}
                                   </div>
                                   {assignment && (
                                     <div className="text-[10px] opacity-80 truncate mt-0.5">
@@ -732,14 +940,27 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                                   )}
                                 </div>
                               </TooltipTrigger>
-                              <TooltipContent>
+                              <TooltipContent className="max-w-xs">
                                 <div className="text-xs space-y-1">
+                                  <div className="font-bold text-sm mb-1">{project?.name || 'Project'}</div>
+                                  <div><b>Taak:</b> {task.title}</div>
                                   <div><b>Start:</b> {format(start, 'dd MMM HH:mm')}</div>
                                   <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
                                   <div><b>Duur:</b> {task.duration} min</div>
-                                  <div><b>Status:</b> {task.status}</div>
+                                  <div><b>Status:</b> {task.status} {task.status === 'HOLD' && '🟠'}</div>
+                                  <div><b>Prioriteit:</b> {task.priority} {task.priority === 'high' && '🔴'}</div>
                                   {assignment && (
                                     <div><b>Werknemer:</b> {assignment.employeeName}</div>
+                                  )}
+                                  {project && (
+                                    <>
+                                      <div className="border-t pt-1 mt-1">
+                                        <div><b>Klant:</b> {project.client}</div>
+                                        <div><b>Project start:</b> {format(new Date(project.start_date), 'dd MMM yyyy')}</div>
+                                        <div><b>Installatie:</b> {format(new Date(project.installation_date), 'dd MMM yyyy')}</div>
+                                        <div><b>Status:</b> {project.status}</div>
+                                      </div>
+                                    </>
                                   )}
                                 </div>
                               </TooltipContent>
