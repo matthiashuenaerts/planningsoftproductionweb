@@ -17,7 +17,7 @@ import { holidayService, Holiday } from '@/services/holidayService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus } from 'lucide-react';
+import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus, ChevronDown, ChevronRight, User } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
@@ -85,6 +85,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [dailyAssignments, setDailyAssignments] = useState<DailyEmployeeAssignment[]>([]);
   const [workstationEmployeeLinks, setWorkstationEmployeeLinks] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
   const [showCriticalPath, setShowCriticalPath] = useState(false);
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const rowHeight = 60;
@@ -473,6 +474,81 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     return dailyAssignments.find(
       (a) => a.date === dateStr && a.workstationId === workstationId && a.workerIndex === workerIndex
     );
+  };
+
+  // Get unique employees from daily assignments
+  const uniqueEmployees = useMemo(() => {
+    const employeeMap = new Map<string, string>();
+    dailyAssignments.forEach(assignment => {
+      employeeMap.set(assignment.employeeId, assignment.employeeName);
+    });
+    return Array.from(employeeMap.entries()).map(([id, name]) => ({ id, name }));
+  }, [dailyAssignments]);
+
+  // Toggle employee expansion
+  const toggleEmployeeExpansion = (employeeId: string) => {
+    setExpandedEmployees(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(employeeId)) {
+        newSet.delete(employeeId);
+      } else {
+        newSet.add(employeeId);
+      }
+      return newSet;
+    });
+  };
+
+  // Toggle workstation assignment for employee
+  const handleToggleWorkstation = async (employeeId: string, workstationId: string) => {
+    const currentLinks = workstationEmployeeLinks.get(workstationId) || [];
+    const isCurrentlyAssigned = currentLinks.some(emp => emp.id === employeeId);
+
+    try {
+      if (isCurrentlyAssigned) {
+        // Remove the link
+        const { error } = await supabase
+          .from('employee_workstation_links')
+          .delete()
+          .eq('employee_id', employeeId)
+          .eq('workstation_id', workstationId);
+
+        if (error) throw error;
+
+        // Update local state
+        setWorkstationEmployeeLinks(prev => {
+          const newMap = new Map(prev);
+          const filtered = currentLinks.filter(emp => emp.id !== employeeId);
+          newMap.set(workstationId, filtered);
+          return newMap;
+        });
+
+        toast.success('Werkstation verwijderd van werknemer');
+      } else {
+        // Add the link
+        const { error } = await supabase
+          .from('employee_workstation_links')
+          .insert({
+            employee_id: employeeId,
+            workstation_id: workstationId,
+          });
+
+        if (error) throw error;
+
+        // Update local state
+        const employeeName = uniqueEmployees.find(e => e.id === employeeId)?.name || '';
+        setWorkstationEmployeeLinks(prev => {
+          const newMap = new Map(prev);
+          const updated = [...currentLinks, { id: employeeId, name: employeeName }];
+          newMap.set(workstationId, updated);
+          return newMap;
+        });
+
+        toast.success('Werkstation toegewezen aan werknemer');
+      }
+    } catch (error) {
+      console.error('Error toggling workstation:', error);
+      toast.error('Fout bij het bijwerken van werkstation toewijzing');
+    }
   };
 
   // Expose data via ref for external access
@@ -975,6 +1051,73 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             );
           })}
         </div>
+
+        {/* Employee Workstation Management */}
+        {uniqueEmployees.length > 0 && (
+          <div className="mt-6 border-t pt-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Toegewezen Werknemers ({uniqueEmployees.length})
+            </h3>
+            <div className="space-y-2">
+              {uniqueEmployees.map(employee => {
+                const isExpanded = expandedEmployees.has(employee.id);
+                const assignedWorkstations = workstations.filter(ws => 
+                  workstationEmployeeLinks.get(ws.id)?.some(emp => emp.id === employee.id)
+                );
+
+                return (
+                  <div key={employee.id} className="border rounded-lg overflow-hidden">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-between p-4 h-auto hover:bg-muted/50"
+                      onClick={() => toggleEmployeeExpansion(employee.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                        <span className="font-medium">{employee.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({assignedWorkstations.length} werkstations)
+                        </span>
+                      </div>
+                    </Button>
+                    
+                    {isExpanded && (
+                      <div className="px-4 pb-4 pt-2 bg-muted/20">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                          {workstations.map(workstation => {
+                            const isAssigned = workstationEmployeeLinks
+                              .get(workstation.id)
+                              ?.some(emp => emp.id === employee.id) || false;
+
+                            return (
+                              <label
+                                key={workstation.id}
+                                className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer transition-colors"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isAssigned}
+                                  onChange={() => handleToggleWorkstation(employee.id, workstation.id)}
+                                  className="rounded border-gray-300"
+                                />
+                                <span className="text-sm">{workstation.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
