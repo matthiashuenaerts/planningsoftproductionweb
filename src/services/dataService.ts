@@ -60,6 +60,7 @@ export interface Employee {
   password?: string;
   created_at: string;
   workstation?: string | null;
+  logistics?: boolean;
 }
 
 // Project service functions

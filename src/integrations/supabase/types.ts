@@ -387,6 +387,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          logistics: boolean | null
           name: string
           password: string
           role: string
@@ -396,6 +397,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          logistics?: boolean | null
           name: string
           password: string
           role: string
@@ -405,6 +407,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          logistics?: boolean | null
           name?: string
           password?: string
           role?: string
@@ -2904,6 +2907,7 @@ export type Database = {
       }
       workstations: {
         Row: {
+          active_task_time: string | null
           active_workers: number
           created_at: string
           description: string | null
@@ -2914,6 +2918,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active_task_time?: string | null
           active_workers?: number
           created_at?: string
           description?: string | null
@@ -2924,6 +2929,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active_task_time?: string | null
           active_workers?: number
           created_at?: string
           description?: string | null

@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, UserCog, UserPlus, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { employeeService } from '@/services/dataService';
@@ -64,7 +65,8 @@ const EmployeeSettings: React.FC = () => {
     name: '',
     email: '',
     password: '',
-    role: 'worker'
+    role: 'worker',
+    logistics: false
   });
   const { toast } = useToast();
 
@@ -108,6 +110,7 @@ const EmployeeSettings: React.FC = () => {
         email: employee.email || '',
         password: '',
         role: employee.role,
+        logistics: employee.logistics || false
       });
     } else {
       setEditingEmployee(null);
@@ -115,7 +118,8 @@ const EmployeeSettings: React.FC = () => {
         name: '',
         email: '',
         password: '',
-        role: 'worker'
+        role: 'worker',
+        logistics: false
       });
     }
     setIsAddOrEditOpen(true);
@@ -248,6 +252,20 @@ const EmployeeSettings: React.FC = () => {
                       <SelectItem value="workstation">Workstation</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="logistics" 
+                    checked={employeeData.logistics}
+                    onCheckedChange={(checked) => setEmployeeData(prev => ({ ...prev, logistics: checked as boolean }))}
+                  />
+                  <Label 
+                    htmlFor="logistics" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Logistics
+                  </Label>
                 </div>
               </div>
               
