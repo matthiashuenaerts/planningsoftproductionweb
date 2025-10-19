@@ -7,6 +7,7 @@ interface Employee {
   name: string;
   role: 'admin' | 'manager' | 'worker' | 'workstation' | 'installation_team' | 'teamleader' | 'preparater';
   workstation?: string;
+  logistics?: boolean;
   expires?: number;
 }
 

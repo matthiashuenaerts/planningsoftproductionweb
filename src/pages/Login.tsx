@@ -91,7 +91,8 @@ const Login: React.FC = () => {
         id: employee.id,
         name: employee.name,
         role: employeeRole,
-        workstation: employee.workstation
+        workstation: employee.workstation,
+        logistics: employee.logistics
       });
       toast({
         title: "Login successful",
