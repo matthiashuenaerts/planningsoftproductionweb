@@ -20,6 +20,7 @@ import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { OrderPartsListEditor } from '@/components/OrderPartsListEditor';
 import { useLanguage } from '@/context/LanguageContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type LogisticsOutOrder = Order & { 
   project_name: string;
@@ -231,13 +232,18 @@ const LogisticsOut: React.FC = () => {
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 10);
 
+  const isMobile = useIsMobile();
+
   if (loading) {
     return (
       <div className="flex min-h-screen">
-        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-          <Navbar />
-        </div>
-        <div className="ml-64 w-full p-6 flex justify-center items-center">
+        {!isMobile && (
+          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+            <Navbar />
+          </div>
+        )}
+        {isMobile && <Navbar />}
+        <div className={`w-full p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : ''}`}>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
         </div>
       </div>
@@ -246,10 +252,13 @@ const LogisticsOut: React.FC = () => {
 
   return (
     <div className="flex min-h-screen">
-      <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-        <Navbar />
-      </div>
-      <div className="ml-64 w-full p-6">
+      {!isMobile && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+      {isMobile && <Navbar />}
+      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : ''}`}>
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div>

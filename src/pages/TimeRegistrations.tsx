@@ -20,6 +20,7 @@ import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { ManualTimeRegistrationDialog } from '@/components/ManualTimeRegistrationDialog';
 import { EditTimeRegistrationDialog } from '@/components/EditTimeRegistrationDialog';
 import { workingHoursService, WorkingHours } from '@/services/workingHoursService';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const TimeRegistrations = () => {
   const { currentEmployee } = useAuth();
@@ -40,6 +41,7 @@ const TimeRegistrations = () => {
     startDate: format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd')
   });
+  const isMobile = useIsMobile();
 
   // Check if user is admin or manager
   const canViewAllRegistrations = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
@@ -487,8 +489,13 @@ const TimeRegistrations = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex">
-        <Navbar />
-        <div className="flex-1 ml-64 p-6">
+        {!isMobile && (
+          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+            <Navbar />
+          </div>
+        )}
+        {isMobile && <Navbar />}
+        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : ''}`}>
           <div>{t("loading")}</div>
         </div>
       </div>
@@ -498,8 +505,13 @@ const TimeRegistrations = () => {
   if (!canViewAllRegistrations) {
     return (
       <div className="min-h-screen bg-gray-50 flex">
-        <Navbar />
-        <div className="flex-1 ml-64 p-6">
+        {!isMobile && (
+          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+            <Navbar />
+          </div>
+        )}
+        {isMobile && <Navbar />}
+        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : ''}`}>
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">{t("my_time_registrations")}</h1>
             <p className="text-gray-600 mt-2">{t("my_time_registrations_description")}</p>
@@ -725,8 +737,13 @@ const TimeRegistrations = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <Navbar />
-      <div className="flex-1 ml-64 p-6">
+      {!isMobile && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+      {isMobile && <Navbar />}
+      <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : ''}`}>
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">{t("time_registration_dashboard")}</h1>
           <p className="text-gray-600 mt-2">{t("time_registration_dashboard_description")}</p>

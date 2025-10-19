@@ -13,6 +13,7 @@ import CreatePersonalItemDialog from '@/components/personal-items/CreatePersonal
 import EditPersonalItemDialog from '@/components/personal-items/EditPersonalItemDialog';
 import SharePersonalItemDialog from '@/components/personal-items/SharePersonalItemDialog';
 import Navbar from '@/components/Navbar';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export interface PersonalItem {
   id: string;
@@ -212,11 +213,18 @@ const NotesAndTasks = () => {
     }
   };
 
+  const isMobile = useIsMobile();
+
   if (!currentEmployee) {
     return (
       <div className="flex min-h-screen">
-        <Navbar />
-        <div className="flex-1 ml-64">
+        {!isMobile && (
+          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+            <Navbar />
+          </div>
+        )}
+        {isMobile && <Navbar />}
+        <div className={`flex-1 ${!isMobile ? 'ml-64' : ''}`}>
           <div className="flex items-center justify-center h-64">
             <p className="text-gray-500">Please log in to access your notes and tasks.</p>
           </div>
@@ -228,8 +236,13 @@ const NotesAndTasks = () => {
   if (isLoading) {
     return (
       <div className="flex min-h-screen">
-        <Navbar />
-        <div className="flex-1 ml-64">
+        {!isMobile && (
+          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+            <Navbar />
+          </div>
+        )}
+        {isMobile && <Navbar />}
+        <div className={`flex-1 ${!isMobile ? 'ml-64' : ''}`}>
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           </div>
@@ -240,8 +253,13 @@ const NotesAndTasks = () => {
 
   return (
     <div className="flex min-h-screen">
-      <Navbar />
-      <div className="flex-1 ml-64">
+      {!isMobile && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+      {isMobile && <Navbar />}
+      <div className={`flex-1 ${!isMobile ? 'ml-64' : ''}`}>
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold">Notes & Tasks</h1>

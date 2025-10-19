@@ -37,6 +37,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 interface TaskWithTimeData extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
@@ -104,6 +105,7 @@ const ProjectDetails = () => {
     lang,
     createLocalizedPath
   } = useLanguage();
+  const isMobile = useIsMobile();
   const calculateAndSaveTaskEfficiency = useCallback(async (completedTasks: TaskWithTimeData[]) => {
     if (!projectId || completedTasks.length === 0) return [];
 
@@ -832,20 +834,26 @@ const ProjectDetails = () => {
   };
   if (loading) {
     return <div className="flex min-h-screen">
-        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-          <Navbar />
-        </div>
-        <div className="ml-64 w-full p-6 flex justify-center items-center">
+        {!isMobile && (
+          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+            <Navbar />
+          </div>
+        )}
+        {isMobile && <Navbar />}
+        <div className={`w-full p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : ''}`}>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
         </div>
       </div>;
   }
   if (!project) {
     return <div className="flex min-h-screen">
-        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-          <Navbar />
-        </div>
-        <div className="ml-64 w-full p-6">
+        {!isMobile && (
+          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+            <Navbar />
+          </div>
+        )}
+        {isMobile && <Navbar />}
+        <div className={`w-full p-6 ${!isMobile ? 'ml-64' : ''}`}>
           <div className="max-w-3xl mx-auto">
             <div className="text-center">
               <h2 className="text-2xl font-bold mb-2">{t('project_not_found')}</h2>
@@ -948,10 +956,13 @@ const ProjectDetails = () => {
 
   return (
     <div className="flex min-h-screen">
-      <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-        <Navbar />
-      </div>
-      <div className="ml-64 w-full p-6">
+      {!isMobile && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+      {isMobile && <Navbar />}
+      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : ''}`}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <Button variant="outline" onClick={() => navigate(createLocalizedPath('/projects'))} className="mb-4">

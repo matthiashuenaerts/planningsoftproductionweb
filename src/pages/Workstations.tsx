@@ -23,6 +23,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeScanner } from '@/components/QRCodeScanner';
 import { qrCodeService } from '@/services/qrCodeService';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Define workstation with appropriate icon mapping
 interface WorkstationWithIcon {
@@ -266,22 +267,30 @@ const Workstations: React.FC = () => {
         return <Badge>{priority}</Badge>;
     }
   };
+  const isMobile = useIsMobile();
+
   if (loading) {
     return <div className="flex min-h-screen">
-        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-          <Navbar />
-        </div>
-        <div className="ml-64 w-full p-6 flex justify-center items-center">
+        {!isMobile && (
+          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+            <Navbar />
+          </div>
+        )}
+        {isMobile && <Navbar />}
+        <div className={`w-full p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : ''}`}>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
         </div>
       </div>;
   }
   const selectedWorkstationForTasks = workstations.find(ws => ws.id === showWorkstationTasks);
   return <div className="flex min-h-screen">
-      <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-        <Navbar />
-      </div>
-      <div className="ml-64 w-full">
+      {!isMobile && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+      {isMobile && <Navbar />}
+      <div className={`w-full ${!isMobile ? 'ml-64' : ''}`}>
         <ScrollArea className="h-screen">
           <div className="p-6">
             <div className="max-w-7xl mx-auto">

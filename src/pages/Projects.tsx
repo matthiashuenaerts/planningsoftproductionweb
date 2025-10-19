@@ -16,6 +16,7 @@ import NewProjectModal from '@/components/NewProjectModal';
 import { exportProjectData, exportProjectDataAsZip } from '@/services/projectExportService';
 import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Projects = () => {
   const navigate = useNavigate();
@@ -350,13 +351,18 @@ const Projects = () => {
     );
   };
 
+  const isMobile = useIsMobile();
+
   return (
     <div className="flex min-h-screen">
-      <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-        <Navbar />
-      </div>
+      {!isMobile && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+      {isMobile && <Navbar />}
       
-      <div className="ml-64 flex-1 p-6">
+      <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : ''}`}>
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
             <div>

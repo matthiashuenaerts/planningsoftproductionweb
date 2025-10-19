@@ -17,6 +17,7 @@ import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import { holidayService } from '@/services/holidayService';
 import { startOfDay, endOfDay, format, parseISO, addDays, isToday, isTomorrow } from 'date-fns';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Task {
   id: string;
@@ -83,6 +84,7 @@ const PersonalTasks = () => {
   const [showPartsDialog, setShowPartsDialog] = useState<string | null>(null);
   const [showBarcodeDialog, setShowBarcodeDialog] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const isMobile = useIsMobile();
 
   // Helper function to get next workday (skip weekends and holidays)
   const getNextWorkday = async (date: Date) => {
@@ -505,8 +507,13 @@ const PersonalTasks = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex">
-        <Navbar />
-        <div className="flex-1 ml-64 p-6">
+        {!isMobile && (
+          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+            <Navbar />
+          </div>
+        )}
+        {isMobile && <Navbar />}
+        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : ''}`}>
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           </div>
@@ -517,8 +524,13 @@ const PersonalTasks = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <Navbar />
-      <div className="flex-1 ml-64 p-6 max-w-none">
+      {!isMobile && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+      {isMobile && <Navbar />}
+      <div className={`flex-1 p-6 max-w-none ${!isMobile ? 'ml-64' : ''}`}>
         {/* Date Navigation Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">

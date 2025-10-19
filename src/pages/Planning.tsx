@@ -55,6 +55,7 @@ import { supabase } from '@/integrations/supabase/client';
 import DraggableScheduleItem from '@/components/DraggableScheduleItem';
 import WorkstationScheduleView from '@/components/WorkstationScheduleView';
 import WorkstationGanttChart from '@/components/WorkstationGanttChart';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface WorkerTask {
   id: string;
@@ -118,6 +119,7 @@ const Planning = () => {
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const isAdmin = currentEmployee?.role === 'admin';
+  const isMobile = useIsMobile();
 
   // Scroll position preservation
   const scrollPositionRef = useRef<number>(0);
@@ -1928,10 +1930,13 @@ const Planning = () => {
   if (loading) {
     return (
       <div className="flex min-h-screen">
-        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-          <Navbar />
-        </div>
-        <div className="ml-64 w-full p-6 flex justify-center items-center">
+        {!isMobile && (
+          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+            <Navbar />
+          </div>
+        )}
+        {isMobile && <Navbar />}
+        <div className={`w-full p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : ''}`}>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
         </div>
       </div>
@@ -1941,12 +1946,15 @@ const Planning = () => {
   return (
     <div className="flex min-h-screen">
       <div className="flex min-h-screen w-full">
-        <div className="hidden md:block w-64 bg-sidebar fixed top-0 bottom-0 left-0 z-10">
-          <Navbar />
-        </div>
+        {!isMobile && (
+          <div className="w-64 bg-sidebar fixed top-0 bottom-0 left-0 z-10">
+            <Navbar />
+          </div>
+        )}
+        {isMobile && <Navbar />}
         <div 
           ref={mainContentRef}
-          className="md:ml-64 w-full p-4 md:p-6 overflow-y-auto"
+          className={`w-full p-4 md:p-6 overflow-y-auto ${!isMobile ? 'md:ml-64' : ''}`}
           style={{ height: '100vh' }}
         >
           <div className="max-w-7xl mx-auto">

@@ -7,16 +7,21 @@ import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, BarChart } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const BrokenParts: React.FC = () => {
   const { currentEmployee } = useAuth();
   const { t, createLocalizedPath } = useLanguage();
+  const isMobile = useIsMobile();
   
   return (
     <div className="flex h-screen bg-gray-50">
-      <div className="w-64 h-full">
-        <Navbar />
-      </div>
+      {!isMobile && (
+        <div className="w-64 h-full">
+          <Navbar />
+        </div>
+      )}
+      {isMobile && <Navbar />}
       <div className="flex-1 overflow-auto">
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center mb-6">
