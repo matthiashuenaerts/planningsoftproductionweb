@@ -4,12 +4,25 @@ import { useNavigate } from 'react-router-dom';
 import { workstationService } from '@/services/workstationService';
 import { floorplanService, WorkstationStatus } from '@/services/floorplanService';
 import { workstationErrorService } from '@/services/workstationErrorService';
-import { ArrowRight, Activity, AlertCircle, CheckCircle2, Clock, Users, AlertTriangle } from 'lucide-react';
+import { ArrowRight, Activity, AlertCircle, CheckCircle2, Clock, Users, AlertTriangle, Truck, Calendar } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { format, subDays, isWeekend, differenceInDays, startOfDay } from 'date-fns';
+import { holidayService } from '@/services/holidayService';
+
+interface LoadingAssignment {
+  project: {
+    id: string;
+    name: string;
+    client: string;
+    status: string;
+    installation_date: string;
+  };
+  loading_date: string;
+}
 
 const ControlPanel: React.FC = () => {
   const navigate = useNavigate();
@@ -17,6 +30,15 @@ const ControlPanel: React.FC = () => {
   const [workstationStatuses, setWorkstationStatuses] = useState<WorkstationStatus[]>([]);
   const [workstationErrors, setWorkstationErrors] = useState<Record<string, number>>({});
   const [workstationBufferTimes, setWorkstationBufferTimes] = useState<Record<string, number>>({});
+  const [truckLoadingData, setTruckLoadingData] = useState<{
+    todayLoadings: LoadingAssignment[];
+    upcomingLoadings: LoadingAssignment[];
+    daysToNext: number;
+  }>({
+    todayLoadings: [],
+    upcomingLoadings: [],
+    daysToNext: 0
+  });
 
   const { data: workstations = [] } = useQuery({
     queryKey: ['workstations'],
@@ -25,13 +47,16 @@ const ControlPanel: React.FC = () => {
 
   useEffect(() => {
     loadStatuses();
+    loadTruckLoadingData();
     
     const statusesChannel = floorplanService.subscribeToTimeRegistrations(setWorkstationStatuses);
     const statusInterval = setInterval(loadStatuses, 30000);
+    const loadingInterval = setInterval(loadTruckLoadingData, 60000);
 
     return () => {
       statusesChannel.unsubscribe();
       clearInterval(statusInterval);
+      clearInterval(loadingInterval);
     };
   }, []);
 
@@ -67,6 +92,97 @@ const ControlPanel: React.FC = () => {
       });
     });
     setWorkstationBufferTimes(bufferTimes);
+  };
+
+  const loadTruckLoadingData = async () => {
+    try {
+      // Fetch holidays
+      const holidays = await holidayService.getHolidays();
+      
+      // Helper to calculate loading date
+      const getPreviousWorkday = (date: Date): Date => {
+        let previousDay = subDays(date, 1);
+        
+        while (true) {
+          if (isWeekend(previousDay)) {
+            previousDay = subDays(previousDay, 1);
+            continue;
+          }
+          
+          const dateStr = format(previousDay, 'yyyy-MM-dd');
+          const isHoliday = holidays.some(h => h.date === dateStr && h.team === 'production');
+          
+          if (isHoliday) {
+            previousDay = subDays(previousDay, 1);
+            continue;
+          }
+          
+          break;
+        }
+        
+        return previousDay;
+      };
+
+      // Fetch overrides
+      const { data: overridesData } = await supabase
+        .from('project_loading_overrides')
+        .select('project_id, override_loading_date');
+      
+      const overridesMap: Record<string, string> = {};
+      (overridesData || []).forEach(override => {
+        overridesMap[override.project_id] = override.override_loading_date;
+      });
+
+      // Fetch projects with installation dates
+      const { data: projectsData } = await supabase
+        .from('projects')
+        .select('id, name, client, status, installation_date')
+        .not('installation_date', 'is', null)
+        .gte('installation_date', format(new Date(), 'yyyy-MM-dd'))
+        .order('installation_date');
+
+      // Calculate loading dates
+      const loadingAssignments: LoadingAssignment[] = (projectsData || []).map(project => {
+        const installationDate = new Date(project.installation_date);
+        const calculatedLoadingDate = getPreviousWorkday(installationDate);
+        const loadingDate = overridesMap[project.id] || format(calculatedLoadingDate, 'yyyy-MM-dd');
+        
+        return {
+          project,
+          loading_date: loadingDate
+        };
+      });
+
+      // Filter today's loadings
+      const today = format(startOfDay(new Date()), 'yyyy-MM-dd');
+      const todayLoadings = loadingAssignments.filter(a => 
+        format(startOfDay(new Date(overridesMap[a.project.id] || a.loading_date)), 'yyyy-MM-dd') === today
+      );
+
+      // Get upcoming loadings (next 7 days, excluding today)
+      const upcomingLoadings = loadingAssignments
+        .filter(a => {
+          const loadingDate = new Date(overridesMap[a.project.id] || a.loading_date);
+          return loadingDate > new Date() && differenceInDays(loadingDate, new Date()) <= 7;
+        })
+        .slice(0, 5);
+
+      // Calculate days to next loading
+      let daysToNext = 0;
+      if (todayLoadings.length === 0 && loadingAssignments.length > 0) {
+        const nextLoading = loadingAssignments[0];
+        const nextDate = new Date(overridesMap[nextLoading.project.id] || nextLoading.loading_date);
+        daysToNext = differenceInDays(nextDate, startOfDay(new Date()));
+      }
+
+      setTruckLoadingData({
+        todayLoadings,
+        upcomingLoadings,
+        daysToNext
+      });
+    } catch (error) {
+      console.error('Error loading truck loading data:', error);
+    }
   };
 
   const getWorkstationStatus = (workstationId: string) => {
@@ -279,6 +395,113 @@ const ControlPanel: React.FC = () => {
               </div>
             </div>
           </div>
+        </Card>
+
+        {/* Truck Loading */}
+        <Card className="bg-slate-800/50 border-slate-700 p-6 mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-orange-500/10">
+                <Truck className="w-6 h-6 text-orange-500" />
+              </div>
+              <h2 className="text-xl font-bold text-white">Truck Loading</h2>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => navigate(createLocalizedPath('/daily-tasks'))}
+              className="text-white border-slate-600 hover:bg-slate-700"
+            >
+              View Calendar
+            </Button>
+          </div>
+
+          {/* Today's Loadings */}
+          {truckLoadingData.todayLoadings.length > 0 ? (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Calendar className="w-4 h-4 text-orange-400" />
+                <h3 className="text-sm font-semibold text-orange-400">Loading Today</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {truckLoadingData.todayLoadings.map((loading) => (
+                  <Card 
+                    key={loading.project.id}
+                    className="bg-orange-500/10 border-orange-500/30 p-3 cursor-pointer hover:bg-orange-500/20 transition-colors"
+                    onClick={() => navigate(createLocalizedPath(`/projects/${loading.project.id}`))}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-semibold text-sm truncate">{loading.project.name}</p>
+                        <p className="text-slate-400 text-xs truncate">{loading.project.client}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className="text-xs border-orange-500/30 text-orange-400">
+                            Install: {format(new Date(loading.project.installation_date), 'MMM d')}
+                          </Badge>
+                        </div>
+                      </div>
+                      <Badge className="bg-orange-500 text-white flex-shrink-0">Today</Badge>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mb-4 p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+              <p className="text-slate-400 text-sm">
+                {truckLoadingData.daysToNext > 0 
+                  ? `Next loading in ${truckLoadingData.daysToNext} day${truckLoadingData.daysToNext > 1 ? 's' : ''}`
+                  : 'No loadings scheduled today'}
+              </p>
+            </div>
+          )}
+
+          {/* Upcoming Loadings */}
+          {truckLoadingData.upcomingLoadings.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="w-4 h-4 text-blue-400" />
+                <h3 className="text-sm font-semibold text-blue-400">Upcoming Installations (Next 7 Days)</h3>
+              </div>
+              <div className="space-y-2">
+                {truckLoadingData.upcomingLoadings.map((loading) => (
+                  <Card 
+                    key={loading.project.id}
+                    className="bg-slate-700/30 border-slate-600 p-3 cursor-pointer hover:bg-slate-700/50 transition-colors"
+                    onClick={() => navigate(createLocalizedPath(`/projects/${loading.project.id}`))}
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium text-sm truncate">{loading.project.name}</p>
+                        <p className="text-slate-400 text-xs truncate">{loading.project.client}</p>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="text-right">
+                          <p className="text-xs text-slate-400">Loading</p>
+                          <p className="text-white font-semibold text-sm">
+                            {format(new Date(loading.loading_date), 'MMM d')}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-400">Install</p>
+                          <p className="text-white font-semibold text-sm">
+                            {format(new Date(loading.project.installation_date), 'MMM d')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {truckLoadingData.todayLoadings.length === 0 && truckLoadingData.upcomingLoadings.length === 0 && (
+            <div className="text-center py-8">
+              <Truck className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+              <p className="text-slate-400">No upcoming installations scheduled</p>
+            </div>
+          )}
         </Card>
       </div>
     </div>
