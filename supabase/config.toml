@@ -186,23 +186,9 @@ url = ""
 [functions]
 [functions.create-storage-bucket]
 verify_jwt = false
-[functions.external-db-proxy]
-verify_jwt = true
-[functions.external-delivery-confirmation]
-verify_jwt = false
-[functions.init-database]
-verify_jwt = true
 [functions.orders-api-proxy]
 verify_jwt = false
 [functions.orders-import]
 verify_jwt = false
-[functions.orders-sync]
-verify_jwt = true
-[functions.project-sync]
-verify_jwt = true
-[functions.send-holiday-request-email]
-verify_jwt = true
-[functions.send-holiday-status-email]
-verify_jwt = true
-[functions.send-project-forecast]
-verify_jwt = true
+[functions.external-delivery-confirmation]
+verify_jwt = false
