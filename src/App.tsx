@@ -26,6 +26,7 @@ import Login from './pages/Login';
 import NotesAndTasks from './pages/NotesAndTasks';
 import ControlPanel from './pages/ControlPanel';
 import WorkstationControl from './pages/WorkstationControl';
+import TruckLoadingView from './pages/TruckLoadingView';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -85,6 +86,7 @@ function App() {
                 <Route path="/:lang/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="/:lang/control-panel" element={<ProtectedRoute><ControlPanel /></ProtectedRoute>} />
                 <Route path="/:lang/control-panel/:workstationId" element={<ProtectedRoute><WorkstationControl /></ProtectedRoute>} />
+                <Route path="/:lang/truck-loading" element={<ProtectedRoute><TruckLoadingView /></ProtectedRoute>} />
               </Routes>
               <Toaster />
             </LanguageProvider>

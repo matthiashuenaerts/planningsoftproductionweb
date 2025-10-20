@@ -372,6 +372,37 @@ const ControlPanel: React.FC = () => {
                 </React.Fragment>
               );
             })}
+            
+            {/* Truck Loading Button */}
+            <div className="flex flex-col items-center gap-1.5">
+              <ArrowRight className="w-6 h-6 text-slate-600 flex-shrink-0" />
+            </div>
+            
+            <button
+              onClick={() => navigate(createLocalizedPath('/truck-loading'))}
+              className="group relative"
+            >
+              <Card 
+                className="w-40 h-28 border-2 border-orange-500 bg-orange-500/20 hover:scale-105 hover:shadow-xl cursor-pointer transition-all duration-300"
+              >
+                <div className="p-3 h-full flex flex-col justify-between">
+                  <div className="flex items-start justify-between">
+                    <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse" />
+                  </div>
+                  
+                  <div className="flex-1 flex flex-col justify-center items-center">
+                    <Truck className="w-6 h-6 text-orange-500 mb-1" />
+                    <h3 className="text-white font-bold text-sm leading-tight">Truck Loading</h3>
+                    {truckLoadingData.todayLoadings.length > 0 && (
+                      <p className="text-orange-400 text-xs mt-1">Today: {truckLoadingData.todayLoadings.length}</p>
+                    )}
+                    {truckLoadingData.todayLoadings.length === 0 && truckLoadingData.daysToNext > 0 && (
+                      <p className="text-slate-400 text-xs mt-1">In {truckLoadingData.daysToNext}d</p>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            </button>
           </div>
 
           {/* Legend */}
@@ -395,113 +426,6 @@ const ControlPanel: React.FC = () => {
               </div>
             </div>
           </div>
-        </Card>
-
-        {/* Truck Loading */}
-        <Card className="bg-slate-800/50 border-slate-700 p-6 mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-orange-500/10">
-                <Truck className="w-6 h-6 text-orange-500" />
-              </div>
-              <h2 className="text-xl font-bold text-white">Truck Loading</h2>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => navigate(createLocalizedPath('/daily-tasks'))}
-              className="text-white border-slate-600 hover:bg-slate-700"
-            >
-              View Calendar
-            </Button>
-          </div>
-
-          {/* Today's Loadings */}
-          {truckLoadingData.todayLoadings.length > 0 ? (
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Calendar className="w-4 h-4 text-orange-400" />
-                <h3 className="text-sm font-semibold text-orange-400">Loading Today</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {truckLoadingData.todayLoadings.map((loading) => (
-                  <Card 
-                    key={loading.project.id}
-                    className="bg-orange-500/10 border-orange-500/30 p-3 cursor-pointer hover:bg-orange-500/20 transition-colors"
-                    onClick={() => navigate(createLocalizedPath(`/projects/${loading.project.id}`))}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-semibold text-sm truncate">{loading.project.name}</p>
-                        <p className="text-slate-400 text-xs truncate">{loading.project.client}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="text-xs border-orange-500/30 text-orange-400">
-                            Install: {format(new Date(loading.project.installation_date), 'MMM d')}
-                          </Badge>
-                        </div>
-                      </div>
-                      <Badge className="bg-orange-500 text-white flex-shrink-0">Today</Badge>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="mb-4 p-4 bg-slate-700/30 rounded-lg border border-slate-600">
-              <p className="text-slate-400 text-sm">
-                {truckLoadingData.daysToNext > 0 
-                  ? `Next loading in ${truckLoadingData.daysToNext} day${truckLoadingData.daysToNext > 1 ? 's' : ''}`
-                  : 'No loadings scheduled today'}
-              </p>
-            </div>
-          )}
-
-          {/* Upcoming Loadings */}
-          {truckLoadingData.upcomingLoadings.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Clock className="w-4 h-4 text-blue-400" />
-                <h3 className="text-sm font-semibold text-blue-400">Upcoming Installations (Next 7 Days)</h3>
-              </div>
-              <div className="space-y-2">
-                {truckLoadingData.upcomingLoadings.map((loading) => (
-                  <Card 
-                    key={loading.project.id}
-                    className="bg-slate-700/30 border-slate-600 p-3 cursor-pointer hover:bg-slate-700/50 transition-colors"
-                    onClick={() => navigate(createLocalizedPath(`/projects/${loading.project.id}`))}
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-medium text-sm truncate">{loading.project.name}</p>
-                        <p className="text-slate-400 text-xs truncate">{loading.project.client}</p>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <div className="text-right">
-                          <p className="text-xs text-slate-400">Loading</p>
-                          <p className="text-white font-semibold text-sm">
-                            {format(new Date(loading.loading_date), 'MMM d')}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-slate-400">Install</p>
-                          <p className="text-white font-semibold text-sm">
-                            {format(new Date(loading.project.installation_date), 'MMM d')}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {truckLoadingData.todayLoadings.length === 0 && truckLoadingData.upcomingLoadings.length === 0 && (
-            <div className="text-center py-8">
-              <Truck className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <p className="text-slate-400">No upcoming installations scheduled</p>
-            </div>
-          )}
         </Card>
       </div>
     </div>
