@@ -17,7 +17,7 @@ import { holidayService, Holiday } from '@/services/holidayService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus, ChevronDown, ChevronRight, User } from 'lucide-react';
+import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus, ChevronDown, ChevronRight, User, Wand2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
@@ -86,6 +86,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [workstationEmployeeLinks, setWorkstationEmployeeLinks] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  const [generatingPlanning, setGeneratingPlanning] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const rowHeight = 60;
@@ -333,6 +334,260 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     });
 
     return totalMinutes;
+  };
+
+  // Generate comprehensive planning with task-to-employee assignments
+  const handleGeneratePlanning = async () => {
+    try {
+      setGeneratingPlanning(true);
+      
+      // Fetch all projects to check start dates
+      const { data: projects, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name, start_date, installation_date, status, client');
+      
+      if (projectsError) throw projectsError;
+      
+      const projectMap = new Map(projects?.map(p => [p.id, p]) || []);
+      const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
+      const today = format(new Date(), 'yyyy-MM-dd');
+      
+      // Get all employees linked to workstations
+      const allEmployees = new Map<string, { id: string; name: string; workstations: string[] }>();
+      workstationEmployeeLinks.forEach((employees, workstationId) => {
+        employees.forEach(emp => {
+          if (!allEmployees.has(emp.id)) {
+            allEmployees.set(emp.id, { id: emp.id, name: emp.name, workstations: [workstationId] });
+          } else {
+            allEmployees.get(emp.id)!.workstations.push(workstationId);
+          }
+        });
+      });
+      
+      // Generate planning for next 60 days
+      const daysToSchedule = 60;
+      const schedulesToCreate: any[] = [];
+      
+      // Track employee schedules: employeeId -> date -> { start: Date, end: Date, workstationId: string }[]
+      const employeeSchedules = new Map<string, Map<string, Array<{ start: Date; end: Date; workstationId: string; taskId: string }>>>();
+      
+      // Initialize employee schedules
+      allEmployees.forEach((emp) => {
+        employeeSchedules.set(emp.id, new Map());
+      });
+      
+      // Task scheduling state
+      const scheduledTasks = new Set<string>();
+      const taskEndTimes = new Map<string, Date>();
+      
+      // Helper: Check if employee is available at a given time
+      const isEmployeeAvailable = (employeeId: string, startTime: Date, endTime: Date): boolean => {
+        const dateStr = format(startTime, 'yyyy-MM-dd');
+        const empSchedule = employeeSchedules.get(employeeId)?.get(dateStr) || [];
+        
+        return !empSchedule.some(slot => 
+          (startTime >= slot.start && startTime < slot.end) ||
+          (endTime > slot.start && endTime <= slot.end) ||
+          (startTime <= slot.start && endTime >= slot.end)
+        );
+      };
+      
+      // Helper: Add schedule slot for employee
+      const addEmployeeSchedule = (employeeId: string, startTime: Date, endTime: Date, workstationId: string, taskId: string) => {
+        const dateStr = format(startTime, 'yyyy-MM-dd');
+        const empSchedule = employeeSchedules.get(employeeId);
+        if (!empSchedule) return;
+        
+        if (!empSchedule.has(dateStr)) {
+          empSchedule.set(dateStr, []);
+        }
+        
+        empSchedule.get(dateStr)!.push({ start: startTime, end: endTime, workstationId, taskId });
+      };
+      
+      // Helper: Get task priority score
+      const getTaskPriorityScore = (task: Task): number => {
+        const project = projectMap.get(task.phases?.projects?.id || '');
+        if (!project) return -2000;
+        
+        // Critical: Don't schedule if project hasn't started
+        if (project.start_date > today) return -1000;
+        
+        let score = 0;
+        const daysUntilInstallation = differenceInMinutes(new Date(project.installation_date), new Date()) / (24 * 60);
+        score += Math.max(0, 100 - daysUntilInstallation);
+        
+        if (project.status === 'in_progress') score += 50;
+        else if (project.status === 'planned') score += 30;
+        else if (project.status === 'on_hold') score -= 20;
+        
+        if (task.priority === 'high') score += 30;
+        else if (task.priority === 'medium') score += 15;
+        else if (task.priority === 'low') score += 5;
+        
+        const daysUntilDue = differenceInMinutes(new Date(task.due_date), new Date()) / (24 * 60);
+        score += Math.max(0, 50 - daysUntilDue);
+        
+        return score;
+      };
+      
+      // Sort tasks by priority, filtering out tasks from projects that haven't started
+      const sortedTasks = [...tasks]
+        .filter(t => {
+          const project = projectMap.get(t.phases?.projects?.id || '');
+          return project && project.start_date <= today && (t.status === 'TODO' || t.status === 'HOLD');
+        })
+        .sort((a, b) => {
+          const scoreA = getTaskPriorityScore(a);
+          const scoreB = getTaskPriorityScore(b);
+          if (scoreA !== scoreB) return scoreB - scoreA;
+          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+        });
+      
+      // Schedule tasks day by day
+      for (let dayOffset = 0; dayOffset < daysToSchedule; dayOffset++) {
+        const currentDate = addDays(timelineStart, dayOffset);
+        
+        if (!isWorkingDay(currentDate)) continue;
+        
+        const workHours = getWorkHours(currentDate);
+        if (!workHours) continue;
+        
+        const dateStr = format(currentDate, 'yyyy-MM-dd');
+        
+        // For each task, try to assign to best available employee
+        for (const task of sortedTasks) {
+          if (scheduledTasks.has(task.id)) continue;
+          
+          // Check dependencies for HOLD tasks
+          if (task.status === 'HOLD') {
+            const dependencyEnd = getRequiredDependencyEndForTask(task, taskEndTimes);
+            if (dependencyEnd === null || dependencyEnd > currentDate) {
+              continue; // Can't schedule yet
+            }
+          }
+          
+          // Find eligible employees for this task (those assigned to task's workstations)
+          const eligibleEmployees = Array.from(allEmployees.values()).filter(emp =>
+            task.workstations?.some(taskWs => emp.workstations.includes(taskWs.id))
+          );
+          
+          if (eligibleEmployees.length === 0) continue;
+          
+          // Sort employees by:
+          // 1. Current workload on this day (prefer less loaded)
+          // 2. Number of workstation switches needed
+          const employeeScores = eligibleEmployees.map(emp => {
+            const empSchedule = employeeSchedules.get(emp.id)?.get(dateStr) || [];
+            const currentWorkload = empSchedule.reduce((sum, slot) => 
+              sum + differenceInMinutes(slot.end, slot.start), 0
+            );
+            
+            // Check if employee is already at one of the task's workstations today
+            const alreadyAtWorkstation = empSchedule.some(slot =>
+              task.workstations?.some(taskWs => taskWs.id === slot.workstationId)
+            );
+            
+            const workstationSwitchPenalty = alreadyAtWorkstation ? 0 : 50;
+            
+            return {
+              employee: emp,
+              score: -currentWorkload - workstationSwitchPenalty
+            };
+          }).sort((a, b) => b.score - a.score);
+          
+          // Try to assign to best employee
+          let taskScheduled = false;
+          for (const { employee } of employeeScores) {
+            // Find available time slot for this employee
+            const empSchedule = employeeSchedules.get(employee.id)?.get(dateStr) || [];
+            
+            // Start from beginning of work day or after last task
+            let candidateStart = workHours.start;
+            
+            // Sort existing slots by start time
+            const sortedSlots = [...empSchedule].sort((a, b) => a.start.getTime() - b.start.getTime());
+            
+            // Find a gap that fits the task
+            for (let i = 0; i <= sortedSlots.length; i++) {
+              const slotEnd = i < sortedSlots.length ? sortedSlots[i].start : workHours.end;
+              const availableMinutes = differenceInMinutes(slotEnd, candidateStart);
+              
+              if (availableMinutes >= task.duration) {
+                // Found a slot!
+                const taskSlots = getTaskSlots(candidateStart, task.duration);
+                
+                if (taskSlots.length > 0) {
+                  // Choose workstation (prefer one employee is already at today)
+                  let chosenWorkstation = task.workstations![0].id;
+                  const currentWorkstations = new Set(empSchedule.map(slot => slot.workstationId));
+                  for (const ws of task.workstations || []) {
+                    if (currentWorkstations.has(ws.id)) {
+                      chosenWorkstation = ws.id;
+                      break;
+                    }
+                  }
+                  
+                  // Create schedule entries for each slot
+                  taskSlots.forEach(slot => {
+                    schedulesToCreate.push({
+                      employee_id: employee.id,
+                      task_id: task.id,
+                      title: task.title,
+                      description: task.description,
+                      start_time: slot.start.toISOString(),
+                      end_time: slot.end.toISOString(),
+                      is_auto_generated: true,
+                    });
+                    
+                    addEmployeeSchedule(employee.id, slot.start, slot.end, chosenWorkstation, task.id);
+                  });
+                  
+                  const lastSlot = taskSlots[taskSlots.length - 1];
+                  taskEndTimes.set(task.id, lastSlot.end);
+                  scheduledTasks.add(task.id);
+                  taskScheduled = true;
+                  break;
+                }
+              }
+              
+              if (i < sortedSlots.length) {
+                candidateStart = sortedSlots[i].end;
+              }
+            }
+            
+            if (taskScheduled) break;
+          }
+        }
+      }
+      
+      // Delete existing auto-generated schedules
+      const { error: deleteError } = await supabase
+        .from('schedules')
+        .delete()
+        .eq('is_auto_generated', true);
+      
+      if (deleteError) throw deleteError;
+      
+      // Insert new schedules in batches
+      const batchSize = 100;
+      for (let i = 0; i < schedulesToCreate.length; i += batchSize) {
+        const batch = schedulesToCreate.slice(i, i + batchSize);
+        const { error: insertError } = await supabase
+          .from('schedules')
+          .insert(batch);
+        
+        if (insertError) throw insertError;
+      }
+      
+      toast.success(`Planning gegenereerd: ${scheduledTasks.size} taken toegewezen aan werknemers voor ${daysToSchedule} dagen`);
+      
+    } catch (error) {
+      console.error('Generate planning error:', error);
+      toast.error('Fout bij het genereren van planning');
+    } finally {
+      setGeneratingPlanning(false);
+    }
   };
 
   // Smart auto-assign employees with project prioritization and optimal worker allocation
@@ -1009,6 +1264,25 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
           <div className="flex gap-2 items-center flex-wrap">
             <Button onClick={handleAutoAssign} variant="outline" size="sm">
               🎯 Slim Auto-toewijzen
+            </Button>
+            <Button 
+              onClick={handleGeneratePlanning} 
+              variant="default"
+              size="sm"
+              disabled={generatingPlanning}
+              className="bg-gradient-to-r from-primary to-primary/80"
+            >
+              {generatingPlanning ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Genereren...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-4 h-4 mr-2" />
+                  Genereer Planning
+                </>
+              )}
             </Button>
             <Button 
               onClick={() => setShowCriticalPath(!showCriticalPath)} 
