@@ -366,7 +366,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       
       // Generate planning for next 60 days
       const daysToSchedule = 60;
-      const schedulesToCreate: any[] = [];
+      const newAssignments: DailyEmployeeAssignment[] = [];
       
       // Track employee schedules: employeeId -> date -> { start: Date, end: Date, workstationId: string }[]
       const employeeSchedules = new Map<string, Map<string, Array<{ start: Date; end: Date; workstationId: string; taskId: string }>>>();
@@ -380,30 +380,8 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       const scheduledTasks = new Set<string>();
       const taskEndTimes = new Map<string, Date>();
       
-      // Helper: Check if employee is available at a given time
-      const isEmployeeAvailable = (employeeId: string, startTime: Date, endTime: Date): boolean => {
-        const dateStr = format(startTime, 'yyyy-MM-dd');
-        const empSchedule = employeeSchedules.get(employeeId)?.get(dateStr) || [];
-        
-        return !empSchedule.some(slot => 
-          (startTime >= slot.start && startTime < slot.end) ||
-          (endTime > slot.start && endTime <= slot.end) ||
-          (startTime <= slot.start && endTime >= slot.end)
-        );
-      };
-      
-      // Helper: Add schedule slot for employee
-      const addEmployeeSchedule = (employeeId: string, startTime: Date, endTime: Date, workstationId: string, taskId: string) => {
-        const dateStr = format(startTime, 'yyyy-MM-dd');
-        const empSchedule = employeeSchedules.get(employeeId);
-        if (!empSchedule) return;
-        
-        if (!empSchedule.has(dateStr)) {
-          empSchedule.set(dateStr, []);
-        }
-        
-        empSchedule.get(dateStr)!.push({ start: startTime, end: endTime, workstationId, taskId });
-      };
+      // Track workstation worker assignments per day
+      const workstationDailyWorkers = new Map<string, Map<string, Set<string>>>(); // workstationId -> date -> Set<employeeId>
       
       // Helper: Get task priority score
       const getTaskPriorityScore = (task: Task): number => {
@@ -488,7 +466,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
               task.workstations?.some(taskWs => taskWs.id === slot.workstationId)
             );
             
-            const workstationSwitchPenalty = alreadyAtWorkstation ? 0 : 50;
+            const workstationSwitchPenalty = alreadyAtWorkstation ? 0 : 100;
             
             return {
               employee: emp,
@@ -501,6 +479,17 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
           for (const { employee } of employeeScores) {
             // Find available time slot for this employee
             const empSchedule = employeeSchedules.get(employee.id)?.get(dateStr) || [];
+            
+            // Check if employee has any availability left
+            const workHours = getWorkHours(currentDate);
+            if (!workHours) continue;
+            
+            const totalAvailableMinutes = differenceInMinutes(workHours.end, workHours.start);
+            const usedMinutes = empSchedule.reduce((sum, slot) => 
+              sum + differenceInMinutes(slot.end, slot.start), 0
+            );
+            
+            if (usedMinutes >= totalAvailableMinutes) continue; // Employee is fully booked
             
             // Start from beginning of work day or after last task
             let candidateStart = workHours.start;
@@ -528,19 +517,41 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                     }
                   }
                   
-                  // Create schedule entries for each slot
-                  taskSlots.forEach(slot => {
-                    schedulesToCreate.push({
-                      employee_id: employee.id,
-                      task_id: task.id,
-                      title: task.title,
-                      description: task.description,
-                      start_time: slot.start.toISOString(),
-                      end_time: slot.end.toISOString(),
-                      is_auto_generated: true,
-                    });
+                  // Track employee assignment to workstation for this day
+                  if (!workstationDailyWorkers.has(chosenWorkstation)) {
+                    workstationDailyWorkers.set(chosenWorkstation, new Map());
+                  }
+                  const wsDateMap = workstationDailyWorkers.get(chosenWorkstation)!;
+                  if (!wsDateMap.has(dateStr)) {
+                    wsDateMap.set(dateStr, new Set());
+                  }
+                  const employeesAtWs = wsDateMap.get(dateStr)!;
+                  
+                  // Only add assignment if this is the first time we see this employee at this workstation today
+                  if (!employeesAtWs.has(employee.id)) {
+                    employeesAtWs.add(employee.id);
+                    const workerIndex = Array.from(employeesAtWs).indexOf(employee.id);
                     
-                    addEmployeeSchedule(employee.id, slot.start, slot.end, chosenWorkstation, task.id);
+                    newAssignments.push({
+                      date: dateStr,
+                      workstationId: chosenWorkstation,
+                      workerIndex,
+                      employeeId: employee.id,
+                      employeeName: employee.name,
+                    });
+                  }
+                  
+                  // Add to employee schedule
+                  taskSlots.forEach(slot => {
+                    if (!employeeSchedules.get(employee.id)!.has(format(slot.start, 'yyyy-MM-dd'))) {
+                      employeeSchedules.get(employee.id)!.set(format(slot.start, 'yyyy-MM-dd'), []);
+                    }
+                    employeeSchedules.get(employee.id)!.get(format(slot.start, 'yyyy-MM-dd'))!.push({
+                      start: slot.start,
+                      end: slot.end,
+                      workstationId: chosenWorkstation,
+                      taskId: task.id
+                    });
                   });
                   
                   const lastSlot = taskSlots[taskSlots.length - 1];
@@ -561,26 +572,10 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         }
       }
       
-      // Delete existing auto-generated schedules
-      const { error: deleteError } = await supabase
-        .from('schedules')
-        .delete()
-        .eq('is_auto_generated', true);
+      // Update daily assignments to show on gantt chart
+      setDailyAssignments(newAssignments);
       
-      if (deleteError) throw deleteError;
-      
-      // Insert new schedules in batches
-      const batchSize = 100;
-      for (let i = 0; i < schedulesToCreate.length; i += batchSize) {
-        const batch = schedulesToCreate.slice(i, i + batchSize);
-        const { error: insertError } = await supabase
-          .from('schedules')
-          .insert(batch);
-        
-        if (insertError) throw insertError;
-      }
-      
-      toast.success(`Planning gegenereerd: ${scheduledTasks.size} taken toegewezen aan werknemers voor ${daysToSchedule} dagen`);
+      toast.success(`Planning gegenereerd: ${scheduledTasks.size} taken toegewezen voor ${daysToSchedule} dagen. Bekijk de Gantt chart voor details.`);
       
     } catch (error) {
       console.error('Generate planning error:', error);
@@ -875,6 +870,13 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     getTasks: () => tasks,
     getWorkstations: () => workstations,
   }));
+
+  // Run auto-assign only once on initial load
+  useEffect(() => {
+    if (workstations.length > 0 && tasks.length > 0 && dailyAssignments.length === 0) {
+      // Don't auto-assign, let user click the button
+    }
+  }, [workstations, tasks]);
 
   // memoize full schedule for all workstations with multi-worker support and dependency resolution
   const schedule = useMemo(() => {
