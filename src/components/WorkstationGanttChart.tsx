@@ -960,12 +960,12 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       return links.some(emp => emp.id === employeeId);
     };
 
-    // Helper: Find best worker for task in workstation - ONLY if employee is assigned
+    // Helper: Find best worker for task in workstation
     const findBestWorkerForTask = (
       workstationId: string, 
       task: Task, 
       minStartTime: Date
-    ): { workerIndex: number; startTime: Date; employeeId: string } | null => {
+    ): { workerIndex: number; startTime: Date; employeeId?: string } | null => {
       const cursors = workstationCursors.get(workstationId);
       if (!cursors) return null;
 
@@ -973,12 +973,11 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       let bestStartTime: Date | null = null;
       let bestEmployeeId: string | null = null;
 
-      // Only consider workers with assigned employees on the task date
+      // PRIORITY 1: Look for workers with assigned employees on the task date
       for (let i = 0; i < cursors.length; i++) {
         const workerStartTime = cursors[i] > minStartTime ? cursors[i] : minStartTime;
         const assignment = getWorkerAssignment(workerStartTime, workstationId, i);
         
-        // CRITICAL: Only schedule if there's an assigned employee for this workstation
         if (assignment && isEmployeeAssignedToWorkstation(assignment.employeeId, workstationId)) {
           if (!bestStartTime || workerStartTime < bestStartTime) {
             bestStartTime = workerStartTime;
@@ -988,9 +987,25 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         }
       }
 
-      // Do NOT use fallback - only schedule tasks where employees are assigned
-      return bestWorkerIndex >= 0 && bestStartTime && bestEmployeeId 
-        ? { workerIndex: bestWorkerIndex, startTime: bestStartTime, employeeId: bestEmployeeId } 
+      // PRIORITY 2: If no assigned employees found, use any available worker slot
+      // This ensures all tasks are scheduled even without explicit employee assignments
+      if (bestWorkerIndex === -1) {
+        for (let i = 0; i < cursors.length; i++) {
+          const workerStartTime = cursors[i] > minStartTime ? cursors[i] : minStartTime;
+          if (!bestStartTime || workerStartTime < bestStartTime) {
+            bestStartTime = workerStartTime;
+            bestWorkerIndex = i;
+            // Try to find any linked employee for this workstation
+            const linkedEmployees = workstationEmployeeLinks.get(workstationId) || [];
+            if (linkedEmployees.length > 0) {
+              bestEmployeeId = linkedEmployees[i % linkedEmployees.length].id;
+            }
+          }
+        }
+      }
+
+      return bestWorkerIndex >= 0 && bestStartTime 
+        ? { workerIndex: bestWorkerIndex, startTime: bestStartTime, employeeId: bestEmployeeId || undefined } 
         : null;
     };
 
