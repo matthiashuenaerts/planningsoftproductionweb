@@ -960,44 +960,38 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       return links.some(emp => emp.id === employeeId);
     };
 
-    // Helper: Find best worker for task in workstation
+    // Helper: Find best worker for task in workstation - ONLY if employee is assigned
     const findBestWorkerForTask = (
       workstationId: string, 
       task: Task, 
       minStartTime: Date
-    ): { workerIndex: number; startTime: Date } | null => {
+    ): { workerIndex: number; startTime: Date; employeeId: string } | null => {
       const cursors = workstationCursors.get(workstationId);
-      const assignments = workerAssignments.get(workstationId);
-      if (!cursors || !assignments) return null;
+      if (!cursors) return null;
 
       let bestWorkerIndex = -1;
       let bestStartTime: Date | null = null;
+      let bestEmployeeId: string | null = null;
 
+      // Only consider workers with assigned employees on the task date
       for (let i = 0; i < cursors.length; i++) {
         const workerStartTime = cursors[i] > minStartTime ? cursors[i] : minStartTime;
         const assignment = getWorkerAssignment(workerStartTime, workstationId, i);
         
-        // Check if this worker is assigned to this workstation
+        // CRITICAL: Only schedule if there's an assigned employee for this workstation
         if (assignment && isEmployeeAssignedToWorkstation(assignment.employeeId, workstationId)) {
           if (!bestStartTime || workerStartTime < bestStartTime) {
             bestStartTime = workerStartTime;
             bestWorkerIndex = i;
+            bestEmployeeId = assignment.employeeId;
           }
         }
       }
 
-      if (bestWorkerIndex === -1) {
-        // Fallback: find earliest available worker even without assignment
-        for (let i = 0; i < cursors.length; i++) {
-          const workerStartTime = cursors[i] > minStartTime ? cursors[i] : minStartTime;
-          if (!bestStartTime || workerStartTime < bestStartTime) {
-            bestStartTime = workerStartTime;
-            bestWorkerIndex = i;
-          }
-        }
-      }
-
-      return bestWorkerIndex >= 0 && bestStartTime ? { workerIndex: bestWorkerIndex, startTime: bestStartTime } : null;
+      // Do NOT use fallback - only schedule tasks where employees are assigned
+      return bestWorkerIndex >= 0 && bestStartTime && bestEmployeeId 
+        ? { workerIndex: bestWorkerIndex, startTime: bestStartTime, employeeId: bestEmployeeId } 
+        : null;
     };
 
     // Initialize workstation structures
