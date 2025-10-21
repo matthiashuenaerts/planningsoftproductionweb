@@ -368,7 +368,10 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       const daysToSchedule = 60;
       const newAssignments: DailyEmployeeAssignment[] = [];
       
-      // Track employee schedules: employeeId -> date -> { start: Date, end: Date, workstationId: string }[]
+      // Track per-day employee -> workstation assignment to prevent double-booking across workstations
+      const assignedEmployeeWorkstationByDate = new Map<string, Map<string, string>>();
+      
+      // Track employee schedules: employeeId -> date -> slots
       const employeeSchedules = new Map<string, Map<string, Array<{ start: Date; end: Date; workstationId: string; taskId: string }>>>();
       
       // Initialize employee schedules
@@ -432,6 +435,11 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         if (!workHours) continue;
         
         const dateStr = format(currentDate, 'yyyy-MM-dd');
+        // Ensure per-day assignment map exists
+        if (!assignedEmployeeWorkstationByDate.has(dateStr)) {
+          assignedEmployeeWorkstationByDate.set(dateStr, new Map());
+        }
+        const assignedToday = assignedEmployeeWorkstationByDate.get(dateStr)!;
         
         // For each task, try to assign to best available employee
         for (const task of sortedTasks) {
@@ -446,9 +454,13 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
           }
           
           // Find eligible employees for this task (those assigned to task's workstations)
-          const eligibleEmployees = Array.from(allEmployees.values()).filter(emp =>
-            task.workstations?.some(taskWs => emp.workstations.includes(taskWs.id))
-          );
+          const eligibleEmployees = Array.from(allEmployees.values()).filter(emp => {
+            const isLinked = task.workstations?.some(taskWs => emp.workstations.includes(taskWs.id));
+            if (!isLinked) return false;
+            const alreadyAssignedWs = assignedToday.get(emp.id);
+            // Allow if not yet assigned today or already assigned to one of the task's workstations
+            return !alreadyAssignedWs || task.workstations?.some(taskWs => taskWs.id === alreadyAssignedWs);
+          });
           
           if (eligibleEmployees.length === 0) continue;
           
@@ -517,6 +529,12 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                     }
                   }
                   
+                  // Prevent double-booking across workstations on the same day
+                  const prevWs = assignedToday.get(employee.id);
+                  if (prevWs && prevWs !== chosenWorkstation) {
+                    continue; // employee already assigned to another workstation today
+                  }
+                  
                   // Track employee assignment to workstation for this day
                   if (!workstationDailyWorkers.has(chosenWorkstation)) {
                     workstationDailyWorkers.set(chosenWorkstation, new Map());
@@ -539,6 +557,10 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                       employeeId: employee.id,
                       employeeName: employee.name,
                     });
+                    // Record per-day assignment to this workstation
+                    if (!assignedToday.get(employee.id)) {
+                      assignedToday.set(employee.id, chosenWorkstation);
+                    }
                   }
                   
                   // Add to employee schedule
@@ -1192,11 +1214,9 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   }, [tasks, workstations, selectedDate, workingHoursMap, holidaySet, limitTaskMap, searchTerm, dailyAssignments, workstationEmployeeLinks]);
 
   // Auto-assign on mount and when dependencies change
-  useEffect(() => {
-    if (workstations.length > 0 && workstationEmployeeLinks.size > 0 && schedule.size > 0) {
-      handleAutoAssign();
-    }
-  }, [workstations, workstationEmployeeLinks, schedule]);
+  // Auto-assign disabled to avoid auto-filling the chart; use the 'Genereer Planning' button instead
+  // useEffect(() => {
+  // }, []);
 
   const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
   const timeline = Array.from({ length: scale.totalUnits }, (_, i) => addMinutes(timelineStart, i * scale.unitInMinutes));
