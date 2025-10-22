@@ -282,7 +282,7 @@ const WorkstationControl: React.FC = () => {
           <Button 
             variant="outline" 
             onClick={() => navigate(createLocalizedPath('/control-panel'))}
-            className="text-white border-slate-600 hover:bg-slate-800"
+            className="text-white border-slate-600 bg-transparent hover:bg-white hover:text-slate-900"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Overview
