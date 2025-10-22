@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { workstationService } from '@/services/workstationService';
 import { floorplanService, WorkstationStatus } from '@/services/floorplanService';
 import { workstationErrorService } from '@/services/workstationErrorService';
-import { ArrowRight, Activity, AlertCircle, CheckCircle2, Clock, Users, AlertTriangle, Truck, Calendar } from 'lucide-react';
+import { ArrowRight, Activity, AlertCircle, CheckCircle2, Clock, Users, AlertTriangle, Truck, Calendar, Zap } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, isWeekend, differenceInDays, startOfDay } from 'date-fns';
 import { holidayService } from '@/services/holidayService';
+import { rushOrderService } from '@/services/rushOrderService';
 
 interface LoadingAssignment {
   project: {
@@ -31,6 +32,7 @@ const ControlPanel: React.FC = () => {
   const [workstationErrors, setWorkstationErrors] = useState<Record<string, number>>({});
   const [workstationBufferTimes, setWorkstationBufferTimes] = useState<Record<string, number>>({});
   const [activeEmployees, setActiveEmployees] = useState<any[]>([]);
+  const [rushOrdersCount, setRushOrdersCount] = useState(0);
   const [truckLoadingData, setTruckLoadingData] = useState<{
     todayLoadings: LoadingAssignment[];
     upcomingLoadings: LoadingAssignment[];
@@ -50,11 +52,13 @@ const ControlPanel: React.FC = () => {
     loadStatuses();
     loadTruckLoadingData();
     loadActiveEmployees();
+    loadRushOrders();
     
     const statusesChannel = floorplanService.subscribeToTimeRegistrations(setWorkstationStatuses);
     const statusInterval = setInterval(() => {
       loadStatuses();
       loadActiveEmployees();
+      loadRushOrders();
     }, 30000);
     const loadingInterval = setInterval(loadTruckLoadingData, 60000);
 
@@ -64,6 +68,19 @@ const ControlPanel: React.FC = () => {
       clearInterval(loadingInterval);
     };
   }, []);
+
+  const loadRushOrders = async () => {
+    try {
+      const { data } = await supabase
+        .from('rush_orders')
+        .select('id, status')
+        .in('status', ['pending', 'in_progress']);
+      
+      setRushOrdersCount(data?.length || 0);
+    } catch (error) {
+      console.error('Error loading rush orders:', error);
+    }
+  };
 
   const loadActiveEmployees = async () => {
     try {
@@ -249,7 +266,7 @@ const ControlPanel: React.FC = () => {
   const totalUsers = workstationStatuses.reduce((sum, s) => sum + s.active_users_count, 0);
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className={`h-screen overflow-hidden flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 ${totalErrors > 0 || rushOrdersCount > 0 ? 'ring-4 ring-red-500 ring-inset' : ''}`}>
       {/* Header */}
       <div className="bg-slate-900/50 border-b border-slate-700 px-8 py-4 flex-shrink-0">
         <div className="flex items-center justify-between">
@@ -269,7 +286,7 @@ const ControlPanel: React.FC = () => {
 
       {/* Stats Overview */}
       <div className="flex-1 overflow-y-auto px-8 py-4">
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-5 gap-4 mb-6">
           <Card className="bg-slate-800/50 border-slate-700 p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-green-500/10">
@@ -314,6 +331,21 @@ const ControlPanel: React.FC = () => {
               <div>
                 <p className="text-slate-400 text-xs">Errors</p>
                 <p className="text-2xl font-bold text-white">{totalErrors}</p>
+              </div>
+            </div>
+          </Card>
+
+          <Card 
+            className="bg-slate-800/50 border-slate-700 p-4 cursor-pointer hover:bg-slate-800/70 transition-colors"
+            onClick={() => navigate(createLocalizedPath('/rush-orders'))}
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-orange-500/10">
+                <Zap className="w-6 h-6 text-orange-500" />
+              </div>
+              <div>
+                <p className="text-slate-400 text-xs">Rush Orders</p>
+                <p className="text-2xl font-bold text-white">{rushOrdersCount}</p>
               </div>
             </div>
           </Card>
