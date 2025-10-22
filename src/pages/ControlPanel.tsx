@@ -30,6 +30,7 @@ const ControlPanel: React.FC = () => {
   const [workstationStatuses, setWorkstationStatuses] = useState<WorkstationStatus[]>([]);
   const [workstationErrors, setWorkstationErrors] = useState<Record<string, number>>({});
   const [workstationBufferTimes, setWorkstationBufferTimes] = useState<Record<string, number>>({});
+  const [activeEmployees, setActiveEmployees] = useState<any[]>([]);
   const [truckLoadingData, setTruckLoadingData] = useState<{
     todayLoadings: LoadingAssignment[];
     upcomingLoadings: LoadingAssignment[];
@@ -48,9 +49,13 @@ const ControlPanel: React.FC = () => {
   useEffect(() => {
     loadStatuses();
     loadTruckLoadingData();
+    loadActiveEmployees();
     
     const statusesChannel = floorplanService.subscribeToTimeRegistrations(setWorkstationStatuses);
-    const statusInterval = setInterval(loadStatuses, 30000);
+    const statusInterval = setInterval(() => {
+      loadStatuses();
+      loadActiveEmployees();
+    }, 30000);
     const loadingInterval = setInterval(loadTruckLoadingData, 60000);
 
     return () => {
@@ -59,6 +64,29 @@ const ControlPanel: React.FC = () => {
       clearInterval(loadingInterval);
     };
   }, []);
+
+  const loadActiveEmployees = async () => {
+    try {
+      const { data } = await supabase
+        .from('time_registrations')
+        .select(`
+          employee_id,
+          task_id,
+          employees!inner(name),
+          tasks(
+            id,
+            title,
+            task_workstation_links(workstation_id, workstations(id, name))
+          )
+        `)
+        .eq('is_active', true)
+        .order('start_time', { ascending: false });
+      
+      setActiveEmployees(data || []);
+    } catch (error) {
+      console.error('Error loading active employees:', error);
+    }
+  };
 
   const loadStatuses = async () => {
     const statuses = await floorplanService.getWorkstationStatuses();
@@ -291,9 +319,11 @@ const ControlPanel: React.FC = () => {
           </Card>
         </div>
 
-        {/* Production Flow */}
-        <Card className="bg-slate-800/50 border-slate-700 p-6">
-          <h2 className="text-xl font-bold text-white mb-4">Production Flow</h2>
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-[1fr_300px] gap-4">
+          {/* Production Flow */}
+          <Card className="bg-slate-800/50 border-slate-700 p-6">
+            <h2 className="text-xl font-bold text-white mb-4">Production Flow</h2>
           
           <div className="flex items-center justify-center gap-4 flex-wrap">
             {workstations.map((workstation, index) => {
@@ -427,6 +457,49 @@ const ControlPanel: React.FC = () => {
             </div>
           </div>
         </Card>
+
+          {/* Active Employees */}
+          <Card className="bg-slate-800/50 border-slate-700 p-4">
+            <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+              <Users className="w-5 h-5 text-blue-400" />
+              Active Workers
+            </h2>
+            
+            <div className="space-y-2 max-h-[calc(100vh-320px)] overflow-y-auto pr-2">
+              {activeEmployees.length === 0 ? (
+                <p className="text-slate-400 text-sm text-center py-4">No active workers</p>
+              ) : (
+                activeEmployees.map((emp: any) => (
+                  <div 
+                    key={emp.employee_id} 
+                    className="bg-slate-700/30 border border-slate-600 rounded-lg p-3 hover:bg-slate-700/50 transition-colors"
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse mt-1.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium text-sm truncate">
+                          {emp.employees?.name || 'Unknown'}
+                        </p>
+                        {emp.tasks && (
+                          <>
+                            <p className="text-slate-300 text-xs mt-1 line-clamp-2">
+                              {emp.tasks.title}
+                            </p>
+                            {emp.tasks.task_workstation_links?.[0]?.workstations && (
+                              <p className="text-slate-400 text-xs mt-1">
+                                {emp.tasks.task_workstation_links[0].workstations.name}
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );
