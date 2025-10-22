@@ -277,7 +277,7 @@ const ControlPanel: React.FC = () => {
           <Button 
             variant="outline" 
             onClick={() => navigate(createLocalizedPath('/'))}
-            className="text-white border-slate-600 hover:bg-slate-800"
+            className="text-white border-slate-600 bg-transparent hover:bg-white hover:text-slate-900"
           >
             Back to Dashboard
           </Button>
