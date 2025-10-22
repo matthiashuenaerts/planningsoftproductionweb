@@ -66,34 +66,35 @@ const WorkstationControl: React.FC = () => {
       const status = statuses.find(s => s.workstation_id === workstationId);
       setWorkstationStatus(status || null);
 
-      // Get time registrations for today
+      // Get time registrations for today - filter by workstation later
       const today = new Date().toISOString().split('T')[0];
       
-      // @ts-expect-error - Supabase type inference issue
-      const timeRegistrationsQuery = supabase
+      const { data: todayTimeRegsRaw } = await supabase
         .from('time_registrations')
-        .select('*, employees(name)')
-        .eq('workstation_id', workstationId)
+        .select('*, employees(name), tasks(task_workstation_links(workstation_id))')
         .gte('start_time', `${today}T00:00:00`)
         .order('start_time', { ascending: false });
       
-      const timeResult = await timeRegistrationsQuery;
-      if (timeResult.data) setTimeRegistrations(timeResult.data);
+      const todayRegs = (todayTimeRegsRaw || []).filter((reg: any) => 
+        reg.tasks?.task_workstation_links?.some((link: any) => link.workstation_id === workstationId)
+      );
+      setTimeRegistrations(todayRegs);
 
       // Get time registrations for this week
       const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
       const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
       
-      const weekTimeRegistrationsQuery = supabase
+      const { data: weekTimeRegsRaw } = await supabase
         .from('time_registrations')
-        .select('*, employees(name)')
-        .eq('workstation_id', workstationId)
+        .select('*, employees(name), tasks(task_workstation_links(workstation_id))')
         .gte('start_time', weekStart.toISOString())
         .lte('start_time', weekEnd.toISOString())
         .order('start_time', { ascending: true });
       
-      const weekResult = await weekTimeRegistrationsQuery;
-      if (weekResult.data) setWeekTimeRegistrations(weekResult.data);
+      const weekRegs = (weekTimeRegsRaw || []).filter((reg: any) => 
+        reg.tasks?.task_workstation_links?.some((link: any) => link.workstation_id === workstationId)
+      );
+      setWeekTimeRegistrations(weekRegs);
 
       // Get broken parts
       const brokenPartsQuery = supabase
@@ -149,16 +150,21 @@ const WorkstationControl: React.FC = () => {
                 title,
                 description,
                 status,
+                task_workstation_links(workstation_id),
                 phases(name, projects(id, name))
               )
             `)
-            .eq('workstation_id', workstationId)
             .gte('start_time', `${today}T00:00:00`)
             .is('end_time', null)
             .order('start_time', { ascending: false });
           
-          if (userTasks && userTasks.length > 0) {
-            userTasksMap.set(userName, userTasks);
+          // Filter by workstation
+          const filteredTasks = (userTasks || []).filter((reg: any) => 
+            reg.tasks?.task_workstation_links?.some((link: any) => link.workstation_id === workstationId)
+          );
+          
+          if (filteredTasks && filteredTasks.length > 0) {
+            userTasksMap.set(userName, filteredTasks);
           }
         }
         
