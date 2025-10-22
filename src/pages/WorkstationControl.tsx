@@ -15,9 +15,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Activity, AlertTriangle, CheckCircle2, Clock, Users, Package, TrendingUp, Calendar } from 'lucide-react';
+import { ArrowLeft, Activity, AlertTriangle, CheckCircle2, Clock, Users, Package, TrendingUp, Calendar, Zap } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, startOfDay, parseISO, addDays } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, ComposedChart } from 'recharts';
+import { rushOrderService } from '@/services/rushOrderService';
 
 const WorkstationControl: React.FC = () => {
   const { workstationId } = useParams<{ workstationId: string }>();
@@ -36,6 +37,7 @@ const WorkstationControl: React.FC = () => {
   const [newErrorType, setNewErrorType] = useState('general');
   const [newErrorNotes, setNewErrorNotes] = useState('');
   const [showAddError, setShowAddError] = useState(false);
+  const [rushOrders, setRushOrders] = useState<any[]>([]);
 
   const { data: workstation } = useQuery({
     queryKey: ['workstation', workstationId],
@@ -167,6 +169,10 @@ const WorkstationControl: React.FC = () => {
       const errors = await workstationErrorService.getActiveErrors(workstationId);
       setActiveErrors(errors);
 
+      // Get rush orders for this workstation
+      const rushOrdersData = await rushOrderService.getRushOrdersForWorkstation(workstationId);
+      setRushOrders(rushOrdersData || []);
+
     } catch (error) {
       console.error('Error loading workstation data:', error);
     }
@@ -292,10 +298,22 @@ const WorkstationControl: React.FC = () => {
           </div>
         </div>
         
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-1">{workstation.name}</h1>
-          {workstation.description && (
-            <p className="text-slate-400 text-sm">{workstation.description}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-1">{workstation.name}</h1>
+            {workstation.description && (
+              <p className="text-slate-400 text-sm">{workstation.description}</p>
+            )}
+          </div>
+          
+          {rushOrders.length > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-red-500/20 border border-red-500/50 rounded-lg">
+              <Zap className="w-5 h-5 text-red-400 animate-pulse" />
+              <div>
+                <p className="text-red-400 font-bold text-sm">RUSH ORDERS</p>
+                <p className="text-red-300 text-xs">{rushOrders.length} active {rushOrders.length === 1 ? 'order' : 'orders'}</p>
+              </div>
+            </div>
           )}
         </div>
       </div>
