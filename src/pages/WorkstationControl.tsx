@@ -269,7 +269,7 @@ const WorkstationControl: React.FC = () => {
   }
 
   return (
-    <div className={`h-screen overflow-hidden flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 ${activeErrors.length > 0 ? 'ring-4 ring-red-500 ring-inset' : ''}`}>
+    <div className={`h-screen overflow-hidden flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 ${activeErrors.length > 0 || rushOrders.length > 0 ? 'ring-4 ring-red-500 ring-inset' : ''}`}>
       {/* Header */}
       <div className="bg-slate-900/50 border-b border-slate-700 px-8 py-4 flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
