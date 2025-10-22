@@ -378,9 +378,9 @@ const WorkstationControl: React.FC = () => {
         </div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-3 gap-4">
-          {/* Open Tasks Timeline */}
-          <Card className="bg-slate-800/50 border-slate-700">
+        <div className="grid grid-cols-3 gap-4 auto-rows-min">
+          {/* Open Tasks Timeline - Spans 2 rows */}
+          <Card className="bg-slate-800/50 border-slate-700 row-span-2">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
                 <Package className="w-5 h-5" />
@@ -388,7 +388,7 @@ const WorkstationControl: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[250px]">
+              <ScrollArea className="h-[570px]">
                 <div className="space-y-2">
                   {todayTasks.length === 0 ? (
                     <p className="text-slate-400 text-sm">No tasks scheduled for today</p>
@@ -630,7 +630,7 @@ const WorkstationControl: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Broken Parts */}
+          {/* Broken Parts - Moved to column 2 */}
           <Card className="bg-slate-800/50 border-slate-700">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
@@ -639,7 +639,7 @@ const WorkstationControl: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[300px]">
+              <ScrollArea className="h-[250px]">
                 <div className="space-y-3">
                   {brokenParts.length === 0 ? (
                     <p className="text-slate-400 text-sm">No broken parts reported</p>
@@ -678,7 +678,7 @@ const WorkstationControl: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Active Users */}
+          {/* Active Users - Moved to column 3 */}
           <Card className="bg-slate-800/50 border-slate-700">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
@@ -687,7 +687,7 @@ const WorkstationControl: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[300px]">
+              <ScrollArea className="h-[250px]">
                 <div className="space-y-3">
                   {workstationStatus?.active_user_names.length === 0 || !workstationStatus ? (
                     <p className="text-slate-400 text-sm">No active users</p>
