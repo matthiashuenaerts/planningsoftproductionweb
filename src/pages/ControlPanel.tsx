@@ -492,13 +492,13 @@ const ControlPanel: React.FC = () => {
         </Card>
 
           {/* Active Employees */}
-          <Card className="bg-slate-800/50 border-slate-700 p-4">
+          <Card className="bg-slate-800/50 border-slate-700 p-4 flex flex-col h-full">
             <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-400" />
               Active Workers
             </h2>
             
-            <div className="space-y-2 max-h-[calc(100vh-320px)] overflow-y-auto pr-2">
+            <div className="space-y-2 flex-1 overflow-y-auto pr-2">
               {activeEmployees.length === 0 ? (
                 <p className="text-slate-400 text-sm text-center py-4">No active workers</p>
               ) : (
