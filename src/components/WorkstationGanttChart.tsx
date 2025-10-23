@@ -1486,7 +1486,12 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center gap-4 flex-wrap">
-          <CardTitle>Workstation Gantt Chart (Slim Gepland)</CardTitle>
+          <div>
+            <CardTitle>Workstation Gantt Chart (Slim Gepland)</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              🏠 Planning integreert automatisch met installatie agenda - werknemers in installatie worden volledig geblokkeerd
+            </p>
+          </div>
           <div className="flex gap-2 items-center flex-wrap">
             <Button onClick={handleAutoAssign} variant="outline" size="sm">
               🎯 Slim Auto-toewijzen
@@ -1662,7 +1667,23 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                           if (!isVisible) return null;
 
                           const project = task.phases?.projects;
-                          const { bg, text, border } = getTaskColor(task);
+                          
+                          // Check if this is an installation block
+                          const isInstallationBlock = task.id?.startsWith('INSTALLATION_');
+                          
+                          let bg, text, border;
+                          if (isInstallationBlock) {
+                            // Special styling for installation blocks
+                            bg = 'hsl(150, 70%, 40%)';
+                            text = 'hsl(0, 0%, 100%)';
+                            border = 'hsl(150, 70%, 30%)';
+                          } else {
+                            const colors = getTaskColor(task);
+                            bg = colors.bg;
+                            text = colors.text;
+                            border = colors.border;
+                          }
+                          
                           const left = (differenceInMinutes(start, timelineStart) / scale.unitInMinutes) * scale.unitWidth;
                           const width = (differenceInMinutes(end, start) / scale.unitInMinutes) * scale.unitWidth;
                           
@@ -1684,19 +1705,32 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                                     height: rowHeight - 16,
                                     background: bg,
                                     color: text,
-                                    border: isCritical ? `3px solid ${border}` : `1px solid ${border}`,
-                                    boxShadow: isCritical ? '0 0 8px rgba(255,0,0,0.3)' : 'none',
+                                    border: isInstallationBlock ? `2px solid ${border}` : isCritical ? `3px solid ${border}` : `1px solid ${border}`,
+                                    boxShadow: isInstallationBlock ? '0 0 8px rgba(34, 197, 94, 0.4)' : isCritical ? '0 0 8px rgba(255,0,0,0.3)' : 'none',
                                   }}
                                 >
-                                  <div className="truncate font-semibold">
-                                    {project?.name || 'Project'} – {task.title}
-                                  </div>
-                                  <div className="text-[9px] opacity-75 truncate">
-                                    {task.priority === 'high' && '🔴 '}
-                                    {task.priority === 'medium' && '🟡 '}
-                                    {task.priority === 'low' && '🟢 '}
-                                    {task.status === 'HOLD' && '🟠 HOLD '}
-                                  </div>
+                                  {isInstallationBlock ? (
+                                    <>
+                                      <div className="truncate font-semibold flex items-center gap-1">
+                                        🏠 Installatie Planning
+                                      </div>
+                                      <div className="text-[9px] opacity-90 truncate">
+                                        {project?.name || 'Project'}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="truncate font-semibold">
+                                        {project?.name || 'Project'} – {task.title}
+                                      </div>
+                                      <div className="text-[9px] opacity-75 truncate">
+                                        {task.priority === 'high' && '🔴 '}
+                                        {task.priority === 'medium' && '🟡 '}
+                                        {task.priority === 'low' && '🟢 '}
+                                        {task.status === 'HOLD' && '🟠 HOLD '}
+                                      </div>
+                                    </>
+                                  )}
                                   {assignment && (
                                     <div className="text-[10px] opacity-80 truncate mt-0.5">
                                       👤 {assignment.employeeName}
@@ -1705,28 +1739,41 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent className="max-w-xs">
-                                <div className="text-xs space-y-1">
-                                  <div className="font-bold text-sm mb-1">{project?.name || 'Project'}</div>
-                                  <div><b>Taak:</b> {task.title}</div>
-                                  <div><b>Start:</b> {format(start, 'dd MMM HH:mm')}</div>
-                                  <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
-                                  <div><b>Duur:</b> {task.duration} min</div>
-                                  <div><b>Status:</b> {task.status} {task.status === 'HOLD' && '🟠'}</div>
-                                  <div><b>Prioriteit:</b> {task.priority} {task.priority === 'high' && '🔴'}</div>
-                                  {assignment && (
-                                    <div><b>Werknemer:</b> {assignment.employeeName}</div>
-                                  )}
-                                  {project && (
-                                    <>
-                                      <div className="border-t pt-1 mt-1">
-                                        <div><b>Klant:</b> {project.client}</div>
-                                        <div><b>Project start:</b> {format(new Date(project.start_date), 'dd MMM yyyy')}</div>
-                                        <div><b>Installatie:</b> {format(new Date(project.installation_date), 'dd MMM yyyy')}</div>
-                                        <div><b>Status:</b> {project.status}</div>
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
+                                {isInstallationBlock ? (
+                                  <div className="text-xs space-y-1">
+                                    <div className="font-bold text-sm mb-1">🏠 Installatie Planning</div>
+                                    <div><b>Project:</b> {project?.name || 'Onbekend'}</div>
+                                    <div><b>Werknemer:</b> {assignment?.employeeName || 'Niet toegewezen'}</div>
+                                    <div><b>Start:</b> {format(start, 'dd MMM HH:mm')}</div>
+                                    <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
+                                    <div className="border-t pt-1 mt-1 text-yellow-400">
+                                      ⚠️ Deze medewerker is volledig gereserveerd voor installatie werkzaamheden
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-xs space-y-1">
+                                    <div className="font-bold text-sm mb-1">{project?.name || 'Project'}</div>
+                                    <div><b>Taak:</b> {task.title}</div>
+                                    <div><b>Start:</b> {format(start, 'dd MMM HH:mm')}</div>
+                                    <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
+                                    <div><b>Duur:</b> {task.duration} min</div>
+                                    <div><b>Status:</b> {task.status} {task.status === 'HOLD' && '🟠'}</div>
+                                    <div><b>Prioriteit:</b> {task.priority} {task.priority === 'high' && '🔴'}</div>
+                                    {assignment && (
+                                      <div><b>Werknemer:</b> {assignment.employeeName}</div>
+                                    )}
+                                    {project && (
+                                      <>
+                                        <div className="border-t pt-1 mt-1">
+                                          <div><b>Klant:</b> {project.client}</div>
+                                          <div><b>Project start:</b> {format(new Date(project.start_date), 'dd MMM yyyy')}</div>
+                                          <div><b>Installatie:</b> {format(new Date(project.installation_date), 'dd MMM yyyy')}</div>
+                                          <div><b>Status:</b> {project.status}</div>
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                               </TooltipContent>
                             </Tooltip>
                           );
