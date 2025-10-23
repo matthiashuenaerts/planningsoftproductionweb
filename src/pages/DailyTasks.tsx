@@ -215,12 +215,7 @@ const DailyTasks: React.FC = () => {
       <div className="ml-64 w-full p-6 my-[70px]">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold">Installation Calendar</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                📅 Manage team assignments - these automatically integrate with workstation planning
-              </p>
-            </div>
+            <h1 className="text-2xl font-bold">Installation Calendar</h1>
             
             <div className="flex mt-4 md:mt-0 space-x-2">
               <Button variant={displayMode === 'calendar' ? 'default' : 'outline'} onClick={() => setDisplayMode('calendar')}>

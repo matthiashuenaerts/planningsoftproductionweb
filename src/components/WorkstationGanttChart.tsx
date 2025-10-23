@@ -368,90 +368,15 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       const daysToSchedule = 60;
       const newAssignments: DailyEmployeeAssignment[] = [];
       
-      // PRIORITY: Fetch installation planning from daily_team_assignments
-      const endDate = format(addDays(timelineStart, daysToSchedule), 'yyyy-MM-dd');
-      const { data: dailyAssignments, error: assignmentsError } = await supabase
-        .from('daily_team_assignments')
-        .select(`
-          *,
-          placement_teams!inner(id, name)
-        `)
-        .gte('date', today)
-        .lte('date', endDate);
-      
-      if (assignmentsError) {
-        console.error('Error fetching daily assignments:', assignmentsError);
-      }
-      
-      // Fetch project team assignments to map teams to projects
-      const { data: projectTeams, error: projectTeamsError } = await supabase
-        .from('project_team_assignments')
-        .select('*');
-      
-      if (projectTeamsError) {
-        console.error('Error fetching project teams:', projectTeamsError);
-      }
-      
-      // Build map: date -> employeeId -> project (from installation planning)
-      const installationBlocks = new Map<string, Map<string, { projectId: string; team: string }>>();
-      
-      dailyAssignments?.forEach((assignment: any) => {
-        if (!assignment.is_available) return; // Skip if employee is not available
-        
-        const dateStr = assignment.date;
-        if (!installationBlocks.has(dateStr)) {
-          installationBlocks.set(dateStr, new Map());
-        }
-        
-        // Find the project for this team on this date
-        const teamName = assignment.placement_teams?.name;
-        const projectTeam = projectTeams?.find((pt: any) => pt.team === teamName);
-        
-        if (projectTeam) {
-          installationBlocks.get(dateStr)!.set(assignment.employee_id, {
-            projectId: projectTeam.project_id,
-            team: teamName
-          });
-        }
-      });
-      
       // Track per-day employee -> workstation assignment to prevent double-booking across workstations
       const assignedEmployeeWorkstationByDate = new Map<string, Map<string, string>>();
       
       // Track employee schedules: employeeId -> date -> slots
-      const employeeSchedules = new Map<string, Map<string, Array<{ start: Date; end: Date; workstationId: string; taskId: string; isInstallation?: boolean }>>>();
+      const employeeSchedules = new Map<string, Map<string, Array<{ start: Date; end: Date; workstationId: string; taskId: string }>>>();
       
-      // Initialize employee schedules and block out installation days
+      // Initialize employee schedules
       allEmployees.forEach((emp) => {
-        const empScheduleMap = new Map<string, Array<{ start: Date; end: Date; workstationId: string; taskId: string; isInstallation?: boolean }>>();
-        
-        // Block out full days for installation planning
-        for (let dayOffset = 0; dayOffset < daysToSchedule; dayOffset++) {
-          const currentDate = addDays(timelineStart, dayOffset);
-          if (!isWorkingDay(currentDate)) continue;
-          
-          const dateStr = format(currentDate, 'yyyy-MM-dd');
-          const installationBlock = installationBlocks.get(dateStr)?.get(emp.id);
-          
-          if (installationBlock) {
-            // Block entire working day for installation
-            const workHours = getWorkHours(currentDate);
-            if (workHours) {
-              if (!empScheduleMap.has(dateStr)) {
-                empScheduleMap.set(dateStr, []);
-              }
-              empScheduleMap.get(dateStr)!.push({
-                start: workHours.start,
-                end: workHours.end,
-                workstationId: 'INSTALLATION',
-                taskId: `INSTALLATION_${installationBlock.projectId}`,
-                isInstallation: true
-              });
-            }
-          }
-        }
-        
-        employeeSchedules.set(emp.id, empScheduleMap);
+        employeeSchedules.set(emp.id, new Map());
       });
       
       // Task scheduling state
@@ -532,13 +457,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
           const eligibleEmployees = Array.from(allEmployees.values()).filter(emp => {
             const isLinked = task.workstations?.some(taskWs => emp.workstations.includes(taskWs.id));
             if (!isLinked) return false;
-            
-            // PRIORITY CHECK: Skip if employee is on installation this day
-            const empSchedule = employeeSchedules.get(emp.id)?.get(dateStr) || [];
-            if (empSchedule.some(slot => slot.isInstallation)) {
-              return false; // Employee is blocked for installation
-            }
-            
             const alreadyAssignedWs = assignedToday.get(emp.id);
             // Allow if not yet assigned today or already assigned to one of the task's workstations
             return !alreadyAssignedWs || task.workstations?.some(taskWs => taskWs.id === alreadyAssignedWs);
@@ -676,123 +594,10 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         }
       }
       
-      // AUTO-REPOSITION: Optimize task placement by moving tasks to fill gaps
-      const unscheduledTasks = sortedTasks.filter(t => !scheduledTasks.has(t.id));
-      let repositionedCount = 0;
-      
-      // Second pass: Try to reposition unscheduled tasks by looking for any available slots
-      for (const task of unscheduledTasks) {
-        // Check dependencies
-        if (task.status === 'HOLD') {
-          const dependencyEnd = getRequiredDependencyEndForTask(task, taskEndTimes);
-          if (dependencyEnd === null) continue;
-        }
-        
-        // Try each day in the schedule window
-        for (let dayOffset = 0; dayOffset < daysToSchedule; dayOffset++) {
-          const currentDate = addDays(timelineStart, dayOffset);
-          if (!isWorkingDay(currentDate)) continue;
-          
-          const dateStr = format(currentDate, 'yyyy-MM-dd');
-          const workHours = getWorkHours(currentDate);
-          if (!workHours) continue;
-          
-          // Find employees who could do this task
-          const potentialEmployees = Array.from(allEmployees.values()).filter(emp => {
-            const isLinked = task.workstations?.some(taskWs => emp.workstations.includes(taskWs.id));
-            if (!isLinked) return false;
-            
-            // Skip if on installation
-            const empSchedule = employeeSchedules.get(emp.id)?.get(dateStr) || [];
-            if (empSchedule.some(slot => slot.isInstallation)) return false;
-            
-            // Check available time
-            const usedMinutes = empSchedule.reduce((sum, slot) => 
-              sum + differenceInMinutes(slot.end, slot.start), 0
-            );
-            const totalMinutes = differenceInMinutes(workHours.end, workHours.start);
-            return usedMinutes + task.duration <= totalMinutes;
-          });
-          
-          if (potentialEmployees.length === 0) continue;
-          
-          // Try to fit task for best employee
-          for (const employee of potentialEmployees) {
-            const empSchedule = employeeSchedules.get(employee.id)?.get(dateStr) || [];
-            const sortedSlots = [...empSchedule].sort((a, b) => a.start.getTime() - b.start.getTime());
-            
-            let candidateStart = workHours.start;
-            let taskFitted = false;
-            
-            for (let i = 0; i <= sortedSlots.length; i++) {
-              const slotEnd = i < sortedSlots.length ? sortedSlots[i].start : workHours.end;
-              const availableMinutes = differenceInMinutes(slotEnd, candidateStart);
-              
-              if (availableMinutes >= task.duration) {
-                const taskSlots = getTaskSlots(candidateStart, task.duration);
-                
-                if (taskSlots.length > 0) {
-                  const chosenWorkstation = task.workstations![0].id;
-                  
-                  taskSlots.forEach(slot => {
-                    if (!employeeSchedules.get(employee.id)!.has(format(slot.start, 'yyyy-MM-dd'))) {
-                      employeeSchedules.get(employee.id)!.set(format(slot.start, 'yyyy-MM-dd'), []);
-                    }
-                    employeeSchedules.get(employee.id)!.get(format(slot.start, 'yyyy-MM-dd'))!.push({
-                      start: slot.start,
-                      end: slot.end,
-                      workstationId: chosenWorkstation,
-                      taskId: task.id
-                    });
-                  });
-                  
-                  const lastSlot = taskSlots[taskSlots.length - 1];
-                  taskEndTimes.set(task.id, lastSlot.end);
-                  scheduledTasks.add(task.id);
-                  repositionedCount++;
-                  taskFitted = true;
-                  
-                  // Add assignment if not already tracked
-                  if (!workstationDailyWorkers.has(chosenWorkstation)) {
-                    workstationDailyWorkers.set(chosenWorkstation, new Map());
-                  }
-                  const wsDateMap = workstationDailyWorkers.get(chosenWorkstation)!;
-                  if (!wsDateMap.has(dateStr)) {
-                    wsDateMap.set(dateStr, new Set());
-                  }
-                  if (!wsDateMap.get(dateStr)!.has(employee.id)) {
-                    wsDateMap.get(dateStr)!.add(employee.id);
-                    const workerIndex = Array.from(wsDateMap.get(dateStr)!).indexOf(employee.id);
-                    newAssignments.push({
-                      date: dateStr,
-                      workstationId: chosenWorkstation,
-                      workerIndex,
-                      employeeId: employee.id,
-                      employeeName: employee.name,
-                    });
-                  }
-                  
-                  break;
-                }
-              }
-              
-              if (i < sortedSlots.length) {
-                candidateStart = sortedSlots[i].end;
-              }
-            }
-            
-            if (taskFitted) break;
-          }
-          
-          if (scheduledTasks.has(task.id)) break;
-        }
-      }
-      
       // Update daily assignments to show on gantt chart
       setDailyAssignments(newAssignments);
       
-      const installationBlockedCount = Array.from(installationBlocks.values()).reduce((sum, empMap) => sum + empMap.size, 0);
-      toast.success(`Planning gegenereerd: ${scheduledTasks.size} taken toegewezen (${repositionedCount} geoptimaliseerd), ${installationBlockedCount} installatie-blokken toegepast voor ${daysToSchedule} dagen.`);
+      toast.success(`Planning gegenereerd: ${scheduledTasks.size} taken toegewezen voor ${daysToSchedule} dagen. Bekijk de Gantt chart voor details.`);
       
     } catch (error) {
       console.error('Generate planning error:', error);
@@ -1486,12 +1291,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center gap-4 flex-wrap">
-          <div>
-            <CardTitle>Workstation Gantt Chart (Slim Gepland)</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              🏠 Planning integreert automatisch met installatie agenda - werknemers in installatie worden volledig geblokkeerd
-            </p>
-          </div>
+          <CardTitle>Workstation Gantt Chart (Slim Gepland)</CardTitle>
           <div className="flex gap-2 items-center flex-wrap">
             <Button onClick={handleAutoAssign} variant="outline" size="sm">
               🎯 Slim Auto-toewijzen
@@ -1667,23 +1467,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                           if (!isVisible) return null;
 
                           const project = task.phases?.projects;
-                          
-                          // Check if this is an installation block
-                          const isInstallationBlock = task.id?.startsWith('INSTALLATION_');
-                          
-                          let bg, text, border;
-                          if (isInstallationBlock) {
-                            // Special styling for installation blocks
-                            bg = 'hsl(150, 70%, 40%)';
-                            text = 'hsl(0, 0%, 100%)';
-                            border = 'hsl(150, 70%, 30%)';
-                          } else {
-                            const colors = getTaskColor(task);
-                            bg = colors.bg;
-                            text = colors.text;
-                            border = colors.border;
-                          }
-                          
+                          const { bg, text, border } = getTaskColor(task);
                           const left = (differenceInMinutes(start, timelineStart) / scale.unitInMinutes) * scale.unitWidth;
                           const width = (differenceInMinutes(end, start) / scale.unitInMinutes) * scale.unitWidth;
                           
@@ -1705,32 +1489,19 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                                     height: rowHeight - 16,
                                     background: bg,
                                     color: text,
-                                    border: isInstallationBlock ? `2px solid ${border}` : isCritical ? `3px solid ${border}` : `1px solid ${border}`,
-                                    boxShadow: isInstallationBlock ? '0 0 8px rgba(34, 197, 94, 0.4)' : isCritical ? '0 0 8px rgba(255,0,0,0.3)' : 'none',
+                                    border: isCritical ? `3px solid ${border}` : `1px solid ${border}`,
+                                    boxShadow: isCritical ? '0 0 8px rgba(255,0,0,0.3)' : 'none',
                                   }}
                                 >
-                                  {isInstallationBlock ? (
-                                    <>
-                                      <div className="truncate font-semibold flex items-center gap-1">
-                                        🏠 Installatie Planning
-                                      </div>
-                                      <div className="text-[9px] opacity-90 truncate">
-                                        {project?.name || 'Project'}
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <div className="truncate font-semibold">
-                                        {project?.name || 'Project'} – {task.title}
-                                      </div>
-                                      <div className="text-[9px] opacity-75 truncate">
-                                        {task.priority === 'high' && '🔴 '}
-                                        {task.priority === 'medium' && '🟡 '}
-                                        {task.priority === 'low' && '🟢 '}
-                                        {task.status === 'HOLD' && '🟠 HOLD '}
-                                      </div>
-                                    </>
-                                  )}
+                                  <div className="truncate font-semibold">
+                                    {project?.name || 'Project'} – {task.title}
+                                  </div>
+                                  <div className="text-[9px] opacity-75 truncate">
+                                    {task.priority === 'high' && '🔴 '}
+                                    {task.priority === 'medium' && '🟡 '}
+                                    {task.priority === 'low' && '🟢 '}
+                                    {task.status === 'HOLD' && '🟠 HOLD '}
+                                  </div>
                                   {assignment && (
                                     <div className="text-[10px] opacity-80 truncate mt-0.5">
                                       👤 {assignment.employeeName}
@@ -1739,41 +1510,28 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent className="max-w-xs">
-                                {isInstallationBlock ? (
-                                  <div className="text-xs space-y-1">
-                                    <div className="font-bold text-sm mb-1">🏠 Installatie Planning</div>
-                                    <div><b>Project:</b> {project?.name || 'Onbekend'}</div>
-                                    <div><b>Werknemer:</b> {assignment?.employeeName || 'Niet toegewezen'}</div>
-                                    <div><b>Start:</b> {format(start, 'dd MMM HH:mm')}</div>
-                                    <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
-                                    <div className="border-t pt-1 mt-1 text-yellow-400">
-                                      ⚠️ Deze medewerker is volledig gereserveerd voor installatie werkzaamheden
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="text-xs space-y-1">
-                                    <div className="font-bold text-sm mb-1">{project?.name || 'Project'}</div>
-                                    <div><b>Taak:</b> {task.title}</div>
-                                    <div><b>Start:</b> {format(start, 'dd MMM HH:mm')}</div>
-                                    <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
-                                    <div><b>Duur:</b> {task.duration} min</div>
-                                    <div><b>Status:</b> {task.status} {task.status === 'HOLD' && '🟠'}</div>
-                                    <div><b>Prioriteit:</b> {task.priority} {task.priority === 'high' && '🔴'}</div>
-                                    {assignment && (
-                                      <div><b>Werknemer:</b> {assignment.employeeName}</div>
-                                    )}
-                                    {project && (
-                                      <>
-                                        <div className="border-t pt-1 mt-1">
-                                          <div><b>Klant:</b> {project.client}</div>
-                                          <div><b>Project start:</b> {format(new Date(project.start_date), 'dd MMM yyyy')}</div>
-                                          <div><b>Installatie:</b> {format(new Date(project.installation_date), 'dd MMM yyyy')}</div>
-                                          <div><b>Status:</b> {project.status}</div>
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                )}
+                                <div className="text-xs space-y-1">
+                                  <div className="font-bold text-sm mb-1">{project?.name || 'Project'}</div>
+                                  <div><b>Taak:</b> {task.title}</div>
+                                  <div><b>Start:</b> {format(start, 'dd MMM HH:mm')}</div>
+                                  <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
+                                  <div><b>Duur:</b> {task.duration} min</div>
+                                  <div><b>Status:</b> {task.status} {task.status === 'HOLD' && '🟠'}</div>
+                                  <div><b>Prioriteit:</b> {task.priority} {task.priority === 'high' && '🔴'}</div>
+                                  {assignment && (
+                                    <div><b>Werknemer:</b> {assignment.employeeName}</div>
+                                  )}
+                                  {project && (
+                                    <>
+                                      <div className="border-t pt-1 mt-1">
+                                        <div><b>Klant:</b> {project.client}</div>
+                                        <div><b>Project start:</b> {format(new Date(project.start_date), 'dd MMM yyyy')}</div>
+                                        <div><b>Installatie:</b> {format(new Date(project.installation_date), 'dd MMM yyyy')}</div>
+                                        <div><b>Status:</b> {project.status}</div>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
                               </TooltipContent>
                             </Tooltip>
                           );
