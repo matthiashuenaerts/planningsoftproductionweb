@@ -93,8 +93,6 @@ const ControlPanel: React.FC = () => {
           tasks(
             id,
             title,
-            project_id,
-            projects(name),
             task_workstation_links(workstation_id, workstations(id, name))
           )
         `)
@@ -506,26 +504,21 @@ const ControlPanel: React.FC = () => {
                 activeEmployees.map((emp: any) => (
                   <div 
                     key={emp.employee_id} 
-                    className="bg-slate-700/30 border border-slate-600 rounded-lg p-2 hover:bg-slate-700/50 transition-colors"
+                    className="bg-slate-700/30 border border-slate-600 rounded-lg p-3 hover:bg-slate-700/50 transition-colors"
                   >
-                    <div className="flex items-start gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse mt-1 flex-shrink-0" />
+                    <div className="flex items-start gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse mt-1.5 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-medium text-sm truncate">
                           {emp.employees?.name || 'Unknown'}
                         </p>
                         {emp.tasks && (
                           <>
-                            {emp.tasks.projects?.name && (
-                              <p className="text-blue-400 text-xs font-medium truncate">
-                                {emp.tasks.projects.name}
-                              </p>
-                            )}
-                            <p className="text-slate-300 text-xs truncate">
+                            <p className="text-slate-300 text-xs mt-1 line-clamp-2">
                               {emp.tasks.title}
                             </p>
                             {emp.tasks.task_workstation_links?.[0]?.workstations && (
-                              <p className="text-slate-400 text-xs truncate">
+                              <p className="text-slate-400 text-xs mt-1">
                                 {emp.tasks.task_workstation_links[0].workstations.name}
                               </p>
                             )}
