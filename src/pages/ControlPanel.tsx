@@ -93,7 +93,8 @@ const ControlPanel: React.FC = () => {
           tasks(
             id,
             title,
-            phases(project_id, projects(name)),
+            project_id,
+            projects(name),
             task_workstation_links(workstation_id, workstations(id, name))
           )
         `)
@@ -492,13 +493,13 @@ const ControlPanel: React.FC = () => {
         </Card>
 
           {/* Active Employees */}
-          <Card className="bg-slate-800/50 border-slate-700 p-4 flex flex-col h-full">
+          <Card className="bg-slate-800/50 border-slate-700 p-4">
             <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-400" />
               Active Workers
             </h2>
             
-            <div className="space-y-2 flex-1 overflow-y-auto pr-2">
+            <div className="space-y-2 max-h-[calc(100vh-320px)] overflow-y-auto pr-2">
               {activeEmployees.length === 0 ? (
                 <p className="text-slate-400 text-sm text-center py-4">No active workers</p>
               ) : (
@@ -515,9 +516,9 @@ const ControlPanel: React.FC = () => {
                         </p>
                         {emp.tasks && (
                           <>
-                            {emp.tasks.phases?.projects?.name && (
+                            {emp.tasks.projects?.name && (
                               <p className="text-blue-400 text-xs font-medium truncate">
-                                {emp.tasks.phases.projects.name}
+                                {emp.tasks.projects.name}
                               </p>
                             )}
                             <p className="text-slate-300 text-xs truncate">
