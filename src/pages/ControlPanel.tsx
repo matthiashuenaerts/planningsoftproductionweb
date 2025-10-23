@@ -93,8 +93,7 @@ const ControlPanel: React.FC = () => {
           tasks(
             id,
             title,
-            project_id,
-            projects(name),
+            phases(project_id, projects(name)),
             task_workstation_links(workstation_id, workstations(id, name))
           )
         `)
@@ -516,9 +515,9 @@ const ControlPanel: React.FC = () => {
                         </p>
                         {emp.tasks && (
                           <>
-                            {emp.tasks.projects?.name && (
+                            {emp.tasks.phases?.projects?.name && (
                               <p className="text-blue-400 text-xs font-medium truncate">
-                                {emp.tasks.projects.name}
+                                {emp.tasks.phases.projects.name}
                               </p>
                             )}
                             <p className="text-slate-300 text-xs truncate">
