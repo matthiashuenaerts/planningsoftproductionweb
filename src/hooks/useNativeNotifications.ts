@@ -5,7 +5,7 @@ export const useNativeNotifications = () => {
 
   useEffect(() => {
     // Create audio element for notification sound
-    audioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTWH0fPTgjMGHm7A7+OZURE');
+    audioRef.current = new Audio('/notification-sound.mp3');
     
     // Request notification permission
     if ('Notification' in window && Notification.permission === 'default') {
