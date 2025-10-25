@@ -24,6 +24,7 @@ export const BrokenPartDetailDialog: React.FC<BrokenPartDetailDialogProps> = ({
 }) => {
   const [showRushOrderForm, setShowRushOrderForm] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [initialRushOrderValues, setInitialRushOrderValues] = useState<any>(null);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -64,19 +65,17 @@ export const BrokenPartDetailDialog: React.FC<BrokenPartDetailDialogProps> = ({
     onOpenChange(false);
   };
 
-  if (!brokenPart) return null;
-
-  const deadline = new Date();
-  deadline.setHours(deadline.getHours() + 24);
-  
-  const [initialRushOrderValues, setInitialRushOrderValues] = useState<any>(null);
-
   // Prepare initial values with attachment
   useEffect(() => {
+    if (!brokenPart) return;
+    
+    const deadline = new Date();
+    deadline.setHours(deadline.getHours() + 24);
+    
     const prepareInitialValues = async () => {
       let attachmentFile: File | undefined = undefined;
       
-      if (brokenPart?.image_path) {
+      if (brokenPart.image_path) {
         try {
           const imageUrl = getImageUrl(brokenPart.image_path);
           if (imageUrl) {
@@ -91,27 +90,27 @@ export const BrokenPartDetailDialog: React.FC<BrokenPartDetailDialogProps> = ({
       }
 
       setInitialRushOrderValues({
-        title: `Urgent: Broken part repair - ${brokenPart?.projects?.name || 'Project'}`,
-        description: `Broken part reported at workstation: ${brokenPart?.workstations?.name || 'Unknown'}
+        title: `Urgent: Broken part repair - ${brokenPart.projects?.name || 'Project'}`,
+        description: `Broken part reported at workstation: ${brokenPart.workstations?.name || 'Unknown'}
 
-Description: ${brokenPart?.description}
+Description: ${brokenPart.description}
 
-Reported by: ${brokenPart?.employees?.name}
-Date: ${brokenPart?.created_at ? format(new Date(brokenPart.created_at), 'MMM d, yyyy HH:mm') : 'Unknown'}
+Reported by: ${brokenPart.employees?.name}
+Date: ${brokenPart.created_at ? format(new Date(brokenPart.created_at), 'MMM d, yyyy HH:mm') : 'Unknown'}
 
 This is an urgent repair request for a broken part that is blocking production.`,
         deadline: deadline,
-        projectId: brokenPart?.project_id || '',
+        projectId: brokenPart.project_id || '',
         selectedTasks: [],
         assignedUsers: [],
         attachment: attachmentFile
       });
     };
 
-    if (brokenPart) {
-      prepareInitialValues();
-    }
+    prepareInitialValues();
   }, [brokenPart]);
+
+  if (!brokenPart) return null;
 
   const imageUrl = getImageUrl(brokenPart.image_path);
 
