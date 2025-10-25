@@ -790,6 +790,40 @@ const ProjectDetails = () => {
       });
     }
   };
+
+  const handleChargeInTruck = async (orderId: string) => {
+    try {
+      // Get all order items
+      const items = await orderService.getOrderItems(orderId);
+      
+      // Clear stock location for all items
+      for (const item of items) {
+        await orderService.updateOrderItem(item.id, { stock_location: null });
+      }
+      
+      // Update order status to charged
+      await orderService.updateOrderStatus(orderId, 'charged' as any);
+      
+      // Refresh orders
+      const updatedOrders = await orderService.getByProject(projectId!);
+      setOrders(updatedOrders);
+      
+      // Reload order items for this order
+      loadOrderItems(orderId);
+      
+      toast({
+        title: t('success'),
+        description: 'Order charged in truck and locations cleared'
+      });
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleDeleteOrder = async (orderId: string) => {
     try {
       await orderService.delete(orderId);
@@ -901,6 +935,8 @@ const ProjectDetails = () => {
         return 'bg-red-100 text-red-800 border-red-300';
       case 'canceled':
         return 'bg-gray-100 text-gray-800 border-gray-300';
+      case 'charged':
+        return 'bg-purple-100 text-purple-800 border-purple-300';
       default:
         return 'bg-blue-100 text-blue-800 border-blue-300';
     }
@@ -915,6 +951,8 @@ const ProjectDetails = () => {
         return <AlertCircle className="h-4 w-4 text-red-600" />;
       case 'canceled':
         return <XCircle className="h-4 w-4 text-gray-600" />;
+      case 'charged':
+        return <Package className="h-4 w-4 text-purple-600" />;
       default:
         return <Clock className="h-4 w-4 text-blue-600" />;
     }
@@ -1266,7 +1304,7 @@ const ProjectDetails = () => {
                   if (!orderAttachments[order.id]) {
                     loadOrderAttachments(order.id);
                   }
-                  return <div key={order.id} className={cn("border rounded-lg p-3 transition-all duration-200", order.status === 'delivered' ? 'bg-green-50 border-green-200' : order.status === 'delayed' ? 'bg-red-50 border-red-200' : order.status === 'pending' ? 'bg-orange-50 border-orange-200' : 'bg-card border-border')}>
+                  return <div key={order.id} className={cn("border rounded-lg p-3 transition-all duration-200", order.status === 'delivered' ? 'bg-green-50 border-green-200' : order.status === 'delayed' ? 'bg-red-50 border-red-200' : order.status === 'pending' ? 'bg-orange-50 border-orange-200' : order.status === 'charged' ? 'bg-purple-50 border-purple-200' : 'bg-card border-border')}>
                             {/* Compact Order Header */}
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
@@ -1290,8 +1328,21 @@ const ProjectDetails = () => {
                                     <SelectItem value="delivered">Delivered</SelectItem>
                                     <SelectItem value="canceled">Canceled</SelectItem>
                                     <SelectItem value="delayed">Delayed</SelectItem>
+                                    <SelectItem value="charged">Charged</SelectItem>
                                   </SelectContent>
                                 </Select>
+
+                                {/* Charged in Truck Button */}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleChargeInTruck(order.id)}
+                                  className="h-7 px-2 text-xs hover:bg-purple-50"
+                                  title="Charge in truck and clear locations"
+                                >
+                                  <Package className="h-3 w-3 mr-1" />
+                                  Charged in Truck
+                                </Button>
 
                                 {/* Action Buttons */}
                                 <Button size="sm" variant="outline" onClick={() => handleEditOrder(order.id)} className="h-7 w-7 p-0 hover:bg-blue-50" title="Edit order">
@@ -1306,11 +1357,11 @@ const ProjectDetails = () => {
 
                             {/* Compact Order Info with Enhanced Delivery Date */}
                             <div className="grid grid-cols-3 gap-2 text-xs mb-2">
-                              <div className={cn("flex items-center gap-1 p-2 rounded border", order.status === 'delivered' ? 'bg-green-50 border-green-200' : order.status === 'pending' ? 'bg-orange-50 border-orange-200' : order.status === 'delayed' ? 'bg-red-50 border-red-200' : order.status === 'canceled' ? 'bg-gray-50 border-gray-200' : 'bg-blue-50 border-blue-200')}>
-                                <Calendar className={cn("h-3 w-3", order.status === 'delivered' ? 'text-green-600' : order.status === 'pending' ? 'text-orange-600' : order.status === 'delayed' ? 'text-red-600' : order.status === 'canceled' ? 'text-gray-600' : 'text-blue-600')} />
+                              <div className={cn("flex items-center gap-1 p-2 rounded border", order.status === 'delivered' ? 'bg-green-50 border-green-200' : order.status === 'pending' ? 'bg-orange-50 border-orange-200' : order.status === 'delayed' ? 'bg-red-50 border-red-200' : order.status === 'canceled' ? 'bg-gray-50 border-gray-200' : order.status === 'charged' ? 'bg-purple-50 border-purple-200' : 'bg-blue-50 border-blue-200')}>
+                                <Calendar className={cn("h-3 w-3", order.status === 'delivered' ? 'text-green-600' : order.status === 'pending' ? 'text-orange-600' : order.status === 'delayed' ? 'text-red-600' : order.status === 'canceled' ? 'text-gray-600' : order.status === 'charged' ? 'text-purple-600' : 'text-blue-600')} />
                                 <div>
-                                  <div className={cn("font-medium text-xs", order.status === 'delivered' ? 'text-green-600' : order.status === 'pending' ? 'text-orange-600' : order.status === 'delayed' ? 'text-red-600' : order.status === 'canceled' ? 'text-gray-600' : 'text-blue-600')}>Expected</div>
-                                  <div className={cn("font-semibold", order.status === 'delivered' ? 'text-green-800' : order.status === 'pending' ? 'text-orange-800' : order.status === 'delayed' ? 'text-red-800' : order.status === 'canceled' ? 'text-gray-800' : 'text-blue-800')}>
+                                  <div className={cn("font-medium text-xs", order.status === 'delivered' ? 'text-green-600' : order.status === 'pending' ? 'text-orange-600' : order.status === 'delayed' ? 'text-red-600' : order.status === 'canceled' ? 'text-gray-600' : order.status === 'charged' ? 'text-purple-600' : 'text-blue-600')}>Expected</div>
+                                  <div className={cn("font-semibold", order.status === 'delivered' ? 'text-green-800' : order.status === 'pending' ? 'text-orange-800' : order.status === 'delayed' ? 'text-red-800' : order.status === 'canceled' ? 'text-gray-800' : order.status === 'charged' ? 'text-purple-800' : 'text-blue-800')}>
                                     {order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString() : 'No date'}
                                   </div>
                                 </div>

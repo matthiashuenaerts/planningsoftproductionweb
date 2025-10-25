@@ -5,7 +5,7 @@ export interface Order {
   supplier: string;
   order_date: string;
   expected_delivery: string;
-  status: 'pending' | 'delivered' | 'canceled' | 'delayed' | 'partially_delivered';
+  status: 'pending' | 'delivered' | 'canceled' | 'delayed' | 'partially_delivered' | 'charged';
   created_at: string;
   updated_at: string;
   order_type: 'standard' | 'semi-finished';
