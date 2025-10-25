@@ -28,22 +28,27 @@ interface Employee {
   email: string;
 }
 
-const NewRushOrderForm: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) => {
+interface NewRushOrderFormProps {
+  onSuccess?: () => void;
+  initialValues?: Partial<RushOrderFormData>;
+}
+
+const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialValues }) => {
   const { register, handleSubmit: formHandleSubmit, reset, setValue, watch, formState: { errors } } = useForm<RushOrderFormData>({
     defaultValues: {
-      title: '',
-      description: '',
-      deadline: new Date(),
+      title: initialValues?.title || '',
+      description: initialValues?.description || '',
+      deadline: initialValues?.deadline || new Date(),
       attachment: undefined,
-      selectedTasks: [],
-      assignedUsers: [],
-      projectId: ''
+      selectedTasks: initialValues?.selectedTasks || [],
+      assignedUsers: initialValues?.assignedUsers || [],
+      projectId: initialValues?.projectId || ''
     }
   });
   
   const [filePreview, setFilePreview] = useState<{ name: string; type: string; url?: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [date, setDate] = useState<Date>(new Date());
+  const [date, setDate] = useState<Date>(initialValues?.deadline || new Date());
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   

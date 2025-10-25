@@ -7,9 +7,9 @@ import { AlertTriangle, Calendar, User, MapPin, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { useAuth } from '@/context/AuthContext';
-import { rushOrderService } from '@/services/rushOrderService';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/LanguageContext';
+import NewRushOrderForm from '@/components/rush-orders/NewRushOrderForm';
 
 interface BrokenPartDetailDialogProps {
   open: boolean;
@@ -22,7 +22,7 @@ export const BrokenPartDetailDialog: React.FC<BrokenPartDetailDialogProps> = ({
   onOpenChange,
   brokenPart
 }) => {
-  const [isCreatingRushOrder, setIsCreatingRushOrder] = useState(false);
+  const [showRushOrderForm, setShowRushOrderForm] = useState(false);
   const [imageError, setImageError] = useState(false);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
@@ -34,59 +34,60 @@ export const BrokenPartDetailDialog: React.FC<BrokenPartDetailDialogProps> = ({
     return data.publicUrl;
   };
 
-  const handleCreateRushOrder = async () => {
-    if (!currentEmployee || !brokenPart) return;
-    
-    setIsCreatingRushOrder(true);
-    try {
-      const deadline = new Date();
-      deadline.setHours(deadline.getHours() + 24); // Set deadline to 24 hours from now
-      
-      const title = `Urgent: Broken part repair - ${brokenPart.projects?.name || 'Project'}`;
-      const description = `Broken part reported at workstation: ${brokenPart.workstations?.name || 'Unknown'}
+  const handleOpenRushOrderForm = () => {
+    setShowRushOrderForm(true);
+  };
+
+  const handleRushOrderSuccess = () => {
+    setShowRushOrderForm(false);
+    toast({
+      title: "Rush order created",
+      description: "A rush order has been created for this broken part repair.",
+    });
+    onOpenChange(false);
+  };
+
+  if (!brokenPart) return null;
+
+  const deadline = new Date();
+  deadline.setHours(deadline.getHours() + 24);
+  
+  const initialRushOrderValues = {
+    title: `Urgent: Broken part repair - ${brokenPart.projects?.name || 'Project'}`,
+    description: `Broken part reported at workstation: ${brokenPart.workstations?.name || 'Unknown'}
 
 Description: ${brokenPart.description}
 
 Reported by: ${brokenPart.employees?.name}
 Date: ${brokenPart.created_at ? format(new Date(brokenPart.created_at), 'MMM d, yyyy HH:mm') : 'Unknown'}
 
-This is an urgent repair request for a broken part that is blocking production.`;
-
-      const rushOrder = await rushOrderService.createRushOrder(
-        title,
-        description,
-        deadline.toISOString(),
-        currentEmployee.id,
-        undefined, // No attachment for now
-        brokenPart.project_id
-      );
-
-      if (rushOrder) {
-        toast({
-          title: "Rush order created",
-          description: "A rush order has been created for this broken part repair.",
-        });
-        onOpenChange(false);
-      }
-    } catch (error) {
-      console.error('Error creating rush order:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create rush order. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCreatingRushOrder(false);
-    }
+This is an urgent repair request for a broken part that is blocking production.`,
+    deadline: deadline,
+    projectId: brokenPart.project_id || '',
+    selectedTasks: [],
+    assignedUsers: []
   };
-
-  if (!brokenPart) return null;
 
   const imageUrl = getImageUrl(brokenPart.image_path);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <>
+      {/* Rush Order Form Dialog */}
+      <Dialog open={showRushOrderForm} onOpenChange={setShowRushOrderForm}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Rush Order from Broken Part</DialogTitle>
+          </DialogHeader>
+          <NewRushOrderForm 
+            onSuccess={handleRushOrderSuccess} 
+            initialValues={initialRushOrderValues}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Broken Part Detail Dialog */}
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -181,18 +182,19 @@ This is an urgent repair request for a broken part that is blocking production.`
 
             <div className="pt-4 border-t">
               <Button 
-                onClick={handleCreateRushOrder}
-                disabled={isCreatingRushOrder || !currentEmployee}
+                onClick={handleOpenRushOrderForm}
+                disabled={!currentEmployee}
                 className="w-full"
                 size="lg"
               >
                 <Zap className="mr-2 h-4 w-4" />
-                {isCreatingRushOrder ? 'Creating Rush Order...' : 'Send to Rush Order'}
+                Send to Rush Order
               </Button>
             </div>
           </div>
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 };
