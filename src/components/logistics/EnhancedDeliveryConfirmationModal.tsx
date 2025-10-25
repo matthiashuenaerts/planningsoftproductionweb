@@ -56,28 +56,60 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
     enabled: isOpen
   });
 
-  // Fetch location suggestions for this project
+  // Fetch location suggestions - prioritize free locations
   const fetchLocationSuggestions = async (itemId: string) => {
     if (!order.project_id || locationSuggestions[itemId]) return;
 
     try {
-      const { data, error } = await supabase
-        .from('order_items')
-        .select(`
-          stock_location,
-          orders!inner(project_id)
-        `)
-        .eq('orders.project_id', order.project_id)
-        .not('stock_location', 'is', null)
-        .neq('stock_location', '');
+      const currentItem = orderItems.find(item => item.id === itemId);
+      const itemHasLocation = currentItem?.stock_location && currentItem.stock_location !== '';
 
-      if (error) throw error;
+      if (itemHasLocation) {
+        // Item already has a location - show locations used in this project
+        const { data, error } = await supabase
+          .from('order_items')
+          .select(`
+            stock_location,
+            orders!inner(project_id)
+          `)
+          .eq('orders.project_id', order.project_id)
+          .not('stock_location', 'is', null)
+          .neq('stock_location', '');
 
-      const uniqueLocations = [...new Set(data.map(item => item.stock_location).filter(Boolean))];
-      setLocationSuggestions(prev => ({
-        ...prev,
-        [itemId]: uniqueLocations
-      }));
+        if (error) throw error;
+
+        const uniqueLocations = [...new Set(data.map(item => item.stock_location).filter(Boolean))];
+        setLocationSuggestions(prev => ({
+          ...prev,
+          [itemId]: uniqueLocations
+        }));
+      } else {
+        // Item has no location - show free locations across all projects
+        const [stockLocationsResult, usedLocationsResult] = await Promise.all([
+          supabase
+            .from('stock_locations')
+            .select('name')
+            .eq('is_active', true)
+            .order('display_order'),
+          supabase
+            .from('order_items')
+            .select('stock_location')
+            .not('stock_location', 'is', null)
+            .neq('stock_location', '')
+        ]);
+
+        if (stockLocationsResult.error) throw stockLocationsResult.error;
+        if (usedLocationsResult.error) throw usedLocationsResult.error;
+
+        const allLocations = stockLocationsResult.data.map(loc => loc.name);
+        const usedLocations = new Set(usedLocationsResult.data.map(item => item.stock_location));
+        const freeLocations = allLocations.filter(loc => !usedLocations.has(loc));
+
+        setLocationSuggestions(prev => ({
+          ...prev,
+          [itemId]: freeLocations
+        }));
+      }
     } catch (error) {
       console.error('Error fetching location suggestions:', error);
     }
@@ -426,10 +458,10 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                                         Suggestions
                                       </Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-60 p-0">
+                                     <PopoverContent className="w-60 p-0">
                                       <div className="p-2">
                                         <div className="text-sm font-medium mb-2 text-muted-foreground">
-                                          Previously used locations for this project:
+                                          {delivery.stockLocation ? 'Previously used locations:' : 'Available free locations:'}
                                         </div>
                                         {locationSuggestions[item.id]?.length > 0 ? (
                                           <div className="space-y-1">
