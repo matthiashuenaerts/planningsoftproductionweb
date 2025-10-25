@@ -119,6 +119,30 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
     setValue('selectedTasks', selectedTaskIds);
     setValue('assignedUsers', selectedUserIds);
   }, [selectedTaskIds, selectedUserIds, setValue]);
+
+  // Handle initial attachment if provided
+  useEffect(() => {
+    if (initialValues?.attachment) {
+      setValue('attachment', initialValues.attachment);
+      
+      if (initialValues.attachment.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setFilePreview({ 
+            name: initialValues.attachment!.name, 
+            type: initialValues.attachment!.type, 
+            url: reader.result as string 
+          });
+        };
+        reader.readAsDataURL(initialValues.attachment);
+      } else {
+        setFilePreview({ 
+          name: initialValues.attachment.name, 
+          type: initialValues.attachment.type 
+        });
+      }
+    }
+  }, [initialValues?.attachment, setValue]);
   
   // Update date in form when popover date changes
   useEffect(() => {
@@ -476,7 +500,7 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
           
           <div className="space-y-2">
             <label htmlFor="projectId" className="block text-sm font-medium">Project (Optional)</label>
-            <Select onValueChange={(value) => setValue('projectId', value === 'none' ? '' : value)}>
+            <Select value={watchData.projectId || 'none'} onValueChange={(value) => setValue('projectId', value === 'none' ? '' : value)}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a project" />
               </SelectTrigger>

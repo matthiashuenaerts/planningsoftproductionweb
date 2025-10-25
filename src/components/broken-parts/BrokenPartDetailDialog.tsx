@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +34,24 @@ export const BrokenPartDetailDialog: React.FC<BrokenPartDetailDialogProps> = ({
     return data.publicUrl;
   };
 
-  const handleOpenRushOrderForm = () => {
+  const handleOpenRushOrderForm = async () => {
+    // Convert the image to a File object if it exists
+    let attachmentFile: File | undefined = undefined;
+    
+    if (brokenPart.image_path) {
+      try {
+        const imageUrl = getImageUrl(brokenPart.image_path);
+        if (imageUrl) {
+          const response = await fetch(imageUrl);
+          const blob = await response.blob();
+          const fileName = brokenPart.image_path.split('/').pop() || 'broken-part-image.jpg';
+          attachmentFile = new File([blob], fileName, { type: blob.type });
+        }
+      } catch (error) {
+        console.error('Error loading image:', error);
+      }
+    }
+    
     setShowRushOrderForm(true);
   };
 
@@ -52,21 +69,49 @@ export const BrokenPartDetailDialog: React.FC<BrokenPartDetailDialogProps> = ({
   const deadline = new Date();
   deadline.setHours(deadline.getHours() + 24);
   
-  const initialRushOrderValues = {
-    title: `Urgent: Broken part repair - ${brokenPart.projects?.name || 'Project'}`,
-    description: `Broken part reported at workstation: ${brokenPart.workstations?.name || 'Unknown'}
+  const [initialRushOrderValues, setInitialRushOrderValues] = useState<any>(null);
 
-Description: ${brokenPart.description}
+  // Prepare initial values with attachment
+  useEffect(() => {
+    const prepareInitialValues = async () => {
+      let attachmentFile: File | undefined = undefined;
+      
+      if (brokenPart?.image_path) {
+        try {
+          const imageUrl = getImageUrl(brokenPart.image_path);
+          if (imageUrl) {
+            const response = await fetch(imageUrl);
+            const blob = await response.blob();
+            const fileName = brokenPart.image_path.split('/').pop() || 'broken-part-image.jpg';
+            attachmentFile = new File([blob], fileName, { type: blob.type });
+          }
+        } catch (error) {
+          console.error('Error loading image:', error);
+        }
+      }
 
-Reported by: ${brokenPart.employees?.name}
-Date: ${brokenPart.created_at ? format(new Date(brokenPart.created_at), 'MMM d, yyyy HH:mm') : 'Unknown'}
+      setInitialRushOrderValues({
+        title: `Urgent: Broken part repair - ${brokenPart?.projects?.name || 'Project'}`,
+        description: `Broken part reported at workstation: ${brokenPart?.workstations?.name || 'Unknown'}
+
+Description: ${brokenPart?.description}
+
+Reported by: ${brokenPart?.employees?.name}
+Date: ${brokenPart?.created_at ? format(new Date(brokenPart.created_at), 'MMM d, yyyy HH:mm') : 'Unknown'}
 
 This is an urgent repair request for a broken part that is blocking production.`,
-    deadline: deadline,
-    projectId: brokenPart.project_id || '',
-    selectedTasks: [],
-    assignedUsers: []
-  };
+        deadline: deadline,
+        projectId: brokenPart?.project_id || '',
+        selectedTasks: [],
+        assignedUsers: [],
+        attachment: attachmentFile
+      });
+    };
+
+    if (brokenPart) {
+      prepareInitialValues();
+    }
+  }, [brokenPart]);
 
   const imageUrl = getImageUrl(brokenPart.image_path);
 
@@ -78,10 +123,12 @@ This is an urgent repair request for a broken part that is blocking production.`
           <DialogHeader>
             <DialogTitle>Create Rush Order from Broken Part</DialogTitle>
           </DialogHeader>
-          <NewRushOrderForm 
-            onSuccess={handleRushOrderSuccess} 
-            initialValues={initialRushOrderValues}
-          />
+          {initialRushOrderValues && (
+            <NewRushOrderForm 
+              onSuccess={handleRushOrderSuccess} 
+              initialValues={initialRushOrderValues}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
