@@ -813,7 +813,7 @@ const ProjectDetails = () => {
       
       toast({
         title: t('success'),
-        description: t('order_charged_success')
+        description: 'Order charged in truck and locations cleared'
       });
     } catch (error: any) {
       toast({
@@ -1324,11 +1324,11 @@ const ProjectDetails = () => {
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent className="bg-background border z-50">
-                                    <SelectItem value="pending">{t('pending')}</SelectItem>
-                                    <SelectItem value="delivered">{t('status_delivered')}</SelectItem>
-                                    <SelectItem value="canceled">{t('status_canceled')}</SelectItem>
-                                    <SelectItem value="delayed">{t('status_delayed')}</SelectItem>
-                                    <SelectItem value="charged">{t('status_charged')}</SelectItem>
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                    <SelectItem value="delivered">Delivered</SelectItem>
+                                    <SelectItem value="canceled">Canceled</SelectItem>
+                                    <SelectItem value="delayed">Delayed</SelectItem>
+                                    <SelectItem value="charged">Charged</SelectItem>
                                   </SelectContent>
                                 </Select>
 
@@ -1338,18 +1338,18 @@ const ProjectDetails = () => {
                                   variant="outline"
                                   onClick={() => handleChargeInTruck(order.id)}
                                   className="h-7 px-2 text-xs hover:bg-purple-50"
-                                  title={t('charged_in_truck_tooltip')}
+                                  title="Charge in truck and clear locations"
                                 >
                                   <Package className="h-3 w-3 mr-1" />
-                                  {t('charged_in_truck_button')}
+                                  Charged in Truck
                                 </Button>
 
                                 {/* Action Buttons */}
-                                <Button size="sm" variant="outline" onClick={() => handleEditOrder(order.id)} className="h-7 w-7 p-0 hover:bg-blue-50" title={t('edit_order_tooltip')}>
+                                <Button size="sm" variant="outline" onClick={() => handleEditOrder(order.id)} className="h-7 w-7 p-0 hover:bg-blue-50" title="Edit order">
                                   <Edit3 className="h-3 w-3" />
                                 </Button>
                                 
-                                <Button size="sm" variant="outline" onClick={() => handleDeleteOrder(order.id)} className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-red-50" title={t('delete_order_tooltip')}>
+                                <Button size="sm" variant="outline" onClick={() => handleDeleteOrder(order.id)} className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-red-50" title="Delete order">
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
                               </div>

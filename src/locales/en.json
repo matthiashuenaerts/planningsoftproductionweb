@@ -269,11 +269,5 @@
   "this_month": "This month",
   "last_month": "Last month",
   "this_year": "This year",
-  "last_year": "Last year",
-  "charged_in_truck_button": "Charged in Truck",
-  "charged_in_truck_tooltip": "Charge in truck and clear locations",
-  "order_charged_success": "Order charged in truck and locations cleared",
-  "status_charged": "Charged",
-  "edit_order_tooltip": "Edit order",
-  "delete_order_tooltip": "Delete order"
+  "last_year": "Last year"
 }

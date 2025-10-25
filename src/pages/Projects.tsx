@@ -410,8 +410,8 @@ const Projects = () => {
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="bg-background">
-                                <DropdownMenuItem
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem 
                                   onClick={e => {
                                     e.stopPropagation();
                                     handleExportProject(project, e, 'pdf');
