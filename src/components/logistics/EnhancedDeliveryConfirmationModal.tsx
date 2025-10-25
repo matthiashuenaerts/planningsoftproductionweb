@@ -56,35 +56,34 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
     enabled: isOpen
   });
 
-  // Fetch location suggestions - prioritize free locations
+  // Fetch location suggestions - prioritize project locations
   const fetchLocationSuggestions = async (itemId: string) => {
     if (!order.project_id || locationSuggestions[itemId]) return;
 
     try {
-      const currentItem = orderItems.find(item => item.id === itemId);
-      const itemHasLocation = currentItem?.stock_location && currentItem.stock_location !== '';
+      // First, check if this project already has articles with assigned locations
+      const { data: projectLocations, error: projectError } = await supabase
+        .from('order_items')
+        .select(`
+          stock_location,
+          orders!inner(project_id)
+        `)
+        .eq('orders.project_id', order.project_id)
+        .not('stock_location', 'is', null)
+        .neq('stock_location', '');
 
-      if (itemHasLocation) {
-        // Item already has a location - show locations used in this project
-        const { data, error } = await supabase
-          .from('order_items')
-          .select(`
-            stock_location,
-            orders!inner(project_id)
-          `)
-          .eq('orders.project_id', order.project_id)
-          .not('stock_location', 'is', null)
-          .neq('stock_location', '');
+      if (projectError) throw projectError;
 
-        if (error) throw error;
+      const projectLocationsList = [...new Set(projectLocations.map(item => item.stock_location).filter(Boolean))];
 
-        const uniqueLocations = [...new Set(data.map(item => item.stock_location).filter(Boolean))];
+      if (projectLocationsList.length > 0) {
+        // Project has assigned locations - suggest those first
         setLocationSuggestions(prev => ({
           ...prev,
-          [itemId]: uniqueLocations
+          [itemId]: projectLocationsList
         }));
       } else {
-        // Item has no location - show free locations across all projects
+        // No locations assigned to this project yet - show free locations
         const [stockLocationsResult, usedLocationsResult] = await Promise.all([
           supabase
             .from('stock_locations')
@@ -461,7 +460,9 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                                      <PopoverContent className="w-60 p-0">
                                       <div className="p-2">
                                         <div className="text-sm font-medium mb-2 text-muted-foreground">
-                                          {delivery.stockLocation ? 'Previously used locations:' : 'Available free locations:'}
+                                          {locationSuggestions[item.id]?.some(loc => 
+                                            orderItems.some(oi => oi.stock_location === loc)
+                                          ) ? 'Project locations:' : 'Available free locations:'}
                                         </div>
                                         {locationSuggestions[item.id]?.length > 0 ? (
                                           <div className="space-y-1">
