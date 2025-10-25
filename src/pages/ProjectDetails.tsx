@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Loader2, Circle, Eye, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Loader2, Circle, Eye, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -1349,6 +1349,10 @@ const ProjectDetails = () => {
                                         <span className="font-semibold text-sm text-gray-800">{item.description}</span>
                                         {item.article_code && <div className={cn("text-xs font-medium mt-0.5", order.status === 'delivered' ? 'text-green-700' : order.status === 'pending' ? 'text-orange-700' : order.status === 'delayed' ? 'text-red-700' : order.status === 'canceled' ? 'text-gray-700' : 'text-blue-700')}>
                                             Article: {item.article_code}
+                                          </div>}
+                                        {order.status === 'delivered' && item.stock_location && <div className="text-xs font-semibold text-green-800 mt-0.5 flex items-center gap-1">
+                                            <MapPin className="h-3 w-3" />
+                                            Location: {item.stock_location}
                                           </div>}
                                         {item.notes && <div className="text-xs text-gray-600 mt-0.5 italic">
                                             Note: {item.notes}
