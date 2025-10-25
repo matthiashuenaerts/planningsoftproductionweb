@@ -2202,6 +2202,39 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_locations: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       storage_system: {
         Row: {
           article_number: string | null
@@ -2960,7 +2993,7 @@ export type Database = {
         Returns: undefined
       }
       get_phase_offsets: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           created_at: string
           days_before_installation: number
@@ -2974,18 +3007,9 @@ export type Database = {
         Args: { check_date: string; emp_id: string }
         Returns: boolean
       }
-      setup_phase_offsets_table: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      table_exists: {
-        Args: { table_name: string }
-        Returns: boolean
-      }
-      trigger_project_forecast_email: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      setup_phase_offsets_table: { Args: never; Returns: boolean }
+      table_exists: { Args: { table_name: string }; Returns: boolean }
+      trigger_project_forecast_email: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role:
