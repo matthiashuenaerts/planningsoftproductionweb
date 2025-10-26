@@ -300,7 +300,9 @@ export const taskService = {
       .from('tasks')
       .select(`
         *,
-        phases!inner(project_id)
+        phases!inner(project_id),
+        assignee:assignee_id(name),
+        completed_by_employee:completed_by(name)
       `)
       .eq('phases.project_id', projectId)
       .order('due_date', { ascending: true });
@@ -324,7 +326,9 @@ export const taskService = {
       .from('tasks')
       .select(`
         *,
-        phases!inner(project_id)
+        phases!inner(project_id),
+        assignee:assignee_id(name),
+        completed_by_employee:completed_by(name)
       `)
       .eq('phase_id', phaseId)
       .order('due_date', { ascending: true });

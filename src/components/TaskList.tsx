@@ -16,6 +16,7 @@ interface ExtendedTask extends Task {
   actual_duration_minutes?: number;
   efficiency_percentage?: number;
   total_duration?: number;
+  completed_by_employee?: { name: string };
 }
 
 interface TaskListProps {
@@ -422,6 +423,9 @@ const TaskList: React.FC<TaskListProps> = ({
                     <div className="flex items-center gap-2">
                       <div className="text-sm text-gray-500">
                         Completed: {new Date(task.completed_at).toLocaleString()}
+                        {task.completed_by_employee?.name && (
+                          <span className="ml-1">by {task.completed_by_employee.name}</span>
+                        )}
                       </div>
                       <Button 
                         size="sm" 
