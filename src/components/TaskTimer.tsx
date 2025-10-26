@@ -331,13 +331,49 @@ const navigate = useNavigate();
 
   // Stop task mutation
   const stopTaskMutation = useMutation({
-    mutationFn: (registrationId: string) => timeRegistrationService.stopTask(registrationId),
+    mutationFn: async (registrationId: string) => {
+      // Stop the time registration first
+      await timeRegistrationService.stopTask(registrationId);
+      
+      // Only update actual duration for regular tasks, not workstation tasks
+      if (activeRegistration?.task_id && activeRegistration?.start_time) {
+        const start = new Date(activeRegistration.start_time);
+        const now = new Date();
+        const elapsedMinutes = Math.floor((now.getTime() - start.getTime()) / (1000 * 60));
+        
+        // Get current task data
+        const { data: currentTask } = await supabase
+          .from('tasks')
+          .select('actual_duration_minutes, duration')
+          .eq('id', activeRegistration.task_id)
+          .single();
+        
+        if (currentTask) {
+          const newActualDuration = (currentTask.actual_duration_minutes || 0) + elapsedMinutes;
+          const efficiencyPercentage = currentTask.duration > 0 
+            ? Math.round((currentTask.duration / newActualDuration) * 100)
+            : 100;
+          
+          // Update task with new actual duration and efficiency
+          await supabase
+            .from('tasks')
+            .update({
+              actual_duration_minutes: newActualDuration,
+              efficiency_percentage: efficiencyPercentage
+            })
+            .eq('id', activeRegistration.task_id);
+        }
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ['activeTimeRegistration']
       });
       queryClient.invalidateQueries({
         queryKey: ['workstationTasks']
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['taskDetails']
       });
       toast({
         title: 'Task Paused',
