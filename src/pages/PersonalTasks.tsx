@@ -309,7 +309,7 @@ const PersonalTasks = () => {
         });
       } else if (newStatus === 'COMPLETED') {
         console.log('Completing task:', taskId);
-        await timeRegistrationService.completeTask(taskId);
+        await timeRegistrationService.completeTask(taskId, currentEmployee?.id);
         await fetchActiveTimeRegistrations();
         
         await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });

@@ -463,7 +463,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
         description: t('task_completed_successfully')
       });
       
-      await timeRegistrationService.completeTask(taskId);
+      await timeRegistrationService.completeTask(taskId, currentEmployee?.id);
       const completedTask = fetchedTasks.find(task => task.id === taskId);
       if (completedTask) {
         await checkAndUpdateLimitPhases(completedTask);
@@ -526,7 +526,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
           description: t('task_completed_successfully')
         });
         
-        await timeRegistrationService.completeTask(taskId);
+        await timeRegistrationService.completeTask(taskId, currentEmployee?.id);
         const completedTask = fetchedTasks.find(task => task.id === taskId);
         if (completedTask) {
           await checkAndUpdateLimitPhases(completedTask);

@@ -647,7 +647,7 @@ const ProjectDetails = () => {
           description: t('task_started_desc')
         });
       } else if (statusValue === 'COMPLETED') {
-        await timeRegistrationService.completeTask(taskId);
+        await timeRegistrationService.completeTask(taskId, currentEmployee.id);
         toast({
           title: t('task_completed'),
           description: t('task_completed_desc')

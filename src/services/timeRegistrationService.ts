@@ -307,15 +307,21 @@ export const timeRegistrationService = {
     };
   },
 
-  async completeTask(taskId: string): Promise<void> {
+  async completeTask(taskId: string, employeeId?: string): Promise<void> {
     // First, stop all active time registrations for this task (both regular and workstation tasks)
     const { data: activeRegistrations, error: fetchError } = await supabase
       .from('time_registrations')
-      .select('id, start_time, task_id, workstation_task_id')
+      .select('id, start_time, task_id, workstation_task_id, employee_id')
       .or(`task_id.eq.${taskId},workstation_task_id.eq.${taskId}`)
       .eq('is_active', true);
     
     if (fetchError) throw fetchError;
+    
+    // Use the employee from the active registration if not provided
+    let completedBy = employeeId;
+    if (!completedBy && activeRegistrations && activeRegistrations.length > 0) {
+      completedBy = activeRegistrations[0].employee_id;
+    }
     
     if (activeRegistrations && activeRegistrations.length > 0) {
       const endTime = new Date();
@@ -343,13 +349,20 @@ export const timeRegistrationService = {
       .maybeSingle();
     
     if (taskExists) {
+      const updateData: any = {
+        status: 'COMPLETED',
+        completed_at: new Date().toISOString(),
+        assignee_id: null
+      };
+      
+      // Set completed_by if we have an employee
+      if (completedBy) {
+        updateData.completed_by = completedBy;
+      }
+      
       await supabase
         .from('tasks')
-        .update({
-          status: 'COMPLETED',
-          completed_at: new Date().toISOString(),
-          assignee_id: null
-        })
+        .update(updateData)
         .eq('id', taskId);
     }
   },
