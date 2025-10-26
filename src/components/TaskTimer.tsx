@@ -41,6 +41,7 @@ const navigate = useNavigate();
     registrationId: string;
     taskDetails: any;
     overTimeMinutes: number;
+    elapsedMinutes: number;
   } | null>(null);
   const timerRef = useRef<HTMLDivElement>(null);
   const pipWindow = useRef<Window | null>(null);
@@ -411,7 +412,8 @@ const navigate = useNavigate();
           setPendingStopData({
             registrationId: activeRegistration.id,
             taskDetails,
-            overTimeMinutes: overTime
+            overTimeMinutes: overTime,
+            elapsedMinutes
           });
           setShowExtraTimeDialog(true);
           return;
@@ -443,26 +445,20 @@ const navigate = useNavigate();
       });
     }
   };
-  const handleExtraTimeConfirm = (extraMinutes: number) => {
+  const handleExtraTimeConfirm = (totalMinutes: number) => {
     if (!pendingStopData) return;
 
-    // Update task duration first
+    // Update task duration to the selected total duration
     updateTaskDurationMutation.mutate({
       taskId: activeRegistration?.task_id,
       workstationTaskId: activeRegistration?.workstation_task_id,
-      extraMinutes
+      extraMinutes: totalMinutes
     });
 
     // Then stop the task
     stopTaskMutation.mutate(pendingStopData.registrationId);
     setShowExtraTimeDialog(false);
-  };
-  const handleExtraTimeCancel = () => {
-    if (!pendingStopData) return;
-
-    // Stop the task without updating duration
-    stopTaskMutation.mutate(pendingStopData.registrationId);
-    setShowExtraTimeDialog(false);
+    setPendingStopData(null);
   };
   const formatDuration = (startTime: string) => {
     const start = new Date(startTime);
@@ -591,7 +587,7 @@ const navigate = useNavigate();
     }, 1000);
   }
   return <>
-      <TaskExtraTimeDialog isOpen={showExtraTimeDialog} onClose={handleExtraTimeCancel} onConfirm={handleExtraTimeConfirm} taskTitle={pendingStopData?.taskDetails?.title || ''} overTimeMinutes={pendingStopData?.overTimeMinutes || 0} />
+      <TaskExtraTimeDialog isOpen={showExtraTimeDialog} onClose={() => {}} onConfirm={handleExtraTimeConfirm} taskTitle={pendingStopData?.taskDetails?.title || ''} overTimeMinutes={pendingStopData?.overTimeMinutes || 0} elapsedMinutes={pendingStopData?.elapsedMinutes || 0} />
       
       <div ref={timerRef} className={`fixed z-[9999] pointer-events-none transition-all duration-200 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isPictureInPicture ? 'opacity-50' : ''}`} style={{
       left: position.x === 0 && position.y === 16 ? '50%' : `${position.x}px`,

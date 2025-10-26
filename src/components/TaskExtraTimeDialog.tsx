@@ -1,11 +1,8 @@
 import React from 'react';
 import {
   AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
@@ -14,9 +11,10 @@ import { Button } from '@/components/ui/button';
 interface TaskExtraTimeDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (extraMinutes: number) => void;
+  onConfirm: (totalMinutes: number) => void;
   taskTitle: string;
   overTimeMinutes: number;
+  elapsedMinutes: number;
 }
 
 const TaskExtraTimeDialog: React.FC<TaskExtraTimeDialogProps> = ({
@@ -24,9 +22,18 @@ const TaskExtraTimeDialog: React.FC<TaskExtraTimeDialogProps> = ({
   onClose,
   onConfirm,
   taskTitle,
-  overTimeMinutes
+  overTimeMinutes,
+  elapsedMinutes
 }) => {
-  const extraTimeOptions = [30, 60, 90, 120, 150];
+  // Generate duration options based on elapsed time, rounded up to nearest 30 min interval
+  const baseTime = Math.ceil(elapsedMinutes / 30) * 30;
+  const durationOptions = [
+    baseTime,
+    baseTime + 30,
+    baseTime + 60,
+    baseTime + 90,
+    baseTime + 120
+  ];
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -38,10 +45,10 @@ const TaskExtraTimeDialog: React.FC<TaskExtraTimeDialogProps> = ({
   };
 
   return (
-    <AlertDialog open={isOpen} onOpenChange={onClose}>
+    <AlertDialog open={isOpen}>
       <AlertDialogContent className="max-w-md">
         <AlertDialogHeader>
-          <AlertDialogTitle>Task Exceeded Expected Time</AlertDialogTitle>
+          <AlertDialogTitle>Set Task Duration</AlertDialogTitle>
           <AlertDialogDescription className="space-y-2">
             <p className="font-medium text-sm">"{taskTitle}"</p>
             <p>
@@ -50,28 +57,22 @@ const TaskExtraTimeDialog: React.FC<TaskExtraTimeDialogProps> = ({
                 {formatTime(overTimeMinutes)}
               </span>.
             </p>
-            <p>How much extra time should be allocated for this task in the future?</p>
+            <p className="font-medium">Select the total duration for this task:</p>
           </AlertDialogDescription>
         </AlertDialogHeader>
         
         <div className="grid grid-cols-2 gap-2 my-4">
-          {extraTimeOptions.map((minutes) => (
+          {durationOptions.map((minutes) => (
             <Button
               key={minutes}
               variant="outline"
               className="h-12"
               onClick={() => onConfirm(minutes)}
             >
-              +{formatTime(minutes)}
+              {formatTime(minutes)}
             </Button>
           ))}
         </div>
-
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={onClose}>
-            Skip
-          </AlertDialogCancel>
-        </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );
