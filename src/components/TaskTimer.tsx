@@ -331,73 +331,13 @@ const navigate = useNavigate();
 
   // Stop task mutation
   const stopTaskMutation = useMutation({
-    mutationFn: async (registrationId: string) => {
-      // Stop the task first
-      await timeRegistrationService.stopTask(registrationId);
-      
-      // Calculate elapsed time and update task
-      if (activeRegistration?.start_time) {
-        const start = new Date(activeRegistration.start_time);
-        const end = new Date();
-        const elapsedMinutes = Math.floor((end.getTime() - start.getTime()) / (1000 * 60));
-        
-        // Update task actual duration and efficiency
-        if (activeRegistration.task_id) {
-          // Get current task data
-          const { data: currentTask } = await supabase
-            .from('tasks')
-            .select('actual_duration_minutes, duration')
-            .eq('id', activeRegistration.task_id)
-            .single();
-          
-          if (currentTask) {
-            const newActualDuration = (currentTask.actual_duration_minutes || 0) + elapsedMinutes;
-            const efficiencyPercentage = currentTask.duration 
-              ? Math.round((currentTask.duration / newActualDuration) * 100)
-              : 100;
-            
-            await supabase
-              .from('tasks')
-              .update({
-                actual_duration_minutes: newActualDuration,
-                efficiency_percentage: efficiencyPercentage
-              })
-              .eq('id', activeRegistration.task_id);
-          }
-        } else if (activeRegistration.workstation_task_id) {
-          // Get current workstation task data
-          const { data: currentTask } = await supabase
-            .from('workstation_tasks')
-            .select('actual_duration_minutes, duration')
-            .eq('id', activeRegistration.workstation_task_id)
-            .single();
-          
-          if (currentTask) {
-            const newActualDuration = (currentTask.actual_duration_minutes || 0) + elapsedMinutes;
-            const efficiencyPercentage = currentTask.duration 
-              ? Math.round((currentTask.duration / newActualDuration) * 100)
-              : 100;
-            
-            await supabase
-              .from('workstation_tasks')
-              .update({
-                actual_duration_minutes: newActualDuration,
-                efficiency_percentage: efficiencyPercentage
-              })
-              .eq('id', activeRegistration.workstation_task_id);
-          }
-        }
-      }
-    },
+    mutationFn: (registrationId: string) => timeRegistrationService.stopTask(registrationId),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ['activeTimeRegistration']
       });
       queryClient.invalidateQueries({
         queryKey: ['workstationTasks']
-      });
-      queryClient.invalidateQueries({
-        queryKey: ['taskDetails']
       });
       toast({
         title: 'Task Paused',
