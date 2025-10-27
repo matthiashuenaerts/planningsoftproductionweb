@@ -405,47 +405,11 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     }
   }, [resizing, handleResizeMove, handleResizeEnd]);
 
-  // Helper function to calculate project lanes to avoid overlaps
-  const calculateProjectLanes = (teamProjects: ProjectWithTeam[]) => {
-    const lanes: Map<number, { end: number }> = new Map();
-    const projectLanes: Map<string, number> = new Map();
-    
-    // Sort projects by start date
-    const sortedProjects = [...teamProjects].sort((a, b) => {
-      const dateA = new Date(a.project_team_assignments?.start_date || a.installation_date);
-      const dateB = new Date(b.project_team_assignments?.start_date || b.installation_date);
-      return dateA.getTime() - dateB.getTime();
-    });
-    
-    sortedProjects.forEach(project => {
-      const position = getProjectPosition(project);
-      if (!position) return;
-      
-      const startDate = new Date(project.project_team_assignments?.start_date || project.installation_date);
-      const startIndex = differenceInDays(startDate, dateRange[0]);
-      const endIndex = startIndex + position.duration;
-      
-      // Find the first available lane
-      let assignedLane = 0;
-      while (true) {
-        const lane = lanes.get(assignedLane);
-        if (!lane || lane.end <= startIndex) {
-          lanes.set(assignedLane, { end: endIndex });
-          projectLanes.set(project.id, assignedLane);
-          break;
-        }
-        assignedLane++;
-      }
-    });
-    
-    return { projectLanes, maxLanes: lanes.size };
-  };
-
   return (
-    <Card className="h-[calc(100vh-250px)] shadow-lg">
-      <CardHeader className="border-b bg-gradient-to-r from-background to-muted/30">
+    <Card className="h-[calc(100vh-250px)]">
+      <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-xl font-semibold">Installation Gantt Chart</CardTitle>
+          <CardTitle>Installation Gantt Chart</CardTitle>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Select value={selectedTeam} onValueChange={setSelectedTeam}>
@@ -513,244 +477,39 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
         </div>
       </CardHeader>
       
-      <CardContent className="p-0 h-[calc(100%-80px)]">
+      <CardContent className="h-full overflow-hidden">
         <div className="flex h-full">
-          {/* Fixed header row */}
-          <div className="flex w-full">
-            {/* Sidebar header */}
-            <div className="w-56 flex-shrink-0 border-r border-border bg-muted/20">
-              <div className="h-14 border-b border-border bg-gradient-to-r from-muted/60 to-muted/40 flex items-center px-4 font-semibold text-sm sticky top-0 z-10">
-                Teams & Employees
-              </div>
+          {/* Teams & Employees sidebar */}
+          <div className="w-48 border-r border-border bg-muted/20">
+            <div className="h-12 border-b border-border bg-muted/40 flex items-center px-4 font-semibold text-sm">
+              Teams & Employees
             </div>
-            
-            {/* Timeline header */}
-            <div className="flex-1 overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
-              <div className="h-14 border-b border-border bg-gradient-to-r from-muted/60 to-muted/40 flex sticky top-0 z-10" style={{ minWidth: dateRange.length * dayWidth }}>
-                {dateRange.map((date, index) => {
-                  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                  const isToday = isSameDay(date, new Date());
-                  return (
-                    <div
-                      key={index}
-                      className={cn(
-                        "border-r border-border/30 flex flex-col items-center justify-center text-xs transition-colors",
-                        isWeekend && "bg-muted/40",
-                        isToday && "bg-primary/10 border-primary/30"
-                      )}
-                      style={{ width: dayWidth, minWidth: dayWidth }}
-                    >
-                      <div className={cn("font-semibold", isToday && "text-primary")}>{format(date, 'dd')}</div>
-                      <div className={cn("text-muted-foreground text-[10px]", isToday && "text-primary/70")}>{format(date, 'EEE')}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Scrollable content area with synchronized scrolling */}
-        <div className="flex h-[calc(100%-56px)] overflow-hidden">
-          {/* Sidebar content */}
-          <div className="w-56 flex-shrink-0 border-r border-border bg-background overflow-y-auto" id="gantt-sidebar">
-            {/* Teams Section */}
-            <div className="border-b border-border bg-muted/20 sticky top-0 z-10">
-              <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Teams
-              </div>
-            </div>
-            {teams.map((team) => {
-              const teamProjects = projects.filter(project => {
-                const projectTeam = project.project_team_assignments?.team;
-                if (team.id === 'unassigned') return !projectTeam;
-                if (!projectTeam) return false;
-                const teamNameLower = team.name.toLowerCase();
-                const projectTeamLower = projectTeam.toLowerCase();
-                return projectTeamLower === teamNameLower ||
-                       projectTeamLower.includes(teamNameLower) ||
-                       teamNameLower.includes(projectTeamLower) ||
-                       (teamNameLower.includes('groen') && projectTeamLower.includes('green')) ||
-                       (teamNameLower.includes('green') && projectTeamLower.includes('groen')) ||
-                       (teamNameLower.includes('blauw') && projectTeamLower.includes('blue')) ||
-                       (teamNameLower.includes('blue') && projectTeamLower.includes('blauw'));
-              });
-              const { maxLanes } = calculateProjectLanes(teamProjects);
-              const rowHeight = Math.max(60, (maxLanes * 28) + 20);
-              
-              return (
-                <div 
-                  key={`team-${team.id}`} 
-                  className="border-b border-border/50 px-4 flex flex-col justify-center hover:bg-accent/50 transition-all group"
-                  style={{ minHeight: `${rowHeight}px` }}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div 
-                      className="w-3 h-3 rounded-full shadow-sm ring-2 ring-background"
-                      style={{ backgroundColor: team.color }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{team.name}</div>
-                      <div className="text-xs text-muted-foreground">{teamProjects.length} project{teamProjects.length !== 1 ? 's' : ''}</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Employees Section */}
-            <div className="border-b border-border bg-muted/20 sticky z-10 mt-6">
-              <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Employees
-              </div>
-            </div>
-            {teams.map((team) => {
-              const assignedEmployees = dailyAssignments
-                .filter(assignment => assignment.team_id === team.id)
-                .reduce((acc, assignment) => {
-                  const employee = employees.find(emp => emp.id === assignment.employee_id);
-                  if (employee && !acc.some(emp => emp.id === employee.id)) {
-                    acc.push(employee);
-                  }
-                  return acc;
-                }, [] as DailyEmployee[]);
-
-              return assignedEmployees.map((employee) => (
-                <div
-                  key={`employee-${team.id}-${employee.id}`}
-                  className="min-h-[60px] border-b border-border/50 px-4 pl-6 flex flex-col justify-center hover:bg-accent/50 transition-all group"
-                >
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-2 h-2 rounded-full shadow-sm"
-                      style={{ backgroundColor: team.color }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{employee.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">{employee.role}</div>
-                    </div>
-                  </div>
-                </div>
-              ));
-            })}
-          </div>
-          
-          {/* Timeline area with synchronized scroll */}
-          <div 
-            className="flex-1 overflow-auto" 
-            id="gantt-timeline"
-            ref={timelineRef}
-            onScroll={(e) => {
-              const sidebar = document.getElementById('gantt-sidebar');
-              if (sidebar) {
-                sidebar.scrollTop = e.currentTarget.scrollTop;
-              }
-            }}
-          >
-            <div style={{ minWidth: dateRange.length * dayWidth }}>
+            <div className="overflow-y-auto h-[calc(100%-48px)]">
               {/* Teams Section */}
-              <div className="border-b border-border bg-muted/10 sticky top-0 z-10">
-                <div className="h-8 flex items-center px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  &nbsp;
+              <div className="border-b border-border/50 bg-muted/30">
+                <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Installation Teams
                 </div>
               </div>
-              
-              {teams.map((team) => {
-                const teamProjects = projects.filter(project => {
-                  const projectTeam = project.project_team_assignments?.team;
-                  if (team.id === 'unassigned') return !projectTeam;
-                  if (!projectTeam) return false;
-                  const teamNameLower = team.name.toLowerCase();
-                  const projectTeamLower = projectTeam.toLowerCase();
-                  return projectTeamLower === teamNameLower ||
-                         projectTeamLower.includes(teamNameLower) ||
-                         teamNameLower.includes(projectTeamLower) ||
-                         (teamNameLower.includes('groen') && projectTeamLower.includes('green')) ||
-                         (teamNameLower.includes('green') && projectTeamLower.includes('groen')) ||
-                         (teamNameLower.includes('blauw') && projectTeamLower.includes('blue')) ||
-                         (teamNameLower.includes('blue') && projectTeamLower.includes('blauw'));
-                });
-                
-                const { projectLanes, maxLanes } = calculateProjectLanes(teamProjects);
-                const rowHeight = Math.max(60, (maxLanes * 28) + 20);
-                
-                return (
-                  <div 
-                    key={`team-row-${team.id}`} 
-                    className="border-b border-border/50 relative hover:bg-accent/20 transition-all"
-                    style={{ minHeight: `${rowHeight}px` }}
-                  >
-                    {/* Day grid */}
-                    {dateRange.map((date, dayIndex) => {
-                      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                      const isToday = isSameDay(date, new Date());
-                      return (
-                        <div
-                          key={dayIndex}
-                          className={cn(
-                            "absolute border-r transition-colors",
-                            isWeekend ? "border-border/20 bg-muted/30" : "border-border/10",
-                            isToday && "bg-primary/5 border-primary/20"
-                          )}
-                          style={{
-                            left: dayIndex * dayWidth,
-                            width: dayWidth,
-                            height: '100%'
-                          }}
-                        />
-                      );
-                    })}
-                    
-                    {/* Team-level projects with lanes */}
-                    {teamProjects.map((project) => {
-                      const position = getProjectPosition(project);
-                      if (!position) return null;
-                      
-                      const lane = projectLanes.get(project.id) || 0;
-                      const topPosition = 10 + (lane * 28);
-                      
-                      return (
-                        <div
-                          key={`${team.id}-${project.id}`}
-                          className="absolute rounded-lg flex items-center px-3 py-1.5 text-white text-xs font-medium cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] group"
-                          style={{
-                            left: position.left + 2,
-                            width: position.width - 4,
-                            top: topPosition,
-                            height: '24px',
-                            ...getTeamColorStyle(team),
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                          }}
-                          title={`${project.name} - ${project.client} (${position.duration} days)`}
-                          onClick={() => {
-                            const projectStartDate = new Date(project.project_team_assignments?.start_date || project.installation_date);
-                            openAssignmentDialog(project.id, project.name, team.id, team.name, projectStartDate);
-                          }}
-                        >
-                          <div className="truncate flex-1 flex items-center gap-2">
-                            <div className="font-semibold truncate">{project.name}</div>
-                            {project.progress > 0 && (
-                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                                {project.progress}%
-                              </Badge>
-                            )}
-                          </div>
-                          <Users className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
-                        </div>
-                      );
-                    })}
+              {teams.map((team) => (
+                <div key={`team-${team.id}`} className="h-16 border-b border-border/50 px-4 flex flex-col justify-center hover:bg-muted/30 transition-colors bg-muted/10">
+                  <div className="font-medium text-sm truncate flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: team.color }}
+                    />
+                    {team.name}
                   </div>
-                );
-              })}
-              
-              {/* Employees Section Header */}
-              <div className="border-b border-border bg-muted/10 sticky z-10 mt-6">
-                <div className="h-8 flex items-center px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  &nbsp;
+                  <div className="text-xs text-muted-foreground">Team Overview</div>
+                </div>
+              ))}
+
+              {/* Employees Section */}
+              <div className="border-b border-border/50 bg-muted/30 mt-4">
+                <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Team Members
                 </div>
               </div>
-              
-              {/* Employee Rows */}
               {teams.map((team) => {
                 const assignedEmployees = dailyAssignments
                   .filter(assignment => assignment.team_id === team.id)
@@ -764,38 +523,79 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
 
                 return assignedEmployees.map((employee) => (
                   <div
-                    key={`employee-row-${team.id}-${employee.id}`}
-                    className="min-h-[60px] border-b border-border/50 relative hover:bg-accent/20 transition-all"
+                    key={`employee-${team.id}-${employee.id}`}
+                    className="h-16 border-b border-border/50 px-6 flex flex-col justify-center hover:bg-muted/30 transition-colors"
                   >
+                    <div className="font-medium text-sm truncate flex items-center gap-2">
+                      <div 
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: team.color }}
+                      />
+                      {employee.name}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{team.name} - {employee.role}</div>
+                  </div>
+                ));
+              })}
+            </div>
+          </div>
+          
+          {/* Timeline area */}
+          <div className="flex-1 overflow-hidden" ref={timelineRef}>
+            <div style={{ width: '100%', minWidth: dateRange.length * dayWidth }}>
+              {/* Time header */}
+              <div className="h-12 border-b border-border bg-muted/40 flex">
+                {dateRange.map((date, index) => (
+                  <div
+                    key={index}
+                    className="border-r border-border/50 flex flex-col items-center justify-center text-xs"
+                    style={{ width: dayWidth }}
+                  >
+                    <div className="font-medium">{format(date, 'dd')}</div>
+                    <div className="text-muted-foreground">{format(date, 'EEE')}</div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Team rows with projects */}
+              <div className="relative">
+                {/* Teams Section Header */}
+                <div className="h-8 border-b border-border bg-muted/30 flex items-center px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Installation Teams
+                </div>
+                
+                {teams.map((team) => (
+                  <div key={`team-row-${team.id}`} className="h-16 border-b border-border/50 relative hover:bg-muted/10 transition-colors bg-muted/10">
                     {/* Day grid */}
-                    {dateRange.map((date, dayIndex) => {
-                      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                      const isToday = isSameDay(date, new Date());
-                      return (
-                        <div
-                          key={dayIndex}
-                          className={cn(
-                            "absolute border-r transition-colors",
-                            isWeekend ? "border-border/20 bg-muted/30" : "border-border/10",
-                            isToday && "bg-primary/5 border-primary/20"
-                          )}
-                          style={{
-                            left: dayIndex * dayWidth,
-                            width: dayWidth,
-                            height: '100%'
-                          }}
-                        />
-                      );
-                    })}
+                    {dateRange.map((date, dayIndex) => (
+                      <div
+                        key={dayIndex}
+                        className="absolute border-r border-border/30"
+                        style={{
+                          left: dayIndex * dayWidth,
+                          width: dayWidth,
+                          height: '100%',
+                          backgroundColor: date.getDay() === 0 || date.getDay() === 6 ? 'hsl(var(--muted)/0.5)' : 'transparent'
+                        }}
+                      />
+                    ))}
                     
-                    {/* Employee-specific project assignments */}
+                    {/* Team-level projects */}
                     {projects
                       .filter(project => {
-                        const teamAssignment = project.project_team_assignments;
-                        if (!teamAssignment) return false;
-                        const projectTeam = teamAssignment.team;
+                        const projectTeam = project.project_team_assignments?.team;
+                        
+                        // Handle unassigned team
+                        if (team.id === 'unassigned') {
+                          return !projectTeam;
+                        }
+                        
+                        if (!projectTeam) return false;
+                        
+                        // More flexible team name matching
                         const teamNameLower = team.name.toLowerCase();
                         const projectTeamLower = projectTeam.toLowerCase();
+                        
                         return projectTeamLower === teamNameLower ||
                                projectTeamLower.includes(teamNameLower) ||
                                teamNameLower.includes(projectTeamLower) ||
@@ -805,75 +605,174 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                                (teamNameLower.includes('blue') && projectTeamLower.includes('blauw'));
                       })
                       .map((project) => {
-                        const teamAssignment = project.project_team_assignments;
-                        if (!teamAssignment) return null;
-                        
-                        const projectStartDate = new Date(teamAssignment.start_date);
-                        const projectEndDate = new Date(projectStartDate);
-                        projectEndDate.setDate(projectEndDate.getDate() + teamAssignment.duration - 1);
-                        
-                        const employeeAssignedDays = dailyAssignments.filter(assignment => 
-                          assignment.employee_id === employee.id &&
-                          assignment.team_id === team.id &&
-                          assignment.is_available &&
-                          new Date(assignment.date) >= projectStartDate &&
-                          new Date(assignment.date) <= projectEndDate
-                        );
-                        
-                        if (employeeAssignedDays.length === 0) return null;
-                        
-                        const firstAssignmentDate = new Date(Math.min(...employeeAssignedDays.map(a => new Date(a.date).getTime())));
-                        const lastAssignmentDate = new Date(Math.max(...employeeAssignedDays.map(a => new Date(a.date).getTime())));
-                        
-                        const startDayIndex = differenceInDays(firstAssignmentDate, dateRange[0]);
-                        const endDayIndex = differenceInDays(lastAssignmentDate, dateRange[0]);
-                        
-                        if (endDayIndex < 0 || startDayIndex >= dateRange.length) return null;
-                        
-                        const left = Math.max(0, startDayIndex * dayWidth);
-                        const width = Math.min(
-                          (endDayIndex - Math.max(0, startDayIndex) + 1) * dayWidth,
-                          (dateRange.length - Math.max(0, startDayIndex)) * dayWidth
-                        );
+                        const position = getProjectPosition(project);
+                        if (!position) return null;
                         
                         return (
                           <div
-                            key={`${employee.id}-${project.id}`}
-                            data-resize-id={`${project.id}-${employee.id}`}
-                            className="absolute rounded-lg flex items-center text-white text-xs font-medium cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] group"
+                            key={`${team.id}-${project.id}`}
+                            className="absolute top-2 h-12 rounded-md flex items-center px-2 text-white text-xs font-medium cursor-pointer hover:opacity-90 transition-opacity group"
                             style={{
-                              left: left + 2,
-                              width: width - 4,
-                              top: '18px',
-                              height: '24px',
-                              ...getTeamColorStyle(team),
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                              left: position.left,
+                              width: position.width,
+                              ...getTeamColorStyle(team)
                             }}
-                            title={`${employee.name} - ${project.name} (${employeeAssignedDays.length} days)`}
+                            title={`${project.name} - ${project.client} (${position.duration} days)`}
+                            onClick={() => {
+                              const projectStartDate = new Date(project.project_team_assignments?.start_date || project.installation_date);
+                              openAssignmentDialog(project.id, project.name, team.id, team.name, projectStartDate);
+                            }}
                           >
-                            <div
-                              className="absolute left-0 top-0 w-3 h-full cursor-w-resize opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-black/20 transition-all rounded-l-lg"
-                              onMouseDown={(e) => handleResizeStart(e, project.id, employee.id, 'start', left, width)}
-                            >
-                              <GripVertical className="h-3 w-3" />
-                            </div>
-                            
-                            <div className="truncate flex-1 px-3">
+                            <div className="truncate flex-1">
                               <div className="font-semibold truncate">{project.name}</div>
+                              <div className="text-xs opacity-90 truncate">{project.client}</div>
                             </div>
-                            
-                            <div
-                              className="absolute right-0 top-0 w-3 h-full cursor-e-resize opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-black/20 transition-all rounded-r-lg"
-                              onMouseDown={(e) => handleResizeStart(e, project.id, employee.id, 'end', left, width)}
-                            >
-                              <GripVertical className="h-3 w-3" />
+                            <div className="flex items-center gap-1">
+                              {project.progress > 0 && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {project.progress}%
+                                </Badge>
+                              )}
+                              <Users className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                             </div>
                           </div>
                         );
                       })}
                   </div>
-                ));
-              })}
+                ))}
+                
+                {/* Employees Section Header */}
+                <div className="h-8 border-b border-border bg-muted/30 flex items-center px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-4">
+                  Team Members
+                </div>
+                
+                {/* Employee Rows */}
+                {teams.map((team) => {
+                  const assignedEmployees = dailyAssignments
+                    .filter(assignment => assignment.team_id === team.id)
+                    .reduce((acc, assignment) => {
+                      const employee = employees.find(emp => emp.id === assignment.employee_id);
+                      if (employee && !acc.some(emp => emp.id === employee.id)) {
+                        acc.push(employee);
+                      }
+                      return acc;
+                    }, [] as DailyEmployee[]);
+
+                  return assignedEmployees.map((employee) => (
+                    <div
+                      key={`employee-row-${team.id}-${employee.id}`}
+                      className="h-16 border-b border-border/50 relative hover:bg-muted/10 transition-colors"
+                    >
+                      {/* Day grid */}
+                      {dateRange.map((date, dayIndex) => (
+                        <div
+                          key={dayIndex}
+                          className="absolute border-r border-border/30"
+                          style={{
+                            left: dayIndex * dayWidth,
+                            width: dayWidth,
+                            height: '100%',
+                            backgroundColor: date.getDay() === 0 || date.getDay() === 6 ? 'hsl(var(--muted)/0.5)' : 'transparent'
+                          }}
+                        />
+                      ))}
+                      
+                      {/* Employee-specific project assignments with resize handles */}
+                      {projects
+                        .filter(project => {
+                          const teamAssignment = project.project_team_assignments;
+                          if (!teamAssignment) return false;
+                          
+                          // Check if this project is assigned to the current team
+                          const projectTeam = teamAssignment.team;
+                          const teamNameLower = team.name.toLowerCase();
+                          const projectTeamLower = projectTeam.toLowerCase();
+                          
+                          return projectTeamLower === teamNameLower ||
+                                 projectTeamLower.includes(teamNameLower) ||
+                                 teamNameLower.includes(projectTeamLower) ||
+                                 (teamNameLower.includes('groen') && projectTeamLower.includes('green')) ||
+                                 (teamNameLower.includes('green') && projectTeamLower.includes('groen')) ||
+                                 (teamNameLower.includes('blauw') && projectTeamLower.includes('blue')) ||
+                                 (teamNameLower.includes('blue') && projectTeamLower.includes('blauw'));
+                        })
+                        .map((project) => {
+                          const teamAssignment = project.project_team_assignments;
+                          if (!teamAssignment) return null;
+                          
+                          const projectStartDate = new Date(teamAssignment.start_date);
+                          const projectEndDate = new Date(projectStartDate);
+                          projectEndDate.setDate(projectEndDate.getDate() + teamAssignment.duration - 1);
+                          
+                          // Check if employee is assigned to this team during project period
+                          const employeeAssignedDays = dailyAssignments.filter(assignment => 
+                            assignment.employee_id === employee.id &&
+                            assignment.team_id === team.id &&
+                            assignment.is_available &&
+                            new Date(assignment.date) >= projectStartDate &&
+                            new Date(assignment.date) <= projectEndDate
+                          );
+                          
+                          if (employeeAssignedDays.length === 0) return null;
+                          
+                          // Calculate position for this employee's assignment
+                          const firstAssignmentDate = new Date(Math.min(...employeeAssignedDays.map(a => new Date(a.date).getTime())));
+                          const lastAssignmentDate = new Date(Math.max(...employeeAssignedDays.map(a => new Date(a.date).getTime())));
+                          
+                          const startDayIndex = differenceInDays(firstAssignmentDate, dateRange[0]);
+                          const endDayIndex = differenceInDays(lastAssignmentDate, dateRange[0]);
+                          
+                          // Only show if assignment intersects with current view
+                          if (endDayIndex < 0 || startDayIndex >= dateRange.length) {
+                            return null;
+                          }
+                          
+                          const left = Math.max(0, startDayIndex * dayWidth);
+                          const width = Math.min(
+                            (endDayIndex - Math.max(0, startDayIndex) + 1) * dayWidth,
+                            (dateRange.length - Math.max(0, startDayIndex)) * dayWidth
+                          );
+                          
+                          return (
+                            <div
+                              key={`${employee.id}-${project.id}`}
+                              data-resize-id={`${project.id}-${employee.id}`}
+                              className="absolute top-2 h-12 rounded-md flex items-center text-white text-xs font-medium cursor-pointer hover:opacity-90 transition-opacity group"
+                              style={{
+                                left: left,
+                                width: width - 2,
+                                ...getTeamColorStyle(team)
+                              }}
+                              title={`${employee.name} - ${project.name} (${employeeAssignedDays.length} days assigned, holidays excluded)`}
+                            >
+                              {/* Left resize handle */}
+                              <div
+                                className="absolute left-0 top-0 w-2 h-full cursor-w-resize opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-black/20 transition-all"
+                                onMouseDown={(e) => handleResizeStart(e, project.id, employee.id, 'start', left, width)}
+                              >
+                                <GripVertical className="h-3 w-3" />
+                              </div>
+                              
+                              {/* Content */}
+                              <div className="truncate flex-1 px-2">
+                                <div className="font-semibold truncate text-xs">{project.name}</div>
+                                <div className="text-xs opacity-75 truncate">{project.client}</div>
+                              </div>
+                              
+                              {/* Right resize handle */}
+                              <div
+                                className="absolute right-0 top-0 w-2 h-full cursor-e-resize opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-black/20 transition-all"
+                                onMouseDown={(e) => handleResizeStart(e, project.id, employee.id, 'end', left, width)}
+                              >
+                                <GripVertical className="h-3 w-3" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  ));
+                })}
+              </div>
             </div>
           </div>
         </div>
