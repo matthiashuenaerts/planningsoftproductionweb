@@ -106,17 +106,17 @@ const Logistics = () => {
   const todaysDeliveries = filterOrders(orders.filter(order => {
     const deliveryDate = new Date(order.expected_delivery);
     deliveryDate.setHours(0, 0, 0, 0);
-    return deliveryDate.getTime() === today.getTime() && (searchTerm ? true : order.status !== 'delivered');
+    return deliveryDate.getTime() === today.getTime() && (searchTerm ? true : (order.status !== 'delivered' && order.status !== 'charged'));
   }));
   
   const upcomingDeliveries = filterOrders(orders.filter(order => {
     const deliveryDate = new Date(order.expected_delivery);
-    return deliveryDate >= tomorrow && (searchTerm ? true : order.status !== 'delivered');
+    return deliveryDate >= tomorrow && (searchTerm ? true : (order.status !== 'delivered' && order.status !== 'charged'));
   }));
   
   const backorderDeliveries = filterOrders(orders.filter(order => {
     const deliveryDate = new Date(order.expected_delivery);
-    return deliveryDate < today && (searchTerm ? true : order.status !== 'delivered');
+    return deliveryDate < today && (searchTerm ? true : (order.status !== 'delivered' && order.status !== 'charged'));
   }));
 
   const handleDeliveryConfirmed = () => {
