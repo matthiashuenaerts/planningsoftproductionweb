@@ -2983,6 +2983,14 @@ export type Database = {
         Args: { installation_date: string }
         Returns: string
       }
+      check_employee_role: {
+        Args: { _role: string; _user_id: string }
+        Returns: boolean
+      }
+      check_employee_roles: {
+        Args: { _roles: string[]; _user_id: string }
+        Returns: boolean
+      }
       create_storage_policy: {
         Args: {
           bucket_name: string
