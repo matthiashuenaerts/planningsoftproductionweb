@@ -63,24 +63,23 @@ const Login: React.FC = () => {
     try {
       setLoading(true);
 
-      // Query the employees table by name
+      // Use the secure authentication function
       const {
         data: employees,
         error: queryError
-      } = await supabase.from('employees').select('*').eq('name', name).limit(1);
+      } = await supabase.rpc('authenticate_employee', {
+        employee_name: name,
+        employee_password: password
+      });
+      
       if (queryError) {
         console.error('Database query error:', queryError);
         throw new Error('Failed to connect to database');
       }
       if (!employees || employees.length === 0) {
-        throw new Error('Employee not found');
+        throw new Error('Invalid username or password');
       }
       const employee = employees[0];
-
-      // Simple password check (in a real app, you would use proper hashing)
-      if (employee.password !== password) {
-        throw new Error('Incorrect password');
-      }
 
       // Ensure role is a valid type
       const validRoles = ['workstation', 'admin', 'manager', 'worker', 'installation_team', 'preparater', 'teamleader'] as const;

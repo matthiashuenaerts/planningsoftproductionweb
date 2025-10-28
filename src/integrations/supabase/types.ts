@@ -2979,6 +2979,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      authenticate_employee: {
+        Args: { employee_name: string; employee_password: string }
+        Returns: {
+          avatar_url: string
+          email: string
+          hourly_rate: number
+          id: string
+          name: string
+          phone: string
+          role: string
+          skills: string[]
+        }[]
+      }
       calculate_loading_date: {
         Args: { installation_date: string }
         Returns: string
