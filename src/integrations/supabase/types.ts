@@ -2982,15 +2982,10 @@ export type Database = {
       authenticate_employee: {
         Args: { employee_name: string; employee_password: string }
         Returns: {
-          avatar_url: string
-          email: string
-          hourly_rate: number
           id: string
           logistics: boolean
           name: string
-          phone: string
           role: string
-          skills: string[]
           workstation: string
         }[]
       }
