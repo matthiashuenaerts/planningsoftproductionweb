@@ -2986,10 +2986,12 @@ export type Database = {
           email: string
           hourly_rate: number
           id: string
+          logistics: boolean
           name: string
           phone: string
           role: string
           skills: string[]
+          workstation: string
         }[]
       }
       calculate_loading_date: {

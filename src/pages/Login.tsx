@@ -70,7 +70,7 @@ const Login: React.FC = () => {
       } = await supabase.rpc('authenticate_employee', {
         employee_name: name,
         employee_password: password
-      });
+      }) as { data: any[] | null; error: any };
       
       if (queryError) {
         console.error('Database query error:', queryError);
@@ -90,8 +90,8 @@ const Login: React.FC = () => {
         id: employee.id,
         name: employee.name,
         role: employeeRole,
-        workstation: employee.workstation,
-        logistics: employee.logistics
+        workstation: employee.workstation || null,
+        logistics: employee.logistics || false
       });
       toast({
         title: "Login successful",
