@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import TaskList from './TaskList';
 import SeedDataButton from './SeedDataButton';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,7 +35,6 @@ interface LoadingAssignment {
 }
 const Dashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [todaysTasks, setTodaysTasks] = useState<Task[]>([]);
   const [recentCompletedTasks, setRecentCompletedTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [tasksByPriority, setTasksByPriority] = useState<any[]>([]);
@@ -79,10 +77,6 @@ const Dashboard: React.FC = () => {
         // Fetch projects
         const projectsData = await projectService.getAll();
         setProjects(projectsData);
-
-        // Fetch today's tasks
-        const todaysTasksData = await taskService.getTodaysTasks();
-        setTodaysTasks(todaysTasksData);
 
         // Fetch all tasks (for chart data)
         const allTasks = await taskService.getAll();
@@ -476,7 +470,6 @@ const Dashboard: React.FC = () => {
   const totalProjects = projects.length;
   const completedProjects = projects.filter(p => p.status === 'completed').length;
   const inProgressProjects = projects.filter(p => p.status === 'in_progress').length;
-  const overdueCount = todaysTasks.filter(task => new Date(task.due_date) < new Date() && task.status !== 'COMPLETED').length;
 
   // Tasks completed today
   const todayCompletedCount = recentCompletedTasks.filter(task => task.completed_at && isToday(parseISO(task.completed_at))).length;
@@ -514,9 +507,8 @@ const Dashboard: React.FC = () => {
           <SeedDataButton />
         </div>}
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard title="Total Projects" value={totalProjects.toString()} footer="Projects managed" icon={<Calendar className="h-5 w-5 text-blue-500" />} />
-        <StatCard title="Tasks Today" value={todaysTasks.length.toString()} footer={`${overdueCount} overdue`} icon={<Clock className="h-5 w-5 text-amber-500" />} />
         <StatCard title="Completed Today" value={todayCompletedCount.toString()} footer="Tasks fulfilled today" icon={<CheckCircle2 className="h-5 w-5 text-green-600" />} />
         {upcomingEvents.length > 0 && <StatCard title="Logistiek Uitgaand" value={upcomingEvents.length.toString()} valueSubtext={upcomingEvents[0] ? `Next: ${format(new Date(upcomingEvents[0].date), 'dd/MM')}` : ''} footer={upcomingEvents.slice(0, 2).map(event => `<span style="color: ${event.type === 'return' ? '#22c55e' : '#3b82f6'}">${format(new Date(event.date), 'dd/MM')} - ${event.project_name}</span>`).join('<br>')} icon={<Users className="h-5 w-5 text-purple-500" />} onClick={() => navigate(createLocalizedPath('/logistics-out'))} />}
         <StatCard title="Truck Loading" value={truckLoadingData.todayLoadings.length > 0 ? truckLoadingData.todayLoadings.length.toString() : truckLoadingData.daysToNext.toString()} footer={truckLoadingData.todayLoadings.length > 0 ? `Loading today: ${truckLoadingData.todayLoadings.map(l => l.project.name).join(', ')}` : truckLoadingData.daysToNext > 0 ? `${truckLoadingData.daysToNext} days to next loading` : 'No upcoming loadings'} icon={<Truck className="h-5 w-5 text-orange-500" />} />
@@ -650,54 +642,6 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
       </div>
-
-      
-      <TaskList tasks={todaysTasks} title="Today's Tasks" onTaskStatusChange={async (taskId, status) => {
-      try {
-        const now = new Date().toISOString();
-        await taskService.update(taskId, {
-          status,
-          ...(status === 'COMPLETED' ? {
-            completed_at: now,
-            completed_by: currentEmployee?.id
-          } : {})
-        });
-
-        // Update local state
-        setTodaysTasks(todaysTasks.map(task => task.id === taskId ? {
-          ...task,
-          status,
-          ...(status === 'COMPLETED' ? {
-            completed_at: now,
-            completed_by: currentEmployee?.id
-          } : {})
-        } : task));
-        toast({
-          title: "Task updated",
-          description: "Task status has been successfully updated."
-        });
-
-        // If it was completed, also update the completed tasks list
-        if (status === 'COMPLETED') {
-          const updatedTask = todaysTasks.find(task => task.id === taskId);
-          if (updatedTask) {
-            const updatedCompletedTask = {
-              ...updatedTask,
-              status,
-              completed_at: now,
-              completed_by: currentEmployee?.id
-            };
-            setRecentCompletedTasks([updatedCompletedTask, ...recentCompletedTasks.slice(0, 9)]);
-          }
-        }
-      } catch (error: any) {
-        toast({
-          title: "Error",
-          description: `Failed to update task: ${error.message}`,
-          variant: "destructive"
-        });
-      }
-    }} />
     </div>;
 };
 interface StatCardProps {
