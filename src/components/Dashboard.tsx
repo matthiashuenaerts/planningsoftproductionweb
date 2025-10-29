@@ -30,6 +30,7 @@ interface LoadingAssignment {
   orderStatus?: {
     undeliveredCount: number;
     allDelivered: boolean;
+    allCharged: boolean;
   };
   teamColor?: string;
 }
@@ -313,25 +314,26 @@ const Dashboard: React.FC = () => {
         };
       }));
 
-      // Enhance assignments with order status and team colors
-      const enhancedAssignments = await Promise.all(weekLoadingAssignments.map(async assignment => {
-        // Calculate order status - count undelivered items instead of undelivered orders
-        const projectOrders = ordersData?.filter(o => o.project_id === assignment.project.id) || [];
-        let undeliveredItemsCount = 0;
+        // Enhance assignments with order status and team colors
+        const enhancedAssignments = await Promise.all(weekLoadingAssignments.map(async assignment => {
+          // Calculate order status - count undelivered items instead of undelivered orders
+          const projectOrders = ordersData?.filter(o => o.project_id === assignment.project.id) || [];
+          let undeliveredItemsCount = 0;
 
-        // Count undelivered items from orders with certain statuses
-        for (const order of projectOrders) {
-          if (['pending', 'delayed', 'partially_delivered'].includes(order.status)) {
-            try {
-              const items = await orderService.getOrderItems(order.id);
-              const undeliveredItems = items.filter(item => (item.quantity || 0) > (item.delivered_quantity || 0));
-              undeliveredItemsCount += undeliveredItems.length;
-            } catch (error) {
-              console.error(`Error loading order items for order ${order.id}:`, error);
+          // Count undelivered items from orders with certain statuses
+          for (const order of projectOrders) {
+            if (['pending', 'delayed', 'partially_delivered'].includes(order.status)) {
+              try {
+                const items = await orderService.getOrderItems(order.id);
+                const undeliveredItems = items.filter(item => (item.quantity || 0) > (item.delivered_quantity || 0));
+                undeliveredItemsCount += undeliveredItems.length;
+              } catch (error) {
+                console.error(`Error loading order items for order ${order.id}:`, error);
+              }
             }
           }
-        }
-        const allOrdersDelivered = projectOrders.length > 0 && projectOrders.every(o => o.status === 'delivered');
+          const allOrdersDelivered = projectOrders.length > 0 && projectOrders.every(o => o.status === 'delivered');
+          const allOrdersCharged = projectOrders.length > 0 && projectOrders.every(o => o.status === 'charged');
 
         // Get team color
         const teamAssignment = teamAssignments.find(ta => ta.projectId === assignment.project.id);
@@ -346,14 +348,15 @@ const Dashboard: React.FC = () => {
             }
           }
         }
-        return {
-          ...assignment,
-          orderStatus: {
-            undeliveredCount: undeliveredItemsCount,
-            allDelivered: allOrdersDelivered
-          },
-          teamColor
-        };
+          return {
+            ...assignment,
+            orderStatus: {
+              undeliveredCount: undeliveredItemsCount,
+              allDelivered: allOrdersDelivered,
+              allCharged: allOrdersCharged
+            },
+            teamColor
+          };
       }));
 
       // Merge with existing assignments
@@ -552,9 +555,15 @@ const Dashboard: React.FC = () => {
                   <div className="space-y-1">
                     {dayAssignments.map((assignment, index) => {
                   const isManuallyAdjusted = manualOverrides[assignment.project.id] !== undefined;
-                  return <div key={`${assignment.project.id}-${index}`} className={cn("p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity relative", getProjectColor(assignment.project.status), getTeamBackgroundColor(assignment.teamColor), isManuallyAdjusted && "ring-2 ring-orange-400")} onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}>
+                  const isCharged = assignment.orderStatus?.allCharged;
+                  return <div key={`${assignment.project.id}-${index}`} className={cn("p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity relative", getProjectColor(assignment.project.status), getTeamBackgroundColor(assignment.teamColor), isManuallyAdjusted && "ring-2 ring-orange-400", isCharged && "opacity-50")} onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}>
+                          {/* Charged status indicator - large checkmark */}
+                          {isCharged && <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-green-600 text-2xl font-bold z-10">
+                              ✓
+                            </div>}
+                          
                           {/* Order status indicator */}
-                          {assignment.orderStatus && <div className={cn("absolute -top-1 -right-1 rounded-full text-xs font-bold text-white flex items-center justify-center min-w-[16px] h-4 px-1", assignment.orderStatus.allDelivered ? "bg-green-500" : "bg-red-500")}>
+                          {assignment.orderStatus && !isCharged && <div className={cn("absolute -top-1 -right-1 rounded-full text-xs font-bold text-white flex items-center justify-center min-w-[16px] h-4 px-1", assignment.orderStatus.allDelivered ? "bg-green-500" : "bg-red-500")}>
                               {assignment.orderStatus.allDelivered ? "✓" : assignment.orderStatus.undeliveredCount}
                             </div>}
                           
