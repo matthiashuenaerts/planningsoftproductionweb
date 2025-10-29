@@ -481,18 +481,48 @@ const navigate = useNavigate();
       });
     }
   };
-  const handleExtraTimeConfirm = (totalMinutes: number) => {
-    if (!pendingStopData) return;
+  const handleExtraTimeConfirm = async (totalMinutes: number) => {
+    if (!pendingStopData || !currentEmployee) return;
 
-    // Update task duration to the selected total duration
-    updateTaskDurationMutation.mutate({
-      taskId: activeRegistration?.task_id,
-      workstationTaskId: activeRegistration?.workstation_task_id,
-      extraMinutes: totalMinutes
-    });
+    try {
+      // First, update the task duration to the selected value
+      if (activeRegistration?.task_id) {
+        await supabase.from('tasks').update({
+          duration: totalMinutes
+        }).eq('id', activeRegistration.task_id);
+      } else if (activeRegistration?.workstation_task_id) {
+        await supabase.from('workstation_tasks').update({
+          duration: totalMinutes
+        }).eq('id', activeRegistration.workstation_task_id);
+      }
 
-    // Then stop the task
-    stopTaskMutation.mutate(pendingStopData.registrationId);
+      // Stop the current registration
+      await timeRegistrationService.stopTask(pendingStopData.registrationId);
+
+      // Start a new registration with the updated duration (resets timer to 0)
+      if (activeRegistration?.task_id) {
+        await timeRegistrationService.startTask(currentEmployee.id, activeRegistration.task_id, totalMinutes);
+      } else if (activeRegistration?.workstation_task_id) {
+        await timeRegistrationService.startWorkstationTask(currentEmployee.id, activeRegistration.workstation_task_id);
+      }
+
+      // Refresh queries
+      queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+      queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
+
+      toast({
+        title: 'Task Duration Updated',
+        description: `Timer reset with ${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m duration`
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update task duration',
+        variant: 'destructive'
+      });
+      console.error('Update task duration error:', error);
+    }
+
     setShowExtraTimeDialog(false);
     setPendingStopData(null);
   };
