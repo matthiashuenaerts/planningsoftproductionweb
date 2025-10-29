@@ -557,14 +557,9 @@ const Dashboard: React.FC = () => {
                   const isManuallyAdjusted = manualOverrides[assignment.project.id] !== undefined;
                   const isCharged = assignment.orderStatus?.allCharged;
                   return <div key={`${assignment.project.id}-${index}`} className={cn("p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity relative", getProjectColor(assignment.project.status), getTeamBackgroundColor(assignment.teamColor), isManuallyAdjusted && "ring-2 ring-orange-400", isCharged && "opacity-50")} onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}>
-                          {/* Charged status indicator - large checkmark */}
-                          {isCharged && <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-green-600 text-2xl font-bold z-10">
-                              ✓
-                            </div>}
-                          
                           {/* Order status indicator */}
-                          {assignment.orderStatus && !isCharged && <div className={cn("absolute -top-1 -right-1 rounded-full text-xs font-bold text-white flex items-center justify-center min-w-[16px] h-4 px-1", assignment.orderStatus.allDelivered ? "bg-green-500" : "bg-red-500")}>
-                              {assignment.orderStatus.allDelivered ? "✓" : assignment.orderStatus.undeliveredCount}
+                          {assignment.orderStatus && <div className={cn("absolute -top-1 -right-1 rounded-full text-xs font-bold text-white flex items-center justify-center min-w-[16px] h-4 px-1", isCharged ? "bg-green-600" : assignment.orderStatus.allDelivered ? "bg-green-500" : "bg-red-500")}>
+                              {isCharged || assignment.orderStatus.allDelivered ? "✓" : assignment.orderStatus.undeliveredCount}
                             </div>}
                           
                           {/* Manual override indicator */}
