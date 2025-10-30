@@ -239,10 +239,25 @@ const handler = async (req: Request): Promise<Response> => {
 
         if (ordersError) {
           console.error(`Error fetching orders for project ${project.id}:`, ordersError);
-          return { ...project, orders: [] };
+          return { ...project, orders: [], hasUndeliveredItems: false };
         }
 
-        return { ...project, orders: orders || [] };
+        // Filter orders to only include those with undelivered items
+        const ordersWithUndeliveredItems = (orders || []).map(order => {
+          const undeliveredItems = (order.order_items || []).filter(
+            item => item.quantity > (item.delivered_quantity || 0)
+          );
+          return { ...order, order_items: undeliveredItems };
+        }).filter(order => order.order_items.length > 0);
+
+        // Check if project has any undelivered items
+        const hasUndeliveredItems = ordersWithUndeliveredItems.length > 0;
+
+        return { 
+          ...project, 
+          orders: ordersWithUndeliveredItems,
+          hasUndeliveredItems 
+        };
       })
     );
 
@@ -258,6 +273,8 @@ const handler = async (req: Request): Promise<Response> => {
           h2 { color: #1e40af; margin-top: 30px; }
           h3 { color: #475569; margin-top: 20px; }
           .project { background: #f8fafc; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #2563eb; }
+          .project-delivered { border-left-color: #16a34a; }
+          .project-undelivered { border-left-color: #dc2626; }
           .order { background: #fff; padding: 15px; margin: 15px 0; border-radius: 6px; border: 1px solid #e2e8f0; }
           .order-item { background: #f1f5f9; padding: 10px; margin: 10px 0; border-radius: 4px; }
           .status { padding: 4px 8px; border-radius: 4px; font-weight: bold; display: inline-block; }
@@ -266,7 +283,8 @@ const handler = async (req: Request): Promise<Response> => {
           .status-partially_delivered { background: #dbeafe; color: #1e40af; }
           table { width: 100%; border-collapse: collapse; margin: 10px 0; }
           th, td { padding: 8px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-          th { background: #f1f5f9; font-weight: bold; }
+          th { background: #f1f5f9; font-weight: bold; width: 200px; }
+          td { width: auto; }
           .summary { background: #eff6ff; padding: 15px; border-radius: 6px; margin: 20px 0; }
         </style>
       </head>
@@ -280,7 +298,7 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
 
           ${projectsWithOrders.map(project => `
-            <div class="project">
+            <div class="project ${project.hasUndeliveredItems ? 'project-undelivered' : 'project-delivered'}">
               <h2>🏗️ ${project.name}</h2>
               <table>
                 <tr><th>${t.client}</th><td>${project.client || 'N/A'}</td></tr>
