@@ -8,6 +8,10 @@ import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loa
 import { differenceInDays, isBefore } from 'date-fns';
 import TaskCompletionChecklistDialog from './TaskCompletionChecklistDialog';
 import { checklistService } from '@/services/checklistService';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { timeRegistrationService } from '@/services/timeRegistrationService';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface ExtendedTask extends Task {
   timeRemaining?: string;
@@ -17,6 +21,7 @@ interface ExtendedTask extends Task {
   efficiency_percentage?: number;
   total_duration?: number;
   completed_by_employee?: { name: string };
+  is_workstation_task?: boolean;
 }
 
 interface TaskListProps {
@@ -42,6 +47,9 @@ const TaskList: React.FC<TaskListProps> = ({
   showEfficiencyData = false,
   onTaskStatusChange 
 }) => {
+  const { currentEmployee } = useAuth();
+  const { toast } = useToast();
+  const { t } = useLanguage();
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
   const [completingTasks, setCompletingTasks] = useState<Set<string>>(new Set());
   const [checklistDialogTask, setChecklistDialogTask] = useState<{
@@ -115,6 +123,46 @@ const TaskList: React.FC<TaskListProps> = ({
       return `${hours}h ${mins}m`;
     }
     return `${mins}m`;
+  };
+
+  const handleJoinTask = async (taskId: string) => {
+    if (!currentEmployee) {
+      toast({
+        title: t('error'),
+        description: 'Please log in to join a task',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    try {
+      const currentTask = tasks.find(task => task.id === taskId);
+      if (currentTask?.is_workstation_task) {
+        await timeRegistrationService.startWorkstationTask(currentEmployee.id, taskId);
+        toast({
+          title: t('workstation_task_started'),
+          description: t('timer_started_ws_desc')
+        });
+      } else {
+        const remainingDuration = currentTask?.duration;
+        await timeRegistrationService.startTask(currentEmployee.id, taskId, remainingDuration);
+        toast({
+          title: t('timer_started'),
+          description: t('timer_started_desc')
+        });
+      }
+      // Trigger refresh if callback exists
+      if (onTaskUpdate && currentTask) {
+        onTaskUpdate(currentTask);
+      }
+    } catch (error) {
+      console.error('Error joining task:', error);
+      toast({
+        title: t('error'),
+        description: t('failed_to_start_timer_error'),
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleStatusChange = async (task: ExtendedTask, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
@@ -395,6 +443,13 @@ const TaskList: React.FC<TaskListProps> = ({
                   )}
                   {task.status === 'IN_PROGRESS' && (
                     <>
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleJoinTask(task.id)}
+                        className="bg-blue-500 hover:bg-blue-600"
+                      >
+                        {t('join_task')}
+                      </Button>
                       <Button 
                         size="sm" 
                         onClick={() => handleStatusChange(task, 'COMPLETED')}
