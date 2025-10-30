@@ -297,47 +297,50 @@ const handler = async (req: Request): Promise<Response> => {
             <strong>${t.totalOrders}</strong> ${projectsWithOrders.reduce((acc, p) => acc + p.orders.length, 0)}
           </div>
 
-          ${projectsWithOrders.map(project => `
-            <div class="project ${project.hasUndeliveredItems ? 'project-undelivered' : 'project-delivered'}">
-              <h2>🏗️ ${project.name}</h2>
-              <table>
-                <tr><th>${t.client}</th><td>${project.client || 'N/A'}</td></tr>
-                <tr><th>${t.installationDate}</th><td>${new Date(project.installation_date).toLocaleDateString()}</td></tr>
-                <tr><th>${t.status}</th><td><span class="status status-${project.status}">${project.status}</span></td></tr>
-                ${project.description ? `<tr><th>${t.description}</th><td>${project.description}</td></tr>` : ''}
-              </table>
+          ${projectsWithOrders.map(project => {
+            const borderColor = project.hasUndeliveredItems ? '#dc2626' : '#16a34a';
+            return `
+              <div class="project" style="border-left: 4px solid ${borderColor};">
+                <h2>🏗️ ${project.name}</h2>
+                <table>
+                  <tr><th>${t.client}</th><td>${project.client || 'N/A'}</td></tr>
+                  <tr><th>${t.installationDate}</th><td>${new Date(project.installation_date).toLocaleDateString()}</td></tr>
+                  <tr><th>${t.status}</th><td><span class="status status-${project.status}">${project.status}</span></td></tr>
+                  ${project.description ? `<tr><th>${t.description}</th><td>${project.description}</td></tr>` : ''}
+                </table>
 
-              ${project.orders.length > 0 ? `
-                <h3>${t.undeliveredOrders(project.orders.length)}</h3>
-                ${project.orders.map(order => `
-                  <div class="order">
-                    <strong>${t.supplier}</strong> ${order.supplier}<br>
-                    <strong>${t.orderType}</strong> ${order.order_type}<br>
-                    <strong>${t.orderDate}</strong> ${new Date(order.order_date).toLocaleDateString()}<br>
-                    <strong>${t.expectedDelivery}</strong> ${new Date(order.expected_delivery).toLocaleDateString()}<br>
-                    <strong>${t.status}</strong> <span class="status status-${order.status}">${order.status}</span><br>
-                    ${order.external_order_number ? `<strong>${t.orderNumber}</strong> ${order.external_order_number}<br>` : ''}
-                    ${order.notes ? `<strong>${t.notes}</strong> ${order.notes}<br>` : ''}
+                ${project.orders.length > 0 ? `
+                  <h3>${t.undeliveredOrders(project.orders.length)}</h3>
+                  ${project.orders.map(order => `
+                    <div class="order">
+                      <strong>${t.supplier}</strong> ${order.supplier}<br>
+                      <strong>${t.orderType}</strong> ${order.order_type}<br>
+                      <strong>${t.orderDate}</strong> ${new Date(order.order_date).toLocaleDateString()}<br>
+                      <strong>${t.expectedDelivery}</strong> ${new Date(order.expected_delivery).toLocaleDateString()}<br>
+                      <strong>${t.status}</strong> <span class="status status-${order.status}">${order.status}</span><br>
+                      ${order.external_order_number ? `<strong>${t.orderNumber}</strong> ${order.external_order_number}<br>` : ''}
+                      ${order.notes ? `<strong>${t.notes}</strong> ${order.notes}<br>` : ''}
 
-                    ${order.order_items && order.order_items.length > 0 ? `
-                      <h4>${t.items(order.order_items.length)}</h4>
-                      ${order.order_items.map(item => `
-                        <div class="order-item">
-                          <strong>${item.description}</strong><br>
-                          ${item.article_code ? `${t.articleCode} ${item.article_code}<br>` : ''}
-                          ${item.ean ? `${t.ean} ${item.ean}<br>` : ''}
-                          ${t.ordered} ${item.quantity} | ${t.delivered} ${item.delivered_quantity || 0} | 
-                          <strong>${t.remaining} ${item.quantity - (item.delivered_quantity || 0)}</strong><br>
-                          ${item.stock_location ? `${t.location} ${item.stock_location}<br>` : ''}
-                          ${item.notes ? `${t.notes} ${item.notes}` : ''}
-                        </div>
-                      `).join('')}
-                    ` : `<p>${t.noItems}</p>`}
-                  </div>
-                `).join('')}
-              ` : `<p>${t.noOrders}</p>`}
-            </div>
-          `).join('')}
+                      ${order.order_items && order.order_items.length > 0 ? `
+                        <h4>${t.items(order.order_items.length)}</h4>
+                        ${order.order_items.map(item => `
+                          <div class="order-item">
+                            <strong>${item.description}</strong><br>
+                            ${item.article_code ? `${t.articleCode} ${item.article_code}<br>` : ''}
+                            ${item.ean ? `${t.ean} ${item.ean}<br>` : ''}
+                            ${t.ordered} ${item.quantity} | ${t.delivered} ${item.delivered_quantity || 0} | 
+                            <strong>${t.remaining} ${item.quantity - (item.delivered_quantity || 0)}</strong><br>
+                            ${item.stock_location ? `${t.location} ${item.stock_location}<br>` : ''}
+                            ${item.notes ? `${t.notes} ${item.notes}` : ''}
+                          </div>
+                        `).join('')}
+                      ` : `<p>${t.noItems}</p>`}
+                    </div>
+                  `).join('')}
+                ` : `<p>${t.noOrders}</p>`}
+              </div>
+            `;
+          }).join('')}
 
           <div class="summary">
             <p><strong>${t.notes}</strong> ${t.noteFooter}</p>
