@@ -492,14 +492,23 @@ const TaskList: React.FC<TaskListProps> = ({
                     </div>
                   )}
                   {task.status === 'HOLD' && (
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      disabled
-                      className="opacity-50"
-                    >
-                      Waiting for Limit Phases
-                    </Button>
+                    <div className="flex gap-2 items-center">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        disabled
+                        className="opacity-50"
+                      >
+                        Waiting for Limit Phases
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleStatusChange(task, 'IN_PROGRESS')}
+                        className="bg-blue-500 hover:bg-blue-600"
+                      >
+                        Start Task
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
