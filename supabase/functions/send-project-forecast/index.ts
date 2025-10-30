@@ -273,8 +273,8 @@ const handler = async (req: Request): Promise<Response> => {
           h2 { color: #1e40af; margin-top: 30px; }
           h3 { color: #475569; margin-top: 20px; }
           .project { background: #f8fafc; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #2563eb; }
-          .project-delivered { border-left-color: #16a34a; }
-          .project-undelivered { border-left-color: #dc2626; }
+          .project-delivered { border-left: 4px solid #16a34a !important; }
+          .project-undelivered { border-left: 4px solid #dc2626 !important; }
           .order { background: #fff; padding: 15px; margin: 15px 0; border-radius: 6px; border: 1px solid #e2e8f0; }
           .order-item { background: #f1f5f9; padding: 10px; margin: 10px 0; border-radius: 4px; }
           .status { padding: 4px 8px; border-radius: 4px; font-weight: bold; display: inline-block; }
