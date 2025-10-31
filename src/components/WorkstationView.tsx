@@ -37,6 +37,7 @@ interface ExtendedTask extends Task {
   isOvertime?: boolean;
   assignee_name?: string;
   active_workers?: number;
+  active_users?: Array<{ id: string; name: string }>;
   project_id?: string;
   is_workstation_task?: boolean;
   isCompleting?: boolean;
@@ -64,6 +65,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
     standardTaskId: string;
     taskName: string;
   } | null>(null);
+  const [activeUsersPerTask, setActiveUsersPerTask] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
   
   const {
     toast
@@ -308,6 +310,70 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
     }
   }, [fetchedTasks]);
   
+  // Track active users on tasks via realtime subscription
+  useEffect(() => {
+    const fetchActiveUsers = async () => {
+      if (!fetchedTasks || fetchedTasks.length === 0) return;
+      
+      const taskIds = fetchedTasks.map(t => t.id).filter(Boolean);
+      if (taskIds.length === 0) return;
+
+      const { data, error } = await supabase
+        .from('time_registrations')
+        .select(`
+          id,
+          task_id,
+          workstation_task_id,
+          employee_id,
+          employees:employee_id (
+            id,
+            name
+          )
+        `)
+        .eq('is_active', true)
+        .in('task_id', taskIds);
+
+      if (!error && data) {
+        const usersMap = new Map<string, Array<{ id: string; name: string }>>();
+        data.forEach((reg: any) => {
+          const taskId = reg.task_id || reg.workstation_task_id;
+          if (taskId && reg.employees) {
+            if (!usersMap.has(taskId)) {
+              usersMap.set(taskId, []);
+            }
+            usersMap.get(taskId)!.push({
+              id: reg.employees.id,
+              name: reg.employees.name
+            });
+          }
+        });
+        setActiveUsersPerTask(usersMap);
+      }
+    };
+
+    fetchActiveUsers();
+
+    // Set up realtime subscription
+    const channel = supabase
+      .channel('workstation-active-users')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'time_registrations'
+        },
+        () => {
+          fetchActiveUsers();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchedTasks]);
+  
   const queryErrorMessage = queryError ? t('failed_to_load_projects', { message: '' }) : null;
   const error = componentError || queryErrorMessage;
   
@@ -494,6 +560,27 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
   const handleTaskUpdate = async (taskId: string, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     try {
       if (newStatus === 'COMPLETED') {
+        // Check if multiple users are active on this task
+        const activeUsers = activeUsersPerTask.get(taskId) || [];
+        if (activeUsers.length > 1) {
+          toast({
+            title: t('error'),
+            description: `${activeUsers.length} users are currently working on this task. Only one user can complete it.`,
+            variant: 'destructive'
+          });
+          return;
+        }
+
+        // Check if current user is the only active user
+        if (activeUsers.length === 1 && currentEmployee && activeUsers[0].id !== currentEmployee.id) {
+          toast({
+            title: t('error'),
+            description: `Only ${activeUsers[0].name} can complete this task as they are currently working on it.`,
+            variant: 'destructive'
+          });
+          return;
+        }
+
         // Find the task to check for standard_task_id
         const currentTask = fetchedTasks.find(task => task.id === taskId);
         
@@ -790,6 +877,22 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                               {t('assigned_to_label', { name: task.assignee_name })}
                             </p>
                           )}
+                          {/* Active Users Display */}
+                          {(() => {
+                            const activeUsers = activeUsersPerTask.get(task.id) || [];
+                            if (activeUsers.length > 0) {
+                              return (
+                                <div className="flex items-center gap-2 text-sm mt-1">
+                                  <Users className="h-4 w-4 text-blue-600" />
+                                  <span className="text-blue-600 font-medium">
+                                    {activeUsers.length === 1 ? 'Active: ' : `${activeUsers.length} users active: `}
+                                    {activeUsers.map(u => u.name).join(', ')}
+                                  </span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                           {task.due_date && (
                             <div className="flex items-center gap-2 mt-1">
                               <p className="text-sm text-gray-500">
@@ -810,12 +913,6 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          {task.active_workers && task.active_workers > 0 && (
-                            <div className="flex items-center gap-1 text-sm text-blue-600">
-                              <Users className="h-4 w-4" />
-                              <span>{task.active_workers}</span>
-                            </div>
-                          )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -865,14 +962,23 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                           >
                             {t('join_task')}
                           </button>
-                          <button
-                            onClick={() => handleTaskUpdate(task.id, 'COMPLETED')}
-                            className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 flex items-center gap-1"
-                            disabled={isCompleting}
-                          >
-                            {isCompleting && <Loader2 className="h-3 w-3 animate-spin" />}
-                            {t('complete_task')}
-                          </button>
+                          {(() => {
+                            const activeUsers = activeUsersPerTask.get(task.id) || [];
+                            const canComplete = activeUsers.length === 0 || 
+                                              (activeUsers.length === 1 && currentEmployee && activeUsers[0].id === currentEmployee.id);
+                            
+                            return (
+                              <button
+                                onClick={() => handleTaskUpdate(task.id, 'COMPLETED')}
+                                className={`px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 flex items-center gap-1 ${!canComplete ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                disabled={isCompleting || !canComplete}
+                                title={!canComplete ? 'Multiple users are working on this task' : ''}
+                              >
+                                {isCompleting && <Loader2 className="h-3 w-3 animate-spin" />}
+                                {t('complete_task')}
+                              </button>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
