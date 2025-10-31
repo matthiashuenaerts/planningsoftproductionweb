@@ -499,20 +499,13 @@ const navigate = useNavigate();
       // Stop the current registration
       await timeRegistrationService.stopTask(pendingStopData.registrationId);
 
-      // Start a new registration with the updated duration (resets timer to 0)
-      if (activeRegistration?.task_id) {
-        await timeRegistrationService.startTask(currentEmployee.id, activeRegistration.task_id, totalMinutes);
-      } else if (activeRegistration?.workstation_task_id) {
-        await timeRegistrationService.startWorkstationTask(currentEmployee.id, activeRegistration.workstation_task_id);
-      }
-
       // Refresh queries
       queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
       queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
 
       toast({
         title: 'Task Duration Updated',
-        description: `Timer reset with ${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m duration`
+        description: `Task paused with new duration: ${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`
       });
     } catch (error) {
       toast({

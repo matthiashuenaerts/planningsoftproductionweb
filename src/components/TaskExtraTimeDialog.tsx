@@ -25,15 +25,8 @@ const TaskExtraTimeDialog: React.FC<TaskExtraTimeDialogProps> = ({
   overTimeMinutes,
   elapsedMinutes
 }) => {
-  // Generate duration options based on elapsed time, rounded up to nearest 30 min interval
-  const baseTime = Math.ceil(elapsedMinutes / 30) * 30;
-  const durationOptions = [
-    baseTime,
-    baseTime + 30,
-    baseTime + 60,
-    baseTime + 90,
-    baseTime + 120
-  ];
+  // Fixed duration options
+  const durationOptions = [30, 60, 90, 120, 150, 180];
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
