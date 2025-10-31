@@ -503,7 +503,10 @@ const TaskList: React.FC<TaskListProps> = ({
                       </Button>
                       <Button 
                         size="sm" 
-                        onClick={() => handleStatusChange(task, 'IN_PROGRESS')}
+                        onClick={async () => {
+                          await handleStatusChange(task, 'IN_PROGRESS');
+                          await handleJoinTask(task.id);
+                        }}
                         className="bg-blue-500 hover:bg-blue-600"
                       >
                         Start Task
