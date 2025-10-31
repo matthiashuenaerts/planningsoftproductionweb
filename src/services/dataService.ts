@@ -145,6 +145,22 @@ export const projectService = {
         if (tasks && tasks.length > 0) {
           const taskIds = tasks.map(task => task.id);
           
+          // Delete time registrations for these tasks
+          const { error: timeRegsError } = await supabase
+            .from('time_registrations')
+            .delete()
+            .in('task_id', taskIds);
+          
+          if (timeRegsError && timeRegsError.code !== '42P01') throw timeRegsError;
+          
+          // Delete task completion checklists
+          const { error: checklistError } = await supabase
+            .from('task_completion_checklists')
+            .delete()
+            .in('task_id', taskIds);
+          
+          if (checklistError && checklistError.code !== '42P01') throw checklistError;
+          
           // Delete task_workstation_links
           const { error: linksError } = await supabase
             .from('task_workstation_links')
@@ -179,6 +195,71 @@ export const projectService = {
         if (deletePhasesError) throw deletePhasesError;
       }
       
+      // Delete parts lists and parts
+      const { data: partsLists, error: partsListsError } = await supabase
+        .from('parts_lists')
+        .select('id')
+        .eq('project_id', id);
+      
+      if (partsListsError && partsListsError.code !== '42P01') throw partsListsError;
+      
+      if (partsLists && partsLists.length > 0) {
+        const partsListIds = partsLists.map(pl => pl.id);
+        
+        // Delete parts
+        const { error: partsError } = await supabase
+          .from('parts')
+          .delete()
+          .in('parts_list_id', partsListIds);
+        
+        if (partsError && partsError.code !== '42P01') throw partsError;
+        
+        // Delete parts lists
+        const { error: deletePartsListsError } = await supabase
+          .from('parts_lists')
+          .delete()
+          .eq('project_id', id);
+        
+        if (deletePartsListsError && deletePartsListsError.code !== '42P01') throw deletePartsListsError;
+      }
+      
+      // Delete accessories
+      const { error: accessoriesError } = await supabase
+        .from('accessories')
+        .delete()
+        .eq('project_id', id);
+      
+      if (accessoriesError && accessoriesError.code !== '42P01') throw accessoriesError;
+      
+      // Delete broken parts and their images
+      const { data: brokenParts, error: brokenPartsError } = await supabase
+        .from('broken_parts')
+        .select('id, image_path')
+        .eq('project_id', id);
+      
+      if (brokenPartsError && brokenPartsError.code !== '42P01') throw brokenPartsError;
+      
+      if (brokenParts && brokenParts.length > 0) {
+        // Delete broken part images from storage
+        for (const brokenPart of brokenParts) {
+          if (brokenPart.image_path) {
+            const { error: storageError } = await supabase.storage
+              .from('broken_parts')
+              .remove([brokenPart.image_path]);
+            
+            if (storageError) console.error("Error removing broken part image:", storageError);
+          }
+        }
+        
+        // Delete broken part records
+        const { error: deleteBrokenPartsError } = await supabase
+          .from('broken_parts')
+          .delete()
+          .eq('project_id', id);
+        
+        if (deleteBrokenPartsError && deleteBrokenPartsError.code !== '42P01') throw deleteBrokenPartsError;
+      }
+      
       // Get all orders for this project
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
@@ -190,6 +271,14 @@ export const projectService = {
       // Delete all orders and their associated items and attachments
       if (orders && orders.length > 0) {
         for (const order of orders) {
+          // Delete order steps
+          const { error: stepsError } = await supabase
+            .from('order_steps')
+            .delete()
+            .eq('order_id', order.id);
+          
+          if (stepsError && stepsError.code !== '42P01') throw stepsError;
+          
           // Delete order items
           const { error: itemsError } = await supabase
             .from('order_items')
@@ -235,6 +324,103 @@ export const projectService = {
           .eq('project_id', id);
         
         if (deleteOrdersError) throw deleteOrdersError;
+      }
+      
+      // Delete project messages and their files
+      const { data: messages, error: messagesError } = await supabase
+        .from('project_messages')
+        .select('id, file_url')
+        .eq('project_id', id);
+      
+      if (messagesError && messagesError.code !== '42P01') throw messagesError;
+      
+      if (messages && messages.length > 0) {
+        // Delete message files from storage
+        for (const message of messages) {
+          if (message.file_url) {
+            // Extract file path from URL
+            const urlParts = message.file_url.split('/project_files/');
+            if (urlParts.length > 1) {
+              const filePath = urlParts[1].split('?')[0]; // Remove query params
+              
+              const { error: storageError } = await supabase.storage
+                .from('project_files')
+                .remove([filePath]);
+              
+              if (storageError) console.error("Error removing message file:", storageError);
+            }
+          }
+        }
+        
+        // Delete message records
+        const { error: deleteMessagesError } = await supabase
+          .from('project_messages')
+          .delete()
+          .eq('project_id', id);
+        
+        if (deleteMessagesError && deleteMessagesError.code !== '42P01') throw deleteMessagesError;
+      }
+      
+      // Delete project message reads
+      const { error: messageReadsError } = await supabase
+        .from('project_message_reads')
+        .delete()
+        .eq('project_id', id);
+      
+      if (messageReadsError && messageReadsError.code !== '42P01') throw messageReadsError;
+      
+      // Delete project calculation variables
+      const { error: calcVarsError } = await supabase
+        .from('project_calculation_variables')
+        .delete()
+        .eq('project_id', id);
+      
+      if (calcVarsError && calcVarsError.code !== '42P01') throw calcVarsError;
+      
+      // Delete project loading overrides
+      const { error: loadingOverridesError } = await supabase
+        .from('project_loading_overrides')
+        .delete()
+        .eq('project_id', id);
+      
+      if (loadingOverridesError && loadingOverridesError.code !== '42P01') throw loadingOverridesError;
+      
+      // Delete project team assignments
+      const { error: teamAssignmentsError } = await supabase
+        .from('project_team_assignments')
+        .delete()
+        .eq('project_id', id);
+      
+      if (teamAssignmentsError && teamAssignmentsError.code !== '42P01') throw teamAssignmentsError;
+      
+      // Delete project truck assignments
+      const { error: truckAssignmentsError } = await supabase
+        .from('project_truck_assignments')
+        .delete()
+        .eq('project_id', id);
+      
+      if (truckAssignmentsError && truckAssignmentsError.code !== '42P01') throw truckAssignmentsError;
+      
+      // Delete project OneDrive configs
+      const { error: onedriveError } = await supabase
+        .from('project_onedrive_configs')
+        .delete()
+        .eq('project_id', id);
+      
+      if (onedriveError && onedriveError.code !== '42P01') throw onedriveError;
+      
+      // Delete all files from project_files storage bucket for this project
+      const { data: projectFiles, error: listFilesError } = await supabase.storage
+        .from('project_files')
+        .list(id);
+      
+      if (!listFilesError && projectFiles && projectFiles.length > 0) {
+        const filePaths = projectFiles.map(file => `${id}/${file.name}`);
+        const { error: deleteFilesError } = await supabase.storage
+          .from('project_files')
+          .remove(filePaths);
+        
+        if (deleteFilesError) console.error("Error removing project files:", deleteFilesError);
       }
       
       // Finally delete the project itself
