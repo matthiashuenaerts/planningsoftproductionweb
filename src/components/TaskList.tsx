@@ -1,10 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Task } from '@/services/dataService';
-import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader, TrendingUp, TrendingDown, AlertTriangle, Users } from 'lucide-react';
 import { differenceInDays, isBefore } from 'date-fns';
 import TaskCompletionChecklistDialog from './TaskCompletionChecklistDialog';
 import { checklistService } from '@/services/checklistService';
@@ -12,6 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { useLanguage } from '@/context/LanguageContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ExtendedTask extends Task {
   timeRemaining?: string;
@@ -57,6 +58,69 @@ const TaskList: React.FC<TaskListProps> = ({
     standardTaskId: string;
     taskName: string;
   } | null>(null);
+  const [activeUsersPerTask, setActiveUsersPerTask] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
+
+  // Track active users on tasks via realtime subscription
+  useEffect(() => {
+    const fetchActiveUsers = async () => {
+      const taskIds = tasks.map(t => t.id);
+      if (taskIds.length === 0) return;
+
+      const { data, error } = await supabase
+        .from('time_registrations')
+        .select(`
+          id,
+          task_id,
+          workstation_task_id,
+          employee_id,
+          employees:employee_id (
+            id,
+            name
+          )
+        `)
+        .eq('is_active', true)
+        .in('task_id', taskIds);
+
+      if (!error && data) {
+        const usersMap = new Map<string, Array<{ id: string; name: string }>>();
+        data.forEach((reg: any) => {
+          const taskId = reg.task_id || reg.workstation_task_id;
+          if (taskId) {
+            if (!usersMap.has(taskId)) {
+              usersMap.set(taskId, []);
+            }
+            usersMap.get(taskId)!.push({
+              id: reg.employees.id,
+              name: reg.employees.name
+            });
+          }
+        });
+        setActiveUsersPerTask(usersMap);
+      }
+    };
+
+    fetchActiveUsers();
+
+    // Set up realtime subscription
+    const channel = supabase
+      .channel('task-active-users')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'time_registrations'
+        },
+        () => {
+          fetchActiveUsers();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [tasks]);
 
   const getUrgencyClass = (dueDate: string) => {
     const today = new Date();
@@ -167,6 +231,27 @@ const TaskList: React.FC<TaskListProps> = ({
 
   const handleStatusChange = async (task: ExtendedTask, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     if (newStatus === 'COMPLETED') {
+      // Check if multiple users are active on this task
+      const activeUsers = activeUsersPerTask.get(task.id) || [];
+      if (activeUsers.length > 1) {
+        toast({
+          title: 'Cannot Complete Task',
+          description: `${activeUsers.length} users are currently working on this task. Only one user can complete it.`,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Check if current user is the only active user
+      if (activeUsers.length === 1 && currentEmployee && activeUsers[0].id !== currentEmployee.id) {
+        toast({
+          title: 'Cannot Complete Task',
+          description: `Only ${activeUsers[0].name} can complete this task as they are currently working on it.`,
+          variant: 'destructive'
+        });
+        return;
+      }
+
       // Check if task has a standard_task_id and checklist items before completing
       if (task.standard_task_id) {
         try {
@@ -315,6 +400,23 @@ const TaskList: React.FC<TaskListProps> = ({
                     {task.title}
                   </h4>
                   
+                  {/* Active Users Display */}
+                  {task.status === 'IN_PROGRESS' && (() => {
+                    const activeUsers = activeUsersPerTask.get(task.id) || [];
+                    if (activeUsers.length > 0) {
+                      return (
+                        <div className="mt-2 flex items-center gap-2 text-sm">
+                          <Users className="h-4 w-4 text-blue-600" />
+                          <span className="text-blue-600 font-medium">
+                            {activeUsers.length === 1 ? 'Active: ' : `${activeUsers.length} users active: `}
+                            {activeUsers.map(u => u.name).join(', ')}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
                   {/* Countdown Timer for IN_PROGRESS tasks */}
                   {task.status === 'IN_PROGRESS' && task.timeRemaining && task.total_duration && (
                     <div className={`mt-2 flex items-center gap-2 text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-blue-600'}`}>
@@ -441,39 +543,46 @@ const TaskList: React.FC<TaskListProps> = ({
                       )}
                     </>
                   )}
-                  {task.status === 'IN_PROGRESS' && (
-                    <>
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleJoinTask(task.id)}
-                        className="bg-blue-500 hover:bg-blue-600"
-                      >
-                        {t('join_task')}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleStatusChange(task, 'COMPLETED')}
-                        className="bg-green-600 hover:bg-green-700 relative"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? (
-                          <>
-                            <Loader className="h-4 w-4 animate-spin mr-2" />
-                            Processing...
-                          </>
-                        ) : (
-                          'Complete'
-                        )}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => handleStatusChange(task, 'TODO')}
-                      >
-                        Back to Todo
-                      </Button>
-                    </>
-                  )}
+                  {task.status === 'IN_PROGRESS' && (() => {
+                    const activeUsers = activeUsersPerTask.get(task.id) || [];
+                    const canComplete = activeUsers.length === 0 || 
+                                      (activeUsers.length === 1 && currentEmployee && activeUsers[0].id === currentEmployee.id);
+                    
+                    return (
+                      <>
+                        <Button 
+                          size="sm" 
+                          onClick={() => handleJoinTask(task.id)}
+                          className="bg-blue-500 hover:bg-blue-600"
+                        >
+                          {t('join_task')}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          onClick={() => handleStatusChange(task, 'COMPLETED')}
+                          className="bg-green-600 hover:bg-green-700 relative"
+                          disabled={isLoading || !canComplete}
+                          title={!canComplete ? 'Multiple users are working on this task' : ''}
+                        >
+                          {isLoading ? (
+                            <>
+                              <Loader className="h-4 w-4 animate-spin mr-2" />
+                              Processing...
+                            </>
+                          ) : (
+                            'Complete'
+                          )}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleStatusChange(task, 'TODO')}
+                        >
+                          Back to Todo
+                        </Button>
+                      </>
+                    );
+                  })()}
                   {task.status === 'COMPLETED' && task.completed_at && (
                     <div className="flex items-center gap-2">
                       <div className="text-sm text-gray-500">
