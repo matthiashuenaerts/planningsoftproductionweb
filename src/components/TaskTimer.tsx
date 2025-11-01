@@ -482,43 +482,48 @@ const navigate = useNavigate();
     }
   };
   const handleExtraTimeConfirm = async (totalMinutes: number) => {
-    if (!pendingStopData || !currentEmployee) return;
+  if (!pendingStopData || !currentEmployee) return;
 
-    try {
-      // First, update the task duration to the selected value
-      if (activeRegistration?.task_id) {
-        await supabase.from('tasks').update({
-          duration: totalMinutes
-        }).eq('id', activeRegistration.task_id);
-      } else if (activeRegistration?.workstation_task_id) {
-        await supabase.from('workstation_tasks').update({
-          duration: totalMinutes
-        }).eq('id', activeRegistration.workstation_task_id);
-      }
-
-      // Stop the current registration
-      await timeRegistrationService.stopTask(pendingStopData.registrationId);
-
-      // Refresh queries
-      queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
-      queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
-
-      toast({
-        title: 'Task Duration Updated',
-        description: `Task paused with new duration: ${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update task duration',
-        variant: 'destructive'
-      });
-      console.error('Update task duration error:', error);
+  try {
+    // Update de taakduur eerst
+    if (activeRegistration?.task_id) {
+      await supabase
+        .from('tasks')
+        .update({ duration: totalMinutes })
+        .eq('id', activeRegistration.task_id);
+    } else if (activeRegistration?.workstation_task_id) {
+      await supabase
+        .from('workstation_tasks')
+        .update({ duration: totalMinutes })
+        .eq('id', activeRegistration.workstation_task_id);
     }
 
-    setShowExtraTimeDialog(false);
-    setPendingStopData(null);
-  };
+    // Forceer direct herladen van taskDetails zodat nieuwe duur bekend is
+    await queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
+
+    // Stop de tijdsregistratie
+    await timeRegistrationService.stopTask(pendingStopData.registrationId);
+
+    // Herlaad ook de actieve registratie
+    await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+
+    toast({
+      title: 'Task Duration Updated',
+      description: `Task paused with new duration: ${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
+    });
+  } catch (error) {
+    toast({
+      title: 'Error',
+      description: 'Failed to update task duration',
+      variant: 'destructive',
+    });
+    console.error('Update task duration error:', error);
+  }
+
+  setShowExtraTimeDialog(false);
+  setPendingStopData(null);
+};
+
   const formatDuration = (startTime: string) => {
     const start = new Date(startTime);
     const now = currentTime;
