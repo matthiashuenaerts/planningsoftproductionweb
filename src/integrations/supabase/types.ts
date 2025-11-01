@@ -384,6 +384,7 @@ export type Database = {
       }
       employees: {
         Row: {
+          auth_user_id: string | null
           created_at: string
           email: string | null
           id: string
@@ -394,6 +395,7 @@ export type Database = {
           workstation: string | null
         }
         Insert: {
+          auth_user_id?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -404,6 +406,7 @@ export type Database = {
           workstation?: string | null
         }
         Update: {
+          auth_user_id?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -2994,11 +2997,11 @@ export type Database = {
         Returns: string
       }
       check_employee_role: {
-        Args: { _role: string; _user_id: string }
+        Args: { required_role: string; user_id: string }
         Returns: boolean
       }
       check_employee_roles: {
-        Args: { _roles: string[]; _user_id: string }
+        Args: { required_roles: string[]; user_id: string }
         Returns: boolean
       }
       create_storage_policy: {
@@ -3010,6 +3013,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_employee_id_from_auth: { Args: { user_id: string }; Returns: string }
       get_phase_offsets: {
         Args: never
         Returns: {

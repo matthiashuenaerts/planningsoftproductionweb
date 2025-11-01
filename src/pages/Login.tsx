@@ -63,36 +63,36 @@ const Login: React.FC = () => {
     try {
       setLoading(true);
 
-      // Use the secure authentication function
-      const {
-        data: employees,
-        error: queryError
-      } = await supabase.rpc('authenticate_employee', {
-        employee_name: name,
-        employee_password: password
-      }) as { data: any[] | null; error: any };
+      // Get employee by name first to find their email
+      const { data: employees, error: queryError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('name', name)
+        .eq('password', password);
       
       if (queryError) {
         console.error('Database query error:', queryError);
         throw new Error('Failed to connect to database');
       }
+
       if (!employees || employees.length === 0) {
         throw new Error('Invalid username or password');
       }
+
       const employee = employees[0];
 
-      // Ensure role is a valid type
-      const validRoles = ['workstation', 'admin', 'manager', 'worker', 'installation_team', 'preparater', 'teamleader'] as const;
-      const employeeRole = validRoles.includes(employee.role as any) ? employee.role as typeof validRoles[number] : 'workstation';
+      // Check if employee has auth_user_id (migrated to Supabase Auth)
+      if (!employee.auth_user_id || !employee.email) {
+        throw new Error('Your account needs to be migrated. Please contact your administrator.');
+      }
 
-      // Use the login function from AuthContext
-      login({
-        id: employee.id,
-        name: employee.name,
-        role: employeeRole,
-        workstation: employee.workstation || null,
-        logistics: employee.logistics || false
-      });
+      // Use Supabase Auth login with email and password
+      const loginResult = await login(employee.email, password);
+      
+      if (loginResult.error) {
+        throw new Error(loginResult.error);
+      }
+
       toast({
         title: "Login successful",
         description: `Welcome, ${employee.name}!`

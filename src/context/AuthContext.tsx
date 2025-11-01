@@ -1,6 +1,8 @@
 
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import type { Session, User } from '@supabase/supabase-js';
 
 interface Employee {
   id: string;
@@ -8,79 +10,115 @@ interface Employee {
   role: 'admin' | 'manager' | 'worker' | 'workstation' | 'installation_team' | 'teamleader' | 'preparater';
   workstation?: string;
   logistics?: boolean;
-  expires?: number;
 }
 
 interface AuthContextType {
   currentEmployee: Employee | null;
   isAuthenticated: boolean;
-  login: (employeeData: Employee) => void;
-  logout: () => void;
+  user: User | null;
+  session: Session | null;
+  login: (email: string, password: string) => Promise<{ error?: string }>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   
-  // Check for existing session on component mount and check for expiration
+  // Fetch employee data based on auth user
+  const fetchEmployeeData = async (userId: string) => {
+    try {
+      const { data: employee, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('auth_user_id', userId)
+        .single();
+
+      if (error) throw error;
+      
+      if (employee) {
+        setCurrentEmployee({
+          id: employee.id,
+          name: employee.name,
+          role: employee.role as 'admin' | 'manager' | 'worker' | 'workstation' | 'installation_team' | 'teamleader' | 'preparater',
+          workstation: employee.workstation,
+          logistics: employee.logistics
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch employee data:', error);
+      setCurrentEmployee(null);
+    }
+  };
+
+  // Set up auth state listener
   useEffect(() => {
-    const checkSession = () => {
-      const storedSession = localStorage.getItem('employeeSession');
-      if (storedSession) {
-        try {
-          const employeeData = JSON.parse(storedSession);
-          
-          // Check if session has expired
-          if (employeeData.expires && employeeData.expires < Date.now()) {
-            console.log('Session expired, logging out');
-            localStorage.removeItem('employeeSession');
-            setCurrentEmployee(null);
-            // Only redirect to login if not already there
-            if (window.location.pathname !== '/login') {
-              navigate('/login');
-            }
-            return;
-          }
-          
-          setCurrentEmployee(employeeData);
-        } catch (error) {
-          console.error('Failed to parse stored session:', error);
-          localStorage.removeItem('employeeSession');
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event);
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          // Defer employee data fetch with setTimeout
+          setTimeout(() => {
+            fetchEmployeeData(session.user.id);
+          }, 0);
+        } else {
           setCurrentEmployee(null);
         }
+        
+        setIsLoading(false);
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchEmployeeData(session.user.id);
       }
       setIsLoading(false);
-    };
-    
-    // Check session immediately
-    checkSession();
-    
-    // Set up interval to check session every minute
-    const intervalId = setInterval(checkSession, 60000);
-    
-    return () => clearInterval(intervalId);
-  }, [navigate]);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
   
-  const login = (employeeData: Employee) => {
-    setCurrentEmployee(employeeData);
-    // Calculate session expiration - end of today
-    const today = new Date();
-    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
-    
-    const sessionData = {
-      ...employeeData,
-      expires: endOfDay.getTime()
-    };
-    
-    localStorage.setItem('employeeSession', JSON.stringify(sessionData));
+  const login = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      if (data.user) {
+        await fetchEmployeeData(data.user.id);
+      }
+
+      return {};
+    } catch (error: any) {
+      console.error('Login error:', error);
+      return { error: error.message || 'Failed to login' };
+    }
   };
   
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setCurrentEmployee(null);
-    localStorage.removeItem('employeeSession');
+    setUser(null);
+    setSession(null);
     navigate('/login');
   };
   
@@ -97,7 +135,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <AuthContext.Provider
       value={{
         currentEmployee,
-        isAuthenticated: !!currentEmployee,
+        user,
+        session,
+        isAuthenticated: !!currentEmployee && !!session,
         login,
         logout
       }}
