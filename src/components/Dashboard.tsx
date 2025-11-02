@@ -79,36 +79,46 @@ const Dashboard: React.FC = () => {
         const projectsData = await projectService.getAll();
         setProjects(projectsData);
 
-        // Fetch all tasks (for chart data)
-        const allTasks = await taskService.getAll();
+        // Efficient parallel queries for dashboard data
+        const today = startOfToday();
+        const sevenDaysAgo = format(subDays(today, 6), 'yyyy-MM-dd');
+        
+        const [
+          tasksStatusCount,
+          tasksPriorityCount,
+          completedTasksLast7Days
+        ] = await Promise.all([
+          // Status distribution - count only
+          supabase
+            .from('tasks')
+            .select('status', { count: 'exact', head: false })
+            .in('status', ['TODO', 'IN_PROGRESS', 'COMPLETED']),
+          
+          // Priority distribution - count only
+          supabase
+            .from('tasks')
+            .select('priority', { count: 'exact', head: false })
+            .in('priority', ['Low', 'Medium', 'High', 'Urgent']),
+          
+          // Completed tasks in last 7 days
+          supabase
+            .from('tasks')
+            .select('completed_at')
+            .eq('status', 'COMPLETED')
+            .not('completed_at', 'is', null)
+            .gte('completed_at', sevenDaysAgo)
+            .order('completed_at', { ascending: false })
+        ]);
 
-        // Create priority distribution data
-        const priorityCount = {
-          Low: 0,
-          Medium: 0,
-          High: 0,
-          Urgent: 0
-        };
-        allTasks.forEach(task => {
-          if (task.priority in priorityCount) {
-            priorityCount[task.priority as keyof typeof priorityCount]++;
-          }
-        });
-        const priorityData = Object.entries(priorityCount).map(([name, value]) => ({
-          name,
-          value
-        }));
-        setTasksByPriority(priorityData);
-
-        // Create status distribution data
-        const statusCount = {
+        // Process status data
+        const statusCount: Record<string, number> = {
           TODO: 0,
           IN_PROGRESS: 0,
           COMPLETED: 0
         };
-        allTasks.forEach(task => {
+        (tasksStatusCount.data || []).forEach((task: any) => {
           if (task.status in statusCount) {
-            statusCount[task.status as keyof typeof statusCount]++;
+            statusCount[task.status]++;
           }
         });
         const statusData = Object.entries(statusCount).map(([name, value]) => ({
@@ -117,15 +127,26 @@ const Dashboard: React.FC = () => {
         }));
         setTasksByStatus(statusData);
 
-        // Get recently completed tasks (with valid completed_at timestamps)
-        const completedTasks = allTasks.filter(task => task.status === 'COMPLETED' && task.completed_at).sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime()).slice(0, 250);
-        setRecentCompletedTasks(completedTasks);
+        // Process priority data
+        const priorityCount: Record<string, number> = {
+          Low: 0,
+          Medium: 0,
+          High: 0,
+          Urgent: 0
+        };
+        (tasksPriorityCount.data || []).forEach((task: any) => {
+          if (task.priority in priorityCount) {
+            priorityCount[task.priority]++;
+          }
+        });
+        const priorityData = Object.entries(priorityCount).map(([name, value]) => ({
+          name,
+          value
+        }));
+        setTasksByPriority(priorityData);
 
-        // Create task completion trend (last 7 days)
-        const today = startOfToday();
-        const last7Days = Array.from({
-          length: 7
-        }, (_, i) => {
+        // Process task completion trend (last 7 days)
+        const last7Days = Array.from({ length: 7 }, (_, i) => {
           const date = subDays(today, 6 - i);
           return {
             date,
@@ -135,10 +156,12 @@ const Dashboard: React.FC = () => {
         });
 
         // Count completed tasks per day
-        completedTasks.forEach(task => {
+        (completedTasksLast7Days.data || []).forEach((task: any) => {
           if (task.completed_at) {
             const completedDate = parseISO(task.completed_at);
-            const dayIndex = last7Days.findIndex(day => format(day.date, 'yyyy-MM-dd') === format(completedDate, 'yyyy-MM-dd'));
+            const dayIndex = last7Days.findIndex(day => 
+              format(day.date, 'yyyy-MM-dd') === format(completedDate, 'yyyy-MM-dd')
+            );
             if (dayIndex !== -1) {
               last7Days[dayIndex].count++;
             }
