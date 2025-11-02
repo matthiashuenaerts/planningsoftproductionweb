@@ -204,7 +204,7 @@ const Dashboard: React.FC = () => {
       }
     };
     fetchDashboardData();
-  }, [toast, currentEmployee]);
+  }, [toast]);
   const fetchWorkstationStats = async () => {
     if (!currentEmployee) return;
     
