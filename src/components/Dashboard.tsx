@@ -10,7 +10,8 @@ import { useLanguage } from '@/context/LanguageContext';
 import { orderService } from '@/services/orderService';
 import { projectTeamAssignmentService } from '@/services/projectTeamAssignmentService';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldCheck, Calendar, CheckCircle2, Clock, Users, BarChart3, ListTodo, Truck, ChevronLeft, ChevronRight } from "lucide-react";
+import { ShieldCheck, Calendar, CheckCircle2, Clock, Users, BarChart3, ListTodo, Truck, ChevronLeft, ChevronRight, Factory, Package, Check } from "lucide-react";
+import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { format, startOfToday, isToday, subDays, parseISO, addDays, isWeekend, startOfWeek } from 'date-fns';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -60,6 +61,20 @@ const Dashboard: React.FC = () => {
   const [weekLoading, setWeekLoading] = useState(false);
   const [manualOverrides, setManualOverrides] = useState<Record<string, string>>({});
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
+  
+  // Workstation stats state
+  const [workstationStats, setWorkstationStats] = useState<Array<{
+    id: string;
+    name: string;
+    openTasks: number;
+    openProjects: number;
+    openHours: number;
+    firstTodoTask: {
+      title: string;
+      projectName: string;
+      priority: string;
+    } | null;
+  }>>([]);
   const {
     toast
   } = useToast();
@@ -172,8 +187,11 @@ const Dashboard: React.FC = () => {
         // Fetch truck loading data
         await fetchInitialTruckLoadingData();
 
-        // Fetch upcoming external processing events
-        await fetchUpcomingExternalProcessingEvents();
+        // Fetch upcoming external processing events and workstation stats in parallel
+        await Promise.all([
+          fetchUpcomingExternalProcessingEvents(),
+          fetchWorkstationStats()
+        ]);
       } catch (error: any) {
         console.error('Error fetching dashboard data:', error);
         toast({
@@ -187,6 +205,142 @@ const Dashboard: React.FC = () => {
     };
     fetchDashboardData();
   }, [toast]);
+  const fetchWorkstationStats = async () => {
+    try {
+      // Fetch all workstations
+      const { data: workstations, error: wsError } = await supabase
+        .from('workstations')
+        .select('id, name')
+        .order('name');
+
+      if (wsError) throw wsError;
+      if (!workstations || workstations.length === 0) return;
+
+      // Fetch all standard task workstation links
+      const { data: standardTaskLinks, error: linksError } = await supabase
+        .from('standard_task_workstation_links')
+        .select('standard_task_id, workstation_id');
+
+      if (linksError) throw linksError;
+
+      // Fetch all standard tasks to get task numbers
+      const { data: standardTasks, error: stError } = await supabase
+        .from('standard_tasks')
+        .select('id, task_number');
+
+      if (stError) throw stError;
+
+      // Create a map of standard_task_id -> workstation_ids
+      const taskToWorkstationMap = new Map<string, string[]>();
+      (standardTaskLinks || []).forEach(link => {
+        if (!taskToWorkstationMap.has(link.standard_task_id)) {
+          taskToWorkstationMap.set(link.standard_task_id, []);
+        }
+        taskToWorkstationMap.get(link.standard_task_id)!.push(link.workstation_id);
+      });
+
+      // Create a map of task_number -> workstation_ids
+      const taskNumberToWorkstationMap = new Map<string, string[]>();
+      (standardTasks || []).forEach(st => {
+        const workstationIds = taskToWorkstationMap.get(st.id);
+        if (workstationIds) {
+          taskNumberToWorkstationMap.set(st.task_number, workstationIds);
+        }
+      });
+
+      // Fetch all open tasks (TODO or IN_PROGRESS) with project info
+      const { data: openTasks, error: tasksError } = await supabase
+        .from('tasks')
+        .select(`
+          id,
+          title,
+          status,
+          priority,
+          duration,
+          phase_id,
+          phases!inner(project_id, projects!inner(id, name))
+        `)
+        .in('status', ['TODO', 'IN_PROGRESS'])
+        .order('priority', { ascending: false });
+
+      if (tasksError) throw tasksError;
+
+      // Also fetch tasks linked directly via task_workstation_links
+      const { data: taskWorkstationLinks, error: twlError } = await supabase
+        .from('task_workstation_links')
+        .select('task_id, workstation_id');
+
+      if (twlError) throw twlError;
+
+      // Create a map of task_id -> workstation_ids (direct links)
+      const directTaskToWorkstationMap = new Map<string, string[]>();
+      (taskWorkstationLinks || []).forEach(link => {
+        if (!directTaskToWorkstationMap.has(link.task_id)) {
+          directTaskToWorkstationMap.set(link.task_id, []);
+        }
+        directTaskToWorkstationMap.get(link.task_id)!.push(link.workstation_id);
+      });
+
+      // Calculate stats for each workstation
+      const stats = workstations.map(ws => {
+        const workstationTasks = (openTasks || []).filter(task => {
+          // Check direct links first
+          const directLinks = directTaskToWorkstationMap.get(task.id);
+          if (directLinks && directLinks.includes(ws.id)) {
+            return true;
+          }
+
+          // Check via task number in title
+          const taskNumberMatch = task.title.match(/^(\d+\.\d+)/);
+          if (taskNumberMatch) {
+            const taskNumber = taskNumberMatch[1];
+            const linkedWorkstations = taskNumberToWorkstationMap.get(taskNumber);
+            return linkedWorkstations && linkedWorkstations.includes(ws.id);
+          }
+          
+          return false;
+        });
+
+        // Calculate stats
+        const openTasksCount = workstationTasks.length;
+        const uniqueProjectIds = new Set(
+          workstationTasks.map(t => (t.phases as any)?.projects?.id).filter(Boolean)
+        );
+        const openProjectsCount = uniqueProjectIds.size;
+        const openHours = workstationTasks.reduce((sum, t) => sum + (t.duration || 0), 0) / 60;
+
+        // Find first TODO task (highest priority)
+        const priorityOrder = { 'Urgent': 4, 'High': 3, 'Medium': 2, 'Low': 1 };
+        const todoTasks = workstationTasks
+          .filter(t => t.status === 'TODO')
+          .sort((a, b) => {
+            const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
+            const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
+            return bPriority - aPriority;
+          });
+
+        const firstTodoTask = todoTasks.length > 0 ? {
+          title: todoTasks[0].title,
+          projectName: (todoTasks[0].phases as any)?.projects?.name || 'Unknown',
+          priority: todoTasks[0].priority
+        } : null;
+
+        return {
+          id: ws.id,
+          name: ws.name,
+          openTasks: openTasksCount,
+          openProjects: openProjectsCount,
+          openHours: Math.round(openHours * 10) / 10,
+          firstTodoTask
+        };
+      });
+
+      setWorkstationStats(stats);
+    } catch (error) {
+      console.error('Error fetching workstation stats:', error);
+    }
+  };
+
   const fetchUpcomingExternalProcessingEvents = async () => {
     try {
       const logisticsOutOrders = await orderService.getLogisticsOutOrders();
@@ -668,6 +822,88 @@ const Dashboard: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Workstation Stats Section */}
+      <div className="mt-8">
+        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+          <Factory className="h-6 w-6" />
+          Workstation Overview
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {workstationStats.map(ws => (
+            <Card key={ws.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" />
+                  {ws.name}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* Stats Grid */}
+                <div className="grid grid-cols-3 gap-2 pb-3 border-b">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{ws.openTasks}</div>
+                    <div className="text-xs text-muted-foreground">Open Tasks</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">{ws.openProjects}</div>
+                    <div className="text-xs text-muted-foreground">Projects</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-600">{ws.openHours}h</div>
+                    <div className="text-xs text-muted-foreground">Est. Hours</div>
+                  </div>
+                </div>
+
+                {/* First Todo Task */}
+                {ws.firstTodoTask ? (
+                  <div className="bg-muted/50 p-3 rounded-md">
+                    <div className="flex items-start gap-2 mb-1">
+                      <CheckCircle2 className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate" title={ws.firstTodoTask.title}>
+                          {ws.firstTodoTask.title}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate" title={ws.firstTodoTask.projectName}>
+                          {ws.firstTodoTask.projectName}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 mt-2">
+                      <Badge 
+                        variant="outline" 
+                        className={cn(
+                          "text-xs",
+                          ws.firstTodoTask.priority === 'Urgent' && "border-red-500 text-red-700 bg-red-50",
+                          ws.firstTodoTask.priority === 'High' && "border-orange-500 text-orange-700 bg-orange-50",
+                          ws.firstTodoTask.priority === 'Medium' && "border-yellow-500 text-yellow-700 bg-yellow-50",
+                          ws.firstTodoTask.priority === 'Low' && "border-green-500 text-green-700 bg-green-50"
+                        )}
+                      >
+                        {ws.firstTodoTask.priority}
+                      </Badge>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-green-50 p-3 rounded-md text-center">
+                    <Check className="h-8 w-8 mx-auto text-green-600 mb-1" />
+                    <div className="text-sm text-green-700 font-medium">All tasks completed!</div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        
+        {workstationStats.length === 0 && (
+          <Card>
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p>No workstations configured yet.</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>;
 };
