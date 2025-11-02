@@ -206,20 +206,44 @@ const Dashboard: React.FC = () => {
     fetchDashboardData();
   }, [toast]);
   const fetchWorkstationStats = async () => {
+    if (!currentEmployee) return;
+    
     try {
-      // Fetch all workstations
+      // Fetch only workstations assigned to the current employee
+      const { data: employeeWorkstationLinks, error: employeeLinksError } = await supabase
+        .from('employee_workstation_links')
+        .select('workstation_id')
+        .eq('employee_id', currentEmployee.id);
+
+      if (employeeLinksError) throw employeeLinksError;
+      
+      // If no workstations are assigned, return early
+      if (!employeeWorkstationLinks || employeeWorkstationLinks.length === 0) {
+        setWorkstationStats([]);
+        return;
+      }
+
+      // Get the workstation IDs assigned to this employee
+      const assignedWorkstationIds = employeeWorkstationLinks.map(link => link.workstation_id);
+
+      // Fetch only the assigned workstations
       const { data: workstations, error: wsError } = await supabase
         .from('workstations')
         .select('id, name')
+        .in('id', assignedWorkstationIds)
         .order('name');
 
       if (wsError) throw wsError;
-      if (!workstations || workstations.length === 0) return;
+      if (!workstations || workstations.length === 0) {
+        setWorkstationStats([]);
+        return;
+      }
 
-      // Fetch all standard task workstation links
+      // Fetch all standard task workstation links only for assigned workstations
       const { data: standardTaskLinks, error: linksError } = await supabase
         .from('standard_task_workstation_links')
-        .select('standard_task_id, workstation_id');
+        .select('standard_task_id, workstation_id')
+        .in('workstation_id', assignedWorkstationIds);
 
       if (linksError) throw linksError;
 
