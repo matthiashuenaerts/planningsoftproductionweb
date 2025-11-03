@@ -142,11 +142,29 @@ const Logistics = () => {
     try {
       setIsStartingRegistration(true);
       
-      // Find the logistics workstation task
+      // First, find the logistics workstation by name
+      const { data: workstation, error: workstationError } = await supabase
+        .from('workstations')
+        .select('id')
+        .eq('name', 'Logistics')
+        .maybeSingle();
+      
+      if (workstationError) throw workstationError;
+      
+      if (!workstation) {
+        toast({
+          title: "Error",
+          description: "Logistics workstation not found",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Then find the workstation task
       const { data: workstationTask, error: taskError } = await supabase
         .from('workstation_tasks')
         .select('id')
-        .eq('workstation_id', 'logistics')
+        .eq('workstation_id', workstation.id)
         .eq('task_name', 'timeregistration logistics')
         .maybeSingle();
       
