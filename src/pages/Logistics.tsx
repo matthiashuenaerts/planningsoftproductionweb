@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,6 +23,7 @@ const Logistics = () => {
   const { t } = useLanguage();
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isStartingRegistration, setIsStartingRegistration] = useState(false);
@@ -142,44 +143,48 @@ const Logistics = () => {
     try {
       setIsStartingRegistration(true);
       
-      // First, find the logistics workstation by name
-      const { data: workstation, error: workstationError } = await supabase
+      // First, try to find the logistics workstation (case-insensitive)
+      let { data: workstation, error: workstationError } = await supabase
         .from('workstations')
-        .select('id')
-        .eq('name', 'Logistics')
+        .select('id, name')
+        .ilike('name', 'logist%')
         .maybeSingle();
-      
       if (workstationError) throw workstationError;
-      
+
+      // If not found, create it
       if (!workstation) {
-        toast({
-          title: "Error",
-          description: "Logistics workstation not found",
-          variant: "destructive"
-        });
-        return;
+        const { data: createdWs, error: createWsError } = await supabase
+          .from('workstations')
+          .insert({ name: 'Logistics', description: 'Logistics workstation' })
+          .select('id, name')
+          .single();
+        if (createWsError) throw createWsError;
+        workstation = createdWs;
       }
 
-      // Then find the workstation task
-      const { data: workstationTask, error: taskError } = await supabase
+      // Find or create the workstation task
+      let { data: workstationTask, error: taskError } = await supabase
         .from('workstation_tasks')
         .select('id')
         .eq('workstation_id', workstation.id)
         .eq('task_name', 'timeregistration logistics')
         .maybeSingle();
-      
       if (taskError) throw taskError;
-      
+
       if (!workstationTask) {
-        toast({
-          title: "Error",
-          description: "Logistics time registration task not found",
-          variant: "destructive"
-        });
-        return;
+        const { data: createdTask, error: createTaskError } = await supabase
+          .from('workstation_tasks')
+          .insert({ workstation_id: workstation.id, task_name: 'timeregistration logistics' })
+          .select('id')
+          .single();
+        if (createTaskError) throw createTaskError;
+        workstationTask = createdTask;
       }
 
       await timeRegistrationService.startWorkstationTask(currentEmployee.id, workstationTask.id);
+
+      // Ensure TaskTimer updates immediately
+      queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
       
       toast({
         title: "Success",
