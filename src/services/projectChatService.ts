@@ -87,11 +87,11 @@ export const projectChatService = {
       if (authError || !user) throw new Error('User not authenticated');
       
       // Get employee data from database
-      // @ts-expect-error - Supabase type inference issue
+      
       const employeeQuery = await supabase
         .from('employees')
         .select('id, name')
-        .eq('user_id', user.id)
+        .eq('auth_user_id', user.id)
         .single();
       
       const employee = employeeQuery.data;
@@ -202,10 +202,10 @@ export const projectChatService = {
       if (!user) return 0;
       
       // Get employee data
-      const employeeQuery = await supabase
+      const employeeQuery = await (supabase as any)
         .from('employees')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('auth_user_id', user.id)
         .single();
       
       const employee = employeeQuery.data;
@@ -251,10 +251,10 @@ export const projectChatService = {
       if (!user) return;
       
       // Get employee data
-      const employeeQuery = await supabase
+      const employeeQuery = await (supabase as any)
         .from('employees')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('auth_user_id', user.id)
         .single();
       
       const employee = employeeQuery.data;
