@@ -1,5 +1,6 @@
 
 {
+  "start_time_registration": "Start Time Registration",
   "login_title": "PlanningSoftProduction",
   "login_description": "Planning software for production environment",
   "username_label": "Username",

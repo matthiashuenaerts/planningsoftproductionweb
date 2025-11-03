@@ -1,5 +1,6 @@
 
 {
+  "start_time_registration": "Démarrer l'Enregistrement du Temps",
   "login_title": "PlanningSoftProduction",
   "login_description": "Logiciel de planification pour environnement de production",
   "username_label": "Nom d'utilisateur",

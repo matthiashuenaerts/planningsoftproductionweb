@@ -9,17 +9,23 @@ import { orderService } from '@/services/orderService';
 import { TodaysDeliveries } from '@/components/logistics/TodaysDeliveries';
 import { UpcomingDeliveries } from '@/components/logistics/UpcomingDeliveries';
 import { BackorderDeliveries } from '@/components/logistics/BackorderDeliveries';
-import { Truck, Calendar, AlertTriangle, Search, Scan } from 'lucide-react';
+import { Truck, Calendar, AlertTriangle, Search, Scan, Clock } from 'lucide-react';
 import { EanBarcodeScanner } from '@/components/logistics/EanBarcodeScanner';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/context/AuthContext';
+import { timeRegistrationService } from '@/services/timeRegistrationService';
+import { useToast } from '@/hooks/use-toast';
 
 const Logistics = () => {
   const { t } = useLanguage();
+  const { currentEmployee } = useAuth();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isStartingRegistration, setIsStartingRegistration] = useState(false);
   const isMobile = useIsMobile();
   
   const {
@@ -123,6 +129,56 @@ const Logistics = () => {
     refetch();
   };
 
+  const handleStartTimeRegistration = async () => {
+    if (!currentEmployee) {
+      toast({
+        title: "Error",
+        description: "No employee found",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsStartingRegistration(true);
+      
+      // Find the logistics workstation task
+      const { data: workstationTask, error: taskError } = await supabase
+        .from('workstation_tasks')
+        .select('id')
+        .eq('workstation_id', 'logistics')
+        .eq('task_name', 'timeregistration logistics')
+        .maybeSingle();
+      
+      if (taskError) throw taskError;
+      
+      if (!workstationTask) {
+        toast({
+          title: "Error",
+          description: "Logistics time registration task not found",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      await timeRegistrationService.startWorkstationTask(currentEmployee.id, workstationTask.id);
+      
+      toast({
+        title: "Success",
+        description: "Time registration started"
+      });
+    } catch (error: any) {
+      console.error('Error starting time registration:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start time registration",
+        variant: "destructive"
+      });
+    } finally {
+      setIsStartingRegistration(false);
+    }
+  };
+
   const handleEanDetected = (ean: string) => {
     setSearchTerm(ean);
   };
@@ -199,7 +255,7 @@ const Logistics = () => {
         </div>
 
         <div className="mb-6">
-          <div className="flex gap-2 max-w-md">
+          <div className="flex gap-2 max-w-2xl">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
@@ -217,6 +273,14 @@ const Logistics = () => {
             >
               <Scan className="h-4 w-4" />
               Scan Barcode
+            </Button>
+            <Button
+              onClick={handleStartTimeRegistration}
+              disabled={isStartingRegistration}
+              className="flex items-center gap-2"
+            >
+              <Clock className="h-4 w-4" />
+              {t("start_time_registration")}
             </Button>
           </div>
         </div>
