@@ -82,7 +82,8 @@ const Dashboard: React.FC = () => {
     currentEmployee
   } = useAuth();
   const {
-    createLocalizedPath
+    createLocalizedPath,
+    t
   } = useLanguage();
   const navigate = useNavigate();
   useEffect(() => {
@@ -137,7 +138,7 @@ const Dashboard: React.FC = () => {
           }
         });
         const statusData = Object.entries(statusCount).map(([name, value]) => ({
-          name: name === 'TODO' ? 'To Do' : name === 'IN_PROGRESS' ? 'In Progress' : 'Completed',
+          name: name === 'TODO' ? t('dashboard_to_do') : name === 'IN_PROGRESS' ? t('dashboard_in_progress') : t('dashboard_completed'),
           value
         }));
         setTasksByStatus(statusData);
@@ -687,10 +688,10 @@ const Dashboard: React.FC = () => {
   };
 
   // Status colors for charts
-  const STATUS_COLORS = {
-    'To Do': '#60a5fa',
-    'In Progress': '#f59e0b',
-    'Completed': '#4ade80'
+  const STATUS_COLORS: Record<string, string> = {
+    [t('dashboard_to_do')]: '#60a5fa',
+    [t('dashboard_in_progress')]: '#f59e0b',
+    [t('dashboard_completed')]: '#4ade80'
   };
   if (loading) {
     return <div className="flex justify-center items-center h-64">
@@ -700,22 +701,22 @@ const Dashboard: React.FC = () => {
   return <div>
       {currentEmployee?.role === 'admin' && <Alert className="mb-6 bg-blue-50 border border-blue-200">
           <ShieldCheck className="h-5 w-5 text-blue-600" />
-          <AlertTitle className="text-blue-800">Administrator Account</AlertTitle>
+          <AlertTitle className="text-blue-800">{t('dashboard_admin_account')}</AlertTitle>
           <AlertDescription className="text-blue-700">
-            You are logged in as an administrator. You have access to user management functionality.
+            {t('dashboard_admin_description')}
           </AlertDescription>
         </Alert>}
 
       {projects.length === 0 && <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md mb-6">
-          <p className="text-yellow-800">No projects found. Initialize the database with sample data to get started.</p>
+          <p className="text-yellow-800">{t('dashboard_no_projects')}</p>
           <SeedDataButton />
         </div>}
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Total Projects" value={totalProjects.toString()} footer="Projects managed" icon={<Calendar className="h-5 w-5 text-blue-500" />} />
-        <StatCard title="Completed Today" value={todayCompletedCount.toString()} footer="Tasks fulfilled today" icon={<CheckCircle2 className="h-5 w-5 text-green-600" />} />
-        {upcomingEvents.length > 0 && <StatCard title="Logistiek Uitgaand" value={upcomingEvents.length.toString()} valueSubtext={upcomingEvents[0] ? `Next: ${format(new Date(upcomingEvents[0].date), 'dd/MM')}` : ''} footer={upcomingEvents.slice(0, 2).map(event => `<span style="color: ${event.type === 'return' ? '#22c55e' : '#3b82f6'}">${format(new Date(event.date), 'dd/MM')} - ${event.project_name}</span>`).join('<br>')} icon={<Users className="h-5 w-5 text-purple-500" />} onClick={() => navigate(createLocalizedPath('/logistics-out'))} />}
-        <StatCard title="Truck Loading" value={truckLoadingData.todayLoadings.length > 0 ? truckLoadingData.todayLoadings.length.toString() : truckLoadingData.daysToNext.toString()} footer={truckLoadingData.todayLoadings.length > 0 ? `Loading today: ${truckLoadingData.todayLoadings.map(l => l.project.name).join(', ')}` : truckLoadingData.daysToNext > 0 ? `${truckLoadingData.daysToNext} days to next loading` : 'No upcoming loadings'} icon={<Truck className="h-5 w-5 text-orange-500" />} />
+        <StatCard title={t('dashboard_total_projects')} value={totalProjects.toString()} footer={t('dashboard_projects_managed')} icon={<Calendar className="h-5 w-5 text-blue-500" />} />
+        <StatCard title={t('dashboard_completed_today')} value={todayCompletedCount.toString()} footer={t('dashboard_tasks_fulfilled')} icon={<CheckCircle2 className="h-5 w-5 text-green-600" />} />
+        {upcomingEvents.length > 0 && <StatCard title={t('dashboard_logistics_out')} value={upcomingEvents.length.toString()} valueSubtext={upcomingEvents[0] ? `${t('dashboard_next')}: ${format(new Date(upcomingEvents[0].date), 'dd/MM')}` : ''} footer={upcomingEvents.slice(0, 2).map(event => `<span style="color: ${event.type === 'return' ? '#22c55e' : '#3b82f6'}">${format(new Date(event.date), 'dd/MM')} - ${event.project_name}</span>`).join('<br>')} icon={<Users className="h-5 w-5 text-purple-500" />} onClick={() => navigate(createLocalizedPath('/logistics-out'))} />}
+        <StatCard title={t('dashboard_truck_loading')} value={truckLoadingData.todayLoadings.length > 0 ? truckLoadingData.todayLoadings.length.toString() : truckLoadingData.daysToNext.toString()} footer={truckLoadingData.todayLoadings.length > 0 ? `${t('dashboard_loading_today')}: ${truckLoadingData.todayLoadings.map(l => l.project.name).join(', ')}` : truckLoadingData.daysToNext > 0 ? `${truckLoadingData.daysToNext} ${t('dashboard_days_to_next')}` : t('dashboard_no_upcoming')} icon={<Truck className="h-5 w-5 text-orange-500" />} />
       </div>
       
       {/* Weekly Loading Schedule */}
@@ -724,7 +725,7 @@ const Dashboard: React.FC = () => {
           <div className="flex justify-between items-center">
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Weekly Loading Schedule
+              {t('dashboard_weekly_schedule')}
             </CardTitle>
             <div className="flex items-center space-x-2">
               <Button variant="outline" size="icon" onClick={prevWeek} disabled={weekLoading}>
@@ -732,7 +733,7 @@ const Dashboard: React.FC = () => {
               </Button>
               <span className="text-sm font-medium min-w-[200px] text-center">
                 {format(weekStartDate, 'MMM d')} - {format(addDays(weekStartDate, 6), 'MMM d, yyyy')}
-                {weekLoading && <span className="ml-2 text-xs text-gray-500">Loading...</span>}
+                {weekLoading && <span className="ml-2 text-xs text-gray-500">{t('dashboard_loading')}</span>}
               </span>
               <Button variant="outline" size="icon" onClick={nextWeek} disabled={weekLoading}>
                 <ChevronRight className="h-4 w-4" />
@@ -770,7 +771,7 @@ const Dashboard: React.FC = () => {
                           
                           <div className="font-medium break-words whitespace-normal leading-tight">{assignment.project.name}</div>
                           <div className="text-xs text-gray-500">
-                            Install: {format(new Date(assignment.project.installation_date), 'MMM d')} | {assignment.project.progress || 0}%
+                            {t('dashboard_install')}: {format(new Date(assignment.project.installation_date), 'MMM d')} | {assignment.project.progress || 0}%
                             {isManuallyAdjusted && <span className="text-orange-600 ml-1 font-medium">*</span>}
                           </div>
                         </div>;
@@ -789,15 +790,15 @@ const Dashboard: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-blue-500" />
-              Task Completion Trend
+              {t('dashboard_task_completion_trend')}
             </CardTitle>
-            <CardDescription>Tasks completed over the last 7 days</CardDescription>
+            <CardDescription>{t('dashboard_tasks_last_7_days')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-80">
               <ChartContainer config={{
               completed: {
-                label: "Completed",
+                label: t('dashboard_completed'),
                 theme: {
                   light: "#4ade80",
                   dark: "#4ade80"
@@ -825,9 +826,9 @@ const Dashboard: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ListTodo className="h-5 w-5 text-blue-500" />
-              Tasks by Status
+              {t('dashboard_tasks_by_status')}
             </CardTitle>
-            <CardDescription>Distribution of tasks by status</CardDescription>
+            <CardDescription>{t('dashboard_status_distribution')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-80">
@@ -852,7 +853,7 @@ const Dashboard: React.FC = () => {
       <div className="mt-8">
         <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
           <Factory className="h-6 w-6" />
-          Workstation Overview
+          {t('dashboard_workstation_overview')}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {workstationStats.map(ws => (
@@ -868,15 +869,15 @@ const Dashboard: React.FC = () => {
                 <div className="grid grid-cols-3 gap-2 pb-3 border-b">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-blue-600">{ws.openTasks}</div>
-                    <div className="text-xs text-muted-foreground">Open Tasks</div>
+                    <div className="text-xs text-muted-foreground">{t('dashboard_open_tasks')}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">{ws.openProjects}</div>
-                    <div className="text-xs text-muted-foreground">Projects</div>
+                    <div className="text-xs text-muted-foreground">{t('dashboard_projects')}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-orange-600">{ws.openHours}h</div>
-                    <div className="text-xs text-muted-foreground">Est. Hours</div>
+                    <div className="text-xs text-muted-foreground">{t('dashboard_est_hours')}</div>
                   </div>
                 </div>
 
@@ -912,7 +913,7 @@ const Dashboard: React.FC = () => {
                 ) : (
                   <div className="bg-green-50 p-3 rounded-md text-center">
                     <Check className="h-8 w-8 mx-auto text-green-600 mb-1" />
-                    <div className="text-sm text-green-700 font-medium">All tasks completed!</div>
+                    <div className="text-sm text-green-700 font-medium">{t('dashboard_all_tasks_completed')}</div>
                   </div>
                 )}
               </CardContent>
@@ -924,7 +925,7 @@ const Dashboard: React.FC = () => {
           <Card>
             <CardContent className="p-8 text-center text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>No workstations configured yet.</p>
+              <p>{t('dashboard_no_workstations')}</p>
             </CardContent>
           </Card>
         )}
