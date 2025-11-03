@@ -82,12 +82,22 @@ export const projectChatService = {
     replyToMessageId?: string
   ): Promise<ProjectMessage> {
     try {
-      // Get current user from localStorage (custom auth system)
-      const storedSession = localStorage.getItem('employeeSession');
-      if (!storedSession) throw new Error('User not authenticated');
+      // Get current authenticated user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error('User not authenticated');
       
-      const employee = JSON.parse(storedSession);
-      if (!employee?.id) throw new Error('User not authenticated');
+      // Get employee data from database
+      // @ts-expect-error - Supabase type inference issue
+      const employeeQuery = await supabase
+        .from('employees')
+        .select('id, name')
+        .eq('user_id', user.id)
+        .single();
+      
+      const employee = employeeQuery.data;
+      const empError = employeeQuery.error;
+      
+      if (empError || !employee) throw new Error('Employee not found');
 
       let file_url: string | null = null;
       let file_name: string | null = null;
@@ -187,11 +197,19 @@ export const projectChatService = {
   // Get unread message count for a project
   async getUnreadMessageCount(projectId: string): Promise<number> {
     try {
-      // Get current user from localStorage (custom auth system)
-      const storedSession = localStorage.getItem('employeeSession');
-      if (!storedSession) return 0;
+      // Get current authenticated user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return 0;
       
-      const employee = JSON.parse(storedSession);
+      // Get employee data
+      const employeeQuery = await supabase
+        .from('employees')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+      
+      const employee = employeeQuery.data;
+      
       if (!employee?.id) return 0;
 
       // Get last read timestamp for this user and project
@@ -228,11 +246,19 @@ export const projectChatService = {
   // Mark messages as read for current user
   async markMessagesAsRead(projectId: string): Promise<void> {
     try {
-      // Get current user from localStorage (custom auth system)
-      const storedSession = localStorage.getItem('employeeSession');
-      if (!storedSession) return;
+      // Get current authenticated user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
       
-      const employee = JSON.parse(storedSession);
+      // Get employee data
+      const employeeQuery = await supabase
+        .from('employees')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+      
+      const employee = employeeQuery.data;
+      
       if (!employee?.id) return;
 
       const { error } = await supabase
