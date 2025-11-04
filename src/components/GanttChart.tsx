@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Plus, Users, Minus, GripVertical, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Users, Minus, GripVertical, Clock, AlertTriangle } from 'lucide-react';
 import { ProjectUserAssignmentDialog } from './ProjectUserAssignmentDialog';
 import { TeamMembershipManager } from './TeamMembershipManager';
 import { ProjectOverlapResolutionDialog } from './ProjectOverlapResolutionDialog';
@@ -573,6 +573,39 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
               </Button>
               
               <TeamMembershipManager onMembershipChange={handleMembershipChange} />
+              
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  // Check for overlaps across all teams
+                  const allOverlaps: any[] = [];
+                  
+                  teams.forEach(team => {
+                    const teamOverlaps = detectOverlaps(team.id);
+                    if (teamOverlaps.length > 1) {
+                      allOverlaps.push(...teamOverlaps);
+                    }
+                  });
+                  
+                  // Remove duplicates based on project id
+                  const uniqueOverlaps = allOverlaps.filter((overlap, index, self) =>
+                    index === self.findIndex(o => o.id === overlap.id)
+                  );
+                  
+                  if (uniqueOverlaps.length > 1) {
+                    setOverlapDialog({
+                      isOpen: true,
+                      overlappingProjects: uniqueOverlaps
+                    });
+                  } else {
+                    alert('No overlaps detected!');
+                  }
+                }}
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Check Overlaps
+              </Button>
             </div>
             
             <div className="flex items-center gap-2">
