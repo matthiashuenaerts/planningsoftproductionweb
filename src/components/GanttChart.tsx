@@ -186,6 +186,35 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     })));
   }, [teams, employees, dailyAssignments, projects]);
 
+  // Auto-detect overlaps on page load
+  useEffect(() => {
+    if (teams.length === 0 || projects.length === 0) return;
+    
+    // Check for overlaps across all teams
+    const allOverlaps: any[] = [];
+    
+    teams.forEach(team => {
+      const teamOverlaps = detectOverlaps(team.id);
+      if (teamOverlaps.length > 1) {
+        allOverlaps.push(...teamOverlaps);
+      }
+    });
+    
+    // Remove duplicates based on project id
+    const uniqueOverlaps = allOverlaps.filter((overlap, index, self) =>
+      index === self.findIndex(o => o.id === overlap.id)
+    );
+    
+    // Show dialog if overlaps detected
+    if (uniqueOverlaps.length > 1) {
+      console.log('Overlaps detected on page load:', uniqueOverlaps);
+      setOverlapDialog({
+        isOpen: true,
+        overlappingProjects: uniqueOverlaps
+      });
+    }
+  }, [teams, projects]);
+
   // Get date/time range for the Gantt chart (supports both day and hour views)
   const getDateRange = () => {
     const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
