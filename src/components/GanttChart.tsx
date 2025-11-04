@@ -75,6 +75,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [employees, setEmployees] = useState<DailyEmployee[]>([]);
   const [dailyAssignments, setDailyAssignments] = useState<DailyTeamAssignment[]>([]);
+  const [overrides, setOverrides] = useState<any[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [weeksToShow, setWeeksToShow] = useState(4);
   const [viewMode, setViewMode] = useState<'day' | 'hour'>('day');
@@ -144,6 +145,9 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
         const employeesData = await dailyTeamAssignmentService.getAvailableEmployees();
         setEmployees(employeesData);
         
+        // Fetch overrides
+        await fetchOverrides();
+        
         // Auto-assign permanent team members to current projects
         await autoAssignTeamMembersToProjects(fetchedTeams);
       } catch (error) {
@@ -153,6 +157,21 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
 
     fetchTeamsAndEmployees();
   }, [projects]);
+
+  const fetchOverrides = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('project_team_assignment_overrides')
+        .select('*');
+
+      if (error) throw error;
+
+      setOverrides(data || []);
+      console.log('Loaded overrides:', data);
+    } catch (error) {
+      console.error('Error fetching overrides:', error);
+    }
+  };
 
   // Fetch daily assignments for the current date range
   useEffect(() => {
@@ -238,10 +257,19 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     : Math.max(30, availableWidth / dateRange.length); // Day view: minimum 30px per day
 
   // Get project position and width (supports both day and hour views)
-  const getProjectPosition = (project: ProjectWithTeam) => {
+  const getProjectPosition = (project: ProjectWithTeam, teamId?: string) => {
     const teamAssignment = project.project_team_assignments as any;
-    const startDate = new Date(teamAssignment?.start_date || project.installation_date);
-    const duration = teamAssignment?.duration || 1;
+    
+    // Check for override
+    const override = overrides.find(o => o.project_id === project.id && o.team_id === teamId);
+    
+    const startDate = override 
+      ? new Date(`${override.start_date}T${override.start_hour.toString().padStart(2, '0')}:00:00`)
+      : new Date(teamAssignment?.start_date || project.installation_date);
+      
+    const duration = override 
+      ? Math.ceil((new Date(override.end_date).getTime() - new Date(override.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1
+      : teamAssignment?.duration || 1;
     
     const firstUnit = dateRange[0];
     
@@ -307,13 +335,32 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
         
         if (!p1Assignment || !p2Assignment) continue;
         
-        const p1Start = new Date(p1Assignment.start_date);
-        const p1End = new Date(p1Start);
-        p1End.setDate(p1End.getDate() + p1Assignment.duration - 1);
+        // Check for overrides
+        const override1 = overrides.find(o => o.project_id === p1.id && o.team_id === teamId);
+        const override2 = overrides.find(o => o.project_id === p2.id && o.team_id === teamId);
         
-        const p2Start = new Date(p2Assignment.start_date);
-        const p2End = new Date(p2Start);
-        p2End.setDate(p2End.getDate() + p2Assignment.duration - 1);
+        // Use override dates if available
+        const p1Start = override1 
+          ? new Date(`${override1.start_date}T${override1.start_hour.toString().padStart(2, '0')}:00:00`)
+          : new Date(p1Assignment.start_date);
+        const p1End = override1 
+          ? new Date(`${override1.end_date}T${override1.end_hour.toString().padStart(2, '0')}:00:00`)
+          : (() => {
+            const end = new Date(p1Start);
+            end.setDate(end.getDate() + p1Assignment.duration - 1);
+            return end;
+          })();
+        
+        const p2Start = override2 
+          ? new Date(`${override2.start_date}T${override2.start_hour.toString().padStart(2, '0')}:00:00`)
+          : new Date(p2Assignment.start_date);
+        const p2End = override2 
+          ? new Date(`${override2.end_date}T${override2.end_hour.toString().padStart(2, '0')}:00:00`)
+          : (() => {
+            const end = new Date(p2Start);
+            end.setDate(end.getDate() + p2Assignment.duration - 1);
+            return end;
+          })();
         
         // Check if projects overlap: p1 starts before p2 ends AND p2 starts before p1 ends
         const hasOverlap = p1Start <= p2End && p2Start <= p1End;
@@ -327,10 +374,10 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
               id: p1.id,
               name: p1.name,
               client: p1.client,
-              startDate: p1Start,
-              endDate: p1End,
-              startHour: 8,
-              endHour: 17,
+              startDate: override1 ? new Date(override1.start_date) : p1Start,
+              endDate: override1 ? new Date(override1.end_date) : p1End,
+              startHour: override1 ? override1.start_hour : 8,
+              endHour: override1 ? override1.end_hour : 17,
               teamId: teamId,
               teamName: teams.find(t => t.id === teamId)?.name || 'Unknown'
             });
@@ -340,10 +387,10 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
               id: p2.id,
               name: p2.name,
               client: p2.client,
-              startDate: p2Start,
-              endDate: p2End,
-              startHour: 8,
-              endHour: 17,
+              startDate: override2 ? new Date(override2.start_date) : p2Start,
+              endDate: override2 ? new Date(override2.end_date) : p2End,
+              startHour: override2 ? override2.start_hour : 8,
+              endHour: override2 ? override2.end_hour : 17,
               teamId: teamId,
               teamName: teams.find(t => t.id === teamId)?.name || 'Unknown'
             });
@@ -353,6 +400,12 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     }
     
     return overlaps;
+  };
+
+  const handleOverlapResolve = async () => {
+    // Refresh overrides and re-check for overlaps
+    await fetchOverrides();
+    setOverlapDialog({ isOpen: false, overlappingProjects: [] });
   };
 
   // Navigate weeks
@@ -816,7 +869,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                                (teamNameLower.includes('blue') && projectTeamLower.includes('blauw'));
                       })
                       .map((project) => {
-                        const position = getProjectPosition(project);
+                        const position = getProjectPosition(project, team.id);
                         if (!position) return null;
                         
                         return (
@@ -1023,10 +1076,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
         isOpen={overlapDialog.isOpen}
         onClose={() => setOverlapDialog({ isOpen: false, overlappingProjects: [] })}
         overlappingProjects={overlapDialog.overlappingProjects}
-        onResolve={(resolvedProjects) => {
-          console.log('Resolved overlaps:', resolvedProjects);
-          // Here you would update the project schedules in the database
-        }}
+        onResolve={handleOverlapResolve}
       />
     </Card>
   );

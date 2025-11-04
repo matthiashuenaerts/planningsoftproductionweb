@@ -1639,6 +1639,57 @@ export type Database = {
         }
         Relationships: []
       }
+      project_team_assignment_overrides: {
+        Row: {
+          created_at: string
+          end_date: string
+          end_hour: number
+          id: string
+          project_id: string
+          start_date: string
+          start_hour: number
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          end_hour?: number
+          id?: string
+          project_id: string
+          start_date: string
+          start_hour?: number
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          end_hour?: number
+          id?: string
+          project_id?: string
+          start_date?: string
+          start_hour?: number
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_team_assignment_overrides_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_team_assignment_overrides_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "placement_teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_team_assignments: {
         Row: {
           created_at: string

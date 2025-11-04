@@ -9,6 +9,8 @@ import { format } from 'date-fns';
 import { CalendarIcon, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface OverlappingProject {
   id: string;
@@ -103,13 +105,31 @@ export const ProjectOverlapResolutionDialog: React.FC<ProjectOverlapResolutionDi
       .map(pair => pair.project1.id === projectId ? pair.project2.name : pair.project1.name);
   };
 
-  const handleSave = () => {
-    if (hasOverlaps) {
-      alert('There are still overlaps! Please adjust the dates and times so projects do not overlap.');
-      return;
+  const handleSave = async () => {
+    try {
+      // Save each project's override to the database
+      for (const project of projects) {
+        const { error } = await supabase
+          .from('project_team_assignment_overrides')
+          .upsert({
+            project_id: project.id,
+            team_id: project.teamId,
+            start_date: format(project.startDate, 'yyyy-MM-dd'),
+            end_date: format(project.endDate, 'yyyy-MM-dd'),
+            start_hour: project.startHour,
+            end_hour: project.endHour,
+          });
+
+        if (error) throw error;
+      }
+
+      toast.success('Project schedules saved successfully');
+      onResolve(projects);
+      onClose();
+    } catch (error) {
+      console.error('Error saving project overrides:', error);
+      toast.error('Failed to save project schedules');
     }
-    onResolve(projects);
-    onClose();
   };
 
   return (
@@ -275,8 +295,8 @@ export const ProjectOverlapResolutionDialog: React.FC<ProjectOverlapResolutionDi
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={hasOverlaps}>
-            {hasOverlaps ? 'Resolve Overlaps First' : 'Save Changes'}
+          <Button onClick={handleSave}>
+            Save Changes
           </Button>
         </DialogFooter>
       </DialogContent>
