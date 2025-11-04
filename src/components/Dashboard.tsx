@@ -69,11 +69,12 @@ const Dashboard: React.FC = () => {
     openTasks: number;
     openProjects: number;
     openHours: number;
-    firstTodoTask: {
+    todoTasks: Array<{
       title: string;
       projectName: string;
       priority: string;
-    } | null;
+      duration: number;
+    }>;
   }>>([]);
   const {
     toast
@@ -334,7 +335,7 @@ const Dashboard: React.FC = () => {
         const openProjectsCount = uniqueProjectIds.size;
         const openHours = workstationTasks.reduce((sum, t) => sum + (t.duration || 0), 0) / 60;
 
-        // Find first TODO task (highest priority)
+        // Get all TODO tasks sorted by priority
         const priorityOrder = { 'Urgent': 4, 'High': 3, 'Medium': 2, 'Low': 1 };
         const todoTasks = workstationTasks
           .filter(t => t.status === 'TODO')
@@ -342,13 +343,13 @@ const Dashboard: React.FC = () => {
             const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
             const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
             return bPriority - aPriority;
-          });
-
-        const firstTodoTask = todoTasks.length > 0 ? {
-          title: todoTasks[0].title,
-          projectName: (todoTasks[0].phases as any)?.projects?.name || 'Unknown',
-          priority: todoTasks[0].priority
-        } : null;
+          })
+          .map(task => ({
+            title: task.title,
+            projectName: (task.phases as any)?.projects?.name || 'Unknown',
+            priority: task.priority,
+            duration: task.duration || 0
+          }));
 
         return {
           id: ws.id,
@@ -356,7 +357,7 @@ const Dashboard: React.FC = () => {
           openTasks: openTasksCount,
           openProjects: openProjectsCount,
           openHours: Math.round(openHours * 10) / 10,
-          firstTodoTask
+          todoTasks
         };
       });
 
@@ -885,34 +886,41 @@ const Dashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* First Todo Task */}
-                {ws.firstTodoTask ? (
-                  <div className="bg-muted/50 p-3 rounded-md">
-                    <div className="flex items-start gap-2 mb-1">
-                      <CheckCircle2 className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate" title={ws.firstTodoTask.title}>
-                          {ws.firstTodoTask.title}
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate" title={ws.firstTodoTask.projectName}>
-                          {ws.firstTodoTask.projectName}
+                {/* All Todo Tasks */}
+                {ws.todoTasks.length > 0 ? (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {ws.todoTasks.map((task, idx) => (
+                      <div key={idx} className="bg-muted/50 p-2 rounded-md">
+                        <div className="flex items-start gap-2">
+                          <CheckCircle2 className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium truncate" title={task.title}>
+                              {task.title}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate" title={task.projectName}>
+                              {task.projectName}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge 
+                                variant="outline" 
+                                className={cn(
+                                  "text-xs py-0",
+                                  task.priority === 'Urgent' && "border-red-500 text-red-700 bg-red-50",
+                                  task.priority === 'High' && "border-orange-500 text-orange-700 bg-orange-50",
+                                  task.priority === 'Medium' && "border-yellow-500 text-yellow-700 bg-yellow-50",
+                                  task.priority === 'Low' && "border-green-500 text-green-700 bg-green-50"
+                                )}
+                              >
+                                {task.priority}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {(task.duration / 60).toFixed(1)}h
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1 mt-2">
-                      <Badge 
-                        variant="outline" 
-                        className={cn(
-                          "text-xs",
-                          ws.firstTodoTask.priority === 'Urgent' && "border-red-500 text-red-700 bg-red-50",
-                          ws.firstTodoTask.priority === 'High' && "border-orange-500 text-orange-700 bg-orange-50",
-                          ws.firstTodoTask.priority === 'Medium' && "border-yellow-500 text-yellow-700 bg-yellow-50",
-                          ws.firstTodoTask.priority === 'Low' && "border-green-500 text-green-700 bg-green-50"
-                        )}
-                      >
-                        {ws.firstTodoTask.priority}
-                      </Badge>
-                    </div>
+                    ))}
                   </div>
                 ) : (
                   <div className="bg-green-50 p-3 rounded-md text-center">
