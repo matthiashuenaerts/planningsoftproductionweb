@@ -451,24 +451,25 @@ const Dashboard: React.FC = () => {
         data: overridesData,
         error: overridesError
       } = await supabase.from('project_loading_overrides').select('project_id, override_loading_date');
+      
+      let overridesMap: Record<string, string> = {};
       if (overridesError) {
         console.error('Error fetching loading overrides:', overridesError);
       } else {
         // Convert overrides to map
-        const overridesMap: Record<string, string> = {};
         (overridesData || []).forEach(override => {
           overridesMap[override.project_id] = override.override_loading_date;
         });
         setManualOverrides(overridesMap);
       }
 
-      // Load current week data
-      await loadWeekData(weekStartDate, holidaysData);
+      // Load current week data with overrides
+      await loadWeekData(weekStartDate, holidaysData, overridesMap);
     } catch (error) {
       console.error('Error fetching initial truck loading data:', error);
     }
   };
-  const loadWeekData = async (weekStart: Date, holidaysData?: Holiday[]) => {
+  const loadWeekData = async (weekStart: Date, holidaysData?: Holiday[], overridesMap?: Record<string, string>) => {
     const weekKey = format(weekStart, 'yyyy-MM-dd');
 
     // Skip if week already loaded
@@ -495,8 +496,9 @@ const Dashboard: React.FC = () => {
           loading_date: format(loadingDate, 'yyyy-MM-dd')
         };
       }).filter(assignment => {
-        // Check if there's a manual override for this project
-        const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
+        // Check if there's a manual override for this project (use passed overrides or state)
+        const overrides = overridesMap || manualOverrides;
+        const effectiveLoadingDate = overrides[assignment.project.id] || assignment.loading_date;
         const loadingDate = new Date(effectiveLoadingDate);
         return loadingDate >= weekStart && loadingDate <= weekEnd;
       });
