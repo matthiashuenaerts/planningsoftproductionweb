@@ -495,7 +495,9 @@ const Dashboard: React.FC = () => {
           loading_date: format(loadingDate, 'yyyy-MM-dd')
         };
       }).filter(assignment => {
-        const loadingDate = new Date(assignment.loading_date);
+        // Check if there's a manual override for this project
+        const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
+        const loadingDate = new Date(effectiveLoadingDate);
         return loadingDate >= weekStart && loadingDate <= weekEnd;
       });
 
