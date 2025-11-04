@@ -37,13 +37,49 @@ export const ProjectOverlapResolutionDialog: React.FC<ProjectOverlapResolutionDi
 }) => {
   const [projects, setProjects] = useState<OverlappingProject[]>(overlappingProjects);
 
+  // Update projects when overlappingProjects changes
+  React.useEffect(() => {
+    setProjects(overlappingProjects);
+  }, [overlappingProjects]);
+
   const updateProject = (index: number, updates: Partial<OverlappingProject>) => {
     const updated = [...projects];
     updated[index] = { ...updated[index], ...updates };
     setProjects(updated);
   };
 
+  // Check if there are still overlaps
+  const checkForOverlaps = () => {
+    for (let i = 0; i < projects.length; i++) {
+      for (let j = i + 1; j < projects.length; j++) {
+        const p1 = projects[i];
+        const p2 = projects[j];
+        
+        const p1Start = new Date(p1.startDate);
+        p1Start.setHours(p1.startHour, 0, 0, 0);
+        const p1End = new Date(p1.endDate);
+        p1End.setHours(p1.endHour, 0, 0, 0);
+        
+        const p2Start = new Date(p2.startDate);
+        p2Start.setHours(p2.startHour, 0, 0, 0);
+        const p2End = new Date(p2.endDate);
+        p2End.setHours(p2.endHour, 0, 0, 0);
+        
+        if (p1Start <= p2End && p2Start <= p1End) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  const hasOverlaps = checkForOverlaps();
+
   const handleSave = () => {
+    if (hasOverlaps) {
+      alert('There are still overlaps! Please adjust the dates and times so projects do not overlap.');
+      return;
+    }
     onResolve(projects);
     onClose();
   };
@@ -61,10 +97,13 @@ export const ProjectOverlapResolutionDialog: React.FC<ProjectOverlapResolutionDi
           </DialogDescription>
         </DialogHeader>
 
-        <Alert variant="default" className="mb-4">
+        <Alert variant={hasOverlaps ? "destructive" : "default"} className="mb-4">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Projects on the same team cannot overlap. Adjust dates and times to resolve conflicts.
+            {hasOverlaps 
+              ? `⚠️ ${projects.length} projects still have overlapping schedules. Adjust dates and times to resolve all conflicts.`
+              : `✓ No overlaps detected! You can now save the changes.`
+            }
           </AlertDescription>
         </Alert>
 
@@ -177,8 +216,8 @@ export const ProjectOverlapResolutionDialog: React.FC<ProjectOverlapResolutionDi
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>
-            Save Changes
+          <Button onClick={handleSave} disabled={hasOverlaps}>
+            {hasOverlaps ? 'Resolve Overlaps First' : 'Save Changes'}
           </Button>
         </DialogFooter>
       </DialogContent>
