@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, differenceInDays } from 'date-fns';
+import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, differenceInDays, eachHourOfInterval, differenceInHours, addHours } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Plus, Users, Minus, GripVertical } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Users, Minus, GripVertical, Clock } from 'lucide-react';
 import { ProjectUserAssignmentDialog } from './ProjectUserAssignmentDialog';
 import { TeamMembershipManager } from './TeamMembershipManager';
+import { ProjectOverlapResolutionDialog } from './ProjectOverlapResolutionDialog';
 import { dailyTeamAssignmentService, DailyTeamAssignment, Employee as DailyEmployee } from '@/services/dailyTeamAssignmentService';
 import { teamMembershipService } from '@/services/teamMembershipService';
 
@@ -76,6 +77,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
   const [dailyAssignments, setDailyAssignments] = useState<DailyTeamAssignment[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [weeksToShow, setWeeksToShow] = useState(4);
+  const [viewMode, setViewMode] = useState<'day' | 'hour'>('day');
   const [selectedTeam, setSelectedTeam] = useState<string>('');
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [assignmentDialog, setAssignmentDialog] = useState<{
@@ -92,6 +94,13 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     teamId: '',
     teamName: '',
     date: new Date()
+  });
+  const [overlapDialog, setOverlapDialog] = useState<{
+    isOpen: boolean;
+    overlappingProjects: any[];
+  }>({
+    isOpen: false,
+    overlappingProjects: []
   });
   const [resizing, setResizing] = useState<{
     projectId: string;
@@ -177,36 +186,123 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     })));
   }, [teams, employees, dailyAssignments, projects]);
 
-  // Get date range for the Gantt chart (dynamic weeks)
+  // Get date/time range for the Gantt chart (supports both day and hour views)
   const getDateRange = () => {
     const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(addDays(weekStart, (weeksToShow * 7) - 1), { weekStartsOn: 1 });
+    
+    if (viewMode === 'hour') {
+      // For hour view, show only the current week in hourly detail
+      const dayStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
+      const dayEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
+      return eachHourOfInterval({ start: dayStart, end: dayEnd });
+    }
+    
     return eachDayOfInterval({ start: weekStart, end: weekEnd });
   };
 
   const dateRange = getDateRange();
-  // Calculate dynamic day width based on available space (subtracting sidebar width and padding)
-  const availableWidth = typeof window !== 'undefined' ? window.innerWidth - 200 - 48 : 1200; // 200px sidebar, 48px padding
-  const dayWidth = Math.max(30, availableWidth / dateRange.length); // Minimum 30px per day
+  // Calculate dynamic width based on view mode
+  const availableWidth = typeof window !== 'undefined' ? window.innerWidth - 200 - 48 : 1200;
+  const unitWidth = viewMode === 'hour' 
+    ? Math.max(40, availableWidth / Math.min(dateRange.length, 168)) // Hour view: minimum 40px per hour
+    : Math.max(30, availableWidth / dateRange.length); // Day view: minimum 30px per day
 
-  // Get project position and width
+  // Get project position and width (supports both day and hour views)
   const getProjectPosition = (project: ProjectWithTeam) => {
     const teamAssignment = project.project_team_assignments as any;
     const startDate = new Date(teamAssignment?.start_date || project.installation_date);
     const duration = teamAssignment?.duration || 1;
     
-    const firstDay = dateRange[0];
-    const startDayIndex = differenceInDays(startDate, firstDay);
+    const firstUnit = dateRange[0];
     
-    // Only show if project intersects with current view
-    if (startDayIndex + duration < 0 || startDayIndex >= dateRange.length) {
-      return null;
+    if (viewMode === 'hour') {
+      // Hour view: calculate position in hours
+      const startHourIndex = differenceInHours(startDate, firstUnit);
+      const durationInHours = duration * 24; // Convert days to hours
+      
+      if (startHourIndex + durationInHours < 0 || startHourIndex >= dateRange.length) {
+        return null;
+      }
+      
+      const left = Math.max(0, startHourIndex * unitWidth);
+      const width = Math.min(durationInHours * unitWidth, (dateRange.length - Math.max(0, startHourIndex)) * unitWidth);
+      
+      return { left, width, duration };
+    } else {
+      // Day view: calculate position in days
+      const startDayIndex = differenceInDays(startDate, firstUnit);
+      
+      if (startDayIndex + duration < 0 || startDayIndex >= dateRange.length) {
+        return null;
+      }
+      
+      const left = Math.max(0, startDayIndex * unitWidth);
+      const width = Math.min(duration * unitWidth, (dateRange.length - Math.max(0, startDayIndex)) * unitWidth);
+      
+      return { left, width, duration };
+    }
+  };
+
+  // Detect overlapping projects on the same team
+  const detectOverlaps = (teamId: string) => {
+    const teamProjects = projects.filter(project => {
+      const projectTeam = project.project_team_assignments?.team;
+      if (!projectTeam) return false;
+      
+      const team = teams.find(t => t.id === teamId);
+      if (!team) return false;
+      
+      const teamNameLower = team.name.toLowerCase();
+      const projectTeamLower = projectTeam.toLowerCase();
+      
+      return projectTeamLower === teamNameLower ||
+             projectTeamLower.includes(teamNameLower) ||
+             teamNameLower.includes(projectTeamLower);
+    });
+
+    const overlaps: any[] = [];
+    
+    for (let i = 0; i < teamProjects.length; i++) {
+      for (let j = i + 1; j < teamProjects.length; j++) {
+        const p1 = teamProjects[i];
+        const p2 = teamProjects[j];
+        
+        const p1Start = new Date(p1.project_team_assignments?.start_date || p1.installation_date);
+        const p1End = addDays(p1Start, (p1.project_team_assignments?.duration || 1) - 1);
+        
+        const p2Start = new Date(p2.project_team_assignments?.start_date || p2.installation_date);
+        const p2End = addDays(p2Start, (p2.project_team_assignments?.duration || 1) - 1);
+        
+        // Check for overlap
+        if (p1Start <= p2End && p2Start <= p1End) {
+          if (!overlaps.some(o => o.id === p1.id)) {
+            overlaps.push({
+              id: p1.id,
+              name: p1.name,
+              client: p1.client,
+              startDate: p1Start,
+              endDate: p1End,
+              startHour: 8,
+              endHour: 17
+            });
+          }
+          if (!overlaps.some(o => o.id === p2.id)) {
+            overlaps.push({
+              id: p2.id,
+              name: p2.name,
+              client: p2.client,
+              startDate: p2Start,
+              endDate: p2End,
+              startHour: 8,
+              endHour: 17
+            });
+          }
+        }
+      }
     }
     
-    const left = Math.max(0, startDayIndex * dayWidth);
-    const width = Math.min(duration * dayWidth, (dateRange.length - Math.max(0, startDayIndex)) * dayWidth);
-    
-    return { left, width, duration };
+    return overlaps;
   };
 
   // Navigate weeks
@@ -359,7 +455,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     if (!resizing) return;
     
     const deltaX = e.clientX - resizing.initialX;
-    const deltaWidth = Math.round(deltaX / dayWidth) * dayWidth;
+    const deltaWidth = Math.round(deltaX / unitWidth) * unitWidth;
     
     // Calculate new position/size based on resize type
     let newLeft = resizing.initialLeft;
@@ -372,8 +468,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
       newWidth = resizing.initialWidth + deltaWidth;
     }
     
-    // Minimum width of one day
-    if (newWidth < dayWidth) return;
+    // Minimum width of one unit
+    if (newWidth < unitWidth) return;
     
     // Update the visual element (this is just for visual feedback)
     const element = document.querySelector(`[data-resize-id="${resizing.projectId}-${resizing.employeeId}"]`) as HTMLElement;
@@ -381,7 +477,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
       element.style.left = `${newLeft}px`;
       element.style.width = `${newWidth}px`;
     }
-  }, [resizing, dayWidth]);
+  }, [resizing, unitWidth]);
 
   const handleResizeEnd = useCallback(() => {
     if (!resizing) return;
@@ -451,16 +547,36 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
             </div>
             
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={zoomOut} disabled={weeksToShow >= 8}>
-                <Minus className="h-4 w-4" />
+              <Button 
+                variant={viewMode === 'day' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setViewMode('day')}
+              >
+                Days
               </Button>
-              <Button variant="outline" size="sm" onClick={zoomIn} disabled={weeksToShow <= 1}>
-                <Plus className="h-4 w-4" />
+              <Button 
+                variant={viewMode === 'hour' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setViewMode('hour')}
+              >
+                <Clock className="h-4 w-4 mr-2" />
+                Hours
               </Button>
-              <span className="text-sm text-muted-foreground">
-                {weeksToShow} week{weeksToShow > 1 ? 's' : ''}
-              </span>
             </div>
+            
+            {viewMode === 'day' && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={zoomOut} disabled={weeksToShow >= 8}>
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={zoomIn} disabled={weeksToShow <= 1}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  {weeksToShow} week{weeksToShow > 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
             
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={goToPreviousWeek}>
@@ -541,18 +657,27 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
           </div>
           
           {/* Timeline area */}
-          <div className="flex-1 overflow-hidden" ref={timelineRef}>
-            <div style={{ width: '100%', minWidth: dateRange.length * dayWidth }}>
+          <div className="flex-1 overflow-x-auto" ref={timelineRef}>
+            <div style={{ width: '100%', minWidth: dateRange.length * unitWidth }}>
               {/* Time header */}
               <div className="h-12 border-b border-border bg-muted/40 flex">
                 {dateRange.map((date, index) => (
                   <div
                     key={index}
                     className="border-r border-border/50 flex flex-col items-center justify-center text-xs"
-                    style={{ width: dayWidth }}
+                    style={{ width: unitWidth }}
                   >
-                    <div className="font-medium">{format(date, 'dd')}</div>
-                    <div className="text-muted-foreground">{format(date, 'EEE')}</div>
+                    {viewMode === 'hour' ? (
+                      <>
+                        <div className="font-medium">{format(date, 'HH:mm')}</div>
+                        <div className="text-muted-foreground">{format(date, 'EEE dd')}</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="font-medium">{format(date, 'dd')}</div>
+                        <div className="text-muted-foreground">{format(date, 'EEE')}</div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
@@ -564,16 +689,19 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                   Installation Teams
                 </div>
                 
-                {teams.map((team) => (
+                {teams.map((team) => {
+                  const overlaps = detectOverlaps(team.id);
+                  
+                  return (
                   <div key={`team-row-${team.id}`} className="h-16 border-b border-border/50 relative hover:bg-muted/10 transition-colors bg-muted/10">
-                    {/* Day grid */}
-                    {dateRange.map((date, dayIndex) => (
+                    {/* Grid */}
+                    {dateRange.map((date, unitIndex) => (
                       <div
-                        key={dayIndex}
+                        key={unitIndex}
                         className="absolute border-r border-border/30"
                         style={{
-                          left: dayIndex * dayWidth,
-                          width: dayWidth,
+                          left: unitIndex * unitWidth,
+                          width: unitWidth,
                           height: '100%',
                           backgroundColor: date.getDay() === 0 || date.getDay() === 6 ? 'hsl(var(--muted)/0.5)' : 'transparent'
                         }}
@@ -620,7 +748,16 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                             title={`${project.name} - ${project.client} (${position.duration} days)`}
                             onClick={() => {
                               const projectStartDate = new Date(project.project_team_assignments?.start_date || project.installation_date);
-                              openAssignmentDialog(project.id, project.name, team.id, team.name, projectStartDate);
+                              
+                              // Check for overlaps before opening dialog
+                              if (overlaps.length > 1) {
+                                setOverlapDialog({
+                                  isOpen: true,
+                                  overlappingProjects: overlaps
+                                });
+                              } else {
+                                openAssignmentDialog(project.id, project.name, team.id, team.name, projectStartDate);
+                              }
                             }}
                           >
                             <div className="truncate flex-1">
@@ -628,6 +765,11 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                               <div className="text-xs opacity-90 truncate">{project.client}</div>
                             </div>
                             <div className="flex items-center gap-1">
+                              {overlaps.length > 1 && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Overlap!
+                                </Badge>
+                              )}
                               {project.progress > 0 && (
                                 <Badge variant="secondary" className="text-xs">
                                   {project.progress}%
@@ -639,7 +781,8 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                         );
                       })}
                   </div>
-                ))}
+                  );
+                })}
                 
                 {/* Employees Section Header */}
                 <div className="h-8 border-b border-border bg-muted/30 flex items-center px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-4">
@@ -663,14 +806,14 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                       key={`employee-row-${team.id}-${employee.id}`}
                       className="h-16 border-b border-border/50 relative hover:bg-muted/10 transition-colors"
                     >
-                      {/* Day grid */}
-                      {dateRange.map((date, dayIndex) => (
+                      {/* Grid */}
+                      {dateRange.map((date, unitIndex) => (
                         <div
-                          key={dayIndex}
+                          key={unitIndex}
                           className="absolute border-r border-border/30"
                           style={{
-                            left: dayIndex * dayWidth,
-                            width: dayWidth,
+                            left: unitIndex * unitWidth,
+                            width: unitWidth,
                             height: '100%',
                             backgroundColor: date.getDay() === 0 || date.getDay() === 6 ? 'hsl(var(--muted)/0.5)' : 'transparent'
                           }}
@@ -719,18 +862,22 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                           const firstAssignmentDate = new Date(Math.min(...employeeAssignedDays.map(a => new Date(a.date).getTime())));
                           const lastAssignmentDate = new Date(Math.max(...employeeAssignedDays.map(a => new Date(a.date).getTime())));
                           
-                          const startDayIndex = differenceInDays(firstAssignmentDate, dateRange[0]);
-                          const endDayIndex = differenceInDays(lastAssignmentDate, dateRange[0]);
+                          const startUnitIndex = viewMode === 'hour' 
+                            ? differenceInHours(firstAssignmentDate, dateRange[0])
+                            : differenceInDays(firstAssignmentDate, dateRange[0]);
+                          const endUnitIndex = viewMode === 'hour'
+                            ? differenceInHours(lastAssignmentDate, dateRange[0])
+                            : differenceInDays(lastAssignmentDate, dateRange[0]);
                           
                           // Only show if assignment intersects with current view
-                          if (endDayIndex < 0 || startDayIndex >= dateRange.length) {
+                          if (endUnitIndex < 0 || startUnitIndex >= dateRange.length) {
                             return null;
                           }
                           
-                          const left = Math.max(0, startDayIndex * dayWidth);
+                          const left = Math.max(0, startUnitIndex * unitWidth);
                           const width = Math.min(
-                            (endDayIndex - Math.max(0, startDayIndex) + 1) * dayWidth,
-                            (dateRange.length - Math.max(0, startDayIndex)) * dayWidth
+                            (endUnitIndex - Math.max(0, startUnitIndex) + 1) * unitWidth,
+                            (dateRange.length - Math.max(0, startUnitIndex)) * unitWidth
                           );
                           
                           return (
@@ -787,6 +934,16 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
         teamName={assignmentDialog.teamName}
         date={assignmentDialog.date}
         onAssignmentUpdate={handleAssignmentUpdate}
+      />
+      
+      <ProjectOverlapResolutionDialog
+        isOpen={overlapDialog.isOpen}
+        onClose={() => setOverlapDialog({ isOpen: false, overlappingProjects: [] })}
+        overlappingProjects={overlapDialog.overlappingProjects}
+        onResolve={(resolvedProjects) => {
+          console.log('Resolved overlaps:', resolvedProjects);
+          // Here you would update the project schedules in the database
+        }}
       />
     </Card>
   );
