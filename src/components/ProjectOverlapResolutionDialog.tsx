@@ -18,6 +18,8 @@ interface OverlappingProject {
   endDate: Date;
   startHour: number;
   endHour: number;
+  teamId?: string;
+  teamName?: string;
 }
 
 interface ProjectOverlapResolutionDialogProps {
@@ -48,12 +50,17 @@ export const ProjectOverlapResolutionDialog: React.FC<ProjectOverlapResolutionDi
     setProjects(updated);
   };
 
-  // Check if there are still overlaps
-  const checkForOverlaps = () => {
+  // Check if there are still overlaps and identify them
+  const getOverlappingPairs = () => {
+    const overlaps: Array<{ project1: OverlappingProject; project2: OverlappingProject }> = [];
+    
     for (let i = 0; i < projects.length; i++) {
       for (let j = i + 1; j < projects.length; j++) {
         const p1 = projects[i];
         const p2 = projects[j];
+        
+        // Only check if same team
+        if (p1.teamId !== p2.teamId) continue;
         
         const p1Start = new Date(p1.startDate);
         p1Start.setHours(p1.startHour, 0, 0, 0);
@@ -66,14 +73,35 @@ export const ProjectOverlapResolutionDialog: React.FC<ProjectOverlapResolutionDi
         p2End.setHours(p2.endHour, 0, 0, 0);
         
         if (p1Start <= p2End && p2Start <= p1End) {
-          return true;
+          overlaps.push({ project1: p1, project2: p2 });
         }
       }
     }
-    return false;
+    return overlaps;
   };
 
-  const hasOverlaps = checkForOverlaps();
+  const overlappingPairs = getOverlappingPairs();
+  const hasOverlaps = overlappingPairs.length > 0;
+
+  // Group projects by team
+  const projectsByTeam = projects.reduce((acc, project) => {
+    const teamId = project.teamId || 'unknown';
+    if (!acc[teamId]) {
+      acc[teamId] = {
+        teamName: project.teamName || 'Unknown Team',
+        projects: []
+      };
+    }
+    acc[teamId].projects.push(project);
+    return acc;
+  }, {} as Record<string, { teamName: string; projects: OverlappingProject[] }>);
+
+  // Get projects that overlap with a specific project
+  const getOverlapsForProject = (projectId: string) => {
+    return overlappingPairs
+      .filter(pair => pair.project1.id === projectId || pair.project2.id === projectId)
+      .map(pair => pair.project1.id === projectId ? pair.project2.name : pair.project1.name);
+  };
 
   const handleSave = () => {
     if (hasOverlaps) {
@@ -107,107 +135,138 @@ export const ProjectOverlapResolutionDialog: React.FC<ProjectOverlapResolutionDi
           </AlertDescription>
         </Alert>
 
-        <div className="space-y-6">
-          {projects.map((project, index) => (
-            <div key={project.id} className="border rounded-lg p-4 space-y-4">
-              <div>
-                <h3 className="font-semibold text-lg">{project.name}</h3>
-                <p className="text-sm text-muted-foreground">{project.client}</p>
+        <div className="space-y-8">
+          {Object.entries(projectsByTeam).map(([teamId, teamData]) => (
+            <div key={teamId} className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <div className="w-3 h-3 rounded-full bg-primary" />
+                <h3 className="font-semibold text-lg">{teamData.teamName}</h3>
+                <span className="text-sm text-muted-foreground">
+                  ({teamData.projects.length} project{teamData.projects.length > 1 ? 's' : ''})
+                </span>
               </div>
+              
+              {teamData.projects.map((project, index) => {
+                const projectIndex = projects.findIndex(p => p.id === project.id);
+                const overlapsWithProjects = getOverlapsForProject(project.id);
+                
+                return (
+                  <div 
+                    key={project.id} 
+                    className={cn(
+                      "border rounded-lg p-4 space-y-4",
+                      overlapsWithProjects.length > 0 && "border-destructive bg-destructive/5"
+                    )}
+                  >
+                    <div>
+                      <h4 className="font-semibold">{project.name}</h4>
+                      <p className="text-sm text-muted-foreground">{project.client}</p>
+                      {overlapsWithProjects.length > 0 && (
+                        <Alert variant="destructive" className="mt-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertDescription className="text-xs">
+                            Overlaps with: {overlapsWithProjects.join(', ')}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                {/* Start Date & Time */}
-                <div className="space-y-2">
-                  <Label>Start Date & Time</Label>
-                  <div className="flex gap-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "flex-1 justify-start text-left font-normal",
-                            !project.startDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {project.startDate ? format(project.startDate, "PPP") : <span>Pick a date</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={project.startDate}
-                          onSelect={(date) => date && updateProject(index, { startDate: date })}
-                          initialFocus
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Start Date & Time */}
+                      <div className="space-y-2">
+                        <Label>Start Date & Time</Label>
+                        <div className="flex gap-2">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "flex-1 justify-start text-left font-normal",
+                                  !project.startDate && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {project.startDate ? format(project.startDate, "PPP") : <span>Pick a date</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={project.startDate}
+                                onSelect={(date) => date && updateProject(projectIndex, { startDate: date })}
+                                initialFocus
+                                className="pointer-events-auto"
+                              />
+                            </PopoverContent>
+                          </Popover>
 
-                    <Select
-                      value={project.startHour.toString()}
-                      onValueChange={(value) => updateProject(index, { startHour: parseInt(value) })}
-                    >
-                      <SelectTrigger className="w-24">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {hours.map((hour) => (
-                          <SelectItem key={hour} value={hour.toString()}>
-                            {hour.toString().padStart(2, '0')}:00
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          <Select
+                            value={project.startHour.toString()}
+                            onValueChange={(value) => updateProject(projectIndex, { startHour: parseInt(value) })}
+                          >
+                            <SelectTrigger className="w-24">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {hours.map((hour) => (
+                                <SelectItem key={hour} value={hour.toString()}>
+                                  {hour.toString().padStart(2, '0')}:00
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* End Date & Time */}
+                      <div className="space-y-2">
+                        <Label>End Date & Time</Label>
+                        <div className="flex gap-2">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "flex-1 justify-start text-left font-normal",
+                                  !project.endDate && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {project.endDate ? format(project.endDate, "PPP") : <span>Pick a date</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={project.endDate}
+                                onSelect={(date) => date && updateProject(projectIndex, { endDate: date })}
+                                initialFocus
+                                className="pointer-events-auto"
+                              />
+                            </PopoverContent>
+                          </Popover>
+
+                          <Select
+                            value={project.endHour.toString()}
+                            onValueChange={(value) => updateProject(projectIndex, { endHour: parseInt(value) })}
+                          >
+                            <SelectTrigger className="w-24">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {hours.map((hour) => (
+                                <SelectItem key={hour} value={hour.toString()}>
+                                  {hour.toString().padStart(2, '0')}:00
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-
-                {/* End Date & Time */}
-                <div className="space-y-2">
-                  <Label>End Date & Time</Label>
-                  <div className="flex gap-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "flex-1 justify-start text-left font-normal",
-                            !project.endDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {project.endDate ? format(project.endDate, "PPP") : <span>Pick a date</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={project.endDate}
-                          onSelect={(date) => date && updateProject(index, { endDate: date })}
-                          initialFocus
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
-
-                    <Select
-                      value={project.endHour.toString()}
-                      onValueChange={(value) => updateProject(index, { endHour: parseInt(value) })}
-                    >
-                      <SelectTrigger className="w-24">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {hours.map((hour) => (
-                          <SelectItem key={hour} value={hour.toString()}>
-                            {hour.toString().padStart(2, '0')}:00
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
+                );
+              })}
             </div>
           ))}
         </div>

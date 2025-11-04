@@ -330,7 +330,9 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
               startDate: p1Start,
               endDate: p1End,
               startHour: 8,
-              endHour: 17
+              endHour: 17,
+              teamId: teamId,
+              teamName: teams.find(t => t.id === teamId)?.name || 'Unknown'
             });
           }
           if (!overlaps.some(o => o.id === p2.id)) {
@@ -341,7 +343,9 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
               startDate: p2Start,
               endDate: p2End,
               startHour: 8,
-              endHour: 17
+              endHour: 17,
+              teamId: teamId,
+              teamName: teams.find(t => t.id === teamId)?.name || 'Unknown'
             });
           }
         }
