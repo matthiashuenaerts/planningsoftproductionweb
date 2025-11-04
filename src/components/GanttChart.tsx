@@ -103,6 +103,49 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
   } | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
+  // Calculate project lanes for stacking overlapping projects
+  const calculateProjectLanes = (teamProjects: ProjectWithTeam[]): Map<string, number> => {
+    const projectLanes = new Map<string, number>();
+    const lanes: Array<{ start: number; end: number }> = [];
+
+    // Sort projects by start date
+    const sortedProjects = [...teamProjects].sort((a, b) => {
+      const aDate = new Date(a.project_team_assignments?.start_date || a.installation_date);
+      const bDate = new Date(b.project_team_assignments?.start_date || b.installation_date);
+      return aDate.getTime() - bDate.getTime();
+    });
+
+    sortedProjects.forEach(project => {
+      const position = getProjectPosition(project);
+      if (!position) return;
+
+      const projectStart = position.left;
+      const projectEnd = position.left + position.width;
+
+      // Find first available lane
+      let laneIndex = 0;
+      while (laneIndex < lanes.length) {
+        const lane = lanes[laneIndex];
+        // Check if this lane has space (no overlap)
+        if (projectStart >= lane.end) {
+          // Update lane end time
+          lanes[laneIndex] = { start: projectStart, end: projectEnd };
+          break;
+        }
+        laneIndex++;
+      }
+
+      // If no available lane found, create a new one
+      if (laneIndex === lanes.length) {
+        lanes.push({ start: projectStart, end: projectEnd });
+      }
+
+      projectLanes.set(project.id, laneIndex);
+    });
+
+    return projectLanes;
+  };
+
   // Fetch installation teams and employees
   useEffect(() => {
     const fetchTeamsAndEmployees = async () => {
@@ -491,18 +534,55 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                   Installation Teams
                 </div>
               </div>
-              {teams.map((team) => (
-                <div key={`team-${team.id}`} className="h-16 border-b border-border/50 px-4 flex flex-col justify-center hover:bg-muted/30 transition-colors bg-muted/10">
-                  <div className="font-medium text-sm truncate flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: team.color }}
-                    />
-                    {team.name}
+              {teams.map((team) => {
+                // Get projects for this team to calculate height
+                const teamProjects = projects.filter(project => {
+                  const projectTeam = project.project_team_assignments?.team;
+                  
+                  // Handle unassigned team
+                  if (team.id === 'unassigned') {
+                    return !projectTeam;
+                  }
+                  
+                  if (!projectTeam) return false;
+                  
+                  // More flexible team name matching
+                  const teamNameLower = team.name.toLowerCase();
+                  const projectTeamLower = projectTeam.toLowerCase();
+                  
+                  return projectTeamLower === teamNameLower ||
+                         projectTeamLower.includes(teamNameLower) ||
+                         teamNameLower.includes(projectTeamLower) ||
+                         (teamNameLower.includes('groen') && projectTeamLower.includes('green')) ||
+                         (teamNameLower.includes('green') && projectTeamLower.includes('groen')) ||
+                         (teamNameLower.includes('blauw') && projectTeamLower.includes('blue')) ||
+                         (teamNameLower.includes('blue') && projectTeamLower.includes('blauw'));
+                });
+
+                // Calculate lanes for this team's projects
+                const projectLanes = calculateProjectLanes(teamProjects);
+                const numLanes = Math.max(1, ...Array.from(projectLanes.values()).map(v => v + 1));
+                const laneHeight = 56;
+                const rowHeight = Math.max(64, numLanes * laneHeight);
+
+                return (
+                  <div key={`team-${team.id}`} className="border-b border-border/50 px-4 flex flex-col justify-center hover:bg-muted/30 transition-colors bg-muted/10" style={{ height: rowHeight }}>
+                    <div className="font-medium text-sm truncate flex items-center gap-2">
+                      <div 
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: team.color }}
+                      />
+                      {team.name}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Team Overview</div>
+                    {numLanes > 1 && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {numLanes} concurrent projects
+                      </div>
+                    )}
                   </div>
-                  <div className="text-xs text-muted-foreground">Team Overview</div>
-                </div>
-              ))}
+                );
+              })}
 
               {/* Employees Section */}
               <div className="border-b border-border/50 bg-muted/30 mt-4">
@@ -564,58 +644,71 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                   Installation Teams
                 </div>
                 
-                {teams.map((team) => (
-                  <div key={`team-row-${team.id}`} className="h-16 border-b border-border/50 relative hover:bg-muted/10 transition-colors bg-muted/10">
-                    {/* Day grid */}
-                    {dateRange.map((date, dayIndex) => (
-                      <div
-                        key={dayIndex}
-                        className="absolute border-r border-border/30"
-                        style={{
-                          left: dayIndex * dayWidth,
-                          width: dayWidth,
-                          height: '100%',
-                          backgroundColor: date.getDay() === 0 || date.getDay() === 6 ? 'hsl(var(--muted)/0.5)' : 'transparent'
-                        }}
-                      />
-                    ))}
+                {teams.map((team) => {
+                  // Get projects for this team
+                  const teamProjects = projects.filter(project => {
+                    const projectTeam = project.project_team_assignments?.team;
                     
-                    {/* Team-level projects */}
-                    {projects
-                      .filter(project => {
-                        const projectTeam = project.project_team_assignments?.team;
-                        
-                        // Handle unassigned team
-                        if (team.id === 'unassigned') {
-                          return !projectTeam;
-                        }
-                        
-                        if (!projectTeam) return false;
-                        
-                        // More flexible team name matching
-                        const teamNameLower = team.name.toLowerCase();
-                        const projectTeamLower = projectTeam.toLowerCase();
-                        
-                        return projectTeamLower === teamNameLower ||
-                               projectTeamLower.includes(teamNameLower) ||
-                               teamNameLower.includes(projectTeamLower) ||
-                               (teamNameLower.includes('groen') && projectTeamLower.includes('green')) ||
-                               (teamNameLower.includes('green') && projectTeamLower.includes('groen')) ||
-                               (teamNameLower.includes('blauw') && projectTeamLower.includes('blue')) ||
-                               (teamNameLower.includes('blue') && projectTeamLower.includes('blauw'));
-                      })
-                      .map((project) => {
+                    // Handle unassigned team
+                    if (team.id === 'unassigned') {
+                      return !projectTeam;
+                    }
+                    
+                    if (!projectTeam) return false;
+                    
+                    // More flexible team name matching
+                    const teamNameLower = team.name.toLowerCase();
+                    const projectTeamLower = projectTeam.toLowerCase();
+                    
+                    return projectTeamLower === teamNameLower ||
+                           projectTeamLower.includes(teamNameLower) ||
+                           teamNameLower.includes(projectTeamLower) ||
+                           (teamNameLower.includes('groen') && projectTeamLower.includes('green')) ||
+                           (teamNameLower.includes('green') && projectTeamLower.includes('groen')) ||
+                           (teamNameLower.includes('blauw') && projectTeamLower.includes('blue')) ||
+                           (teamNameLower.includes('blue') && projectTeamLower.includes('blauw'));
+                  });
+
+                  // Calculate lanes for this team's projects
+                  const projectLanes = calculateProjectLanes(teamProjects);
+                  const numLanes = Math.max(1, ...Array.from(projectLanes.values()).map(v => v + 1));
+                  const laneHeight = 56; // Height per lane
+                  const rowHeight = Math.max(64, numLanes * laneHeight); // Minimum 64px
+
+                  return (
+                    <div key={`team-row-${team.id}`} className="border-b border-border/50 relative hover:bg-muted/10 transition-colors bg-muted/10" style={{ height: rowHeight }}>
+                      {/* Day grid */}
+                      {dateRange.map((date, dayIndex) => (
+                        <div
+                          key={dayIndex}
+                          className="absolute border-r border-border/30"
+                          style={{
+                            left: dayIndex * dayWidth,
+                            width: dayWidth,
+                            height: '100%',
+                            backgroundColor: date.getDay() === 0 || date.getDay() === 6 ? 'hsl(var(--muted)/0.5)' : 'transparent'
+                          }}
+                        />
+                      ))}
+                      
+                      {/* Team-level projects with stacking */}
+                      {teamProjects.map((project) => {
                         const position = getProjectPosition(project);
                         if (!position) return null;
+                        
+                        const laneIndex = projectLanes.get(project.id) || 0;
+                        const topPosition = 8 + (laneIndex * laneHeight);
                         
                         return (
                           <div
                             key={`${team.id}-${project.id}`}
-                            className="absolute top-2 h-12 rounded-md flex items-center px-2 text-white text-xs font-medium cursor-pointer hover:opacity-90 transition-opacity group"
+                            className="absolute h-12 rounded-md flex items-center px-2 text-white text-xs font-medium cursor-pointer hover:opacity-90 transition-all hover:shadow-lg group animate-fade-in"
                             style={{
                               left: position.left,
                               width: position.width,
-                              ...getTeamColorStyle(team)
+                              top: topPosition,
+                              ...getTeamColorStyle(team),
+                              zIndex: 10 + laneIndex
                             }}
                             title={`${project.name} - ${project.client} (${position.duration} days)`}
                             onClick={() => {
@@ -638,8 +731,9 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
                           </div>
                         );
                       })}
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
                 
                 {/* Employees Section Header */}
                 <div className="h-8 border-b border-border bg-muted/30 flex items-center px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-4">
