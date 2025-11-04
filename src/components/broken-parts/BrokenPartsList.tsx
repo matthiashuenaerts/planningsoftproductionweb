@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   Table, 
   TableBody, 
@@ -11,7 +11,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { brokenPartsService } from '@/services/brokenPartsService';
 import { Button } from "@/components/ui/button";
-import { Plus, AlertTriangle, X, Eye } from 'lucide-react';
+import { Plus, AlertTriangle, X, Eye, MoreVertical, Trash } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,12 +20,25 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from '@/context/LanguageContext';
 import { BrokenPartDetailDialog } from './BrokenPartDetailDialog';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const BrokenPartsList: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedBrokenPart, setSelectedBrokenPart] = useState<any | null>(null);
   const [imageError, setImageError] = useState<Record<string, boolean>>({});
   const { t, createLocalizedPath } = useLanguage();
+  const { currentEmployee } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  const isAdmin = currentEmployee?.role === 'admin';
 
   const { data: brokenParts = [], isLoading, error } = useQuery({
     queryKey: ['broken-parts'],
@@ -47,6 +60,30 @@ const BrokenPartsList: React.FC = () => {
 
   const handleImageError = (id: string) => {
     setImageError(prev => ({ ...prev, [id]: true }));
+  };
+
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!confirm(t('confirm_delete_broken_part') || 'Are you sure you want to delete this broken part?')) {
+      return;
+    }
+
+    try {
+      await brokenPartsService.delete(id);
+      queryClient.invalidateQueries({ queryKey: ['broken-parts'] });
+      toast({
+        title: t('success') || 'Success',
+        description: t('broken_part_deleted') || 'Broken part deleted successfully',
+      });
+    } catch (error) {
+      console.error('Error deleting broken part:', error);
+      toast({
+        title: t('error') || 'Error',
+        description: t('failed_to_delete') || 'Failed to delete broken part',
+        variant: 'destructive',
+      });
+    }
   };
 
   if (isLoading) {
@@ -94,6 +131,7 @@ const BrokenPartsList: React.FC = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {isAdmin && <TableHead className="w-[50px]"></TableHead>}
                     <TableHead>Image</TableHead>
                     <TableHead>Project</TableHead>
                     <TableHead>Workstation</TableHead>
@@ -109,6 +147,26 @@ const BrokenPartsList: React.FC = () => {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => setSelectedBrokenPart(part)}
                     >
+                      {isAdmin && (
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start">
+                              <DropdownMenuItem
+                                onClick={(e) => handleDelete(part.id, e)}
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                              >
+                                <Trash className="mr-2 h-4 w-4" />
+                                {t('delete') || 'Delete'}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      )}
                       <TableCell>
                         {part.image_path ? (
                           <div className="relative">

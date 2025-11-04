@@ -66,6 +66,9 @@
   "view_summary": "View Summary",
   "report_new": "Report New",
   "report_broken_part": "Report Broken Part",
+  "confirm_delete_broken_part": "Are you sure you want to delete this broken part?",
+  "broken_part_deleted": "Broken part deleted successfully",
+  "failed_to_delete": "Failed to delete broken part",
 
   "loading_messages": "Loading messages...",
   "no_messages_yet": "No messages yet. Start the conversation!",

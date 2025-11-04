@@ -66,6 +66,9 @@
   "view_summary": "Voir le résumé",
   "report_new": "Signaler un nouveau",
   "report_broken_part": "Signaler une pièce défectueuse",
+  "confirm_delete_broken_part": "Êtes-vous sûr de vouloir supprimer cette pièce défectueuse ?",
+  "broken_part_deleted": "Pièce défectueuse supprimée avec succès",
+  "failed_to_delete": "Échec de la suppression de la pièce défectueuse",
 
   "loading_messages": "Chargement des messages...",
   "no_messages_yet": "Aucun message. Commencez la conversation!",

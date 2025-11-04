@@ -136,5 +136,50 @@ export const brokenPartsService = {
       console.error('Error getting image URL:', error);
       return null;
     }
+  },
+
+  // Delete a broken part
+  async delete(id: string): Promise<boolean> {
+    try {
+      // First, get the broken part to see if it has an image
+      const { data: brokenPart, error: fetchError } = await supabase
+        .from('broken_parts')
+        .select('image_path')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching broken part:', fetchError);
+        throw fetchError;
+      }
+
+      // Delete the image from storage if it exists
+      if (brokenPart?.image_path) {
+        const { error: storageError } = await supabase.storage
+          .from('broken_parts')
+          .remove([brokenPart.image_path]);
+
+        if (storageError) {
+          console.error('Error deleting image from storage:', storageError);
+          // Continue with deletion even if image deletion fails
+        }
+      }
+
+      // Delete the broken part record
+      const { error: deleteError } = await supabase
+        .from('broken_parts')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        console.error('Error deleting broken part:', deleteError);
+        throw deleteError;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in delete:', error);
+      throw error;
+    }
   }
 };

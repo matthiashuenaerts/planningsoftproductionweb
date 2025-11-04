@@ -69,6 +69,9 @@
   "view_summary": "Bekijk Samenvatting",
   "report_new": "Nieuw Melden",
   "report_broken_part": "Meld Defect Onderdeel",
+  "confirm_delete_broken_part": "Weet je zeker dat je dit defecte onderdeel wilt verwijderen?",
+  "broken_part_deleted": "Defect onderdeel succesvol verwijderd",
+  "failed_to_delete": "Kon defect onderdeel niet verwijderen",
 
   "loading_messages": "Berichten laden...",
   "no_messages_yet": "Nog geen berichten. Begin het gesprek!",
