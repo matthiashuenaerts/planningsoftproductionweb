@@ -287,24 +287,41 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
       
       return projectTeamLower === teamNameLower ||
              projectTeamLower.includes(teamNameLower) ||
-             teamNameLower.includes(projectTeamLower);
+             teamNameLower.includes(projectTeamLower) ||
+             (teamNameLower.includes('groen') && projectTeamLower.includes('green')) ||
+             (teamNameLower.includes('green') && projectTeamLower.includes('groen')) ||
+             (teamNameLower.includes('blauw') && projectTeamLower.includes('blue')) ||
+             (teamNameLower.includes('blue') && projectTeamLower.includes('blauw'));
     });
 
     const overlaps: any[] = [];
     
+    // Check each pair of projects for overlaps
     for (let i = 0; i < teamProjects.length; i++) {
       for (let j = i + 1; j < teamProjects.length; j++) {
         const p1 = teamProjects[i];
         const p2 = teamProjects[j];
         
-        const p1Start = new Date(p1.project_team_assignments?.start_date || p1.installation_date);
-        const p1End = addDays(p1Start, (p1.project_team_assignments?.duration || 1) - 1);
+        const p1Assignment = p1.project_team_assignments;
+        const p2Assignment = p2.project_team_assignments;
         
-        const p2Start = new Date(p2.project_team_assignments?.start_date || p2.installation_date);
-        const p2End = addDays(p2Start, (p2.project_team_assignments?.duration || 1) - 1);
+        if (!p1Assignment || !p2Assignment) continue;
         
-        // Check for overlap
-        if (p1Start <= p2End && p2Start <= p1End) {
+        const p1Start = new Date(p1Assignment.start_date);
+        const p1End = new Date(p1Start);
+        p1End.setDate(p1End.getDate() + p1Assignment.duration - 1);
+        
+        const p2Start = new Date(p2Assignment.start_date);
+        const p2End = new Date(p2Start);
+        p2End.setDate(p2End.getDate() + p2Assignment.duration - 1);
+        
+        // Check if projects overlap: p1 starts before p2 ends AND p2 starts before p1 ends
+        const hasOverlap = p1Start <= p2End && p2Start <= p1End;
+        
+        if (hasOverlap) {
+          console.log(`Overlap detected between "${p1.name}" (${format(p1Start, 'yyyy-MM-dd')} to ${format(p1End, 'yyyy-MM-dd')}) and "${p2.name}" (${format(p2Start, 'yyyy-MM-dd')} to ${format(p2End, 'yyyy-MM-dd')})`);
+          
+          // Add both projects to overlaps if not already there
           if (!overlaps.some(o => o.id === p1.id)) {
             overlaps.push({
               id: p1.id,
