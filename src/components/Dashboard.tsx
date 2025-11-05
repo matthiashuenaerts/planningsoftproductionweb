@@ -584,49 +584,52 @@ const Dashboard: React.FC = () => {
               allCharged: allOrdersCharged
             },
             teamColor
-          };
+        };
       }));
 
-      // Merge with existing assignments
+      // Merge with existing assignments and recalculate truck loading stats
       setAllLoadingAssignments(prev => {
         const existingIds = new Set(prev.map(a => `${a.project.id}-${a.loading_date}`));
         const newAssignments = enhancedAssignments.filter(a => !existingIds.has(`${a.project.id}-${a.loading_date}`));
-        return [...prev, ...newAssignments];
-      });
+        const updatedAssignments = [...prev, ...newAssignments];
 
-      // Update today's loading stats if current week
-      const today = format(new Date(), 'yyyy-MM-dd');
-      const isCurrentWeek = today >= format(weekStart, 'yyyy-MM-dd') && today <= format(weekEnd, 'yyyy-MM-dd');
-      if (isCurrentWeek) {
+        // Recalculate today's loading stats using ALL assignments
+        const today = format(new Date(), 'yyyy-MM-dd');
+        
         // Consider manual overrides when calculating today's loadings
-        const todayLoadings = enhancedAssignments.filter(assignment => {
-          const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
+        const todayLoadings = updatedAssignments.filter(assignment => {
+          const effectiveLoadingDate = (overridesMap || manualOverrides)[assignment.project.id] || assignment.loading_date;
           return effectiveLoadingDate === today;
         });
 
-        // Calculate days to next loading (also considering overrides)
+        // Calculate days to next loading using ALL assignments (also considering overrides)
         let daysToNext = 0;
         if (todayLoadings.length === 0) {
-          const futureLoadings = enhancedAssignments.filter(assignment => {
-            const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
+          const futureLoadings = updatedAssignments.filter(assignment => {
+            const effectiveLoadingDate = (overridesMap || manualOverrides)[assignment.project.id] || assignment.loading_date;
             const loadingDate = new Date(effectiveLoadingDate);
-            return loadingDate > new Date();
+            const todayDate = new Date(today);
+            return loadingDate > todayDate;
           }).sort((a, b) => {
-            const aDate = manualOverrides[a.project.id] || a.loading_date;
-            const bDate = manualOverrides[b.project.id] || b.loading_date;
+            const aDate = (overridesMap || manualOverrides)[a.project.id] || a.loading_date;
+            const bDate = (overridesMap || manualOverrides)[b.project.id] || b.loading_date;
             return new Date(aDate).getTime() - new Date(bDate).getTime();
           });
+          
           if (futureLoadings.length > 0) {
-            const nextLoadingDate = new Date(manualOverrides[futureLoadings[0].project.id] || futureLoadings[0].loading_date);
-            const today = new Date();
-            daysToNext = Math.ceil((nextLoadingDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+            const nextLoadingDate = new Date((overridesMap || manualOverrides)[futureLoadings[0].project.id] || futureLoadings[0].loading_date);
+            const todayDate = new Date(today);
+            daysToNext = Math.ceil((nextLoadingDate.getTime() - todayDate.getTime()) / (1000 * 3600 * 24));
           }
         }
+        
         setTruckLoadingData({
           todayLoadings,
           daysToNext
         });
-      }
+
+        return updatedAssignments;
+      });
 
       // Mark week as loaded
       setLoadedWeeks(prev => new Set([...prev, weekKey]));
