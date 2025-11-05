@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { orderService } from '@/services/orderService';
 import { projectTeamAssignmentService } from '@/services/projectTeamAssignmentService';
+import { projectTeamAssignmentOverrideService } from '@/services/projectTeamAssignmentOverrideService';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ShieldCheck, Calendar, CheckCircle2, Clock, Users, BarChart3, ListTodo, Truck, ChevronLeft, ChevronRight, Factory, Package, Check } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
@@ -60,6 +61,7 @@ const Dashboard: React.FC = () => {
   const [loadedWeeks, setLoadedWeeks] = useState<Set<string>>(new Set());
   const [weekLoading, setWeekLoading] = useState(false);
   const [manualOverrides, setManualOverrides] = useState<Record<string, string>>({});
+  const [teamAssignmentOverrides, setTeamAssignmentOverrides] = useState<any[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   
   // Workstation stats state
@@ -447,22 +449,25 @@ const Dashboard: React.FC = () => {
       const holidaysData = await holidayService.getHolidays();
       setHolidays(holidaysData);
 
-      // Fetch existing overrides
-      const {
-        data: overridesData,
-        error: overridesError
-      } = await supabase.from('project_loading_overrides').select('project_id, override_loading_date');
+      // Fetch existing overrides in parallel
+      const [loadingOverridesResult, teamOverridesResult] = await Promise.all([
+        supabase.from('project_loading_overrides').select('project_id, override_loading_date'),
+        projectTeamAssignmentOverrideService.getAll()
+      ]);
       
       let overridesMap: Record<string, string> = {};
-      if (overridesError) {
-        console.error('Error fetching loading overrides:', overridesError);
+      if (loadingOverridesResult.error) {
+        console.error('Error fetching loading overrides:', loadingOverridesResult.error);
       } else {
         // Convert overrides to map
-        (overridesData || []).forEach(override => {
+        (loadingOverridesResult.data || []).forEach(override => {
           overridesMap[override.project_id] = override.override_loading_date;
         });
         setManualOverrides(overridesMap);
       }
+
+      // Store team assignment overrides
+      setTeamAssignmentOverrides(teamOverridesResult || []);
 
       // Load current week data with overrides
       await loadWeekData(weekStartDate, holidaysData, overridesMap);
@@ -512,9 +517,25 @@ const Dashboard: React.FC = () => {
         data: ordersData
       } = await supabase.from('orders').select('id, project_id, status').in('project_id', projectIds);
 
-      // Fetch team assignments for projects  
+      // Fetch team assignments for projects and apply overrides
       const teamAssignments = await Promise.all(projectIds.map(async projectId => {
         const assignments = await projectTeamAssignmentService.getByProject(projectId);
+        
+        // Check if there's an override for this project
+        const override = teamAssignmentOverrides.find(o => o.project_id === projectId);
+        
+        if (override) {
+          // Use override data instead of regular assignment
+          return {
+            projectId,
+            assignments: [{
+              team: override.team_id,
+              start_date: override.start_date,
+              duration: 0 // Not used in this context
+            }]
+          };
+        }
+        
         return {
           projectId,
           assignments
