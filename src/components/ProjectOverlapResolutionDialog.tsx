@@ -109,18 +109,39 @@ export const ProjectOverlapResolutionDialog: React.FC<ProjectOverlapResolutionDi
     try {
       // Save each project's override to the database
       for (const project of projects) {
-        const { error } = await supabase
+        // First check if override exists
+        const { data: existingOverride } = await supabase
           .from('project_team_assignment_overrides')
-          .upsert({
-            project_id: project.id,
-            team_id: project.teamId,
-            start_date: format(project.startDate, 'yyyy-MM-dd'),
-            end_date: format(project.endDate, 'yyyy-MM-dd'),
-            start_hour: project.startHour,
-            end_hour: project.endHour,
-          });
+          .select('id')
+          .eq('project_id', project.id)
+          .eq('team_id', project.teamId)
+          .maybeSingle();
 
-        if (error) throw error;
+        const overrideData = {
+          project_id: project.id,
+          team_id: project.teamId,
+          start_date: format(project.startDate, 'yyyy-MM-dd'),
+          end_date: format(project.endDate, 'yyyy-MM-dd'),
+          start_hour: project.startHour,
+          end_hour: project.endHour,
+        };
+
+        if (existingOverride) {
+          // Update existing override
+          const { error } = await supabase
+            .from('project_team_assignment_overrides')
+            .update(overrideData)
+            .eq('id', existingOverride.id);
+
+          if (error) throw error;
+        } else {
+          // Insert new override
+          const { error } = await supabase
+            .from('project_team_assignment_overrides')
+            .insert(overrideData);
+
+          if (error) throw error;
+        }
       }
 
       toast.success('Project schedules saved successfully');

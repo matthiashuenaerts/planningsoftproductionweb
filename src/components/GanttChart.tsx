@@ -166,10 +166,12 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
 
       if (error) throw error;
 
+      console.log('Loaded overrides from database:', data);
       setOverrides(data || []);
-      console.log('Loaded overrides:', data);
+      return data;
     } catch (error) {
       console.error('Error fetching overrides:', error);
+      return [];
     }
   };
 
@@ -234,6 +236,11 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     }
   }, [teams, projects]);
 
+  // Re-render chart when overrides change
+  useEffect(() => {
+    console.log('Overrides state updated, chart will re-render:', overrides);
+  }, [overrides]);
+
   // Get date/time range for the Gantt chart (supports both day and hour views)
   const getDateRange = () => {
     const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
@@ -263,13 +270,22 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     // Check for override
     const override = overrides.find(o => o.project_id === project.id && o.team_id === teamId);
     
-    const startDate = override 
-      ? new Date(`${override.start_date}T${override.start_hour.toString().padStart(2, '0')}:00:00`)
-      : new Date(teamAssignment?.start_date || project.installation_date);
+    let startDate: Date;
+    let duration: number;
+    
+    if (override) {
+      // Use override with hours
+      startDate = new Date(`${override.start_date}T${override.start_hour.toString().padStart(2, '0')}:00:00`);
+      const endDate = new Date(`${override.end_date}T${override.end_hour.toString().padStart(2, '0')}:00:00`);
       
-    const duration = override 
-      ? Math.ceil((new Date(override.end_date).getTime() - new Date(override.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1
-      : teamAssignment?.duration || 1;
+      // Calculate duration in days (including partial days)
+      const durationMs = endDate.getTime() - startDate.getTime();
+      duration = Math.ceil(durationMs / (1000 * 60 * 60 * 24));
+    } else {
+      // Use original assignment
+      startDate = new Date(teamAssignment?.start_date || project.installation_date);
+      duration = teamAssignment?.duration || 1;
+    }
     
     const firstUnit = dateRange[0];
     
@@ -402,10 +418,34 @@ const GanttChart: React.FC<GanttChartProps> = ({ projects }) => {
     return overlaps;
   };
 
-  const handleOverlapResolve = async () => {
-    // Refresh overrides and re-check for overlaps
+  const handleOverlapResolve = async (resolvedProjects: any[]) => {
+    // Refresh overrides from database
     await fetchOverrides();
+    
+    // Close the dialog
     setOverlapDialog({ isOpen: false, overlappingProjects: [] });
+    
+    // Force re-check for any remaining overlaps after a brief delay to allow state to update
+    setTimeout(() => {
+      const allOverlaps: any[] = [];
+      
+      teams.forEach(team => {
+        const teamOverlaps = detectOverlaps(team.id);
+        if (teamOverlaps.length > 1) {
+          allOverlaps.push(...teamOverlaps);
+        }
+      });
+      
+      const uniqueOverlaps = allOverlaps.filter((overlap, index, self) =>
+        index === self.findIndex(o => o.id === overlap.id)
+      );
+      
+      if (uniqueOverlaps.length > 1) {
+        console.log('Remaining overlaps detected after resolution:', uniqueOverlaps);
+      } else {
+        console.log('All overlaps successfully resolved!');
+      }
+    }, 500);
   };
 
   // Navigate weeks
