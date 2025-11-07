@@ -67,8 +67,12 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
         // Edit mode
         setTitle(scheduleItem.title || '');
         setDescription(scheduleItem.description || '');
-        setStartTime(format(new Date(scheduleItem.start_time), 'HH:mm'));
-        setEndTime(format(new Date(scheduleItem.end_time), 'HH:mm'));
+        
+        // Parse times without timezone conversion
+        const startDate = new Date(scheduleItem.start_time);
+        const endDate = new Date(scheduleItem.end_time);
+        setStartTime(format(startDate, 'HH:mm'));
+        setEndTime(format(endDate, 'HH:mm'));
         setSelectedTaskId(scheduleItem.task_id || '');
         
         // If there's a task, fetch its project
@@ -234,17 +238,24 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
 
     try {
       setLoading(true);
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const startDateTime = `${dateStr}T${startTime}:00`;
-      const endDateTime = `${dateStr}T${endTime}:00`;
+      
+      // Create proper date objects in local timezone
+      const year = selectedDate.getFullYear();
+      const month = selectedDate.getMonth();
+      const day = selectedDate.getDate();
+      const [startHour, startMinute] = startTime.split(':').map(Number);
+      const [endHour, endMinute] = endTime.split(':').map(Number);
+      
+      const startDateTime = new Date(year, month, day, startHour, startMinute);
+      const endDateTime = new Date(year, month, day, endHour, endMinute);
 
       const scheduleData = {
         employee_id: selectedEmployee,
         task_id: selectedTaskId || null,
         title,
         description,
-        start_time: startDateTime,
-        end_time: endDateTime,
+        start_time: startDateTime.toISOString(),
+        end_time: endDateTime.toISOString(),
         is_auto_generated: false
       };
 
