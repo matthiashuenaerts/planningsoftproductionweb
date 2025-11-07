@@ -56,6 +56,8 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
   const [projects, setProjects] = useState<any[]>([]);
   const [availableTasks, setAvailableTasks] = useState<any[]>([]);
+  const [allTodoTasks, setAllTodoTasks] = useState<any[]>([]);
+  const [userWorkstations, setUserWorkstations] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -63,6 +65,8 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
     if (isOpen) {
       fetchProjects();
       calculateFirstAvailableTime();
+      fetchUserWorkstations();
+      fetchAllTodoTasks();
       if (scheduleItem) {
         // Edit mode
         setTitle(scheduleItem.title || '');
@@ -156,6 +160,45 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
     }
   };
 
+  const fetchUserWorkstations = async () => {
+    try {
+      const { data: links, error } = await supabase
+        .from('employee_workstation_links')
+        .select('workstation:workstations(name)')
+        .eq('employee_id', selectedEmployee);
+
+      if (error) throw error;
+      const workstationNames = links?.map((link: any) => link.workstation?.name).filter(Boolean) || [];
+      setUserWorkstations(workstationNames);
+    } catch (error: any) {
+      console.error('Error fetching user workstations:', error);
+    }
+  };
+
+  const fetchAllTodoTasks = async () => {
+    try {
+      const { data: tasks, error } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          phase:phases(name, project:projects(name))
+        `)
+        .eq('status', 'TODO')
+        .order('due_date', { ascending: true });
+
+      if (error) throw error;
+      
+      // Filter by user's workstations
+      const filtered = tasks?.filter(task => 
+        userWorkstations.includes(task.workstation)
+      ) || [];
+      
+      setAllTodoTasks(filtered);
+    } catch (error: any) {
+      console.error('Error fetching TODO tasks:', error);
+    }
+  };
+
   const fetchAvailableTasks = async (projectId: string) => {
     if (!projectId) {
       setAvailableTasks([]);
@@ -178,14 +221,14 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
         return;
       }
 
-      // Then get tasks for these phases
+      // Then get tasks for these phases - including HOLD tasks
       const { data: tasks, error } = await supabase
         .from('tasks')
         .select(`
           *,
           phase:phases(name, project_id)
         `)
-        .in('status', ['TODO', 'IN_PROGRESS'])
+        .in('status', ['TODO', 'IN_PROGRESS', 'HOLD'])
         .in('phase_id', phaseIds)
         .order('priority', { ascending: false })
         .order('due_date', { ascending: true });
@@ -317,7 +360,7 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-6xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>
             {scheduleItem ? 'Edit Schedule Item' : 'Add Schedule Item'}
@@ -327,93 +370,155 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="project-select">Select Project</Label>
-            <Select value={selectedProjectId} onValueChange={handleProjectSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a project..." />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {selectedProjectId && (
+        <div className="flex gap-6 overflow-hidden">
+          <div className="flex-1 space-y-4 overflow-y-auto pr-4">
             <div className="space-y-2">
-              <Label htmlFor="task-select">Select Task</Label>
-              <Select value={selectedTaskId} onValueChange={handleTaskSelect}>
+              <Label htmlFor="project-select">Select Project</Label>
+              <Select value={selectedProjectId} onValueChange={handleProjectSelect}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a task..." />
+                  <SelectValue placeholder="Select a project..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableTasks.map((task) => (
-                    <SelectItem key={task.id} value={task.id}>
-                      <div className="flex items-center justify-between w-full">
-                        <span>{task.title}</span>
-                        <div className="flex items-center space-x-2 ml-2">
-                          <span className={cn("text-xs", getPriorityColor(task.priority))}>
-                            {task.priority}
-                          </span>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedProjectId && (
+              <div className="space-y-2">
+                <Label htmlFor="task-select">Select Task</Label>
+                <Select value={selectedTaskId} onValueChange={handleTaskSelect}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a task..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTasks.map((task) => (
+                      <SelectItem 
+                        key={task.id} 
+                        value={task.id}
+                        className={cn(
+                          task.status === 'HOLD' && "bg-yellow-100 dark:bg-yellow-900/20"
+                        )}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span>{task.title}</span>
+                          <div className="flex items-center space-x-2 ml-2">
+                            {task.status === 'HOLD' && (
+                              <span className="text-xs text-yellow-700 dark:text-yellow-400">HOLD</span>
+                            )}
+                            <span className={cn("text-xs", getPriorityColor(task.priority))}>
+                              {task.priority}
+                            </span>
+                            {task.duration && (
+                              <span className="text-xs text-muted-foreground flex items-center">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {task.duration}m
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter task title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Enter task description"
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start-time">Start Time</Label>
+                <Input
+                  id="start-time"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end-time">End Time</Label>
+                <Input
+                  id="end-time"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Right side - Scrollable TODO tasks list */}
+          <div className="w-80 border-l pl-6">
+            <div className="space-y-2 h-full flex flex-col">
+              <Label>Urgent TODO Tasks (Your Workstations)</Label>
+              <div className="flex-1 overflow-y-auto space-y-2 max-h-[500px]">
+                {allTodoTasks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No TODO tasks for your workstations</p>
+                ) : (
+                  allTodoTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      onClick={() => {
+                        // Find and select the project first
+                        if (task.phase?.project_id) {
+                          setSelectedProjectId(task.phase.project_id);
+                          fetchAvailableTasks(task.phase.project_id);
+                          // Then select the task
+                          setTimeout(() => handleTaskSelect(task.id), 100);
+                        }
+                      }}
+                      className="p-3 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
+                    >
+                      <div className="font-medium text-sm">{task.title}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {task.phase?.project?.name}
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className={cn("text-xs", getPriorityColor(task.priority))}>
+                          {task.priority}
+                        </span>
+                        <div className="flex items-center gap-2">
                           {task.duration && (
                             <span className="text-xs text-muted-foreground flex items-center">
                               <Clock className="h-3 w-3 mr-1" />
                               {task.duration}m
                             </span>
                           )}
+                          {task.due_date && (
+                            <span className="text-xs text-muted-foreground">
+                              Due: {format(new Date(task.due_date), 'MMM dd')}
+                            </span>
+                          )}
                         </div>
                       </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter task title"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter task description"
-              rows={3}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="start-time">Start Time</Label>
-              <Input
-                id="start-time"
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="end-time">End Time</Label>
-              <Input
-                id="end-time"
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
