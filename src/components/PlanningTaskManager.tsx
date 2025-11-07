@@ -52,14 +52,17 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
   const [description, setDescription] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('10:00');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
+  const [projects, setProjects] = useState<any[]>([]);
   const [availableTasks, setAvailableTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen) {
-      fetchAvailableTasks();
+      fetchProjects();
+      calculateFirstAvailableTime();
       if (scheduleItem) {
         // Edit mode
         setTitle(scheduleItem.title || '');
@@ -67,27 +70,119 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
         setStartTime(format(new Date(scheduleItem.start_time), 'HH:mm'));
         setEndTime(format(new Date(scheduleItem.end_time), 'HH:mm'));
         setSelectedTaskId(scheduleItem.task_id || '');
+        
+        // If there's a task, fetch its project
+        if (scheduleItem.task_id) {
+          fetchProjectForTask(scheduleItem.task_id);
+        }
       } else {
         // Add mode - reset form
         setTitle('');
         setDescription('');
-        setStartTime('09:00');
-        setEndTime('10:00');
+        setSelectedProjectId('');
         setSelectedTaskId('');
+        setAvailableTasks([]);
       }
     }
-  }, [isOpen, scheduleItem]);
+  }, [isOpen, scheduleItem, selectedDate, selectedEmployee]);
 
-  const fetchAvailableTasks = async () => {
+  const fetchProjectForTask = async (taskId: string) => {
     try {
+      const { data: task, error } = await supabase
+        .from('tasks')
+        .select('phase:phases(project_id)')
+        .eq('id', taskId)
+        .single();
+
+      if (error) throw error;
+      if (task?.phase?.project_id) {
+        setSelectedProjectId(task.phase.project_id);
+        fetchAvailableTasks(task.phase.project_id);
+      }
+    } catch (error: any) {
+      console.error('Error fetching project for task:', error);
+    }
+  };
+
+  const fetchProjects = async () => {
+    try {
+      const { data: projectsData, error } = await supabase
+        .from('projects')
+        .select('id, name, status')
+        .in('status', ['planned', 'in_progress'])
+        .order('name');
+
+      if (error) throw error;
+      setProjects(projectsData || []);
+    } catch (error: any) {
+      console.error('Error fetching projects:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load projects',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const calculateFirstAvailableTime = async () => {
+    try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const { data: existingSchedules, error } = await supabase
+        .from('schedules')
+        .select('start_time, end_time')
+        .eq('employee_id', selectedEmployee)
+        .gte('start_time', `${dateStr}T00:00:00`)
+        .lte('start_time', `${dateStr}T23:59:59`)
+        .order('end_time', { ascending: false });
+
+      if (error) throw error;
+
+      if (existingSchedules && existingSchedules.length > 0) {
+        // Get the latest end time
+        const latestEndTime = new Date(existingSchedules[0].end_time);
+        const firstAvailable = format(latestEndTime, 'HH:mm');
+        setStartTime(firstAvailable);
+      } else {
+        // No schedules, start at 09:00
+        setStartTime('09:00');
+      }
+    } catch (error: any) {
+      console.error('Error calculating available time:', error);
+      setStartTime('09:00');
+    }
+  };
+
+  const fetchAvailableTasks = async (projectId: string) => {
+    if (!projectId) {
+      setAvailableTasks([]);
+      return;
+    }
+
+    try {
+      // First get phases for this project
+      const { data: phases, error: phasesError } = await supabase
+        .from('phases')
+        .select('id')
+        .eq('project_id', projectId);
+
+      if (phasesError) throw phasesError;
+      
+      const phaseIds = phases?.map(p => p.id) || [];
+      
+      if (phaseIds.length === 0) {
+        setAvailableTasks([]);
+        return;
+      }
+
+      // Then get tasks for these phases
       const { data: tasks, error } = await supabase
         .from('tasks')
         .select(`
           *,
-          phase:phases(name, project:projects(name))
+          phase:phases(name, project_id)
         `)
         .in('status', ['TODO', 'IN_PROGRESS'])
-        .or(`assignee_id.is.null,assignee_id.eq.${selectedEmployee}`)
+        .in('phase_id', phaseIds)
         .order('priority', { ascending: false })
         .order('due_date', { ascending: true });
 
@@ -101,6 +196,14 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
         variant: 'destructive'
       });
     }
+  };
+
+  const handleProjectSelect = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    setSelectedTaskId('');
+    setTitle('');
+    setDescription('');
+    fetchAvailableTasks(projectId);
   };
 
   const handleTaskSelect = (taskId: string) => {
@@ -215,33 +318,51 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="task-select">Link to Existing Task (Optional)</Label>
-            <Select value={selectedTaskId} onValueChange={handleTaskSelect}>
+            <Label htmlFor="project-select">Select Project</Label>
+            <Select value={selectedProjectId} onValueChange={handleProjectSelect}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a task to link..." />
+                <SelectValue placeholder="Select a project..." />
               </SelectTrigger>
               <SelectContent>
-                {availableTasks.map((task) => (
-                  <SelectItem key={task.id} value={task.id}>
-                    <div className="flex items-center justify-between w-full">
-                      <span>{task.title}</span>
-                      <div className="flex items-center space-x-2 ml-2">
-                        <span className={cn("text-xs", getPriorityColor(task.priority))}>
-                          {task.priority}
-                        </span>
-                        {task.duration && (
-                          <span className="text-xs text-muted-foreground flex items-center">
-                            <Clock className="h-3 w-3 mr-1" />
-                            {task.duration}m
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          {selectedProjectId && (
+            <div className="space-y-2">
+              <Label htmlFor="task-select">Select Task</Label>
+              <Select value={selectedTaskId} onValueChange={handleTaskSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a task..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTasks.map((task) => (
+                    <SelectItem key={task.id} value={task.id}>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{task.title}</span>
+                        <div className="flex items-center space-x-2 ml-2">
+                          <span className={cn("text-xs", getPriorityColor(task.priority))}>
+                            {task.priority}
+                          </span>
+                          {task.duration && (
+                            <span className="text-xs text-muted-foreground flex items-center">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {task.duration}m
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
