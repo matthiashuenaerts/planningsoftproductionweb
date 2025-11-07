@@ -192,6 +192,19 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
     try {
       console.log('Fetching TODO tasks for workstations:', userWorkstations);
       
+      // First, let's check all tasks for these workstations
+      const { data: allTasks, error: allError } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          phase:phases(name, project:projects(name))
+        `)
+        .in('workstation', userWorkstations)
+        .limit(50);
+
+      console.log('All tasks for workstations (any status):', allTasks?.length, allTasks);
+
+      // Now get TODO tasks specifically
       const { data: tasks, error } = await supabase
         .from('tasks')
         .select(`
@@ -208,7 +221,7 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
         throw error;
       }
       
-      console.log('Found TODO tasks:', tasks?.length || 0, tasks);
+      console.log('TODO tasks found:', tasks?.length || 0, tasks);
       setAllTodoTasks(tasks || []);
     } catch (error: any) {
       console.error('Error fetching TODO tasks:', error);
