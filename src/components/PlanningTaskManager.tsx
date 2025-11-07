@@ -66,7 +66,6 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
       fetchProjects();
       calculateFirstAvailableTime();
       fetchUserWorkstations();
-      fetchAllTodoTasks();
       if (scheduleItem) {
         // Edit mode
         setTitle(scheduleItem.title || '');
@@ -93,6 +92,13 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
       }
     }
   }, [isOpen, scheduleItem, selectedDate, selectedEmployee]);
+
+  // Fetch TODO tasks when userWorkstations changes
+  useEffect(() => {
+    if (isOpen && userWorkstations.length > 0) {
+      fetchAllTodoTasks();
+    }
+  }, [userWorkstations, isOpen]);
 
   const fetchProjectForTask = async (taskId: string) => {
     try {
@@ -172,10 +178,16 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
       setUserWorkstations(workstationNames);
     } catch (error: any) {
       console.error('Error fetching user workstations:', error);
+      setUserWorkstations([]);
     }
   };
 
   const fetchAllTodoTasks = async () => {
+    if (userWorkstations.length === 0) {
+      setAllTodoTasks([]);
+      return;
+    }
+
     try {
       const { data: tasks, error } = await supabase
         .from('tasks')
@@ -184,18 +196,16 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
           phase:phases(name, project:projects(name))
         `)
         .eq('status', 'TODO')
+        .in('workstation', userWorkstations)
+        .order('priority', { ascending: false })
         .order('due_date', { ascending: true });
 
       if (error) throw error;
       
-      // Filter by user's workstations
-      const filtered = tasks?.filter(task => 
-        userWorkstations.includes(task.workstation)
-      ) || [];
-      
-      setAllTodoTasks(filtered);
+      setAllTodoTasks(tasks || []);
     } catch (error: any) {
       console.error('Error fetching TODO tasks:', error);
+      setAllTodoTasks([]);
     }
   };
 
