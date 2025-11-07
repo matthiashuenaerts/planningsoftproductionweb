@@ -184,11 +184,14 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
 
   const fetchAllTodoTasks = async () => {
     if (userWorkstations.length === 0) {
+      console.log('No workstations found for user');
       setAllTodoTasks([]);
       return;
     }
 
     try {
+      console.log('Fetching TODO tasks for workstations:', userWorkstations);
+      
       const { data: tasks, error } = await supabase
         .from('tasks')
         .select(`
@@ -200,8 +203,12 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
         .order('priority', { ascending: false })
         .order('due_date', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching TODO tasks:', error);
+        throw error;
+      }
       
+      console.log('Found TODO tasks:', tasks?.length || 0, tasks);
       setAllTodoTasks(tasks || []);
     } catch (error: any) {
       console.error('Error fetching TODO tasks:', error);
@@ -487,7 +494,14 @@ const PlanningTaskManager: React.FC<PlanningTaskManagerProps> = ({
               <Label>Urgent TODO Tasks (Your Workstations)</Label>
               <div className="flex-1 overflow-y-auto space-y-2 max-h-[500px]">
                 {allTodoTasks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No TODO tasks for your workstations</p>
+                  <div className="text-sm text-muted-foreground space-y-2">
+                    <p>No TODO tasks found for your assigned workstations:</p>
+                    <ul className="list-disc list-inside text-xs">
+                      {userWorkstations.map((ws) => (
+                        <li key={ws}>{ws}</li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : (
                   allTodoTasks.map((task) => (
                     <div
