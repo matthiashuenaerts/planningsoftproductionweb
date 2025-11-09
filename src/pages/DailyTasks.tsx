@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import InstallationTeamCalendar from '@/components/InstallationTeamCalendar';
 import TruckLoadingCalendar from '@/components/TruckLoadingCalendar';
-import GanttChart from '@/components/GanttChart';
+import OrdersGanttChart from '@/components/OrdersGanttChart';
 interface Project {
   id: string;
   name: string;
@@ -424,7 +424,7 @@ const DailyTasks: React.FC = () => {
               </CardContent>
             </Card>
           ) : displayMode === 'gantt' ? (
-            <GanttChart projects={allProjects} />
+            <OrdersGanttChart className="h-[calc(100vh-200px)]" />
           ) : displayMode === 'teams' ? (
             <InstallationTeamCalendar projects={allProjects} />
           ) : (
