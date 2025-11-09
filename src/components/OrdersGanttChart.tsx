@@ -21,16 +21,26 @@ interface Order {
   order_date: string;
   status: string;
   project_id: string;
-  project?: {
-    name: string;
-    client: string;
-    installation_date: string;
-    project_team_assignments?: Array<{
-      team: string;
-      start_date: string;
-      duration: number;
-    }>;
-  };
+    project?: {
+      name: string;
+      client: string;
+      installation_date: string;
+      project_team_assignments?: Array<{
+        team: string;
+        start_date: string;
+        duration: number;
+      }>;
+    };
+    projects?: {
+      name: string;
+      client: string;
+      installation_date: string;
+      project_team_assignments?: Array<{
+        team: string;
+        start_date: string;
+        duration: number;
+      }>;
+    };
 }
 
 interface OrdersGanttChartProps {
@@ -86,7 +96,10 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
 
         if (ordersError) throw ordersError;
 
-        setTeams(teamsData || []);
+        const baseTeams = teamsData || [];
+        const hasUnnamed = baseTeams.some(t => (t.name?.toLowerCase?.() === 'unnamed') || t.id === 'unnamed');
+        const teamsWithUnnamed = hasUnnamed ? baseTeams : [...baseTeams, { id: 'unnamed', name: 'unnamed', color: 'gray', is_active: true }];
+        setTeams(teamsWithUnnamed);
         setOrders(ordersData || []);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -141,14 +154,16 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
 
     orders.forEach((order) => {
       // Get the first team assignment if available
-      const teamAssignments = order.project?.project_team_assignments;
+      const teamAssignments = (order.project?.project_team_assignments || order.projects?.project_team_assignments);
       if (teamAssignments && teamAssignments.length > 0) {
         const projectTeam = teamAssignments[0].team;
         
         // Find matching team
-        const matchedTeam = teams.find((team) => {
+        const projectTeamLower = projectTeam.toLowerCase();
+        
+        // Try direct/partial match first
+        let matchedTeam = teams.find((team) => {
           const teamNameLower = team.name.toLowerCase();
-          const projectTeamLower = projectTeam.toLowerCase();
           return (
             projectTeamLower === teamNameLower ||
             projectTeamLower.includes(teamNameLower) ||
@@ -156,9 +171,24 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
           );
         });
 
-        if (matchedTeam) {
-          grouped[matchedTeam.id].push(order);
+        // Color-based fallback mapping (handles language variations)
+        if (!matchedTeam) {
+          const color = projectTeamLower.includes('groen') || projectTeamLower.includes('green')
+            ? 'groen'
+            : projectTeamLower.includes('blauw') || projectTeamLower.includes('blue')
+            ? 'blauw'
+            : projectTeamLower.includes('oranje') || projectTeamLower.includes('orange')
+            ? 'oranje'
+            : undefined;
+
+          if (color) {
+            matchedTeam = teams.find((t) => t.name.toLowerCase().includes(color));
+          }
         }
+
+        // Fallback to "unnamed"
+        const targetTeamId = matchedTeam?.id || 'unnamed';
+        (grouped[targetTeamId] = grouped[targetTeamId] || []).push(order);
       }
     });
 
@@ -167,7 +197,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
 
   // Calculate order bar position
   const getOrderPosition = (order: Order) => {
-    const teamAssignments = order.project?.project_team_assignments;
+    const teamAssignments = (order.project?.project_team_assignments || order.projects?.project_team_assignments);
     const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
     
     const startDate = new Date(assignment?.start_date || order.expected_delivery);
@@ -217,7 +247,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     if (!draggedOrder) return;
 
     const { order } = draggedOrder;
-    const teamAssignments = order.project?.project_team_assignments;
+    const teamAssignments = (order.project?.project_team_assignments || order.projects?.project_team_assignments);
     const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
 
     if (!assignment) {
@@ -258,16 +288,16 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
           order_date,
           status,
           project_id,
-          projects:project_id (
-            name,
-            client,
-            installation_date,
-            project_team_assignments (
-              team,
-              start_date,
-              duration
+            projects:project_id (
+              name,
+              client,
+              installation_date,
+              project_team_assignments (
+                team,
+                start_date,
+                duration
+              )
             )
-          )
         `)
         .order('expected_delivery');
 
@@ -483,7 +513,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                           const position = getOrderPosition(order);
                           if (!position) return null;
 
-                          const orderLabel = `order ${order.external_order_number} : ${order.project?.client || 'Unknown'} - ${order.project?.name?.split('_')[2] || 'Unknown'}`;
+                          const proj = (order.project || order.projects);
+                          const orderLabel = `order ${order.external_order_number} : ${proj?.client || 'Unknown'} - ${proj?.name?.split('_')[2] || 'Unknown'}`;
 
                           return (
                             <div
