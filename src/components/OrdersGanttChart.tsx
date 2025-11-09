@@ -71,7 +71,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
 
         if (teamsError) throw teamsError;
 
-        // Fetch orders with project and team assignment data
+        // Fetch orders with project data (no nested assignments)
         const { data: ordersData, error: ordersError } = await supabase
           .from('orders')
           .select(`
@@ -82,14 +82,10 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
             status,
             project_id,
             projects:project_id (
+              id,
               name,
               client,
-              installation_date,
-              project_team_assignments (
-                team,
-                start_date,
-                duration
-              )
+              installation_date
             )
           `)
           .order('expected_delivery');
@@ -100,7 +96,30 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
         const hasUnnamed = baseTeams.some(t => (t.name?.toLowerCase?.() === 'unnamed') || t.id === 'unnamed');
         const teamsWithUnnamed = hasUnnamed ? baseTeams : [...baseTeams, { id: 'unnamed', name: 'unnamed', color: 'gray', is_active: true }];
         setTeams(teamsWithUnnamed);
-        setOrders(ordersData || []);
+
+        // Fetch team assignments for all projects and merge locally
+        const projectIds = (ordersData || []).map(o => o.project_id).filter(Boolean);
+        let assignmentsByProject: Record<string, Array<{ team: string; start_date: string; duration: number }>> = {};
+        if (projectIds.length > 0) {
+          const { data: assignments, error: assignError } = await supabase
+            .from('project_team_assignments')
+            .select('project_id, team, start_date, duration')
+            .in('project_id', projectIds as string[]);
+          if (assignError) throw assignError;
+          assignmentsByProject = (assignments || []).reduce((acc: Record<string, Array<{ team: string; start_date: string; duration: number }>>, a: any) => {
+            const pid = a.project_id as string;
+            (acc[pid] = acc[pid] || []).push({ team: a.team, start_date: a.start_date, duration: a.duration });
+            return acc;
+          }, {} as Record<string, Array<{ team: string; start_date: string; duration: number }>>);
+        }
+
+        const mergedOrders = (ordersData || []).map((o: any) => ({
+          ...o,
+          projects: o.projects
+            ? { ...o.projects, project_team_assignments: assignmentsByProject[o.project_id] || [] }
+            : undefined,
+        }));
+        setOrders(mergedOrders);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -153,12 +172,10 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     });
 
     orders.forEach((order) => {
-      // Get the first team assignment if available
       const teamAssignments = (order.project?.project_team_assignments || order.projects?.project_team_assignments);
+      let targetTeamId = 'unnamed';
       if (teamAssignments && teamAssignments.length > 0) {
         const projectTeam = teamAssignments[0].team;
-        
-        // Find matching team
         const projectTeamLower = projectTeam.toLowerCase();
         
         // Try direct/partial match first
@@ -187,9 +204,9 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
         }
 
         // Fallback to "unnamed"
-        const targetTeamId = matchedTeam?.id || 'unnamed';
-        (grouped[targetTeamId] = grouped[targetTeamId] || []).push(order);
+        targetTeamId = matchedTeam?.id || 'unnamed';
       }
+      (grouped[targetTeamId] = grouped[targetTeamId] || []).push(order);
     });
 
     return grouped;
@@ -288,21 +305,39 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
           order_date,
           status,
           project_id,
-            projects:project_id (
-              name,
-              client,
-              installation_date,
-              project_team_assignments (
-                team,
-                start_date,
-                duration
-              )
-            )
+          projects:project_id (
+            id,
+            name,
+            client,
+            installation_date
+          )
         `)
         .order('expected_delivery');
 
       if (!ordersError && ordersData) {
-        setOrders(ordersData);
+        // fetch assignments again and merge
+        const projectIds = ordersData.map(o => o.project_id).filter(Boolean);
+        let assignmentsByProject: Record<string, Array<{ team: string; start_date: string; duration: number }>> = {};
+        if (projectIds.length > 0) {
+          const { data: assignments, error: assignError } = await supabase
+            .from('project_team_assignments')
+            .select('project_id, team, start_date, duration')
+            .in('project_id', projectIds as string[]);
+          if (!assignError && assignments) {
+            assignmentsByProject = assignments.reduce((acc: Record<string, Array<{ team: string; start_date: string; duration: number }>>, a: any) => {
+              const pid = a.project_id as string;
+              (acc[pid] = acc[pid] || []).push({ team: a.team, start_date: a.start_date, duration: a.duration });
+              return acc;
+            }, {} as Record<string, Array<{ team: string; start_date: string; duration: number }>>);
+          }
+        }
+        const mergedOrders = ordersData.map((o: any) => ({
+          ...o,
+          projects: o.projects
+            ? { ...o.projects, project_team_assignments: assignmentsByProject[o.project_id] || [] }
+            : undefined,
+        }));
+        setOrders(mergedOrders);
       }
     } catch (error) {
       console.error('Error updating project assignment:', error);
