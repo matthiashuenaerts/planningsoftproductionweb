@@ -33,7 +33,6 @@ interface OrdersGanttChartProps {
 
 const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
   const [teams, setTeams] = useState<PlacementTeam[]>([]);
-  const timelineRef = useRef<HTMLDivElement>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [weeksToShow, setWeeksToShow] = useState(4);
@@ -341,42 +340,34 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
   }, [projects, teams, dateRange]);
 
   // Calculate project bar position
-const getProjectPosition = (project: Project) => {
-  const teamAssignments = project.project_team_assignments;
-  const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
+  const getProjectPosition = (project: Project) => {
+    const teamAssignments = project.project_team_assignments;
+    const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
+    
+    if (!assignment?.start_date || !assignment?.duration) {
+      return null;
+    }
 
-  if (!assignment?.start_date || !assignment?.duration) {
-    return null;
-  }
+    const startDate = new Date(assignment.start_date);
+    const duration = assignment.duration;
+    const endDate = addDays(startDate, duration - 1);
 
-  const startDate = new Date(assignment.start_date);
-  const duration = assignment.duration;
-  const endDate = addDays(startDate, duration - 1);
+    const firstDay = dateRange[0];
+    const startDayIndex = differenceInDays(startDate, firstDay);
+    const endDayIndex = differenceInDays(endDate, firstDay);
 
-  const firstDay = dateRange[0];
-  const startDayIndex = differenceInDays(startDate, firstDay);
-  const endDayIndex = differenceInDays(endDate, firstDay);
+    if (endDayIndex < 0 || startDayIndex >= dateRange.length) {
+      return null; // Project is outside visible range
+    }
 
-  // skip if outside range
-  if (endDayIndex < 0 || startDayIndex >= dateRange.length) return null;
+    const visibleStartIndex = Math.max(0, startDayIndex);
+    const visibleEndIndex = Math.min(endDayIndex, dateRange.length - 1);
+    
+    const left = (visibleStartIndex / dateRange.length) * 100;
+    const width = ((visibleEndIndex - visibleStartIndex + 1) / dateRange.length) * 100;
 
-  // visible portion
-  const visibleStartIndex = Math.max(0, startDayIndex);
-  const visibleEndIndex = Math.min(endDayIndex, dateRange.length - 1);
-
-  // ✅ compute pixel width instead of %
-  const container = timelineRef.current;
-  if (!container) return null;
-
-  const containerWidth = container.clientWidth - 256; // subtract sidebar width
-  const dayWidthPx = containerWidth / dateRange.length;
-
-  const leftPx = visibleStartIndex * dayWidthPx;
-  const widthPx = (visibleEndIndex - visibleStartIndex + 1) * dayWidthPx;
-
-  return { left: leftPx, width: widthPx };
-};
-
+    return { left: `${left}%`, width: `${width}%` };
+  };
 
   // Toggle team collapse
   const toggleTeam = (teamId: string) => {
@@ -537,8 +528,7 @@ const getProjectPosition = (project: Project) => {
 
       {/* Timeline */}
       <div className="flex-1 overflow-auto">
-        <div className="relative w-full" ref={timelineRef}>
-
+        <div className="relative w-full">
           {/* Timeline Header */}
           <div className="sticky top-0 z-10 bg-background border-b">
             {/* Week headers */}
@@ -675,23 +665,24 @@ const getProjectPosition = (project: Project) => {
                           const labelFitsInside = barWidthPx > labelWidthPx + 16;
 
                           return (
-<div
-  key={project.id}
-  className="absolute flex items-center gap-1"
-  style={{
-    left: `calc(16rem + ${position.left}px)`,
-    top: `${8 + idx * 32}px`,
-    height: '28px',
-  }}
->
-  <div
-    className="relative h-7 bg-destructive hover:bg-destructive/90 transition-colors rounded flex items-center overflow-hidden shadow-sm group"
-    style={{
-      width: `${position.width}px`,
-      minWidth: '20px',
-    }}
-    title={projectLabel}
-  >
+                            <div
+                              key={project.id}
+                              className="absolute flex items-center gap-1"
+                              style={{
+                                left: position.left,
+                                top: `${8 + idx * 32}px`,
+                                height: '28px',
+                              }}
+                            >
+                              {/* Project bar */}
+                              <div
+                                className="relative h-7 bg-destructive hover:bg-destructive/90 transition-colors rounded flex items-center overflow-hidden shadow-sm group"
+                                style={{
+                                  width: position.width,
+                                  minWidth: '40px',
+                                }}
+                                title={projectLabel}
+                              >
                                 {/* Left resize handle */}
                                 <div
                                   className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-destructive-foreground/20 opacity-0 group-hover:opacity-100 transition-opacity"
