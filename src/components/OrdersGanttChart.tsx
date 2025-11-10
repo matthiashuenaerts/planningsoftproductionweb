@@ -3,7 +3,7 @@ import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, differenceI
 import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Calendar, Menu, Share2, Bookmark } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -374,12 +374,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
   return (
     <div className={cn('flex flex-col h-full bg-background', className)}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-background sticky top-0 z-20">
+      <div className="flex items-center justify-between px-6 py-4 border-b bg-card sticky top-0 z-20">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon">
-            <Menu className="h-5 w-5" />
-          </Button>
-          
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={goToPreviousWeek}>
               <ChevronLeft className="h-5 w-5" />
@@ -392,57 +388,38 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
             </Button>
           </div>
 
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <Button variant="link" size="sm" className="text-primary" onClick={goToToday}>
-              <Calendar className="h-4 w-4 mr-1" />
-              Vandaag
-            </Button>
-            <Button variant="link" size="sm" onClick={() => window.location.reload()}>
-              verversen
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={goToToday}>
+            <Calendar className="h-4 w-4 mr-2" />
+            Vandaag
+          </Button>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            Bron
-          </Button>
-          <Button variant="default" size="sm" className="bg-blue-600 hover:bg-blue-700">
-            <Bookmark className="h-4 w-4 mr-1" />
-            Bladwijzer/Delen
-          </Button>
-          <Button variant="ghost" size="icon">
-            <Menu className="h-5 w-5" />
-          </Button>
+          <span className="text-sm text-muted-foreground">{weeksToShow} weken</span>
+          <input
+            type="range"
+            min="1"
+            max="8"
+            value={weeksToShow}
+            onChange={(e) => setWeeksToShow(Number(e.target.value))}
+            className="w-32"
+          />
         </div>
-      </div>
-
-      {/* Zoom control */}
-      <div className="px-4 py-2 border-b flex items-center justify-end gap-2">
-        <span className="text-sm text-muted-foreground">{weeksToShow} dagen</span>
-        <input
-          type="range"
-          min="1"
-          max="8"
-          value={weeksToShow}
-          onChange={(e) => setWeeksToShow(Number(e.target.value))}
-          className="w-32"
-        />
       </div>
 
       {/* Timeline */}
       <div className="flex-1 overflow-auto">
-        <div className="relative min-w-[1200px]">
+        <div className="relative w-full">
           {/* Timeline Header */}
           <div className="sticky top-0 z-10 bg-background border-b">
             {/* Week headers */}
-            <div className="flex border-b bg-slate-800">
+            <div className="flex border-b bg-primary">
               <div className="w-64 flex-shrink-0" /> {/* Spacer for team names */}
               {weekGroups.map((week) => (
                 <div
                   key={week.weekNumber}
-                  className="flex-shrink-0 px-2 py-2 text-xs font-semibold text-white border-r border-slate-700"
-                  style={{ width: `${(week.days.length / dateRange.length) * 100}%` }}
+                  className="flex-shrink-0 px-2 py-2 text-xs font-semibold text-primary-foreground border-r border-primary-foreground/20"
+                  style={{ width: `calc((100% - 16rem) * ${week.days.length / dateRange.length})` }}
                 >
                   Week {week.weekNumber}
                 </div>
@@ -450,7 +427,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
             </div>
 
             {/* Day headers */}
-            <div className="flex bg-cyan-800">
+            <div className="flex bg-accent">
               <div className="w-64 flex-shrink-0" /> {/* Spacer for team names */}
               {dateRange.map((date, idx) => {
                 const isWeekStart = date.getDay() === 1;
@@ -458,15 +435,15 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                   <div
                     key={idx}
                     className={cn(
-                      'flex-shrink-0 text-center border-r border-cyan-700',
-                      isWeekStart && 'border-l-2 border-l-cyan-600'
+                      'flex-shrink-0 text-center border-r border-accent-foreground/20',
+                      isWeekStart && 'border-l-2 border-l-accent-foreground/40'
                     )}
-                    style={{ width: `${dayWidth}%` }}
+                    style={{ width: `calc((100% - 16rem) / ${dateRange.length})` }}
                   >
-                    <div className="text-xs font-medium text-white py-1">
+                    <div className="text-xs font-medium text-accent-foreground py-1">
                       {format(date, 'd-MM', { locale: nl })}
                     </div>
-                    <div className="text-xs py-1 text-white">
+                    <div className="text-xs py-1 text-accent-foreground/80">
                       {format(date, 'EEEEEE', { locale: nl })}
                     </div>
                   </div>
@@ -481,11 +458,11 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
             {todayPosition !== null && (
               <>
                 <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-red-600 z-10 pointer-events-none"
+                  className="absolute top-0 bottom-0 w-0.5 bg-destructive z-10 pointer-events-none"
                   style={{ left: `calc(16rem + ${todayPosition}%)` }}
                 />
                 <div
-                  className="absolute top-0 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-b whitespace-nowrap z-20"
+                  className="absolute top-0 bg-destructive text-destructive-foreground text-[10px] px-2 py-0.5 rounded-b whitespace-nowrap z-20"
                   style={{ left: `calc(16rem + ${todayPosition}% - 20px)` }}
                 >
                   Vandaag
@@ -504,20 +481,20 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
               const isCollapsed = collapsedTeams.has(team.id);
 
               return (
-                <div key={team.id} className="border-b">
+                <div key={team.id} className="border-b border-border">
                   {/* Team header */}
                   <div
-                    className="flex items-center cursor-pointer hover:bg-muted/30 sticky left-0 z-10 bg-background border-t"
+                    className="flex items-center cursor-pointer hover:bg-muted/50 sticky left-0 z-10 bg-card border-t transition-colors"
                     onClick={() => toggleTeam(team.id)}
                   >
-                    <div className="w-64 flex-shrink-0 px-4 py-2 font-medium flex items-center gap-2 border-r bg-muted/20">
+                    <div className="w-64 flex-shrink-0 px-4 py-3 font-medium flex items-center gap-2 border-r border-border">
                       <ChevronRight
                         className={cn(
-                          'h-4 w-4 transition-transform',
+                          'h-4 w-4 transition-transform text-muted-foreground',
                           !isCollapsed && 'rotate-90'
                         )}
                       />
-                      <span className="text-sm font-normal">{team.name}</span>
+                      <span className="text-sm font-semibold text-foreground">{team.name}</span>
                     </div>
                     <div className="flex-1" />
                   </div>
@@ -526,23 +503,25 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                   {!isCollapsed && (
                     <div 
                       className="relative" 
-                      style={{ minHeight: `${Math.max(teamProjects.length * 32 + 16, 80)}px` }}
+                      style={{ minHeight: `${Math.max(teamProjects.length * 36 + 16, 80)}px` }}
                       onDragOver={handleDragOver}
                     >
                       <div className="flex absolute inset-0">
-                        <div className="w-64 flex-shrink-0 border-r bg-amber-50/30" />
+                        <div className="w-64 flex-shrink-0 border-r border-border bg-muted/30" />
                         {/* Day columns */}
                         {dateRange.map((date, idx) => {
                           const isWeekStart = date.getDay() === 1;
+                          const isToday = isSameDay(date, new Date());
                           return (
                             <div
                               key={idx}
                               className={cn(
-                                'flex-shrink-0 border-r border-gray-200',
-                                idx % 2 === 0 ? 'bg-amber-50/30' : 'bg-white',
-                                isWeekStart && 'border-l-2 border-l-gray-300'
+                                'flex-shrink-0 border-r border-border/50',
+                                idx % 2 === 0 ? 'bg-muted/20' : 'bg-background',
+                                isWeekStart && 'border-l-2 border-l-border',
+                                isToday && 'bg-accent/10'
                               )}
-                              style={{ width: `${dayWidth}%` }}
+                              style={{ width: `calc((100% - 16rem) / ${dateRange.length})` }}
                               onDrop={(e) => {
                                 e.preventDefault();
                                 handleDrop(team.id, date);
@@ -559,21 +538,46 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                           if (!position) return null;
 
                           const projectLabel = `${project.name} - ${project.progress || 0}%`;
+                          
+                          // Calculate if label fits inside bar (rough estimate: 8px per character)
+                          const barWidthPx = (parseFloat(position.width) / 100) * (window.innerWidth - 256);
+                          const labelWidthPx = projectLabel.length * 7;
+                          const labelFitsInside = barWidthPx > labelWidthPx + 16;
 
                           return (
                             <div
                               key={project.id}
-                              draggable
-                              onDragStart={() => handleDragStart(project, team.id)}
-                              className="absolute h-6 bg-red-600 text-white text-xs px-2 flex items-center overflow-hidden whitespace-nowrap hover:z-20 hover:shadow-lg transition-shadow cursor-move rounded-sm"
+                              className="absolute flex items-center gap-1"
                               style={{
                                 left: position.left,
-                                width: position.width,
-                                top: `${8 + idx * 28}px`,
+                                top: `${8 + idx * 32}px`,
+                                height: '28px',
                               }}
-                              title={projectLabel}
                             >
-                              <span className="font-medium">{projectLabel}</span>
+                              {/* Project bar */}
+                              <div
+                                draggable
+                                onDragStart={() => handleDragStart(project, team.id)}
+                                className="h-7 bg-destructive hover:bg-destructive/90 transition-colors cursor-move rounded flex items-center overflow-hidden shadow-sm"
+                                style={{
+                                  width: position.width,
+                                  minWidth: '40px',
+                                }}
+                                title={projectLabel}
+                              >
+                                {labelFitsInside && (
+                                  <span className="text-xs font-medium text-destructive-foreground px-2 truncate">
+                                    {projectLabel}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {/* Label to the right of bar if doesn't fit inside */}
+                              {!labelFitsInside && (
+                                <div className="bg-muted px-2 py-1 rounded text-xs font-medium text-muted-foreground whitespace-nowrap shadow-sm">
+                                  {projectLabel}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
