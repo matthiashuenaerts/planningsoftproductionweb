@@ -14,33 +14,17 @@ interface PlacementTeam {
   is_active: boolean;
 }
 
-interface Order {
+interface Project {
   id: string;
-  external_order_number: string;
-  expected_delivery: string;
-  order_date: string;
-  status: string;
-  project_id: string;
-    project?: {
-      name: string;
-      client: string;
-      installation_date: string;
-      project_team_assignments?: Array<{
-        team: string;
-        start_date: string;
-        duration: number;
-      }>;
-    };
-    projects?: {
-      name: string;
-      client: string;
-      installation_date: string;
-      project_team_assignments?: Array<{
-        team: string;
-        start_date: string;
-        duration: number;
-      }>;
-    };
+  name: string;
+  client: string;
+  installation_date: string;
+  progress: number;
+  project_team_assignments?: Array<{
+    team: string;
+    start_date: string;
+    duration: number;
+  }>;
 }
 
 interface OrdersGanttChartProps {
@@ -49,14 +33,14 @@ interface OrdersGanttChartProps {
 
 const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
   const [teams, setTeams] = useState<PlacementTeam[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [weeksToShow, setWeeksToShow] = useState(4);
   const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [draggedOrder, setDraggedOrder] = useState<{ order: Order; teamId: string } | null>(null);
+  const [draggedProject, setDraggedProject] = useState<{ project: Project; teamId: string } | null>(null);
 
-  // Fetch teams and orders
+  // Fetch teams and projects
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -71,26 +55,20 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
 
         if (teamsError) throw teamsError;
 
-        // Fetch orders with project data (no nested assignments)
-        const { data: ordersData, error: ordersError } = await supabase
-          .from('orders')
+        // Fetch projects directly from projects table
+        const { data: projectsData, error: projectsError } = await supabase
+          .from('projects')
           .select(`
             id,
-            external_order_number,
-            expected_delivery,
-            order_date,
-            status,
-            project_id,
-            projects:project_id (
-              id,
-              name,
-              client,
-              installation_date
-            )
+            name,
+            client,
+            installation_date,
+            progress
           `)
-          .order('expected_delivery');
+          .not('installation_date', 'is', null)
+          .order('installation_date');
 
-        if (ordersError) throw ordersError;
+        if (projectsError) throw projectsError;
 
         const baseTeams = teamsData || [];
         const hasUnnamed = baseTeams.some(t => (t.name?.toLowerCase?.() === 'unnamed') || t.id === 'unnamed');
@@ -98,7 +76,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
         setTeams(teamsWithUnnamed);
 
         // Fetch team assignments for all projects and merge locally
-        const projectIds = (ordersData || []).map(o => o.project_id).filter(Boolean);
+        const projectIds = (projectsData || []).map(p => p.id).filter(Boolean);
         let assignmentsByProject: Record<string, Array<{ team: string; start_date: string; duration: number }>> = {};
         if (projectIds.length > 0) {
           const { data: assignments, error: assignError } = await supabase
@@ -113,13 +91,11 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
           }, {} as Record<string, Array<{ team: string; start_date: string; duration: number }>>);
         }
 
-        const mergedOrders = (ordersData || []).map((o: any) => ({
-          ...o,
-          projects: o.projects
-            ? { ...o.projects, project_team_assignments: assignmentsByProject[o.project_id] || [] }
-            : undefined,
+        const mergedProjects = (projectsData || []).map((p: any) => ({
+          ...p,
+          project_team_assignments: assignmentsByProject[p.id] || [],
         }));
-        setOrders(mergedOrders);
+        setProjects(mergedProjects);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -163,9 +139,9 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     return groups;
   }, [dateRange]);
 
-  // Group orders by team - only include orders visible in current date range
-  const ordersByTeam = useMemo(() => {
-    const grouped: Record<string, Order[]> = {};
+  // Group projects by team - only include projects visible in current date range
+  const projectsByTeam = useMemo(() => {
+    const grouped: Record<string, Project[]> = {};
     
     teams.forEach((team) => {
       grouped[team.id] = [];
@@ -197,29 +173,29 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
       return 'unnamed';
     };
 
-    // Check if order is visible in current date range
-    const isOrderVisible = (order: Order): boolean => {
-      const teamAssignments = (order.project?.project_team_assignments || order.projects?.project_team_assignments);
+    // Check if project is visible in current date range
+    const isProjectVisible = (project: Project): boolean => {
+      const teamAssignments = project.project_team_assignments;
       const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
       
-      const startDate = new Date(assignment?.start_date || order.expected_delivery);
+      const startDate = new Date(assignment?.start_date || project.installation_date);
       const duration = assignment?.duration || 1;
       const endDate = addDays(startDate, duration - 1);
 
       const firstDay = dateRange[0];
       const lastDay = dateRange[dateRange.length - 1];
       
-      // Order is visible if it overlaps with the date range
+      // Project is visible if it overlaps with the date range
       return endDate >= firstDay && startDate <= lastDay;
     };
 
-    orders.forEach((order) => {
-      // Only include orders that are visible in current date range
-      if (!isOrderVisible(order)) {
+    projects.forEach((project) => {
+      // Only include projects that are visible in current date range
+      if (!isProjectVisible(project)) {
         return;
       }
 
-      const teamAssignments = (order.project?.project_team_assignments || order.projects?.project_team_assignments);
+      const teamAssignments = project.project_team_assignments;
       let targetTeamId = 'unnamed';
       
       if (teamAssignments && teamAssignments.length > 0) {
@@ -233,29 +209,27 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
         }
       }
       
-      (grouped[targetTeamId] = grouped[targetTeamId] || []).push(order);
+      (grouped[targetTeamId] = grouped[targetTeamId] || []).push(project);
     });
 
-    // Sort orders within each team by installation date (oldest to newest)
+    // Sort projects within each team by installation date (oldest to newest)
     Object.keys(grouped).forEach(teamId => {
       grouped[teamId].sort((a, b) => {
-        const installationDateA = (a.project?.installation_date || a.projects?.installation_date) || a.expected_delivery;
-        const installationDateB = (b.project?.installation_date || b.projects?.installation_date) || b.expected_delivery;
-        const dateA = new Date(installationDateA).getTime();
-        const dateB = new Date(installationDateB).getTime();
+        const dateA = new Date(a.installation_date).getTime();
+        const dateB = new Date(b.installation_date).getTime();
         return dateA - dateB;
       });
     });
 
     return grouped;
-  }, [orders, teams, dateRange]);
+  }, [projects, teams, dateRange]);
 
-  // Calculate order bar position
-  const getOrderPosition = (order: Order) => {
-    const teamAssignments = (order.project?.project_team_assignments || order.projects?.project_team_assignments);
+  // Calculate project bar position
+  const getProjectPosition = (project: Project) => {
+    const teamAssignments = project.project_team_assignments;
     const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
     
-    const startDate = new Date(assignment?.start_date || order.expected_delivery);
+    const startDate = new Date(assignment?.start_date || project.installation_date);
     const duration = assignment?.duration || 1;
     const endDate = addDays(startDate, duration - 1);
 
@@ -264,7 +238,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     const endDayIndex = differenceInDays(endDate, firstDay);
 
     if (endDayIndex < 0 || startDayIndex >= dateRange.length) {
-      return null; // Order is outside visible range
+      return null; // Project is outside visible range
     }
 
     const left = Math.max(0, (startDayIndex / dateRange.length) * 100);
@@ -290,8 +264,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
   };
 
   // Drag handlers
-  const handleDragStart = (order: Order, teamId: string) => {
-    setDraggedOrder({ order, teamId });
+  const handleDragStart = (project: Project, teamId: string) => {
+    setDraggedProject({ project, teamId });
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -299,15 +273,15 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
   };
 
   const handleDrop = async (targetTeamId: string, targetDate: Date) => {
-    if (!draggedOrder) return;
+    if (!draggedProject) return;
 
-    const { order } = draggedOrder;
-    const teamAssignments = (order.project?.project_team_assignments || order.projects?.project_team_assignments);
+    const { project } = draggedProject;
+    const teamAssignments = project.project_team_assignments;
     const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
 
     if (!assignment) {
-      toast.error('No team assignment found for this order');
-      setDraggedOrder(null);
+      toast.error('No team assignment found for this project');
+      setDraggedProject(null);
       return;
     }
 
@@ -315,7 +289,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     const targetTeam = teams.find(t => t.id === targetTeamId);
     if (!targetTeam) {
       toast.error('Target team not found');
-      setDraggedOrder(null);
+      setDraggedProject(null);
       return;
     }
 
@@ -327,34 +301,28 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
           team: targetTeam.name,
           start_date: format(targetDate, 'yyyy-MM-dd'),
         })
-        .eq('project_id', order.project_id);
+        .eq('project_id', project.id);
 
       if (error) throw error;
 
       toast.success('Project moved successfully');
       
       // Refresh data
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
         .select(`
           id,
-          external_order_number,
-          expected_delivery,
-          order_date,
-          status,
-          project_id,
-          projects:project_id (
-            id,
-            name,
-            client,
-            installation_date
-          )
+          name,
+          client,
+          installation_date,
+          progress
         `)
-        .order('expected_delivery');
+        .not('installation_date', 'is', null)
+        .order('installation_date');
 
-      if (!ordersError && ordersData) {
+      if (!projectsError && projectsData) {
         // fetch assignments again and merge
-        const projectIds = ordersData.map(o => o.project_id).filter(Boolean);
+        const projectIds = projectsData.map(p => p.id).filter(Boolean);
         let assignmentsByProject: Record<string, Array<{ team: string; start_date: string; duration: number }>> = {};
         if (projectIds.length > 0) {
           const { data: assignments, error: assignError } = await supabase
@@ -369,20 +337,18 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
             }, {} as Record<string, Array<{ team: string; start_date: string; duration: number }>>);
           }
         }
-        const mergedOrders = ordersData.map((o: any) => ({
-          ...o,
-          projects: o.projects
-            ? { ...o.projects, project_team_assignments: assignmentsByProject[o.project_id] || [] }
-            : undefined,
+        const mergedProjects = projectsData.map((p: any) => ({
+          ...p,
+          project_team_assignments: assignmentsByProject[p.id] || [],
         }));
-        setOrders(mergedOrders);
+        setProjects(mergedProjects);
       }
     } catch (error) {
       console.error('Error updating project assignment:', error);
       toast.error('Failed to move project');
     }
 
-    setDraggedOrder(null);
+    setDraggedProject(null);
   };
 
   // Navigation
@@ -529,12 +495,12 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
 
             {teams
               .filter(team => {
-                // Only show teams that have visible orders
-                const teamOrders = ordersByTeam[team.id] || [];
-                return teamOrders.length > 0;
+                // Only show teams that have visible projects
+                const teamProjects = projectsByTeam[team.id] || [];
+                return teamProjects.length > 0;
               })
               .map((team) => {
-              const teamOrders = ordersByTeam[team.id] || [];
+              const teamProjects = projectsByTeam[team.id] || [];
               const isCollapsed = collapsedTeams.has(team.id);
 
               return (
@@ -556,11 +522,11 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                     <div className="flex-1" />
                   </div>
 
-                  {/* Team orders */}
+                  {/* Team projects */}
                   {!isCollapsed && (
                     <div 
                       className="relative" 
-                      style={{ minHeight: `${Math.max(teamOrders.length * 32 + 16, 80)}px` }}
+                      style={{ minHeight: `${Math.max(teamProjects.length * 32 + 16, 80)}px` }}
                       onDragOver={handleDragOver}
                     >
                       <div className="flex absolute inset-0">
@@ -586,29 +552,28 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                         })}
                       </div>
 
-                      {/* Order bars */}
-                      <div className="relative z-10 pl-64 py-2">
-                        {teamOrders.map((order, idx) => {
-                          const position = getOrderPosition(order);
+                      {/* Project bars - positioned in calendar grid only */}
+                      <div className="relative z-10 py-2" style={{ marginLeft: '16rem' }}>
+                        {teamProjects.map((project, idx) => {
+                          const position = getProjectPosition(project);
                           if (!position) return null;
 
-                          const proj = (order.project || order.projects);
-                          const orderLabel = `order ${order.external_order_number} : ${proj?.client || 'Unknown'} - ${proj?.name?.split('_')[2] || 'Unknown'}`;
+                          const projectLabel = `${project.name} - ${project.progress || 0}%`;
 
                           return (
                             <div
-                              key={order.id}
+                              key={project.id}
                               draggable
-                              onDragStart={() => handleDragStart(order, team.id)}
+                              onDragStart={() => handleDragStart(project, team.id)}
                               className="absolute h-6 bg-red-600 text-white text-xs px-2 flex items-center overflow-hidden whitespace-nowrap hover:z-20 hover:shadow-lg transition-shadow cursor-move rounded-sm"
                               style={{
                                 left: position.left,
                                 width: position.width,
                                 top: `${8 + idx * 28}px`,
                               }}
-                              title={orderLabel}
+                              title={projectLabel}
                             >
-                              <span className="font-medium">{orderLabel}</span>
+                              <span className="font-medium">{projectLabel}</span>
                             </div>
                           );
                         })}
