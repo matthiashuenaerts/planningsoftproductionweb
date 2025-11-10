@@ -171,42 +171,57 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
       grouped[team.id] = [];
     });
 
+    // Define exact team category mapping
+    const getTeamCategory = (teamName: string): string => {
+      const normalizedTeam = teamName.trim();
+      
+      // Green team - exact matches
+      if (normalizedTeam === '05 - GROEN PLAATSING - SPRINTER 2' || 
+          normalizedTeam === '05 - GROEN PLAATSING - SPRINTER 12') {
+        return 'Installation Team Green';
+      }
+      
+      // Blue team - exact matches
+      if (normalizedTeam === '04 - BLAUW PLAATSING - SPRINTER 1' || 
+          normalizedTeam === '04 - BLAUW PLAATSING - SPRINTER 11') {
+        return 'Installation Team Blue';
+      }
+      
+      // Orange team - contains check
+      const lowerTeam = normalizedTeam.toLowerCase();
+      if (lowerTeam.includes('orange') || lowerTeam.includes('oranje')) {
+        return 'Installation Team Orange';
+      }
+      
+      // Default to unnamed
+      return 'unnamed';
+    };
+
     orders.forEach((order) => {
       const teamAssignments = (order.project?.project_team_assignments || order.projects?.project_team_assignments);
       let targetTeamId = 'unnamed';
+      
       if (teamAssignments && teamAssignments.length > 0) {
         const projectTeam = teamAssignments[0].team;
-        const projectTeamLower = projectTeam.toLowerCase();
-        
-        // Try direct/partial match first
-        let matchedTeam = teams.find((team) => {
-          const teamNameLower = team.name.toLowerCase();
-          return (
-            projectTeamLower === teamNameLower ||
-            projectTeamLower.includes(teamNameLower) ||
-            teamNameLower.includes(projectTeamLower)
-          );
-        });
-
-        // Color-based fallback mapping (handles language variations)
-        if (!matchedTeam) {
-          const color = projectTeamLower.includes('groen') || projectTeamLower.includes('green')
-            ? 'groen'
-            : projectTeamLower.includes('blauw') || projectTeamLower.includes('blue')
-            ? 'blauw'
-            : projectTeamLower.includes('oranje') || projectTeamLower.includes('orange')
-            ? 'oranje'
-            : undefined;
-
-          if (color) {
-            matchedTeam = teams.find((t) => t.name.toLowerCase().includes(color));
-          }
+        if (projectTeam) {
+          const targetCategory = getTeamCategory(projectTeam);
+          
+          // Find matching team by category name
+          const matchedTeam = teams.find(t => t.name === targetCategory);
+          targetTeamId = matchedTeam?.id || 'unnamed';
         }
-
-        // Fallback to "unnamed"
-        targetTeamId = matchedTeam?.id || 'unnamed';
       }
+      
       (grouped[targetTeamId] = grouped[targetTeamId] || []).push(order);
+    });
+
+    // Sort orders within each team by expected_delivery date (oldest to newest)
+    Object.keys(grouped).forEach(teamId => {
+      grouped[teamId].sort((a, b) => {
+        const dateA = new Date(a.expected_delivery).getTime();
+        const dateB = new Date(b.expected_delivery).getTime();
+        return dateA - dateB;
+      });
     });
 
     return grouped;
