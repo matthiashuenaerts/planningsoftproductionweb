@@ -163,7 +163,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     return groups;
   }, [dateRange]);
 
-  // Group orders by team
+  // Group orders by team - only include orders visible in current date range
   const ordersByTeam = useMemo(() => {
     const grouped: Record<string, Order[]> = {};
     
@@ -197,7 +197,28 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
       return 'unnamed';
     };
 
+    // Check if order is visible in current date range
+    const isOrderVisible = (order: Order): boolean => {
+      const teamAssignments = (order.project?.project_team_assignments || order.projects?.project_team_assignments);
+      const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
+      
+      const startDate = new Date(assignment?.start_date || order.expected_delivery);
+      const duration = assignment?.duration || 1;
+      const endDate = addDays(startDate, duration - 1);
+
+      const firstDay = dateRange[0];
+      const lastDay = dateRange[dateRange.length - 1];
+      
+      // Order is visible if it overlaps with the date range
+      return endDate >= firstDay && startDate <= lastDay;
+    };
+
     orders.forEach((order) => {
+      // Only include orders that are visible in current date range
+      if (!isOrderVisible(order)) {
+        return;
+      }
+
       const teamAssignments = (order.project?.project_team_assignments || order.projects?.project_team_assignments);
       let targetTeamId = 'unnamed';
       
@@ -215,17 +236,19 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
       (grouped[targetTeamId] = grouped[targetTeamId] || []).push(order);
     });
 
-    // Sort orders within each team by expected_delivery date (oldest to newest)
+    // Sort orders within each team by installation date (oldest to newest)
     Object.keys(grouped).forEach(teamId => {
       grouped[teamId].sort((a, b) => {
-        const dateA = new Date(a.expected_delivery).getTime();
-        const dateB = new Date(b.expected_delivery).getTime();
+        const installationDateA = (a.project?.installation_date || a.projects?.installation_date) || a.expected_delivery;
+        const installationDateB = (b.project?.installation_date || b.projects?.installation_date) || b.expected_delivery;
+        const dateA = new Date(installationDateA).getTime();
+        const dateB = new Date(installationDateB).getTime();
         return dateA - dateB;
       });
     });
 
     return grouped;
-  }, [orders, teams]);
+  }, [orders, teams, dateRange]);
 
   // Calculate order bar position
   const getOrderPosition = (order: Order) => {
@@ -504,7 +527,13 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
               </>
             )}
 
-            {teams.map((team) => {
+            {teams
+              .filter(team => {
+                // Only show teams that have visible orders
+                const teamOrders = ordersByTeam[team.id] || [];
+                return teamOrders.length > 0;
+              })
+              .map((team) => {
               const teamOrders = ordersByTeam[team.id] || [];
               const isCollapsed = collapsedTeams.has(team.id);
 
