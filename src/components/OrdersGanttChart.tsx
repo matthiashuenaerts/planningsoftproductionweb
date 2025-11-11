@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, differenceInDays, getWeek, isSameDay } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
@@ -352,47 +352,47 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     return grouped;
   }, [projects, teams, dateRange]);
 
-  // Calculate project bar position for the assignment that belongs to the given team
-  const getProjectPosition = (project: Project, teamName: string) => {
-    const teamAssignments = project.project_team_assignments || [];
-    // Prefer the assignment that maps to the current team row
-    const matchedAssignment = teamAssignments.find((a) => mapTeamToCategory(a.team) === teamName) || teamAssignments[0];
+ 
+// Calculate project bar position for the assignment that belongs to the given team
+const getProjectPosition = (project: Project, teamName: string) => {
+  const teamAssignments = project.project_team_assignments || [];
+  const matchedAssignment = teamAssignments.find((a) => mapTeamToCategory(a.team) === teamName) || teamAssignments[0];
 
-    if (!matchedAssignment?.start_date || !matchedAssignment?.duration) {
-      return null;
-    }
+  if (!matchedAssignment?.start_date || !matchedAssignment?.duration) {
+    return null;
+  }
 
-    const startDate = parseYMD(matchedAssignment.start_date);
-    const duration = Math.max(1, matchedAssignment.duration || 0);
-    const endDate = addDays(startDate, duration - 1);
+  const startDate = parseYMD(matchedAssignment.start_date);
+  const duration = Math.max(1, matchedAssignment.duration || 0);
+  const endDate = addDays(startDate, duration - 1);
 
-    const firstDay = dateRange[0];
-    const lastDay = dateRange[dateRange.length - 1];
-    
-    const startDayIndex = differenceInDays(startDate, firstDay);
-    const endDayIndex = differenceInDays(endDate, firstDay);
+  const firstDay = dateRange[0];
+  const lastDay = dateRange[dateRange.length - 1];
 
-    if (endDayIndex < 0 || startDayIndex >= dateRange.length) {
-      return null; // Project is outside visible range
-    }
+  // Clamp within visible range
+  const startDayIndex = differenceInDays(startDate, firstDay);
+  const endDayIndex = differenceInDays(endDate, firstDay);
 
-    const visibleStartIndex = Math.max(0, startDayIndex);
-    const visibleEndIndex = Math.min(endDayIndex, dateRange.length - 1);
-    
-    // Calculate position and width based on actual calendar days
-    const leftPercentage = (visibleStartIndex / dateRange.length) * 100;
-    const widthInDays = visibleEndIndex - visibleStartIndex + 1;
-    const widthPercentage = (widthInDays / dateRange.length) * 100;
+  const visibleStartIndex = clamp(startDayIndex, 0, dateRange.length - 1);
+  const visibleEndIndex = clamp(endDayIndex, 0, dateRange.length - 1);
 
-    return { 
-      left: `${leftPercentage}%`, 
-      width: `${widthPercentage}%`,
-      startIndex: visibleStartIndex,
-      endIndex: visibleEndIndex,
-      durationDays: widthInDays,
-      assignment: matchedAssignment,
-    };
+  const totalDays = dateRange.length;
+  const widthInDays = visibleEndIndex - visibleStartIndex + 1;
+
+  // ✅ FIX: compute based on number of visible days, not total timeline width
+  const leftPercentage = (visibleStartIndex / totalDays) * 100;
+  const widthPercentage = (widthInDays / totalDays) * 100;
+
+  return {
+    left: `${leftPercentage}%`,
+    width: `${widthPercentage}%`,
+    startIndex: visibleStartIndex,
+    endIndex: visibleEndIndex,
+    durationDays: widthInDays,
+    assignment: matchedAssignment,
   };
+};
+
 
   // Toggle team collapse
   const toggleTeam = (teamId: string) => {
@@ -582,7 +582,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                       'flex-shrink-0 text-center border-r border-accent-foreground/20',
                       isWeekStart && 'border-l-2 border-l-accent-foreground/40'
                     )}
-                    style={{ width: `calc((100% - 16rem) / ${dateRange.length})` }}
+                    style={{ flex: `0 0 ${100 / dateRange.length}%` }}
                   >
                     <div className="text-xs font-medium text-accent-foreground py-1">
                       {format(date, 'd-MM', { locale: nl })}
@@ -660,7 +660,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                                 isWeekStart && 'border-l-2 border-l-border',
                                 isToday && 'bg-accent/10'
                               )}
-                              style={{ width: `calc((100% - 16rem) / ${dateRange.length})` }}
+                              style={{ flex: `0 0 ${100 / dateRange.length}%` }}
                               onDrop={(e) => {
                                 e.preventDefault();
                                 handleDrop(team.id, date);
