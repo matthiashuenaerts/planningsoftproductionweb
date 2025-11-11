@@ -679,7 +679,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                       <div className="relative z-10 py-2" style={{ marginLeft: '16rem', width: 'calc(100% - 16rem)' }}>
                           {teamProjects.map((project, idx) => {
                             // Use container width once
-                            const ganttContainerWidth = window.innerWidth - 256; // team column width
+                            const ganttContainerWidth = window.innerWidth - 1040; // team column width
 
                             const position = getProjectPosition(project, team.name, ganttContainerWidth);
                             if (!position) return null;
