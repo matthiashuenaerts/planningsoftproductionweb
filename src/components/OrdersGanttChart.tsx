@@ -31,6 +31,13 @@ interface OrdersGanttChartProps {
   className?: string;
 }
 
+// Parse 'YYYY-MM-DD' safely as a local date to avoid timezone shifts
+const parseYMD = (s: string) => {
+  if (!s) return new Date(NaN);
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+
 const mapTeamToCategory = (teamName: string): string => {
   const normalizedTeam = teamName.trim();
 
@@ -299,7 +306,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
         return false; // Skip projects without proper assignment data
       }
 
-      const startDate = new Date(assignment.start_date);
+      const startDate = parseYMD(assignment.start_date);
       const duration = assignment.duration;
       const endDate = addDays(startDate, duration - 1);
 
@@ -355,7 +362,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
       return null;
     }
 
-    const startDate = new Date(matchedAssignment.start_date);
+    const startDate = parseYMD(matchedAssignment.start_date);
     const duration = Math.max(1, matchedAssignment.duration || 0);
     const endDate = addDays(startDate, duration - 1);
 
