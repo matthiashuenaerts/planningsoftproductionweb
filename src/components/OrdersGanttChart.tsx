@@ -31,6 +31,35 @@ interface OrdersGanttChartProps {
   className?: string;
 }
 
+const mapTeamToCategory = (teamName: string): string => {
+  const normalizedTeam = teamName.trim();
+
+  // Green team - exact matches
+  if (
+    normalizedTeam === '05 - GROEN PLAATSING - SPRINTER 2' ||
+    normalizedTeam === '05 - GROEN PLAATSING - SPRINTER 12'
+  ) {
+    return 'Installation Team Green';
+  }
+
+  // Blue team - exact matches
+  if (
+    normalizedTeam === '04 - BLAUW PLAATSING - SPRINTER 1' ||
+    normalizedTeam === '04 - BLAUW PLAATSING - SPRINTER 11'
+  ) {
+    return 'Installation Team Blue';
+  }
+
+  // Orange team - contains check
+  const lowerTeam = normalizedTeam.toLowerCase();
+  if (lowerTeam.includes('orange') || lowerTeam.includes('oranje')) {
+    return 'Installation Team Orange';
+  }
+
+  // Default to unnamed
+  return 'unnamed';
+};
+
 const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
   const [teams, setTeams] = useState<PlacementTeam[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -259,30 +288,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     });
 
     // Define exact team category mapping
-    const getTeamCategory = (teamName: string): string => {
-      const normalizedTeam = teamName.trim();
-      
-      // Green team - exact matches
-      if (normalizedTeam === '05 - GROEN PLAATSING - SPRINTER 2' || 
-          normalizedTeam === '05 - GROEN PLAATSING - SPRINTER 12') {
-        return 'Installation Team Green';
-      }
-      
-      // Blue team - exact matches
-      if (normalizedTeam === '04 - BLAUW PLAATSING - SPRINTER 1' || 
-          normalizedTeam === '04 - BLAUW PLAATSING - SPRINTER 11') {
-        return 'Installation Team Blue';
-      }
-      
-      // Orange team - contains check
-      const lowerTeam = normalizedTeam.toLowerCase();
-      if (lowerTeam.includes('orange') || lowerTeam.includes('oranje')) {
-        return 'Installation Team Orange';
-      }
-      
-      // Default to unnamed
-      return 'unnamed';
-    };
+    const getTeamCategory = mapTeamToCategory;
 
     // Check if project is visible in current date range
     const isProjectVisible = (project: Project): boolean => {
@@ -339,17 +345,18 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     return grouped;
   }, [projects, teams, dateRange]);
 
-  // Calculate project bar position
-  const getProjectPosition = (project: Project) => {
-    const teamAssignments = project.project_team_assignments;
-    const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
-    
-    if (!assignment?.start_date || !assignment?.duration) {
+  // Calculate project bar position for the assignment that belongs to the given team
+  const getProjectPosition = (project: Project, teamName: string) => {
+    const teamAssignments = project.project_team_assignments || [];
+    // Prefer the assignment that maps to the current team row
+    const matchedAssignment = teamAssignments.find((a) => mapTeamToCategory(a.team) === teamName) || teamAssignments[0];
+
+    if (!matchedAssignment?.start_date || !matchedAssignment?.duration) {
       return null;
     }
 
-    const startDate = new Date(assignment.start_date);
-    const duration = assignment.duration;
+    const startDate = new Date(matchedAssignment.start_date);
+    const duration = Math.max(1, matchedAssignment.duration || 0);
     const endDate = addDays(startDate, duration - 1);
 
     const firstDay = dateRange[0];
@@ -375,7 +382,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
       width: `${widthPercentage}%`,
       startIndex: visibleStartIndex,
       endIndex: visibleEndIndex,
-      durationDays: widthInDays
+      durationDays: widthInDays,
+      assignment: matchedAssignment,
     };
   };
 
@@ -664,10 +672,10 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                       {/* Project bars - positioned in calendar grid only */}
                       <div className="relative z-10 py-2" style={{ marginLeft: '16rem', width: 'calc(100% - 16rem)' }}>
                         {teamProjects.map((project, idx) => {
-                          const position = getProjectPosition(project);
+                          const position = getProjectPosition(project, team.name);
                           if (!position) return null;
 
-                          const teamAssignment = project.project_team_assignments?.[0];
+                          const teamAssignment = position.assignment;
                           const projectLabel = `${project.name} - ${project.progress || 0}%`;
                           
                           // Calculate if label fits inside bar based on the actual container width
