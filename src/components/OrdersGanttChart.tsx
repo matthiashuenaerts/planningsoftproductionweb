@@ -353,6 +353,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     const endDate = addDays(startDate, duration - 1);
 
     const firstDay = dateRange[0];
+    const lastDay = dateRange[dateRange.length - 1];
+    
     const startDayIndex = differenceInDays(startDate, firstDay);
     const endDayIndex = differenceInDays(endDate, firstDay);
 
@@ -363,10 +365,18 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     const visibleStartIndex = Math.max(0, startDayIndex);
     const visibleEndIndex = Math.min(endDayIndex, dateRange.length - 1);
     
-    const left = (visibleStartIndex / dateRange.length) * 100;
-    const width = ((visibleEndIndex - visibleStartIndex + 1) / dateRange.length) * 100;
+    // Calculate position and width based on actual calendar days
+    const leftPercentage = (visibleStartIndex / dateRange.length) * 100;
+    const widthInDays = visibleEndIndex - visibleStartIndex + 1;
+    const widthPercentage = (widthInDays / dateRange.length) * 100;
 
-    return { left: `${left}%`, width: `${width}%` };
+    return { 
+      left: `${leftPercentage}%`, 
+      width: `${widthPercentage}%`,
+      startIndex: visibleStartIndex,
+      endIndex: visibleEndIndex,
+      durationDays: widthInDays
+    };
   };
 
   // Toggle team collapse
@@ -652,15 +662,17 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                       )}
 
                       {/* Project bars - positioned in calendar grid only */}
-                      <div className="relative z-10 py-2" style={{ marginLeft: '16rem' }}>
+                      <div className="relative z-10 py-2" style={{ marginLeft: '16rem', width: 'calc(100% - 16rem)' }}>
                         {teamProjects.map((project, idx) => {
                           const position = getProjectPosition(project);
                           if (!position) return null;
 
+                          const teamAssignment = project.project_team_assignments?.[0];
                           const projectLabel = `${project.name} - ${project.progress || 0}%`;
                           
-                          // Calculate if label fits inside bar (rough estimate: 8px per character)
-                          const barWidthPx = (parseFloat(position.width) / 100) * (window.innerWidth - 256);
+                          // Calculate if label fits inside bar based on the actual container width
+                          const containerWidth = window.innerWidth - 256; // Subtract team column width
+                          const barWidthPx = (parseFloat(position.width) / 100) * containerWidth;
                           const labelWidthPx = projectLabel.length * 7;
                           const labelFitsInside = barWidthPx > labelWidthPx + 16;
 
@@ -681,7 +693,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                                   width: position.width,
                                   minWidth: '40px',
                                 }}
-                                title={projectLabel}
+                                title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
                               >
                                 {/* Left resize handle */}
                                 <div
