@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, differenceInDays, getWeek, isSameDay } from 'date-fns';
+const clamp = (num: number, min: number, max: number) => Math.min(Math.max(num, min), max);
 import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -563,7 +564,7 @@ const getProjectPosition = (project: Project, teamName: string) => {
                 <div
                   key={week.weekNumber}
                   className="flex-shrink-0 px-2 py-2 text-xs font-semibold text-primary-foreground border-r border-primary-foreground/20"
-                  style={{ width: `calc((100% - 16rem) * ${week.days.length / dateRange.length})` }}
+                  style={{ flex: `0 0 ${(week.days.length / dateRange.length) * 100}%` }}
                 >
                   Week {week.weekNumber}
                 </div>
