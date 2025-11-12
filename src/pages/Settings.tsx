@@ -15,6 +15,7 @@ import ExternalDatabaseSettings from '@/components/settings/ExternalDatabaseSett
 import { HelpManagement } from '@/components/help/HelpManagement';
 import MailSettings from '@/components/settings/MailSettings';
 import StockLocationsSettings from '@/components/settings/StockLocationsSettings';
+import InstallationTeamsSettings from '@/components/settings/InstallationTeamsSettings';
 import { Button } from '@/components/ui/button';
 import { Settings as SettingsIcon } from 'lucide-react';
 
@@ -93,6 +94,7 @@ const Settings: React.FC = () => {
               <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
               <TabsTrigger value="products">Products</TabsTrigger>
               <TabsTrigger value="stock">Stock Locations</TabsTrigger>
+              <TabsTrigger value="installation-teams">Installation Teams</TabsTrigger>
               <TabsTrigger value="external-database">External Database API</TabsTrigger>
               <TabsTrigger value="mail">Mail</TabsTrigger>
               <TabsTrigger value="help">Help Management</TabsTrigger>
@@ -128,6 +130,10 @@ const Settings: React.FC = () => {
 
             <TabsContent value="stock">
               <StockLocationsSettings />
+            </TabsContent>
+
+            <TabsContent value="installation-teams">
+              <InstallationTeamsSettings />
             </TabsContent>
 
             <TabsContent value="external-database">

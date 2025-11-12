@@ -39,33 +39,16 @@ const parseYMD = (s: string) => {
   return new Date(y, (m || 1) - 1, d || 1);
 };
 
-const mapTeamToCategory = (teamName: string): string => {
+// Dynamic team mapping using database
+const mapTeamToCategory = (teamName: string, placementTeams: any[]): string => {
   const normalizedTeam = teamName.trim();
-
-  // Green team - exact matches
-  if (
-    normalizedTeam === '05 - GROEN PLAATSING - SPRINTER 2' ||
-    normalizedTeam === '05 - GROEN PLAATSING - SPRINTER 12'
-  ) {
-    return 'Installation Team Green';
-  }
-
-  // Blue team - exact matches
-  if (
-    normalizedTeam === '04 - BLAUW PLAATSING - SPRINTER 1' ||
-    normalizedTeam === '04 - BLAUW PLAATSING - SPRINTER 11'
-  ) {
-    return 'Installation Team Blue';
-  }
-
-  // Orange team - contains check
-  const lowerTeam = normalizedTeam.toLowerCase();
-  if (lowerTeam.includes('orange') || lowerTeam.includes('oranje')) {
-    return 'Installation Team Orange';
-  }
-
-  // Default to unnamed
-  return 'unnamed';
+  
+  // Find team that has this external name
+  const matchedTeam = placementTeams.find(team => 
+    team.external_team_names?.includes(normalizedTeam)
+  );
+  
+  return matchedTeam ? matchedTeam.name : 'unnamed';
 };
 
 const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
@@ -334,7 +317,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
       if (teamAssignments && teamAssignments.length > 0) {
         const projectTeam = teamAssignments[0].team;
         if (projectTeam) {
-          const targetCategory = getTeamCategory(projectTeam);
+          const targetCategory = getTeamCategory(projectTeam, teams);
           
           // Find matching team by category name
           const matchedTeam = teams.find(t => t.name === targetCategory);
@@ -361,7 +344,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
   const getProjectPosition = (project: Project, teamName: string, containerWidth: number) => {
   const teamAssignments = project.project_team_assignments || [];
   // Prefer assignment that matches the team row
-  const matchedAssignment = teamAssignments.find((a) => mapTeamToCategory(a.team) === teamName) || teamAssignments[0];
+  const matchedAssignment = teamAssignments.find((a) => mapTeamToCategory(a.team, teams) === teamName) || teamAssignments[0];
   if (!matchedAssignment?.start_date || !matchedAssignment?.duration) return null;
 
   const startDate = parseYMD(matchedAssignment.start_date);
