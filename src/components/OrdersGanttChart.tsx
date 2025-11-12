@@ -594,12 +594,6 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
             </div>
           </div>
 
-          {/* Hidden measurement element to track the exact width of the timeline content (right of team names) */}
-          <div
-            ref={timelineRef}
-            style={{ marginLeft: '16rem', width: 'calc(100% - 16rem)', height: 0, overflow: 'hidden', padding: 0, border: 0 }}
-          />
-
           {/* Team rows */}
           <div className="relative">
             {/* Today indicator */}
