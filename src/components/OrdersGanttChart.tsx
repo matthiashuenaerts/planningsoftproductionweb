@@ -23,6 +23,7 @@ interface Project {
   progress: number;
   project_team_assignments?: Array<{
     team: string;
+    team_id: string | null;
     start_date: string;
     duration: number;
   }>;
@@ -151,18 +152,18 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
 
       if (!projectsError && projectsData) {
         const projectIds = projectsData.map(p => p.id).filter(Boolean);
-        let assignmentsByProject: Record<string, Array<{ team: string; start_date: string; duration: number }>> = {};
+        let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
         if (projectIds.length > 0) {
           const { data: assignments, error: assignError } = await supabase
             .from('project_team_assignments')
-            .select('project_id, team, start_date, duration')
+            .select('project_id, team, team_id, start_date, duration')
             .in('project_id', projectIds as string[]);
           if (!assignError && assignments) {
-            assignmentsByProject = assignments.reduce((acc: Record<string, Array<{ team: string; start_date: string; duration: number }>>, a: any) => {
+            assignmentsByProject = assignments.reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>, a: any) => {
               const pid = a.project_id as string;
-              (acc[pid] = acc[pid] || []).push({ team: a.team, start_date: a.start_date, duration: a.duration });
+              (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
               return acc;
-            }, {} as Record<string, Array<{ team: string; start_date: string; duration: number }>>);
+            }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>);
           }
         }
         const mergedProjects = projectsData.map((p: any) => ({
@@ -214,18 +215,18 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
 
         // Fetch team assignments for all projects and merge locally
         const projectIds = (projectsData || []).map(p => p.id).filter(Boolean);
-        let assignmentsByProject: Record<string, Array<{ team: string; start_date: string; duration: number }>> = {};
+        let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
         if (projectIds.length > 0) {
           const { data: assignments, error: assignError } = await supabase
             .from('project_team_assignments')
-            .select('project_id, team, start_date, duration')
+            .select('project_id, team, team_id, start_date, duration')
             .in('project_id', projectIds as string[]);
           if (assignError) throw assignError;
-          assignmentsByProject = (assignments || []).reduce((acc: Record<string, Array<{ team: string; start_date: string; duration: number }>>, a: any) => {
+          assignmentsByProject = (assignments || []).reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>, a: any) => {
             const pid = a.project_id as string;
-            (acc[pid] = acc[pid] || []).push({ team: a.team, start_date: a.start_date, duration: a.duration });
+            (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
             return acc;
-          }, {} as Record<string, Array<{ team: string; start_date: string; duration: number }>>);
+          }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>);
         }
 
         const mergedProjects = (projectsData || []).map((p: any) => ({
@@ -318,11 +319,15 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
       let targetTeamId = 'unnamed';
       
       if (teamAssignments && teamAssignments.length > 0) {
-        const projectTeam = teamAssignments[0].team;
-        if (projectTeam) {
-          const targetCategory = getTeamCategory(projectTeam, teams);
-          
-          // Find matching team by category name
+        const assignment = teamAssignments[0];
+        // Use team_id directly if available, otherwise fall back to team name matching
+        if (assignment.team_id) {
+          // Verify this team_id exists in our teams list
+          const teamExists = teams.find(t => t.id === assignment.team_id);
+          targetTeamId = teamExists ? assignment.team_id : 'unnamed';
+        } else if (assignment.team) {
+          // Fallback to old team name matching
+          const targetCategory = getTeamCategory(assignment.team, teams);
           const matchedTeam = teams.find(t => t.name === targetCategory);
           targetTeamId = matchedTeam?.id || 'unnamed';
         }
@@ -428,6 +433,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
         .from('project_team_assignments')
         .update({
           team: targetTeam.name,
+          team_id: targetTeam.id,
           start_date: format(targetDate, 'yyyy-MM-dd'),
         })
         .eq('project_id', project.id);
@@ -452,18 +458,18 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
       if (!projectsError && projectsData) {
         // fetch assignments again and merge
         const projectIds = projectsData.map(p => p.id).filter(Boolean);
-        let assignmentsByProject: Record<string, Array<{ team: string; start_date: string; duration: number }>> = {};
+        let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
         if (projectIds.length > 0) {
           const { data: assignments, error: assignError } = await supabase
             .from('project_team_assignments')
-            .select('project_id, team, start_date, duration')
+            .select('project_id, team, team_id, start_date, duration')
             .in('project_id', projectIds as string[]);
           if (!assignError && assignments) {
-            assignmentsByProject = assignments.reduce((acc: Record<string, Array<{ team: string; start_date: string; duration: number }>>, a: any) => {
+            assignmentsByProject = assignments.reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>, a: any) => {
               const pid = a.project_id as string;
-              (acc[pid] = acc[pid] || []).push({ team: a.team, start_date: a.start_date, duration: a.duration });
+              (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
               return acc;
-            }, {} as Record<string, Array<{ team: string; start_date: string; duration: number }>>);
+            }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>);
           }
         }
         const mergedProjects = projectsData.map((p: any) => ({
