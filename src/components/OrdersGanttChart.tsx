@@ -41,11 +41,14 @@ const parseYMD = (s: string) => {
 
 // Dynamic team mapping using database
 const mapTeamToCategory = (teamName: string, placementTeams: any[]): string => {
-  const normalizedTeam = teamName.trim();
+  const normalizedTeam = teamName.trim().toLowerCase();
   
-  // Find team that has this external name
+  // Find team that has this external name (case-insensitive matching)
   const matchedTeam = placementTeams.find(team => 
-    team.external_team_names?.includes(normalizedTeam)
+    team.external_team_names?.some((externalName: string) => 
+      externalName.toLowerCase() === normalizedTeam || 
+      normalizedTeam.includes(externalName.toLowerCase())
+    )
   );
   
   return matchedTeam ? matchedTeam.name : 'unnamed';
