@@ -216,8 +216,24 @@ let planningTeams: string[] = [];
                   const p = orderData.order.planning[0];
                   planningStartRaw = p.datum_start || p.start_date || null;
                   planningEndRaw = p.datum_einde || p.end_date || null;
-                  planningTeams = Array.isArray(p.teams) ? p.teams : [];
-                  console.log(`Found planning: start=${planningStartRaw}, end=${planningEndRaw}, teams=${JSON.stringify(planningTeams)}`);
+                  
+                  // Extract teams - handle different possible formats
+                  if (p.teams) {
+                    if (Array.isArray(p.teams)) {
+                      planningTeams = p.teams;
+                    } else if (typeof p.teams === 'string') {
+                      planningTeams = [p.teams];
+                    } else if (typeof p.teams === 'object') {
+                      // If teams is an object, try to extract string values
+                      planningTeams = Object.values(p.teams).filter(v => typeof v === 'string') as string[];
+                    }
+                  }
+                  
+                  console.log(`Found planning for project ${project.name}:`);
+                  console.log(`  - start=${planningStartRaw}`);
+                  console.log(`  - end=${planningEndRaw}`);
+                  console.log(`  - teams raw=${JSON.stringify(p.teams)}`);
+                  console.log(`  - teams extracted=${JSON.stringify(planningTeams)}`);
                 }
               }
             } catch (parseErr) {
@@ -290,21 +306,52 @@ if (planningStartRaw || rawPlacementDate) {
             try {
               if (startFromPlanning && endFromPlanning) {
                 const durationDays = daysBetweenInclusive(startFromPlanning, endFromPlanning);
-                const externalTeamName = (planningTeams && planningTeams.length > 0) ? planningTeams[0] : 'INSTALLATION TEAM';
                 
-                // Map external team name to team_id
-                const normalizedExternal = externalTeamName.trim().toLowerCase();
-                const matchedTeam = placementTeams?.find(team => 
-                  team.external_team_names?.some((extName: string) => 
-                    extName.toLowerCase() === normalizedExternal || 
-                    normalizedExternal.includes(extName.toLowerCase())
-                  )
-                );
+                // Try to match the external team name against placement_teams
+                let matchedTeam = null;
+                let externalTeamName = 'unnamed';
+                
+                // Loop through all team names from planning and find the first match
+                if (planningTeams && planningTeams.length > 0) {
+                  for (const teamText of planningTeams) {
+                    if (!teamText || typeof teamText !== 'string') continue;
+                    
+                    const normalizedTeamText = teamText.trim().toLowerCase();
+                    console.log(`Checking team text: "${teamText}" (normalized: "${normalizedTeamText}")`);
+                    
+                    // Search for this team text in placement_teams.external_team_names
+                    matchedTeam = placementTeams?.find(team => {
+                      if (!team.external_team_names || !Array.isArray(team.external_team_names)) {
+                        return false;
+                      }
+                      
+                      return team.external_team_names.some((extName: string) => {
+                        const normalizedExtName = extName.trim().toLowerCase();
+                        const matches = normalizedExtName === normalizedTeamText || 
+                                      normalizedTeamText.includes(normalizedExtName) ||
+                                      normalizedExtName.includes(normalizedTeamText);
+                        
+                        if (matches) {
+                          console.log(`  ✓ Matched with external_team_name: "${extName}" in team "${team.name}"`);
+                        }
+                        return matches;
+                      });
+                    });
+                    
+                    if (matchedTeam) {
+                      externalTeamName = teamText;
+                      break;
+                    }
+                  }
+                }
                 
                 const teamId = matchedTeam ? matchedTeam.id : null;
                 const teamName = matchedTeam ? matchedTeam.name : externalTeamName;
                 
-                console.log(`Mapping external team "${externalTeamName}" to team_id: ${teamId} (${teamName})`);
+                console.log(`Final mapping for project ${project.name}:`);
+                console.log(`  - External team text: "${externalTeamName}"`);
+                console.log(`  - Matched team_id: ${teamId}`);
+                console.log(`  - Matched team name: ${teamName}`);
                 
                 const payload = {
                   project_id: project.id,
