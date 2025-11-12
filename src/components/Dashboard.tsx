@@ -485,6 +485,15 @@ const Dashboard: React.FC = () => {
       const weekEnd = addDays(weekStart, 6);
       const holidaysList = holidaysData || holidays;
 
+      // Fetch placement teams for color lookup
+      const { data: placementTeamsData, error: teamsError } = await supabase
+        .from('placement_teams')
+        .select('id, name, color')
+        .eq('is_active', true);
+      
+      if (teamsError) throw teamsError;
+      const placementTeamsMap = new Map((placementTeamsData || []).map(team => [team.id, team.color]));
+
       // Fetch projects for this week range
       const {
         data: projectsData,
@@ -530,6 +539,7 @@ const Dashboard: React.FC = () => {
             projectId,
             assignments: [{
               team: override.team_id,
+              team_id: override.team_id,
               start_date: override.start_date,
               duration: 0 // Not used in this context
             }]
@@ -563,16 +573,18 @@ const Dashboard: React.FC = () => {
           const allOrdersDelivered = projectOrders.length > 0 && projectOrders.every(o => o.status === 'delivered');
           const allOrdersCharged = projectOrders.length > 0 && projectOrders.every(o => o.status === 'charged');
 
-        // Get team color
+        // Get team color using team_id
         const teamAssignment = teamAssignments.find(ta => ta.projectId === assignment.project.id);
         let teamColor = '';
         if (teamAssignment?.assignments && teamAssignment.assignments.length > 0) {
-          // Look for any team assignment that contains color keywords
+          // Use team_id to look up color from placement_teams
           for (const team of teamAssignment.assignments) {
-            const color = getTeamColorFromName(team.team);
-            if (color) {
-              teamColor = color;
-              break;
+            if (team.team_id) {
+              const color = placementTeamsMap.get(team.team_id);
+              if (color) {
+                teamColor = color;
+                break;
+              }
             }
           }
         }
