@@ -125,6 +125,18 @@ serve(async (req) => {
 
     console.log(`Found ${projects?.length || 0} projects with project_link_id`);
 
+    // Fetch all placement teams for mapping external team names to team IDs
+    const { data: placementTeams, error: teamsError } = await supabase
+      .from('placement_teams')
+      .select('id, name, external_team_names');
+
+    if (teamsError) {
+      console.error('Failed to fetch placement teams:', teamsError);
+      throw new Error(`Failed to fetch placement teams: ${teamsError.message}`);
+    }
+
+    console.log(`Found ${placementTeams?.length || 0} placement teams`);
+
     let syncedCount = 0;
     let errorCount = 0;
     const syncDetails: any[] = [];
@@ -278,9 +290,25 @@ if (planningStartRaw || rawPlacementDate) {
             try {
               if (startFromPlanning && endFromPlanning) {
                 const durationDays = daysBetweenInclusive(startFromPlanning, endFromPlanning);
-                const teamName = (planningTeams && planningTeams.length > 0) ? planningTeams[0] : 'INSTALLATION TEAM';
+                const externalTeamName = (planningTeams && planningTeams.length > 0) ? planningTeams[0] : 'INSTALLATION TEAM';
+                
+                // Map external team name to team_id
+                const normalizedExternal = externalTeamName.trim().toLowerCase();
+                const matchedTeam = placementTeams?.find(team => 
+                  team.external_team_names?.some((extName: string) => 
+                    extName.toLowerCase() === normalizedExternal || 
+                    normalizedExternal.includes(extName.toLowerCase())
+                  )
+                );
+                
+                const teamId = matchedTeam ? matchedTeam.id : null;
+                const teamName = matchedTeam ? matchedTeam.name : externalTeamName;
+                
+                console.log(`Mapping external team "${externalTeamName}" to team_id: ${teamId} (${teamName})`);
+                
                 const payload = {
                   project_id: project.id,
+                  team_id: teamId,
                   team: teamName,
                   start_date: startFromPlanning,
                   duration: durationDays,
@@ -292,7 +320,7 @@ if (planningStartRaw || rawPlacementDate) {
                 if (upsertPtaError) {
                   console.warn(`Failed to upsert team assignment for project ${project.name}: ${upsertPtaError.message}`);
                 } else {
-                  console.log(`Upserted team assignment for project ${project.name} (team: ${teamName}, start: ${startFromPlanning}, duration: ${durationDays})`);
+                  console.log(`Upserted team assignment for project ${project.name} (team_id: ${teamId}, team: ${teamName}, start: ${startFromPlanning}, duration: ${durationDays})`);
                   // After PTA upsert, ensure installation_date remains the START date
                   try {
                     const normalizedStart = startFromPlanning ? new Date(startFromPlanning).toISOString().slice(0, 10) : null;

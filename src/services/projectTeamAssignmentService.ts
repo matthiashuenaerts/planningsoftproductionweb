@@ -5,6 +5,7 @@ export interface ProjectTeamAssignment {
   id: string;
   project_id: string;
   team: string;
+  team_id?: string;
   start_date: string;
   duration: number;
   created_at: string;

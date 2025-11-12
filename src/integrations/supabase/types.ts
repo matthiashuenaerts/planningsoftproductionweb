@@ -1701,6 +1701,7 @@ export type Database = {
           project_id: string
           start_date: string
           team: string
+          team_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1710,6 +1711,7 @@ export type Database = {
           project_id: string
           start_date: string
           team: string
+          team_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1719,6 +1721,7 @@ export type Database = {
           project_id?: string
           start_date?: string
           team?: string
+          team_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1727,6 +1730,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: true
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_team_assignments_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "placement_teams"
             referencedColumns: ["id"]
           },
         ]
