@@ -87,6 +87,19 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
   const [containerWidth, setContainerWidth] = useState(0);
   const timelineRef = useRef<HTMLDivElement>(null);
 
+  // Observe the width of the timeline content area (right of team column)
+  useLayoutEffect(() => {
+    const el = timelineRef.current;
+    if (!el) return;
+
+    const update = () => setContainerWidth(el.clientWidth || 0);
+    update();
+
+    const ro = new ResizeObserver(() => update());
+    ro.observe(el);
+
+    return () => ro.disconnect();
+  }, []);
 
   
   const handleResizeStart = (e: React.MouseEvent, project: Project, teamId: string, edge: 'left' | 'right') => {
@@ -113,9 +126,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     const { project, edge, originalStartDate, originalDuration, startX } = resizingProject;
     
     // Calculate days moved based on pixel movement
-    const container = e.currentTarget as HTMLElement;
-    const rect = container.getBoundingClientRect();
-    const dayWidth = (rect.width - 256) / dateRange.length;
+    const dayWidth = containerWidth / dateRange.length;
     const pixelsMoved = e.clientX - startX;
     const daysMoved = Math.round(pixelsMoved / dayWidth);
     
@@ -595,6 +606,12 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
             </div>
           </div>
 
+          {/* Hidden measurement element to track the exact width of the timeline content (right of team names) */}
+          <div
+            ref={timelineRef}
+            style={{ marginLeft: '16rem', width: 'calc(100% - 16rem)', height: 0, overflow: 'hidden', padding: 0, border: 0 }}
+          />
+
           {/* Team rows */}
           <div className="relative">
             {/* Today indicator */}
@@ -678,9 +695,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                       {/* Project bars - positioned in calendar grid only */}
                       <div className="relative z-10 py-2" style={{ marginLeft: '16rem', width: 'calc(100% - 16rem)' }}>
                           {teamProjects.map((project, idx) => {
-                            // Use container width once
-                            const ganttContainerWidth = window.innerWidth - 1040; // team column width
-
+                            const ganttContainerWidth = containerWidth;
                             const position = getProjectPosition(project, team.name, ganttContainerWidth);
                             if (!position) return null;
 
