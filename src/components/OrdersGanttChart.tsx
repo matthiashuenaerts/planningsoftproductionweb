@@ -84,24 +84,6 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     originalDuration: number;
     startX: number;
   } | null>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const timelineRef = useRef<HTMLDivElement>(null);
-
-  // Observe the width of the timeline content area (right of team column)
-  useLayoutEffect(() => {
-    const el = timelineRef.current;
-    if (!el) return;
-
-    const update = () => setContainerWidth(el.clientWidth || 0);
-    update();
-
-    const ro = new ResizeObserver(() => update());
-    ro.observe(el);
-
-    return () => ro.disconnect();
-  }, []);
-
-  
   const handleResizeStart = (e: React.MouseEvent, project: Project, teamId: string, edge: 'left' | 'right') => {
     e.stopPropagation();
     e.preventDefault();
@@ -125,8 +107,15 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
 
     const { project, edge, originalStartDate, originalDuration, startX } = resizingProject;
     
-    // Calculate days moved based on pixel movement
-    const dayWidth = containerWidth / dateRange.length;
+    // Calculate days moved based on pixel movement using the actual Gantt container width
+    const containerEl = e.currentTarget as HTMLElement;
+    const ganttEl = containerEl.querySelector('[data-gantt-container]') as HTMLElement | null;
+    const timelineWidth = ganttEl?.clientWidth || 0;
+    if (!timelineWidth) {
+      setResizingProject(null);
+      return;
+    }
+    const dayWidth = timelineWidth / dateRange.length;
     const pixelsMoved = e.clientX - startX;
     const daysMoved = Math.round(pixelsMoved / dayWidth);
     
@@ -368,40 +357,39 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     return grouped;
   }, [projects, teams, dateRange]);
 
-  // Calculate project bar position in pixels, ensuring same width for same duration
-  const getProjectPosition = (project: Project, teamName: string, containerWidth: number) => {
-  const teamAssignments = project.project_team_assignments || [];
-  // Prefer assignment that matches the team row
-  const matchedAssignment = teamAssignments.find((a) => mapTeamToCategory(a.team) === teamName) || teamAssignments[0];
-  if (!matchedAssignment?.start_date || !matchedAssignment?.duration) return null;
+  // Calculate project bar position using percentages for perfect responsiveness
+  const getProjectPosition = (project: Project, teamName: string) => {
+    const teamAssignments = project.project_team_assignments || [];
+    // Prefer assignment that matches the team row
+    const matchedAssignment = teamAssignments.find((a) => mapTeamToCategory(a.team) === teamName) || teamAssignments[0];
+    if (!matchedAssignment?.start_date || !matchedAssignment?.duration) return null;
 
-  const startDate = parseYMD(matchedAssignment.start_date);
-  const duration = Math.max(1, matchedAssignment.duration);
+    const startDate = parseYMD(matchedAssignment.start_date);
+    const duration = Math.max(1, matchedAssignment.duration);
 
-  const dayWidthPx = containerWidth / dateRange.length;
+    // Calculate absolute start index relative to dateRange
+    const startDayIndex = differenceInDays(startDate, dateRange[0]);
+    const endDayIndex = startDayIndex + duration - 1;
 
-  // Calculate absolute start index relative to dateRange
-  const startDayIndex = differenceInDays(startDate, dateRange[0]);
-  const endDayIndex = startDayIndex + duration - 1;
+    // Clip to visible range
+    const firstIndex = 0;
+    const lastIndex = dateRange.length - 1;
+    const visibleStartIndex = Math.max(firstIndex, startDayIndex);
+    const visibleEndIndex = Math.min(lastIndex, endDayIndex);
+    const visibleDuration = Math.max(0, visibleEndIndex - visibleStartIndex + 1);
 
-  // Position in pixels (allow negative for clipping)
-  const leftPx = startDayIndex * dayWidthPx;
-  const widthPx = duration * dayWidthPx;
+    const leftPercent = (visibleStartIndex / dateRange.length) * 100;
+    const widthPercent = (visibleDuration / dateRange.length) * 100;
 
-  // Clip left and right if outside visible range
-  const visibleLeftPx = Math.max(0, leftPx);
-  const visibleRightPx = Math.min(containerWidth, leftPx + widthPx);
-  const visibleWidthPx = Math.max(0, visibleRightPx - visibleLeftPx);
-
-  return {
-    left: visibleLeftPx,
-    width: visibleWidthPx,
-    startIndex: startDayIndex,
-    endIndex: endDayIndex,
-    durationDays: duration,
-    assignment: matchedAssignment,
+    return {
+      leftPercent,
+      widthPercent,
+      startIndex: startDayIndex,
+      endIndex: endDayIndex,
+      durationDays: duration,
+      assignment: matchedAssignment,
+    };
   };
-};
 
 
   // Toggle team collapse
@@ -693,25 +681,23 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                       )}
 
                       {/* Project bars - positioned in calendar grid only */}
-                      <div className="relative z-10 py-2" style={{ marginLeft: '16rem', width: 'calc(100% - 16rem)' }}>
+                      <div className="relative z-10 py-2" data-gantt-container style={{ marginLeft: '16rem', width: 'calc(100% - 16rem)' }}>
                           {teamProjects.map((project, idx) => {
-                            const ganttContainerWidth = containerWidth;
-                            const position = getProjectPosition(project, team.name, ganttContainerWidth);
+                            const position = getProjectPosition(project, team.name);
                             if (!position) return null;
 
                             const teamAssignment = position.assignment;
                             const projectLabel = `${project.name} - ${project.progress || 0}%`;
 
-                            // Check if label fits inside bar
-                            const labelWidthPx = projectLabel.length * 7;
-                            const labelFitsInside = position.width > labelWidthPx + 16;
+                            // Simple label strategy: always inside; it will truncate if too small
+                            const labelFitsInside = true;
 
                             return (
                               <div
                                 key={project.id}
                                 className="absolute flex items-center gap-1"
                                 style={{
-                                  left: `${position.left}px`,        // add 'px'
+                                  left: `${position.leftPercent}%`,
                                   top: `${8 + idx * 32}px`,
                                   height: '28px',
                                 }}
@@ -720,7 +706,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                               <div
                                 className="relative h-7 bg-destructive hover:bg-destructive/90 transition-colors rounded flex items-center overflow-hidden shadow-sm group"
                                 style={{
-                                  width: position.width,
+                                  width: `${position.widthPercent}%`,
                                   
                                 }}
                                 title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
