@@ -350,6 +350,22 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     return grouped;
   }, [projects, teams, dateRange]);
 
+  // Measure timeline container width
+  useLayoutEffect(() => {
+    const update = () => {
+      const el = timelineRef.current;
+      if (el) {
+        const total = el.getBoundingClientRect().width;
+        setContainerWidth(Math.max(0, total - 256));
+      } else {
+        setContainerWidth(Math.max(0, window.innerWidth - 1040));
+      }
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
   // Calculate project bar position in pixels, aligned to calendar grid
   const getProjectPosition = (project: Project, teamName: string) => {
     const teamAssignments = project.project_team_assignments || [];
@@ -360,24 +376,22 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     const startDate = parseYMD(matchedAssignment.start_date);
     const duration = Math.max(1, matchedAssignment.duration);
 
-    // Calculate position as percentage of the calendar grid
-    const totalDays = dateRange.length;
-    
+    // Calculate pixel widths
+    const gridCellWidthPx = containerWidth / dateRange.length; // width of one day column in pixels
+    const barWidthPx = gridCellWidthPx * duration; // bar width = cell width × duration
+
     // Calculate start position relative to first day in dateRange
     const startDayIndex = differenceInDays(startDate, dateRange[0]);
-    
-    // Calculate positions as percentages for accurate alignment
-    const leftPercent = (startDayIndex / totalDays) * 100;
-    const widthPercent = (duration / totalDays) * 100;
+    const leftPx = startDayIndex * gridCellWidthPx;
 
-    // Clip to visible range
-    const visibleLeftPercent = Math.max(0, leftPercent);
-    const visibleRightPercent = Math.min(100, leftPercent + widthPercent);
-    const visibleWidthPercent = Math.max(0, visibleRightPercent - visibleLeftPercent);
+    // Clip to visible range [0, containerWidth]
+    const visibleLeftPx = Math.max(0, leftPx);
+    const visibleRightPx = Math.min(containerWidth, leftPx + barWidthPx);
+    const visibleWidthPx = Math.max(0, visibleRightPx - visibleLeftPx);
 
     return {
-      left: visibleLeftPercent,
-      width: visibleWidthPercent,
+      left: visibleLeftPx,
+      width: visibleWidthPx,
       startIndex: startDayIndex,
       durationDays: duration,
       assignment: matchedAssignment,
@@ -687,62 +701,63 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                             }
 
                             // Estimate if label fits inside bar (approximate)
-                            const labelFitsInside = position.width > 8; // If bar is more than 8% of calendar width
+                            const labelFitsInside = position.width > 80; // If bar is more than 80px
 
                             return (
                               <div
                                 key={project.id}
                                 className="absolute flex items-center gap-1"
-                                style={{
-                                  left: `${position.left}%`,
-                                  top: `${8 + idx * 32}px`,
-                                  height: '28px',
-                                }}
+                                  style={{
+                                    left: `${position.left}px`,
+                                    top: `${8 + idx * 32}px`,
+                                    height: '28px',
+                                  }}
+
                               >
-                              {/* Project bar */}
-                              <div
-                                className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto"
-                                style={{
-                                  width: `${position.width}%`,
-                                  backgroundColor: teamColor,
-                                }}
-                                title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
-                              >
-                                {/* Left resize handle */}
+                                {/* Project bar */}
                                 <div
-                                  className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onMouseDown={(e) => handleResizeStart(e, project, team.id, 'left')}
-                                />
-                                
-                                {/* Draggable center area */}
-                                <div
-                                  draggable
-                                  onDragStart={() => handleDragStart(project, team.id)}
-                                  className="flex-1 flex items-center cursor-move px-2"
+                                  className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto"
+                                  style={{
+                                    width: `${position.width}px`,
+                                    backgroundColor: teamColor,
+                                  }}
+                                  title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
                                 >
-                                  {labelFitsInside && (
-                                    <span className="text-xs font-medium text-white truncate">
-                                      {projectLabel}
-                                    </span>
-                                  )}
+                                  {/* Left resize handle */}
+                                  <div
+                                    className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onMouseDown={(e) => handleResizeStart(e, project, team.id, 'left')}
+                                  />
+                                  
+                                  {/* Draggable center area */}
+                                  <div
+                                    draggable
+                                    onDragStart={() => handleDragStart(project, team.id)}
+                                    className="flex-1 flex items-center cursor-move px-2"
+                                  >
+                                    {labelFitsInside && (
+                                      <span className="text-xs font-medium text-white truncate">
+                                        {projectLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Right resize handle */}
+                                  <div
+                                    className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onMouseDown={(e) => handleResizeStart(e, project, team.id, 'right')}
+                                  />
                                 </div>
                                 
-                                {/* Right resize handle */}
-                                <div
-                                  className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onMouseDown={(e) => handleResizeStart(e, project, team.id, 'right')}
-                                />
+                                {/* Label to the right of bar if doesn't fit inside */}
+                                {!labelFitsInside && (
+                                  <div className="bg-muted px-2 py-1 rounded text-xs font-medium text-muted-foreground whitespace-nowrap shadow-sm">
+                                    {projectLabel}
+                                  </div>
+                                )}
                               </div>
-                              
-                              {/* Label to the right of bar if doesn't fit inside */}
-                              {!labelFitsInside && (
-                                <div className="bg-muted px-2 py-1 rounded text-xs font-medium text-muted-foreground whitespace-nowrap shadow-sm">
-                                  {projectLabel}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
                       </div>
                     </div>
                   )}
