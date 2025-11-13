@@ -55,7 +55,7 @@ const mapTeamToCategory = (teamName: string, placementTeams: any[]): string => {
   return matchedTeam ? matchedTeam.name : 'unnamed';
 };
 
-const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
+const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React.ReactNode => {
   const [teams, setTeams] = useState<PlacementTeam[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
@@ -63,14 +63,23 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
   const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [draggedProject, setDraggedProject] = useState<{ project: Project; teamId: string } | null>(null);
-  const [resizingProject, setResizingProject] = useState<{ 
-    project: Project; 
-    teamId: string; 
+  const [resizingProject, setResizingProject] = useState<{
+    project: Project;
+    teamId: string;
     edge: 'left' | 'right';
     originalStartDate: Date;
     originalDuration: number;
     startX: number;
   } | null>(null);
+  const [draggingProject, setDraggingProject] = useState<{
+    project: Project;
+    teamId: string;
+    initialX: number;
+    initialLeft: number;
+    dayWidth: number;
+  } | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [resizeDelta, setResizeDelta] = useState({ left: 0, right: 0 });
   const [containerWidth, setContainerWidth] = useState(0);
   const timelineRef = useRef<HTMLDivElement>(null);
 
@@ -95,91 +104,198 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
   };
 
   const handleMouseUp = async (e: React.MouseEvent) => {
-    if (!resizingProject) return;
+    if (resizingProject) {
+      const { project, edge, originalStartDate, originalDuration, startX } = resizingProject;
 
-    const { project, edge, originalStartDate, originalDuration, startX } = resizingProject;
-    
-    // Calculate days moved based on pixel movement
-    const container = e.currentTarget as HTMLElement;
-    const rect = container.getBoundingClientRect();
-    // Calendar grid is the full width minus the 16rem (256px) team name column
-    const calendarGridWidth = rect.width - 256;
-    const dayWidth = calendarGridWidth / dateRange.length;
-    const pixelsMoved = e.clientX - startX;
-    const daysMoved = Math.round(pixelsMoved / dayWidth);
-    
-    if (daysMoved === 0) {
+      // Calculate days moved based on pixel movement
+      const container = e.currentTarget as HTMLElement;
+      const rect = container.getBoundingClientRect();
+      // Calendar grid is the full width minus the 16rem (256px) team name column
+      const calendarGridWidth = rect.width - 256;
+      const dayWidth = calendarGridWidth / dateRange.length;
+      const pixelsMoved = e.clientX - startX;
+      const daysMoved = Math.round(pixelsMoved / dayWidth);
+
+      if (daysMoved === 0) {
+        setResizingProject(null);
+        setResizeDelta({ left: 0, right: 0 });
+        return;
+      }
+
+      let newStartDate: Date;
+      let newDuration: number;
+
+      if (edge === 'left') {
+        // Resizing from left - adjust start date and duration
+        newStartDate = addDays(originalStartDate, daysMoved);
+        newDuration = Math.max(1, originalDuration - daysMoved);
+      } else {
+        // Resizing from right - keep start date, adjust duration
+        newStartDate = originalStartDate;
+        newDuration = Math.max(1, originalDuration + daysMoved);
+      }
+
+      try {
+        const { error } = await supabase
+          .from('project_team_assignments')
+          .update({
+            start_date: format(newStartDate, 'yyyy-MM-dd'),
+            duration: newDuration,
+          })
+          .eq('project_id', project.id);
+
+        if (error) throw error;
+
+        toast.success('Project duration updated');
+
+        // Optimistically update local state
+        setProjects(prevProjects =>
+          prevProjects.map(p =>
+            p.id === project.id
+              ? {
+                  ...p,
+                  project_team_assignments: p.project_team_assignments?.map((assignment, idx) =>
+                    idx === 0
+                      ? { ...assignment, start_date: format(newStartDate, 'yyyy-MM-dd'), duration: newDuration }
+                      : assignment
+                  ) || []
+                }
+              : p
+          )
+        );
+
+        // Refresh data in background
+        const { data: projectsData, error: projectsError } = await supabase
+          .from('projects')
+          .select(`
+            id,
+            name,
+            client,
+            installation_date,
+            progress
+          `)
+          .not('installation_date', 'is', null)
+          .order('installation_date');
+
+        if (!projectsError && projectsData) {
+          const projectIds = projectsData.map(p => p.id).filter(Boolean);
+          let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
+          if (projectIds.length > 0) {
+            const { data: assignments, error: assignError } = await supabase
+              .from('project_team_assignments')
+              .select('project_id, team, team_id, start_date, duration')
+              .in('project_id', projectIds as string[]);
+            if (!assignError && assignments) {
+              assignmentsByProject = assignments.reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>, a: any) => {
+                const pid = a.project_id as string;
+                (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
+                return acc;
+              }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>);
+            }
+          }
+          const mergedProjects = projectsData.map((p: any) => ({
+            ...p,
+            project_team_assignments: assignmentsByProject[p.id] || [],
+          }));
+          setProjects(mergedProjects);
+        }
+      } catch (error) {
+        console.error('Error updating project duration:', error);
+        toast.error('Failed to update project duration');
+        // Reset deltas on error
+        setResizeDelta({ left: 0, right: 0 });
+      }
+
       setResizingProject(null);
-      return;
+      setResizeDelta({ left: 0, right: 0 });
     }
 
-    let newStartDate: Date;
-    let newDuration: number;
+    if (draggingProject) {
+      const { project, teamId, initialLeft, dayWidth } = draggingProject;
+      const daysMoved = Math.round(dragOffset / dayWidth);
 
-    if (edge === 'left') {
-      // Resizing from left - adjust start date and duration
-      newStartDate = addDays(originalStartDate, daysMoved);
-      newDuration = Math.max(1, originalDuration - daysMoved);
-    } else {
-      // Resizing from right - keep start date, adjust duration
-      newStartDate = originalStartDate;
-      newDuration = Math.max(1, originalDuration + daysMoved);
-    }
+      if (daysMoved !== 0) {
+        const teamAssignments = project.project_team_assignments;
+        const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
 
-    try {
-      const { error } = await supabase
-        .from('project_team_assignments')
-        .update({
-          start_date: format(newStartDate, 'yyyy-MM-dd'),
-          duration: newDuration,
-        })
-        .eq('project_id', project.id);
+        if (assignment) {
+          const newStartDate = addDays(parseYMD(assignment.start_date), daysMoved);
 
-      if (error) throw error;
+          try {
+            const { error } = await supabase
+              .from('project_team_assignments')
+              .update({
+                start_date: format(newStartDate, 'yyyy-MM-dd'),
+              })
+              .eq('project_id', project.id);
 
-      toast.success('Project duration updated');
-      
-      // Refresh data
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select(`
-          id,
-          name,
-          client,
-          installation_date,
-          progress
-        `)
-        .not('installation_date', 'is', null)
-        .order('installation_date');
+            if (error) throw error;
 
-      if (!projectsError && projectsData) {
-        const projectIds = projectsData.map(p => p.id).filter(Boolean);
-        let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
-        if (projectIds.length > 0) {
-          const { data: assignments, error: assignError } = await supabase
-            .from('project_team_assignments')
-            .select('project_id, team, team_id, start_date, duration')
-            .in('project_id', projectIds as string[]);
-          if (!assignError && assignments) {
-            assignmentsByProject = assignments.reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>, a: any) => {
-              const pid = a.project_id as string;
-              (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
-              return acc;
-            }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>);
+            toast.success('Project moved successfully');
+
+            // Optimistically update local state
+            setProjects(prevProjects =>
+              prevProjects.map(p =>
+                p.id === project.id
+                  ? {
+                      ...p,
+                      project_team_assignments: p.project_team_assignments?.map((assignment, idx) =>
+                        idx === 0
+                          ? { ...assignment, start_date: format(newStartDate, 'yyyy-MM-dd') }
+                          : assignment
+                      ) || []
+                    }
+                  : p
+              )
+            );
+
+            // Refresh data in background
+            const { data: projectsData, error: projectsError } = await supabase
+              .from('projects')
+              .select(`
+                id,
+                name,
+                client,
+                installation_date,
+                progress
+              `)
+              .not('installation_date', 'is', null)
+              .order('installation_date');
+
+            if (!projectsError && projectsData) {
+              const projectIds = projectsData.map(p => p.id).filter(Boolean);
+              let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
+              if (projectIds.length > 0) {
+                const { data: assignments, error: assignError } = await supabase
+                  .from('project_team_assignments')
+                  .select('project_id, team, team_id, start_date, duration')
+                  .in('project_id', projectIds as string[]);
+                if (!assignError && assignments) {
+                  assignmentsByProject = assignments.reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>, a: any) => {
+                    const pid = a.project_id as string;
+                    (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
+                    return acc;
+                  }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>);
+                }
+              }
+              const mergedProjects = projectsData.map((p: any) => ({
+                ...p,
+                project_team_assignments: assignmentsByProject[p.id] || [],
+              }));
+              setProjects(mergedProjects);
+            }
+          } catch (error) {
+            console.error('Error updating project position:', error);
+            toast.error('Failed to move project');
+            // Reset offset on error
+            setDragOffset(0);
           }
         }
-        const mergedProjects = projectsData.map((p: any) => ({
-          ...p,
-          project_team_assignments: assignmentsByProject[p.id] || [],
-        }));
-        setProjects(mergedProjects);
       }
-    } catch (error) {
-      console.error('Error updating project duration:', error);
-      toast.error('Failed to update project duration');
-    }
 
-    setResizingProject(null);
+      setDraggingProject(null);
+      setDragOffset(0);
+    }
   };
   useEffect(() => {
     const fetchData = async () => {
@@ -417,6 +533,48 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
     setDraggedProject({ project, teamId });
   };
 
+  const handleMouseDown = (e: React.MouseEvent, project: Project, teamId: string) => {
+    e.preventDefault();
+    const container = e.currentTarget.closest('[data-timeline]') as HTMLElement;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const calendarGridWidth = rect.width - 256;
+    const dayWidth = calendarGridWidth / dateRange.length;
+
+    setDraggingProject({
+      project,
+      teamId,
+      initialX: e.clientX,
+      initialLeft: 0, // Will be calculated in render
+      dayWidth,
+    });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (draggingProject) {
+      const deltaX = e.clientX - draggingProject.initialX;
+      const daysMoved = Math.round(deltaX / draggingProject.dayWidth);
+      setDragOffset(daysMoved * draggingProject.dayWidth);
+    }
+
+    if (resizingProject) {
+      const { edge, startX } = resizingProject;
+      const container = e.currentTarget as HTMLElement;
+      const rect = container.getBoundingClientRect();
+      const calendarGridWidth = rect.width - 256;
+      const dayWidth = calendarGridWidth / dateRange.length;
+      const pixelsMoved = e.clientX - startX;
+      const daysMoved = Math.round(pixelsMoved / dayWidth);
+
+      if (edge === 'left') {
+        setResizeDelta({ left: daysMoved * dayWidth, right: 0 });
+      } else {
+        setResizeDelta({ left: 0, right: daysMoved * dayWidth });
+      }
+    }
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
@@ -645,11 +803,13 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
 
                   {/* Team projects */}
                   {!isCollapsed && (
-                    <div 
-                      className="relative" 
+                    <div
+                      className="relative"
                       style={{ minHeight: teamProjects.length > 0 ? `${teamProjects.length * 36 + 16}px` : '80px' }}
                       onDragOver={handleDragOver}
                       onMouseUp={handleMouseUp}
+                      onMouseMove={handleMouseMove}
+                      data-timeline
                     >
                       <div className="flex absolute inset-0">
                         <div className="w-64 flex-shrink-0 border-r border-border bg-muted/30" />
@@ -690,7 +850,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
 
                             const teamAssignment = position.assignment;
                             const projectLabel = `${project.name} - ${project.progress || 0}%`;
-                            
+
                             // Get team color from placement_teams using team_id
                             let teamColor = team.color || '#ef4444'; // Default to red if no color
                             if (teamAssignment?.team_id) {
@@ -703,23 +863,33 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                             // Estimate if label fits inside bar (approximate)
                             const labelFitsInside = position.width > 80; // If bar is more than 80px
 
+                            // Calculate drag offset for this project
+                            const isDraggingThisProject = draggingProject?.project.id === project.id;
+                            const dragLeftOffset = isDraggingThisProject ? dragOffset : 0;
+
+                            // Calculate resize delta for this project
+                            const isResizingThisProject = resizingProject?.project.id === project.id;
+                            const resizeLeftOffset = isResizingThisProject ? resizeDelta.left : 0;
+                            const resizeWidthOffset = isResizingThisProject ? (resizeDelta.left + resizeDelta.right) : 0;
+
                             return (
                               <div
                                 key={project.id}
                                 className="absolute flex items-center gap-1"
-                                  style={{
-                                    left: `${position.left}px`,
-                                    top: `${8 + idx * 32}px`,
-                                    height: '28px',
-                                  }}
+                                style={{
+                                  left: `${position.left + dragLeftOffset + resizeLeftOffset}px`,
+                                  top: `${8 + idx * 32}px`,
+                                  height: '28px',
+                                }}
 
                               >
                                 {/* Project bar */}
                                 <div
                                   className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto"
                                   style={{
-                                    width: `${position.width}px`,
+                                    width: `${position.width + resizeWidthOffset}px`,
                                     backgroundColor: teamColor,
+                                    opacity: isDraggingThisProject ? 0.8 : 1,
                                   }}
                                   title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
                                 >
@@ -728,11 +898,12 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                                     className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"
                                     onMouseDown={(e) => handleResizeStart(e, project, team.id, 'left')}
                                   />
-                                  
+
                                   {/* Draggable center area */}
                                   <div
                                     draggable
                                     onDragStart={() => handleDragStart(project, team.id)}
+                                    onMouseDown={(e) => handleMouseDown(e, project, team.id)}
                                     className="flex-1 flex items-center cursor-move px-2"
                                   >
                                     {labelFitsInside && (
@@ -741,14 +912,14 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                                       </span>
                                     )}
                                   </div>
-                                  
+
                                   {/* Right resize handle */}
                                   <div
                                     className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"
                                     onMouseDown={(e) => handleResizeStart(e, project, team.id, 'right')}
                                   />
                                 </div>
-                                
+
                                 {/* Label to the right of bar if doesn't fit inside */}
                                 {!labelFitsInside && (
                                   <div className="bg-muted px-2 py-1 rounded text-xs font-medium text-muted-foreground whitespace-nowrap shadow-sm">
