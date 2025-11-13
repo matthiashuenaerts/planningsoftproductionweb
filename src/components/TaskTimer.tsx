@@ -303,13 +303,29 @@ const navigate = useNavigate();
 
   // Start task mutation
   const startTaskMutation = useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       employeeId,
       taskId
     }: {
       employeeId: string;
       taskId: string;
-    }) => timeRegistrationService.startTask(employeeId, taskId),
+    }) => {
+      // Check if current task has negative time before starting new one
+      if (activeRegistration?.is_active && taskDetails?.duration && activeRegistration.start_time) {
+        const start = new Date(activeRegistration.start_time);
+        const now = new Date();
+        const elapsedMs = now.getTime() - start.getTime();
+        const adjustedDurationMs = taskDetails.duration * 60 * 1000 / activeUsersOnTask;
+        const remainingMs = adjustedDurationMs - elapsedMs;
+        
+        if (remainingMs < 0) {
+          // Current timer is negative, must handle this first
+          throw new Error('NEGATIVE_TIME_PENDING');
+        }
+      }
+      
+      return timeRegistrationService.startTask(employeeId, taskId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ['activeTimeRegistration']
@@ -320,12 +336,20 @@ const navigate = useNavigate();
       });
     },
     onError: error => {
-      toast({
-        title: 'Error',
-        description: 'Failed to start task timer',
-        variant: 'destructive'
-      });
-      console.error('Start task error:', error);
+      if (error instanceof Error && error.message === 'NEGATIVE_TIME_PENDING') {
+        toast({
+          title: 'Timer Overtime',
+          description: 'Please stop the current task and set a new duration first',
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to start task timer',
+          variant: 'destructive'
+        });
+        console.error('Start task error:', error);
+      }
     }
   });
 
@@ -437,18 +461,23 @@ const navigate = useNavigate();
   const handleTimerClick = () => {
     if (!currentEmployee) return;
     if (activeRegistration && activeRegistration.is_active) {
-      // Check if task is over time before stopping
+      // Check if countdown timer is negative before stopping
       if (taskDetails?.duration && activeRegistration.start_time) {
         const start = new Date(activeRegistration.start_time);
         const now = new Date();
-        const elapsedMinutes = Math.floor((now.getTime() - start.getTime()) / (1000 * 60));
-        const overTime = elapsedMinutes - taskDetails.duration;
-        if (overTime > 0) {
-          // Task is over time, show dialog
+        const elapsedMs = now.getTime() - start.getTime();
+        const adjustedDurationMs = taskDetails.duration * 60 * 1000 / activeUsersOnTask;
+        const remainingMs = adjustedDurationMs - elapsedMs;
+        
+        if (remainingMs < 0) {
+          // Timer is negative, show dialog to input new duration
+          const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
+          const overTimeMinutes = Math.floor(Math.abs(remainingMs) / (1000 * 60));
+          
           setPendingStopData({
             registrationId: activeRegistration.id,
             taskDetails,
-            overTimeMinutes: overTime,
+            overTimeMinutes,
             elapsedMinutes
           });
           setShowExtraTimeDialog(true);
