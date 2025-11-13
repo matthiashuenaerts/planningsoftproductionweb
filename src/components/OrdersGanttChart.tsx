@@ -703,7 +703,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                               <div
                                 className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto"
                                 style={{
-                                  width: `${position.width}%`,
+                                  width: `calc(100% * ${position.durationDays} / ${dateRange.length})`,
                                   backgroundColor: teamColor,
                                 }}
                                 title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
