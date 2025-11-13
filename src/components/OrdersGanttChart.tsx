@@ -680,7 +680,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   }
 
   return (
-    <div className={cn('flex flex-col h-full bg-background', className)}>
+    <div className={cn('flex flex-col bg-background h-full', className)}>
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b bg-card sticky top-0 z-20">
         <div className="flex items-center gap-4">
@@ -716,66 +716,68 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
       </div>
 
       {/* Timeline */}
-      <div className="flex-1 overflow-auto">
-        <div className="relative w-full">
-          {/* Timeline Header */}
-          <div className="sticky top-0 z-10 bg-background border-b">
-            {/* Week headers */}
-            <div className="flex border-b bg-primary">
-              <div className="w-64 flex-shrink-0" /> {/* Spacer for team names */}
-              {weekGroups.map((week) => (
-                <div
-                  key={week.weekNumber}
-                  className="flex-shrink-0 px-2 py-2 text-xs font-semibold text-primary-foreground border-r border-primary-foreground/20"
-                  style={{ width: `calc((100% - 16rem) * ${week.days.length / dateRange.length})` }}
-                >
-                  Week {week.weekNumber}
+      {/* Timeline Header */}
+      <div className="sticky top-0 z-10 bg-background border-b relative">
+        {/* Week headers */}
+        <div className="flex border-b bg-primary">
+          <div className="w-64 flex-shrink-0" /> {/* Spacer for team names */}
+          {weekGroups.map((week) => (
+            <div
+              key={week.weekNumber}
+              className="flex-shrink-0 px-2 py-2 text-xs font-semibold text-primary-foreground border-r border-primary-foreground/20"
+              style={{ width: `calc((100% - 16rem) * ${week.days.length / dateRange.length})` }}
+            >
+              Week {week.weekNumber}
+            </div>
+          ))}
+        </div>
+
+        {/* Day headers */}
+        <div className="flex bg-accent">
+          <div className="w-64 flex-shrink-0" /> {/* Spacer for team names */}
+          {dateRange.map((date, idx) => {
+            const isWeekStart = date.getDay() === 1;
+            return (
+              <div
+                key={idx}
+                className={cn(
+                  'flex-shrink-0 text-center border-r border-accent-foreground/20',
+                  isWeekStart && 'border-l-2 border-l-accent-foreground/40'
+                )}
+                style={{ width: `calc((100% - 16rem) / ${dateRange.length})` }}
+              >
+                <div className="text-xs font-medium text-accent-foreground py-1">
+                  {format(date, 'd-MM', { locale: nl })}
                 </div>
-              ))}
-            </div>
+                <div className="text-xs py-1 text-accent-foreground/80">
+                  {format(date, 'EEEEEE', { locale: nl })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-            {/* Day headers */}
-            <div className="flex bg-accent">
-              <div className="w-64 flex-shrink-0" /> {/* Spacer for team names */}
-              {dateRange.map((date, idx) => {
-                const isWeekStart = date.getDay() === 1;
-                return (
-                  <div
-                    key={idx}
-                    className={cn(
-                      'flex-shrink-0 text-center border-r border-accent-foreground/20',
-                      isWeekStart && 'border-l-2 border-l-accent-foreground/40'
-                    )}
-                    style={{ width: `calc((100% - 16rem) / ${dateRange.length})` }}
-                  >
-                    <div className="text-xs font-medium text-accent-foreground py-1">
-                      {format(date, 'd-MM', { locale: nl })}
-                    </div>
-                    <div className="text-xs py-1 text-accent-foreground/80">
-                      {format(date, 'EEEEEE', { locale: nl })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+        {/* Today label */}
+        {todayPosition !== null && (
+          <div
+            className="absolute top-0 bg-destructive text-destructive-foreground text-[10px] px-2 py-0.5 rounded-b whitespace-nowrap z-20"
+            style={{ left: `calc(16rem + ${todayPosition}% - 20px)` }}
+          >
+            Vandaag
           </div>
+        )}
+      </div>
 
+      <div className="overflow-x-auto overflow-y-visible flex-1" ref={timelineRef}>
+        <div className="relative w-full">
           {/* Team rows */}
           <div className="relative">
-            {/* Today indicator */}
+            {/* Today indicator line */}
             {todayPosition !== null && (
-              <>
-                <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-destructive z-10 pointer-events-none"
-                  style={{ left: `calc(16rem + ${todayPosition}%)` }}
-                />
-                <div
-                  className="absolute top-0 bg-destructive text-destructive-foreground text-[10px] px-2 py-0.5 rounded-b whitespace-nowrap z-20"
-                  style={{ left: `calc(16rem + ${todayPosition}% - 20px)` }}
-                >
-                  Vandaag
-                </div>
-              </>
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-destructive z-10 pointer-events-none"
+                style={{ left: `calc(16rem + ${todayPosition}%)` }}
+              />
             )}
 
             {teams.map((team) => {
