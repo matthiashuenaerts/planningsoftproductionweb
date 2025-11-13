@@ -639,27 +639,28 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }) => {
                     >
                       <div className="flex absolute inset-0">
                         <div className="w-64 flex-shrink-0 border-r border-border bg-muted/30" />
-                        {/* Day columns */}
-                        {dateRange.map((date, idx) => {
-                          const isWeekStart = date.getDay() === 1;
-                          const isToday = isSameDay(date, new Date());
-                          return (
-                            <div
-                              key={idx}
-                              className={cn(
-                                'flex-shrink-0 border-r border-border/50',
-                                idx % 2 === 0 ? 'bg-muted/20' : 'bg-background',
-                                isWeekStart && 'border-l-2 border-l-border',
-                                isToday && 'bg-accent/10'
-                              )}
-                              style={{ width: `calc((100% - 16rem) / ${dateRange.length})` }}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                handleDrop(team.id, date);
-                              }}
-                            />
-                          );
-                        })}
+                        {/* Calendar grid - day columns */}
+                        <div className="flex-1 flex">
+                          {dateRange.map((date, idx) => {
+                            const isWeekStart = date.getDay() === 1;
+                            const isToday = isSameDay(date, new Date());
+                            return (
+                              <div
+                                key={idx}
+                                className={cn(
+                                  'flex-1 border-r border-border/50',
+                                  idx % 2 === 0 ? 'bg-muted/20' : 'bg-background',
+                                  isWeekStart && 'border-l-2 border-l-border',
+                                  isToday && 'bg-accent/10'
+                                )}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  handleDrop(team.id, date);
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
                       </div>
 
                       {teamProjects.length === 0 && (
