@@ -495,13 +495,23 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     // Calculate using same formula as calendar grid cells
     const totalDays = dateRange.length;
     
-    // Start position: each day is (100% / totalDays) of the container
+    // Start position: index of the first day relative to the range start
     const startDayIndex = differenceInDays(startDate, dateRange[0]);
+    const endDayIndex = startDayIndex + duration - 1; // inclusive
+
+    // Clip to visible range [0, totalDays - 1]
+    const firstIndex = 0;
+    const lastIndex = totalDays - 1;
+    const displayStart = Math.max(firstIndex, Math.min(lastIndex, startDayIndex));
+    const displayEnd = Math.max(firstIndex, Math.min(lastIndex, endDayIndex));
+
+    // Visible width in whole days (inclusive)
+    const visibleWidth = displayEnd >= displayStart ? (displayEnd - displayStart + 1) : 0;
 
     return {
-      left: startDayIndex,
-      width: duration,
-      totalDays: totalDays,
+      left: displayStart,
+      width: visibleWidth,
+      totalDays,
       startIndex: startDayIndex,
       durationDays: duration,
       assignment: matchedAssignment,
@@ -857,7 +867,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                             }
 
                             // Estimate if label fits inside bar (approximate)
-                            const labelFitsInside = position.width > 80; // If bar is more than 80px
+                            const labelFitsInside = position.width >= 3; // Show inside if 3+ visible days
 
                             // Calculate drag offset for this project
                             const isDraggingThisProject = draggingProject?.project.id === project.id;
@@ -880,13 +890,13 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
 
                               >
                                 {/* Project bar */}
-                                <div
-                                  className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto"
-                                  style={{
-                                    width: `calc(100% / ${position.totalDays} * ${position.width})`,
-                                    backgroundColor: teamColor,
-                                    opacity: isDraggingThisProject ? 0.8 : 1,
-                                  }}
+                                 <div
+                                   className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto"
+                                   style={{
+                                     width: `calc(${(100 / position.totalDays) * position.width}%)`,
+                                     backgroundColor: teamColor,
+                                     opacity: isDraggingThisProject ? 0.8 : 1,
+                                   }}
                                   title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
                                 >
                                   {/* Left resize handle */}
