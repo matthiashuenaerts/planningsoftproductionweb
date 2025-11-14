@@ -482,7 +482,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     return () => window.removeEventListener('resize', update);
   }, []);
 
-  // Calculate project bar position as percentages, aligned to calendar grid
+  // Calculate project bar position and width to match calendar grid exactly
   const getProjectPosition = (project: Project, teamName: string) => {
     const teamAssignments = project.project_team_assignments || [];
     // Prefer assignment that matches the team row
@@ -492,18 +492,19 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     const startDate = parseYMD(matchedAssignment.start_date);
     const duration = Math.max(1, matchedAssignment.duration);
 
-    // Calculate percentages based on dateRange length (same as calendar grid)
+    // Calculate using same formula as calendar grid cells
     const totalDays = dateRange.length;
-    const cellWidthPercent = 100 / totalDays; // width of one day as percentage
-    const barWidthPercent = cellWidthPercent * duration; // bar width = cell width × duration
-
-    // Calculate start position relative to first day in dateRange
+    
+    // Start position: each day is (100% / totalDays) of the container
     const startDayIndex = differenceInDays(startDate, dateRange[0]);
-    const leftPercent = startDayIndex * cellWidthPercent;
+    const leftPercent = (startDayIndex / totalDays) * 100;
+
+    // Width: duration days, each day is (100% / totalDays) of the container  
+    const widthPercent = (duration / totalDays) * 100;
 
     // Clip to visible range [0, 100%]
     const visibleLeftPercent = Math.max(0, leftPercent);
-    const visibleRightPercent = Math.min(100, leftPercent + barWidthPercent);
+    const visibleRightPercent = Math.min(100, leftPercent + widthPercent);
     const visibleWidthPercent = Math.max(0, visibleRightPercent - visibleLeftPercent);
 
     return {
