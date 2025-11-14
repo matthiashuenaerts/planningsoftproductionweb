@@ -497,19 +497,11 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     
     // Start position: each day is (100% / totalDays) of the container
     const startDayIndex = differenceInDays(startDate, dateRange[0]);
-    const leftPercent = (startDayIndex / totalDays) * 100;
-
-    // Width: duration days, each day is (100% / totalDays) of the container  
-    const widthPercent = (duration / totalDays) * 100;
-
-    // Clip to visible range [0, 100%]
-    const visibleLeftPercent = Math.max(0, leftPercent);
-    const visibleRightPercent = Math.min(100, leftPercent + widthPercent);
-    const visibleWidthPercent = Math.max(0, visibleRightPercent - visibleLeftPercent);
 
     return {
-      left: visibleLeftPercent,
-      width: visibleWidthPercent,
+      left: startDayIndex,
+      width: duration,
+      totalDays: totalDays,
       startIndex: startDayIndex,
       durationDays: duration,
       assignment: matchedAssignment,
@@ -881,7 +873,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                 key={project.id}
                                 className="absolute flex items-center gap-1"
                                 style={{
-                                  left: `${position.left}%`,
+                                  left: `calc(100% / ${position.totalDays} * ${position.left})`,
                                   top: `${8 + idx * 32}px`,
                                   height: '28px',
                                 }}
@@ -891,7 +883,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                 <div
                                   className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto"
                                   style={{
-                                    width: `${position.width}%`,
+                                    width: `calc(100% / ${position.totalDays} * ${position.width})`,
                                     backgroundColor: teamColor,
                                     opacity: isDraggingThisProject ? 0.8 : 1,
                                   }}
