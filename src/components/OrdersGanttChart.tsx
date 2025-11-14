@@ -482,7 +482,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     return () => window.removeEventListener('resize', update);
   }, []);
 
-  // Calculate project bar position in pixels, aligned to calendar grid
+  // Calculate project bar position as percentages, aligned to calendar grid
   const getProjectPosition = (project: Project, teamName: string) => {
     const teamAssignments = project.project_team_assignments || [];
     // Prefer assignment that matches the team row
@@ -492,22 +492,23 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     const startDate = parseYMD(matchedAssignment.start_date);
     const duration = Math.max(1, matchedAssignment.duration);
 
-    // Calculate pixel widths
-    const gridCellWidthPx = containerWidth / dateRange.length; // width of one day column in pixels
-    const barWidthPx = gridCellWidthPx * duration; // bar width = cell width × duration
+    // Calculate percentages based on dateRange length (same as calendar grid)
+    const totalDays = dateRange.length;
+    const cellWidthPercent = 100 / totalDays; // width of one day as percentage
+    const barWidthPercent = cellWidthPercent * duration; // bar width = cell width × duration
 
     // Calculate start position relative to first day in dateRange
     const startDayIndex = differenceInDays(startDate, dateRange[0]);
-    const leftPx = startDayIndex * gridCellWidthPx;
+    const leftPercent = startDayIndex * cellWidthPercent;
 
-    // Clip to visible range [0, containerWidth]
-    const visibleLeftPx = Math.max(0, leftPx);
-    const visibleRightPx = Math.min(containerWidth, leftPx + barWidthPx);
-    const visibleWidthPx = Math.max(0, visibleRightPx - visibleLeftPx);
+    // Clip to visible range [0, 100%]
+    const visibleLeftPercent = Math.max(0, leftPercent);
+    const visibleRightPercent = Math.min(100, leftPercent + barWidthPercent);
+    const visibleWidthPercent = Math.max(0, visibleRightPercent - visibleLeftPercent);
 
     return {
-      left: visibleLeftPx,
-      width: visibleWidthPx,
+      left: visibleLeftPercent,
+      width: visibleWidthPercent,
       startIndex: startDayIndex,
       durationDays: duration,
       assignment: matchedAssignment,
@@ -879,7 +880,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                 key={project.id}
                                 className="absolute flex items-center gap-1"
                                 style={{
-                                  left: `${position.left + dragLeftOffset + resizeLeftOffset}px`,
+                                  left: `${position.left}%`,
                                   top: `${8 + idx * 32}px`,
                                   height: '28px',
                                 }}
@@ -889,7 +890,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                 <div
                                   className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto"
                                   style={{
-                                    width: `${position.width + resizeWidthOffset}px`,
+                                    width: `${position.width}%`,
                                     backgroundColor: teamColor,
                                     opacity: isDraggingThisProject ? 0.8 : 1,
                                   }}
