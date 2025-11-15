@@ -31,6 +31,7 @@ interface Assignment {
   id: string;
   project_id: string;
   team: string;
+  team_id?: string;
   start_date: string;
   duration: number;
   created_at?: string;
@@ -1193,9 +1194,9 @@ const InstallationTeamCalendar = ({
         <UnassignedProjects projects={projects} assignments={assignments} truckAssignments={truckAssignments} onTruckAssign={handleTruckAssign} onDropProject={handleDropProject} />
         
         {teams.map(team => {
-          // Get assignments for this team based on external team names
+          // Get assignments for this team based on team_id
           const teamAssignments = assignments.filter(assignment => 
-            team.external_team_names.includes(assignment.team)
+            assignment.team_id === team.id || team.external_team_names.includes(assignment.team)
           );
           
           return (
@@ -1204,7 +1205,7 @@ const InstallationTeamCalendar = ({
               team={team.name}
               currentMonth={currentMonth} 
               projects={projects} 
-              assignments={teamAssignments} 
+              assignments={teamAssignments}
               truckAssignments={truckAssignments} 
               onDropProject={handleDropProject} 
               handleExtendProject={handleExtendProject} 
