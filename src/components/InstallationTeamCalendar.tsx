@@ -94,36 +94,61 @@ const getBusinessDaysArray = (startDate: Date, duration: number): Date[] => {
   return days;
 };
 
-// Define team colors
-const teamColors = {
-  green: {
-    bg: 'bg-green-100 hover:bg-green-200',
-    border: 'border-green-300',
-    text: 'text-green-800',
-    header: 'bg-green-500 text-white',
-    project: 'bg-green-200 border-green-400'
-  },
-  blue: {
-    bg: 'bg-blue-100 hover:bg-blue-200',
-    border: 'border-blue-300',
-    text: 'text-blue-800',
-    header: 'bg-blue-500 text-white',
-    project: 'bg-blue-200 border-blue-400'
-  },
-  orange: {
-    bg: 'bg-orange-100 hover:bg-orange-200',
-    border: 'border-orange-300',
-    text: 'text-orange-800',
-    header: 'bg-orange-500 text-white',
-    project: 'bg-orange-200 border-orange-400'
-  },
-  unassigned: {
-    bg: 'bg-gray-100 hover:bg-gray-200',
-    border: 'border-gray-300',
-    text: 'text-gray-800',
-    header: 'bg-gray-500 text-white',
-    project: 'bg-gray-200 border-gray-400'
-  }
+// Define team colors with flexible color mapping
+const getColorClasses = (colorName: string) => {
+  const colorMap: Record<string, { bg: string; text: string; border: string; header: string; project: string }> = {
+    green: {
+      bg: 'bg-green-100 hover:bg-green-200',
+      border: 'border-green-300',
+      text: 'text-green-800',
+      header: 'bg-green-500 text-white',
+      project: 'bg-green-200 border-green-400'
+    },
+    blue: {
+      bg: 'bg-blue-100 hover:bg-blue-200',
+      border: 'border-blue-300',
+      text: 'text-blue-800',
+      header: 'bg-blue-500 text-white',
+      project: 'bg-blue-200 border-blue-400'
+    },
+    orange: {
+      bg: 'bg-orange-100 hover:bg-orange-200',
+      border: 'border-orange-300',
+      text: 'text-orange-800',
+      header: 'bg-orange-500 text-white',
+      project: 'bg-orange-200 border-orange-400'
+    },
+    red: {
+      bg: 'bg-red-100 hover:bg-red-200',
+      border: 'border-red-300',
+      text: 'text-red-800',
+      header: 'bg-red-500 text-white',
+      project: 'bg-red-200 border-red-400'
+    },
+    yellow: {
+      bg: 'bg-yellow-100 hover:bg-yellow-200',
+      border: 'border-yellow-300',
+      text: 'text-yellow-800',
+      header: 'bg-yellow-500 text-white',
+      project: 'bg-yellow-200 border-yellow-400'
+    },
+    purple: {
+      bg: 'bg-purple-100 hover:bg-purple-200',
+      border: 'border-purple-300',
+      text: 'text-purple-800',
+      header: 'bg-purple-500 text-white',
+      project: 'bg-purple-200 border-purple-400'
+    },
+    unassigned: {
+      bg: 'bg-gray-100 hover:bg-gray-200',
+      border: 'border-gray-300',
+      text: 'text-gray-800',
+      header: 'bg-gray-500 text-white',
+      project: 'bg-gray-200 border-gray-400'
+    }
+  };
+  
+  return colorMap[colorName] || colorMap.unassigned;
 };
 
 // Get truck color for visual distinction
@@ -183,12 +208,15 @@ const ProjectItem = ({
   }));
   // Map team names to colors based on content  
   const getTeamColor = (teamName: string) => {
-    if (teamName?.toLowerCase().includes('groen')) return teamColors.green;
-    if (teamName?.toLowerCase().includes('blauw')) return teamColors.blue;
-    if (teamName?.toLowerCase().includes('orange')) return teamColors.orange;
-    return teamColors[teamName] || teamColors.unassigned;
+    if (teamName?.toLowerCase().includes('groen') || teamName?.toLowerCase().includes('green')) return getColorClasses('green');
+    if (teamName?.toLowerCase().includes('blauw') || teamName?.toLowerCase().includes('blue')) return getColorClasses('blue');
+    if (teamName?.toLowerCase().includes('orange') || teamName?.toLowerCase().includes('oranje')) return getColorClasses('orange');
+    if (teamName?.toLowerCase().includes('red') || teamName?.toLowerCase().includes('rood')) return getColorClasses('red');
+    if (teamName?.toLowerCase().includes('yellow') || teamName?.toLowerCase().includes('geel')) return getColorClasses('yellow');
+    if (teamName?.toLowerCase().includes('purple') || teamName?.toLowerCase().includes('paars')) return getColorClasses('purple');
+    return getColorClasses('blue'); // default
   };
-  const teamColor = team ? getTeamColor(team) : teamColors.unassigned;
+  const teamColor = team ? getTeamColor(team) : getColorClasses('unassigned');
   const handleDurationChange = (newDuration: number) => {
     if (assignment && onDurationChange) {
       onDurationChange(assignment.id, newDuration);
@@ -421,12 +449,16 @@ const TeamCalendar = ({
   isCollapsed,
   setIsCollapsed
 }) => {
-  // Map team names to colors based on content
+  // Get team color - look up from database teams or fallback to color detection
   const getTeamColor = (teamName: string) => {
-    if (teamName?.toLowerCase().includes('groen')) return teamColors.green;
-    if (teamName?.toLowerCase().includes('blauw')) return teamColors.blue;
-    if (teamName?.toLowerCase().includes('orange')) return teamColors.orange;
-    return teamColors[teamName] || teamColors.unassigned;
+    // Try to find color from team name keywords
+    if (teamName?.toLowerCase().includes('groen') || teamName?.toLowerCase().includes('green')) return getColorClasses('green');
+    if (teamName?.toLowerCase().includes('blauw') || teamName?.toLowerCase().includes('blue')) return getColorClasses('blue');
+    if (teamName?.toLowerCase().includes('orange') || teamName?.toLowerCase().includes('oranje')) return getColorClasses('orange');
+    if (teamName?.toLowerCase().includes('red') || teamName?.toLowerCase().includes('rood')) return getColorClasses('red');
+    if (teamName?.toLowerCase().includes('yellow') || teamName?.toLowerCase().includes('geel')) return getColorClasses('yellow');
+    if (teamName?.toLowerCase().includes('purple') || teamName?.toLowerCase().includes('paars')) return getColorClasses('purple');
+    return getColorClasses('blue'); // default
   };
   const teamColor = getTeamColor(team);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -606,7 +638,7 @@ const UnassignedProjects = ({
   const unassignedProjects = projects.filter(project => !assignments.some(a => a.project_id === project.id));
   
   return <div className="mb-6">
-      <div className={cn("p-3 rounded-t-lg", teamColors.unassigned.header)}>
+      <div className={cn("p-3 rounded-t-lg", getColorClasses('unassigned').header)}>
         <h3 className="text-lg font-medium">Unassigned Projects ({unassignedProjects.length})</h3>
       </div>
       
@@ -632,6 +664,15 @@ const UnassignedProjects = ({
     </div>;
 };
 
+// Define team interface
+interface Team {
+  id: string;
+  name: string;
+  color: string;
+  external_team_names: string[];
+  is_active: boolean;
+}
+
 // Main installation team calendar component with enhanced scroll preservation and default collapsed state
 const InstallationTeamCalendar = ({
   projects
@@ -641,15 +682,12 @@ const InstallationTeamCalendar = ({
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [truckAssignments, setTruckAssignments] = useState<TruckAssignment[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [scrollPositions, setScrollPositions] = useState<Record<string, number>>({});
   const [pageScrollPosition, setPageScrollPosition] = useState(0);
-  // Start with all calendars collapsed
-  const [teamCollapsedStates, setTeamCollapsedStates] = useState({
-    green: true,
-    blue: true,
-    orange: true
-  });
+  // Start with all calendars collapsed - will be dynamically generated
+  const [teamCollapsedStates, setTeamCollapsedStates] = useState<Record<string, boolean>>({});
   const {
     toast
   } = useToast();
@@ -677,10 +715,32 @@ const InstallationTeamCalendar = ({
     }, 50);
   };
 
-  // Fetch team assignments and truck assignments
+  // Fetch teams, team assignments and truck assignments
   const fetchAssignments = async () => {
     try {
       setLoading(true);
+
+      // Fetch active placement teams
+      const {
+        data: teamsData,
+        error: teamsError
+      } = await supabase
+        .from('placement_teams')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+      
+      if (teamsError) throw teamsError;
+      
+      const fetchedTeams = teamsData || [];
+      setTeams(fetchedTeams);
+      
+      // Initialize collapsed states for all teams
+      const initialCollapsedStates: Record<string, boolean> = {};
+      fetchedTeams.forEach(team => {
+        initialCollapsedStates[team.id] = true; // Start collapsed
+      });
+      setTeamCollapsedStates(initialCollapsedStates);
 
       // Fetch team assignments
       const {
@@ -1116,7 +1176,8 @@ const InstallationTeamCalendar = ({
     </div>;
   }
   
-  return <Card>
+  return (
+    <Card>
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <CardTitle className="flex items-center gap-2">
@@ -1130,56 +1191,36 @@ const InstallationTeamCalendar = ({
       </CardHeader>
       <CardContent>
         <UnassignedProjects projects={projects} assignments={assignments} truckAssignments={truckAssignments} onTruckAssign={handleTruckAssign} onDropProject={handleDropProject} />
-        <TeamCalendar 
-          team="05 - GROEN PLAATSING - SPRINTER 2" 
-          currentMonth={currentMonth} 
-          projects={projects} 
-          assignments={assignments} 
-          truckAssignments={truckAssignments} 
-          onDropProject={handleDropProject} 
-          handleExtendProject={handleExtendProject} 
-          handleDurationChange={handleDurationChange} 
-          onTruckAssign={handleTruckAssign} 
-          onRefreshData={refreshDataWithScrollPreservation} 
-          scrollPositions={scrollPositions} 
-          setScrollPositions={setScrollPositions}
-          isCollapsed={teamCollapsedStates.green}
-          setIsCollapsed={(collapsed) => setTeamCollapsed('green', collapsed)}
-        />
-        <TeamCalendar 
-          team="04 - BLAUW PLAATSING - SPRINTER 1" 
-          currentMonth={currentMonth} 
-          projects={projects} 
-          assignments={assignments} 
-          truckAssignments={truckAssignments} 
-          onDropProject={handleDropProject} 
-          handleExtendProject={handleExtendProject} 
-          handleDurationChange={handleDurationChange} 
-          onTruckAssign={handleTruckAssign} 
-          onRefreshData={refreshDataWithScrollPreservation} 
-          scrollPositions={scrollPositions} 
-          setScrollPositions={setScrollPositions}
-          isCollapsed={teamCollapsedStates.blue}
-          setIsCollapsed={(collapsed) => setTeamCollapsed('blue', collapsed)}
-        />
-        <TeamCalendar 
-          team="orange" 
-          currentMonth={currentMonth} 
-          projects={projects} 
-          assignments={assignments} 
-          truckAssignments={truckAssignments} 
-          onDropProject={handleDropProject} 
-          handleExtendProject={handleExtendProject} 
-          handleDurationChange={handleDurationChange} 
-          onTruckAssign={handleTruckAssign} 
-          onRefreshData={refreshDataWithScrollPreservation} 
-          scrollPositions={scrollPositions} 
-          setScrollPositions={setScrollPositions}
-          isCollapsed={teamCollapsedStates.orange}
-          setIsCollapsed={(collapsed) => setTeamCollapsed('orange', collapsed)}
-        />
+        
+        {teams.map(team => {
+          // Get assignments for this team based on external team names
+          const teamAssignments = assignments.filter(assignment => 
+            team.external_team_names.includes(assignment.team)
+          );
+          
+          return (
+            <TeamCalendar 
+              key={team.id}
+              team={team.name}
+              currentMonth={currentMonth} 
+              projects={projects} 
+              assignments={teamAssignments} 
+              truckAssignments={truckAssignments} 
+              onDropProject={handleDropProject} 
+              handleExtendProject={handleExtendProject} 
+              handleDurationChange={handleDurationChange} 
+              onTruckAssign={handleTruckAssign} 
+              onRefreshData={refreshDataWithScrollPreservation} 
+              scrollPositions={scrollPositions} 
+              setScrollPositions={setScrollPositions}
+              isCollapsed={teamCollapsedStates[team.id] ?? true}
+              setIsCollapsed={(collapsed) => setTeamCollapsed(team.id, collapsed)}
+            />
+          );
+        })}
       </CardContent>
-    </Card>;
+    </Card>
+  );
 };
 
 export default InstallationTeamCalendar;
