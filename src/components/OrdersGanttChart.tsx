@@ -883,7 +883,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                 key={project.id}
                                 className="absolute flex items-center gap-1"
                                 style={{
-                                  left: `${(containerWidth / position.totalDays) * position.left}px`,
+                                  left: `calc(100% / ${position.totalDays} * ${position.left})`,
                                   top: `${8 + idx * 32}px`,
                                   height: '28px',
                                 }}
@@ -893,7 +893,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                  <div
                                    className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto"
                                    style={{
-                                     width: `${(containerWidth / position.totalDays) * position.width}px`,
+                                     width: `calc(${(100 / position.totalDays) * position.width}%)`,
                                      backgroundColor: teamColor,
                                      opacity: isDraggingThisProject ? 0.8 : 1,
                                    }}
