@@ -34,6 +34,7 @@ interface Project {
     duration: number;
   }>;
   employees?: Employee[];
+  employeesOnHoliday?: Set<string>;
 }
 
 interface OrdersGanttChartProps {
@@ -401,12 +402,31 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         const projectsWithEmployees = await Promise.all(
           mergedProjects.map(async (project) => {
             const assignment = project.project_team_assignments?.[0];
-            if (!assignment?.team_id) return project;
+            if (!assignment?.team_id || !assignment?.start_date || !assignment?.duration) {
+              return project;
+            }
             
             const employees = teamMembersMap[assignment.team_id] || [];
+            
+            // Check holiday requests for employees during project period
+            const endDate = format(
+              addDays(parseYMD(assignment.start_date), assignment.duration - 1),
+              'yyyy-MM-dd'
+            );
+            
+            const { data: holidayData } = await supabase
+              .from('holiday_requests')
+              .select('user_id')
+              .eq('status', 'approved')
+              .lte('start_date', endDate)
+              .gte('end_date', assignment.start_date);
+            
+            const employeesOnHoliday = new Set(holidayData?.map(h => h.user_id) || []);
+            
             return {
               ...project,
-              employees
+              employees,
+              employeesOnHoliday
             };
           })
         );
@@ -878,7 +898,42 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                       data-timeline
                     >
                       <div className="flex absolute inset-0">
-                        <div className="w-64 flex-shrink-0 border-r border-border bg-muted/30" />
+                        <div className="w-64 flex-shrink-0 border-r border-border bg-muted/30 py-2">
+                          {/* Project names and employees in left column */}
+                          {teamProjects.map((project, idx) => (
+                            <div
+                              key={project.id}
+                              className="px-2 text-xs"
+                              style={{ 
+                                position: 'absolute',
+                                top: `${8 + idx * 32}px`,
+                                height: '28px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                width: '256px'
+                              }}
+                            >
+                              <div className="truncate">
+                                <div className="font-medium text-foreground truncate">{project.name}</div>
+                                {project.employees && project.employees.length > 0 && (
+                                  <div className="text-[10px] text-muted-foreground truncate">
+                                    {project.employees.map((emp, empIdx) => {
+                                      const isOnHoliday = project.employeesOnHoliday?.has(emp.id);
+                                      return (
+                                        <React.Fragment key={emp.id}>
+                                          {empIdx > 0 && ', '}
+                                          <span className={isOnHoliday ? 'text-destructive font-semibold' : ''}>
+                                            {emp.name}
+                                          </span>
+                                        </React.Fragment>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                         {/* Day columns */}
                         {dateRange.map((date, idx) => {
                           const isWeekStart = date.getDay() === 1;
@@ -938,6 +993,11 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                             const resizeLeftOffset = isResizingThisProject ? resizeDelta.left : 0;
                             const resizeWidthOffset = isResizingThisProject ? (resizeDelta.left + resizeDelta.right) : 0;
 
+                            // Check if any employee is on holiday
+                            const hasEmployeeOnHoliday = project.employees?.some(emp => 
+                              project.employeesOnHoliday?.has(emp.id)
+                            );
+
                             return (
                               <div
                                 key={project.id}
@@ -954,7 +1014,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                    className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto cursor-pointer"
                                    style={{
                                      width: `${(containerWidth / position.totalDays) * position.width}px`,
-                                     backgroundColor: teamColor,
+                                     backgroundColor: hasEmployeeOnHoliday ? '#ef4444' : teamColor,
                                      opacity: isDraggingThisProject ? 0.8 : 1,
                                    }}
                                    title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
@@ -988,14 +1048,9 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                      <GripVertical className="h-4 w-4 text-white/80" />
                                    </div>
 
-                                   {/* Project label and employees */}
+                                   {/* Project label */}
                                    <div className="px-2 text-xs text-white font-medium truncate flex-1">
                                      <div className="truncate">{projectLabel}</div>
-                                     {project.employees && project.employees.length > 0 && (
-                                       <div className="text-[10px] opacity-80 truncate">
-                                         {project.employees.map(e => e.name).join(', ')}
-                                       </div>
-                                     )}
                                    </div>
                                  </div>
 
@@ -1067,7 +1122,9 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
               const projectsWithEmployees = await Promise.all(
                 mergedProjects.map(async (project) => {
                   const assignment = project.project_team_assignments?.[0];
-                  if (!assignment?.team_id) return project;
+                  if (!assignment?.team_id || !assignment?.start_date || !assignment?.duration) {
+                    return project;
+                  }
                   
                   const { data: memberData } = await supabase
                     .from('placement_team_members')
@@ -1078,9 +1135,26 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                     .eq('team_id', assignment.team_id);
                   
                   const employees = memberData?.map((m: any) => m.employees) || [];
+                  
+                  // Check holiday requests
+                  const endDate = format(
+                    addDays(parseYMD(assignment.start_date), assignment.duration - 1),
+                    'yyyy-MM-dd'
+                  );
+                  
+                  const { data: holidayData } = await supabase
+                    .from('holiday_requests')
+                    .select('user_id')
+                    .eq('status', 'approved')
+                    .lte('start_date', endDate)
+                    .gte('end_date', assignment.start_date);
+                  
+                  const employeesOnHoliday = new Set(holidayData?.map(h => h.user_id) || []);
+                  
                   return {
                     ...project,
-                    employees
+                    employees,
+                    employeesOnHoliday
                   };
                 })
               );
