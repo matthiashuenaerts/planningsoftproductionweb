@@ -6,8 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { ExternalLink, User, X } from 'lucide-react';
+import { format, eachDayOfInterval } from 'date-fns';
+import { ExternalLink, User, X, Plus } from 'lucide-react';
 
 interface Employee {
   id: string;
@@ -47,12 +47,14 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   const [duration, setDuration] = useState(currentDuration);
   const [teamMembers, setTeamMembers] = useState<Employee[]>([]);
   const [assignedEmployees, setAssignedEmployees] = useState<Employee[]>([]);
+  const [employeesOnHoliday, setEmployeesOnHoliday] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       fetchTeams();
       fetchAssignedEmployees();
+      checkHolidayRequests();
     }
   }, [isOpen]);
 
@@ -107,6 +109,24 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
     }
   };
 
+  const checkHolidayRequests = async () => {
+    const endDate = format(
+      new Date(new Date(currentStartDate).getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000),
+      'yyyy-MM-dd'
+    );
+
+    const { data, error } = await supabase
+      .from('holiday_requests')
+      .select('user_id')
+      .eq('status', 'approved')
+      .lte('start_date', endDate)
+      .gte('end_date', currentStartDate);
+
+    if (!error && data) {
+      setEmployeesOnHoliday(new Set(data.map(h => h.user_id)));
+    }
+  };
+
   const handleSave = async () => {
     setLoading(true);
     try {
@@ -151,9 +171,9 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
         .from('daily_team_assignments')
         .delete()
         .eq('employee_id', employeeId)
-        .eq('team_id', currentTeamId || '')
-        .gte('date', currentStartDate)
-        .lte('date', format(new Date(new Date(currentStartDate).getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
+        .eq('team_id', selectedTeamId || '')
+        .gte('date', startDate)
+        .lte('date', format(new Date(new Date(startDate).getTime() + (duration - 1) * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
 
       if (error) throw error;
 
@@ -161,6 +181,45 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       toast.success('Employee removed from project');
     } catch (error: any) {
       toast.error(`Failed to remove employee: ${error.message}`);
+    }
+  };
+
+  const handleAddEmployee = async (employeeId: string) => {
+    if (!selectedTeamId) {
+      toast.error('Please select a team first');
+      return;
+    }
+
+    try {
+      // Get all dates in the project duration
+      const dates = eachDayOfInterval({
+        start: new Date(startDate),
+        end: new Date(new Date(startDate).getTime() + (duration - 1) * 24 * 60 * 60 * 1000)
+      });
+
+      // Create assignments for each day
+      const assignments = dates.map(date => ({
+        employee_id: employeeId,
+        team_id: selectedTeamId,
+        date: format(date, 'yyyy-MM-dd'),
+        is_available: true
+      }));
+
+      const { error } = await supabase
+        .from('daily_team_assignments')
+        .insert(assignments);
+
+      if (error) throw error;
+
+      // Add to assigned employees
+      const employee = teamMembers.find(m => m.id === employeeId);
+      if (employee) {
+        setAssignedEmployees(prev => [...prev, employee]);
+      }
+      
+      toast.success('Employee added to project');
+    } catch (error: any) {
+      toast.error(`Failed to add employee: ${error.message}`);
     }
   };
 
@@ -247,20 +306,27 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
             </Label>
             {assignedEmployees.length > 0 ? (
               <div className="flex flex-wrap gap-2">
-                {assignedEmployees.map((employee) => (
-                  <div
-                    key={employee.id}
-                    className="flex items-center gap-2 bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm"
-                  >
-                    <span>{employee.name}</span>
-                    <button
-                      onClick={() => handleRemoveEmployee(employee.id)}
-                      className="hover:text-destructive"
+                {assignedEmployees.map((employee) => {
+                  const isOnHoliday = employeesOnHoliday.has(employee.id);
+                  return (
+                    <div
+                      key={employee.id}
+                      className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
+                        isOnHoliday 
+                          ? 'bg-destructive text-destructive-foreground' 
+                          : 'bg-secondary text-secondary-foreground'
+                      }`}
                     >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
+                      <span>{employee.name}</span>
+                      <button
+                        onClick={() => handleRemoveEmployee(employee.id)}
+                        className="hover:opacity-70"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No employees assigned</p>
@@ -269,16 +335,28 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
 
           {selectedTeamId && teamMembers.length > 0 && (
             <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Team Members Available</Label>
+              <Label className="text-sm text-muted-foreground">Available Team Members (Click to Add)</Label>
               <div className="flex flex-wrap gap-2">
-                {teamMembers.map((member) => (
-                  <div
-                    key={member.id}
-                    className="bg-muted text-muted-foreground px-3 py-1 rounded-full text-sm"
-                  >
-                    {member.name}
-                  </div>
-                ))}
+                {teamMembers
+                  .filter(member => !assignedEmployees.some(e => e.id === member.id))
+                  .map((member) => {
+                    const isOnHoliday = employeesOnHoliday.has(member.id);
+                    return (
+                      <button
+                        key={member.id}
+                        onClick={() => handleAddEmployee(member.id)}
+                        className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm hover:opacity-80 transition-opacity ${
+                          isOnHoliday
+                            ? 'bg-destructive/10 text-destructive border border-destructive'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        <Plus className="h-3 w-3" />
+                        <span>{member.name}</span>
+                        {isOnHoliday && <span className="text-xs">(On Holiday)</span>}
+                      </button>
+                    );
+                  })}
               </div>
             </div>
           )}
