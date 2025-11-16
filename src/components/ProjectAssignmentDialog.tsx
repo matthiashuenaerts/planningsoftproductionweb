@@ -12,6 +12,7 @@ import { ExternalLink, User, X } from 'lucide-react';
 interface Employee {
   id: string;
   name: string;
+  onHoliday?: boolean;
 }
 
 interface PlacementTeam {
@@ -84,7 +85,27 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       .eq('team_id', teamId);
 
     if (!error && data) {
-      setTeamMembers(data.map((item: any) => item.employees));
+      const members = data.map((item: any) => item.employees);
+      
+      // Check holidays for team members
+      const membersWithHolidays = await Promise.all(
+        members.map(async (member: Employee) => {
+          const { data: holidayData } = await supabase
+            .from('holiday_requests')
+            .select('*')
+            .eq('user_id', member.id)
+            .eq('status', 'approved')
+            .lte('start_date', format(new Date(new Date(currentStartDate).getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'))
+            .gte('end_date', currentStartDate);
+          
+          return {
+            ...member,
+            onHoliday: holidayData && holidayData.length > 0
+          };
+        })
+      );
+      
+      setTeamMembers(membersWithHolidays);
     }
   };
 
@@ -102,8 +123,27 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
     if (!error && data) {
       const uniqueEmployees = Array.from(
         new Map(data.map((item: any) => [item.employees.id, item.employees])).values()
+      ) as Employee[];
+      
+      // Check holidays for assigned employees
+      const employeesWithHolidays = await Promise.all(
+        uniqueEmployees.map(async (employee) => {
+          const { data: holidayData } = await supabase
+            .from('holiday_requests')
+            .select('*')
+            .eq('user_id', employee.id)
+            .eq('status', 'approved')
+            .lte('start_date', format(new Date(new Date(currentStartDate).getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'))
+            .gte('end_date', currentStartDate);
+          
+          return {
+            ...employee,
+            onHoliday: holidayData && holidayData.length > 0
+          };
+        })
       );
-      setAssignedEmployees(uniqueEmployees as Employee[]);
+      
+      setAssignedEmployees(employeesWithHolidays);
     }
   };
 
