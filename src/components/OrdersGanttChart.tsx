@@ -878,7 +878,21 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                       data-timeline
                     >
                       <div className="flex absolute inset-0">
-                        <div className="w-64 flex-shrink-0 border-r border-border bg-muted/30" />
+                        <div className="w-64 flex-shrink-0 border-r border-border bg-muted/30 p-2 overflow-y-auto">
+                          {/* Team members */}
+                          {team.members && team.members.length > 0 && (
+                            <div className="space-y-1">
+                              {team.members.map((member) => (
+                                <div
+                                  key={member.id}
+                                  className="text-xs px-2 py-1 bg-background rounded border border-border truncate"
+                                >
+                                  {member.name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         {/* Day columns */}
                         {dateRange.map((date, idx) => {
                           const isWeekStart = date.getDay() === 1;
