@@ -899,7 +899,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                     >
                       <div className="flex absolute inset-0">
                         <div className="w-64 flex-shrink-0 border-r border-border bg-muted/30 py-2">
-                          {/* Project names and employees in left column */}
+                          {/* Team members in left column */}
                           {teamProjects.map((project, idx) => (
                             <div
                               key={project.id}
@@ -914,9 +914,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                               }}
                             >
                               <div className="truncate">
-                                <div className="font-medium text-foreground truncate">{project.name}</div>
-                                {project.employees && project.employees.length > 0 && (
-                                  <div className="text-[10px] text-muted-foreground truncate">
+                                {project.employees && project.employees.length > 0 ? (
+                                  <div className="text-xs text-muted-foreground truncate">
                                     {project.employees.map((emp, empIdx) => {
                                       const isOnHoliday = project.employeesOnHoliday?.has(emp.id);
                                       return (
@@ -929,6 +928,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                       );
                                     })}
                                   </div>
+                                ) : (
+                                  <div className="text-xs text-muted-foreground/50 italic">No employees assigned</div>
                                 )}
                               </div>
                             </div>
