@@ -3,16 +3,22 @@ import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, differenceI
 import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { ProjectAssignmentDialog } from './ProjectAssignmentDialog';
 
+interface Employee {
+  id: string;
+  name: string;
+}
 
 interface PlacementTeam {
   id: string;
   name: string;
   color: string;
   is_active: boolean;
+  members?: Employee[];
 }
 
 interface Project {
@@ -27,6 +33,7 @@ interface Project {
     start_date: string;
     duration: number;
   }>;
+  employees?: Employee[];
 }
 
 interface OrdersGanttChartProps {
@@ -82,6 +89,13 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const [resizeDelta, setResizeDelta] = useState({ left: 0, right: 0 });
   const [containerWidth, setContainerWidth] = useState(0);
   const timelineRef = useRef<HTMLDivElement>(null);
+  const [selectedProject, setSelectedProject] = useState<{
+    id: string;
+    name: string;
+    teamId: string | null;
+    startDate: string;
+    duration: number;
+  } | null>(null);
 
 
   
@@ -351,7 +365,53 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
           ...p,
           project_team_assignments: assignmentsByProject[p.id] || [],
         }));
-        setProjects(mergedProjects);
+        
+        // Fetch team members for all teams
+        const teamMembersPromises = teamsWithUnnamed
+          .filter(team => team.id !== 'unnamed')
+          .map(async (team) => {
+            const { data: memberData } = await supabase
+              .from('placement_team_members')
+              .select(`
+                employee_id,
+                employees!inner(id, name)
+              `)
+              .eq('team_id', team.id);
+            
+            return {
+              teamId: team.id,
+              members: memberData?.map((m: any) => m.employees) || []
+            };
+          });
+        
+        const teamMembersResults = await Promise.all(teamMembersPromises);
+        const teamMembersMap: Record<string, Employee[]> = {};
+        teamMembersResults.forEach(result => {
+          teamMembersMap[result.teamId] = result.members;
+        });
+        
+        // Update teams with members
+        const teamsWithMembers = teamsWithUnnamed.map(team => ({
+          ...team,
+          members: teamMembersMap[team.id] || []
+        }));
+        setTeams(teamsWithMembers);
+        
+        // Fetch employees for each project based on team assignments
+        const projectsWithEmployees = await Promise.all(
+          mergedProjects.map(async (project) => {
+            const assignment = project.project_team_assignments?.[0];
+            if (!assignment?.team_id) return project;
+            
+            const employees = teamMembersMap[assignment.team_id] || [];
+            return {
+              ...project,
+              employees
+            };
+          })
+        );
+        
+        setProjects(projectsWithEmployees);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -889,53 +949,66 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                 }}
 
                               >
-                                {/* Project bar */}
+                                 {/* Project bar */}
                                  <div
-                                   className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto"
+                                   className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto cursor-pointer"
                                    style={{
                                      width: `${(containerWidth / position.totalDays) * position.width}px`,
                                      backgroundColor: teamColor,
                                      opacity: isDraggingThisProject ? 0.8 : 1,
                                    }}
-                                  title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
-                                >
-                                  {/* Left resize handle */}
-                                  <div
-                                    className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onMouseDown={(e) => handleResizeStart(e, project, team.id, 'left')}
-                                  />
+                                   title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
+                                   onClick={() => {
+                                     if (teamAssignment) {
+                                       setSelectedProject({
+                                         id: project.id,
+                                         name: project.name,
+                                         teamId: teamAssignment.team_id,
+                                         startDate: teamAssignment.start_date,
+                                         duration: teamAssignment.duration,
+                                       });
+                                     }
+                                   }}
+                                 >
+                                   {/* Left resize handle */}
+                                   <div
+                                     className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
+                                     onMouseDown={(e) => handleResizeStart(e, project, team.id, 'left')}
+                                     onClick={(e) => e.stopPropagation()}
+                                   >
+                                     <GripVertical className="h-4 w-4 text-white/80" />
+                                   </div>
 
-                                  {/* Draggable center area */}
-                                  <div
-                                    draggable
-                                    onDragStart={() => handleDragStart(project, team.id)}
-                                    onMouseDown={(e) => handleMouseDown(e, project, team.id)}
-                                    className="flex-1 flex items-center cursor-move px-2"
-                                  >
-                                    {labelFitsInside && (
-                                      <span className="text-xs font-medium text-white truncate">
-                                        {projectLabel}
-                                      </span>
-                                    )}
-                                  </div>
+                                   {/* Right resize handle */}
+                                   <div
+                                     className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
+                                     onMouseDown={(e) => handleResizeStart(e, project, team.id, 'right')}
+                                     onClick={(e) => e.stopPropagation()}
+                                   >
+                                     <GripVertical className="h-4 w-4 text-white/80" />
+                                   </div>
 
-                                  {/* Right resize handle */}
-                                  <div
-                                    className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onMouseDown={(e) => handleResizeStart(e, project, team.id, 'right')}
-                                  />
-                                </div>
+                                   {/* Project label and employees */}
+                                   <div className="px-2 text-xs text-white font-medium truncate flex-1">
+                                     <div className="truncate">{projectLabel}</div>
+                                     {project.employees && project.employees.length > 0 && (
+                                       <div className="text-[10px] opacity-80 truncate">
+                                         {project.employees.map(e => e.name).join(', ')}
+                                       </div>
+                                     )}
+                                   </div>
+                                 </div>
 
-                                {/* Label to the right of bar if doesn't fit inside */}
-                                {!labelFitsInside && (
-                                  <div className="bg-muted px-2 py-1 rounded text-xs font-medium text-muted-foreground whitespace-nowrap shadow-sm">
-                                    {projectLabel}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                      </div>
+                                 {/* Label to the right of bar if doesn't fit inside */}
+                                 {!labelFitsInside && (
+                                   <div className="bg-muted px-2 py-1 rounded text-xs font-medium text-muted-foreground whitespace-nowrap shadow-sm">
+                                     {projectLabel}
+                                   </div>
+                                 )}
+                               </div>
+                             );
+                           })}
+                       </div>
                     </div>
                   )}
                 </div>
@@ -944,6 +1017,79 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
           </div>
         </div>
       </div>
+      
+      {/* Project Assignment Dialog */}
+      {selectedProject && (
+        <ProjectAssignmentDialog
+          isOpen={!!selectedProject}
+          onClose={() => setSelectedProject(null)}
+          projectId={selectedProject.id}
+          projectName={selectedProject.name}
+          currentTeamId={selectedProject.teamId}
+          currentStartDate={selectedProject.startDate}
+          currentDuration={selectedProject.duration}
+          onUpdate={async () => {
+            // Refresh data after update
+            const { data: projectsData, error: projectsError } = await supabase
+              .from('projects')
+              .select(`
+                id,
+                name,
+                client,
+                installation_date,
+                progress
+              `)
+              .not('installation_date', 'is', null)
+              .order('installation_date');
+
+            if (!projectsError && projectsData) {
+              const projectIds = projectsData.map(p => p.id).filter(Boolean);
+              let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
+              if (projectIds.length > 0) {
+                const { data: assignments, error: assignError } = await supabase
+                  .from('project_team_assignments')
+                  .select('project_id, team, team_id, start_date, duration')
+                  .in('project_id', projectIds as string[]);
+                if (!assignError && assignments) {
+                  assignmentsByProject = assignments.reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>, a: any) => {
+                    const pid = a.project_id as string;
+                    (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
+                    return acc;
+                  }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>);
+                }
+              }
+              const mergedProjects = projectsData.map((p: any) => ({
+                ...p,
+                project_team_assignments: assignmentsByProject[p.id] || [],
+              }));
+              
+              // Re-fetch employees for updated projects
+              const projectsWithEmployees = await Promise.all(
+                mergedProjects.map(async (project) => {
+                  const assignment = project.project_team_assignments?.[0];
+                  if (!assignment?.team_id) return project;
+                  
+                  const { data: memberData } = await supabase
+                    .from('placement_team_members')
+                    .select(`
+                      employee_id,
+                      employees!inner(id, name)
+                    `)
+                    .eq('team_id', assignment.team_id);
+                  
+                  const employees = memberData?.map((m: any) => m.employees) || [];
+                  return {
+                    ...project,
+                    employees
+                  };
+                })
+              );
+              
+              setProjects(projectsWithEmployees);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };
