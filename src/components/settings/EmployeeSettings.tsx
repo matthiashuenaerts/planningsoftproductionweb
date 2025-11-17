@@ -388,7 +388,7 @@ const EmployeeSettings: React.FC = () => {
           </Dialog>
 
           <Dialog open={showTaskAssignment} onOpenChange={setShowTaskAssignment}>
-            <DialogContent className="max-w-3xl">
+            <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
               <DialogHeader>
                 <DialogTitle>Manage Standard Tasks for {selectedEmployee.name}</DialogTitle>
                 <DialogDescription>
@@ -396,12 +396,14 @@ const EmployeeSettings: React.FC = () => {
                 </DialogDescription>
               </DialogHeader>
               
-              <EmployeeStandardTasksManager 
-                employeeId={selectedEmployee.id} 
-                employeeName={selectedEmployee.name} 
-              />
+              <div className="overflow-y-auto flex-1 pr-2">
+                <EmployeeStandardTasksManager 
+                  employeeId={selectedEmployee.id} 
+                  employeeName={selectedEmployee.name} 
+                />
+              </div>
               
-              <div className="flex justify-end">
+              <div className="flex justify-end pt-4 border-t">
                 <DialogClose asChild>
                   <Button type="button" variant="outline">Close</Button>
                 </DialogClose>
