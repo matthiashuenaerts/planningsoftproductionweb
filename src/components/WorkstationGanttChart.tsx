@@ -83,6 +83,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [zoom, setZoom] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [dailyAssignments, setDailyAssignments] = useState<DailyEmployeeAssignment[]>([]);
+  const [employeeStandardTaskLinks, setEmployeeStandardTaskLinks] = useState<Map<string, Array<{ id: string; name: string; standardTasks: string[] }>>>(new Map());
   const [workstationEmployeeLinks, setWorkstationEmployeeLinks] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
@@ -112,13 +113,43 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       setWorkingHours(wh || []);
       setHolidays(hd || []);
       
-      // Fetch workstation-employee links
+      // Fetch workstation-employee links for UI
       const linksMap = new Map<string, Array<{ id: string; name: string }>>();
       for (const workstation of ws || []) {
         const employees = await workstationService.getEmployeesForWorkstation(workstation.id);
         linksMap.set(workstation.id, employees);
       }
       setWorkstationEmployeeLinks(linksMap);
+      
+      // Fetch employee-standard_task links for planning
+      const { data: employeeTaskLinks, error: linksError } = await supabase
+        .from('employee_standard_task_links')
+        .select('employee_id, standard_task_id, employees(id, name)');
+      
+      if (linksError) {
+        console.error('Error fetching employee task links:', linksError);
+      }
+      
+      // Group by employee
+      const employeeTaskMap = new Map<string, Array<{ id: string; name: string; standardTasks: string[] }>>();
+      (employeeTaskLinks || []).forEach((link: any) => {
+        if (!link.employees) return;
+        
+        if (!employeeTaskMap.has(link.employee_id)) {
+          employeeTaskMap.set(link.employee_id, [{
+            id: link.employees.id,
+            name: link.employees.name,
+            standardTasks: [link.standard_task_id]
+          }]);
+        } else {
+          const existing = employeeTaskMap.get(link.employee_id)![0];
+          if (!existing.standardTasks.includes(link.standard_task_id)) {
+            existing.standardTasks.push(link.standard_task_id);
+          }
+        }
+      });
+      
+      setEmployeeStandardTaskLinks(employeeTaskMap);
       
       const { data } = await supabase
         .from('tasks')
@@ -352,14 +383,12 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
       const today = format(new Date(), 'yyyy-MM-dd');
       
-      // Get all employees linked to workstations
-      const allEmployees = new Map<string, { id: string; name: string; workstations: string[] }>();
-      workstationEmployeeLinks.forEach((employees, workstationId) => {
+      // Get all employees linked to standard tasks
+      const allEmployees = new Map<string, { id: string; name: string; standardTasks: string[] }>();
+      employeeStandardTaskLinks.forEach((employees) => {
         employees.forEach(emp => {
           if (!allEmployees.has(emp.id)) {
-            allEmployees.set(emp.id, { id: emp.id, name: emp.name, workstations: [workstationId] });
-          } else {
-            allEmployees.get(emp.id)!.workstations.push(workstationId);
+            allEmployees.set(emp.id, { id: emp.id, name: emp.name, standardTasks: [...emp.standardTasks] });
           }
         });
       });
@@ -453,9 +482,11 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             }
           }
           
-          // Find eligible employees for this task (those assigned to task's workstations)
+          // Find eligible employees for this task (those assigned to the standard task)
           const eligibleEmployees = Array.from(allEmployees.values()).filter(emp => {
-            const isLinked = task.workstations?.some(taskWs => emp.workstations.includes(taskWs.id));
+            // Check if employee is linked to this task's standard_task_id
+            if (!task.standard_task_id) return false;
+            const isLinked = emp.standardTasks.includes(task.standard_task_id);
             if (!isLinked) return false;
             const alreadyAssignedWs = assignedToday.get(emp.id);
             // Allow if not yet assigned today or already assigned to one of the task's workstations
