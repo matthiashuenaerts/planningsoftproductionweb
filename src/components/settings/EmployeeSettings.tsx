@@ -36,10 +36,11 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, UserCog, UserPlus, Edit, Trash2 } from 'lucide-react';
+import { Loader2, UserCog, UserPlus, Edit, Trash2, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { employeeService } from '@/services/dataService';
 import { EmployeeWorkstationsManager } from './EmployeeWorkstationsManager';
+import StandardTaskAssignment from '../StandardTaskAssignment';
 import { Employee } from '@/services/dataService';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -56,6 +57,8 @@ const EmployeeSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showWorkstationMapping, setShowWorkstationMapping] = useState(false);
+  const [showTaskAssignment, setShowTaskAssignment] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
   const [isAddOrEditOpen, setIsAddOrEditOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -338,6 +341,17 @@ const EmployeeSettings: React.FC = () => {
                           >
                             <UserCog className="h-4 w-4" />
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                              setSelectedEmployee(employee);
+                              setShowTaskAssignment(true);
+                            }}
+                            title="Assign Tasks"
+                          >
+                            <Calendar className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -350,27 +364,51 @@ const EmployeeSettings: React.FC = () => {
       </Card>
 
       {selectedEmployee && (
-        <Dialog open={showWorkstationMapping} onOpenChange={setShowWorkstationMapping}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Manage Workstations for {selectedEmployee.name}</DialogTitle>
-              <DialogDescription>
-                Select which workstations this employee is assigned to
-              </DialogDescription>
-            </DialogHeader>
-            
-            <EmployeeWorkstationsManager 
-              employeeId={selectedEmployee.id} 
-              employeeName={selectedEmployee.name} 
-            />
-            
-            <div className="flex justify-end">
-              <DialogClose asChild>
-                <Button type="button" variant="outline">Close</Button>
-              </DialogClose>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <>
+          <Dialog open={showWorkstationMapping} onOpenChange={setShowWorkstationMapping}>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Manage Workstations for {selectedEmployee.name}</DialogTitle>
+                <DialogDescription>
+                  Select which workstations this employee is assigned to
+                </DialogDescription>
+              </DialogHeader>
+              
+              <EmployeeWorkstationsManager 
+                employeeId={selectedEmployee.id} 
+                employeeName={selectedEmployee.name} 
+              />
+              
+              <div className="flex justify-end">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Close</Button>
+                </DialogClose>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={showTaskAssignment} onOpenChange={setShowTaskAssignment}>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Assign Standard Tasks to {selectedEmployee.name}</DialogTitle>
+                <DialogDescription>
+                  Select standard tasks and assign them to this employee
+                </DialogDescription>
+              </DialogHeader>
+              
+              <StandardTaskAssignment
+                isOpen={showTaskAssignment}
+                onClose={() => setShowTaskAssignment(false)}
+                selectedDate={selectedDate}
+                workers={[selectedEmployee]}
+                onSave={() => {
+                  setShowTaskAssignment(false);
+                  toast({ title: "Success", description: "Tasks assigned successfully" });
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+        </>
       )}
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
