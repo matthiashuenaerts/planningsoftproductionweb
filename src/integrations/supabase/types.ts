@@ -346,6 +346,42 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_standard_task_links: {
+        Row: {
+          created_at: string
+          employee_id: string | null
+          id: string
+          standard_task_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          employee_id?: string | null
+          id?: string
+          standard_task_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string | null
+          id?: string
+          standard_task_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_standard_task_links_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_standard_task_links_standard_task_id_fkey"
+            columns: ["standard_task_id"]
+            isOneToOne: false
+            referencedRelation: "standard_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_workstation_links: {
         Row: {
           created_at: string
