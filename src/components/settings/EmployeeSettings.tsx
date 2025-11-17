@@ -40,7 +40,7 @@ import { Loader2, UserCog, UserPlus, Edit, Trash2, Calendar } from 'lucide-react
 import { useToast } from '@/hooks/use-toast';
 import { employeeService } from '@/services/dataService';
 import { EmployeeWorkstationsManager } from './EmployeeWorkstationsManager';
-import StandardTaskAssignment from '../StandardTaskAssignment';
+import { EmployeeStandardTasksManager } from './EmployeeStandardTasksManager';
 import { Employee } from '@/services/dataService';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -388,24 +388,24 @@ const EmployeeSettings: React.FC = () => {
           </Dialog>
 
           <Dialog open={showTaskAssignment} onOpenChange={setShowTaskAssignment}>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogContent className="max-w-3xl">
               <DialogHeader>
-                <DialogTitle>Assign Standard Tasks to {selectedEmployee.name}</DialogTitle>
+                <DialogTitle>Manage Standard Tasks for {selectedEmployee.name}</DialogTitle>
                 <DialogDescription>
-                  Select standard tasks and assign them to this employee
+                  Select which standard tasks this employee can perform
                 </DialogDescription>
               </DialogHeader>
               
-              <StandardTaskAssignment
-                isOpen={showTaskAssignment}
-                onClose={() => setShowTaskAssignment(false)}
-                selectedDate={selectedDate}
-                workers={[selectedEmployee]}
-                onSave={() => {
-                  setShowTaskAssignment(false);
-                  toast({ title: "Success", description: "Tasks assigned successfully" });
-                }}
+              <EmployeeStandardTasksManager 
+                employeeId={selectedEmployee.id} 
+                employeeName={selectedEmployee.name} 
               />
+              
+              <div className="flex justify-end">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Close</Button>
+                </DialogClose>
+              </div>
             </DialogContent>
           </Dialog>
         </>

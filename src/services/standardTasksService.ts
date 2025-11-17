@@ -320,5 +320,52 @@ export const standardTasksService = {
     const dueDate = new Date(installationDate);
     dueDate.setDate(dueDate.getDate() - dayCounter);
     return dueDate;
+  },
+
+  async linkEmployeeToStandardTask(employeeId: string, standardTaskId: string): Promise<void> {
+    const { error } = await supabase
+      .from('employee_standard_task_links')
+      .insert({ employee_id: employeeId, standard_task_id: standardTaskId });
+    
+    if (error) {
+      throw new Error(`Failed to link employee to standard task: ${error.message}`);
+    }
+  },
+
+  async unlinkEmployeeFromStandardTask(employeeId: string, standardTaskId: string): Promise<void> {
+    const { error } = await supabase
+      .from('employee_standard_task_links')
+      .delete()
+      .eq('employee_id', employeeId)
+      .eq('standard_task_id', standardTaskId);
+    
+    if (error) {
+      throw new Error(`Failed to unlink employee from standard task: ${error.message}`);
+    }
+  },
+
+  async getStandardTasksForEmployee(employeeId: string): Promise<StandardTask[]> {
+    const { data, error } = await supabase
+      .from('employee_standard_task_links')
+      .select(`
+        standard_tasks (
+          id,
+          task_number,
+          task_name,
+          time_coefficient,
+          day_counter,
+          color,
+          hourly_cost,
+          created_at,
+          updated_at
+        )
+      `)
+      .eq('employee_id', employeeId);
+    
+    if (error) {
+      throw new Error(`Failed to fetch standard tasks for employee: ${error.message}`);
+    }
+    
+    return data?.map(item => item.standard_tasks).filter(Boolean) as StandardTask[] || [];
   }
 };
