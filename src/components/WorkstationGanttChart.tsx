@@ -79,6 +79,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [workingHours, setWorkingHours] = useState<WorkingHours[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [limitPhases, setLimitPhases] = useState<LimitPhase[]>([]);
+  const [standardTasks, setStandardTasks] = useState<Array<{ id: string; task_name: string; task_number: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
@@ -112,6 +113,18 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       setWorkstations(ws || []);
       setWorkingHours(wh || []);
       setHolidays(hd || []);
+      
+      // Fetch standard tasks
+      const { data: standardTasksData, error: standardTasksError } = await supabase
+        .from('standard_tasks')
+        .select('id, task_name, task_number')
+        .order('task_number');
+      
+      if (standardTasksError) {
+        console.error('Error fetching standard tasks:', standardTasksError);
+      } else {
+        setStandardTasks(standardTasksData || []);
+      }
       
       // Fetch workstation-employee links for UI
       const linksMap = new Map<string, Array<{ id: string; name: string }>>();
@@ -916,6 +929,75 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     }
   };
 
+  // Toggle standard task assignment for employee
+  const handleToggleStandardTask = async (employeeId: string, standardTaskId: string) => {
+    const currentEmployee = Array.from(employeeStandardTaskLinks.values())
+      .flat()
+      .find(emp => emp.id === employeeId);
+    
+    const isCurrentlyAssigned = currentEmployee?.standardTasks.includes(standardTaskId) || false;
+
+    try {
+      if (isCurrentlyAssigned) {
+        // Remove the link
+        const { error } = await supabase
+          .from('employee_standard_task_links')
+          .delete()
+          .eq('employee_id', employeeId)
+          .eq('standard_task_id', standardTaskId);
+
+        if (error) throw error;
+
+        // Update local state
+        setEmployeeStandardTaskLinks(prev => {
+          const newMap = new Map(prev);
+          const empData = newMap.get(employeeId);
+          if (empData && empData[0]) {
+            empData[0].standardTasks = empData[0].standardTasks.filter(id => id !== standardTaskId);
+            if (empData[0].standardTasks.length === 0) {
+              newMap.delete(employeeId);
+            }
+          }
+          return newMap;
+        });
+
+        toast.success('Standaard taak verwijderd van werknemer');
+      } else {
+        // Add the link
+        const { error } = await supabase
+          .from('employee_standard_task_links')
+          .insert({
+            employee_id: employeeId,
+            standard_task_id: standardTaskId,
+          });
+
+        if (error) throw error;
+
+        // Update local state
+        const employeeName = uniqueEmployees.find(e => e.id === employeeId)?.name || '';
+        setEmployeeStandardTaskLinks(prev => {
+          const newMap = new Map(prev);
+          const existing = newMap.get(employeeId);
+          if (existing && existing[0]) {
+            existing[0].standardTasks.push(standardTaskId);
+          } else {
+            newMap.set(employeeId, [{
+              id: employeeId,
+              name: employeeName,
+              standardTasks: [standardTaskId]
+            }]);
+          }
+          return newMap;
+        });
+
+        toast.success('Standaard taak toegewezen aan werknemer');
+      }
+    } catch (error: any) {
+      console.error('Error toggling standard task:', error);
+      toast.error(`Fout: ${error.message}`);
+    }
+  };
+
   // Expose data via ref for external access
   useImperativeHandle(ref, () => ({
     getDailyAssignments: () => dailyAssignments,
@@ -1612,9 +1694,10 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
               <div className="space-y-2">
                 {uniqueEmployees.map(employee => {
                   const isExpanded = expandedEmployees.has(employee.id);
-                  const assignedWorkstations = workstations.filter(ws => 
-                    workstationEmployeeLinks.get(ws.id)?.some(emp => emp.id === employee.id)
-                  );
+                  const employeeData = Array.from(employeeStandardTaskLinks.values())
+                    .flat()
+                    .find(emp => emp.id === employee.id);
+                  const assignedTasksCount = employeeData?.standardTasks.length || 0;
 
                   return (
                     <div key={employee.id} className="border rounded-lg overflow-hidden">
@@ -1631,7 +1714,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                           )}
                           <span className="font-medium">{employee.name}</span>
                           <span className="text-xs text-muted-foreground">
-                            ({assignedWorkstations.length} werkstations)
+                            ({assignedTasksCount} standaard taken)
                           </span>
                         </div>
                       </Button>
@@ -1639,23 +1722,21 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                       {isExpanded && (
                         <div className="px-4 pb-4 pt-2 bg-muted/20">
                           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                            {workstations.map(workstation => {
-                              const isAssigned = workstationEmployeeLinks
-                                .get(workstation.id)
-                                ?.some(emp => emp.id === employee.id) || false;
+                            {standardTasks.map(task => {
+                              const isAssigned = employeeData?.standardTasks.includes(task.id) || false;
 
                               return (
                                 <label
-                                  key={workstation.id}
+                                  key={task.id}
                                   className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer transition-colors"
                                 >
                                   <input
                                     type="checkbox"
                                     checked={isAssigned}
-                                    onChange={() => handleToggleWorkstation(employee.id, workstation.id)}
+                                    onChange={() => handleToggleStandardTask(employee.id, task.id)}
                                     className="rounded border-gray-300"
                                   />
-                                  <span className="text-sm">{workstation.name}</span>
+                                  <span className="text-sm">{task.task_number} - {task.task_name}</span>
                                 </label>
                               );
                             })}
