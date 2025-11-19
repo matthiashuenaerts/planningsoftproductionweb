@@ -1013,7 +1013,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     }
   }, [workstations, tasks]);
 
-  // Advanced employee-centric schedule calculation with maximum utilization
+  // Advanced employee-centric schedule calculation with optimal task assignment
   const schedule = useMemo(() => {
     // Map: workstationId -> workerIndex -> tasks (for rendering)
     const all = new Map<string, Map<number, { task: Task; start: Date; end: Date; isVisible: boolean }[]>>();
@@ -1024,10 +1024,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     const scheduledTaskIds = new Set<string>();
     const unassignedTasks: Task[] = [];
     
-    const workHours = getWorkHours(selectedDate);
-    const timelineStart = workHours?.start || setHours(startOfDay(selectedDate), 8);
-    const timelineEnd = workHours?.end || setHours(startOfDay(selectedDate), 17);
-    const totalWorkMinutes = differenceInMinutes(timelineEnd, timelineStart);
+    const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
     const today = format(new Date(), 'yyyy-MM-dd');
 
     // Initialize workstation structures for rendering
@@ -1230,26 +1227,24 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         continue;
       }
 
-    // Score each employee - NOW PREFER MORE LOADED to maximize continuous work
+      // Score each employee based on current workload and capability
       const employeeScores = eligibleEmployees.map(emp => {
         const empSchedule = employeeSchedules.get(emp.id) || [];
         const currentWorkload = empSchedule.reduce((sum, s) => 
           sum + differenceInMinutes(s.end, s.start), 0
         );
         
-        // CHANGED: Prefer MORE loaded employees to fill schedules continuously
-        const utilizationPercent = (currentWorkload / totalWorkMinutes) * 100;
-        const workloadScore = currentWorkload; // Higher workload = higher score
+        // Prefer less loaded employees
+        const workloadScore = 10000 - currentWorkload;
         
-        // Prefer employees working at task's workstations (but lower weight)
+        // Prefer employees working at task's workstations
         const workstationMatchScore = task.workstations?.some(taskWs => 
           emp.workstations.includes(taskWs.id)
-        ) ? 500 : 0;
+        ) ? 1000 : 0;
         
         return {
           employee: emp,
-          score: workloadScore + workstationMatchScore,
-          utilizationPercent
+          score: workloadScore + workstationMatchScore
         };
       }).sort((a, b) => b.score - a.score);
 
@@ -1302,17 +1297,17 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
           continue;
         }
 
-        // Score employees - prefer more loaded
+        // Score employees
         const employeeScores = eligibleEmployees.map(emp => {
           const empSchedule = employeeSchedules.get(emp.id) || [];
           const currentWorkload = empSchedule.reduce((sum, s) => 
             sum + differenceInMinutes(s.end, s.start), 0
           );
           
-          const workloadScore = currentWorkload;
+          const workloadScore = 10000 - currentWorkload;
           const workstationMatchScore = task.workstations?.some(taskWs => 
             emp.workstations.includes(taskWs.id)
-          ) ? 500 : 0;
+          ) ? 1000 : 0;
           
           return {
             employee: emp,
@@ -1346,7 +1341,8 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     }
 
     // PHASE 3: Gap-filling optimization - try to fit unassigned tasks into gaps
-    if (unassignedTasks.length > 0) {
+    const workHours = getWorkHours(selectedDate);
+    if (workHours && unassignedTasks.length > 0) {
       const sortedUnassigned = [...unassignedTasks].sort((a, b) => {
         const scoreA = getTaskPriorityScore(a);
         const scoreB = getTaskPriorityScore(b);
@@ -1374,117 +1370,14 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       }
     }
 
-    // PHASE 4: Maximize utilization - fill underutilized employees
-    const utilizationThreshold = 70; // Target at least 70% utilization
-    let redistributionIterations = 0;
-    const maxRedistributions = 10;
-
-    while (redistributionIterations < maxRedistributions) {
-      redistributionIterations++;
-      
-      // Calculate utilization for each employee
-      const employeeUtilization = Array.from(allEmployees.values()).map(emp => {
-        const empSchedule = employeeSchedules.get(emp.id) || [];
-        const workload = empSchedule.reduce((sum, s) => 
-          sum + differenceInMinutes(s.end, s.start), 0
-        );
-        const utilization = (workload / totalWorkMinutes) * 100;
-        
-        return {
-          employee: emp,
-          workload,
-          utilization,
-          schedule: empSchedule
-        };
-      });
-
-      // Find underutilized employees
-      const underutilized = employeeUtilization
-        .filter(eu => eu.utilization < utilizationThreshold && eu.utilization < 95)
-        .sort((a, b) => a.utilization - b.utilization);
-
-      if (underutilized.length === 0) break;
-
-      // Try to assign more tasks to underutilized employees
-      let tasksReassigned = false;
-
-      for (const { employee } of underutilized) {
-        // Find tasks that this employee CAN do but aren't assigned to them
-        const potentialTasks = sortedTasks.filter(task => 
-          task.standard_task_id &&
-          employee.standardTasks.includes(task.standard_task_id) &&
-          !scheduledTaskIds.has(task.id)
-        );
-
-        for (const task of potentialTasks) {
-          const slot = findAvailableSlot(employee.id, task.duration, timelineStart);
-          if (slot) {
-            if (assignTaskToEmployee(task, employee.id, slot.start)) {
-              tasksReassigned = true;
-              const idx = unassignedTasks.findIndex(t => t.id === task.id);
-              if (idx >= 0) unassignedTasks.splice(idx, 1);
-              break;
-            }
-          }
-        }
-      }
-
-      if (!tasksReassigned) break;
-    }
-
-    // PHASE 5: Final push - be flexible with workstation assignments
-    if (unassignedTasks.length > 0) {
-      for (const task of unassignedTasks) {
-        if (!task.standard_task_id || scheduledTaskIds.has(task.id)) continue;
-
-        // Find ANY employee who can do this task, regardless of workstation
-        const eligibleEmployees = Array.from(allEmployees.values())
-          .filter(emp => emp.standardTasks.includes(task.standard_task_id!))
-          .sort((a, b) => {
-            const aSchedule = employeeSchedules.get(a.id) || [];
-            const bSchedule = employeeSchedules.get(b.id) || [];
-            const aWorkload = aSchedule.reduce((sum, s) => sum + differenceInMinutes(s.end, s.start), 0);
-            const bWorkload = bSchedule.reduce((sum, s) => sum + differenceInMinutes(s.end, s.start), 0);
-            return aWorkload - bWorkload; // Prefer less loaded
-          });
-
-        for (const employee of eligibleEmployees) {
-          const slot = findAvailableSlot(employee.id, task.duration, timelineStart);
-          if (slot) {
-            if (assignTaskToEmployee(task, employee.id, slot.start)) {
-              break;
-            }
-          }
-        }
-      }
-    }
-
     // Log scheduling statistics
-    const finalUtilization = Array.from(allEmployees.values()).map(emp => {
-      const empSchedule = employeeSchedules.get(emp.id) || [];
-      const workload = empSchedule.reduce((sum, s) => 
-        sum + differenceInMinutes(s.end, s.start), 0
-      );
-      return {
-        name: emp.name,
-        utilization: ((workload / totalWorkMinutes) * 100).toFixed(1),
-        minutes: workload
-      };
-    }).filter(e => e.minutes > 0);
-
     console.log('📊 Scheduling Statistics:');
     console.log(`✅ Scheduled: ${scheduledTaskIds.size} tasks`);
-    console.log(`❌ Unassigned: ${unassignedTasks.filter(t => !scheduledTaskIds.has(t.id)).length} tasks`);
-    console.log(`👥 Employees used: ${finalUtilization.length}/${allEmployees.size}`);
-    console.log(`⏱️ Total work minutes available: ${totalWorkMinutes} per employee`);
-    console.log('📈 Employee Utilization:');
-    finalUtilization.forEach(e => {
-      console.log(`  ${e.name}: ${e.utilization}% (${e.minutes}/${totalWorkMinutes} min)`);
-    });
+    console.log(`❌ Unassigned: ${unassignedTasks.length} tasks`);
+    console.log(`👥 Employees used: ${Array.from(employeeSchedules.values()).filter(s => s.length > 0).length}`);
     
-    if (unassignedTasks.filter(t => !scheduledTaskIds.has(t.id)).length > 0) {
-      const remaining = unassignedTasks.filter(t => !scheduledTaskIds.has(t.id));
-      console.warn(`⚠️ ${remaining.length} unassigned tasks:`, remaining.map(t => ({
+    if (unassignedTasks.length > 0) {
+      console.warn('⚠️ Unassigned tasks:', unassignedTasks.map(t => ({
         title: t.title,
         standardTask: t.standard_task_id,
         reason: !t.standard_task_id ? 'No standard task' : 'No eligible employee or time slot'
