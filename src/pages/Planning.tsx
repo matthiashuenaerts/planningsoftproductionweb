@@ -968,7 +968,17 @@ const Planning = () => {
       
       if (historyError) throw historyError;
       
-      // Get employee-workstation assignments
+      // Get employee-standard task assignments (PRIMARY eligibility source)
+      const { data: employeeStandardTaskLinks, error: empStdTaskError } = await supabase
+        .from('employee_standard_task_links')
+        .select(`
+          employee_id,
+          standard_task_id
+        `);
+      
+      if (empStdTaskError) throw empStdTaskError;
+      
+      // Get employee-workstation assignments (for workstation placement only)
       const { data: employeeWorkstations, error: empWsError } = await supabase
         .from('employee_workstation_links')
         .select(`
@@ -1010,13 +1020,22 @@ const Planning = () => {
         }
       }
       
-      // Build employee competency map (which workstations they can work at)
-      const employeeCompetencyMap = new Map<string, Set<string>>();
-      for (const empWs of employeeWorkstations || []) {
-        if (!employeeCompetencyMap.has(empWs.employee_id)) {
-          employeeCompetencyMap.set(empWs.employee_id, new Set());
+      // Build employee standard task competency map (PRIMARY eligibility check)
+      const employeeStandardTaskMap = new Map<string, Set<string>>();
+      for (const empStdTask of employeeStandardTaskLinks || []) {
+        if (!employeeStandardTaskMap.has(empStdTask.employee_id)) {
+          employeeStandardTaskMap.set(empStdTask.employee_id, new Set());
         }
-        employeeCompetencyMap.get(empWs.employee_id)!.add(empWs.workstation?.id || '');
+        employeeStandardTaskMap.get(empStdTask.employee_id)!.add(empStdTask.standard_task_id);
+      }
+      
+      // Build employee workstation map (for workstation placement only)
+      const employeeWorkstationMap = new Map<string, Set<string>>();
+      for (const empWs of employeeWorkstations || []) {
+        if (!employeeWorkstationMap.has(empWs.employee_id)) {
+          employeeWorkstationMap.set(empWs.employee_id, new Set());
+        }
+        employeeWorkstationMap.get(empWs.employee_id)!.add(empWs.workstation?.id || '');
       }
       
       // Build task-workstation requirement map
@@ -1077,6 +1096,12 @@ const Planning = () => {
       console.log('⚡ Phase 4: Executing task assignment logic...');
       
       for (const task of sortedTasks) {
+        // CRITICAL: Check if task already assigned (prevent duplicates)
+        if (taskAssignments.has(task.id)) {
+          console.log(`⚠️ Task ${task.title} already assigned, skipping duplicate`);
+          continue;
+        }
+        
         let assignedEmployee: string | null = null;
         const taskWorkstations = taskWorkstationMap.get(task.id) || new Set();
         
@@ -1084,24 +1109,23 @@ const Planning = () => {
         if (taskOwnershipMap.has(task.id)) {
           const originalEmployee = taskOwnershipMap.get(task.id)!;
           
-          // Check if original employee is available and competent
-          const employeeCompetencies = employeeCompetencyMap.get(originalEmployee) || new Set();
-          const canWorkOnTask = taskWorkstations.size === 0 || 
-            Array.from(taskWorkstations).some(wsId => employeeCompetencies.has(wsId));
+          // PRIMARY CHECK: Employee must be linked to this standard task
+          const employeeStandardTasks = employeeStandardTaskMap.get(originalEmployee) || new Set();
+          const canDoStandardTask = task.standard_task_id && employeeStandardTasks.has(task.standard_task_id);
           
-          if (canWorkOnTask) {
+          if (canDoStandardTask) {
             // Check if employee is not on holiday
             const isOnHoliday = await planningService.isEmployeeOnHoliday(originalEmployee, selectedDate);
             if (!isOnHoliday) {
               assignedEmployee = originalEmployee;
-              console.log(`✅ Task ${task.title} assigned to original owner ${originalEmployee} (continuation)`);
+              console.log(`✅ Task ${task.title} (standard_task: ${task.standard_task_id}) assigned to original owner ${originalEmployee} (continuation)`);
             } else {
               console.log(`❌ Original owner ${originalEmployee} on holiday, task ${task.title} cannot be continued`);
               conflictedTasks.add(task.id);
               continue;
             }
           } else {
-            console.log(`❌ Original owner ${originalEmployee} not competent for task ${task.title}`);
+            console.log(`❌ Original owner ${originalEmployee} not linked to standard task ${task.standard_task_id} for task ${task.title}`);
             conflictedTasks.add(task.id);
             continue;
           }
@@ -1109,6 +1133,13 @@ const Planning = () => {
         
         // RULE 2: New task assignment - Find best available employee
         if (!assignedEmployee) {
+          // Skip tasks without standard_task_id
+          if (!task.standard_task_id) {
+            console.log(`⚠️ Task ${task.title} has no standard_task_id, cannot assign`);
+            conflictedTasks.add(task.id);
+            continue;
+          }
+          
           const candidateEmployees: Array<{employeeId: string, score: number}> = [];
           
           for (const workerSchedule of workerSchedules) {
@@ -1118,12 +1149,11 @@ const Planning = () => {
             const isOnHoliday = await planningService.isEmployeeOnHoliday(employeeId, selectedDate);
             if (isOnHoliday) continue;
             
-            // Check competency for required workstations
-            const employeeCompetencies = employeeCompetencyMap.get(employeeId) || new Set();
-            const canWorkOnTask = taskWorkstations.size === 0 || 
-              Array.from(taskWorkstations).some(wsId => employeeCompetencies.has(wsId));
+            // PRIMARY CHECK: Employee must be linked to this standard task
+            const employeeStandardTasks = employeeStandardTaskMap.get(employeeId) || new Set();
+            const canDoStandardTask = employeeStandardTasks.has(task.standard_task_id);
             
-            if (!canWorkOnTask) continue;
+            if (!canDoStandardTask) continue;
             
             // Calculate assignment score
             let score = 0;
@@ -1137,10 +1167,11 @@ const Planning = () => {
             const currentTaskCount = employeeTaskQueue.get(employeeId)?.length || 0;
             score += Math.max(0, 100 - (currentTaskCount * 10));
             
-            // Workstation efficiency (exact workstation match gets bonus)
+            // Workstation efficiency bonus (if employee also has matching workstation)
+            const employeeWorkstations = employeeWorkstationMap.get(employeeId) || new Set();
             if (taskWorkstations.size > 0) {
               const matchingWorkstations = Array.from(taskWorkstations).filter(wsId => 
-                employeeCompetencies.has(wsId)
+                employeeWorkstations.has(wsId)
               );
               score += matchingWorkstations.length * 25;
             }
@@ -1152,21 +1183,21 @@ const Planning = () => {
           if (candidateEmployees.length > 0) {
             candidateEmployees.sort((a, b) => b.score - a.score);
             assignedEmployee = candidateEmployees[0].employeeId;
-            console.log(`✅ Task ${task.title} assigned to ${assignedEmployee} (score: ${candidateEmployees[0].score})`);
+            console.log(`✅ Task ${task.title} (standard_task: ${task.standard_task_id}) assigned to ${assignedEmployee} (score: ${candidateEmployees[0].score})`);
           } else {
-            console.log(`❌ No suitable employee found for task ${task.title}`);
+            console.log(`❌ No employee linked to standard_task ${task.standard_task_id} for task ${task.title}`);
             conflictedTasks.add(task.id);
             continue;
           }
         }
         
-        // RULE 3: Prevent double assignment
+        // CRITICAL: Final duplicate check before recording
         if (taskAssignments.has(task.id)) {
-          console.log(`⚠️ Task ${task.title} already assigned, skipping duplicate`);
+          console.log(`🛑 DUPLICATE PREVENTION: Task ${task.title} already assigned to ${taskAssignments.get(task.id)}, skipping`);
           continue;
         }
         
-        // Record assignment
+        // Record assignment (ONE task to ONE employee)
         if (assignedEmployee) {
           taskAssignments.set(task.id, assignedEmployee);
           
@@ -1174,11 +1205,15 @@ const Planning = () => {
             employeeTaskQueue.set(assignedEmployee, []);
           }
           employeeTaskQueue.get(assignedEmployee)!.push(task);
+          
+          console.log(`📝 Recorded: Task ${task.id} -> Employee ${assignedEmployee}`);
         }
       }
       
       // PHASE 5: Generate Actual Schedules
       console.log('📅 Phase 5: Generating actual schedules...');
+      console.log(`✅ Total unique tasks assigned: ${taskAssignments.size}`);
+      console.log(`👥 Employees with assignments: ${employeeTaskQueue.size}`);
       
       // Clear existing schedules for the date
       const { error: deleteError } = await supabase
@@ -1303,11 +1338,22 @@ const Planning = () => {
       }
       
       console.log(`🎯 Algorithm Results:
-        - Workers processed: ${successfullyGenerated}
-        - Tasks assigned: ${totalAssignedTasks}
+        - Assignment Method: employee_standard_task_links (strict enforcement)
+        - Unique tasks assigned: ${taskAssignments.size}
+        - Total task slots created: ${totalAssignedTasks}
+        - Employees scheduled: ${successfullyGenerated}
         - Unassigned tasks: ${unassignedTasks}
         - Continued tasks: ${Array.from(taskOwnershipMap.keys()).length}
-        - New task assignments: ${totalAssignedTasks - Array.from(taskOwnershipMap.keys()).length}`);
+        - New task assignments: ${taskAssignments.size - Array.from(taskOwnershipMap.keys()).length}
+        - Duplicate assignments prevented: ${sortedTasks.length - taskAssignments.size - unassignedTasks}`);
+      
+      // Verify no duplicate assignments
+      const uniqueAssignedTasks = new Set(taskAssignments.keys());
+      if (uniqueAssignedTasks.size !== taskAssignments.size) {
+        console.error('🚨 CRITICAL: Duplicate task assignments detected!');
+      } else {
+        console.log('✅ VERIFIED: All task assignments are unique (one task = one employee)');
+      }
       
       toast({
         title: "Advanced Schedule Generation Complete",
