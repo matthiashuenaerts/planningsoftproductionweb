@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, eachDayOfInterval } from 'date-fns';
-import { ExternalLink, User, X, Plus } from 'lucide-react';
+import { ExternalLink, User, X, Plus, Truck } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface Employee {
   id: string;
@@ -18,6 +19,12 @@ interface PlacementTeam {
   id: string;
   name: string;
   color: string;
+}
+
+interface TruckOption {
+  id: string;
+  truck_number: number | string;
+  description: string | null;
 }
 
 interface ProjectAssignmentDialogProps {
@@ -49,12 +56,16 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   const [assignedEmployees, setAssignedEmployees] = useState<Employee[]>([]);
   const [employeesOnHoliday, setEmployeesOnHoliday] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [trucks, setTrucks] = useState<TruckOption[]>([]);
+  const [selectedTruckId, setSelectedTruckId] = useState<string>('');
 
   useEffect(() => {
     if (isOpen) {
       fetchTeams();
       fetchAssignedEmployees();
       checkHolidayRequests();
+      fetchTrucks();
+      fetchTruckAssignment();
     }
   }, [isOpen]);
 
@@ -127,6 +138,29 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
     }
   };
 
+  const fetchTrucks = async () => {
+    const { data, error } = await supabase
+      .from('trucks')
+      .select('id, truck_number, description')
+      .order('truck_number');
+
+    if (!error && data) {
+      setTrucks(data as TruckOption[]);
+    }
+  };
+
+  const fetchTruckAssignment = async () => {
+    const { data, error } = await supabase
+      .from('project_truck_assignments')
+      .select('truck_id')
+      .eq('project_id', projectId)
+      .single();
+
+    if (!error && data) {
+      setSelectedTruckId(data.truck_id);
+    }
+  };
+
   const handleSave = async () => {
     setLoading(true);
     try {
@@ -154,6 +188,48 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
         .eq('id', projectId);
 
       if (projectError) throw projectError;
+
+      // Handle truck assignment
+      if (selectedTruckId) {
+        // Check if truck assignment exists
+        const { data: existingAssignment } = await supabase
+          .from('project_truck_assignments')
+          .select('id')
+          .eq('project_id', projectId)
+          .single();
+
+        if (existingAssignment) {
+          // Update existing assignment
+          const { error: truckUpdateError } = await supabase
+            .from('project_truck_assignments')
+            .update({
+              truck_id: selectedTruckId,
+              loading_date: startDate,
+              installation_date: installationDate,
+            })
+            .eq('project_id', projectId);
+
+          if (truckUpdateError) throw truckUpdateError;
+        } else {
+          // Create new assignment
+          const { error: truckInsertError } = await supabase
+            .from('project_truck_assignments')
+            .insert({
+              project_id: projectId,
+              truck_id: selectedTruckId,
+              loading_date: startDate,
+              installation_date: installationDate,
+            });
+
+          if (truckInsertError) throw truckInsertError;
+        }
+      } else {
+        // Remove truck assignment if none selected
+        await supabase
+          .from('project_truck_assignments')
+          .delete()
+          .eq('project_id', projectId);
+      }
 
       toast.success('Project updated successfully');
       onUpdate();
@@ -297,6 +373,36 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
                 className="bg-muted"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="truck">Assigned Truck</Label>
+            <Select value={selectedTruckId} onValueChange={setSelectedTruckId}>
+              <SelectTrigger id="truck">
+                <SelectValue placeholder="Select truck">
+                  {selectedTruckId && trucks.find(t => t.id === selectedTruckId) ? (
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-4 w-4" />
+                      <Badge variant="secondary">
+                        T{trucks.find(t => t.id === selectedTruckId)?.truck_number}
+                      </Badge>
+                      <span>{trucks.find(t => t.id === selectedTruckId)?.description}</span>
+                    </div>
+                  ) : "No truck assigned"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No truck assigned</SelectItem>
+                {trucks.map((truck) => (
+                  <SelectItem key={truck.id} value={truck.id}>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">T{truck.truck_number}</Badge>
+                      <span>{truck.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
