@@ -164,11 +164,25 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   const handleSave = async () => {
     setLoading(true);
     try {
+      // Get the selected team name
+      const selectedTeam = teams.find(t => t.id === selectedTeamId);
+      if (!selectedTeam) {
+        toast.error('Please select a team');
+        return;
+      }
+
+      // Calculate installation date based on start date + duration
+      const installationDate = format(
+        new Date(new Date(startDate).getTime() + (duration - 1) * 24 * 60 * 60 * 1000),
+        'yyyy-MM-dd'
+      );
+
       // Update project team assignment
       const { error: assignmentError } = await supabase
         .from('project_team_assignments')
         .update({
           team_id: selectedTeamId,
+          team: selectedTeam.name,
           start_date: startDate,
           duration: duration,
         })
@@ -176,12 +190,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
 
       if (assignmentError) throw assignmentError;
 
-      // Update installation date based on start date + duration
-      const installationDate = format(
-        new Date(new Date(startDate).getTime() + (duration - 1) * 24 * 60 * 60 * 1000),
-        'yyyy-MM-dd'
-      );
-
+      // Update installation date in projects table
       const { error: projectError } = await supabase
         .from('projects')
         .update({ installation_date: installationDate })
@@ -189,8 +198,46 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
 
       if (projectError) throw projectError;
 
+      // Handle daily team assignments synchronization
+      // First, delete all existing assignments for this project's date range
+      const oldEndDate = format(
+        new Date(new Date(currentStartDate).getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000),
+        'yyyy-MM-dd'
+      );
+
+      await supabase
+        .from('daily_team_assignments')
+        .delete()
+        .eq('team_id', currentTeamId || '')
+        .gte('date', currentStartDate)
+        .lte('date', oldEndDate)
+        .in('employee_id', assignedEmployees.map(e => e.id));
+
+      // Create new assignments for the updated date range with new team
+      if (assignedEmployees.length > 0) {
+        const dates = eachDayOfInterval({
+          start: new Date(startDate),
+          end: new Date(new Date(startDate).getTime() + (duration - 1) * 24 * 60 * 60 * 1000)
+        });
+
+        const newAssignments = dates.flatMap(date => 
+          assignedEmployees.map(employee => ({
+            employee_id: employee.id,
+            team_id: selectedTeamId,
+            date: format(date, 'yyyy-MM-dd'),
+            is_available: true
+          }))
+        );
+
+        const { error: assignmentsError } = await supabase
+          .from('daily_team_assignments')
+          .insert(newAssignments);
+
+        if (assignmentsError) throw assignmentsError;
+      }
+
       // Handle truck assignment
-      if (selectedTruckId) {
+      if (selectedTruckId && selectedTruckId !== 'none') {
         // Check if truck assignment exists
         const { data: existingAssignment } = await supabase
           .from('project_truck_assignments')
