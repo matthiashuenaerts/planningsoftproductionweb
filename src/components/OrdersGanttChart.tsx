@@ -560,7 +560,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
-  }, []);
+  }, [teams, projects, loading]);
 
   // Calculate project bar position and width to match calendar grid exactly
   const getProjectPosition = (project: Project, teamName: string) => {
