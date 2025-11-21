@@ -410,14 +410,28 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
               return project;
             }
             
-            const employees = teamMembersMap[assignment.team_id] || [];
-            
-            // Check holiday requests for employees during project period
+            // Fetch all employees assigned via daily_team_assignments for this project
             const endDate = format(
               addDays(parseYMD(assignment.start_date), assignment.duration - 1),
               'yyyy-MM-dd'
             );
             
+            const { data: assignedEmployeesData } = await supabase
+              .from('daily_team_assignments')
+              .select(`
+                employee_id,
+                employees!inner(id, name)
+              `)
+              .eq('team_id', assignment.team_id)
+              .gte('date', assignment.start_date)
+              .lte('date', endDate);
+            
+            // Get unique employees from assignments
+            const employees = Array.from(
+              new Map((assignedEmployeesData || []).map((item: any) => [item.employees.id, item.employees])).values()
+            ) as Employee[];
+            
+            // Check holiday requests for employees during project period
             const { data: holidayData } = await supabase
               .from('holiday_requests')
               .select('user_id')
