@@ -171,12 +171,6 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
         return;
       }
 
-      // Calculate installation date based on start date + duration
-      const installationDate = format(
-        new Date(new Date(startDate).getTime() + (duration - 1) * 24 * 60 * 60 * 1000),
-        'yyyy-MM-dd'
-      );
-
       // Update project team assignment
       const { error: assignmentError } = await supabase
         .from('project_team_assignments')
@@ -190,10 +184,10 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
 
       if (assignmentError) throw assignmentError;
 
-      // Update installation date in projects table
+      // Update installation date in projects table with start date
       const { error: projectError } = await supabase
         .from('projects')
-        .update({ installation_date: installationDate })
+        .update({ installation_date: startDate })
         .eq('id', projectId);
 
       if (projectError) throw projectError;
@@ -252,7 +246,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
             .update({
               truck_id: selectedTruckId,
               loading_date: startDate,
-              installation_date: installationDate,
+              installation_date: startDate,
             })
             .eq('project_id', projectId);
 
@@ -265,7 +259,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
               project_id: projectId,
               truck_id: selectedTruckId,
               loading_date: startDate,
-              installation_date: installationDate,
+              installation_date: startDate,
             });
 
           if (truckInsertError) throw truckInsertError;
