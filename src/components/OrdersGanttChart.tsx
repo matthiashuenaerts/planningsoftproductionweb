@@ -35,6 +35,10 @@ interface Project {
   }>;
   employees?: Employee[];
   employeesOnHoliday?: Set<string>;
+  truck?: {
+    truck_number: number | string;
+    description: string | null;
+  };
 }
 
 interface OrdersGanttChartProps {
@@ -398,7 +402,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         }));
         setTeams(teamsWithMembers);
         
-        // Fetch employees for each project based on team assignments
+        // Fetch employees and trucks for each project based on team assignments
         const projectsWithEmployees = await Promise.all(
           mergedProjects.map(async (project) => {
             const assignment = project.project_team_assignments?.[0];
@@ -423,10 +427,31 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
             
             const employeesOnHoliday = new Set(holidayData?.map(h => h.user_id) || []);
             
+            // Fetch truck assignment for this project
+            const { data: truckAssignment } = await supabase
+              .from('project_truck_assignments')
+              .select('truck_id')
+              .eq('project_id', project.id)
+              .single();
+            
+            let truck = undefined;
+            if (truckAssignment?.truck_id) {
+              const { data: truckData } = await supabase
+                .from('trucks')
+                .select('truck_number, description')
+                .eq('id', truckAssignment.truck_id)
+                .single();
+              
+              if (truckData) {
+                truck = truckData;
+              }
+            }
+            
             return {
               ...project,
               employees,
-              employeesOnHoliday
+              employeesOnHoliday,
+              truck
             };
           })
         );
@@ -914,6 +939,11 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                               }}
                             >
                               <div className="truncate">
+                                {project.truck && (
+                                  <div className="text-xs font-semibold text-foreground mb-0.5 flex items-center gap-1">
+                                    <span className="text-primary">🚛 T{project.truck.truck_number}</span>
+                                  </div>
+                                )}
                                 {project.employees && project.employees.length > 0 ? (
                                   <div className="text-xs text-muted-foreground truncate">
                                     {project.employees.map((emp, empIdx) => {
