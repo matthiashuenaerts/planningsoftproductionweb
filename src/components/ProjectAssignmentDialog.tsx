@@ -53,6 +53,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   const [startDate, setStartDate] = useState(currentStartDate);
   const [duration, setDuration] = useState(currentDuration);
   const [teamMembers, setTeamMembers] = useState<Employee[]>([]);
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
   const [assignedEmployees, setAssignedEmployees] = useState<Employee[]>([]);
   const [employeesOnHoliday, setEmployeesOnHoliday] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -62,6 +63,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   useEffect(() => {
     if (isOpen) {
       fetchTeams();
+      fetchAllEmployees();
       fetchAssignedEmployees();
       checkHolidayRequests();
       fetchTrucks();
@@ -98,6 +100,17 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
 
     if (!error && data) {
       setTeamMembers(data.map((item: any) => item.employees));
+    }
+  };
+
+  const fetchAllEmployees = async () => {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('id, name')
+      .order('name');
+
+    if (!error && data) {
+      setAllEmployees(data);
     }
   };
 
@@ -329,7 +342,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       if (error) throw error;
 
       // Add to assigned employees
-      const employee = teamMembers.find(m => m.id === employeeId);
+      const employee = allEmployees.find(m => m.id === employeeId);
       if (employee) {
         setAssignedEmployees(prev => [...prev, employee]);
       }
@@ -480,31 +493,71 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
             )}
           </div>
 
-          {selectedTeamId && teamMembers.length > 0 && (
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Available Team Members (Click to Add)</Label>
-              <div className="flex flex-wrap gap-2">
-                {teamMembers
-                  .filter(member => !assignedEmployees.some(e => e.id === member.id))
-                  .map((member) => {
-                    const isOnHoliday = employeesOnHoliday.has(member.id);
-                    return (
-                      <button
-                        key={member.id}
-                        onClick={() => handleAddEmployee(member.id)}
-                        className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm hover:opacity-80 transition-opacity ${
-                          isOnHoliday
-                            ? 'bg-destructive/10 text-destructive border border-destructive'
-                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                        }`}
-                      >
-                        <Plus className="h-3 w-3" />
-                        <span>{member.name}</span>
-                        {isOnHoliday && <span className="text-xs">(On Holiday)</span>}
-                      </button>
-                    );
-                  })}
-              </div>
+          {selectedTeamId && (
+            <div className="space-y-4">
+              {/* Team Members */}
+              {teamMembers.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Team Members (Click to Add)</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {teamMembers
+                      .filter(member => !assignedEmployees.some(e => e.id === member.id))
+                      .map((member) => {
+                        const isOnHoliday = employeesOnHoliday.has(member.id);
+                        return (
+                          <button
+                            key={member.id}
+                            onClick={() => handleAddEmployee(member.id)}
+                            className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm hover:opacity-80 transition-opacity ${
+                              isOnHoliday
+                                ? 'bg-destructive/10 text-destructive border border-destructive'
+                                : 'bg-primary/10 text-primary border border-primary/20'
+                            }`}
+                          >
+                            <Plus className="h-3 w-3" />
+                            <span>{member.name}</span>
+                            {isOnHoliday && <span className="text-xs">(On Holiday)</span>}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+
+              {/* Other Employees */}
+              {allEmployees.filter(emp => 
+                !teamMembers.some(tm => tm.id === emp.id) && 
+                !assignedEmployees.some(ae => ae.id === emp.id)
+              ).length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Other Employees (Click to Add)</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {allEmployees
+                      .filter(emp => 
+                        !teamMembers.some(tm => tm.id === emp.id) && 
+                        !assignedEmployees.some(ae => ae.id === emp.id)
+                      )
+                      .map((employee) => {
+                        const isOnHoliday = employeesOnHoliday.has(employee.id);
+                        return (
+                          <button
+                            key={employee.id}
+                            onClick={() => handleAddEmployee(employee.id)}
+                            className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm hover:opacity-80 transition-opacity ${
+                              isOnHoliday
+                                ? 'bg-destructive/10 text-destructive border border-destructive'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                            }`}
+                          >
+                            <Plus className="h-3 w-3" />
+                            <span>{employee.name}</span>
+                            {isOnHoliday && <span className="text-xs">(On Holiday)</span>}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
