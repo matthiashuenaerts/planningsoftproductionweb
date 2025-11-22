@@ -1163,30 +1163,57 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                 project_team_assignments: assignmentsByProject[p.id] || [],
               }));
               
-              // Re-fetch employees for updated projects
+              // Fetch truck assignments for all projects
+              const { data: truckAssignmentsData } = await supabase
+                .from('project_truck_assignments')
+                .select(`
+                  project_id,
+                  trucks!inner(truck_number, description)
+                `)
+                .in('project_id', projectIds as string[]);
+              
+              const trucksByProject = new Map(
+                (truckAssignmentsData || []).map(ta => [
+                  ta.project_id,
+                  { truck_number: ta.trucks.truck_number, description: ta.trucks.description }
+                ])
+              );
+
+              // Re-fetch employees and holiday data for updated projects
               const projectsWithEmployees = await Promise.all(
                 mergedProjects.map(async (project) => {
                   const assignment = project.project_team_assignments?.[0];
                   if (!assignment?.team_id || !assignment?.start_date || !assignment?.duration) {
-                    return project;
+                    return { ...project, truck: trucksByProject.get(project.id) };
                   }
                   
-                  const { data: memberData } = await supabase
-                    .from('placement_team_members')
-                    .select(`
-                      employee_id,
-                      employees!inner(id, name)
-                    `)
-                    .eq('team_id', assignment.team_id);
-                  
-                  const employees = memberData?.map((m: any) => m.employees) || [];
-                  
-                  // Check holiday requests
+                  // Calculate end date for the project
                   const endDate = format(
                     addDays(parseYMD(assignment.start_date), assignment.duration - 1),
                     'yyyy-MM-dd'
                   );
+
+                  // Fetch employees from daily team assignments across the entire project duration
+                  const { data: dailyAssignments } = await supabase
+                    .from('daily_team_assignments')
+                    .select(`
+                      employee_id,
+                      employees!inner(id, name)
+                    `)
+                    .eq('team_id', assignment.team_id)
+                    .gte('date', assignment.start_date)
+                    .lte('date', endDate);
+
+                  // Get unique employees
+                  const uniqueEmployees = new Map<string, Employee>();
+                  dailyAssignments?.forEach((da: any) => {
+                    if (da.employees) {
+                      uniqueEmployees.set(da.employees.id, da.employees);
+                    }
+                  });
+                  const employees = Array.from(uniqueEmployees.values());
                   
+                  // Check holiday requests
                   const { data: holidayData } = await supabase
                     .from('holiday_requests')
                     .select('user_id')
@@ -1199,7 +1226,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                   return {
                     ...project,
                     employees,
-                    employeesOnHoliday
+                    employeesOnHoliday,
+                    truck: trucksByProject.get(project.id)
                   };
                 })
               );
