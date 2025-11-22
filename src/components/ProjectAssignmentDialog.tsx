@@ -62,6 +62,22 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
 
   useEffect(() => {
     if (isOpen) {
+      console.log('Dialog opened, initializing state...', {
+        projectId,
+        currentTeamId,
+        currentStartDate,
+        currentDuration
+      });
+      
+      // Reset state with current values
+      setSelectedTeamId(currentTeamId || '');
+      setStartDate(currentStartDate);
+      setDuration(currentDuration);
+      setAssignedEmployees([]);
+      setEmployeesOnHoliday(new Set());
+      setSelectedTruckId('');
+      
+      // Fetch all data
       fetchTeams();
       fetchAllEmployees();
       fetchAssignedEmployees();
@@ -69,7 +85,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       fetchTrucks();
       fetchTruckAssignment();
     }
-  }, [isOpen]);
+  }, [isOpen, projectId, currentTeamId, currentStartDate, currentDuration]);
 
   useEffect(() => {
     if (selectedTeamId) {
@@ -115,20 +131,43 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   };
 
   const fetchAssignedEmployees = async () => {
+    if (!currentTeamId) {
+      console.log('No current team ID, skipping fetch assigned employees');
+      setAssignedEmployees([]);
+      return;
+    }
+
+    const endDate = format(
+      new Date(new Date(currentStartDate).getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000),
+      'yyyy-MM-dd'
+    );
+
+    console.log('Fetching assigned employees...', {
+      teamId: currentTeamId,
+      dateRange: `${currentStartDate} to ${endDate}`
+    });
+
     const { data, error } = await supabase
       .from('daily_team_assignments')
       .select(`
         employee_id,
         employees!inner(id, name)
       `)
-      .eq('team_id', currentTeamId || '')
+      .eq('team_id', currentTeamId)
       .gte('date', currentStartDate)
-      .lte('date', format(new Date(new Date(currentStartDate).getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
+      .lte('date', endDate);
 
-    if (!error && data) {
+    if (error) {
+      console.error('Error fetching assigned employees:', error);
+      toast.error('Failed to load assigned employees');
+      return;
+    }
+
+    if (data) {
       const uniqueEmployees = Array.from(
         new Map(data.map((item: any) => [item.employees.id, item.employees])).values()
       );
+      console.log('Loaded assigned employees:', uniqueEmployees.length);
       setAssignedEmployees(uniqueEmployees as Employee[]);
     }
   };
@@ -167,23 +206,64 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       .from('project_truck_assignments')
       .select('truck_id')
       .eq('project_id', projectId)
-      .single();
+      .maybeSingle();
 
-    if (!error && data) {
+    if (error) {
+      console.error('Error fetching truck assignment:', error);
+      return;
+    }
+
+    if (data) {
+      console.log('Loaded truck assignment:', data.truck_id);
       setSelectedTruckId(data.truck_id);
+    } else {
+      console.log('No truck assignment found');
+      setSelectedTruckId('none');
     }
   };
 
   const handleSave = async () => {
+    console.log('Starting save operation...', {
+      projectId,
+      selectedTeamId,
+      startDate,
+      duration,
+      assignedEmployees: assignedEmployees.length,
+      currentTeamId,
+      currentStartDate,
+      currentDuration
+    });
+
     setLoading(true);
     try {
-      // Get the selected team name
-      const selectedTeam = teams.find(t => t.id === selectedTeamId);
-      if (!selectedTeam) {
+      // Validation
+      if (!selectedTeamId) {
         toast.error('Please select a team');
+        setLoading(false);
         return;
       }
 
+      if (!startDate) {
+        toast.error('Please select a start date');
+        setLoading(false);
+        return;
+      }
+
+      if (!duration || duration < 1) {
+        toast.error('Duration must be at least 1 day');
+        setLoading(false);
+        return;
+      }
+
+      // Get the selected team name
+      const selectedTeam = teams.find(t => t.id === selectedTeamId);
+      if (!selectedTeam) {
+        toast.error('Selected team not found');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Updating project team assignment...');
       // Update project team assignment
       const { error: assignmentError } = await supabase
         .from('project_team_assignments')
@@ -195,33 +275,55 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
         })
         .eq('project_id', projectId);
 
-      if (assignmentError) throw assignmentError;
+      if (assignmentError) {
+        console.error('Assignment error:', assignmentError);
+        throw assignmentError;
+      }
 
+      console.log('Updating project installation date...');
       // Update installation date in projects table with start date
       const { error: projectError } = await supabase
         .from('projects')
         .update({ installation_date: startDate })
         .eq('id', projectId);
 
-      if (projectError) throw projectError;
+      if (projectError) {
+        console.error('Project error:', projectError);
+        throw projectError;
+      }
 
       // Handle daily team assignments synchronization
-      // First, delete all existing assignments for this project's date range
+      console.log('Handling daily team assignments...');
       const oldEndDate = format(
         new Date(new Date(currentStartDate).getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000),
         'yyyy-MM-dd'
       );
 
-      await supabase
-        .from('daily_team_assignments')
-        .delete()
-        .eq('team_id', currentTeamId || '')
-        .gte('date', currentStartDate)
-        .lte('date', oldEndDate)
-        .in('employee_id', assignedEmployees.map(e => e.id));
+      // Delete old assignments only if there are employees and a valid team ID
+      if (assignedEmployees.length > 0 && currentTeamId) {
+        console.log('Deleting old assignments...', {
+          teamId: currentTeamId,
+          dateRange: `${currentStartDate} to ${oldEndDate}`,
+          employeeCount: assignedEmployees.length
+        });
 
-      // Create new assignments for the updated date range with new team
+        const { error: deleteError } = await supabase
+          .from('daily_team_assignments')
+          .delete()
+          .eq('team_id', currentTeamId)
+          .gte('date', currentStartDate)
+          .lte('date', oldEndDate)
+          .in('employee_id', assignedEmployees.map(e => e.id));
+
+        if (deleteError) {
+          console.error('Delete error:', deleteError);
+          throw deleteError;
+        }
+      }
+
+      // Create new assignments for the updated date range
       if (assignedEmployees.length > 0) {
+        console.log('Creating new assignments...');
         const dates = eachDayOfInterval({
           start: new Date(startDate),
           end: new Date(new Date(startDate).getTime() + (duration - 1) * 24 * 60 * 60 * 1000)
@@ -236,23 +338,34 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
           }))
         );
 
+        console.log(`Inserting ${newAssignments.length} assignments...`);
         const { error: assignmentsError } = await supabase
           .from('daily_team_assignments')
           .insert(newAssignments);
 
-        if (assignmentsError) throw assignmentsError;
+        if (assignmentsError) {
+          console.error('Assignments error:', assignmentsError);
+          throw assignmentsError;
+        }
       }
 
       // Handle truck assignment
+      console.log('Handling truck assignment...', { selectedTruckId });
       if (selectedTruckId && selectedTruckId !== 'none') {
         // Check if truck assignment exists
-        const { data: existingAssignment } = await supabase
+        const { data: existingAssignment, error: checkError } = await supabase
           .from('project_truck_assignments')
           .select('id')
           .eq('project_id', projectId)
-          .single();
+          .maybeSingle();
+
+        if (checkError) {
+          console.error('Truck check error:', checkError);
+          throw checkError;
+        }
 
         if (existingAssignment) {
+          console.log('Updating existing truck assignment...');
           // Update existing assignment
           const { error: truckUpdateError } = await supabase
             .from('project_truck_assignments')
@@ -263,8 +376,12 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
             })
             .eq('project_id', projectId);
 
-          if (truckUpdateError) throw truckUpdateError;
+          if (truckUpdateError) {
+            console.error('Truck update error:', truckUpdateError);
+            throw truckUpdateError;
+          }
         } else {
+          console.log('Creating new truck assignment...');
           // Create new assignment
           const { error: truckInsertError } = await supabase
             .from('project_truck_assignments')
@@ -275,21 +392,37 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
               installation_date: startDate,
             });
 
-          if (truckInsertError) throw truckInsertError;
+          if (truckInsertError) {
+            console.error('Truck insert error:', truckInsertError);
+            throw truckInsertError;
+          }
         }
-      } else {
+      } else if (selectedTruckId === 'none') {
+        console.log('Removing truck assignment...');
         // Remove truck assignment if none selected
-        await supabase
+        const { error: truckDeleteError } = await supabase
           .from('project_truck_assignments')
           .delete()
           .eq('project_id', projectId);
+
+        if (truckDeleteError) {
+          console.error('Truck delete error:', truckDeleteError);
+          // Don't throw here, just log - deletion of non-existent assignment is ok
+        }
       }
 
+      console.log('Save completed successfully!');
       toast.success('Project updated successfully');
-      onUpdate();
+      
+      // Call onUpdate to refresh the data
+      await onUpdate();
+      
+      // Close the dialog
       onClose();
     } catch (error: any) {
-      toast.error(`Failed to update project: ${error.message}`);
+      console.error('Save failed:', error);
+      toast.error(`Failed to update project: ${error.message || 'Unknown error'}`);
+      // Don't close dialog on error so user can try again or cancel
     } finally {
       setLoading(false);
     }
