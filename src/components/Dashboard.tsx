@@ -35,6 +35,10 @@ interface LoadingAssignment {
     allCharged: boolean;
   };
   teamColor?: string;
+  truck?: {
+    id: string;
+    name: string;
+  };
 }
 const Dashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -552,6 +556,20 @@ const Dashboard: React.FC = () => {
         };
       }));
 
+      // Fetch truck assignments for projects
+      const { data: truckAssignmentsData } = await supabase
+        .from('project_truck_assignments')
+        .select(`
+          project_id,
+          truck_id,
+          trucks!inner(id, truck_number)
+        `)
+        .in('project_id', projectIds);
+      
+      const truckAssignmentsMap = new Map(
+        (truckAssignmentsData || []).map(ta => [ta.project_id, { id: ta.trucks.id, name: `T${ta.trucks.truck_number}` }])
+      );
+
         // Enhance assignments with order status and team colors
         const enhancedAssignments = await Promise.all(weekLoadingAssignments.map(async assignment => {
           // Calculate order status - count undelivered items instead of undelivered orders
@@ -588,6 +606,10 @@ const Dashboard: React.FC = () => {
             }
           }
         }
+
+        // Get truck assignment
+        const truck = truckAssignmentsMap.get(assignment.project.id);
+
           return {
             ...assignment,
             orderStatus: {
@@ -595,7 +617,8 @@ const Dashboard: React.FC = () => {
               allDelivered: allOrdersDelivered,
               allCharged: allOrdersCharged
             },
-            teamColor
+            teamColor,
+            truck
         };
       }));
 
@@ -812,6 +835,7 @@ const Dashboard: React.FC = () => {
                           
                           <div className="font-medium break-words whitespace-normal leading-tight">{assignment.project.name}</div>
                           <div className="text-xs text-gray-500">
+                            {assignment.truck && <span className="mr-1">🚛 {assignment.truck.name}</span>}
                             {t('dashboard_install')}: {format(new Date(assignment.project.installation_date), 'MMM d')} | {assignment.project.progress || 0}%
                             {isManuallyAdjusted && <span className="text-orange-600 ml-1 font-medium">*</span>}
                           </div>
