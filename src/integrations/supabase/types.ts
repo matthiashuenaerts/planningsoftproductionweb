@@ -289,6 +289,7 @@ export type Database = {
           description: string | null
           function_name: string
           id: string
+          language: string | null
           recipient_emails: string[]
           updated_at: string
         }
@@ -297,6 +298,7 @@ export type Database = {
           description?: string | null
           function_name: string
           id?: string
+          language?: string | null
           recipient_emails?: string[]
           updated_at?: string
         }
@@ -305,6 +307,7 @@ export type Database = {
           description?: string | null
           function_name?: string
           id?: string
+          language?: string | null
           recipient_emails?: string[]
           updated_at?: string
         }
