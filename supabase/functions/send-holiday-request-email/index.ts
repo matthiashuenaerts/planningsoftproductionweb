@@ -34,16 +34,61 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Fetch email configuration from database
+    // Fetch email configuration with language from database
     const { data: emailConfig, error: configError } = await supabase
       .from('email_configurations')
-      .select('recipient_emails')
+      .select('recipient_emails, language')
       .eq('function_name', 'holiday_request')
       .single();
 
     if (configError) {
       console.error('Error fetching email configuration:', configError);
     }
+
+    const language = emailConfig?.language || 'nl';
+    console.log(`Using language: ${language} for email`);
+
+    // Define translations
+    const translations: Record<string, any> = {
+      nl: {
+        subject: (name: string) => `Vakantieaanvraag van ${name}`,
+        title: 'Vakantieaanvraag Ingediend',
+        employee: 'Werknemer:',
+        email: 'E-mail:',
+        startDate: 'Startdatum:',
+        endDate: 'Einddatum:',
+        reason: 'Reden:',
+        requestId: 'Aanvraag ID:',
+        footer: 'Deze aanvraag is ingediend en wacht op goedkeuring.',
+        sentTo: 'Deze vakantieaanvraag is verzonden naar:'
+      },
+      en: {
+        subject: (name: string) => `Holiday Request from ${name}`,
+        title: 'Holiday Request Submitted',
+        employee: 'Employee:',
+        email: 'Email:',
+        startDate: 'Start Date:',
+        endDate: 'End Date:',
+        reason: 'Reason:',
+        requestId: 'Request ID:',
+        footer: 'This request has been submitted and is pending approval.',
+        sentTo: 'This holiday request notification was sent to:'
+      },
+      fr: {
+        subject: (name: string) => `Demande de Vacances de ${name}`,
+        title: 'Demande de Vacances Soumise',
+        employee: 'Employé:',
+        email: 'E-mail:',
+        startDate: 'Date de Début:',
+        endDate: 'Date de Fin:',
+        reason: 'Raison:',
+        requestId: 'ID de Demande:',
+        footer: 'Cette demande a été soumise et est en attente d\'approbation.',
+        sentTo: 'Cette notification de demande de vacances a été envoyée à:'
+      }
+    };
+
+    const t = translations[language];
 
     // Get configured recipient emails or use default
     const configuredEmails = emailConfig?.recipient_emails || ['productiesturing@thonon.be'];
@@ -61,36 +106,25 @@ const handler = async (req: Request): Promise<Response> => {
 
     const finalRecipients = recipients;
 
-
     console.log('Sending email to:', finalRecipients);
 
     const emailResponse = await resend.emails.send({
       from: "Holiday System <noreply@automattion-compass.com>",
       to: finalRecipients,
-      subject: `Holiday Request from ${employeeName}`,
+      subject: t.subject(employeeName),
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Holiday Request Submitted</h2>
+          <h2 style="color: #333;">${t.title}</h2>
           <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <p><strong>Employee:</strong> ${employeeName}</p>
-            <p><strong>Email:</strong> ${employeeEmail}</p>
-            <p><strong>Start Date:</strong> ${new Date(startDate).toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}</p>
-            <p><strong>End Date:</strong> ${new Date(endDate).toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}</p>
-            ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
-            <p><strong>Request ID:</strong> ${requestId}</p>
+            <p><strong>${t.employee}</strong> ${employeeName}</p>
+            <p><strong>${t.email}</strong> ${employeeEmail}</p>
+            <p><strong>${t.startDate}</strong> ${new Date(startDate).toLocaleDateString()}</p>
+            <p><strong>${t.endDate}</strong> ${new Date(endDate).toLocaleDateString()}</p>
+            ${reason ? `<p><strong>${t.reason}</strong> ${reason}</p>` : ''}
+            <p><strong>${t.requestId}</strong> ${requestId}</p>
           </div>
-          <p>This request has been submitted and is pending approval.</p>
-          <p><em>This holiday request notification was sent to: ${finalRecipients.join(', ')}</em></p>
+          <p>${t.footer}</p>
+          <p><em>${t.sentTo} ${finalRecipients.join(', ')}</em></p>
         </div>
       `,
     });

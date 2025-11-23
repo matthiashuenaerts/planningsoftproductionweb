@@ -303,6 +303,96 @@ const MailSettings: React.FC = () => {
                 </div>
               </div>
 
+              {/* Language configuration for holiday and forecast emails */}
+              {(['send_project_forecast', 'send_holiday_request_email', 'send_holiday_status_email'].includes(config.function_name)) && (
+                <div className="space-y-2 mt-6 pt-6 border-t">
+                  <Label>Email Language</Label>
+                  <Select
+                    value={(config as any).language || 'nl'}
+                    onValueChange={async (value) => {
+                      try {
+                        const { error } = await supabase
+                          .from('email_configurations')
+                          .update({ language: value })
+                          .eq('id', config.id);
+
+                        if (error) throw error;
+
+                        setConfigs(prev =>
+                          prev.map(c => c.id === config.id ? { ...c, language: value } : c)
+                        );
+
+                        toast({
+                          title: 'Success',
+                          description: 'Email language updated successfully',
+                        });
+                      } catch (error) {
+                        console.error('Error updating language:', error);
+                        toast({
+                          title: 'Error',
+                          description: 'Failed to update email language',
+                          variant: 'destructive',
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nl">Nederlands</SelectItem>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="fr">Français</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Language configuration for holiday and forecast emails */}
+              {(['send_project_forecast', 'send_holiday_request_email', 'send_holiday_status_email'].includes(config.function_name)) && (
+                <div className="space-y-2 mt-6 pt-6 border-t">
+                  <Label>Email Language</Label>
+                  <Select
+                    value={(config as any).language || 'nl'}
+                    onValueChange={async (value) => {
+                      try {
+                        const { error } = await supabase
+                          .from('email_configurations')
+                          .update({ language: value })
+                          .eq('id', config.id);
+
+                        if (error) throw error;
+
+                        setConfigs(prev =>
+                          prev.map(c => c.id === config.id ? { ...c, language: value } : c)
+                        );
+
+                        toast({
+                          title: 'Success',
+                          description: 'Email language updated successfully',
+                        });
+                      } catch (error) {
+                        console.error('Error updating language:', error);
+                        toast({
+                          title: 'Error',
+                          description: 'Failed to update email language',
+                          variant: 'destructive',
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nl">Nederlands</SelectItem>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="fr">Français</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               {/* Schedule configuration for project forecast */}
               {config.function_name === 'send_project_forecast' && scheduleConfigs[config.function_name] && (
                 <div className="space-y-4 mt-6 pt-6 border-t">
