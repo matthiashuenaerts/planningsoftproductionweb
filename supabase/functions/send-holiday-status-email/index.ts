@@ -45,16 +45,70 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Fetch email configuration from database
+    // Fetch email configuration with language from database
     const { data: emailConfig, error: configError } = await supabase
       .from('email_configurations')
-      .select('recipient_emails')
+      .select('recipient_emails, language')
       .eq('function_name', 'holiday_status')
       .single();
 
     if (configError) {
       console.error('Error fetching email configuration:', configError);
     }
+
+    const language = emailConfig?.language || 'nl';
+    console.log(`Using language: ${language} for email`);
+
+    // Define translations
+    const translations: Record<string, any> = {
+      nl: {
+        subject: (name: string, statusText: string) => `Vakantieaanvraag ${statusText}: ${name}`,
+        title: (statusText: string) => `Vakantieaanvraag ${statusText}`,
+        employee: 'Werknemer:',
+        email: 'E-mail:',
+        startDate: 'Startdatum:',
+        endDate: 'Einddatum:',
+        reason: 'Reden:',
+        status: 'Status:',
+        adminNotes: 'Opmerkingen beheerder:',
+        requestId: 'Aanvraag ID:',
+        sentTo: 'Deze notificatie is verzonden naar:',
+        approved: 'Goedgekeurd',
+        rejected: 'Afgewezen'
+      },
+      en: {
+        subject: (name: string, statusText: string) => `Holiday Request ${statusText}: ${name}`,
+        title: (statusText: string) => `Holiday Request ${statusText}`,
+        employee: 'Employee:',
+        email: 'Email:',
+        startDate: 'Start Date:',
+        endDate: 'End Date:',
+        reason: 'Reason:',
+        status: 'Status:',
+        adminNotes: 'Admin Notes:',
+        requestId: 'Request ID:',
+        sentTo: 'This notification was sent to:',
+        approved: 'Approved',
+        rejected: 'Rejected'
+      },
+      fr: {
+        subject: (name: string, statusText: string) => `Demande de Vacances ${statusText}: ${name}`,
+        title: (statusText: string) => `Demande de Vacances ${statusText}`,
+        employee: 'Employé:',
+        email: 'E-mail:',
+        startDate: 'Date de Début:',
+        endDate: 'Date de Fin:',
+        reason: 'Raison:',
+        status: 'Statut:',
+        adminNotes: 'Notes de l\'Administrateur:',
+        requestId: 'ID de Demande:',
+        sentTo: 'Cette notification a été envoyée à:',
+        approved: 'Approuvée',
+        rejected: 'Rejetée'
+      }
+    };
+
+    const t = translations[language];
 
     // Get configured recipient emails or use default
     const configuredEmails = emailConfig?.recipient_emails || ['productiesturing@thonon.be'];
@@ -72,42 +126,32 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Sending status email to:', recipients);
 
-    const statusText = status === 'approved' ? 'Approved' : 'Rejected';
+    const statusText = status === 'approved' ? t.approved : t.rejected;
     const statusColor = status === 'approved' ? '#10b981' : '#ef4444';
 
     const emailResponse = await resend.emails.send({
       from: "Holiday System <noreply@automattion-compass.com>",
       to: recipients,
-      subject: `Holiday Request ${statusText}: ${employeeName}`,
+      subject: t.subject(employeeName, statusText),
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: ${statusColor};">Holiday Request ${statusText}</h2>
+          <h2 style="color: ${statusColor};">${t.title(statusText)}</h2>
           <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${statusColor};">
-            <p><strong>Employee:</strong> ${employeeName}</p>
-            <p><strong>Email:</strong> ${employeeEmail}</p>
-            <p><strong>Start Date:</strong> ${new Date(startDate).toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}</p>
-            <p><strong>End Date:</strong> ${new Date(endDate).toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}</p>
-            ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
-            <p><strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${statusText.toUpperCase()}</span></p>
+            <p><strong>${t.employee}</strong> ${employeeName}</p>
+            <p><strong>${t.email}</strong> ${employeeEmail}</p>
+            <p><strong>${t.startDate}</strong> ${new Date(startDate).toLocaleDateString()}</p>
+            <p><strong>${t.endDate}</strong> ${new Date(endDate).toLocaleDateString()}</p>
+            ${reason ? `<p><strong>${t.reason}</strong> ${reason}</p>` : ''}
+            <p><strong>${t.status}</strong> <span style="color: ${statusColor}; font-weight: bold;">${statusText.toUpperCase()}</span></p>
             ${adminNotes ? `
               <div style="margin-top: 15px; padding: 15px; background-color: #fff; border-radius: 4px;">
-                <p style="margin: 0;"><strong>Admin Notes:</strong></p>
+                <p style="margin: 0;"><strong>${t.adminNotes}</strong></p>
                 <p style="margin: 5px 0 0 0;">${adminNotes}</p>
               </div>
             ` : ''}
-            <p><strong>Request ID:</strong> ${requestId}</p>
+            <p><strong>${t.requestId}</strong> ${requestId}</p>
           </div>
-          <p>This notification was sent to: ${recipients.join(', ')}</p>
+          <p>${t.sentTo} ${recipients.join(', ')}</p>
         </div>
       `,
     });
