@@ -303,9 +303,8 @@ const MailSettings: React.FC = () => {
                 </div>
               </div>
 
-              {/* Schedule configuration for emails with scheduling support */}
-              {['send_project_forecast', 'send_holiday_request_email', 'send_holiday_status_email'].includes(config.function_name) && 
-               scheduleConfigs[config.function_name] && (
+              {/* Schedule configuration for project forecast */}
+              {config.function_name === 'send_project_forecast' && scheduleConfigs[config.function_name] && (
                 <div className="space-y-4 mt-6 pt-6 border-t">
                   <div className="flex items-center justify-between">
                     <h4 className="font-semibold flex items-center gap-2">
@@ -343,7 +342,7 @@ const MailSettings: React.FC = () => {
                     </div>
                   </div>
                   
-                  <div className={`grid gap-4 ${config.function_name === 'send_project_forecast' ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+                  <div className="grid gap-4 md:grid-cols-4">
                     <div className="space-y-2">
                       <Label>Day of Week</Label>
                       <Select
@@ -374,18 +373,16 @@ const MailSettings: React.FC = () => {
                       />
                     </div>
 
-                    {config.function_name === 'send_project_forecast' && (
-                      <div className="space-y-2">
-                        <Label>Forecast Weeks</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          max="12"
-                          value={scheduleConfigs[config.function_name].forecast_weeks}
-                          onChange={(e) => handleUpdateSchedule(config.function_name, 'forecast_weeks', parseInt(e.target.value))}
-                        />
-                      </div>
-                    )}
+                    <div className="space-y-2">
+                      <Label>Forecast Weeks</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="12"
+                        value={scheduleConfigs[config.function_name].forecast_weeks}
+                        onChange={(e) => handleUpdateSchedule(config.function_name, 'forecast_weeks', parseInt(e.target.value))}
+                      />
+                    </div>
 
                     <div className="space-y-2">
                       <Label>Language</Label>
@@ -408,10 +405,8 @@ const MailSettings: React.FC = () => {
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="h-4 w-4" />
                     <span>
-                      Email will be sent every {scheduleConfigs[config.function_name].schedule_day} at {scheduleConfigs[config.function_name].schedule_time}
-                      {config.function_name === 'send_project_forecast' && 
-                        ` with a ${scheduleConfigs[config.function_name].forecast_weeks}-week forecast`
-                      }
+                      Email will be sent every {scheduleConfigs[config.function_name].schedule_day} at {scheduleConfigs[config.function_name].schedule_time} 
+                      with a {scheduleConfigs[config.function_name].forecast_weeks}-week forecast
                     </span>
                   </div>
                 </div>
