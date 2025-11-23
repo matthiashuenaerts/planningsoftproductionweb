@@ -806,7 +806,7 @@ const Dashboard: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-7 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
             {Array.from({
             length: 7
           }, (_, i) => addDays(weekStartDate, i)).map((date, index) => {
