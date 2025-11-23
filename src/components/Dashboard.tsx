@@ -786,20 +786,20 @@ const Dashboard: React.FC = () => {
       {/* Weekly Loading Schedule */}
       <Card className="mb-6">
         <CardHeader className="pb-2">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
               {t('dashboard_weekly_schedule')}
             </CardTitle>
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="icon" onClick={prevWeek} disabled={weekLoading}>
+            <div className="flex items-center justify-between md:justify-center space-x-2">
+              <Button variant="outline" size="icon" onClick={prevWeek} disabled={weekLoading} className="h-9 w-9">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-sm font-medium min-w-[200px] text-center">
+              <span className="text-xs md:text-sm font-medium min-w-[140px] md:min-w-[200px] text-center px-2">
                 {format(weekStartDate, 'MMM d')} - {format(addDays(weekStartDate, 6), 'MMM d, yyyy')}
                 {weekLoading && <span className="ml-2 text-xs text-gray-500">{t('dashboard_loading')}</span>}
               </span>
-              <Button variant="outline" size="icon" onClick={nextWeek} disabled={weekLoading}>
+              <Button variant="outline" size="icon" onClick={nextWeek} disabled={weekLoading} className="h-9 w-9">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
