@@ -62,6 +62,7 @@ interface DragItem {
   type: string;
   id: string;
   team: string;
+  teamId?: string;
   assignment?: Assignment;
 }
 
@@ -182,6 +183,7 @@ const DurationSelector = ({
 const ProjectItem = ({
   project,
   team,
+  teamId,
   assignment,
   onExtendProject,
   onDurationChange,
@@ -201,6 +203,7 @@ const ProjectItem = ({
     item: {
       id: project.id,
       team: team,
+      teamId: teamId,
       assignment: assignment
     },
     collect: monitor => ({
@@ -326,6 +329,7 @@ const TruckSelector = ({
 const DayCell = ({
   date,
   team,
+  teamId,
   projects,
   assignments,
   truckAssignments,
@@ -342,20 +346,20 @@ const DayCell = ({
     accept: 'PROJECT',
     drop: (item: DragItem) => {
       const dropDate = format(date, 'yyyy-MM-dd');
-      console.log(`Dropping project ${item.id} on date: ${dropDate}`);
+      console.log(`Dropping project ${item.id} on date: ${dropDate}, team: ${team}, teamId: ${teamId}`);
       
-      if (item.team === team && item.assignment) {
+      if (item.teamId === teamId && item.assignment) {
         // Moving within same team - just update start date
         handleDateChange(item.assignment.id, dropDate);
       } else {
         // Moving to different team or from unassigned
-        onDropProject(item.id, team, dropDate);
+        onDropProject(item.id, team, teamId, dropDate);
       }
     },
     collect: monitor => ({
       isOver: !!monitor.isOver()
     })
-  }));
+  }), [date, team, teamId]);
   
   const handleDateChange = async (assignmentId: string, newStartDate: string) => {
     try {
@@ -427,7 +431,7 @@ const DayCell = ({
         totalDays
       }) => {
         const truckAssignment = truckAssignments.find(ta => ta.project_id === project.id);
-        return <ProjectItem key={`${project.id}-${dayPosition}`} project={project} team={team} assignment={assignment} truckAssignment={truckAssignment} onExtendProject={handleExtendProject} onDurationChange={handleDurationChange} onTruckAssign={onTruckAssign} isStart={isStart} isContinuation={isContinuation} dayPosition={dayPosition} totalDays={totalDays} />;
+        return <ProjectItem key={`${project.id}-${dayPosition}`} project={project} team={team} teamId={teamId} assignment={assignment} truckAssignment={truckAssignment} onExtendProject={handleExtendProject} onDurationChange={handleDurationChange} onTruckAssign={onTruckAssign} isStart={isStart} isContinuation={isContinuation} dayPosition={dayPosition} totalDays={totalDays} />;
       })}
       </div>
     </div>;
@@ -436,6 +440,7 @@ const DayCell = ({
 // Enhanced team calendar component with collapsible functionality - starts collapsed
 const TeamCalendar = ({
   team,
+  teamId,
   currentMonth,
   projects,
   assignments,
@@ -570,19 +575,20 @@ const TeamCalendar = ({
                     {weeks.map((week, weekIndex) => (
                       <div key={weekIndex} className="grid grid-cols-7">
                         {week.map((date, dayIndex) => (
-                          <DayCell 
+                      <DayCell 
                             key={dayIndex} 
                             date={date} 
                             team={team} 
+                            teamId={teamId}
                             projects={projects} 
                             assignments={assignments} 
                             truckAssignments={truckAssignments} 
                             onDropProject={onDropProject} 
-                            handleExtendProject={handleExtendProject} 
-                            handleDurationChange={handleDurationChange} 
-                            onTruckAssign={onTruckAssign} 
-                            currentMonth={month} 
-                            onRefreshData={onRefreshData} 
+                            handleExtendProject={handleExtendProject}
+                            handleDurationChange={handleDurationChange}
+                            onTruckAssign={onTruckAssign}
+                            currentMonth={month}
+                            onRefreshData={onRefreshData}
                           />
                         ))}
                       </div>
@@ -629,7 +635,7 @@ const UnassignedProjects = ({
     drop: (item: DragItem) => {
       console.log('Dropping project to unassigned:', item);
       // Move project back to unassigned by removing its team assignment
-      onDropProject(item.id, null, null);
+      onDropProject(item.id, null, null, null);
     },
     collect: monitor => ({
       isOver: !!monitor.isOver()
@@ -650,7 +656,7 @@ const UnassignedProjects = ({
           const hasTeamAssignment = assignments.some(a => a.project_id === project.id);
           
           return <div key={project.id} className="border rounded-lg p-3">
-              <ProjectItem project={project} team={null} assignment={null} truckAssignment={truckAssignment} onExtendProject={() => {}} onDurationChange={() => {}} onTruckAssign={onTruckAssign} />
+              <ProjectItem project={project} team={null} teamId={null} assignment={null} truckAssignment={truckAssignment} onExtendProject={() => {}} onDurationChange={() => {}} onTruckAssign={onTruckAssign} />
               
               {/* Show planned vs to plan badge */}
               <div className="mt-2 flex justify-center">
@@ -832,12 +838,12 @@ const InstallationTeamCalendar = ({
   };
 
   // Enhanced project drop handling with truck loading date calculation
-  const handleDropProject = async (projectId: string, team: string | null, newStartDate?: string) => {
+  const handleDropProject = async (projectId: string, team: string | null, teamId: string | null, newStartDate?: string) => {
     try {
       // Store current page scroll position
       storePageScrollPosition();
       
-      console.log(`Handling drop for project ${projectId} to team ${team} on date ${newStartDate}`);
+      console.log(`Handling drop for project ${projectId} to team ${team} (ID: ${teamId}) on date ${newStartDate}`);
       const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
       
       if (team === null) {
@@ -889,7 +895,7 @@ const InstallationTeamCalendar = ({
         // Assign to team
         if (existingAssignmentIndex >= 0) {
           const existingAssignment = assignments[existingAssignmentIndex];
-          const updateData: Partial<Assignment> = { team };
+          const updateData: Partial<Assignment> = { team, team_id: teamId };
           if (newStartDate) {
             updateData.start_date = newStartDate;
           }
@@ -934,6 +940,7 @@ const InstallationTeamCalendar = ({
           const newAssignment = {
             project_id: projectId,
             team,
+            team_id: teamId,
             start_date: newStartDate || format(new Date(), 'yyyy-MM-dd'),
             duration: 1
           };
@@ -1203,6 +1210,7 @@ const InstallationTeamCalendar = ({
             <TeamCalendar 
               key={team.id}
               team={team.name}
+              teamId={team.id}
               currentMonth={currentMonth} 
               projects={projects} 
               assignments={teamAssignments}
