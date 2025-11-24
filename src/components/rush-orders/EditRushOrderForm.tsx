@@ -59,7 +59,7 @@ const EditRushOrderForm: React.FC<EditRushOrderFormProps> = ({ rushOrder, onSucc
       const { data, error } = await supabase
         .from('employees')
         .select('*')
-        .in('role', ['admin', 'manager', 'worker', 'installation_team']);
+        .in('role', ['admin', 'manager', 'worker', 'teamleader', 'installation_team']);
       
       if (error) throw error;
       return data as Employee[];
