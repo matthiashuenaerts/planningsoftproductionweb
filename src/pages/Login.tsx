@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -188,8 +188,8 @@ const Login: React.FC = () => {
               </div>
             </CardContent>
             
-            <CardFooter className="pt-6 pb-8">
-              <Button 
+            <CardFooter className="flex flex-col space-y-4 pt-6 pb-8">
+              <Button
                 className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none" 
                 type="submit" 
                 disabled={loading}
@@ -199,6 +199,13 @@ const Login: React.FC = () => {
                     <span>Signing in...</span>
                   </div> : "Sign in"}
               </Button>
+              
+              <Link 
+                to="/forgot-password" 
+                className="text-sm text-center text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                Forgot your password?
+              </Link>
             </CardFooter>
           </form>
         </Card>
