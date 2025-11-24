@@ -531,8 +531,9 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
       const teamAssignments = project.project_team_assignments;
       const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
       
+      // If no assignment, show in "unnamed" team (always visible)
       if (!assignment?.start_date || !assignment?.duration) {
-        return false; // Skip projects without proper assignment data
+        return true;
       }
 
       const startDate = parseYMD(assignment.start_date);
@@ -1012,7 +1013,39 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                       <div className="absolute left-64 right-0 top-0 z-10 py-2 pointer-events-none">
                           {teamProjects.map((project, idx) => {
                             const position = getProjectPosition(project, team.name);
-                            if (!position) return null;
+                            
+                            // For unassigned projects, show a placeholder indicator
+                            if (!position) {
+                              return (
+                                <div
+                                  key={project.id}
+                                  className="absolute pointer-events-auto"
+                                  style={{
+                                    left: '8px',
+                                    top: `${8 + idx * 32}px`,
+                                    height: '28px',
+                                  }}
+                                >
+                                  <div
+                                    className="h-7 px-3 rounded flex items-center bg-muted border border-border cursor-pointer hover:bg-muted/80 transition-colors"
+                                    onClick={() => {
+                                      setSelectedProject({
+                                        id: project.id,
+                                        name: project.name,
+                                        teamId: null,
+                                        startDate: '',
+                                        duration: 0,
+                                      });
+                                    }}
+                                    title={`${project.name} - Not scheduled`}
+                                  >
+                                    <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
+                                      {project.name} - Not scheduled
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            }
 
                             const teamAssignment = position.assignment;
                             const projectLabel = `${project.name} - ${project.progress || 0}%`;
