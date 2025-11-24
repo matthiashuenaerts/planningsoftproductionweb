@@ -23,6 +23,8 @@ import TimeRegistrations from './pages/TimeRegistrations';
 import GeneralSchedule from './pages/GeneralSchedule';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
+import ForgotPassword from './components/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import MigrateAuth from './pages/MigrateAuth';
 import NotesAndTasks from './pages/NotesAndTasks';
 import ControlPanel from './pages/ControlPanel';
@@ -59,6 +61,8 @@ function App() {
               <Routes>
                 <Route path="/" element={<Navigate to="/nl/" replace />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/migrate-auth" element={<ProtectedRoute><MigrateAuth /></ProtectedRoute>} />
                 <Route path="/:lang/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/:lang/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
