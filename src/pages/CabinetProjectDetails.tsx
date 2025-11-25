@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cabinetService } from '@/services/cabinetService';
 import { useToast } from '@/hooks/use-toast';
+import { CabinetConfigurator } from '@/components/cabinet/CabinetConfigurator';
 import type { Database } from '@/integrations/supabase/types';
 
 type CabinetProject = Database['public']['Tables']['cabinet_projects']['Row'];
@@ -136,10 +137,8 @@ export default function CabinetProjectDetails() {
         <CardHeader>
           <CardTitle>Cabinet Configurations</CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-center py-8">
-            Cabinet configurator coming soon...
-          </p>
+        <CardContent className="p-0">
+          <CabinetConfigurator projectId={projectId!} />
         </CardContent>
       </Card>
     </div>
