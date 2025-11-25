@@ -33,7 +33,7 @@ export interface CabinetModel {
   max_height?: number;
   min_depth?: number;
   max_depth?: number;
-  parameters?: Record<string, any>;
+  parameters?: any;
   created_by?: string;
   is_active: boolean;
   created_at: string;
@@ -52,12 +52,12 @@ export interface CabinetConfiguration {
   vertical_divisions: number;
   door_type?: string;
   drawer_count: number;
-  material_config?: Record<string, any>;
+  material_config?: any;
   finish?: string;
   edge_banding?: string;
   position_x: number;
   position_y: number;
-  parameters?: Record<string, any>;
+  parameters?: any;
   created_at: string;
   updated_at: string;
 }
@@ -147,7 +147,7 @@ class CabinetService {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data as any[]) || [];
   }
 
   async getProject(id: string): Promise<CabinetProject | null> {
@@ -164,12 +164,12 @@ class CabinetService {
   async createProject(project: Partial<CabinetProject>): Promise<CabinetProject> {
     const { data, error } = await supabase
       .from('cabinet_projects')
-      .insert([project])
+      .insert([project as any])
       .select()
       .single();
 
     if (error) throw error;
-    return data;
+    return data as CabinetProject;
   }
 
   async updateProject(id: string, updates: Partial<CabinetProject>): Promise<CabinetProject> {
@@ -204,7 +204,7 @@ class CabinetService {
       .order('name', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+    return (data as any[]) || [];
   }
 
   async getModelsByCategory(category: string): Promise<CabinetModel[]> {
@@ -216,18 +216,18 @@ class CabinetService {
       .order('name', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+    return (data as any[]) || [];
   }
 
   async createModel(model: Partial<CabinetModel>): Promise<CabinetModel> {
     const { data, error } = await supabase
       .from('cabinet_models')
-      .insert([model])
+      .insert([model as any])
       .select()
       .single();
 
     if (error) throw error;
-    return data;
+    return data as CabinetModel;
   }
 
   async updateModel(id: string, updates: Partial<CabinetModel>): Promise<CabinetModel> {
@@ -252,18 +252,18 @@ class CabinetService {
       .order('created_at', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+    return (data as any[]) || [];
   }
 
   async createConfiguration(config: Partial<CabinetConfiguration>): Promise<CabinetConfiguration> {
     const { data, error } = await supabase
       .from('cabinet_configurations')
-      .insert([config])
+      .insert([config as any])
       .select()
       .single();
 
     if (error) throw error;
-    return data;
+    return data as CabinetConfiguration;
   }
 
   async updateConfiguration(id: string, updates: Partial<CabinetConfiguration>): Promise<CabinetConfiguration> {
@@ -314,12 +314,12 @@ class CabinetService {
   async createMaterial(material: Partial<CabinetMaterial>): Promise<CabinetMaterial> {
     const { data, error } = await supabase
       .from('cabinet_materials')
-      .insert([material])
+      .insert([material as any])
       .select()
       .single();
 
     if (error) throw error;
-    return data;
+    return data as CabinetMaterial;
   }
 
   async updateMaterial(id: string, updates: Partial<CabinetMaterial>): Promise<CabinetMaterial> {
@@ -349,12 +349,12 @@ class CabinetService {
   async createPart(part: Partial<CabinetPart>): Promise<CabinetPart> {
     const { data, error } = await supabase
       .from('cabinet_parts')
-      .insert([part])
+      .insert([part as any])
       .select()
       .single();
 
     if (error) throw error;
-    return data;
+    return data as CabinetPart;
   }
 
   async getQuotesByProject(projectId: string): Promise<CabinetQuote[]> {
@@ -371,12 +371,12 @@ class CabinetService {
   async createQuote(quote: Partial<CabinetQuote>): Promise<CabinetQuote> {
     const { data, error } = await supabase
       .from('cabinet_quotes')
-      .insert([quote])
+      .insert([quote as any])
       .select()
       .single();
 
     if (error) throw error;
-    return data;
+    return data as CabinetQuote;
   }
 
   // ===== PRICE RULES =====
