@@ -30,6 +30,9 @@ import NotesAndTasks from './pages/NotesAndTasks';
 import ControlPanel from './pages/ControlPanel';
 import WorkstationControl from './pages/WorkstationControl';
 import TruckLoadingView from './pages/TruckLoadingView';
+import Calculation from './pages/Calculation';
+import NewCabinetProject from './pages/NewCabinetProject';
+import CabinetProjectDetails from './pages/CabinetProjectDetails';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -93,6 +96,9 @@ function App() {
                 <Route path="/:lang/control-panel" element={<ProtectedRoute><ControlPanel /></ProtectedRoute>} />
                 <Route path="/:lang/control-panel/:workstationId" element={<ProtectedRoute><WorkstationControl /></ProtectedRoute>} />
                 <Route path="/:lang/truck-loading" element={<ProtectedRoute><TruckLoadingView /></ProtectedRoute>} />
+                <Route path="/:lang/calculation" element={<ProtectedRoute><Calculation /></ProtectedRoute>} />
+                <Route path="/:lang/calculation/new" element={<ProtectedRoute><NewCabinetProject /></ProtectedRoute>} />
+                <Route path="/:lang/calculation/:projectId" element={<ProtectedRoute><CabinetProjectDetails /></ProtectedRoute>} />
               </Routes>
               <Toaster />
             </LanguageProvider>
