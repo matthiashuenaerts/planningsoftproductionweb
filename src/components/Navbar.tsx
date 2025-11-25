@@ -92,6 +92,19 @@ const NavbarContent = ({
             </li>
           )}
 
+          {currentEmployee && currentEmployee.role === 'admin' && (
+            <li>
+              <NavLink
+                to={createLocalizedPath("/calculation")}
+                className="flex items-center p-2 rounded-lg hover:bg-sky-700 group"
+                onClick={handleItemClick}
+              >
+                <LayoutDashboard className="w-5 h-5 text-white group-hover:text-white" />
+                <span className="ml-3">Calculation</span>
+              </NavLink>
+            </li>
+          )}
+
           <li>
             <NavLink to={createLocalizedPath("/projects")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
               <LayoutDashboard className="w-5 h-5 text-white group-hover:text-white" />

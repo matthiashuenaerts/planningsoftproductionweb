@@ -10,6 +10,9 @@ import Workstations from './pages/Workstations';
 import Floorplan from './pages/Floorplan';
 import BrokenParts from './pages/BrokenParts';
 import BrokenPartsSummary from './pages/BrokenPartsSummary';
+import Calculation from './pages/Calculation';
+import NewCabinetProject from './pages/NewCabinetProject';
+import CabinetProjectDetails from './pages/CabinetProjectDetails';
 import NewBrokenPart from './pages/NewBrokenPart';
 import PersonalTasks from './pages/PersonalTasks';
 import DailyTasks from './pages/DailyTasks';
@@ -87,6 +90,9 @@ function App() {
                 <Route path="/:lang/logistics-out" element={<ProtectedRoute><LogisticsOut /></ProtectedRoute>} />
                 <Route path="/:lang/rush-orders" element={<ProtectedRoute><RushOrders /></ProtectedRoute>} />
                 <Route path="/:lang/rush-orders/:rushOrderId" element={<ProtectedRoute><RushOrderDetails /></ProtectedRoute>} />
+                <Route path="/:lang/calculation" element={<ProtectedRoute><Calculation /></ProtectedRoute>} />
+                <Route path="/:lang/calculation/new" element={<ProtectedRoute><NewCabinetProject /></ProtectedRoute>} />
+                <Route path="/:lang/calculation/project/:projectId" element={<ProtectedRoute><CabinetProjectDetails /></ProtectedRoute>} />
                 <Route path="/:lang/time-registrations" element={<ProtectedRoute><TimeRegistrations /></ProtectedRoute>} />
                 <Route path="/:lang/general-schedule" element={<ProtectedRoute><GeneralSchedule /></ProtectedRoute>} />
                 <Route path="/:lang/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
