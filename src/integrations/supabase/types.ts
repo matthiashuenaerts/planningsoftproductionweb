@@ -132,6 +132,481 @@ export type Database = {
           },
         ]
       }
+      cabinet_configurations: {
+        Row: {
+          created_at: string
+          depth: number
+          door_type: string | null
+          drawer_count: number | null
+          edge_banding: string | null
+          finish: string | null
+          height: number
+          horizontal_divisions: number | null
+          id: string
+          material_config: Json | null
+          model_id: string | null
+          name: string
+          parameters: Json | null
+          position_x: number | null
+          position_y: number | null
+          project_id: string
+          updated_at: string
+          vertical_divisions: number | null
+          width: number
+        }
+        Insert: {
+          created_at?: string
+          depth: number
+          door_type?: string | null
+          drawer_count?: number | null
+          edge_banding?: string | null
+          finish?: string | null
+          height: number
+          horizontal_divisions?: number | null
+          id?: string
+          material_config?: Json | null
+          model_id?: string | null
+          name: string
+          parameters?: Json | null
+          position_x?: number | null
+          position_y?: number | null
+          project_id: string
+          updated_at?: string
+          vertical_divisions?: number | null
+          width: number
+        }
+        Update: {
+          created_at?: string
+          depth?: number
+          door_type?: string | null
+          drawer_count?: number | null
+          edge_banding?: string | null
+          finish?: string | null
+          height?: number
+          horizontal_divisions?: number | null
+          id?: string
+          material_config?: Json | null
+          model_id?: string | null
+          name?: string
+          parameters?: Json | null
+          position_x?: number | null
+          position_y?: number | null
+          project_id?: string
+          updated_at?: string
+          vertical_divisions?: number | null
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cabinet_configurations_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "cabinet_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cabinet_configurations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cabinet_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cabinet_materials: {
+        Row: {
+          category: string
+          color: string | null
+          cost_per_unit: number
+          created_at: string
+          finish_type: string | null
+          id: string
+          image_url: string | null
+          in_stock: boolean | null
+          lead_time_days: number | null
+          name: string
+          notes: string | null
+          sku: string
+          standard_size_height: number | null
+          standard_size_width: number | null
+          subcategory: string | null
+          supplier: string | null
+          thickness: number | null
+          unit: string
+          updated_at: string
+          waste_factor: number | null
+        }
+        Insert: {
+          category: string
+          color?: string | null
+          cost_per_unit: number
+          created_at?: string
+          finish_type?: string | null
+          id?: string
+          image_url?: string | null
+          in_stock?: boolean | null
+          lead_time_days?: number | null
+          name: string
+          notes?: string | null
+          sku: string
+          standard_size_height?: number | null
+          standard_size_width?: number | null
+          subcategory?: string | null
+          supplier?: string | null
+          thickness?: number | null
+          unit: string
+          updated_at?: string
+          waste_factor?: number | null
+        }
+        Update: {
+          category?: string
+          color?: string | null
+          cost_per_unit?: number
+          created_at?: string
+          finish_type?: string | null
+          id?: string
+          image_url?: string | null
+          in_stock?: boolean | null
+          lead_time_days?: number | null
+          name?: string
+          notes?: string | null
+          sku?: string
+          standard_size_height?: number | null
+          standard_size_width?: number | null
+          subcategory?: string | null
+          supplier?: string | null
+          thickness?: number | null
+          unit?: string
+          updated_at?: string
+          waste_factor?: number | null
+        }
+        Relationships: []
+      }
+      cabinet_models: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          default_depth: number | null
+          default_height: number | null
+          default_width: number | null
+          description: string | null
+          id: string
+          is_active: boolean
+          is_template: boolean
+          max_depth: number | null
+          max_height: number | null
+          max_width: number | null
+          min_depth: number | null
+          min_height: number | null
+          min_width: number | null
+          name: string
+          parameters: Json | null
+          thumbnail_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          created_by?: string | null
+          default_depth?: number | null
+          default_height?: number | null
+          default_width?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_template?: boolean
+          max_depth?: number | null
+          max_height?: number | null
+          max_width?: number | null
+          min_depth?: number | null
+          min_height?: number | null
+          min_width?: number | null
+          name: string
+          parameters?: Json | null
+          thumbnail_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          default_depth?: number | null
+          default_height?: number | null
+          default_width?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_template?: boolean
+          max_depth?: number | null
+          max_height?: number | null
+          max_width?: number | null
+          min_depth?: number | null
+          min_height?: number | null
+          min_width?: number | null
+          name?: string
+          parameters?: Json | null
+          thumbnail_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cabinet_parts: {
+        Row: {
+          configuration_id: string
+          created_at: string
+          height: number | null
+          id: string
+          length: number | null
+          material_area: number | null
+          material_id: string | null
+          notes: string | null
+          part_name: string
+          part_type: string
+          quantity: number
+          thickness: number | null
+          total_cost: number | null
+          unit_cost: number | null
+          width: number | null
+        }
+        Insert: {
+          configuration_id: string
+          created_at?: string
+          height?: number | null
+          id?: string
+          length?: number | null
+          material_area?: number | null
+          material_id?: string | null
+          notes?: string | null
+          part_name: string
+          part_type: string
+          quantity?: number
+          thickness?: number | null
+          total_cost?: number | null
+          unit_cost?: number | null
+          width?: number | null
+        }
+        Update: {
+          configuration_id?: string
+          created_at?: string
+          height?: number | null
+          id?: string
+          length?: number | null
+          material_area?: number | null
+          material_id?: string | null
+          notes?: string | null
+          part_name?: string
+          part_type?: string
+          quantity?: number
+          thickness?: number | null
+          total_cost?: number | null
+          unit_cost?: number | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cabinet_parts_configuration_id_fkey"
+            columns: ["configuration_id"]
+            isOneToOne: false
+            referencedRelation: "cabinet_configurations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cabinet_parts_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "cabinet_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cabinet_price_rules: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          rule_type: string
+          unit: string | null
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          rule_type: string
+          unit?: string | null
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          rule_type?: string
+          unit?: string | null
+          updated_at?: string
+          value?: number
+        }
+        Relationships: []
+      }
+      cabinet_project_revisions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          project_id: string
+          snapshot: Json
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          project_id: string
+          snapshot: Json
+          version: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          project_id?: string
+          snapshot?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cabinet_project_revisions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cabinet_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cabinet_projects: {
+        Row: {
+          client_address: string | null
+          client_name: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          id: string
+          name: string
+          notes: string | null
+          project_number: string | null
+          status: string
+          units: string
+          updated_at: string
+        }
+        Insert: {
+          client_address?: string | null
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          name: string
+          notes?: string | null
+          project_number?: string | null
+          status?: string
+          units?: string
+          updated_at?: string
+        }
+        Update: {
+          client_address?: string | null
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          project_number?: string | null
+          status?: string
+          units?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cabinet_quotes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          hardware_cost: number
+          id: string
+          labor_cost: number
+          labor_minutes: number
+          margin_amount: number
+          margin_percentage: number
+          materials_cost: number
+          notes: string | null
+          overhead_cost: number
+          overhead_percentage: number
+          project_id: string
+          subtotal: number
+          tax_amount: number
+          tax_percentage: number
+          total_cost: number
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          hardware_cost?: number
+          id?: string
+          labor_cost?: number
+          labor_minutes?: number
+          margin_amount?: number
+          margin_percentage?: number
+          materials_cost?: number
+          notes?: string | null
+          overhead_cost?: number
+          overhead_percentage?: number
+          project_id: string
+          subtotal?: number
+          tax_amount?: number
+          tax_percentage?: number
+          total_cost?: number
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          hardware_cost?: number
+          id?: string
+          labor_cost?: number
+          labor_minutes?: number
+          margin_amount?: number
+          margin_percentage?: number
+          materials_cost?: number
+          notes?: string | null
+          overhead_cost?: number
+          overhead_percentage?: number
+          project_id?: string
+          subtotal?: number
+          tax_amount?: number
+          tax_percentage?: number
+          total_cost?: number
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cabinet_quotes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cabinet_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calculation_task_relationships: {
         Row: {
           base_duration_minutes: number
@@ -3127,6 +3602,20 @@ export type Database = {
           phase_name: string
           updated_at: string
         }[]
+      }
+      has_any_role: {
+        Args: {
+          _roles: Database["public"]["Enums"]["app_role"][]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
       }
       is_employee_on_holiday: {
         Args: { check_date: string; emp_id: string }
