@@ -3144,6 +3144,8 @@ export type Database = {
         | "workstation"
         | "installation_team"
         | "preparater"
+        | "advisor"
+        | "calculator"
       holiday_request_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
@@ -3279,6 +3281,8 @@ export const Constants = {
         "workstation",
         "installation_team",
         "preparater",
+        "advisor",
+        "calculator",
       ],
       holiday_request_status: ["pending", "approved", "rejected"],
     },
