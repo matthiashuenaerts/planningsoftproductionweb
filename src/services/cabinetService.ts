@@ -158,7 +158,7 @@ class CabinetService {
       .single();
 
     if (error) throw error;
-    return data;
+    return data as CabinetProject;
   }
 
   async createProject(project: Partial<CabinetProject>): Promise<CabinetProject> {
@@ -175,13 +175,13 @@ class CabinetService {
   async updateProject(id: string, updates: Partial<CabinetProject>): Promise<CabinetProject> {
     const { data, error } = await supabase
       .from('cabinet_projects')
-      .update(updates)
+      .update(updates as any)
       .eq('id', id)
       .select()
       .single();
 
     if (error) throw error;
-    return data;
+    return data as CabinetProject;
   }
 
   async deleteProject(id: string): Promise<void> {
@@ -423,7 +423,7 @@ class CabinetService {
       return false;
     }
 
-    const userRoles = data?.map(r => r.role) || [];
+    const userRoles = data?.map(r => String(r.role)) || [];
     return roles.some(role => userRoles.includes(role));
   }
 }
