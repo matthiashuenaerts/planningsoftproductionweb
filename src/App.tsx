@@ -13,6 +13,8 @@ import BrokenPartsSummary from './pages/BrokenPartsSummary';
 import Calculation from './pages/Calculation';
 import NewCabinetProject from './pages/NewCabinetProject';
 import CabinetProjectDetails from './pages/CabinetProjectDetails';
+import CabinetLibrary from './pages/CabinetLibrary';
+import CabinetEditor from './pages/CabinetEditor';
 import NewBrokenPart from './pages/NewBrokenPart';
 import PersonalTasks from './pages/PersonalTasks';
 import DailyTasks from './pages/DailyTasks';
@@ -93,6 +95,8 @@ function App() {
                 <Route path="/:lang/calculation" element={<ProtectedRoute><Calculation /></ProtectedRoute>} />
                 <Route path="/:lang/calculation/new" element={<ProtectedRoute><NewCabinetProject /></ProtectedRoute>} />
                 <Route path="/:lang/calculation/project/:projectId" element={<ProtectedRoute><CabinetProjectDetails /></ProtectedRoute>} />
+                <Route path="/:lang/calculation/project/:projectId/library" element={<ProtectedRoute><CabinetLibrary /></ProtectedRoute>} />
+                <Route path="/:lang/calculation/project/:projectId/editor/:modelId" element={<ProtectedRoute><CabinetEditor /></ProtectedRoute>} />
                 <Route path="/:lang/time-registrations" element={<ProtectedRoute><TimeRegistrations /></ProtectedRoute>} />
                 <Route path="/:lang/general-schedule" element={<ProtectedRoute><GeneralSchedule /></ProtectedRoute>} />
                 <Route path="/:lang/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
