@@ -116,6 +116,7 @@ export const cabinetService = {
     material_config: any;
     edge_banding: string;
     finish: string;
+    parameters?: any;
   }) {
     const { data, error } = await supabase
       .from('cabinet_configurations')

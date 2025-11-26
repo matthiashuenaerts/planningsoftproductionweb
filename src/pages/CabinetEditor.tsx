@@ -8,29 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cabinetService } from '@/services/cabinetService';
 import { useToast } from '@/hooks/use-toast';
-import { CabinetVisualizer } from '@/components/cabinet/CabinetVisualizer';
+import { InteractiveCabinetVisualizer } from '@/components/cabinet/InteractiveCabinetVisualizer';
+import { ModuleEditor } from '@/components/cabinet/ModuleEditor';
 import type { Database } from '@/integrations/supabase/types';
+import { CabinetConfiguration, Compartment } from '@/types/cabinet';
+import { v4 as uuidv4 } from 'uuid';
 
 type CabinetModel = Database['public']['Tables']['cabinet_models']['Row'];
 type CabinetMaterial = Database['public']['Tables']['cabinet_materials']['Row'];
-
-interface ConfigurationData {
-  name: string;
-  width: number;
-  height: number;
-  depth: number;
-  horizontal_divisions: number;
-  vertical_divisions: number;
-  drawer_count: number;
-  door_type: string;
-  material_config: {
-    body_material: string;
-    door_material: string;
-    shelf_material: string;
-  };
-  edge_banding: string;
-  finish: string;
-}
 
 export default function CabinetEditor() {
   const { projectId, modelId } = useParams<{ projectId: string; modelId: string }>();
@@ -40,23 +25,25 @@ export default function CabinetEditor() {
   const [materials, setMaterials] = useState<CabinetMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [selectedCompartmentId, setSelectedCompartmentId] = useState<string | null>(null);
   
-  const [config, setConfig] = useState<ConfigurationData>({
+  const [config, setConfig] = useState<CabinetConfiguration>({
     name: '',
     width: 800,
     height: 2000,
     depth: 600,
-    horizontal_divisions: 0,
-    vertical_divisions: 0,
-    drawer_count: 0,
-    door_type: 'hinged',
     material_config: {
       body_material: '',
       door_material: '',
       shelf_material: '',
+      body_thickness: 18,
+      door_thickness: 18,
+      shelf_thickness: 18,
     },
     edge_banding: 'PVC',
     finish: 'matte',
+    door_type: 'hinged',
+    compartments: [],
   });
 
   useEffect(() => {
@@ -75,14 +62,24 @@ export default function CabinetEditor() {
       setModel(modelData);
       setMaterials(materialsData);
       
-      // Set default values from model
+      // Set default values from model and create initial compartment
       if (modelData) {
+        const initialCompartment: Compartment = {
+          id: uuidv4(),
+          x: 0,
+          y: 0,
+          width: modelData.default_width || 800,
+          height: modelData.default_height || 2000,
+          modules: [],
+        };
+
         setConfig(prev => ({
           ...prev,
           name: modelData.name,
           width: modelData.default_width || prev.width,
           height: modelData.default_height || prev.height,
           depth: modelData.default_depth || prev.depth,
+          compartments: [initialCompartment],
         }));
       }
     } catch (error) {
@@ -97,6 +94,17 @@ export default function CabinetEditor() {
     }
   };
 
+  const handleUpdateCompartment = (updatedCompartment: Compartment) => {
+    setConfig(prev => ({
+      ...prev,
+      compartments: prev.compartments.map(c => 
+        c.id === updatedCompartment.id ? updatedCompartment : c
+      ),
+    }));
+  };
+
+  const selectedCompartment = config.compartments.find(c => c.id === selectedCompartmentId) || null;
+
   const handleSave = async () => {
     if (!projectId || !modelId) return;
     
@@ -109,13 +117,16 @@ export default function CabinetEditor() {
         width: config.width,
         height: config.height,
         depth: config.depth,
-        horizontal_divisions: config.horizontal_divisions,
-        vertical_divisions: config.vertical_divisions,
-        drawer_count: config.drawer_count,
+        horizontal_divisions: 0, // Legacy field
+        vertical_divisions: 0, // Legacy field
+        drawer_count: config.compartments.reduce((sum, c) => 
+          sum + c.modules.filter(m => m.type === 'drawer').length, 0
+        ),
         door_type: config.door_type,
-        material_config: config.material_config,
+        material_config: config.material_config as any,
         edge_banding: config.edge_banding,
         finish: config.finish,
+        parameters: { compartments: config.compartments } as any,
       });
       
       toast({
@@ -175,9 +186,9 @@ export default function CabinetEditor() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Configuration Panel */}
-        <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Basic Configuration */}
+        <div className="space-y-6 lg:col-span-1">
           {/* Cabinet Structure */}
           <Card>
             <CardHeader>
@@ -194,73 +205,38 @@ export default function CabinetEditor() {
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="width">Width (mm)</Label>
-                  <Input
-                    id="width"
-                    type="number"
-                    value={config.width}
-                    onChange={(e) => setConfig({ ...config, width: Number(e.target.value) })}
-                    min={model.min_width || 0}
-                    max={model.max_width || undefined}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="height">Height (mm)</Label>
-                  <Input
-                    id="height"
-                    type="number"
-                    value={config.height}
-                    onChange={(e) => setConfig({ ...config, height: Number(e.target.value) })}
-                    min={model.min_height || 0}
-                    max={model.max_height || undefined}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="depth">Depth (mm)</Label>
-                  <Input
-                    id="depth"
-                    type="number"
-                    value={config.depth}
-                    onChange={(e) => setConfig({ ...config, depth: Number(e.target.value) })}
-                    min={model.min_depth || 0}
-                    max={model.max_depth || undefined}
-                  />
-                </div>
+              <div className="space-y-4">
+                <Label htmlFor="width">Width (mm)</Label>
+                <Input
+                  id="width"
+                  type="number"
+                  value={config.width}
+                  onChange={(e) => setConfig({ ...config, width: Number(e.target.value) })}
+                  min={model.min_width || 0}
+                  max={model.max_width || undefined}
+                />
               </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="horizontal">Horizontal Divisions</Label>
-                  <Input
-                    id="horizontal"
-                    type="number"
-                    value={config.horizontal_divisions}
-                    onChange={(e) => setConfig({ ...config, horizontal_divisions: Number(e.target.value) })}
-                    min={0}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="vertical">Vertical Divisions</Label>
-                  <Input
-                    id="vertical"
-                    type="number"
-                    value={config.vertical_divisions}
-                    onChange={(e) => setConfig({ ...config, vertical_divisions: Number(e.target.value) })}
-                    min={0}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="drawers">Drawers</Label>
-                  <Input
-                    id="drawers"
-                    type="number"
-                    value={config.drawer_count}
-                    onChange={(e) => setConfig({ ...config, drawer_count: Number(e.target.value) })}
-                    min={0}
-                  />
-                </div>
+              <div>
+                <Label htmlFor="height">Height (mm)</Label>
+                <Input
+                  id="height"
+                  type="number"
+                  value={config.height}
+                  onChange={(e) => setConfig({ ...config, height: Number(e.target.value) })}
+                  min={model.min_height || 0}
+                  max={model.max_height || undefined}
+                />
+              </div>
+              <div>
+                <Label htmlFor="depth">Depth (mm)</Label>
+                <Input
+                  id="depth"
+                  type="number"
+                  value={config.depth}
+                  onChange={(e) => setConfig({ ...config, depth: Number(e.target.value) })}
+                  min={model.min_depth || 0}
+                  max={model.max_depth || undefined}
+                />
               </div>
 
               <div>
@@ -292,10 +268,17 @@ export default function CabinetEditor() {
                 <Label htmlFor="body_material">Body Material</Label>
                 <Select
                   value={config.material_config.body_material}
-                  onValueChange={(value) => setConfig({
-                    ...config,
-                    material_config: { ...config.material_config, body_material: value }
-                  })}
+                  onValueChange={(value) => {
+                    const selectedMaterial = materials.find(m => m.id === value);
+                    setConfig({
+                      ...config,
+                      material_config: { 
+                        ...config.material_config, 
+                        body_material: value,
+                        body_thickness: selectedMaterial?.thickness || 18,
+                      }
+                    });
+                  }}
                 >
                   <SelectTrigger id="body_material">
                     <SelectValue placeholder="Select material" />
@@ -392,15 +375,28 @@ export default function CabinetEditor() {
         </div>
 
         {/* Visual Preview */}
-        <div>
+        <div className="lg:col-span-1">
           <Card>
             <CardHeader>
               <CardTitle>Cabinet Preview</CardTitle>
             </CardHeader>
             <CardContent>
-              <CabinetVisualizer config={config} />
+              <InteractiveCabinetVisualizer 
+                config={config}
+                selectedCompartmentId={selectedCompartmentId || undefined}
+                onCompartmentSelect={setSelectedCompartmentId}
+              />
             </CardContent>
           </Card>
+        </div>
+
+        {/* Module Editor */}
+        <div className="lg:col-span-1">
+          <ModuleEditor
+            compartment={selectedCompartment}
+            materials={materials}
+            onUpdateCompartment={handleUpdateCompartment}
+          />
         </div>
       </div>
     </div>
