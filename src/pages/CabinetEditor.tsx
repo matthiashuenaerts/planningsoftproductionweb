@@ -10,9 +10,12 @@ import { cabinetService } from '@/services/cabinetService';
 import { useToast } from '@/hooks/use-toast';
 import { InteractiveCabinetVisualizer } from '@/components/cabinet/InteractiveCabinetVisualizer';
 import { ModuleEditor } from '@/components/cabinet/ModuleEditor';
+import { Cabinet3DVisualizer } from '@/components/cabinet/Cabinet3DVisualizer';
 import type { Database } from '@/integrations/supabase/types';
 import { CabinetConfiguration, Compartment } from '@/types/cabinet';
+import { CabinetCalculationService } from '@/services/cabinetCalculationService';
 import { v4 as uuidv4 } from 'uuid';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type CabinetModel = Database['public']['Tables']['cabinet_models']['Row'];
 type CabinetMaterial = Database['public']['Tables']['cabinet_materials']['Row'];
@@ -26,6 +29,7 @@ export default function CabinetEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedCompartmentId, setSelectedCompartmentId] = useState<string | null>(null);
+  const [costBreakdown, setCostBreakdown] = useState<any>(null);
   
   const [config, setConfig] = useState<CabinetConfiguration>({
     name: '',
@@ -49,6 +53,14 @@ export default function CabinetEditor() {
   useEffect(() => {
     loadData();
   }, [modelId]);
+
+  useEffect(() => {
+    if (materials.length > 0 && config.material_config.body_material) {
+      const calculator = new CabinetCalculationService(materials);
+      const costs = calculator.calculateCosts(config);
+      setCostBreakdown(costs);
+    }
+  }, [config, materials]);
 
   const loadData = async () => {
     if (!modelId) return;
@@ -186,7 +198,7 @@ export default function CabinetEditor() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Basic Configuration */}
         <div className="space-y-6 lg:col-span-1">
           {/* Cabinet Structure */}
@@ -381,11 +393,25 @@ export default function CabinetEditor() {
               <CardTitle>Cabinet Preview</CardTitle>
             </CardHeader>
             <CardContent>
-              <InteractiveCabinetVisualizer 
-                config={config}
-                selectedCompartmentId={selectedCompartmentId || undefined}
-                onCompartmentSelect={setSelectedCompartmentId}
-              />
+              <Tabs defaultValue="2d" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="2d">2D View</TabsTrigger>
+                  <TabsTrigger value="3d">3D View</TabsTrigger>
+                </TabsList>
+                <TabsContent value="2d" className="mt-4">
+                  <InteractiveCabinetVisualizer 
+                    config={config}
+                    selectedCompartmentId={selectedCompartmentId || undefined}
+                    onCompartmentSelect={setSelectedCompartmentId}
+                  />
+                </TabsContent>
+                <TabsContent value="3d" className="mt-4">
+                  <Cabinet3DVisualizer 
+                    config={config}
+                    materials={materials}
+                  />
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </div>
@@ -397,6 +423,74 @@ export default function CabinetEditor() {
             materials={materials}
             onUpdateCompartment={handleUpdateCompartment}
           />
+        </div>
+
+        {/* Cost Breakdown */}
+        <div className="lg:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Cost Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {costBreakdown ? (
+                <>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Materials</span>
+                      <span className="font-medium">€{costBreakdown.materials_cost.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Hardware</span>
+                      <span className="font-medium">€{costBreakdown.hardware_cost.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Labor ({costBreakdown.labor_minutes} min)</span>
+                      <span className="font-medium">€{costBreakdown.labor_cost.toFixed(2)}</span>
+                    </div>
+                    <div className="border-t pt-2 flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="font-medium">€{costBreakdown.subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Overhead ({costBreakdown.overhead_percentage}%)</span>
+                      <span className="font-medium">€{costBreakdown.overhead_cost.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Margin ({costBreakdown.margin_percentage}%)</span>
+                      <span className="font-medium">€{costBreakdown.margin_amount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Tax ({costBreakdown.tax_percentage}%)</span>
+                      <span className="font-medium">€{costBreakdown.tax_amount.toFixed(2)}</span>
+                    </div>
+                    <div className="border-t pt-2 flex justify-between font-bold">
+                      <span>Total</span>
+                      <span className="text-primary">€{costBreakdown.total_cost.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <h4 className="font-semibold mb-3">Cut List ({costBreakdown.panels.length} panels)</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {costBreakdown.panels.map((panel: any, idx: number) => (
+                        <div key={idx} className="text-xs p-2 bg-muted rounded">
+                          <div className="font-medium">{panel.name}</div>
+                          <div className="text-muted-foreground">
+                            {panel.width} × {panel.height} × {panel.thickness}mm
+                          </div>
+                          <div className="text-muted-foreground">
+                            {panel.material_name} (×{panel.quantity})
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Configure cabinet to see costs</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
