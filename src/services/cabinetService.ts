@@ -79,15 +79,52 @@ export const cabinetService = {
     return data as CabinetModel[];
   },
 
+  async getModel(modelId: string) {
+    const { data, error } = await supabase
+      .from('cabinet_models')
+      .select('*')
+      .eq('id', modelId)
+      .single();
+
+    if (error) throw error;
+    return data as CabinetModel;
+  },
+
   // Configurations
   async getProjectConfigurations(projectId: string) {
     const { data, error } = await supabase
       .from('cabinet_configurations')
       .select('*')
-      .eq('project_id', projectId);
-    
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false });
+
     if (error) throw error;
     return data as CabinetConfiguration[];
+  },
+
+  async createConfiguration(config: {
+    project_id: string;
+    model_id: string;
+    name: string;
+    width: number;
+    height: number;
+    depth: number;
+    horizontal_divisions: number;
+    vertical_divisions: number;
+    drawer_count: number;
+    door_type: string;
+    material_config: any;
+    edge_banding: string;
+    finish: string;
+  }) {
+    const { data, error } = await supabase
+      .from('cabinet_configurations')
+      .insert([config])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as CabinetConfiguration;
   },
 
   // Materials

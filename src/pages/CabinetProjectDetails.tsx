@@ -133,12 +133,15 @@ export default function CabinetProjectDetails() {
       )}
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Cabinet Configurations</CardTitle>
+          <Button onClick={() => navigate(`/calculation/project/${projectId}/library`)}>
+            Add
+          </Button>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center py-8">
-            Cabinet configurator coming soon...
+            No cabinets configured yet. Click "Add" to select from library.
           </p>
         </CardContent>
       </Card>
