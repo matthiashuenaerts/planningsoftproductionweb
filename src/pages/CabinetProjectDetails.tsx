@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cabinetService } from '@/services/cabinetService';
@@ -8,12 +8,14 @@ import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
 
 type CabinetProject = Database['public']['Tables']['cabinet_projects']['Row'];
+type CabinetConfiguration = Database['public']['Tables']['cabinet_configurations']['Row'];
 
 export default function CabinetProjectDetails() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [project, setProject] = useState<CabinetProject | null>(null);
+  const [configurations, setConfigurations] = useState<CabinetConfiguration[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,8 +28,12 @@ export default function CabinetProjectDetails() {
     if (!projectId) return;
     
     try {
-      const data = await cabinetService.getProject(projectId);
-      setProject(data);
+      const [projectData, configurationsData] = await Promise.all([
+        cabinetService.getProject(projectId),
+        cabinetService.getProjectConfigurations(projectId),
+      ]);
+      setProject(projectData);
+      setConfigurations(configurationsData);
     } catch (error) {
       console.error('Error loading project:', error);
       toast({
@@ -136,13 +142,46 @@ export default function CabinetProjectDetails() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Cabinet Configurations</CardTitle>
           <Button onClick={() => navigate(`/calculation/project/${projectId}/library`)}>
-            Add
+            <Plus className="mr-2 h-4 w-4" />
+            Add Cabinet
           </Button>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground text-center py-8">
-            No cabinets configured yet. Click "Add" to select from library.
-          </p>
+          {configurations.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">
+              No cabinets configured yet. Click "Add Cabinet" to get started.
+            </p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {configurations.map((config) => (
+                <Card key={config.id} className="hover:bg-accent/50 transition-colors">
+                  <CardHeader>
+                    <CardTitle className="text-base">{config.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="text-sm text-muted-foreground">
+                      Dimensions: {config.width} × {config.height} × {config.depth} mm
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Door: {config.door_type || 'None'}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Finish: {config.finish || 'Standard'}
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full mt-2"
+                      onClick={() => navigate(`/calculation/project/${projectId}/editor/${config.model_id}?configId=${config.id}`)}
+                    >
+                      <Pencil className="mr-2 h-3 w-3" />
+                      Edit
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
