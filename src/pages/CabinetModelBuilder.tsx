@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -63,6 +64,7 @@ export default function CabinetModelBuilder() {
   const { modelId } = useParams<{ modelId?: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { createLocalizedPath } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [materials, setMaterials] = useState<any[]>([]);
@@ -213,7 +215,7 @@ export default function CabinetModelBuilder() {
         description: 'Cabinet model saved successfully',
       });
       
-      navigate('/calculation/library');
+      navigate(createLocalizedPath('/calculation'));
     } catch (error) {
       console.error('Error saving model:', error);
       toast({
@@ -239,7 +241,7 @@ export default function CabinetModelBuilder() {
       <div className="flex items-center justify-between">
         <Button
           variant="ghost"
-          onClick={() => navigate('/calculation/library')}
+          onClick={() => navigate(createLocalizedPath('/calculation'))}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Library

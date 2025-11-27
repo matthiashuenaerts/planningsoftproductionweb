@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Edit } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cabinetService } from '@/services/cabinetService';
@@ -15,6 +16,7 @@ export default function CabinetLibrary() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
+  const { createLocalizedPath } = useLanguage();
   const [models, setModels] = useState<CabinetModel[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -41,12 +43,12 @@ export default function CabinetLibrary() {
   };
 
   const handleSelectModel = (modelId: string) => {
-    navigate(`/calculation/project/${projectId}/editor/${modelId}`);
+    navigate(createLocalizedPath(`/calculation/project/${projectId}/editor/${modelId}`));
   };
 
   const handleEditModel = (modelId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    navigate(`/calculation/model-builder/${modelId}`);
+    navigate(createLocalizedPath(`/calculation/model-builder/${modelId}`));
   };
 
   if (loading) {
@@ -61,7 +63,7 @@ export default function CabinetLibrary() {
     <div className="container mx-auto p-6 space-y-6">
       <Button
         variant="ghost"
-        onClick={() => navigate(`/calculation/project/${projectId}`)}
+        onClick={() => navigate(createLocalizedPath(`/calculation/project/${projectId}`))}
         className="mb-6"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />

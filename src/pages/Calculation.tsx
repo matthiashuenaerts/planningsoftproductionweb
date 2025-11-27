@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, FolderOpen } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cabinetService } from '@/services/cabinetService';
@@ -12,6 +13,7 @@ type CabinetProject = Database['public']['Tables']['cabinet_projects']['Row'];
 export default function Calculation() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { createLocalizedPath } = useLanguage();
   const [projects, setProjects] = useState<CabinetProject[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,11 +38,11 @@ export default function Calculation() {
   };
 
   const handleNewProject = () => {
-    navigate('/calculation/new');
+    navigate(createLocalizedPath('/calculation/new'));
   };
 
   const handleOpenProject = (projectId: string) => {
-    navigate(`/calculation/project/${projectId}`);
+    navigate(createLocalizedPath(`/calculation/project/${projectId}`));
   };
 
   return (
