@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function NewCabinetProject() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { createLocalizedPath } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -60,7 +62,7 @@ export default function NewCabinetProject() {
         description: 'Project created successfully',
       });
 
-      navigate(`/calculation/project/${project.id}`);
+      navigate(createLocalizedPath(`/calculation/project/${project.id}`));
     } catch (error) {
       console.error('Error creating project:', error);
       toast({
@@ -77,7 +79,7 @@ export default function NewCabinetProject() {
     <div className="container mx-auto p-6 max-w-2xl">
       <Button
         variant="ghost"
-        onClick={() => navigate('/calculation')}
+        onClick={() => navigate(createLocalizedPath('/calculation'))}
         className="mb-6"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -187,7 +189,7 @@ export default function NewCabinetProject() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate('/calculation')}
+                onClick={() => navigate(createLocalizedPath('/calculation'))}
               >
                 Cancel
               </Button>

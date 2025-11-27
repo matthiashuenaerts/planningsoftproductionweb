@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Pencil } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cabinetService } from '@/services/cabinetService';
@@ -14,6 +15,7 @@ export default function CabinetProjectDetails() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { createLocalizedPath } = useLanguage();
   const [project, setProject] = useState<CabinetProject | null>(null);
   const [configurations, setConfigurations] = useState<CabinetConfiguration[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +43,7 @@ export default function CabinetProjectDetails() {
         description: 'Failed to load project',
         variant: 'destructive',
       });
-      navigate('/calculation');
+      navigate(createLocalizedPath('/calculation'));
     } finally {
       setLoading(false);
     }
@@ -67,7 +69,7 @@ export default function CabinetProjectDetails() {
     <div className="container mx-auto p-6 space-y-6">
       <Button
         variant="ghost"
-        onClick={() => navigate('/calculation')}
+        onClick={() => navigate(createLocalizedPath('/calculation'))}
         className="mb-6"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -141,7 +143,7 @@ export default function CabinetProjectDetails() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Cabinet Configurations</CardTitle>
-          <Button onClick={() => navigate(`/calculation/project/${projectId}/library`)}>
+          <Button onClick={() => navigate(createLocalizedPath(`/calculation/project/${projectId}/library`))}>
             <Plus className="mr-2 h-4 w-4" />
             Add Cabinet
           </Button>
@@ -172,7 +174,7 @@ export default function CabinetProjectDetails() {
                       variant="outline" 
                       size="sm" 
                       className="w-full mt-2"
-                      onClick={() => navigate(`/calculation/project/${projectId}/editor/${config.model_id}?configId=${config.id}`)}
+                      onClick={() => navigate(createLocalizedPath(`/calculation/project/${projectId}/editor/${config.model_id}?configId=${config.id}`))}
                     >
                       <Pencil className="mr-2 h-3 w-3" />
                       Edit
