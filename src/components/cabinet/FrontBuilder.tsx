@@ -290,14 +290,14 @@ export function FrontBuilder({ modelId, fronts, onFrontsChange }: FrontBuilderPr
                 <div>
                   <Label>Hardware (Hinges/Runners)</Label>
                   <Select
-                    value={selectedFront.hardware_id || ''}
-                    onValueChange={(value) => updateFront(selectedFront.id, { hardware_id: value || undefined })}
+                    value={selectedFront.hardware_id || 'none'}
+                    onValueChange={(value) => updateFront(selectedFront.id, { hardware_id: value === 'none' ? undefined : value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select hardware..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {products.map((product) => (
                         <SelectItem key={product.id} value={product.id}>
                           {product.name} {product.price_per_unit > 0 && `(€${product.price_per_unit})`}
