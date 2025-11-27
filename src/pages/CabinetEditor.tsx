@@ -10,7 +10,7 @@ import { cabinetService } from '@/services/cabinetService';
 import { useToast } from '@/hooks/use-toast';
 import { InteractiveCabinetVisualizer } from '@/components/cabinet/InteractiveCabinetVisualizer';
 import { ModuleEditor } from '@/components/cabinet/ModuleEditor';
-import { Cabinet3DVisualizer } from '@/components/cabinet/Cabinet3DVisualizer';
+import { Enhanced3DCabinetVisualizer } from '@/components/cabinet/Enhanced3DCabinetVisualizer';
 import type { Database } from '@/integrations/supabase/types';
 import { CabinetConfiguration, Compartment } from '@/types/cabinet';
 import { CabinetCalculationService } from '@/services/cabinetCalculationService';
@@ -406,9 +406,10 @@ export default function CabinetEditor() {
                   />
                 </TabsContent>
                 <TabsContent value="3d" className="mt-4">
-                  <Cabinet3DVisualizer 
+                  <Enhanced3DCabinetVisualizer 
                     config={config}
                     materials={materials}
+                    panels={model?.parameters && typeof model.parameters === 'object' && 'panels' in model.parameters ? (model.parameters as any).panels : undefined}
                   />
                 </TabsContent>
               </Tabs>
