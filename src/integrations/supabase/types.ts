@@ -132,6 +132,56 @@ export type Database = {
           },
         ]
       }
+      cabinet_compartments: {
+        Row: {
+          created_at: string
+          depth: string
+          height: string
+          id: string
+          model_id: string | null
+          name: string
+          position_x: string
+          position_y: string
+          position_z: string
+          updated_at: string
+          width: string
+        }
+        Insert: {
+          created_at?: string
+          depth: string
+          height: string
+          id?: string
+          model_id?: string | null
+          name: string
+          position_x?: string
+          position_y?: string
+          position_z?: string
+          updated_at?: string
+          width: string
+        }
+        Update: {
+          created_at?: string
+          depth?: string
+          height?: string
+          id?: string
+          model_id?: string | null
+          name?: string
+          position_x?: string
+          position_y?: string
+          position_z?: string
+          updated_at?: string
+          width?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cabinet_compartments_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "cabinet_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cabinet_configurations: {
         Row: {
           created_at: string
@@ -209,6 +259,81 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "cabinet_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cabinet_fronts: {
+        Row: {
+          created_at: string
+          front_type: string
+          hardware_id: string | null
+          height: string
+          hinge_side: string | null
+          id: string
+          material_type: string | null
+          model_id: string | null
+          name: string
+          position_x: string
+          position_y: string
+          position_z: string
+          quantity: number | null
+          thickness: string
+          updated_at: string
+          visible: boolean | null
+          width: string
+        }
+        Insert: {
+          created_at?: string
+          front_type: string
+          hardware_id?: string | null
+          height?: string
+          hinge_side?: string | null
+          id?: string
+          material_type?: string | null
+          model_id?: string | null
+          name: string
+          position_x?: string
+          position_y?: string
+          position_z?: string
+          quantity?: number | null
+          thickness?: string
+          updated_at?: string
+          visible?: boolean | null
+          width?: string
+        }
+        Update: {
+          created_at?: string
+          front_type?: string
+          hardware_id?: string | null
+          height?: string
+          hinge_side?: string | null
+          id?: string
+          material_type?: string | null
+          model_id?: string | null
+          name?: string
+          position_x?: string
+          position_y?: string
+          position_z?: string
+          quantity?: number | null
+          thickness?: string
+          updated_at?: string
+          visible?: boolean | null
+          width?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cabinet_fronts_hardware_id_fkey"
+            columns: ["hardware_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cabinet_fronts_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "cabinet_models"
             referencedColumns: ["id"]
           },
         ]
@@ -710,6 +835,69 @@ export type Database = {
         }
         Relationships: []
       }
+      compartment_items: {
+        Row: {
+          compartment_id: string | null
+          created_at: string
+          drilling_pattern: string | null
+          has_drilling: boolean | null
+          id: string
+          item_type: string
+          legrabox_id: string | null
+          material_type: string | null
+          position_x: string
+          position_y: string
+          quantity: number | null
+          thickness: string | null
+          updated_at: string
+        }
+        Insert: {
+          compartment_id?: string | null
+          created_at?: string
+          drilling_pattern?: string | null
+          has_drilling?: boolean | null
+          id?: string
+          item_type: string
+          legrabox_id?: string | null
+          material_type?: string | null
+          position_x?: string
+          position_y?: string
+          quantity?: number | null
+          thickness?: string | null
+          updated_at?: string
+        }
+        Update: {
+          compartment_id?: string | null
+          created_at?: string
+          drilling_pattern?: string | null
+          has_drilling?: boolean | null
+          id?: string
+          item_type?: string
+          legrabox_id?: string | null
+          material_type?: string | null
+          position_x?: string
+          position_y?: string
+          quantity?: number | null
+          thickness?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compartment_items_compartment_id_fkey"
+            columns: ["compartment_id"]
+            isOneToOne: false
+            referencedRelation: "cabinet_compartments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compartment_items_legrabox_id_fkey"
+            columns: ["legrabox_id"]
+            isOneToOne: false
+            referencedRelation: "legrabox_configurations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_team_assignments: {
         Row: {
           created_at: string
@@ -1090,6 +1278,63 @@ export type Database = {
           date?: string
           id?: string
           team?: string
+        }
+        Relationships: []
+      }
+      legrabox_configurations: {
+        Row: {
+          bottom_colour: string | null
+          created_at: string
+          has_drawer_mat: boolean | null
+          height_mm: number
+          height_type: string
+          id: string
+          is_active: boolean | null
+          load_capacity_kg: number | null
+          name: string
+          nominal_length: number
+          notes: string | null
+          price: number
+          side_colour: string
+          sku: string | null
+          supplier: string | null
+          updated_at: string
+        }
+        Insert: {
+          bottom_colour?: string | null
+          created_at?: string
+          has_drawer_mat?: boolean | null
+          height_mm: number
+          height_type: string
+          id?: string
+          is_active?: boolean | null
+          load_capacity_kg?: number | null
+          name: string
+          nominal_length: number
+          notes?: string | null
+          price?: number
+          side_colour?: string
+          sku?: string | null
+          supplier?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bottom_colour?: string | null
+          created_at?: string
+          has_drawer_mat?: boolean | null
+          height_mm?: number
+          height_type?: string
+          id?: string
+          is_active?: boolean | null
+          load_capacity_kg?: number | null
+          name?: string
+          nominal_length?: number
+          notes?: string | null
+          price?: number
+          side_colour?: string
+          sku?: string | null
+          supplier?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1866,6 +2111,7 @@ export type Database = {
           image_path: string | null
           location: string | null
           name: string
+          price_per_unit: number | null
           qr_code: string | null
           standard_order_quantity: number | null
           storage_code: string | null
@@ -1882,6 +2128,7 @@ export type Database = {
           image_path?: string | null
           location?: string | null
           name: string
+          price_per_unit?: number | null
           qr_code?: string | null
           standard_order_quantity?: number | null
           storage_code?: string | null
@@ -1898,6 +2145,7 @@ export type Database = {
           image_path?: string | null
           location?: string | null
           name?: string
+          price_per_unit?: number | null
           qr_code?: string | null
           standard_order_quantity?: number | null
           storage_code?: string | null

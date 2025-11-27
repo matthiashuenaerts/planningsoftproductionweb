@@ -6,12 +6,58 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { PanelBuilder } from '@/components/cabinet/PanelBuilder';
+import { FrontBuilder } from '@/components/cabinet/FrontBuilder';
+import { CompartmentBuilder } from '@/components/cabinet/CompartmentBuilder';
+import { LegraboxManager } from '@/components/cabinet/LegraboxManager';
 import { Enhanced3DCabinetVisualizer } from '@/components/cabinet/Enhanced3DCabinetVisualizer';
 import { cabinetService } from '@/services/cabinetService';
 import { ParametricPanel, CabinetConfiguration } from '@/types/cabinet';
 import { supabase } from '@/integrations/supabase/client';
+
+interface CabinetFront {
+  id: string;
+  name: string;
+  front_type: 'hinged_door' | 'drawer_front' | 'lift_up' | 'sliding';
+  position_x: string;
+  position_y: string;
+  position_z: string;
+  width: string;
+  height: string;
+  thickness: string;
+  hinge_side?: 'left' | 'right' | 'top' | 'bottom';
+  hardware_id?: string;
+  quantity: number;
+  material_type: string;
+  visible: boolean;
+}
+
+interface CompartmentItem {
+  id: string;
+  item_type: 'horizontal_divider' | 'vertical_divider' | 'shelf' | 'legrabox_drawer';
+  position_y: string;
+  position_x: string;
+  thickness: string;
+  quantity: number;
+  has_drilling: boolean;
+  drilling_pattern?: string;
+  legrabox_id?: string;
+  material_type: string;
+}
+
+interface Compartment {
+  id: string;
+  name: string;
+  position_x: string;
+  position_y: string;
+  position_z: string;
+  width: string;
+  height: string;
+  depth: string;
+  items: CompartmentItem[];
+}
 
 export default function CabinetModelBuilder() {
   const { modelId } = useParams<{ modelId?: string }>();
@@ -20,6 +66,7 @@ export default function CabinetModelBuilder() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [materials, setMaterials] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState('panels');
   
   const [modelData, setModelData] = useState({
     name: '',
@@ -37,6 +84,8 @@ export default function CabinetModelBuilder() {
   });
   
   const [panels, setPanels] = useState<ParametricPanel[]>([]);
+  const [fronts, setFronts] = useState<CabinetFront[]>([]);
+  const [compartments, setCompartments] = useState<Compartment[]>([]);
   
   // Preview config for 3D view
   const previewConfig: CabinetConfiguration = {
@@ -85,9 +134,12 @@ export default function CabinetModelBuilder() {
             max_depth: model.max_depth || 800,
           });
           
-          // Load panels from model parameters
-          if (model.parameters && typeof model.parameters === 'object' && 'panels' in model.parameters) {
-            setPanels((model.parameters as any).panels || []);
+          // Load panels, fronts, compartments from model parameters
+          if (model.parameters && typeof model.parameters === 'object') {
+            const params = model.parameters as any;
+            if (params.panels) setPanels(params.panels);
+            if (params.fronts) setFronts(params.fronts);
+            if (params.compartments) setCompartments(params.compartments);
           }
         }
       }
@@ -106,7 +158,7 @@ export default function CabinetModelBuilder() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const parameters = { panels } as any;
+      const parameters = { panels, fronts, compartments } as any;
       
       if (modelId) {
         // Update existing model
@@ -161,7 +213,7 @@ export default function CabinetModelBuilder() {
         description: 'Cabinet model saved successfully',
       });
       
-      navigate('/settings');
+      navigate('/calculation/library');
     } catch (error) {
       console.error('Error saving model:', error);
       toast({
@@ -187,10 +239,14 @@ export default function CabinetModelBuilder() {
       <div className="flex items-center justify-between">
         <Button
           variant="ghost"
-          onClick={() => navigate('/settings')}
+          onClick={() => navigate('/calculation/library')}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Settings
+          Back to Library
+        </Button>
+        <Button onClick={handleSave} disabled={saving}>
+          <Save className="mr-2 h-4 w-4" />
+          {saving ? 'Saving...' : 'Save Model'}
         </Button>
       </div>
 
@@ -199,7 +255,7 @@ export default function CabinetModelBuilder() {
           {modelId ? 'Edit' : 'Create'} Cabinet Model
         </h1>
         <p className="text-muted-foreground mt-2">
-          Define parametric panels that adapt to cabinet dimensions
+          Define parametric structure, doors, and interior components
         </p>
       </div>
 
@@ -240,29 +296,31 @@ export default function CabinetModelBuilder() {
 
             <div className="space-y-2">
               <h4 className="font-semibold">Default Dimensions (mm)</h4>
-              <div>
-                <Label>Width</Label>
-                <Input
-                  type="number"
-                  value={modelData.default_width}
-                  onChange={(e) => setModelData({ ...modelData, default_width: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <Label>Height</Label>
-                <Input
-                  type="number"
-                  value={modelData.default_height}
-                  onChange={(e) => setModelData({ ...modelData, default_height: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <Label>Depth</Label>
-                <Input
-                  type="number"
-                  value={modelData.default_depth}
-                  onChange={(e) => setModelData({ ...modelData, default_depth: Number(e.target.value) })}
-                />
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <Label className="text-xs">Width</Label>
+                  <Input
+                    type="number"
+                    value={modelData.default_width}
+                    onChange={(e) => setModelData({ ...modelData, default_width: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Height</Label>
+                  <Input
+                    type="number"
+                    value={modelData.default_height}
+                    onChange={(e) => setModelData({ ...modelData, default_height: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Depth</Label>
+                  <Input
+                    type="number"
+                    value={modelData.default_depth}
+                    onChange={(e) => setModelData({ ...modelData, default_depth: Number(e.target.value) })}
+                  />
+                </div>
               </div>
             </div>
 
@@ -275,7 +333,6 @@ export default function CabinetModelBuilder() {
                     type="number"
                     value={modelData.min_width}
                     onChange={(e) => setModelData({ ...modelData, min_width: Number(e.target.value) })}
-                    placeholder="e.g., 400"
                   />
                 </div>
                 <div>
@@ -284,7 +341,6 @@ export default function CabinetModelBuilder() {
                     type="number"
                     value={modelData.max_width}
                     onChange={(e) => setModelData({ ...modelData, max_width: Number(e.target.value) })}
-                    placeholder="e.g., 3000"
                   />
                 </div>
                 <div>
@@ -293,7 +349,6 @@ export default function CabinetModelBuilder() {
                     type="number"
                     value={modelData.min_height}
                     onChange={(e) => setModelData({ ...modelData, min_height: Number(e.target.value) })}
-                    placeholder="e.g., 500"
                   />
                 </div>
                 <div>
@@ -302,7 +357,6 @@ export default function CabinetModelBuilder() {
                     type="number"
                     value={modelData.max_height}
                     onChange={(e) => setModelData({ ...modelData, max_height: Number(e.target.value) })}
-                    placeholder="e.g., 3000"
                   />
                 </div>
                 <div>
@@ -311,7 +365,6 @@ export default function CabinetModelBuilder() {
                     type="number"
                     value={modelData.min_depth}
                     onChange={(e) => setModelData({ ...modelData, min_depth: Number(e.target.value) })}
-                    placeholder="e.g., 300"
                   />
                 </div>
                 <div>
@@ -320,7 +373,6 @@ export default function CabinetModelBuilder() {
                     type="number"
                     value={modelData.max_depth}
                     onChange={(e) => setModelData({ ...modelData, max_depth: Number(e.target.value) })}
-                    placeholder="e.g., 800"
                   />
                 </div>
               </div>
@@ -338,17 +390,50 @@ export default function CabinetModelBuilder() {
               config={previewConfig}
               materials={materials}
               panels={panels}
+              fronts={fronts}
+              compartments={compartments}
             />
           </CardContent>
         </Card>
       </div>
 
-      {/* Panel Builder */}
-      <PanelBuilder
-        panels={panels}
-        onPanelsChange={setPanels}
-        onSave={handleSave}
-      />
+      {/* Component Builders */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="panels">Panels ({panels.length})</TabsTrigger>
+          <TabsTrigger value="fronts">Doors & Fronts ({fronts.length})</TabsTrigger>
+          <TabsTrigger value="compartments">Compartments ({compartments.length})</TabsTrigger>
+          <TabsTrigger value="legrabox">Legrabox Database</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="panels" className="mt-6">
+          <PanelBuilder
+            panels={panels}
+            onPanelsChange={setPanels}
+            onSave={handleSave}
+          />
+        </TabsContent>
+
+        <TabsContent value="fronts" className="mt-6">
+          <FrontBuilder
+            modelId={modelId}
+            fronts={fronts}
+            onFrontsChange={setFronts}
+          />
+        </TabsContent>
+
+        <TabsContent value="compartments" className="mt-6">
+          <CompartmentBuilder
+            modelId={modelId}
+            compartments={compartments}
+            onCompartmentsChange={setCompartments}
+          />
+        </TabsContent>
+
+        <TabsContent value="legrabox" className="mt-6">
+          <LegraboxManager />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
