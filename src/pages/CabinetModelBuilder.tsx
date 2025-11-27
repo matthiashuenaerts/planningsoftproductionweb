@@ -267,7 +267,7 @@ export default function CabinetModelBuilder() {
             </div>
 
             <div className="space-y-2">
-              <h4 className="font-semibold">Size Constraints</h4>
+              <h4 className="font-semibold">Size Constraints (mm)</h4>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <Label className="text-xs">Min Width</Label>
@@ -275,6 +275,7 @@ export default function CabinetModelBuilder() {
                     type="number"
                     value={modelData.min_width}
                     onChange={(e) => setModelData({ ...modelData, min_width: Number(e.target.value) })}
+                    placeholder="e.g., 400"
                   />
                 </div>
                 <div>
@@ -283,6 +284,7 @@ export default function CabinetModelBuilder() {
                     type="number"
                     value={modelData.max_width}
                     onChange={(e) => setModelData({ ...modelData, max_width: Number(e.target.value) })}
+                    placeholder="e.g., 3000"
                   />
                 </div>
                 <div>
@@ -291,6 +293,7 @@ export default function CabinetModelBuilder() {
                     type="number"
                     value={modelData.min_height}
                     onChange={(e) => setModelData({ ...modelData, min_height: Number(e.target.value) })}
+                    placeholder="e.g., 500"
                   />
                 </div>
                 <div>
@@ -299,6 +302,7 @@ export default function CabinetModelBuilder() {
                     type="number"
                     value={modelData.max_height}
                     onChange={(e) => setModelData({ ...modelData, max_height: Number(e.target.value) })}
+                    placeholder="e.g., 3000"
                   />
                 </div>
                 <div>
@@ -307,6 +311,7 @@ export default function CabinetModelBuilder() {
                     type="number"
                     value={modelData.min_depth}
                     onChange={(e) => setModelData({ ...modelData, min_depth: Number(e.target.value) })}
+                    placeholder="e.g., 300"
                   />
                 </div>
                 <div>
@@ -315,6 +320,7 @@ export default function CabinetModelBuilder() {
                     type="number"
                     value={modelData.max_depth}
                     onChange={(e) => setModelData({ ...modelData, max_depth: Number(e.target.value) })}
+                    placeholder="e.g., 800"
                   />
                 </div>
               </div>

@@ -123,6 +123,10 @@ export function PanelBuilder({ panels, onPanelsChange, onSave }: PanelBuilderPro
               Save Model
             </Button>
           </CardTitle>
+          <p className="text-sm text-muted-foreground mt-2">
+            Define panels using variables: <strong>width</strong>, <strong>height</strong>, <strong>depth</strong> for dimensions; <strong>body_thickness</strong>, <strong>door_thickness</strong>, <strong>shelf_thickness</strong> for material thicknesses. 
+            Use expressions like "width - body_thickness*2" for dynamic sizing.
+          </p>
         </CardHeader>
         <CardContent>
           {selectedPanel ? (
