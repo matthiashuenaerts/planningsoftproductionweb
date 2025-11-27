@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cabinetService } from '@/services/cabinetService';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
 import type { Database } from '@/integrations/supabase/types';
 
 type CabinetModel = Database['public']['Tables']['cabinet_models']['Row'];
@@ -13,8 +14,11 @@ export default function CabinetLibrary() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { currentEmployee } = useAuth();
   const [models, setModels] = useState<CabinetModel[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const isAdmin = currentEmployee?.role === 'admin';
 
   useEffect(() => {
     loadModels();
@@ -38,6 +42,11 @@ export default function CabinetLibrary() {
 
   const handleSelectModel = (modelId: string) => {
     navigate(`/calculation/project/${projectId}/editor/${modelId}`);
+  };
+
+  const handleEditModel = (modelId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/calculation/model-builder/${modelId}`);
   };
 
   if (loading) {
@@ -70,14 +79,28 @@ export default function CabinetLibrary() {
         {models.map((model) => (
           <Card
             key={model.id}
-            className="cursor-pointer hover:shadow-lg transition-shadow"
+            className="cursor-pointer hover:shadow-lg transition-shadow relative"
             onClick={() => handleSelectModel(model.id)}
           >
             <CardHeader>
-              <CardTitle className="text-lg">{model.name}</CardTitle>
-              <CardDescription className="text-sm">
-                {model.category}
-              </CardDescription>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <CardTitle className="text-lg">{model.name}</CardTitle>
+                  <CardDescription className="text-sm">
+                    {model.category}
+                  </CardDescription>
+                </div>
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => handleEditModel(model.id, e)}
+                    className="h-8 w-8"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {model.description && (
