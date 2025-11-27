@@ -10,6 +10,29 @@ export interface Module {
   material_id?: string; // Material override for this specific module
 }
 
+// Parametric panel system for cabinet models
+export type DimensionVariable = 'width' | 'height' | 'depth' | 'body_thickness' | 'door_thickness' | 'shelf_thickness';
+export type PanelType = 'bottom' | 'top' | 'left_side' | 'right_side' | 'back' | 'shelf' | 'divider' | 'door' | 'drawer_front';
+
+export interface ParametricPanel {
+  id: string;
+  name: string;
+  type: PanelType;
+  // Position variables (can be numbers or variable references or expressions)
+  x: number | string;
+  y: number | string;
+  z: number | string;
+  // Dimension variables (can be numbers or variable references or expressions)
+  length: number | string;
+  width: number | string;
+  thickness: number | string;
+  // Material reference
+  material_type: 'body' | 'door' | 'shelf';
+  // Visual properties
+  visible: boolean;
+  color?: string;
+}
+
 export interface Compartment {
   id: string;
   x: number; // Position from left in mm
