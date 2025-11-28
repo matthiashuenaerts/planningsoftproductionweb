@@ -13,7 +13,7 @@ import { PanelBuilder } from '@/components/cabinet/PanelBuilder';
 import { FrontBuilder } from '@/components/cabinet/FrontBuilder';
 import { CompartmentBuilder } from '@/components/cabinet/CompartmentBuilder';
 import { LegraboxManager } from '@/components/cabinet/LegraboxManager';
-import { Enhanced3DCabinetVisualizer } from '@/components/cabinet/Enhanced3DCabinetVisualizer';
+import { Interactive3DCabinetVisualizer } from '@/components/cabinet/Interactive3DCabinetVisualizer';
 import { cabinetService } from '@/services/cabinetService';
 import { ParametricPanel, CabinetConfiguration } from '@/types/cabinet';
 import { supabase } from '@/integrations/supabase/client';
@@ -388,7 +388,7 @@ export default function CabinetModelBuilder() {
             <CardTitle>3D Preview</CardTitle>
           </CardHeader>
           <CardContent>
-            <Enhanced3DCabinetVisualizer
+            <Interactive3DCabinetVisualizer
               config={previewConfig}
               materials={materials}
               panels={panels}

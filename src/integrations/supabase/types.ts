@@ -200,6 +200,7 @@ export type Database = {
           position_x: number | null
           position_y: number | null
           project_id: string
+          project_model_id: string | null
           updated_at: string
           vertical_divisions: number | null
           width: number
@@ -221,6 +222,7 @@ export type Database = {
           position_x?: number | null
           position_y?: number | null
           project_id: string
+          project_model_id?: string | null
           updated_at?: string
           vertical_divisions?: number | null
           width: number
@@ -242,6 +244,7 @@ export type Database = {
           position_x?: number | null
           position_y?: number | null
           project_id?: string
+          project_model_id?: string | null
           updated_at?: string
           vertical_divisions?: number | null
           width?: number
@@ -259,6 +262,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "cabinet_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cabinet_configurations_project_model_id_fkey"
+            columns: ["project_model_id"]
+            isOneToOne: false
+            referencedRelation: "project_models"
             referencedColumns: ["id"]
           },
         ]
@@ -1119,6 +1129,51 @@ export type Database = {
           workstation?: string | null
         }
         Relationships: []
+      }
+      front_hardware: {
+        Row: {
+          created_at: string
+          front_id: string
+          hardware_type: string
+          id: string
+          notes: string | null
+          product_id: string | null
+          quantity: number
+        }
+        Insert: {
+          created_at?: string
+          front_id: string
+          hardware_type: string
+          id?: string
+          notes?: string | null
+          product_id?: string | null
+          quantity?: number
+        }
+        Update: {
+          created_at?: string
+          front_id?: string
+          hardware_type?: string
+          id?: string
+          notes?: string | null
+          product_id?: string | null
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "front_hardware_front_id_fkey"
+            columns: ["front_id"]
+            isOneToOne: false
+            referencedRelation: "cabinet_fronts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "front_hardware_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       help_articles: {
         Row: {
@@ -2332,6 +2387,92 @@ export type Database = {
             columns: ["reply_to_message_id"]
             isOneToOne: false
             referencedRelation: "project_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_models: {
+        Row: {
+          body_material_id: string | null
+          body_thickness: number | null
+          created_at: string
+          door_material_id: string | null
+          door_thickness: number | null
+          edge_banding: string | null
+          finish: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          notes: string | null
+          plinth_height: number | null
+          project_id: string
+          shelf_material_id: string | null
+          shelf_thickness: number | null
+          updated_at: string
+        }
+        Insert: {
+          body_material_id?: string | null
+          body_thickness?: number | null
+          created_at?: string
+          door_material_id?: string | null
+          door_thickness?: number | null
+          edge_banding?: string | null
+          finish?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          notes?: string | null
+          plinth_height?: number | null
+          project_id: string
+          shelf_material_id?: string | null
+          shelf_thickness?: number | null
+          updated_at?: string
+        }
+        Update: {
+          body_material_id?: string | null
+          body_thickness?: number | null
+          created_at?: string
+          door_material_id?: string | null
+          door_thickness?: number | null
+          edge_banding?: string | null
+          finish?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          notes?: string | null
+          plinth_height?: number | null
+          project_id?: string
+          shelf_material_id?: string | null
+          shelf_thickness?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_models_body_material_id_fkey"
+            columns: ["body_material_id"]
+            isOneToOne: false
+            referencedRelation: "cabinet_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_models_door_material_id_fkey"
+            columns: ["door_material_id"]
+            isOneToOne: false
+            referencedRelation: "cabinet_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_models_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cabinet_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_models_shelf_material_id_fkey"
+            columns: ["shelf_material_id"]
+            isOneToOne: false
+            referencedRelation: "cabinet_materials"
             referencedColumns: ["id"]
           },
         ]

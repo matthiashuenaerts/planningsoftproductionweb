@@ -9,6 +9,15 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { FrontHardwareManager } from './FrontHardwareManager';
+
+interface FrontHardware {
+  id: string;
+  hardware_type: 'hinge' | 'damper' | 'runner' | 'handle' | 'other';
+  product_id?: string;
+  quantity: number;
+  notes?: string;
+}
 
 interface CabinetFront {
   id: string;
@@ -22,6 +31,7 @@ interface CabinetFront {
   thickness: string;
   hinge_side?: 'left' | 'right' | 'top' | 'bottom';
   hardware_id?: string;
+  hardware?: FrontHardware[];
   quantity: number;
   material_type: string;
   visible: boolean;
@@ -72,6 +82,7 @@ export function FrontBuilder({ modelId, fronts, onFrontsChange }: FrontBuilderPr
       height: 'height',
       thickness: 'door_thickness',
       hinge_side: 'left',
+      hardware: [],
       quantity: 1,
       material_type: 'door',
       visible: true,
@@ -79,6 +90,10 @@ export function FrontBuilder({ modelId, fronts, onFrontsChange }: FrontBuilderPr
     onFrontsChange([...fronts, newFront]);
     setSelectedFrontId(newFront.id);
     toast({ title: 'Door/Front added' });
+  };
+
+  const updateFrontHardware = (frontId: string, hardware: FrontHardware[]) => {
+    onFrontsChange(fronts.map(f => f.id === frontId ? { ...f, hardware } : f));
   };
 
   const deleteFront = (id: string) => {
@@ -286,26 +301,12 @@ export function FrontBuilder({ modelId, fronts, onFrontsChange }: FrontBuilderPr
                   </div>
                 )}
 
-                {/* Hardware Selection */}
-                <div>
-                  <Label>Hardware (Hinges/Runners)</Label>
-                  <Select
-                    value={selectedFront.hardware_id || 'none'}
-                    onValueChange={(value) => updateFront(selectedFront.id, { hardware_id: value === 'none' ? undefined : value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select hardware..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {products.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name} {product.price_per_unit > 0 && `(€${product.price_per_unit})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Hardware Selection - Multiple Items */}
+                <FrontHardwareManager
+                  hardware={selectedFront.hardware || []}
+                  onHardwareChange={(hardware) => updateFrontHardware(selectedFront.id, hardware)}
+                  frontType={selectedFront.front_type}
+                />
 
                 {/* Quantity */}
                 <div className="grid grid-cols-2 gap-4">
