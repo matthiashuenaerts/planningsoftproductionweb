@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cabinetService } from '@/services/cabinetService';
 import { useToast } from '@/hooks/use-toast';
+import { ProjectModelManager } from '@/components/cabinet/ProjectModelManager';
 import type { Database } from '@/integrations/supabase/types';
 
 type CabinetProject = Database['public']['Tables']['cabinet_projects']['Row'];
@@ -139,6 +140,9 @@ export default function CabinetProjectDetails() {
           </CardContent>
         </Card>
       )}
+
+      {/* Project Models */}
+      <ProjectModelManager projectId={projectId!} />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
