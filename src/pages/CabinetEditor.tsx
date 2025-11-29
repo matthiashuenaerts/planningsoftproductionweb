@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -7,13 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { cabinetService } from '@/services/cabinetService';
 import { useToast } from '@/hooks/use-toast';
 import { Interactive3DCabinetVisualizer } from '@/components/cabinet/Interactive3DCabinetVisualizer';
 import { InteractiveCabinetVisualizer } from '@/components/cabinet/InteractiveCabinetVisualizer';
 import { ModuleEditor } from '@/components/cabinet/ModuleEditor';
 import { FrontBuilder } from '@/components/cabinet/FrontBuilder';
-import { CompartmentBuilder } from '@/components/cabinet/CompartmentBuilder';
+import { EnhancedCompartmentBuilder } from '@/components/cabinet/EnhancedCompartmentBuilder';
 import type { Database } from '@/integrations/supabase/types';
 import { CabinetConfiguration, Compartment, ParametricPanel } from '@/types/cabinet';
 import { CabinetCalculationService } from '@/services/cabinetCalculationService';
@@ -67,6 +69,24 @@ interface CompartmentData {
   height: string;
   depth: string;
   items: any[];
+}
+
+interface ModelHardware {
+  id: string;
+  product_id: string;
+  product_name: string;
+  product_code: string;
+  quantity: string;
+  unit_price: number;
+  notes: string;
+}
+
+interface LaborConfig {
+  base_minutes: number;
+  per_panel_minutes: number;
+  per_front_minutes: number;
+  per_compartment_item_minutes: number;
+  hourly_rate: number;
 }
 
 export default function CabinetEditor() {
@@ -625,7 +645,7 @@ export default function CabinetEditor() {
                 </TabsContent>
 
                 <TabsContent value="compartments" className="mt-4">
-                  <CompartmentBuilder
+                  <EnhancedCompartmentBuilder
                     modelId={modelId}
                     compartments={compartments}
                     onCompartmentsChange={setCompartments}

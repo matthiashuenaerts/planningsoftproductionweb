@@ -11,8 +11,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { PanelBuilder } from '@/components/cabinet/PanelBuilder';
 import { FrontBuilder } from '@/components/cabinet/FrontBuilder';
-import { CompartmentBuilder } from '@/components/cabinet/CompartmentBuilder';
+import { EnhancedCompartmentBuilder } from '@/components/cabinet/EnhancedCompartmentBuilder';
 import { LegraboxManager } from '@/components/cabinet/LegraboxManager';
+import { ModelHardwareManager, ModelHardware } from '@/components/cabinet/ModelHardwareManager';
+import { ModelCalculationSummary } from '@/components/cabinet/ModelCalculationSummary';
+import { LaborPriceCalculator, LaborConfig } from '@/components/cabinet/LaborPriceCalculator';
 import { Interactive3DCabinetVisualizer } from '@/components/cabinet/Interactive3DCabinetVisualizer';
 import { cabinetService } from '@/services/cabinetService';
 import { ParametricPanel, CabinetConfiguration } from '@/types/cabinet';
@@ -88,6 +91,14 @@ export default function CabinetModelBuilder() {
   const [panels, setPanels] = useState<ParametricPanel[]>([]);
   const [fronts, setFronts] = useState<CabinetFront[]>([]);
   const [compartments, setCompartments] = useState<Compartment[]>([]);
+  const [hardware, setHardware] = useState<ModelHardware[]>([]);
+  const [laborConfig, setLaborConfig] = useState<LaborConfig>({
+    base_minutes: 30,
+    per_panel_minutes: 5,
+    per_front_minutes: 15,
+    per_compartment_item_minutes: 10,
+    hourly_rate: 50,
+  });
   
   // Preview config for 3D view
   const previewConfig: CabinetConfiguration = {
@@ -136,12 +147,14 @@ export default function CabinetModelBuilder() {
             max_depth: model.max_depth || 800,
           });
           
-          // Load panels, fronts, compartments from model parameters
+          // Load panels, fronts, compartments, hardware from model parameters
           if (model.parameters && typeof model.parameters === 'object') {
             const params = model.parameters as any;
             if (params.panels) setPanels(params.panels);
             if (params.fronts) setFronts(params.fronts);
             if (params.compartments) setCompartments(params.compartments);
+            if (params.hardware) setHardware(params.hardware);
+            if (params.laborConfig) setLaborConfig(params.laborConfig);
           }
         }
       }
@@ -160,7 +173,7 @@ export default function CabinetModelBuilder() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const parameters = { panels, fronts, compartments } as any;
+      const parameters = { panels, fronts, compartments, hardware, laborConfig } as any;
       
       if (modelId) {
         // Update existing model
@@ -401,11 +414,14 @@ export default function CabinetModelBuilder() {
 
       {/* Component Builders */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="panels">Panels ({panels.length})</TabsTrigger>
-          <TabsTrigger value="fronts">Doors & Fronts ({fronts.length})</TabsTrigger>
-          <TabsTrigger value="compartments">Compartments ({compartments.length})</TabsTrigger>
-          <TabsTrigger value="legrabox">Legrabox Database</TabsTrigger>
+          <TabsTrigger value="fronts">Fronts ({fronts.length})</TabsTrigger>
+          <TabsTrigger value="compartments">Compartments</TabsTrigger>
+          <TabsTrigger value="hardware">Hardware ({hardware.length})</TabsTrigger>
+          <TabsTrigger value="labor">Labor</TabsTrigger>
+          <TabsTrigger value="calculation">Calculation</TabsTrigger>
+          <TabsTrigger value="legrabox">Legrabox DB</TabsTrigger>
         </TabsList>
 
         <TabsContent value="panels" className="mt-6">
@@ -425,10 +441,40 @@ export default function CabinetModelBuilder() {
         </TabsContent>
 
         <TabsContent value="compartments" className="mt-6">
-          <CompartmentBuilder
+          <EnhancedCompartmentBuilder
             modelId={modelId}
             compartments={compartments}
             onCompartmentsChange={setCompartments}
+            defaultWidth={modelData.default_width}
+            defaultHeight={modelData.default_height}
+            defaultDepth={modelData.default_depth}
+          />
+        </TabsContent>
+
+        <TabsContent value="hardware" className="mt-6">
+          <ModelHardwareManager
+            hardware={hardware}
+            onHardwareChange={setHardware}
+          />
+        </TabsContent>
+
+        <TabsContent value="labor" className="mt-6">
+          <div className="max-w-xl">
+            <LaborPriceCalculator
+              config={laborConfig}
+              onChange={setLaborConfig}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="calculation" className="mt-6">
+          <ModelCalculationSummary
+            modelData={modelData}
+            panels={panels}
+            fronts={fronts}
+            compartments={compartments}
+            hardware={hardware}
+            laborConfig={laborConfig}
           />
         </TabsContent>
 
