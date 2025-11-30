@@ -173,9 +173,40 @@ export default function CabinetEditor() {
         if (params.fronts) setFronts(params.fronts);
         if (params.compartments) setCompartments(params.compartments);
       }
-      
-      // Set default values from model
-      if (modelData) {
+
+      // If editing existing configuration, load it
+      if (configId) {
+        try {
+          const existingConfig = await cabinetService.getConfiguration(configId);
+          if (existingConfig) {
+            const params = existingConfig.parameters as any;
+            setConfig({
+              name: existingConfig.name,
+              width: existingConfig.width,
+              height: existingConfig.height,
+              depth: existingConfig.depth,
+              material_config: existingConfig.material_config as any || {
+                body_material: '',
+                door_material: '',
+                shelf_material: '',
+                body_thickness: 18,
+                door_thickness: 18,
+                shelf_thickness: 18,
+              },
+              edge_banding: existingConfig.edge_banding || 'PVC',
+              finish: existingConfig.finish || 'matte',
+              door_type: existingConfig.door_type || 'hinged',
+              compartments: params?.compartments || [],
+            });
+            if (params?.fronts) setFronts(params.fronts);
+            if (params?.panels) setPanels(params.panels);
+            if (params?.parametric_compartments) setCompartments(params.parametric_compartments);
+          }
+        } catch (err) {
+          console.error('Error loading existing config:', err);
+        }
+      } else if (modelData) {
+        // Set default values from model for new configuration
         const initialCompartment: Compartment = {
           id: uuidv4(),
           x: 0,
@@ -263,9 +294,7 @@ export default function CabinetEditor() {
     
     setSaving(true);
     try {
-      await cabinetService.createConfiguration({
-        project_id: projectId,
-        model_id: modelId,
+      const configData = {
         name: config.name,
         width: config.width,
         height: config.height,
@@ -285,12 +314,27 @@ export default function CabinetEditor() {
           panels,
           parametric_compartments: compartments,
         } as any,
-      });
-      
-      toast({
-        title: 'Success',
-        description: 'Cabinet configuration saved',
-      });
+      };
+
+      if (configId) {
+        // Update existing configuration
+        await cabinetService.updateConfiguration(configId, configData);
+        toast({
+          title: 'Success',
+          description: 'Cabinet configuration updated',
+        });
+      } else {
+        // Create new configuration
+        await cabinetService.createConfiguration({
+          project_id: projectId,
+          model_id: modelId,
+          ...configData,
+        });
+        toast({
+          title: 'Success',
+          description: 'Cabinet configuration saved',
+        });
+      }
       
       navigate(createLocalizedPath(`/calculation/project/${projectId}`));
     } catch (error) {
