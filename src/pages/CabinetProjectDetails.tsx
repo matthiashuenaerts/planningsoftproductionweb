@@ -1,16 +1,27 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Pencil } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cabinetService } from '@/services/cabinetService';
 import { useToast } from '@/hooks/use-toast';
 import { ProjectModelManager } from '@/components/cabinet/ProjectModelManager';
+import { CabinetConfigurationCard } from '@/components/cabinet/CabinetConfigurationCard';
+import { ProjectPricingSummary } from '@/components/cabinet/ProjectPricingSummary';
 import type { Database } from '@/integrations/supabase/types';
 
 type CabinetProject = Database['public']['Tables']['cabinet_projects']['Row'];
 type CabinetConfiguration = Database['public']['Tables']['cabinet_configurations']['Row'];
+type CabinetModel = Database['public']['Tables']['cabinet_models']['Row'];
+
+interface ModelParameters {
+  panels?: any[];
+  fronts?: any[];
+  compartments?: any[];
+  hardware?: any[];
+  laborConfig?: any;
+}
 
 export default function CabinetProjectDetails() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -19,6 +30,7 @@ export default function CabinetProjectDetails() {
   const { createLocalizedPath } = useLanguage();
   const [project, setProject] = useState<CabinetProject | null>(null);
   const [configurations, setConfigurations] = useState<CabinetConfiguration[]>([]);
+  const [modelParametersMap, setModelParametersMap] = useState<Record<string, ModelParameters>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,6 +49,26 @@ export default function CabinetProjectDetails() {
       ]);
       setProject(projectData);
       setConfigurations(configurationsData);
+
+      // Load model parameters for each unique model
+      const modelIds = [...new Set(configurationsData.map(c => c.model_id).filter(Boolean))] as string[];
+      const parametersMap: Record<string, ModelParameters> = {};
+      
+      await Promise.all(modelIds.map(async (modelId) => {
+        try {
+          const model = await cabinetService.getModel(modelId);
+          if (model?.parameters) {
+            const params = typeof model.parameters === 'string' 
+              ? JSON.parse(model.parameters) 
+              : model.parameters;
+            parametersMap[modelId] = params as ModelParameters;
+          }
+        } catch (err) {
+          console.error(`Error loading model ${modelId}:`, err);
+        }
+      }));
+      
+      setModelParametersMap(parametersMap);
     } catch (error) {
       console.error('Error loading project:', error);
       toast({
@@ -160,36 +192,24 @@ export default function CabinetProjectDetails() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {configurations.map((config) => (
-                <Card key={config.id} className="hover:bg-accent/50 transition-colors">
-                  <CardHeader>
-                    <CardTitle className="text-base">{config.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="text-sm text-muted-foreground">
-                      Dimensions: {config.width} × {config.height} × {config.depth} mm
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Door: {config.door_type || 'None'}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Finish: {config.finish || 'Standard'}
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full mt-2"
-                      onClick={() => navigate(createLocalizedPath(`/calculation/project/${projectId}/editor/${config.model_id}?configId=${config.id}`))}
-                    >
-                      <Pencil className="mr-2 h-3 w-3" />
-                      Edit
-                    </Button>
-                  </CardContent>
-                </Card>
+                <CabinetConfigurationCard
+                  key={config.id}
+                  config={config}
+                  modelParameters={config.model_id ? modelParametersMap[config.model_id] : undefined}
+                  onEdit={() => navigate(createLocalizedPath(`/calculation/project/${projectId}/editor/${config.model_id}?configId=${config.id}`))}
+                />
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Project Summary */}
+      <ProjectPricingSummary
+        configurations={configurations}
+        modelParametersMap={modelParametersMap}
+        currency={project.currency}
+      />
     </div>
   );
 }
