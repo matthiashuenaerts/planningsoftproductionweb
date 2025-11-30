@@ -128,6 +128,42 @@ export const cabinetService = {
     return data as CabinetConfiguration;
   },
 
+  async updateConfiguration(id: string, config: {
+    name?: string;
+    width?: number;
+    height?: number;
+    depth?: number;
+    horizontal_divisions?: number;
+    vertical_divisions?: number;
+    drawer_count?: number;
+    door_type?: string;
+    material_config?: any;
+    edge_banding?: string;
+    finish?: string;
+    parameters?: any;
+  }) {
+    const { data, error } = await supabase
+      .from('cabinet_configurations')
+      .update(config)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as CabinetConfiguration;
+  },
+
+  async getConfiguration(id: string) {
+    const { data, error } = await supabase
+      .from('cabinet_configurations')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    return data as CabinetConfiguration;
+  },
+
   // Materials
   async getAllMaterials() {
     const { data, error } = await supabase

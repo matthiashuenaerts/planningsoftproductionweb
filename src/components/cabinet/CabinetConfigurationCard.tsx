@@ -3,6 +3,7 @@ import { Pencil } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Cabinet3DThumbnail } from './Cabinet3DThumbnail';
 import type { Database } from '@/integrations/supabase/types';
 
 type CabinetConfiguration = Database['public']['Tables']['cabinet_configurations']['Row'];
@@ -120,43 +121,16 @@ export function CabinetConfigurationCard({ config, modelParameters, onEdit }: Ca
 
   return (
     <Card className="hover:bg-accent/50 transition-colors overflow-hidden">
-      {/* Simple 3D preview representation */}
-      <div className="h-32 bg-gradient-to-br from-muted to-muted/50 relative flex items-center justify-center">
-        <div 
-          className="relative"
-          style={{
-            width: `${Math.min(100, config.width / 10)}px`,
-            height: `${Math.min(80, config.height / 10)}px`,
-          }}
-        >
-          {/* Cabinet body */}
-          <div 
-            className="absolute bg-amber-700/80 border border-amber-900/50 rounded-sm"
-            style={{
-              width: '100%',
-              height: '100%',
-              transform: 'perspective(200px) rotateY(-15deg) rotateX(5deg)',
-              boxShadow: '4px 4px 8px rgba(0,0,0,0.3)',
-            }}
-          >
-            {/* Door lines */}
-            <div className="absolute inset-2 border border-amber-900/30 rounded-sm" />
-            {config.door_type === 'double' && (
-              <div className="absolute top-2 bottom-2 left-1/2 w-px bg-amber-900/30" />
-            )}
-          </div>
-          {/* Side depth illusion */}
-          <div 
-            className="absolute bg-amber-800/60 border-r border-amber-900/50"
-            style={{
-              width: `${Math.min(20, config.depth / 30)}px`,
-              height: '100%',
-              right: '100%',
-              transform: 'skewY(-30deg)',
-              transformOrigin: 'right top',
-            }}
-          />
-        </div>
+      {/* 3D preview */}
+      <div className="h-36 bg-gradient-to-br from-muted to-muted/50 relative">
+        <Cabinet3DThumbnail
+          width={config.width}
+          height={config.height}
+          depth={config.depth}
+          panels={modelParameters?.panels}
+          fronts={modelParameters?.fronts}
+          doorType={config.door_type || 'hinged'}
+        />
         <Badge className="absolute top-2 right-2 text-xs" variant="secondary">
           {config.width} × {config.height}
         </Badge>
