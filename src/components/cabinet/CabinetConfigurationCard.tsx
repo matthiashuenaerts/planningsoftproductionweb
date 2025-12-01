@@ -30,9 +30,11 @@ interface CabinetConfigurationCardProps {
     panels?: any[];
     fronts?: any[];
     compartments?: any[];
+    parametric_compartments?: any[];
     hardware?: ModelHardware[];
     laborConfig?: LaborConfig;
   };
+  materials?: Array<{ id: string; cost_per_unit: number }>;
   onEdit: () => void;
 }
 
@@ -53,9 +55,13 @@ function evaluateExpression(expr: string | number, variables: Record<string, num
   }
 }
 
-export function CabinetConfigurationCard({ config, modelParameters, onEdit }: CabinetConfigurationCardProps) {
+export function CabinetConfigurationCard({ config, modelParameters, materials = [], onEdit }: CabinetConfigurationCardProps) {
   const calculatedPrice = useMemo(() => {
-    if (!modelParameters) return null;
+    const price = calculateConfigurationPrice(config, modelParameters, materials);
+    const subtotal = price.material + price.hardware + price.labor;
+    const overhead = subtotal * 0.15;
+    return { ...price, subtotal, overhead, total: subtotal + overhead };
+  }, [config, modelParameters, materials]);
 
     const variables = {
       width: config.width,
