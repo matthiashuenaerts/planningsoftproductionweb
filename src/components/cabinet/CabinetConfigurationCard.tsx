@@ -63,68 +63,6 @@ export function CabinetConfigurationCard({ config, modelParameters, materials = 
     return { ...price, subtotal, overhead, total: subtotal + overhead };
   }, [config, modelParameters, materials]);
 
-    const variables = {
-      width: config.width,
-      height: config.height,
-      depth: config.depth,
-      body_thickness: 18,
-      door_thickness: 18,
-      shelf_thickness: 18,
-      door_count: modelParameters.fronts?.filter((f: any) => f.front_type === 'hinged_door').length || 0,
-      drawer_count: modelParameters.fronts?.filter((f: any) => f.front_type === 'drawer_front').length || 0,
-    };
-
-    // Calculate material areas (simplified - would need actual material prices)
-    let materialCost = 0;
-    const panels = modelParameters.panels || [];
-    const fronts = modelParameters.fronts || [];
-    const compartments = modelParameters.compartments || [];
-
-    // Estimate material cost at €50/m² average
-    const materialPricePerM2 = 50;
-    
-    panels.filter((p: any) => p.visible !== false).forEach((panel: any) => {
-      const length = evaluateExpression(panel.length || 0, variables);
-      const width = evaluateExpression(panel.width || 0, variables);
-      materialCost += (length * width / 1000000) * materialPricePerM2;
-    });
-
-    fronts.filter((f: any) => f.visible !== false).forEach((front: any) => {
-      const w = evaluateExpression(front.width || 0, variables);
-      const h = evaluateExpression(front.height || 0, variables);
-      const qty = front.quantity || 1;
-      materialCost += (w * h * qty / 1000000) * materialPricePerM2;
-    });
-
-    // Hardware cost
-    let hardwareCost = 0;
-    (modelParameters.hardware || []).forEach((h: ModelHardware) => {
-      const qty = evaluateExpression(h.quantity, variables);
-      hardwareCost += Math.ceil(qty) * h.unit_price;
-    });
-
-    // Labor cost
-    let laborCost = 0;
-    const laborConfig = modelParameters.laborConfig;
-    if (laborConfig) {
-      const panelMinutes = panels.filter((p: any) => p.visible !== false).length * laborConfig.per_panel_minutes;
-      const frontMinutes = fronts.filter((f: any) => f.visible !== false).reduce((sum: number, f: any) => 
-        sum + ((f.quantity || 1) * laborConfig.per_front_minutes), 0);
-      const compartmentItemMinutes = compartments.reduce((sum: number, c: any) => 
-        sum + (c.items?.length || 0) * laborConfig.per_compartment_item_minutes, 0);
-      
-      const totalMinutes = laborConfig.base_minutes + panelMinutes + frontMinutes + compartmentItemMinutes;
-      laborCost = (totalMinutes / 60) * laborConfig.hourly_rate;
-    }
-
-    return {
-      material: materialCost,
-      hardware: hardwareCost,
-      labor: laborCost,
-      total: materialCost + hardwareCost + laborCost,
-    };
-  }, [config, modelParameters]);
-
   return (
     <Card className="hover:bg-accent/50 transition-colors overflow-hidden">
       {/* 3D preview */}
@@ -197,9 +135,11 @@ export function calculateConfigurationPrice(
     panels?: any[];
     fronts?: any[];
     compartments?: any[];
+    parametric_compartments?: any[];
     hardware?: ModelHardware[];
     laborConfig?: LaborConfig;
-  }
+  },
+  materials?: Array<{ id: string; cost_per_unit: number }>
 ) {
   if (!modelParameters) return { material: 0, hardware: 0, labor: 0, total: 0 };
 
@@ -207,31 +147,58 @@ export function calculateConfigurationPrice(
     width: config.width,
     height: config.height,
     depth: config.depth,
-    body_thickness: 18,
-    door_thickness: 18,
-    shelf_thickness: 18,
+    body_thickness: (config.material_config as any)?.body_thickness || 18,
+    door_thickness: (config.material_config as any)?.door_thickness || 18,
+    shelf_thickness: (config.material_config as any)?.shelf_thickness || 18,
     door_count: modelParameters.fronts?.filter((f: any) => f.front_type === 'hinged_door').length || 0,
     drawer_count: modelParameters.fronts?.filter((f: any) => f.front_type === 'drawer_front').length || 0,
   };
 
-  let materialCost = 0;
-  const materialPricePerM2 = 50;
+  const areas = { body: 0, door: 0, shelf: 0 };
   const panels = modelParameters.panels || [];
   const fronts = modelParameters.fronts || [];
-  const compartments = modelParameters.compartments || [];
+  const compartments = modelParameters.parametric_compartments || modelParameters.compartments || [];
 
   panels.filter((p: any) => p.visible !== false).forEach((panel: any) => {
     const length = evaluateExpression(panel.length || 0, variables);
     const width = evaluateExpression(panel.width || 0, variables);
-    materialCost += (length * width / 1000000) * materialPricePerM2;
+    const area = (length * width) / 1000000;
+    if (panel.material_type === 'door') areas.door += area;
+    else if (panel.material_type === 'shelf') areas.shelf += area;
+    else areas.body += area;
   });
 
   fronts.filter((f: any) => f.visible !== false).forEach((front: any) => {
     const w = evaluateExpression(front.width || 0, variables);
     const h = evaluateExpression(front.height || 0, variables);
     const qty = front.quantity || 1;
-    materialCost += (w * h * qty / 1000000) * materialPricePerM2;
+    areas.door += (w * h * qty) / 1000000;
   });
+
+  compartments.forEach((c: any) => {
+    const cW = evaluateExpression(c.width || 0, variables);
+    const cD = evaluateExpression(c.depth || 0, variables);
+    const cH = evaluateExpression(c.height || 0, variables);
+    (c.items || []).forEach((i: any) => {
+      const qty = i.quantity || 1;
+      if (i.item_type === 'shelf' || i.item_type === 'horizontal_divider') areas.shelf += (cW * cD * qty) / 1000000;
+      else if (i.item_type === 'vertical_divider') areas.body += (cH * cD) / 1000000;
+    });
+  });
+
+  const matCfg = config.material_config as any;
+  const wasteFactor = 1.1;
+  const defaultPrice = 50;
+  let materialCost = 0;
+
+  if (materials?.length) {
+    materialCost += areas.body * wasteFactor * (materials.find(m => m.id === matCfg?.body_material)?.cost_per_unit || defaultPrice);
+    materialCost += areas.door * wasteFactor * (materials.find(m => m.id === matCfg?.door_material)?.cost_per_unit || defaultPrice);
+    materialCost += areas.shelf * wasteFactor * (materials.find(m => m.id === matCfg?.shelf_material)?.cost_per_unit || defaultPrice);
+  } else {
+    materialCost = (areas.body + areas.door + areas.shelf) * wasteFactor * defaultPrice;
+  }
+  materialCost += (areas.body + areas.door + areas.shelf) * 4 * 2; // Edge banding
 
   let hardwareCost = 0;
   (modelParameters.hardware || []).forEach((h: ModelHardware) => {
