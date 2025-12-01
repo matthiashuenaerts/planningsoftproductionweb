@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { cabinetService } from '@/services/cabinetService';
 import { useToast } from '@/hooks/use-toast';
 import { Interactive3DCabinetVisualizer } from '@/components/cabinet/Interactive3DCabinetVisualizer';
-import { InteractiveCabinetVisualizer } from '@/components/cabinet/InteractiveCabinetVisualizer';
+import { Enhanced2DVisualizer } from '@/components/cabinet/Enhanced2DVisualizer';
 import { ModuleEditor } from '@/components/cabinet/ModuleEditor';
 import { FrontBuilder } from '@/components/cabinet/FrontBuilder';
 import { EnhancedCompartmentBuilder } from '@/components/cabinet/EnhancedCompartmentBuilder';
@@ -131,6 +131,16 @@ export default function CabinetEditor() {
     compartments: [],
   });
 
+  // Store model parameters for price calculation
+  const [modelHardware, setModelHardware] = useState<ModelHardware[]>([]);
+  const [laborConfig, setLaborConfig] = useState<LaborConfig>({
+    base_minutes: 60,
+    per_panel_minutes: 5,
+    per_front_minutes: 10,
+    per_compartment_item_minutes: 5,
+    hourly_rate: 45,
+  });
+
   useEffect(() => {
     loadData();
   }, [modelId, projectId]);
@@ -138,10 +148,16 @@ export default function CabinetEditor() {
   useEffect(() => {
     if (materials.length > 0 && config.material_config.body_material) {
       const calculator = new CabinetCalculationService(materials);
-      const costs = calculator.calculateCosts(config);
+      const costs = calculator.calculateCostsWithModel(config, {
+        panels,
+        fronts,
+        parametric_compartments: compartments,
+        hardware: modelHardware,
+        laborConfig,
+      });
       setCostBreakdown(costs);
     }
-  }, [config, materials]);
+  }, [config, materials, panels, fronts, compartments, modelHardware, laborConfig]);
 
   const loadData = async () => {
     if (!modelId || !projectId) return;
@@ -172,6 +188,8 @@ export default function CabinetEditor() {
         if (params.panels) setPanels(params.panels);
         if (params.fronts) setFronts(params.fronts);
         if (params.compartments) setCompartments(params.compartments);
+        if (params.hardware) setModelHardware(params.hardware);
+        if (params.laborConfig) setLaborConfig(params.laborConfig);
       }
 
       // If editing existing configuration, load it
@@ -201,6 +219,10 @@ export default function CabinetEditor() {
             if (params?.fronts) setFronts(params.fronts);
             if (params?.panels) setPanels(params.panels);
             if (params?.parametric_compartments) setCompartments(params.parametric_compartments);
+            // Load project model ID if saved
+            if (existingConfig.project_model_id) {
+              setSelectedProjectModelId(existingConfig.project_model_id);
+            }
           }
         } catch (err) {
           console.error('Error loading existing config:', err);
@@ -308,11 +330,14 @@ export default function CabinetEditor() {
         material_config: config.material_config as any,
         edge_banding: config.edge_banding,
         finish: config.finish,
+        project_model_id: selectedProjectModelId || null,
         parameters: { 
           compartments: config.compartments,
           fronts,
           panels,
           parametric_compartments: compartments,
+          hardware: modelHardware,
+          laborConfig,
         } as any,
       };
 
@@ -451,7 +476,8 @@ export default function CabinetEditor() {
                     id="width"
                     type="number"
                     value={config.width}
-                    onChange={(e) => setConfig({ 
+                    onChange={(e) => setConfig({ ...config, width: Number(e.target.value) })}
+                    onBlur={(e) => setConfig({ 
                       ...config, 
                       width: validateDimension(Number(e.target.value), model.min_width, model.max_width)
                     })}
@@ -468,7 +494,8 @@ export default function CabinetEditor() {
                     id="height"
                     type="number"
                     value={config.height}
-                    onChange={(e) => setConfig({ 
+                    onChange={(e) => setConfig({ ...config, height: Number(e.target.value) })}
+                    onBlur={(e) => setConfig({ 
                       ...config, 
                       height: validateDimension(Number(e.target.value), model.min_height, model.max_height)
                     })}
@@ -485,7 +512,8 @@ export default function CabinetEditor() {
                     id="depth"
                     type="number"
                     value={config.depth}
-                    onChange={(e) => setConfig({ 
+                    onChange={(e) => setConfig({ ...config, depth: Number(e.target.value) })}
+                    onBlur={(e) => setConfig({ 
                       ...config, 
                       depth: validateDimension(Number(e.target.value), model.min_depth, model.max_depth)
                     })}
@@ -664,8 +692,11 @@ export default function CabinetEditor() {
                 </TabsList>
 
                 <TabsContent value="structure" className="mt-4">
-                  <InteractiveCabinetVisualizer 
+                  <Enhanced2DVisualizer 
                     config={config}
+                    panels={panels}
+                    fronts={fronts}
+                    compartments={compartments}
                     selectedCompartmentId={selectedCompartmentId || undefined}
                     onCompartmentSelect={setSelectedCompartmentId}
                   />
