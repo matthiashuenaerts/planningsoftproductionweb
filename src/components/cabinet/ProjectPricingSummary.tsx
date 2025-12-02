@@ -44,9 +44,10 @@ export function ProjectPricingSummary({
         material: acc.material + price.material,
         hardware: acc.hardware + price.hardware,
         labor: acc.labor + price.labor,
+        overhead: acc.overhead + price.overhead,
         total: acc.total + price.total,
       }),
-      { material: 0, hardware: 0, labor: 0, total: 0 }
+      { material: 0, hardware: 0, labor: 0, overhead: 0, total: 0 }
     );
 
     // Collect all unique hardware items across all models (including front hardware)
@@ -195,6 +196,10 @@ export function ProjectPricingSummary({
             <div className="flex justify-between">
               <span className="text-muted-foreground">Labor</span>
               <span>{currencySymbol}{summary.totals.labor.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Overhead (15%)</span>
+              <span>{currencySymbol}{summary.totals.overhead.toFixed(2)}</span>
             </div>
           </div>
         </div>

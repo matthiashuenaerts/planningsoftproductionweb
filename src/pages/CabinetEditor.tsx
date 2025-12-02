@@ -133,6 +133,7 @@ export default function CabinetEditor() {
 
   // Store model parameters for price calculation
   const [modelHardware, setModelHardware] = useState<ModelHardware[]>([]);
+  const [frontHardware, setFrontHardware] = useState<any[]>([]);
   const [laborConfig, setLaborConfig] = useState<LaborConfig>({
     base_minutes: 60,
     per_panel_minutes: 5,
@@ -153,17 +154,18 @@ export default function CabinetEditor() {
         fronts,
         parametric_compartments: compartments,
         hardware: modelHardware,
+        frontHardware,
         laborConfig,
       });
       setCostBreakdown(costs);
     }
-  }, [config, materials, panels, fronts, compartments, modelHardware, laborConfig]);
+  }, [config, materials, panels, fronts, compartments, modelHardware, frontHardware, laborConfig]);
 
   const loadData = async () => {
     if (!modelId || !projectId) return;
     
     try {
-      const [modelData, materialsData, projectModelsData, legraboxData] = await Promise.all([
+      const [modelData, materialsData, projectModelsData, legraboxData, frontHardwareData] = await Promise.all([
         cabinetService.getModel(modelId),
         cabinetService.getAllMaterials(),
         supabase
@@ -175,12 +177,14 @@ export default function CabinetEditor() {
           .from('legrabox_configurations')
           .select('*')
           .eq('is_active', true),
+        cabinetService.getFrontHardwareForModel(modelId),
       ]);
       
       setModel(modelData);
       setMaterials(materialsData);
       setProjectModels(projectModelsData.data || []);
       setLegraboxConfigs(legraboxData.data || []);
+      setFrontHardware(frontHardwareData);
       
       // Load parametric elements from model
       if (modelData?.parameters && typeof modelData.parameters === 'object') {
