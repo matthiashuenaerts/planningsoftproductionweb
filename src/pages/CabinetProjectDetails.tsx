@@ -21,6 +21,7 @@ interface ModelParameters {
   compartments?: any[];
   hardware?: any[];
   laborConfig?: any;
+  frontHardware?: any[];
 }
 
 export default function CabinetProjectDetails() {
@@ -31,6 +32,7 @@ export default function CabinetProjectDetails() {
   const [project, setProject] = useState<CabinetProject | null>(null);
   const [configurations, setConfigurations] = useState<CabinetConfiguration[]>([]);
   const [modelParametersMap, setModelParametersMap] = useState<Record<string, ModelParameters>>({});
+  const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,12 +45,14 @@ export default function CabinetProjectDetails() {
     if (!projectId) return;
     
     try {
-      const [projectData, configurationsData] = await Promise.all([
+      const [projectData, configurationsData, materialsData] = await Promise.all([
         cabinetService.getProject(projectId),
         cabinetService.getProjectConfigurations(projectId),
+        cabinetService.getAllMaterials(),
       ]);
       setProject(projectData);
       setConfigurations(configurationsData);
+      setMaterials(materialsData);
 
       // Load model parameters for each unique model
       const modelIds = [...new Set(configurationsData.map(c => c.model_id).filter(Boolean))] as string[];
@@ -56,12 +60,21 @@ export default function CabinetProjectDetails() {
       
       await Promise.all(modelIds.map(async (modelId) => {
         try {
-          const model = await cabinetService.getModel(modelId);
+          const [model, frontHardware] = await Promise.all([
+            cabinetService.getModel(modelId),
+            cabinetService.getFrontHardwareForModel(modelId),
+          ]);
+          
           if (model?.parameters) {
             const params = typeof model.parameters === 'string' 
               ? JSON.parse(model.parameters) 
               : model.parameters;
-            parametersMap[modelId] = params as ModelParameters;
+            
+            // Include front hardware in parameters
+            parametersMap[modelId] = {
+              ...params as ModelParameters,
+              frontHardware,
+            };
           }
         } catch (err) {
           console.error(`Error loading model ${modelId}:`, err);
@@ -196,6 +209,7 @@ export default function CabinetProjectDetails() {
                   key={config.id}
                   config={config}
                   modelParameters={config.model_id ? modelParametersMap[config.model_id] : undefined}
+                  materials={materials}
                   onEdit={() => navigate(createLocalizedPath(`/calculation/project/${projectId}/editor/${config.model_id}?configId=${config.id}`))}
                 />
               ))}
@@ -208,6 +222,7 @@ export default function CabinetProjectDetails() {
       <ProjectPricingSummary
         configurations={configurations}
         modelParametersMap={modelParametersMap}
+        materials={materials}
         currency={project.currency}
       />
     </div>
