@@ -57,10 +57,7 @@ function evaluateExpression(expr: string | number, variables: Record<string, num
 
 export function CabinetConfigurationCard({ config, modelParameters, materials = [], onEdit }: CabinetConfigurationCardProps) {
   const calculatedPrice = useMemo(() => {
-    const price = calculateConfigurationPrice(config, modelParameters, materials);
-    const subtotal = price.material + price.hardware + price.labor;
-    const overhead = subtotal * 0.15;
-    return { ...price, subtotal, overhead, total: subtotal + overhead };
+    return calculateConfigurationPrice(config, modelParameters, materials);
   }, [config, modelParameters, materials]);
 
   return (
@@ -137,11 +134,12 @@ export function calculateConfigurationPrice(
     compartments?: any[];
     parametric_compartments?: any[];
     hardware?: ModelHardware[];
+    frontHardware?: any[];
     laborConfig?: LaborConfig;
   },
   materials?: Array<{ id: string; cost_per_unit: number }>
 ) {
-  if (!modelParameters) return { material: 0, hardware: 0, labor: 0, total: 0 };
+  if (!modelParameters) return { material: 0, hardware: 0, labor: 0, overhead: 0, total: 0 };
 
   const variables = {
     width: config.width,
@@ -200,10 +198,22 @@ export function calculateConfigurationPrice(
   }
   materialCost += (areas.body + areas.door + areas.shelf) * 4 * 2; // Edge banding
 
+  // Calculate hardware cost (model hardware + front hardware)
   let hardwareCost = 0;
+  
+  // Model-level hardware
   (modelParameters.hardware || []).forEach((h: ModelHardware) => {
     const qty = evaluateExpression(h.quantity, variables);
     hardwareCost += Math.ceil(qty) * h.unit_price;
+  });
+  
+  // Front-level hardware
+  (modelParameters.frontHardware || []).forEach((fh: any) => {
+    const productData = fh.products;
+    if (productData && productData.price) {
+      const qty = fh.quantity || 1;
+      hardwareCost += qty * productData.price;
+    }
   });
 
   let laborCost = 0;
@@ -219,10 +229,14 @@ export function calculateConfigurationPrice(
     laborCost = (totalMinutes / 60) * laborConfig.hourly_rate;
   }
 
+  const subtotal = materialCost + hardwareCost + laborCost;
+  const overhead = subtotal * 0.15; // 15% overhead
+
   return {
     material: materialCost,
     hardware: hardwareCost,
     labor: laborCost,
-    total: materialCost + hardwareCost + laborCost,
+    overhead: overhead,
+    total: subtotal + overhead,
   };
 }
