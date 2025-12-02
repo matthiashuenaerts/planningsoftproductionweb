@@ -175,4 +175,34 @@ export const cabinetService = {
     if (error) throw error;
     return data as CabinetMaterial[];
   },
+
+  // Front Hardware
+  async getFrontHardwareForModel(modelId: string) {
+    // Get all fronts for this model
+    const { data: fronts, error: frontsError } = await supabase
+      .from('cabinet_fronts')
+      .select('id')
+      .eq('model_id', modelId);
+    
+    if (frontsError) throw frontsError;
+    if (!fronts || fronts.length === 0) return [];
+    
+    const frontIds = fronts.map(f => f.id);
+    
+    // Get all hardware for these fronts with product details
+    const { data, error } = await supabase
+      .from('front_hardware')
+      .select(`
+        *,
+        products:product_id (
+          id,
+          name,
+          price
+        )
+      `)
+      .in('front_id', frontIds);
+    
+    if (error) throw error;
+    return data || [];
+  },
 };

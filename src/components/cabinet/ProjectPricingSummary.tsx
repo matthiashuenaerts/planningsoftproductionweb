@@ -13,23 +13,26 @@ interface ModelParameters {
   compartments?: any[];
   hardware?: any[];
   laborConfig?: any;
+  frontHardware?: any[];
 }
 
 interface ProjectPricingSummaryProps {
   configurations: CabinetConfiguration[];
   modelParametersMap: Record<string, ModelParameters>;
+  materials: Array<{ id: string; cost_per_unit: number }>;
   currency?: string;
 }
 
 export function ProjectPricingSummary({ 
   configurations, 
   modelParametersMap,
+  materials,
   currency = 'EUR' 
 }: ProjectPricingSummaryProps) {
   const summary = useMemo(() => {
     const cabinetPrices = configurations.map(config => {
       const modelParams = config.model_id ? modelParametersMap[config.model_id] : undefined;
-      const price = calculateConfigurationPrice(config, modelParams);
+      const price = calculateConfigurationPrice(config, modelParams, materials);
       return {
         config,
         price,
@@ -46,12 +49,12 @@ export function ProjectPricingSummary({
       { material: 0, hardware: 0, labor: 0, total: 0 }
     );
 
-    // Collect all unique hardware items across all models
+    // Collect all unique hardware items across all models (including front hardware)
     const hardwareItems: Record<string, { name: string; quantity: number; unitPrice: number; total: number }> = {};
     
     configurations.forEach(config => {
       const modelParams = config.model_id ? modelParametersMap[config.model_id] : undefined;
-      if (!modelParams?.hardware) return;
+      if (!modelParams) return;
 
       const variables = {
         width: config.width,
@@ -64,7 +67,8 @@ export function ProjectPricingSummary({
         drawer_count: modelParams.fronts?.filter((f: any) => f.front_type === 'drawer_front').length || 0,
       };
 
-      modelParams.hardware.forEach((h: any) => {
+      // Model-level hardware
+      modelParams.hardware?.forEach((h: any) => {
         let qty: number;
         if (typeof h.quantity === 'number') {
           qty = h.quantity;
@@ -94,6 +98,28 @@ export function ProjectPricingSummary({
           };
         }
       });
+
+      // Front-level hardware
+      modelParams.frontHardware?.forEach((fh: any) => {
+        const productData = fh.products;
+        if (productData && productData.price) {
+          const qty = fh.quantity || 1;
+          const unitPrice = productData.price;
+          const key = productData.id || productData.name;
+          
+          if (hardwareItems[key]) {
+            hardwareItems[key].quantity += qty;
+            hardwareItems[key].total += qty * unitPrice;
+          } else {
+            hardwareItems[key] = {
+              name: productData.name,
+              quantity: qty,
+              unitPrice: unitPrice,
+              total: qty * unitPrice,
+            };
+          }
+        }
+      });
     });
 
     return {
@@ -101,7 +127,7 @@ export function ProjectPricingSummary({
       totals,
       hardwareItems: Object.values(hardwareItems),
     };
-  }, [configurations, modelParametersMap]);
+  }, [configurations, modelParametersMap, materials]);
 
   const currencySymbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency;
 

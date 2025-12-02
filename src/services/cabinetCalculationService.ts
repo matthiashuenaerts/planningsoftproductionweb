@@ -49,6 +49,7 @@ interface ModelParameters {
   parametric_compartments?: CompartmentData[];
   hardware?: ModelHardware[];
   laborConfig?: LaborConfig;
+  frontHardware?: any[];
 }
 
 interface PanelCut {
@@ -168,9 +169,10 @@ export class CabinetCalculationService {
       shelfMaterial
     );
 
-    // Calculate hardware costs
+    // Calculate hardware costs (model hardware + front hardware)
     const hardwareResult = this.calculateHardwareCostsFromModel(
       modelParameters?.hardware || [],
+      modelParameters?.frontHardware || [],
       variables
     );
 
@@ -292,11 +294,13 @@ export class CabinetCalculationService {
 
   private calculateHardwareCostsFromModel(
     hardware: ModelHardware[],
+    frontHardware: any[],
     variables: Record<string, number>
   ): { total: number; items: Array<{ name: string; quantity: number; unit_price: number; total_price: number }> } {
     const items: Array<{ name: string; quantity: number; unit_price: number; total_price: number }> = [];
     let total = 0;
 
+    // Model-level hardware
     hardware.forEach((h) => {
       const qty = Math.ceil(evaluateExpression(h.quantity, variables));
       const totalPrice = qty * h.unit_price;
@@ -307,6 +311,23 @@ export class CabinetCalculationService {
         unit_price: h.unit_price,
         total_price: totalPrice,
       });
+    });
+
+    // Front-level hardware
+    frontHardware.forEach((fh) => {
+      const productData = fh.products;
+      if (productData && productData.price) {
+        const qty = fh.quantity || 1;
+        const unitPrice = productData.price;
+        const totalPrice = qty * unitPrice;
+        total += totalPrice;
+        items.push({
+          name: productData.name || 'Unknown hardware',
+          quantity: qty,
+          unit_price: unitPrice,
+          total_price: totalPrice,
+        });
+      }
     });
 
     return { total, items };
