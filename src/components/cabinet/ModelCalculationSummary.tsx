@@ -1,9 +1,18 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ParametricPanel } from '@/types/cabinet';
 import { ModelHardware } from './ModelHardwareManager';
+import { LaborConfig, evaluateLaborFormula } from './LaborPriceCalculator';
+import { supabase } from '@/integrations/supabase/client';
+
+interface FrontHardware {
+  id: string;
+  hardware_type: string;
+  product_id?: string;
+  quantity: number;
+}
 
 interface CabinetFront {
   id: string;
@@ -15,6 +24,7 @@ interface CabinetFront {
   quantity: number;
   material_type: string;
   visible: boolean;
+  hardware?: FrontHardware[];
 }
 
 interface Compartment {
@@ -38,13 +48,13 @@ interface ModelCalculationSummaryProps {
   fronts: CabinetFront[];
   compartments: Compartment[];
   hardware: ModelHardware[];
-  laborConfig: {
-    base_minutes: number;
-    per_panel_minutes: number;
-    per_front_minutes: number;
-    per_compartment_item_minutes: number;
-    hourly_rate: number;
-  };
+  laborConfig: LaborConfig;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  price_per_unit: number;
 }
 
 function evaluateExpression(expr: string | number, variables: Record<string, number>): number {
@@ -72,6 +82,18 @@ export function ModelCalculationSummary({
   hardware,
   laborConfig,
 }: ModelCalculationSummaryProps) {
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      const { data } = await supabase
+        .from('products')
+        .select('id, name, price_per_unit');
+      if (data) setProducts(data);
+    };
+    loadProducts();
+  }, []);
+
   const variables = useMemo(() => ({
     width: modelData.default_width,
     height: modelData.default_height,
@@ -84,11 +106,7 @@ export function ModelCalculationSummary({
   }), [modelData, fronts]);
 
   const materialAreas = useMemo(() => {
-    const areas = {
-      body: 0,
-      door: 0,
-      shelf: 0,
-    };
+    const areas = { body: 0, door: 0, shelf: 0 };
 
     // Calculate panel areas
     panels.filter(p => p.visible).forEach((panel) => {
@@ -133,6 +151,26 @@ export function ModelCalculationSummary({
     return areas;
   }, [panels, fronts, compartments, variables]);
 
+  // Calculate total edges (perimeter of all panels and fronts in meters)
+  const totalEdges = useMemo(() => {
+    let edges = 0;
+    
+    panels.filter(p => p.visible).forEach((panel) => {
+      const length = evaluateExpression(panel.length, variables);
+      const width = evaluateExpression(panel.width, variables);
+      edges += 2 * (length + width) / 1000; // Convert mm to m
+    });
+
+    fronts.filter(f => f.visible).forEach((front) => {
+      const w = evaluateExpression(front.width, variables);
+      const h = evaluateExpression(front.height, variables);
+      edges += (2 * (w + h) * front.quantity) / 1000;
+    });
+
+    return edges;
+  }, [panels, fronts, variables]);
+
+  // Model hardware list
   const hardwareList = useMemo(() => {
     return hardware.map((h) => {
       const qty = evaluateExpression(h.quantity, variables);
@@ -144,29 +182,88 @@ export function ModelCalculationSummary({
     });
   }, [hardware, variables]);
 
-  const totalHardwareCost = hardwareList.reduce((sum, h) => sum + h.totalPrice, 0);
+  // Front hardware list (from doors/fronts)
+  const frontHardwareList = useMemo(() => {
+    const items: Array<{
+      id: string;
+      frontName: string;
+      hardwareType: string;
+      productName: string;
+      quantity: number;
+      unitPrice: number;
+      totalPrice: number;
+    }> = [];
 
-  const laborCalculation = useMemo(() => {
-    const panelMinutes = panels.filter(p => p.visible).length * laborConfig.per_panel_minutes;
-    const frontMinutes = fronts.filter(f => f.visible).reduce((sum, f) => 
-      sum + (f.quantity * laborConfig.per_front_minutes), 0);
-    const compartmentItemMinutes = compartments.reduce((sum, c) => 
-      sum + c.items.length * laborConfig.per_compartment_item_minutes, 0);
-    
-    const totalMinutes = laborConfig.base_minutes + panelMinutes + frontMinutes + compartmentItemMinutes;
-    const laborCost = (totalMinutes / 60) * laborConfig.hourly_rate;
+    fronts.forEach((front) => {
+      if (!front.hardware) return;
+      
+      front.hardware.forEach((hw) => {
+        const product = products.find(p => p.id === hw.product_id);
+        const totalQty = hw.quantity * front.quantity;
+        items.push({
+          id: hw.id,
+          frontName: front.name,
+          hardwareType: hw.hardware_type,
+          productName: product?.name || 'Unknown',
+          quantity: totalQty,
+          unitPrice: product?.price_per_unit || 0,
+          totalPrice: totalQty * (product?.price_per_unit || 0),
+        });
+      });
+    });
 
-    return {
-      baseMinutes: laborConfig.base_minutes,
-      panelMinutes,
-      frontMinutes,
-      compartmentItemMinutes,
-      totalMinutes,
-      laborCost,
-    };
-  }, [panels, fronts, compartments, laborConfig]);
+    return items;
+  }, [fronts, products]);
+
+  const totalModelHardwareCost = hardwareList.reduce((sum, h) => sum + h.totalPrice, 0);
+  const totalFrontHardwareCost = frontHardwareList.reduce((sum, h) => sum + h.totalPrice, 0);
+  const totalHardwareCost = totalModelHardwareCost + totalFrontHardwareCost;
 
   const compartmentItemCount = compartments.reduce((sum, c) => sum + c.items.length, 0);
+  const totalHardwareCount = hardwareList.reduce((sum, h) => sum + h.calculatedQty, 0) + 
+    frontHardwareList.reduce((sum, h) => sum + h.quantity, 0);
+
+  // Build full variables for labor calculation
+  const laborVariables = useMemo(() => ({
+    ...variables,
+    panels: panels.filter(p => p.visible).length,
+    fronts: fronts.filter(f => f.visible).reduce((sum, f) => sum + f.quantity, 0),
+    compartment_items: compartmentItemCount,
+    total_edges: totalEdges,
+    body_area: materialAreas.body,
+    door_area: materialAreas.door,
+    shelf_area: materialAreas.shelf,
+    total_area: materialAreas.body + materialAreas.door + materialAreas.shelf,
+    hardware_count: totalHardwareCount,
+  }), [variables, panels, fronts, compartmentItemCount, totalEdges, materialAreas, totalHardwareCount]);
+
+  // Calculate labor using new formula-based system
+  const laborCalculation = useMemo(() => {
+    const lines = laborConfig.lines || [];
+    let totalMinutes = 0;
+    let totalEuros = 0;
+
+    const lineResults = lines.map((line) => {
+      const value = evaluateLaborFormula(line.formula, laborVariables);
+      if (line.unit === 'minutes') {
+        totalMinutes += value;
+      } else {
+        totalEuros += value;
+      }
+      return { ...line, calculatedValue: value };
+    });
+
+    const laborCostFromMinutes = (totalMinutes / 60) * laborConfig.hourly_rate;
+    const totalLaborCost = laborCostFromMinutes + totalEuros;
+
+    return {
+      lineResults,
+      totalMinutes,
+      totalEuros,
+      laborCostFromMinutes,
+      totalLaborCost,
+    };
+  }, [laborConfig, laborVariables]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -187,6 +284,10 @@ export function ModelCalculationSummary({
           <div className="flex justify-between items-center">
             <span>Shelf Material</span>
             <Badge variant="secondary">{materialAreas.shelf.toFixed(3)} m²</Badge>
+          </div>
+          <div className="flex justify-between items-center">
+            <span>Total Edges</span>
+            <Badge variant="outline">{totalEdges.toFixed(2)} m</Badge>
           </div>
           <Separator />
           <div className="flex justify-between items-center font-semibold">
@@ -233,10 +334,10 @@ export function ModelCalculationSummary({
         </CardContent>
       </Card>
 
-      {/* Hardware List */}
+      {/* Model Hardware */}
       <Card>
         <CardHeader>
-          <CardTitle>Hardware Summary</CardTitle>
+          <CardTitle>Model Hardware</CardTitle>
         </CardHeader>
         <CardContent>
           {hardwareList.length > 0 ? (
@@ -252,50 +353,105 @@ export function ModelCalculationSummary({
               ))}
               <Separator />
               <div className="flex justify-between items-center font-semibold">
-                <span>Total Hardware Cost</span>
-                <span>€{totalHardwareCost.toFixed(2)}</span>
+                <span>Model Hardware Total</span>
+                <span>€{totalModelHardwareCost.toFixed(2)}</span>
               </div>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">
-              No hardware attached to this model
+              No model-level hardware attached
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Front Hardware */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Front Hardware</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {frontHardwareList.length > 0 ? (
+            <div className="space-y-3">
+              {frontHardwareList.map((h) => (
+                <div key={h.id} className="flex justify-between items-center text-sm">
+                  <div>
+                    <span className="font-medium">{h.productName}</span>
+                    <span className="text-muted-foreground ml-2">
+                      ({h.frontName}, {h.hardwareType})
+                    </span>
+                    <span className="text-muted-foreground ml-1">× {h.quantity}</span>
+                  </div>
+                  <span>€{h.totalPrice.toFixed(2)}</span>
+                </div>
+              ))}
+              <Separator />
+              <div className="flex justify-between items-center font-semibold">
+                <span>Front Hardware Total</span>
+                <span>€{totalFrontHardwareCost.toFixed(2)}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No front hardware assigned. Add hardware to doors/fronts.
             </p>
           )}
         </CardContent>
       </Card>
 
       {/* Labor Calculation */}
-      <Card>
+      <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle>Labor Estimate</CardTitle>
+          <CardTitle>Labor & Cost Calculation</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="text-sm space-y-2">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Base assembly:</span>
-              <span>{laborCalculation.baseMinutes} min</span>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Line breakdown */}
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm mb-3">Calculation Lines</h4>
+              {laborCalculation.lineResults.map((line) => (
+                <div key={line.id} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{line.name}:</span>
+                  <span>
+                    {line.calculatedValue.toFixed(1)} {line.unit === 'minutes' ? 'min' : '€'}
+                  </span>
+                </div>
+              ))}
+              {laborCalculation.lineResults.length === 0 && (
+                <p className="text-sm text-muted-foreground">No calculation lines defined.</p>
+              )}
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Panel work ({panels.filter(p => p.visible).length} panels):</span>
-              <span>{laborCalculation.panelMinutes} min</span>
+
+            {/* Summary */}
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm mb-3">Summary</h4>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Total Time:</span>
+                <span>{laborCalculation.totalMinutes.toFixed(0)} min ({(laborCalculation.totalMinutes / 60).toFixed(1)} hrs)</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Labor Cost (@ €{laborConfig.hourly_rate}/hr):</span>
+                <span>€{laborCalculation.laborCostFromMinutes.toFixed(2)}</span>
+              </div>
+              {laborCalculation.totalEuros > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Direct Costs:</span>
+                  <span>€{laborCalculation.totalEuros.toFixed(2)}</span>
+                </div>
+              )}
+              <Separator />
+              <div className="flex justify-between font-semibold">
+                <span>Total Labor Cost:</span>
+                <span>€{laborCalculation.totalLaborCost.toFixed(2)}</span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Front installation ({fronts.filter(f => f.visible).length} fronts):</span>
-              <span>{laborCalculation.frontMinutes} min</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Interior items ({compartmentItemCount} items):</span>
-              <span>{laborCalculation.compartmentItemMinutes} min</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between font-medium">
-              <span>Total Time:</span>
-              <span>{laborCalculation.totalMinutes} min ({(laborCalculation.totalMinutes / 60).toFixed(1)} hrs)</span>
-            </div>
-            <div className="flex justify-between font-semibold text-base">
-              <span>Labor Cost (@ €{laborConfig.hourly_rate}/hr):</span>
-              <span>€{laborCalculation.laborCost.toFixed(2)}</span>
-            </div>
+          </div>
+
+          {/* Grand Total */}
+          <Separator className="my-4" />
+          <div className="flex justify-between items-center text-lg font-bold">
+            <span>Total Hardware Cost:</span>
+            <span className="text-primary">€{totalHardwareCost.toFixed(2)}</span>
           </div>
         </CardContent>
       </Card>
