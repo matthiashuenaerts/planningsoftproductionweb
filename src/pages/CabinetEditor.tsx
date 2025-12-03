@@ -385,10 +385,12 @@ export default function CabinetEditor() {
     return value;
   };
 
+  const { t } = useLanguage();
+
   if (loading) {
     return (
       <div className="container mx-auto p-6">
-        <p className="text-center text-muted-foreground">Loading editor...</p>
+        <p className="text-center text-muted-foreground">{t('calc_loading_editor')}</p>
       </div>
     );
   }
@@ -396,7 +398,7 @@ export default function CabinetEditor() {
   if (!model) {
     return (
       <div className="container mx-auto p-6">
-        <p className="text-center text-muted-foreground">Model not found</p>
+        <p className="text-center text-muted-foreground">{t('calc_model_not_found')}</p>
       </div>
     );
   }
@@ -409,16 +411,16 @@ export default function CabinetEditor() {
           onClick={() => navigate(createLocalizedPath(`/calculation/project/${projectId}/library`))}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Library
+          {t('calc_back_to_library')}
         </Button>
         <Button onClick={handleSave} disabled={saving}>
           <Save className="mr-2 h-4 w-4" />
-          {saving ? 'Saving...' : 'Save Configuration'}
+          {saving ? t('calc_saving') : t('calc_save_configuration')}
         </Button>
       </div>
 
       <div>
-        <h1 className="text-3xl font-bold">Configure Cabinet</h1>
+        <h1 className="text-3xl font-bold">{t('calc_configure_cabinet')}</h1>
         <p className="text-muted-foreground mt-2">
           {model.name} - {model.category}
         </p>
@@ -431,7 +433,7 @@ export default function CabinetEditor() {
           {projectModels.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Project Model</CardTitle>
+                <CardTitle>{t('calc_project_model')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <Select
@@ -439,19 +441,19 @@ export default function CabinetEditor() {
                   onValueChange={(v) => v !== 'none' && handleProjectModelSelect(v)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select project model..." />
+                    <SelectValue placeholder={t('calc_select_project_model')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">None (Manual)</SelectItem>
+                    <SelectItem value="none">{t('calc_none_manual')}</SelectItem>
                     {projectModels.map(m => (
                       <SelectItem key={m.id} value={m.id}>
-                        {m.name} {m.is_default && '(Default)'}
+                        {m.name} {m.is_default && `(${t('calc_default')})`}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Select a project model to apply predefined materials and settings.
+                  {t('calc_select_model_desc')}
                 </p>
               </CardContent>
             </Card>
@@ -460,22 +462,22 @@ export default function CabinetEditor() {
           {/* Cabinet Structure */}
           <Card>
             <CardHeader>
-              <CardTitle>Cabinet Structure</CardTitle>
+              <CardTitle>{t('calc_cabinet_structure')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="name">Cabinet Name</Label>
+                <Label htmlFor="name">{t('calc_cabinet_name')}</Label>
                 <Input
                   id="name"
                   value={config.name}
                   onChange={(e) => setConfig({ ...config, name: e.target.value })}
-                  placeholder="Enter cabinet name"
+                  placeholder={t('calc_enter_cabinet_name')}
                 />
               </div>
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <Label htmlFor="width">Width (mm)</Label>
+                  <Label htmlFor="width">{t('calc_width')}</Label>
                   <Input
                     id="width"
                     type="number"
@@ -493,7 +495,7 @@ export default function CabinetEditor() {
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="height">Height (mm)</Label>
+                  <Label htmlFor="height">{t('calc_height')}</Label>
                   <Input
                     id="height"
                     type="number"
@@ -511,7 +513,7 @@ export default function CabinetEditor() {
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="depth">Depth (mm)</Label>
+                  <Label htmlFor="depth">{t('calc_depth')}</Label>
                   <Input
                     id="depth"
                     type="number"
@@ -552,11 +554,11 @@ export default function CabinetEditor() {
           {/* Materials */}
           <Card>
             <CardHeader>
-              <CardTitle>Materials</CardTitle>
+              <CardTitle>{t('calc_materials')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="body_material">Body Material</Label>
+                <Label htmlFor="body_material">{t('calc_body_material')}</Label>
                 <Select
                   value={config.material_config.body_material}
                   onValueChange={(value) => {
@@ -571,8 +573,8 @@ export default function CabinetEditor() {
                     });
                   }}
                 >
-                  <SelectTrigger id="body_material">
-                    <SelectValue placeholder="Select material" />
+                <SelectTrigger id="body_material">
+                    <SelectValue placeholder={t('calc_select_body_material')} />
                   </SelectTrigger>
                   <SelectContent>
                     {materials.filter(m => m.category === 'panel').map((material) => (
@@ -585,7 +587,7 @@ export default function CabinetEditor() {
               </div>
 
               <div>
-                <Label htmlFor="door_material">Door Material</Label>
+                <Label htmlFor="door_material">{t('calc_door_material')}</Label>
                 <Select
                   value={config.material_config.door_material}
                   onValueChange={(value) => setConfig({
@@ -593,8 +595,8 @@ export default function CabinetEditor() {
                     material_config: { ...config.material_config, door_material: value }
                   })}
                 >
-                  <SelectTrigger id="door_material">
-                    <SelectValue placeholder="Select material" />
+                <SelectTrigger id="door_material">
+                    <SelectValue placeholder={t('calc_select_door_material')} />
                   </SelectTrigger>
                   <SelectContent>
                     {materials.filter(m => m.category === 'panel').map((material) => (
@@ -607,7 +609,7 @@ export default function CabinetEditor() {
               </div>
 
               <div>
-                <Label htmlFor="shelf_material">Shelf Material</Label>
+                <Label htmlFor="shelf_material">{t('calc_shelf_material')}</Label>
                 <Select
                   value={config.material_config.shelf_material}
                   onValueChange={(value) => setConfig({
@@ -615,8 +617,8 @@ export default function CabinetEditor() {
                     material_config: { ...config.material_config, shelf_material: value }
                   })}
                 >
-                  <SelectTrigger id="shelf_material">
-                    <SelectValue placeholder="Select material" />
+                <SelectTrigger id="shelf_material">
+                    <SelectValue placeholder={t('calc_select_shelf_material')} />
                   </SelectTrigger>
                   <SelectContent>
                     {materials.filter(m => m.category === 'panel').map((material) => (
@@ -630,7 +632,7 @@ export default function CabinetEditor() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label htmlFor="edge_banding">Edge Banding</Label>
+                  <Label htmlFor="edge_banding">{t('calc_edge_banding')}</Label>
                   <Select
                     value={config.edge_banding}
                     onValueChange={(value) => setConfig({ ...config, edge_banding: value })}
@@ -647,7 +649,7 @@ export default function CabinetEditor() {
                 </div>
 
                 <div>
-                  <Label htmlFor="finish">Finish</Label>
+                  <Label htmlFor="finish">{t('calc_finish')}</Label>
                   <Select
                     value={config.finish}
                     onValueChange={(value) => setConfig({ ...config, finish: value })}
@@ -656,9 +658,9 @@ export default function CabinetEditor() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="matte">Matte</SelectItem>
-                      <SelectItem value="glossy">Glossy</SelectItem>
-                      <SelectItem value="textured">Textured</SelectItem>
+                      <SelectItem value="matte">{t('calc_matte')}</SelectItem>
+                      <SelectItem value="glossy">{t('calc_gloss')}</SelectItem>
+                      <SelectItem value="textured">{t('calc_textured')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -671,7 +673,7 @@ export default function CabinetEditor() {
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>Cabinet Preview</CardTitle>
+              <CardTitle>{t('calc_3d_preview')}</CardTitle>
             </CardHeader>
             <CardContent>
               <Interactive3DCabinetVisualizer 
@@ -690,9 +692,9 @@ export default function CabinetEditor() {
             <CardContent className="pt-6">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="structure">Structure</TabsTrigger>
-                  <TabsTrigger value="fronts">Doors & Fronts</TabsTrigger>
-                  <TabsTrigger value="compartments">Interior</TabsTrigger>
+                  <TabsTrigger value="structure">{t('calc_structure')}</TabsTrigger>
+                  <TabsTrigger value="fronts">{t('calc_fronts')}</TabsTrigger>
+                  <TabsTrigger value="compartments">{t('interior')}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="structure" className="mt-4">
@@ -738,21 +740,21 @@ export default function CabinetEditor() {
           {costBreakdown && (
             <Card className="mt-6">
               <CardHeader>
-                <CardTitle>Cost Breakdown</CardTitle>
+                <CardTitle>{t('cost_breakdown')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Materials</span>
+                      <span className="text-muted-foreground">{t('materials_cost')}</span>
                       <span className="font-medium">€{costBreakdown.materials_cost.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Hardware</span>
+                      <span className="text-muted-foreground">{t('hardware_cost')}</span>
                       <span className="font-medium">€{costBreakdown.hardware_cost.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Labor ({costBreakdown.labor_minutes} min)</span>
+                      <span className="text-muted-foreground">{t('labor')} ({costBreakdown.labor_minutes} min)</span>
                       <span className="font-medium">€{costBreakdown.labor_cost.toFixed(2)}</span>
                     </div>
                   </div>
@@ -762,11 +764,11 @@ export default function CabinetEditor() {
                       <span className="font-medium">€{costBreakdown.subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Overhead ({costBreakdown.overhead_percentage}%)</span>
+                      <span className="text-muted-foreground">{t('calc_overhead')} ({costBreakdown.overhead_percentage}%)</span>
                       <span className="font-medium">€{costBreakdown.overhead_cost.toFixed(2)}</span>
                     </div>
                     <div className="border-t pt-2 flex justify-between font-bold">
-                      <span>Total</span>
+                      <span>{t('total')}</span>
                       <span className="text-primary">€{costBreakdown.total_cost.toFixed(2)}</span>
                     </div>
                   </div>

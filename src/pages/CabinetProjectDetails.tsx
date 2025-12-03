@@ -13,7 +13,6 @@ import type { Database } from '@/integrations/supabase/types';
 
 type CabinetProject = Database['public']['Tables']['cabinet_projects']['Row'];
 type CabinetConfiguration = Database['public']['Tables']['cabinet_configurations']['Row'];
-type CabinetModel = Database['public']['Tables']['cabinet_models']['Row'];
 
 interface ModelParameters {
   panels?: any[];
@@ -28,7 +27,7 @@ export default function CabinetProjectDetails() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { createLocalizedPath } = useLanguage();
+  const { t, createLocalizedPath } = useLanguage();
   const [project, setProject] = useState<CabinetProject | null>(null);
   const [configurations, setConfigurations] = useState<CabinetConfiguration[]>([]);
   const [modelParametersMap, setModelParametersMap] = useState<Record<string, ModelParameters>>({});
@@ -85,8 +84,8 @@ export default function CabinetProjectDetails() {
     } catch (error) {
       console.error('Error loading project:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load project',
+        title: t('calc_error'),
+        description: t('calc_failed_load_projects'),
         variant: 'destructive',
       });
       navigate(createLocalizedPath('/calculation'));
@@ -98,7 +97,7 @@ export default function CabinetProjectDetails() {
   if (loading) {
     return (
       <div className="container mx-auto p-6">
-        <p className="text-center text-muted-foreground">Loading project...</p>
+        <p className="text-center text-muted-foreground">{t('calc_loading_project')}</p>
       </div>
     );
   }
@@ -106,7 +105,7 @@ export default function CabinetProjectDetails() {
   if (!project) {
     return (
       <div className="container mx-auto p-6">
-        <p className="text-center text-muted-foreground">Project not found</p>
+        <p className="text-center text-muted-foreground">{t('calc_project_not_found')}</p>
       </div>
     );
   }
@@ -119,40 +118,40 @@ export default function CabinetProjectDetails() {
         className="mb-6"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Projects
+        {t('calc_back_to_projects')}
       </Button>
 
       <div>
         <h1 className="text-3xl font-bold">{project.name}</h1>
         <p className="text-muted-foreground mt-2">
-          {project.client_name || 'No client specified'}
+          {project.client_name || t('calc_no_client_specified')}
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Project Information</CardTitle>
+            <CardTitle>{t('calc_project_information')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Status:</span>
+              <span className="text-muted-foreground">{t('calc_status')}:</span>
               <span className="font-medium capitalize">{project.status}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Project Number:</span>
+              <span className="text-muted-foreground">{t('calc_project_number')}:</span>
               <span>{project.project_number || '-'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Currency:</span>
+              <span className="text-muted-foreground">{t('calc_currency')}:</span>
               <span>{project.currency}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Units:</span>
+              <span className="text-muted-foreground">{t('calc_units')}:</span>
               <span className="capitalize">{project.units}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Created:</span>
+              <span className="text-muted-foreground">{t('calc_created')}:</span>
               <span>{new Date(project.created_at).toLocaleDateString()}</span>
             </div>
           </CardContent>
@@ -160,15 +159,15 @@ export default function CabinetProjectDetails() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Client Information</CardTitle>
+            <CardTitle>{t('calc_client_information')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <span className="text-muted-foreground block mb-1">Name:</span>
+              <span className="text-muted-foreground block mb-1">{t('calc_name')}:</span>
               <span>{project.client_name || '-'}</span>
             </div>
             <div>
-              <span className="text-muted-foreground block mb-1">Address:</span>
+              <span className="text-muted-foreground block mb-1">{t('calc_address')}:</span>
               <span>{project.client_address || '-'}</span>
             </div>
           </CardContent>
@@ -178,7 +177,7 @@ export default function CabinetProjectDetails() {
       {project.notes && (
         <Card>
           <CardHeader>
-            <CardTitle>Notes</CardTitle>
+            <CardTitle>{t('calc_notes')}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="whitespace-pre-wrap">{project.notes}</p>
@@ -191,16 +190,16 @@ export default function CabinetProjectDetails() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Cabinet Configurations</CardTitle>
+          <CardTitle>{t('calc_cabinet_configurations')}</CardTitle>
           <Button onClick={() => navigate(createLocalizedPath(`/calculation/project/${projectId}/library`))}>
             <Plus className="mr-2 h-4 w-4" />
-            Add Cabinet
+            {t('calc_add_cabinet')}
           </Button>
         </CardHeader>
         <CardContent>
           {configurations.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
-              No cabinets configured yet. Click "Add Cabinet" to get started.
+              {t('calc_no_cabinets_yet')}
             </p>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

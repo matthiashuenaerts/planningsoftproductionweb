@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function NewCabinetProject() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { createLocalizedPath } = useLanguage();
+  const { t, createLocalizedPath } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -37,8 +37,8 @@ export default function NewCabinetProject() {
     
     if (!formData.name.trim()) {
       toast({
-        title: 'Error',
-        description: 'Project name is required',
+        title: t('calc_error'),
+        description: t('calc_project_name_required'),
         variant: 'destructive',
       });
       return;
@@ -58,16 +58,16 @@ export default function NewCabinetProject() {
       });
 
       toast({
-        title: 'Success',
-        description: 'Project created successfully',
+        title: t('calc_success'),
+        description: t('calc_project_created'),
       });
 
       navigate(createLocalizedPath(`/calculation/project/${project.id}`));
     } catch (error) {
       console.error('Error creating project:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to create project',
+        title: t('calc_error'),
+        description: t('calc_failed_create_project'),
         variant: 'destructive',
       });
     } finally {
@@ -83,20 +83,20 @@ export default function NewCabinetProject() {
         className="mb-6"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Projects
+        {t('calc_back_to_projects')}
       </Button>
 
       <Card>
         <CardHeader>
-          <CardTitle>New Cabinet Project</CardTitle>
+          <CardTitle>{t('calc_new_cabinet_project')}</CardTitle>
           <CardDescription>
-            Create a new project to start designing cabinets
+            {t('calc_create_new_project_desc')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="name">Project Name *</Label>
+              <Label htmlFor="name">{t('calc_project_name')} *</Label>
               <Input
                 id="name"
                 value={formData.name}
@@ -107,7 +107,7 @@ export default function NewCabinetProject() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="client_name">Client Name</Label>
+              <Label htmlFor="client_name">{t('calc_client_name')}</Label>
               <Input
                 id="client_name"
                 value={formData.client_name}
@@ -117,7 +117,7 @@ export default function NewCabinetProject() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="client_address">Client Address</Label>
+              <Label htmlFor="client_address">{t('calc_client_address')}</Label>
               <Input
                 id="client_address"
                 value={formData.client_address}
@@ -127,7 +127,7 @@ export default function NewCabinetProject() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="project_number">Project Number</Label>
+              <Label htmlFor="project_number">{t('calc_project_number_field')}</Label>
               <Input
                 id="project_number"
                 value={formData.project_number}
@@ -138,7 +138,7 @@ export default function NewCabinetProject() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="currency">Currency</Label>
+                <Label htmlFor="currency">{t('calc_currency')}</Label>
                 <Select
                   value={formData.currency}
                   onValueChange={(value) => setFormData({ ...formData, currency: value })}
@@ -155,7 +155,7 @@ export default function NewCabinetProject() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="units">Units</Label>
+                <Label htmlFor="units">{t('calc_units')}</Label>
                 <Select
                   value={formData.units}
                   onValueChange={(value) => setFormData({ ...formData, units: value })}
@@ -164,34 +164,34 @@ export default function NewCabinetProject() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="metric">Metric (mm)</SelectItem>
-                    <SelectItem value="imperial">Imperial (in)</SelectItem>
+                    <SelectItem value="metric">{t('calc_metric')}</SelectItem>
+                    <SelectItem value="imperial">{t('calc_imperial')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
+              <Label htmlFor="notes">{t('calc_notes')}</Label>
               <Textarea
                 id="notes"
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Additional project notes..."
+                placeholder={t('calc_additional_notes')}
                 rows={4}
               />
             </div>
 
             <div className="flex gap-3">
               <Button type="submit" disabled={loading}>
-                {loading ? 'Creating...' : 'Create Project'}
+                {loading ? t('calc_creating') : t('calc_create_project')}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => navigate(createLocalizedPath('/calculation'))}
               >
-                Cancel
+                {t('calc_cancel')}
               </Button>
             </div>
           </form>

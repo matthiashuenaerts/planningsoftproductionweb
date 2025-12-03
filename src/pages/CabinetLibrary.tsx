@@ -16,7 +16,7 @@ export default function CabinetLibrary() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
-  const { createLocalizedPath } = useLanguage();
+  const { t, createLocalizedPath } = useLanguage();
   const [models, setModels] = useState<CabinetModel[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -33,8 +33,8 @@ export default function CabinetLibrary() {
     } catch (error) {
       console.error('Error loading cabinet models:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load cabinet models',
+        title: t('calc_error'),
+        description: t('calc_failed_load_models'),
         variant: 'destructive',
       });
     } finally {
@@ -54,7 +54,7 @@ export default function CabinetLibrary() {
   if (loading) {
     return (
       <div className="container mx-auto p-6">
-        <p className="text-center text-muted-foreground">Loading cabinet library...</p>
+        <p className="text-center text-muted-foreground">{t('calc_loading_cabinet_library')}</p>
       </div>
     );
   }
@@ -67,13 +67,13 @@ export default function CabinetLibrary() {
         className="mb-6"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Project
+        {t('calc_back_to_project')}
       </Button>
 
       <div>
-        <h1 className="text-3xl font-bold">Cabinet Library</h1>
+        <h1 className="text-3xl font-bold">{t('calc_cabinet_library')}</h1>
         <p className="text-muted-foreground mt-2">
-          Select a cabinet model to configure
+          {t('calc_select_model')}
         </p>
       </div>
 
@@ -112,20 +112,20 @@ export default function CabinetLibrary() {
               )}
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Default Size:</span>
+                  <span className="text-muted-foreground">{t('calc_default_size')}:</span>
                   <span>
                     {model.default_width} × {model.default_height} × {model.default_depth}
                   </span>
                 </div>
                 {model.min_width && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Min Width:</span>
+                    <span className="text-muted-foreground">{t('calc_min_width')}:</span>
                     <span>{model.min_width}</span>
                   </div>
                 )}
                 {model.max_width && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Max Width:</span>
+                    <span className="text-muted-foreground">{t('calc_max_width')}:</span>
                     <span>{model.max_width}</span>
                   </div>
                 )}

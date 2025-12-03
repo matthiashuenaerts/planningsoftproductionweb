@@ -13,7 +13,7 @@ type CabinetProject = Database['public']['Tables']['cabinet_projects']['Row'];
 export default function Calculation() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { createLocalizedPath } = useLanguage();
+  const { t, createLocalizedPath } = useLanguage();
   const [projects, setProjects] = useState<CabinetProject[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,8 +28,8 @@ export default function Calculation() {
     } catch (error) {
       console.error('Error loading projects:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load projects',
+        title: t('calc_error'),
+        description: t('calc_failed_load_projects'),
         variant: 'destructive',
       });
     } finally {
@@ -49,32 +49,32 @@ export default function Calculation() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Cabinet Calculator</h1>
+          <h1 className="text-3xl font-bold">{t('calc_cabinet_calculator')}</h1>
           <p className="text-muted-foreground mt-2">
-            Create and manage cabinet projects
+            {t('calc_create_manage_projects')}
           </p>
         </div>
         <Button onClick={handleNewProject} size="lg">
           <Plus className="mr-2 h-5 w-5" />
-          New Project
+          {t('calc_new_project')}
         </Button>
       </div>
 
       {loading ? (
         <div className="text-center py-12">
-          <p className="text-muted-foreground">Loading projects...</p>
+          <p className="text-muted-foreground">{t('calc_loading_projects')}</p>
         </div>
       ) : projects.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('calc_no_projects_yet')}</h3>
             <p className="text-muted-foreground mb-4">
-              Get started by creating your first cabinet project
+              {t('calc_get_started')}
             </p>
             <Button onClick={handleNewProject}>
               <Plus className="mr-2 h-4 w-4" />
-              Create Project
+              {t('calc_create_project')}
             </Button>
           </CardContent>
         </Card>
@@ -89,22 +89,22 @@ export default function Calculation() {
               <CardHeader>
                 <CardTitle>{project.name}</CardTitle>
                 <CardDescription>
-                  {project.client_name || 'No client'}
+                  {project.client_name || t('calc_no_client')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Status:</span>
+                    <span className="text-muted-foreground">{t('calc_status')}:</span>
                     <span className="font-medium capitalize">{project.status}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Created:</span>
+                    <span className="text-muted-foreground">{t('calc_created')}:</span>
                     <span>{new Date(project.created_at).toLocaleDateString()}</span>
                   </div>
                   {project.project_number && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Project #:</span>
+                      <span className="text-muted-foreground">{t('calc_project_number')}:</span>
                       <span>{project.project_number}</span>
                     </div>
                   )}
