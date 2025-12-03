@@ -69,10 +69,20 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// Default fallback for when used outside provider (e.g., during initial render)
+const defaultLanguageContext: LanguageContextType = {
+  lang: 'nl',
+  t: (key: string) => key,
+  changeLang: () => {},
+  createLocalizedPath: (path: string) => `/nl${path === '/' ? '' : path}`,
+};
+
 export const useLanguage = () => {
   const context = useContext(LanguageContext);
+  // Return fallback instead of throwing to prevent crashes during edge cases
   if (context === undefined) {
-    throw new Error('useLanguage must be used within a LanguageProvider');
+    console.warn('useLanguage used outside LanguageProvider, returning defaults');
+    return defaultLanguageContext;
   }
   return context;
 };
