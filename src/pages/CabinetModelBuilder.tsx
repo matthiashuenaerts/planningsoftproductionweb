@@ -67,7 +67,7 @@ export default function CabinetModelBuilder() {
   const { modelId } = useParams<{ modelId?: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { createLocalizedPath } = useLanguage();
+  const { t, createLocalizedPath } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [materials, setMaterials] = useState<any[]>([]);
@@ -161,8 +161,8 @@ export default function CabinetModelBuilder() {
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load model data',
+        title: t('calc_error'),
+        description: t('calc_failed_load_model'),
         variant: 'destructive',
       });
     } finally {
@@ -224,16 +224,16 @@ export default function CabinetModelBuilder() {
       }
       
       toast({
-        title: 'Success',
-        description: 'Cabinet model saved successfully',
+        title: t('calc_success'),
+        description: t('calc_model_saved'),
       });
       
       navigate(createLocalizedPath('/calculation'));
     } catch (error) {
       console.error('Error saving model:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to save cabinet model',
+        title: t('calc_error'),
+        description: t('calc_failed_save_model'),
         variant: 'destructive',
       });
     } finally {
@@ -244,7 +244,7 @@ export default function CabinetModelBuilder() {
   if (loading) {
     return (
       <div className="container mx-auto p-6">
-        <p className="text-center text-muted-foreground">Loading...</p>
+        <p className="text-center text-muted-foreground">{t('calc_loading')}</p>
       </div>
     );
   }
@@ -257,20 +257,20 @@ export default function CabinetModelBuilder() {
           onClick={() => navigate(createLocalizedPath('/calculation'))}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Library
+          {t('calc_back_to_library')}
         </Button>
         <Button onClick={handleSave} disabled={saving}>
           <Save className="mr-2 h-4 w-4" />
-          {saving ? 'Saving...' : 'Save Model'}
+          {saving ? t('calc_saving') : t('calc_save_model')}
         </Button>
       </div>
 
       <div>
         <h1 className="text-3xl font-bold">
-          {modelId ? 'Edit' : 'Create'} Cabinet Model
+          {modelId ? t('calc_edit_cabinet_model') : t('calc_create_cabinet_model')}
         </h1>
         <p className="text-muted-foreground mt-2">
-          Define parametric structure, doors, and interior components
+          {t('calc_define_parametric')}
         </p>
       </div>
 
@@ -278,42 +278,42 @@ export default function CabinetModelBuilder() {
         {/* Model Properties */}
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>Model Properties</CardTitle>
+            <CardTitle>{t('calc_model_properties')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>Model Name</Label>
+              <Label>{t('calc_model_name')}</Label>
               <Input
                 value={modelData.name}
                 onChange={(e) => setModelData({ ...modelData, name: e.target.value })}
-                placeholder="e.g., Standard Wardrobe"
+                placeholder={t('calc_model_name_placeholder')}
               />
             </div>
             
             <div>
-              <Label>Category</Label>
+              <Label>{t('calc_category')}</Label>
               <Input
                 value={modelData.category}
                 onChange={(e) => setModelData({ ...modelData, category: e.target.value })}
-                placeholder="e.g., wardrobe, kitchen"
+                placeholder={t('calc_category_placeholder')}
               />
             </div>
             
             <div>
-              <Label>Description</Label>
+              <Label>{t('calc_description')}</Label>
               <Textarea
                 value={modelData.description}
                 onChange={(e) => setModelData({ ...modelData, description: e.target.value })}
-                placeholder="Describe this cabinet model..."
+                placeholder={t('calc_describe_model')}
                 rows={3}
               />
             </div>
 
             <div className="space-y-2">
-              <h4 className="font-semibold">Default Dimensions (mm)</h4>
+              <h4 className="font-semibold">{t('calc_default_dimensions')}</h4>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <Label className="text-xs">Width</Label>
+                  <Label className="text-xs">{t('calc_width')}</Label>
                   <Input
                     type="number"
                     value={modelData.default_width}
@@ -321,7 +321,7 @@ export default function CabinetModelBuilder() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Height</Label>
+                  <Label className="text-xs">{t('calc_height')}</Label>
                   <Input
                     type="number"
                     value={modelData.default_height}
@@ -329,7 +329,7 @@ export default function CabinetModelBuilder() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Depth</Label>
+                  <Label className="text-xs">{t('calc_depth')}</Label>
                   <Input
                     type="number"
                     value={modelData.default_depth}
@@ -340,10 +340,10 @@ export default function CabinetModelBuilder() {
             </div>
 
             <div className="space-y-2">
-              <h4 className="font-semibold">Size Constraints (mm)</h4>
+              <h4 className="font-semibold">{t('calc_size_constraints')}</h4>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label className="text-xs">Min Width</Label>
+                  <Label className="text-xs">{t('calc_min_width')}</Label>
                   <Input
                     type="number"
                     value={modelData.min_width}
@@ -351,7 +351,7 @@ export default function CabinetModelBuilder() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Max Width</Label>
+                  <Label className="text-xs">{t('calc_max_width')}</Label>
                   <Input
                     type="number"
                     value={modelData.max_width}
@@ -359,7 +359,7 @@ export default function CabinetModelBuilder() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Min Height</Label>
+                  <Label className="text-xs">Min. {t('calc_height')}</Label>
                   <Input
                     type="number"
                     value={modelData.min_height}
@@ -367,7 +367,7 @@ export default function CabinetModelBuilder() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Max Height</Label>
+                  <Label className="text-xs">Max. {t('calc_height')}</Label>
                   <Input
                     type="number"
                     value={modelData.max_height}
@@ -375,7 +375,7 @@ export default function CabinetModelBuilder() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Min Depth</Label>
+                  <Label className="text-xs">Min. {t('calc_depth')}</Label>
                   <Input
                     type="number"
                     value={modelData.min_depth}
@@ -383,7 +383,7 @@ export default function CabinetModelBuilder() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Max Depth</Label>
+                  <Label className="text-xs">Max. {t('calc_depth')}</Label>
                   <Input
                     type="number"
                     value={modelData.max_depth}
@@ -398,7 +398,7 @@ export default function CabinetModelBuilder() {
         {/* 3D Preview */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>3D Preview</CardTitle>
+            <CardTitle>{t('calc_3d_preview')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Interactive3DCabinetVisualizer
@@ -415,13 +415,13 @@ export default function CabinetModelBuilder() {
       {/* Component Builders */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="panels">Panels ({panels.length})</TabsTrigger>
-          <TabsTrigger value="fronts">Fronts ({fronts.length})</TabsTrigger>
-          <TabsTrigger value="compartments">Compartments</TabsTrigger>
-          <TabsTrigger value="hardware">Hardware ({hardware.length})</TabsTrigger>
-          <TabsTrigger value="labor">Labor</TabsTrigger>
-          <TabsTrigger value="calculation">Calculation</TabsTrigger>
-          <TabsTrigger value="legrabox">Legrabox DB</TabsTrigger>
+          <TabsTrigger value="panels">{t('calc_panels_tab')} ({panels.length})</TabsTrigger>
+          <TabsTrigger value="fronts">{t('calc_fronts_tab')} ({fronts.length})</TabsTrigger>
+          <TabsTrigger value="compartments">{t('calc_compartments_tab')}</TabsTrigger>
+          <TabsTrigger value="hardware">{t('calc_hardware_tab')} ({hardware.length})</TabsTrigger>
+          <TabsTrigger value="labor">{t('calc_labor_tab')}</TabsTrigger>
+          <TabsTrigger value="calculation">{t('calc_calculation_tab')}</TabsTrigger>
+          <TabsTrigger value="legrabox">{t('calc_legrabox_db_tab')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="panels" className="mt-6">
