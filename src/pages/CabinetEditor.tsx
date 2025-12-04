@@ -81,12 +81,21 @@ interface ModelHardware {
   notes: string;
 }
 
+interface LaborLine {
+  id: string;
+  name: string;
+  formula: string;
+  unit: 'minutes' | 'euros';
+}
+
 interface LaborConfig {
-  base_minutes: number;
-  per_panel_minutes: number;
-  per_front_minutes: number;
-  per_compartment_item_minutes: number;
   hourly_rate: number;
+  lines?: LaborLine[];
+  // Legacy fields for backwards compatibility
+  base_minutes?: number;
+  per_panel_minutes?: number;
+  per_front_minutes?: number;
+  per_compartment_item_minutes?: number;
 }
 
 export default function CabinetEditor() {
@@ -135,11 +144,13 @@ export default function CabinetEditor() {
   const [modelHardware, setModelHardware] = useState<ModelHardware[]>([]);
   const [frontHardware, setFrontHardware] = useState<any[]>([]);
   const [laborConfig, setLaborConfig] = useState<LaborConfig>({
-    base_minutes: 60,
-    per_panel_minutes: 5,
-    per_front_minutes: 10,
-    per_compartment_item_minutes: 5,
     hourly_rate: 45,
+    lines: [
+      { id: '1', name: 'Base Assembly', formula: '30', unit: 'minutes' },
+      { id: '2', name: 'Panel Work', formula: 'panels * 5', unit: 'minutes' },
+      { id: '3', name: 'Front Installation', formula: 'fronts * 15', unit: 'minutes' },
+      { id: '4', name: 'Interior Items', formula: 'compartment_items * 10', unit: 'minutes' },
+    ],
   });
 
   useEffect(() => {

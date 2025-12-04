@@ -13,12 +13,21 @@ interface ModelHardware {
   notes?: string;
 }
 
+interface LaborLine {
+  id: string;
+  name: string;
+  formula: string;
+  unit: 'minutes' | 'euros';
+}
+
 interface LaborConfig {
-  base_minutes: number;
-  per_panel_minutes: number;
-  per_front_minutes: number;
-  per_compartment_item_minutes: number;
   hourly_rate: number;
+  lines?: LaborLine[];
+  // Legacy fields for backwards compatibility
+  base_minutes?: number;
+  per_panel_minutes?: number;
+  per_front_minutes?: number;
+  per_compartment_item_minutes?: number;
 }
 
 interface CabinetFront {
@@ -112,13 +121,12 @@ function evaluateExpression(expr: string | number, variables: Record<string, num
 export class CabinetCalculationService {
   private materials: CabinetMaterial[];
   private overheadPercentage: number = 15;
-  private defaultLaborConfig: LaborConfig = {
-    base_minutes: 60,
-    per_panel_minutes: 5,
-    per_front_minutes: 10,
-    per_compartment_item_minutes: 5,
-    hourly_rate: 45,
-  };
+  private defaultLaborLines: LaborLine[] = [
+    { id: '1', name: 'Base Assembly', formula: '30', unit: 'minutes' },
+    { id: '2', name: 'Panel Work', formula: 'panels * 5', unit: 'minutes' },
+    { id: '3', name: 'Front Installation', formula: 'fronts * 15', unit: 'minutes' },
+    { id: '4', name: 'Interior Items', formula: 'compartment_items * 10', unit: 'minutes' },
+  ];
 
   constructor(materials: CabinetMaterial[]) {
     this.materials = materials;
@@ -176,13 +184,15 @@ export class CabinetCalculationService {
       variables
     );
 
-    // Calculate labor
-    const laborConfig = modelParameters?.laborConfig || this.defaultLaborConfig;
+    // Calculate labor with full variable context
+    const laborConfig = modelParameters?.laborConfig || { hourly_rate: 45, lines: this.defaultLaborLines };
     const laborResult = this.calculateLaborFromModel(
       modelParameters?.panels || [],
       fronts,
       modelParameters?.parametric_compartments || modelParameters?.compartments || [],
-      laborConfig
+      laborConfig,
+      { ...variables, ...materialAreas, total_area: materialAreas.body + materialAreas.door + materialAreas.shelf },
+      modelParameters?.hardware || []
     );
 
     const subtotal = materialCosts + hardwareResult.total + laborResult.cost;
@@ -337,20 +347,77 @@ export class CabinetCalculationService {
     panels: ParametricPanel[],
     fronts: CabinetFront[],
     compartments: CompartmentData[],
-    laborConfig: LaborConfig
+    laborConfig: LaborConfig,
+    baseVariables: Record<string, number>,
+    hardware: ModelHardware[]
   ): { minutes: number; cost: number } {
     const panelCount = panels.filter(p => p.visible).length;
+    const totalPanelCount = panels.length;
+    const interiorPanels = panels.filter(p => p.material_type === 'shelf' || p.name?.toLowerCase().includes('shelf')).length;
     const frontCount = fronts.filter(f => f.visible).reduce((sum, f) => sum + (f.quantity || 1), 0);
     const compartmentItemCount = compartments.reduce((sum, c) => sum + (c.items?.length || 0), 0);
-
-    const panelMinutes = panelCount * laborConfig.per_panel_minutes;
-    const frontMinutes = frontCount * laborConfig.per_front_minutes;
-    const compartmentItemMinutes = compartmentItemCount * laborConfig.per_compartment_item_minutes;
+    const hardwareCount = hardware.length;
     
-    const totalMinutes = laborConfig.base_minutes + panelMinutes + frontMinutes + compartmentItemMinutes;
-    const laborCost = (totalMinutes / 60) * laborConfig.hourly_rate;
+    // Calculate front area
+    let frontArea = 0;
+    fronts.filter(f => f.visible).forEach(f => {
+      const w = evaluateExpression(f.width, baseVariables);
+      const h = evaluateExpression(f.height, baseVariables);
+      frontArea += (w * h * (f.quantity || 1)) / 1000000;
+    });
 
-    return { minutes: totalMinutes, cost: laborCost };
+    // Build complete variable set for formula evaluation
+    const variables: Record<string, number> = {
+      ...baseVariables,
+      panels: panelCount,
+      total_panels: totalPanelCount,
+      interior_panels: interiorPanels,
+      fronts: frontCount,
+      compartment_items: compartmentItemCount,
+      hardware_count: hardwareCount,
+      body_area: baseVariables.body || 0,
+      door_area: baseVariables.door || 0,
+      shelf_area: baseVariables.shelf || 0,
+      front_area: frontArea,
+      volume: (baseVariables.width * baseVariables.height * baseVariables.depth) / 1000000000, // m³
+      total_edges: (baseVariables.total_area || 0) * 4, // Rough estimate
+    };
+
+    // Use formula-based lines if available, otherwise fall back to legacy
+    const lines = laborConfig.lines || this.migrateToLines(laborConfig);
+    
+    let totalMinutes = 0;
+    let directCost = 0;
+    
+    lines.forEach(line => {
+      const value = evaluateExpression(line.formula, variables);
+      if (line.unit === 'minutes') {
+        totalMinutes += value;
+      } else {
+        directCost += value;
+      }
+    });
+
+    const laborCost = (totalMinutes / 60) * laborConfig.hourly_rate + directCost;
+
+    return { minutes: Math.round(totalMinutes), cost: laborCost };
+  }
+
+  private migrateToLines(config: LaborConfig): LaborLine[] {
+    const lines: LaborLine[] = [];
+    if (config.base_minutes) {
+      lines.push({ id: '1', name: 'Base', formula: String(config.base_minutes), unit: 'minutes' });
+    }
+    if (config.per_panel_minutes) {
+      lines.push({ id: '2', name: 'Panels', formula: `panels * ${config.per_panel_minutes}`, unit: 'minutes' });
+    }
+    if (config.per_front_minutes) {
+      lines.push({ id: '3', name: 'Fronts', formula: `fronts * ${config.per_front_minutes}`, unit: 'minutes' });
+    }
+    if (config.per_compartment_item_minutes) {
+      lines.push({ id: '4', name: 'Items', formula: `compartment_items * ${config.per_compartment_item_minutes}`, unit: 'minutes' });
+    }
+    return lines.length > 0 ? lines : this.defaultLaborLines;
   }
 
   // Legacy method for backward compatibility
