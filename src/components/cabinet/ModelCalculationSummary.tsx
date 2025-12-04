@@ -227,6 +227,8 @@ export function ModelCalculationSummary({
   const laborVariables = useMemo(() => ({
     ...variables,
     panels: panels.filter(p => p.visible).length,
+    total_panels: panels.length,
+    interior_panels: compartmentItemCount,
     fronts: fronts.filter(f => f.visible).reduce((sum, f) => sum + f.quantity, 0),
     compartment_items: compartmentItemCount,
     total_edges: totalEdges,
@@ -234,8 +236,10 @@ export function ModelCalculationSummary({
     door_area: materialAreas.door,
     shelf_area: materialAreas.shelf,
     total_area: materialAreas.body + materialAreas.door + materialAreas.shelf,
+    front_area: materialAreas.door,
     hardware_count: totalHardwareCount,
-  }), [variables, panels, fronts, compartmentItemCount, totalEdges, materialAreas, totalHardwareCount]);
+    volume: (modelData.default_width * modelData.default_height * modelData.default_depth) / 1000000000,
+  }), [variables, panels, fronts, compartmentItemCount, totalEdges, materialAreas, totalHardwareCount, modelData]);
 
   // Calculate labor using new formula-based system
   const laborCalculation = useMemo(() => {
