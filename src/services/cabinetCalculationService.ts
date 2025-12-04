@@ -351,19 +351,31 @@ export class CabinetCalculationService {
     baseVariables: Record<string, number>,
     hardware: ModelHardware[]
   ): { minutes: number; cost: number } {
-    const panelCount = panels.filter(p => p.visible).length;
+    const visiblePanels = panels.filter(p => p.visible);
+    const visibleFronts = fronts.filter(f => f.visible);
+    const panelCount = visiblePanels.length;
     const totalPanelCount = panels.length;
     const interiorPanels = panels.filter(p => p.material_type === 'shelf' || p.name?.toLowerCase().includes('shelf')).length;
-    const frontCount = fronts.filter(f => f.visible).reduce((sum, f) => sum + (f.quantity || 1), 0);
+    const frontCount = visibleFronts.reduce((sum, f) => sum + (f.quantity || 1), 0);
     const compartmentItemCount = compartments.reduce((sum, c) => sum + (c.items?.length || 0), 0);
-    const hardwareCount = hardware.length;
+    const hardwareCount = hardware.reduce((sum, h) => sum + Math.ceil(evaluateExpression(h.quantity, baseVariables)), 0);
     
-    // Calculate front area
+    // Calculate front area and total edges accurately
     let frontArea = 0;
-    fronts.filter(f => f.visible).forEach(f => {
+    let totalEdges = 0;
+    
+    visiblePanels.forEach(panel => {
+      const length = evaluateExpression(panel.length, baseVariables);
+      const width = evaluateExpression(panel.width, baseVariables);
+      totalEdges += 2 * (length + width) / 1000; // Convert to meters
+    });
+    
+    visibleFronts.forEach(f => {
       const w = evaluateExpression(f.width, baseVariables);
       const h = evaluateExpression(f.height, baseVariables);
-      frontArea += (w * h * (f.quantity || 1)) / 1000000;
+      const qty = f.quantity || 1;
+      frontArea += (w * h * qty) / 1000000;
+      totalEdges += (2 * (w + h) * qty) / 1000; // Convert to meters
     });
 
     // Build complete variable set for formula evaluation
@@ -380,7 +392,7 @@ export class CabinetCalculationService {
       shelf_area: baseVariables.shelf || 0,
       front_area: frontArea,
       volume: (baseVariables.width * baseVariables.height * baseVariables.depth) / 1000000000, // m³
-      total_edges: (baseVariables.total_area || 0) * 4, // Rough estimate
+      total_edges: totalEdges,
     };
 
     // Use formula-based lines if available, otherwise fall back to legacy
