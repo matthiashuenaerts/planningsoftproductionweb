@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Cabinet3DThumbnail } from './Cabinet3DThumbnail';
+import { LaborConfig, LaborLine, evaluateLaborFormula } from './LaborPriceCalculator';
 import type { Database } from '@/integrations/supabase/types';
 
 type CabinetConfiguration = Database['public']['Tables']['cabinet_configurations']['Row'];
@@ -16,14 +17,6 @@ interface ModelHardware {
   unit_price: number;
 }
 
-interface LaborConfig {
-  hourly_rate: number;
-  base_minutes: number;
-  per_panel_minutes: number;
-  per_front_minutes: number;
-  per_compartment_item_minutes: number;
-}
-
 interface CabinetConfigurationCardProps {
   config: CabinetConfiguration;
   modelParameters?: {
@@ -32,6 +25,7 @@ interface CabinetConfigurationCardProps {
     compartments?: any[];
     parametric_compartments?: any[];
     hardware?: ModelHardware[];
+    frontHardware?: any[];
     laborConfig?: LaborConfig;
   };
   materials?: Array<{ id: string; cost_per_unit: number }>;
@@ -219,14 +213,67 @@ export function calculateConfigurationPrice(
   let laborCost = 0;
   const laborConfig = modelParameters.laborConfig;
   if (laborConfig) {
-    const panelMinutes = panels.filter((p: any) => p.visible !== false).length * laborConfig.per_panel_minutes;
-    const frontMinutes = fronts.filter((f: any) => f.visible !== false).reduce((sum: number, f: any) => 
-      sum + ((f.quantity || 1) * laborConfig.per_front_minutes), 0);
-    const compartmentItemMinutes = compartments.reduce((sum: number, c: any) => 
-      sum + (c.items?.length || 0) * laborConfig.per_compartment_item_minutes, 0);
+    const visiblePanels = panels.filter((p: any) => p.visible !== false);
+    const visibleFronts = fronts.filter((f: any) => f.visible !== false);
+    const totalFronts = visibleFronts.reduce((sum: number, f: any) => sum + (f.quantity || 1), 0);
+    const compartmentItemCount = compartments.reduce((sum: number, c: any) => sum + (c.items?.length || 0), 0);
     
-    const totalMinutes = laborConfig.base_minutes + panelMinutes + frontMinutes + compartmentItemMinutes;
-    laborCost = (totalMinutes / 60) * laborConfig.hourly_rate;
+    // Calculate areas and edges for labor variables
+    const totalArea = areas.body + areas.door + areas.shelf;
+    let totalEdges = 0;
+    visiblePanels.forEach((panel: any) => {
+      const length = evaluateExpression(panel.length || 0, variables);
+      const width = evaluateExpression(panel.width || 0, variables);
+      totalEdges += 2 * (length + width) / 1000;
+    });
+    visibleFronts.forEach((front: any) => {
+      const w = evaluateExpression(front.width || 0, variables);
+      const h = evaluateExpression(front.height || 0, variables);
+      totalEdges += (2 * (w + h) * (front.quantity || 1)) / 1000;
+    });
+
+    // Build full labor variables
+    const laborVariables: Record<string, number> = {
+      ...variables,
+      panels: visiblePanels.length,
+      total_panels: panels.length,
+      interior_panels: compartmentItemCount,
+      fronts: totalFronts,
+      compartment_items: compartmentItemCount,
+      total_edges: totalEdges,
+      body_area: areas.body,
+      door_area: areas.door,
+      shelf_area: areas.shelf,
+      total_area: totalArea,
+      front_area: areas.door,
+      hardware_count: Math.ceil((modelParameters.hardware || []).reduce((sum: number, h: any) => 
+        sum + evaluateExpression(h.quantity, variables), 0)),
+      volume: (config.width * config.height * config.depth) / 1000000000,
+    };
+
+    // Use new formula-based calculation if lines exist
+    if (laborConfig.lines && laborConfig.lines.length > 0) {
+      let totalMinutes = 0;
+      let totalEuros = 0;
+      
+      laborConfig.lines.forEach((line: LaborLine) => {
+        const value = evaluateLaborFormula(line.formula, laborVariables);
+        if (line.unit === 'minutes') {
+          totalMinutes += value;
+        } else {
+          totalEuros += value;
+        }
+      });
+      
+      laborCost = (totalMinutes / 60) * laborConfig.hourly_rate + totalEuros;
+    } else {
+      // Fallback to legacy calculation
+      const panelMinutes = visiblePanels.length * (laborConfig.per_panel_minutes || 0);
+      const frontMinutes = totalFronts * (laborConfig.per_front_minutes || 0);
+      const compartmentItemMinutes = compartmentItemCount * (laborConfig.per_compartment_item_minutes || 0);
+      const totalMinutes = (laborConfig.base_minutes || 0) + panelMinutes + frontMinutes + compartmentItemMinutes;
+      laborCost = (totalMinutes / 60) * laborConfig.hourly_rate;
+    }
   }
 
   const subtotal = materialCost + hardwareCost + laborCost;

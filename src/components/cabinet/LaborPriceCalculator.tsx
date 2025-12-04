@@ -31,8 +31,10 @@ interface LaborPriceCalculatorProps {
 
 const AVAILABLE_VARIABLES = [
   { name: 'panels', description: 'Number of visible panels' },
+  { name: 'total_panels', description: 'Total panel count (visible + hidden)' },
+  { name: 'interior_panels', description: 'Interior panels (shelves, dividers)' },
   { name: 'fronts', description: 'Number of visible fronts' },
-  { name: 'compartment_items', description: 'Number of compartment items (shelves, dividers)' },
+  { name: 'compartment_items', description: 'Number of compartment items' },
   { name: 'total_edges', description: 'Total edge length in meters' },
   { name: 'body_area', description: 'Body material area in m²' },
   { name: 'door_area', description: 'Door/front material area in m²' },
@@ -44,6 +46,8 @@ const AVAILABLE_VARIABLES = [
   { name: 'width', description: 'Cabinet width in mm' },
   { name: 'height', description: 'Cabinet height in mm' },
   { name: 'depth', description: 'Cabinet depth in mm' },
+  { name: 'volume', description: 'Cabinet volume in m³' },
+  { name: 'front_area', description: 'Total front area in m²' },
 ];
 
 const DEFAULT_LINES: LaborLine[] = [
