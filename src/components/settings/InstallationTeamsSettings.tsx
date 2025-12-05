@@ -102,8 +102,7 @@ const InstallationTeamsSettings: React.FC = () => {
       if (data && data.length > 0) {
         const { data: membersData, error: membersError } = await supabase
           .from('placement_team_members')
-          .select('*')
-          .eq('is_default', true);
+          .select('*');
         
         if (membersError) throw membersError;
         
@@ -222,12 +221,11 @@ const InstallationTeamsSettings: React.FC = () => {
         if (error) throw error;
         teamId = editingTeam.id;
         
-        // Delete existing default team members
+        // Delete existing team members
         await supabase
           .from('placement_team_members')
           .delete()
-          .eq('team_id', editingTeam.id)
-          .eq('is_default', true);
+          .eq('team_id', editingTeam.id);
           
         toast({ title: "Success", description: "Installation team updated successfully" });
       } else {
@@ -242,12 +240,12 @@ const InstallationTeamsSettings: React.FC = () => {
         toast({ title: "Success", description: "Installation team added successfully" });
       }
       
-      // Insert new default team members
+      // Insert team members
       if (selectedMemberIds.length > 0) {
         const membersToInsert = selectedMemberIds.map(employeeId => ({
           team_id: teamId,
           employee_id: employeeId,
-          is_default: true
+          is_default: false
         }));
         
         const { error: membersError } = await supabase
