@@ -24,6 +24,13 @@ interface ModelParameters {
   frontHardware?: any[];
 }
 
+interface ProjectModel {
+  id: string;
+  body_material_id?: string;
+  door_material_id?: string;
+  shelf_material_id?: string;
+}
+
 export default function CabinetProjectDetails() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -32,6 +39,7 @@ export default function CabinetProjectDetails() {
   const [project, setProject] = useState<CabinetProject | null>(null);
   const [configurations, setConfigurations] = useState<CabinetConfiguration[]>([]);
   const [modelParametersMap, setModelParametersMap] = useState<Record<string, ModelParameters>>({});
+  const [projectModelsMap, setProjectModelsMap] = useState<Record<string, ProjectModel>>({});
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,12 +53,20 @@ export default function CabinetProjectDetails() {
     if (!projectId) return;
     
     try {
-      const [projectData, configurationsData, materialsData] = await Promise.all([
+      const [projectData, configurationsData, materialsData, projectModelsData] = await Promise.all([
         cabinetService.getProject(projectId),
         cabinetService.getProjectConfigurations(projectId),
         cabinetService.getAllMaterials(),
+        supabase.from('project_models').select('*').eq('project_id', projectId),
       ]);
       setProject(projectData);
+      
+      // Build project models map
+      const pmMap: Record<string, ProjectModel> = {};
+      (projectModelsData.data || []).forEach(pm => {
+        pmMap[pm.id] = pm;
+      });
+      setProjectModelsMap(pmMap);
       setConfigurations(configurationsData);
       setMaterials(materialsData);
 
@@ -219,7 +235,7 @@ export default function CabinetProjectDetails() {
       )}
 
       {/* Project Models */}
-      <ProjectModelManager projectId={projectId!} />
+      <ProjectModelManager projectId={projectId!} onModelChange={loadProject} />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -242,6 +258,7 @@ export default function CabinetProjectDetails() {
                   config={config}
                   modelParameters={config.model_id ? modelParametersMap[config.model_id] : undefined}
                   materials={materials}
+                  projectModel={config.project_model_id ? projectModelsMap[config.project_model_id] : undefined}
                   onEdit={() => navigate(createLocalizedPath(`/calculation/project/${projectId}/editor/${config.model_id}?configId=${config.id}`))}
                 />
               ))}
@@ -256,6 +273,7 @@ export default function CabinetProjectDetails() {
         modelParametersMap={modelParametersMap}
         materials={materials}
         currency={project.currency}
+        projectModelsMap={projectModelsMap}
       />
     </div>
   );

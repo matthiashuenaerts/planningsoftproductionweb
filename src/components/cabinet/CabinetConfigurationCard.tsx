@@ -17,6 +17,13 @@ interface ModelHardware {
   unit_price: number;
 }
 
+interface ProjectModel {
+  id: string;
+  body_material_id?: string;
+  door_material_id?: string;
+  shelf_material_id?: string;
+}
+
 interface CabinetConfigurationCardProps {
   config: CabinetConfiguration;
   modelParameters?: {
@@ -29,6 +36,7 @@ interface CabinetConfigurationCardProps {
     laborConfig?: LaborConfig;
   };
   materials?: Array<{ id: string; cost_per_unit: number }>;
+  projectModel?: ProjectModel;
   onEdit: () => void;
 }
 
@@ -49,10 +57,10 @@ function evaluateExpression(expr: string | number, variables: Record<string, num
   }
 }
 
-export function CabinetConfigurationCard({ config, modelParameters, materials = [], onEdit }: CabinetConfigurationCardProps) {
+export function CabinetConfigurationCard({ config, modelParameters, materials = [], projectModel, onEdit }: CabinetConfigurationCardProps) {
   const calculatedPrice = useMemo(() => {
-    return calculateConfigurationPrice(config, modelParameters, materials);
-  }, [config, modelParameters, materials]);
+    return calculateConfigurationPrice(config, modelParameters, materials, projectModel);
+  }, [config, modelParameters, materials, projectModel]);
 
   return (
     <Card className="hover:bg-accent/50 transition-colors overflow-hidden">
@@ -131,7 +139,8 @@ export function calculateConfigurationPrice(
     frontHardware?: any[];
     laborConfig?: LaborConfig;
   },
-  materials?: Array<{ id: string; cost_per_unit: number }>
+  materials?: Array<{ id: string; cost_per_unit: number }>,
+  projectModel?: ProjectModel
 ) {
   if (!modelParameters) return { material: 0, hardware: 0, labor: 0, overhead: 0, total: 0 };
 
@@ -183,10 +192,15 @@ export function calculateConfigurationPrice(
   const defaultPrice = 50;
   let materialCost = 0;
 
+  // Use project model materials if available, otherwise fall back to config.material_config
+  const bodyMaterialId = projectModel?.body_material_id || matCfg?.body_material;
+  const doorMaterialId = projectModel?.door_material_id || matCfg?.door_material;
+  const shelfMaterialId = projectModel?.shelf_material_id || matCfg?.shelf_material;
+
   if (materials?.length) {
-    materialCost += areas.body * wasteFactor * (materials.find(m => m.id === matCfg?.body_material)?.cost_per_unit || defaultPrice);
-    materialCost += areas.door * wasteFactor * (materials.find(m => m.id === matCfg?.door_material)?.cost_per_unit || defaultPrice);
-    materialCost += areas.shelf * wasteFactor * (materials.find(m => m.id === matCfg?.shelf_material)?.cost_per_unit || defaultPrice);
+    materialCost += areas.body * wasteFactor * (materials.find(m => m.id === bodyMaterialId)?.cost_per_unit || defaultPrice);
+    materialCost += areas.door * wasteFactor * (materials.find(m => m.id === doorMaterialId)?.cost_per_unit || defaultPrice);
+    materialCost += areas.shelf * wasteFactor * (materials.find(m => m.id === shelfMaterialId)?.cost_per_unit || defaultPrice);
   } else {
     materialCost = (areas.body + areas.door + areas.shelf) * wasteFactor * defaultPrice;
   }

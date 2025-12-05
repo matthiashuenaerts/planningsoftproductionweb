@@ -40,9 +40,10 @@ interface ProjectModelManagerProps {
   projectId: string;
   onModelSelect?: (model: ProjectModel | null) => void;
   selectedModelId?: string;
+  onModelChange?: () => void;
 }
 
-export function ProjectModelManager({ projectId, onModelSelect, selectedModelId }: ProjectModelManagerProps) {
+export function ProjectModelManager({ projectId, onModelSelect, selectedModelId, onModelChange }: ProjectModelManagerProps) {
   const { toast } = useToast();
   const [models, setModels] = useState<ProjectModel[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -145,6 +146,7 @@ export function ProjectModelManager({ projectId, onModelSelect, selectedModelId 
       setEditingModel(null);
       setFormData(emptyModel);
       loadData();
+      onModelChange?.();
     } catch (error) {
       toast({ title: 'Error saving model', variant: 'destructive' });
     }
@@ -159,6 +161,7 @@ export function ProjectModelManager({ projectId, onModelSelect, selectedModelId 
       if (error) throw error;
       toast({ title: 'Model deleted' });
       loadData();
+      onModelChange?.();
     } catch (error) {
       toast({ title: 'Error deleting model', variant: 'destructive' });
     }
@@ -178,6 +181,7 @@ export function ProjectModelManager({ projectId, onModelSelect, selectedModelId 
       
       toast({ title: 'Default model updated' });
       loadData();
+      onModelChange?.();
     } catch (error) {
       toast({ title: 'Error setting default', variant: 'destructive' });
     }
