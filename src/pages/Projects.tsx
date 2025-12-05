@@ -28,7 +28,7 @@ const Projects = () => {
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [projectTasks, setProjectTasks] = useState<Record<string, Task[]>>({});
   const [workstations, setWorkstations] = useState<Workstation[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('projects_search') || '');
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
   const [exportingProject, setExportingProject] = useState<string | null>(null);
@@ -53,6 +53,7 @@ const Projects = () => {
 
   // Filter projects when search query changes
   useEffect(() => {
+    localStorage.setItem('projects_search', searchQuery);
     if (searchQuery.trim() === '') {
       setFilteredProjects(projects);
     } else {
