@@ -458,7 +458,7 @@ const navigate = useNavigate();
       console.error('Update task duration error:', error);
     }
   });
-  const handleTimerClick = () => {
+  const handleTimerClick = async () => {
     if (!currentEmployee) return;
     if (activeRegistration && activeRegistration.is_active) {
       // Check if countdown timer is negative before stopping
@@ -470,15 +470,23 @@ const navigate = useNavigate();
         const remainingMs = adjustedDurationMs - elapsedMs;
         
         if (remainingMs < 0) {
-          // Timer is negative, show dialog to input new duration
-          const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
+          // Timer is negative - first reset timer to zero by updating start_time to NOW
           const overTimeMinutes = Math.floor(Math.abs(remainingMs) / (1000 * 60));
+          
+          // Reset start_time to NOW so elapsed becomes 0
+          await supabase
+            .from('time_registrations')
+            .update({ start_time: new Date().toISOString() })
+            .eq('id', activeRegistration.id);
+          
+          // Invalidate to refresh the registration with new start_time
+          await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
           
           setPendingStopData({
             registrationId: activeRegistration.id,
             taskDetails,
             overTimeMinutes,
-            elapsedMinutes
+            elapsedMinutes: 0 // Now elapsed is 0
           });
           setShowExtraTimeDialog(true);
           return;
