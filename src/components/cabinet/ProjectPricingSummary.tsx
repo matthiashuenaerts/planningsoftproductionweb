@@ -16,23 +16,33 @@ interface ModelParameters {
   frontHardware?: any[];
 }
 
+interface ProjectModel {
+  id: string;
+  body_material_id?: string;
+  door_material_id?: string;
+  shelf_material_id?: string;
+}
+
 interface ProjectPricingSummaryProps {
   configurations: CabinetConfiguration[];
   modelParametersMap: Record<string, ModelParameters>;
   materials: Array<{ id: string; cost_per_unit: number }>;
   currency?: string;
+  projectModelsMap?: Record<string, ProjectModel>;
 }
 
 export function ProjectPricingSummary({ 
   configurations, 
   modelParametersMap,
   materials,
-  currency = 'EUR' 
+  currency = 'EUR',
+  projectModelsMap = {}
 }: ProjectPricingSummaryProps) {
   const summary = useMemo(() => {
     const cabinetPrices = configurations.map(config => {
       const modelParams = config.model_id ? modelParametersMap[config.model_id] : undefined;
-      const price = calculateConfigurationPrice(config, modelParams, materials);
+      const projectModel = config.project_model_id ? projectModelsMap[config.project_model_id] : undefined;
+      const price = calculateConfigurationPrice(config, modelParams, materials, projectModel);
       return {
         config,
         price,
