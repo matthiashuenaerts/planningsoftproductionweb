@@ -5,6 +5,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cabinetService } from '@/services/cabinetService';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ProjectModelManager } from '@/components/cabinet/ProjectModelManager';
 import { CabinetConfigurationCard } from '@/components/cabinet/CabinetConfigurationCard';
@@ -59,20 +60,52 @@ export default function CabinetProjectDetails() {
       
       await Promise.all(modelIds.map(async (modelId) => {
         try {
-          const [model, frontHardware] = await Promise.all([
-            cabinetService.getModel(modelId),
-            cabinetService.getFrontHardwareForModel(modelId),
-          ]);
+          const model = await cabinetService.getModel(modelId);
           
           if (model?.parameters) {
             const params = typeof model.parameters === 'string' 
               ? JSON.parse(model.parameters) 
               : model.parameters;
             
+            // Extract front hardware from fronts and fetch product prices
+            const fronts = (params as any).fronts || [];
+            const frontHardwareItems: any[] = [];
+            const productIds: string[] = [];
+            
+            fronts.forEach((front: any) => {
+              if (front.hardware && Array.isArray(front.hardware)) {
+                front.hardware.forEach((hw: any) => {
+                  if (hw.product_id) {
+                    productIds.push(hw.product_id);
+                    frontHardwareItems.push({
+                      ...hw,
+                      front_id: front.id,
+                    });
+                  }
+                });
+              }
+            });
+            
+            let enrichedFrontHardware: any[] = [];
+            if (productIds.length > 0) {
+              const uniqueProductIds = [...new Set(productIds)];
+              const { data: products } = await supabase
+                .from('products')
+                .select('id, name, price_per_unit')
+                .in('id', uniqueProductIds);
+              
+              const productMap = new Map(products?.map(p => [p.id, p]) || []);
+              
+              enrichedFrontHardware = frontHardwareItems.map(hw => ({
+                ...hw,
+                products: productMap.get(hw.product_id) || null,
+              }));
+            }
+            
             // Include front hardware in parameters
             parametersMap[modelId] = {
               ...params as ModelParameters,
-              frontHardware,
+              frontHardware: enrichedFrontHardware,
             };
           }
         } catch (err) {

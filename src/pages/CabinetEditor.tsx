@@ -176,7 +176,7 @@ export default function CabinetEditor() {
     if (!modelId || !projectId) return;
     
     try {
-      const [modelData, materialsData, projectModelsData, legraboxData, frontHardwareData] = await Promise.all([
+      const [modelData, materialsData, projectModelsData, legraboxData] = await Promise.all([
         cabinetService.getModel(modelId),
         cabinetService.getAllMaterials(),
         supabase
@@ -188,23 +188,64 @@ export default function CabinetEditor() {
           .from('legrabox_configurations')
           .select('*')
           .eq('is_active', true),
-        cabinetService.getFrontHardwareForModel(modelId),
       ]);
       
       setModel(modelData);
       setMaterials(materialsData);
       setProjectModels(projectModelsData.data || []);
       setLegraboxConfigs(legraboxData.data || []);
-      setFrontHardware(frontHardwareData);
       
       // Load parametric elements from model
+      let loadedFronts: CabinetFront[] = [];
       if (modelData?.parameters && typeof modelData.parameters === 'object') {
         const params = modelData.parameters as any;
         if (params.panels) setPanels(params.panels);
-        if (params.fronts) setFronts(params.fronts);
+        if (params.fronts) {
+          loadedFronts = params.fronts;
+          setFronts(params.fronts);
+        }
         if (params.compartments) setCompartments(params.compartments);
         if (params.hardware) setModelHardware(params.hardware);
         if (params.laborConfig) setLaborConfig(params.laborConfig);
+      }
+      
+      // Extract front hardware from fronts and fetch product prices
+      const frontHardwareItems: any[] = [];
+      const productIds: string[] = [];
+      
+      loadedFronts.forEach((front: any) => {
+        if (front.hardware && Array.isArray(front.hardware)) {
+          front.hardware.forEach((hw: any) => {
+            if (hw.product_id) {
+              productIds.push(hw.product_id);
+              frontHardwareItems.push({
+                ...hw,
+                front_id: front.id,
+              });
+            }
+          });
+        }
+      });
+      
+      // Fetch product prices for front hardware
+      if (productIds.length > 0) {
+        const uniqueProductIds = [...new Set(productIds)];
+        const { data: products } = await supabase
+          .from('products')
+          .select('id, name, price_per_unit')
+          .in('id', uniqueProductIds);
+        
+        const productMap = new Map(products?.map(p => [p.id, p]) || []);
+        
+        // Attach product data to front hardware items
+        const enrichedFrontHardware = frontHardwareItems.map(hw => ({
+          ...hw,
+          products: productMap.get(hw.product_id) || null,
+        }));
+        
+        setFrontHardware(enrichedFrontHardware);
+      } else {
+        setFrontHardware([]);
       }
 
       // If editing existing configuration, load it
