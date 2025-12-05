@@ -204,9 +204,10 @@ export function calculateConfigurationPrice(
   // Front-level hardware
   (modelParameters.frontHardware || []).forEach((fh: any) => {
     const productData = fh.products;
-    if (productData && productData.price) {
+    const unitPrice = productData?.price_per_unit || productData?.price || 0;
+    if (productData && unitPrice > 0) {
       const qty = fh.quantity || 1;
-      hardwareCost += qty * productData.price;
+      hardwareCost += qty * unitPrice;
     }
   });
 

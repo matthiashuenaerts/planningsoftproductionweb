@@ -197,7 +197,7 @@ export const cabinetService = {
         products:product_id (
           id,
           name,
-          price
+          price_per_unit
         )
       `)
       .in('front_id', frontIds);

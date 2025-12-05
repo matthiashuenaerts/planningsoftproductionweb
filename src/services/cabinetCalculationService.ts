@@ -326,9 +326,9 @@ export class CabinetCalculationService {
     // Front-level hardware
     frontHardware.forEach((fh) => {
       const productData = fh.products;
-      if (productData && productData.price) {
+      const unitPrice = productData?.price_per_unit || productData?.price || 0;
+      if (productData && unitPrice > 0) {
         const qty = fh.quantity || 1;
-        const unitPrice = productData.price;
         const totalPrice = qty * unitPrice;
         total += totalPrice;
         items.push({
