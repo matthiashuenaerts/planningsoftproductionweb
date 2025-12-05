@@ -37,7 +37,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Plus, Edit, Trash2, X } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, Plus, Edit, Trash2, X, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -51,8 +52,22 @@ interface InstallationTeam {
   updated_at: string;
 }
 
+interface Employee {
+  id: string;
+  name: string;
+}
+
+interface TeamMember {
+  id: string;
+  team_id: string;
+  employee_id: string;
+  is_default: boolean;
+}
+
 const InstallationTeamsSettings: React.FC = () => {
   const [teams, setTeams] = useState<InstallationTeam[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [teamMembers, setTeamMembers] = useState<Record<string, TeamMember[]>>({});
   const [loading, setLoading] = useState(true);
   
   const [isAddOrEditOpen, setIsAddOrEditOpen] = useState(false);
@@ -67,6 +82,7 @@ const InstallationTeamsSettings: React.FC = () => {
     is_active: true
   });
   
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [newExternalName, setNewExternalName] = useState('');
   
   const { toast } = useToast();
@@ -81,6 +97,26 @@ const InstallationTeamsSettings: React.FC = () => {
       
       if (error) throw error;
       setTeams(data || []);
+      
+      // Load team members for all teams
+      if (data && data.length > 0) {
+        const { data: membersData, error: membersError } = await supabase
+          .from('placement_team_members')
+          .select('*')
+          .eq('is_default', true);
+        
+        if (membersError) throw membersError;
+        
+        // Group members by team_id
+        const membersByTeam: Record<string, TeamMember[]> = {};
+        (membersData || []).forEach((member: TeamMember) => {
+          if (!membersByTeam[member.team_id]) {
+            membersByTeam[member.team_id] = [];
+          }
+          membersByTeam[member.team_id].push(member);
+        });
+        setTeamMembers(membersByTeam);
+      }
     } catch (error: any) {
       console.error('Error loading installation teams:', error);
       toast({
@@ -93,8 +129,23 @@ const InstallationTeamsSettings: React.FC = () => {
     }
   };
 
+  const loadEmployees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('id, name')
+        .order('name');
+      
+      if (error) throw error;
+      setEmployees(data || []);
+    } catch (error: any) {
+      console.error('Error loading employees:', error);
+    }
+  };
+
   useEffect(() => {
     loadTeams();
+    loadEmployees();
   }, []);
 
   const handleOpenAddOrEditDialog = (team: InstallationTeam | null) => {
@@ -106,6 +157,9 @@ const InstallationTeamsSettings: React.FC = () => {
         external_team_names: team.external_team_names || [],
         is_active: team.is_active
       });
+      // Load existing team members
+      const existingMembers = teamMembers[team.id] || [];
+      setSelectedMemberIds(existingMembers.map(m => m.employee_id));
     } else {
       setEditingTeam(null);
       setTeamData({
@@ -114,9 +168,18 @@ const InstallationTeamsSettings: React.FC = () => {
         external_team_names: [],
         is_active: true
       });
+      setSelectedMemberIds([]);
     }
     setNewExternalName('');
     setIsAddOrEditOpen(true);
+  };
+
+  const handleToggleMember = (employeeId: string) => {
+    setSelectedMemberIds(prev => 
+      prev.includes(employeeId)
+        ? prev.filter(id => id !== employeeId)
+        : [...prev, employeeId]
+    );
   };
 
   const handleAddExternalName = () => {
@@ -148,6 +211,8 @@ const InstallationTeamsSettings: React.FC = () => {
         return;
       }
 
+      let teamId: string;
+
       if (editingTeam) {
         const { error } = await supabase
           .from('placement_teams')
@@ -155,14 +220,41 @@ const InstallationTeamsSettings: React.FC = () => {
           .eq('id', editingTeam.id);
         
         if (error) throw error;
+        teamId = editingTeam.id;
+        
+        // Delete existing default team members
+        await supabase
+          .from('placement_team_members')
+          .delete()
+          .eq('team_id', editingTeam.id)
+          .eq('is_default', true);
+          
         toast({ title: "Success", description: "Installation team updated successfully" });
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('placement_teams')
-          .insert([teamData]);
+          .insert([teamData])
+          .select()
+          .single();
         
         if (error) throw error;
+        teamId = data.id;
         toast({ title: "Success", description: "Installation team added successfully" });
+      }
+      
+      // Insert new default team members
+      if (selectedMemberIds.length > 0) {
+        const membersToInsert = selectedMemberIds.map(employeeId => ({
+          team_id: teamId,
+          employee_id: employeeId,
+          is_default: true
+        }));
+        
+        const { error: membersError } = await supabase
+          .from('placement_team_members')
+          .insert(membersToInsert);
+        
+        if (membersError) throw membersError;
       }
       
       setIsAddOrEditOpen(false);
@@ -298,6 +390,39 @@ const InstallationTeamsSettings: React.FC = () => {
                     </div>
                   )}
                 </div>
+                
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Default Team Members
+                  </Label>
+                  <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+                    {employees.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No employees found</p>
+                    ) : (
+                      employees.map((employee) => (
+                        <div key={employee.id} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`employee-${employee.id}`}
+                            checked={selectedMemberIds.includes(employee.id)}
+                            onCheckedChange={() => handleToggleMember(employee.id)}
+                          />
+                          <Label 
+                            htmlFor={`employee-${employee.id}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {employee.name}
+                          </Label>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {selectedMemberIds.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedMemberIds.length} member(s) selected
+                    </p>
+                  )}
+                </div>
               </div>
               
               <div className="flex justify-end space-x-2 mt-4">
@@ -321,6 +446,7 @@ const InstallationTeamsSettings: React.FC = () => {
                 <TableRow>
                   <TableHead>Team Name</TableHead>
                   <TableHead>Color</TableHead>
+                  <TableHead>Default Members</TableHead>
                   <TableHead>External Team Names</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
@@ -329,63 +455,83 @@ const InstallationTeamsSettings: React.FC = () => {
               <TableBody>
                 {teams.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       No installation teams found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  teams.map((team) => (
-                    <TableRow key={team.id}>
-                      <TableCell className="font-medium">{team.name}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-6 h-6 rounded border border-border" 
-                            style={{ backgroundColor: team.color }}
-                          />
-                          <span className="text-sm text-muted-foreground">{team.color}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {team.external_team_names && team.external_team_names.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {team.external_team_names.map((name) => (
-                              <Badge key={name} variant="outline" className="text-xs">
-                                {name}
-                              </Badge>
-                            ))}
+                  teams.map((team) => {
+                    const members = teamMembers[team.id] || [];
+                    const memberNames = members
+                      .map(m => employees.find(e => e.id === m.employee_id)?.name)
+                      .filter(Boolean);
+                    
+                    return (
+                      <TableRow key={team.id}>
+                        <TableCell className="font-medium">{team.name}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-6 h-6 rounded border border-border" 
+                              style={{ backgroundColor: team.color }}
+                            />
+                            <span className="text-sm text-muted-foreground">{team.color}</span>
                           </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">No mappings</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={team.is_active ? "default" : "secondary"}>
-                          {team.is_active ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline" 
-                            size="icon"
-                            onClick={() => handleOpenAddOrEditDialog(team)}
-                            title="Edit Team"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            onClick={() => handleDeleteClick(team)}
-                            title="Delete Team"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                        </TableCell>
+                        <TableCell>
+                          {memberNames.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {memberNames.map((name) => (
+                                <Badge key={name} variant="secondary" className="text-xs">
+                                  {name}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">No members</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {team.external_team_names && team.external_team_names.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {team.external_team_names.map((name) => (
+                                <Badge key={name} variant="outline" className="text-xs">
+                                  {name}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">No mappings</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={team.is_active ? "default" : "secondary"}>
+                            {team.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline" 
+                              size="icon"
+                              onClick={() => handleOpenAddOrEditDialog(team)}
+                              title="Edit Team"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              onClick={() => handleDeleteClick(team)}
+                              title="Delete Team"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
