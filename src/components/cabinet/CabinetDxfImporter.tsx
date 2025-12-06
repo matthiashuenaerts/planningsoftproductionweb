@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import DxfParser from 'dxf-parser';
 
@@ -31,7 +30,6 @@ interface CabinetDxfImporterProps {
 }
 
 export function CabinetDxfImporter({ open, onOpenChange, onImportComplete }: CabinetDxfImporterProps) {
-  const { t } = useLanguage();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -60,8 +58,8 @@ export function CabinetDxfImporter({ open, onOpenChange, onImportComplete }: Cab
     const extension = selectedFile.name.split('.').pop()?.toLowerCase();
     if (extension !== 'dxf' && extension !== 'dwg') {
       toast({
-        title: t('calc_error'),
-        description: t('calc_invalid_file_type'),
+        title: 'Fout',
+        description: 'Ongeldig bestandstype. Gebruik een .DXF bestand.',
         variant: 'destructive',
       });
       return;
@@ -69,8 +67,8 @@ export function CabinetDxfImporter({ open, onOpenChange, onImportComplete }: Cab
 
     if (extension === 'dwg') {
       toast({
-        title: t('calc_dwg_not_supported'),
-        description: t('calc_dwg_convert_to_dxf'),
+        title: 'DWG niet ondersteund',
+        description: 'Converteer uw DWG bestand naar DXF formaat voor import',
         variant: 'destructive',
       });
       return;
@@ -100,8 +98,8 @@ export function CabinetDxfImporter({ open, onOpenChange, onImportComplete }: Cab
       console.error('DXF parse error:', error);
       setParseError(error instanceof Error ? error.message : 'Unknown parse error');
       toast({
-        title: t('calc_parse_error'),
-        description: t('calc_dxf_parse_failed'),
+        title: 'Parsing Fout',
+        description: 'Kon het DXF bestand niet parsen. Controleer of het bestand geldig is.',
         variant: 'destructive',
       });
     }
@@ -293,8 +291,8 @@ export function CabinetDxfImporter({ open, onOpenChange, onImportComplete }: Cab
   const handleImport = async () => {
     if (!cabinetName.trim() || !category.trim()) {
       toast({
-        title: t('calc_error'),
-        description: t('calc_fill_required_fields'),
+        title: 'Fout',
+        description: 'Vul alle verplichte velden in',
         variant: 'destructive',
       });
       return;
@@ -353,8 +351,8 @@ export function CabinetDxfImporter({ open, onOpenChange, onImportComplete }: Cab
       // For now we store panels in the model's parameters JSON
 
       toast({
-        title: t('calc_success'),
-        description: t('calc_cabinet_imported'),
+        title: 'Succes',
+        description: 'Kast succesvol geïmporteerd',
       });
 
       onImportComplete();
@@ -363,8 +361,8 @@ export function CabinetDxfImporter({ open, onOpenChange, onImportComplete }: Cab
     } catch (error) {
       console.error('Import error:', error);
       toast({
-        title: t('calc_error'),
-        description: t('calc_import_failed'),
+        title: 'Fout',
+        description: 'Kon kast niet importeren',
         variant: 'destructive',
       });
     } finally {
@@ -390,9 +388,9 @@ export function CabinetDxfImporter({ open, onOpenChange, onImportComplete }: Cab
     }}>
       <DialogContent className="max-w-2xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>{t('calc_import_cabinet')}</DialogTitle>
+          <DialogTitle>Kast Importeren</DialogTitle>
           <DialogDescription>
-            {t('calc_import_cabinet_description')}
+            Importeer een kastmodel vanuit een DXF bestand. Het systeem zal proberen panelen en componenten te extraheren.
           </DialogDescription>
         </DialogHeader>
 
@@ -404,12 +402,12 @@ export function CabinetDxfImporter({ open, onOpenChange, onImportComplete }: Cab
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-lg font-medium">{t('calc_drop_dxf_file')}</p>
+                <p className="text-lg font-medium">Klik om een DXF bestand te selecteren</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {t('calc_supported_formats')}: .DXF
+                  Ondersteunde formaten: .DXF (3D)
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  {t('calc_dwg_note')}
+                  DWG bestanden moeten eerst naar DXF worden geconverteerd
                 </p>
               </div>
               <input
@@ -446,7 +444,7 @@ export function CabinetDxfImporter({ open, onOpenChange, onImportComplete }: Cab
                 <>
                   <div className="flex items-center gap-2 p-3 bg-green-500/10 text-green-600 rounded-lg">
                     <CheckCircle className="h-5 w-5" />
-                    <span>{t('calc_panels_detected').replace('{count}', String(parsedPanels.length))}</span>
+                    <span>{parsedPanels.length} panelen gedetecteerd</span>
                   </div>
 
                   <ScrollArea className="h-48 border rounded-lg">
@@ -471,7 +469,7 @@ export function CabinetDxfImporter({ open, onOpenChange, onImportComplete }: Cab
                   </ScrollArea>
 
                   <Button onClick={() => setStep('configure')} className="w-full">
-                    {t('calc_continue')}
+                    Doorgaan
                   </Button>
                 </>
               )}
@@ -481,20 +479,20 @@ export function CabinetDxfImporter({ open, onOpenChange, onImportComplete }: Cab
           {step === 'configure' && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="cabinet-name">{t('calc_cabinet_name')}</Label>
+                <Label htmlFor="cabinet-name">Kastnaam</Label>
                 <Input
                   id="cabinet-name"
                   value={cabinetName}
                   onChange={(e) => setCabinetName(e.target.value)}
-                  placeholder={t('calc_enter_cabinet_name')}
+                  placeholder="Voer een naam in voor de kast"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category">{t('calc_category')}</Label>
+                <Label htmlFor="category">Categorie</Label>
                 <Select value={category} onValueChange={setCategory}>
                   <SelectTrigger>
-                    <SelectValue placeholder={t('calc_select_category')} />
+                    <SelectValue placeholder="Selecteer een categorie" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((cat) => (
@@ -508,14 +506,14 @@ export function CabinetDxfImporter({ open, onOpenChange, onImportComplete }: Cab
 
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setStep('review')} className="flex-1">
-                  {t('common_back')}
+                  Terug
                 </Button>
                 <Button
                   onClick={handleImport}
                   disabled={importing}
                   className="flex-1"
                 >
-                  {importing ? t('calc_importing') : t('calc_import')}
+                  {importing ? 'Importeren...' : 'Importeren'}
                 </Button>
               </div>
             </div>

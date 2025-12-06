@@ -35,8 +35,8 @@ export default function CabinetLibrary() {
     } catch (error) {
       console.error('Error loading cabinet models:', error);
       toast({
-        title: t('calc_error'),
-        description: t('calc_failed_load_models'),
+        title: 'Fout',
+        description: 'Kastmodellen laden mislukt',
         variant: 'destructive',
       });
     } finally {
@@ -56,20 +56,20 @@ export default function CabinetLibrary() {
   if (loading) {
     return (
       <div className="container mx-auto p-6">
-        <p className="text-center text-muted-foreground">{t('calc_loading_cabinet_library')}</p>
+        <p className="text-center text-muted-foreground">Kast bibliotheek laden...</p>
       </div>
     );
   }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <Button
           variant="ghost"
           onClick={() => navigate(createLocalizedPath(`/calculation/project/${projectId}`))}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          {t('calc_back_to_project')}
+          Terug naar Project
         </Button>
 
         {isAdmin && (
@@ -79,22 +79,22 @@ export default function CabinetLibrary() {
               onClick={() => setImportDialogOpen(true)}
             >
               <Upload className="mr-2 h-4 w-4" />
-              {t('calc_import_dxf')}
+              Importeer DXF
             </Button>
             <Button
               onClick={() => navigate(createLocalizedPath('/calculation/model-builder/new'))}
             >
               <Plus className="mr-2 h-4 w-4" />
-              {t('calc_new_cabinet')}
+              Nieuwe Kast
             </Button>
           </div>
         )}
       </div>
 
       <div>
-        <h1 className="text-3xl font-bold">{t('calc_cabinet_library')}</h1>
+        <h1 className="text-3xl font-bold">Kast Bibliotheek</h1>
         <p className="text-muted-foreground mt-2">
-          {t('calc_select_model')}
+          Selecteer een kastmodel om te configureren
         </p>
       </div>
 
@@ -133,20 +133,20 @@ export default function CabinetLibrary() {
               )}
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('calc_default_size')}:</span>
+                  <span className="text-muted-foreground">Standaard Afmeting:</span>
                   <span>
                     {model.default_width} × {model.default_height} × {model.default_depth}
                   </span>
                 </div>
                 {model.min_width && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t('calc_min_width')}:</span>
+                    <span className="text-muted-foreground">Min. Breedte:</span>
                     <span>{model.min_width}</span>
                   </div>
                 )}
                 {model.max_width && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t('calc_max_width')}:</span>
+                    <span className="text-muted-foreground">Max. Breedte:</span>
                     <span>{model.max_width}</span>
                   </div>
                 )}
