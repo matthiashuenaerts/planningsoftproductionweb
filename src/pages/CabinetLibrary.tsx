@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Edit } from 'lucide-react';
+import { ArrowLeft, Edit, Plus, Upload } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cabinetService } from '@/services/cabinetService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
+import { CabinetDxfImporter } from '@/components/cabinet/CabinetDxfImporter';
 import type { Database } from '@/integrations/supabase/types';
 
 type CabinetModel = Database['public']['Tables']['cabinet_models']['Row'];
@@ -19,6 +20,7 @@ export default function CabinetLibrary() {
   const { t, createLocalizedPath } = useLanguage();
   const [models, setModels] = useState<CabinetModel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   
   const isAdmin = currentEmployee?.role === 'admin';
 
@@ -61,14 +63,33 @@ export default function CabinetLibrary() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <Button
-        variant="ghost"
-        onClick={() => navigate(createLocalizedPath(`/calculation/project/${projectId}`))}
-        className="mb-6"
-      >
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        {t('calc_back_to_project')}
-      </Button>
+      <div className="flex items-center justify-between">
+        <Button
+          variant="ghost"
+          onClick={() => navigate(createLocalizedPath(`/calculation/project/${projectId}`))}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          {t('calc_back_to_project')}
+        </Button>
+
+        {isAdmin && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setImportDialogOpen(true)}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              {t('calc_import_dxf')}
+            </Button>
+            <Button
+              onClick={() => navigate(createLocalizedPath('/calculation/model-builder/new'))}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              {t('calc_new_cabinet')}
+            </Button>
+          </div>
+        )}
+      </div>
 
       <div>
         <h1 className="text-3xl font-bold">{t('calc_cabinet_library')}</h1>
@@ -134,6 +155,12 @@ export default function CabinetLibrary() {
           </Card>
         ))}
       </div>
+
+      <CabinetDxfImporter
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImportComplete={loadModels}
+      />
     </div>
   );
 }
