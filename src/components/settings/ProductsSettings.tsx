@@ -26,6 +26,7 @@ const productSchema = z.object({
   barcode: z.string().optional(),
   qr_code: z.string().optional(),
   location: z.string().optional(),
+  price_per_unit: z.number().min(0, 'Price must be 0 or greater').optional(),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -42,6 +43,7 @@ interface Product {
   barcode: string | null;
   qr_code: string | null;
   location: string | null;
+  price_per_unit: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -71,6 +73,7 @@ const ProductsSettings: React.FC = () => {
       barcode: '',
       qr_code: '',
       location: '',
+      price_per_unit: 0,
     },
   });
 
@@ -157,6 +160,7 @@ const ProductsSettings: React.FC = () => {
         barcode: data.barcode || null,
         qr_code: data.qr_code || null,
         location: data.location || null,
+        price_per_unit: data.price_per_unit || null,
         image_path: imagePath,
       };
 
@@ -210,6 +214,7 @@ const ProductsSettings: React.FC = () => {
       barcode: product.barcode || '',
       qr_code: product.qr_code || '',
       location: product.location || '',
+      price_per_unit: product.price_per_unit || 0,
     });
     setIsDialogOpen(true);
   };
@@ -500,6 +505,27 @@ const ProductsSettings: React.FC = () => {
                     />
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="price_per_unit"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price per Unit (€)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              step="0.01"
+                              {...field} 
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <FormField
                     control={form.control}
                     name="website_link"
@@ -605,6 +631,7 @@ const ProductsSettings: React.FC = () => {
                <TableHead>Article Code</TableHead>
                <TableHead>Supplier</TableHead>
                <TableHead>Location</TableHead>
+               <TableHead>Price</TableHead>
                <TableHead>Order Qty</TableHead>
                <TableHead>Website</TableHead>
                <TableHead>Actions</TableHead>
@@ -634,6 +661,9 @@ const ProductsSettings: React.FC = () => {
                 </TableCell>
                  <TableCell>{product.supplier}</TableCell>
                  <TableCell>{product.location}</TableCell>
+                 <TableCell>
+                   {product.price_per_unit != null ? `€${product.price_per_unit.toFixed(2)}` : '-'}
+                 </TableCell>
                  <TableCell>{product.standard_order_quantity}</TableCell>
                 <TableCell>
                   {product.website_link && (
