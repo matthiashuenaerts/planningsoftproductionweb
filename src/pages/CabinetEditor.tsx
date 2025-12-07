@@ -1,15 +1,14 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Save, ChevronDown, ChevronUp, Ruler, Palette, Box, DoorOpen, Grid3X3 } from 'lucide-react';
+import { ArrowLeft, Save } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cabinetService } from '@/services/cabinetService';
 import { useToast } from '@/hooks/use-toast';
 import { Interactive3DCabinetVisualizer } from '@/components/cabinet/Interactive3DCabinetVisualizer';
@@ -23,7 +22,6 @@ import { CabinetCalculationService } from '@/services/cabinetCalculationService'
 import { v4 as uuidv4 } from 'uuid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
-import { cn } from '@/lib/utils';
 
 type CabinetModel = Database['public']['Tables']['cabinet_models']['Row'];
 type CabinetMaterial = Database['public']['Tables']['cabinet_materials']['Row'];
@@ -93,6 +91,7 @@ interface LaborLine {
 interface LaborConfig {
   hourly_rate: number;
   lines?: LaborLine[];
+  // Legacy fields for backwards compatibility
   base_minutes?: number;
   per_panel_minutes?: number;
   per_front_minutes?: number;
@@ -105,7 +104,7 @@ export default function CabinetEditor() {
   const configId = searchParams.get('configId');
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { createLocalizedPath, t } = useLanguage();
+  const { createLocalizedPath } = useLanguage();
   const [model, setModel] = useState<CabinetModel | null>(null);
   const [materials, setMaterials] = useState<CabinetMaterial[]>([]);
   const [projectModels, setProjectModels] = useState<ProjectModel[]>([]);
@@ -114,13 +113,8 @@ export default function CabinetEditor() {
   const [saving, setSaving] = useState(false);
   const [selectedCompartmentId, setSelectedCompartmentId] = useState<string | null>(null);
   const [costBreakdown, setCostBreakdown] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState('3d');
+  const [activeTab, setActiveTab] = useState('structure');
   const [selectedProjectModelId, setSelectedProjectModelId] = useState<string | null>(null);
-  
-  // Collapsible sections state
-  const [dimensionsOpen, setDimensionsOpen] = useState(true);
-  const [materialsOpen, setMaterialsOpen] = useState(false);
-  const [interiorOpen, setInteriorOpen] = useState(false);
   
   // Parametric elements from model
   const [panels, setPanels] = useState<ParametricPanel[]>([]);
@@ -146,6 +140,7 @@ export default function CabinetEditor() {
     compartments: [],
   });
 
+  // Store model parameters for price calculation
   const [modelHardware, setModelHardware] = useState<ModelHardware[]>([]);
   const [frontHardware, setFrontHardware] = useState<any[]>([]);
   const [laborConfig, setLaborConfig] = useState<LaborConfig>({
@@ -200,6 +195,7 @@ export default function CabinetEditor() {
       setProjectModels(projectModelsData.data || []);
       setLegraboxConfigs(legraboxData.data || []);
       
+      // Load parametric elements from model
       let loadedFronts: CabinetFront[] = [];
       if (modelData?.parameters && typeof modelData.parameters === 'object') {
         const params = modelData.parameters as any;
@@ -213,6 +209,7 @@ export default function CabinetEditor() {
         if (params.laborConfig) setLaborConfig(params.laborConfig);
       }
       
+      // Extract front hardware from fronts and fetch product prices
       const frontHardwareItems: any[] = [];
       const productIds: string[] = [];
       
@@ -230,6 +227,7 @@ export default function CabinetEditor() {
         }
       });
       
+      // Fetch product prices for front hardware
       if (productIds.length > 0) {
         const uniqueProductIds = [...new Set(productIds)];
         const { data: products } = await supabase
@@ -239,6 +237,7 @@ export default function CabinetEditor() {
         
         const productMap = new Map(products?.map(p => [p.id, p]) || []);
         
+        // Attach product data to front hardware items
         const enrichedFrontHardware = frontHardwareItems.map(hw => ({
           ...hw,
           products: productMap.get(hw.product_id) || null,
@@ -249,6 +248,7 @@ export default function CabinetEditor() {
         setFrontHardware([]);
       }
 
+      // If editing existing configuration, load it
       if (configId) {
         try {
           const existingConfig = await cabinetService.getConfiguration(configId);
@@ -275,6 +275,7 @@ export default function CabinetEditor() {
             if (params?.fronts) setFronts(params.fronts);
             if (params?.panels) setPanels(params.panels);
             if (params?.parametric_compartments) setCompartments(params.parametric_compartments);
+            // Load project model ID if saved
             if (existingConfig.project_model_id) {
               setSelectedProjectModelId(existingConfig.project_model_id);
             }
@@ -283,6 +284,7 @@ export default function CabinetEditor() {
           console.error('Error loading existing config:', err);
         }
       } else if (modelData) {
+        // Set default values from model for new configuration
         const initialCompartment: Compartment = {
           id: uuidv4(),
           x: 0,
@@ -292,6 +294,7 @@ export default function CabinetEditor() {
           modules: [],
         };
 
+        // Check for default project model
         const defaultModel = projectModelsData.data?.find((m: ProjectModel) => m.is_default);
         
         setConfig(prev => ({
@@ -350,7 +353,7 @@ export default function CabinetEditor() {
       finish: projectModel.finish,
     }));
     
-    toast({ title: `Instellingen "${projectModel.name}" toegepast` });
+    toast({ title: `Applied "${projectModel.name}" settings` });
   };
 
   const handleUpdateCompartment = (updatedCompartment: Compartment) => {
@@ -395,20 +398,22 @@ export default function CabinetEditor() {
       };
 
       if (configId) {
+        // Update existing configuration
         await cabinetService.updateConfiguration(configId, configData);
         toast({
-          title: 'Succes',
-          description: 'Kastconfiguratie bijgewerkt',
+          title: 'Success',
+          description: 'Cabinet configuration updated',
         });
       } else {
+        // Create new configuration
         await cabinetService.createConfiguration({
           project_id: projectId,
           model_id: modelId,
           ...configData,
         });
         toast({
-          title: 'Succes',
-          description: 'Kastconfiguratie opgeslagen',
+          title: 'Success',
+          description: 'Cabinet configuration saved',
         });
       }
       
@@ -416,8 +421,8 @@ export default function CabinetEditor() {
     } catch (error) {
       console.error('Error saving configuration:', error);
       toast({
-        title: 'Fout',
-        description: 'Kon configuratie niet opslaan',
+        title: 'Error',
+        description: 'Failed to save configuration',
         variant: 'destructive',
       });
     } finally {
@@ -425,517 +430,404 @@ export default function CabinetEditor() {
     }
   };
 
+  // Validate dimensions against model constraints
   const validateDimension = (value: number, min?: number | null, max?: number | null) => {
     if (min && value < min) return min;
     if (max && value > max) return max;
     return value;
   };
 
-  const getMaterialName = (materialId: string) => {
-    const material = materials.find(m => m.id === materialId);
-    return material?.name || 'Geen geselecteerd';
-  };
-
-  const getMaterialColor = (materialId: string) => {
-    const material = materials.find(m => m.id === materialId);
-    return material?.color || '#e5e7eb';
-  };
+  const { t } = useLanguage();
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground">Configurator laden...</p>
-        </div>
+      <div className="container mx-auto p-6">
+        <p className="text-center text-muted-foreground">{t('calc_loading_editor')}</p>
       </div>
     );
   }
 
   if (!model) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <p className="text-muted-foreground">Model niet gevonden</p>
+      <div className="container mx-auto p-6">
+        <p className="text-center text-muted-foreground">{t('calc_model_not_found')}</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(createLocalizedPath(`/calculation/project/${projectId}/library`))}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <Input
-                value={config.name}
-                onChange={(e) => setConfig({ ...config, name: e.target.value })}
-                className="text-lg font-semibold border-none bg-transparent h-auto p-0 focus-visible:ring-0"
-                placeholder="Kastnaam"
-              />
-              <p className="text-xs text-muted-foreground">{model.name}</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            {costBreakdown && (
-              <Badge variant="secondary" className="text-lg px-4 py-2">
-                €{costBreakdown.total_cost.toFixed(2)}
-              </Badge>
-            )}
-            <Button onClick={handleSave} disabled={saving}>
-              <Save className="mr-2 h-4 w-4" />
-              {saving ? 'Opslaan...' : 'Opslaan'}
-            </Button>
-          </div>
-        </div>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <Button
+          variant="ghost"
+          onClick={() => navigate(createLocalizedPath(`/calculation/project/${projectId}/library`))}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          {t('calc_back_to_library')}
+        </Button>
+        <Button onClick={handleSave} disabled={saving}>
+          <Save className="mr-2 h-4 w-4" />
+          {saving ? t('calc_saving') : t('calc_save_configuration')}
+        </Button>
       </div>
 
-      <div className="flex h-[calc(100vh-65px)]">
-        {/* Left Sidebar - Configuration */}
-        <div className="w-80 border-r bg-card overflow-y-auto">
-          <div className="p-4 space-y-3">
-            
-            {/* Quick Project Model Selection */}
-            {projectModels.length > 0 && (
-              <div className="p-3 bg-muted/50 rounded-lg">
-                <Label className="text-xs text-muted-foreground mb-2 block">Project Sjabloon</Label>
+      <div>
+        <h1 className="text-3xl font-bold">{t('calc_configure_cabinet')}</h1>
+        <p className="text-muted-foreground mt-2">
+          {model.name} - {model.category}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Properties & Project Model */}
+        <div className="space-y-6">
+          {/* Project Model Selection */}
+          {projectModels.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('calc_project_model')}</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <Select
                   value={selectedProjectModelId || 'none'}
                   onValueChange={(v) => v !== 'none' && handleProjectModelSelect(v)}
                 >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Selecteer sjabloon" />
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('calc_select_project_model')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Handmatig configureren</SelectItem>
+                    <SelectItem value="none">{t('calc_none_manual')}</SelectItem>
                     {projectModels.map(m => (
                       <SelectItem key={m.id} value={m.id}>
-                        {m.name} {m.is_default && '(Standaard)'}
+                        {m.name} {m.is_default && `(${t('calc_default')})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {t('calc_select_model_desc')}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Cabinet Structure */}
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('calc_cabinet_structure')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="name">{t('calc_cabinet_name')}</Label>
+                <Input
+                  id="name"
+                  value={config.name}
+                  onChange={(e) => setConfig({ ...config, name: e.target.value })}
+                  placeholder={t('calc_enter_cabinet_name')}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <Label htmlFor="width">{t('calc_width')}</Label>
+                  <Input
+                    id="width"
+                    type="number"
+                    value={config.width}
+                    onChange={(e) => setConfig({ ...config, width: Number(e.target.value) })}
+                    onBlur={(e) => setConfig({ 
+                      ...config, 
+                      width: validateDimension(Number(e.target.value), model.min_width, model.max_width)
+                    })}
+                    min={model.min_width || 0}
+                    max={model.max_width || undefined}
+                  />
+                  {model.min_width && model.max_width && (
+                    <span className="text-xs text-muted-foreground">{model.min_width}-{model.max_width}</span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="height">{t('calc_height')}</Label>
+                  <Input
+                    id="height"
+                    type="number"
+                    value={config.height}
+                    onChange={(e) => setConfig({ ...config, height: Number(e.target.value) })}
+                    onBlur={(e) => setConfig({ 
+                      ...config, 
+                      height: validateDimension(Number(e.target.value), model.min_height, model.max_height)
+                    })}
+                    min={model.min_height || 0}
+                    max={model.max_height || undefined}
+                  />
+                  {model.min_height && model.max_height && (
+                    <span className="text-xs text-muted-foreground">{model.min_height}-{model.max_height}</span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="depth">{t('calc_depth')}</Label>
+                  <Input
+                    id="depth"
+                    type="number"
+                    value={config.depth}
+                    onChange={(e) => setConfig({ ...config, depth: Number(e.target.value) })}
+                    onBlur={(e) => setConfig({ 
+                      ...config, 
+                      depth: validateDimension(Number(e.target.value), model.min_depth, model.max_depth)
+                    })}
+                    min={model.min_depth || 0}
+                    max={model.max_depth || undefined}
+                  />
+                  {model.min_depth && model.max_depth && (
+                    <span className="text-xs text-muted-foreground">{model.min_depth}-{model.max_depth}</span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="door_type">Door Type</Label>
+                <Select
+                  value={config.door_type}
+                  onValueChange={(value) => setConfig({ ...config, door_type: value })}
+                >
+                  <SelectTrigger id="door_type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hinged">Hinged</SelectItem>
+                    <SelectItem value="sliding">Sliding</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Materials */}
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('calc_materials')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="body_material">{t('calc_body_material')}</Label>
+                <Select
+                  value={config.material_config.body_material}
+                  onValueChange={(value) => {
+                    const selectedMaterial = materials.find(m => m.id === value);
+                    setConfig({
+                      ...config,
+                      material_config: { 
+                        ...config.material_config, 
+                        body_material: value,
+                        body_thickness: selectedMaterial?.thickness || 18,
+                      }
+                    });
+                  }}
+                >
+                <SelectTrigger id="body_material">
+                    <SelectValue placeholder={t('calc_select_body_material')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {materials.filter(m => m.category === 'panel').map((material) => (
+                      <SelectItem key={material.id} value={material.id}>
+                        {material.name} - {material.sku}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
 
-            {/* Dimensions Section */}
-            <Collapsible open={dimensionsOpen} onOpenChange={setDimensionsOpen}>
-              <CollapsibleTrigger asChild>
-                <button className="w-full flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Ruler className="h-4 w-4 text-primary" />
-                    <span className="font-medium">Afmetingen</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      {config.width} × {config.height} × {config.depth}
-                    </span>
-                    {dimensionsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                  </div>
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3 space-y-4">
-                {/* Width */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Breedte</Label>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        value={config.width}
-                        onChange={(e) => setConfig({ ...config, width: Number(e.target.value) })}
-                        onBlur={(e) => setConfig({ 
-                          ...config, 
-                          width: validateDimension(Number(e.target.value), model.min_width, model.max_width)
-                        })}
-                        className="w-20 h-8 text-right"
-                      />
-                      <span className="text-xs text-muted-foreground">mm</span>
-                    </div>
-                  </div>
-                  <Slider
-                    value={[config.width]}
-                    onValueChange={([v]) => setConfig({ ...config, width: v })}
-                    min={model.min_width || 300}
-                    max={model.max_width || 1200}
-                    step={10}
-                    className="py-2"
-                  />
-                </div>
+              <div>
+                <Label htmlFor="door_material">{t('calc_door_material')}</Label>
+                <Select
+                  value={config.material_config.door_material}
+                  onValueChange={(value) => setConfig({
+                    ...config,
+                    material_config: { ...config.material_config, door_material: value }
+                  })}
+                >
+                <SelectTrigger id="door_material">
+                    <SelectValue placeholder={t('calc_select_door_material')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {materials.filter(m => m.category === 'panel').map((material) => (
+                      <SelectItem key={material.id} value={material.id}>
+                        {material.name} - {material.sku}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                {/* Height */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Hoogte</Label>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        value={config.height}
-                        onChange={(e) => setConfig({ ...config, height: Number(e.target.value) })}
-                        onBlur={(e) => setConfig({ 
-                          ...config, 
-                          height: validateDimension(Number(e.target.value), model.min_height, model.max_height)
-                        })}
-                        className="w-20 h-8 text-right"
-                      />
-                      <span className="text-xs text-muted-foreground">mm</span>
-                    </div>
-                  </div>
-                  <Slider
-                    value={[config.height]}
-                    onValueChange={([v]) => setConfig({ ...config, height: v })}
-                    min={model.min_height || 500}
-                    max={model.max_height || 2600}
-                    step={10}
-                    className="py-2"
-                  />
-                </div>
+              <div>
+                <Label htmlFor="shelf_material">{t('calc_shelf_material')}</Label>
+                <Select
+                  value={config.material_config.shelf_material}
+                  onValueChange={(value) => setConfig({
+                    ...config,
+                    material_config: { ...config.material_config, shelf_material: value }
+                  })}
+                >
+                <SelectTrigger id="shelf_material">
+                    <SelectValue placeholder={t('calc_select_shelf_material')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {materials.filter(m => m.category === 'panel').map((material) => (
+                      <SelectItem key={material.id} value={material.id}>
+                        {material.name} - {material.sku}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                {/* Depth */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Diepte</Label>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        value={config.depth}
-                        onChange={(e) => setConfig({ ...config, depth: Number(e.target.value) })}
-                        onBlur={(e) => setConfig({ 
-                          ...config, 
-                          depth: validateDimension(Number(e.target.value), model.min_depth, model.max_depth)
-                        })}
-                        className="w-20 h-8 text-right"
-                      />
-                      <span className="text-xs text-muted-foreground">mm</span>
-                    </div>
-                  </div>
-                  <Slider
-                    value={[config.depth]}
-                    onValueChange={([v]) => setConfig({ ...config, depth: v })}
-                    min={model.min_depth || 300}
-                    max={model.max_depth || 700}
-                    step={10}
-                    className="py-2"
-                  />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Materials Section */}
-            <Collapsible open={materialsOpen} onOpenChange={setMaterialsOpen}>
-              <CollapsibleTrigger asChild>
-                <button className="w-full flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Palette className="h-4 w-4 text-primary" />
-                    <span className="font-medium">Materialen</span>
-                  </div>
-                  {materialsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3 space-y-4">
-                {/* Body Material */}
-                <div className="space-y-2">
-                  <Label className="text-sm">Korpus</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label htmlFor="edge_banding">{t('calc_edge_banding')}</Label>
                   <Select
-                    value={config.material_config.body_material}
-                    onValueChange={(value) => {
-                      const selectedMaterial = materials.find(m => m.id === value);
-                      setConfig({
-                        ...config,
-                        material_config: { 
-                          ...config.material_config, 
-                          body_material: value,
-                          body_thickness: selectedMaterial?.thickness || 18,
-                        }
-                      });
-                    }}
+                    value={config.edge_banding}
+                    onValueChange={(value) => setConfig({ ...config, edge_banding: value })}
                   >
-                    <SelectTrigger className="h-10">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-4 h-4 rounded border"
-                          style={{ backgroundColor: getMaterialColor(config.material_config.body_material) }}
-                        />
-                        <SelectValue placeholder="Selecteer materiaal" />
-                      </div>
+                    <SelectTrigger id="edge_banding">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {materials.filter(m => m.category === 'panel').map((material) => (
-                        <SelectItem key={material.id} value={material.id}>
-                          <div className="flex items-center gap-2">
-                            <div 
-                              className="w-4 h-4 rounded border"
-                              style={{ backgroundColor: material.color || '#e5e7eb' }}
-                            />
-                            {material.name}
-                          </div>
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="PVC">PVC</SelectItem>
+                      <SelectItem value="ABS">ABS</SelectItem>
+                      <SelectItem value="veneer">Veneer</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Door Material */}
-                <div className="space-y-2">
-                  <Label className="text-sm">Deuren</Label>
+                <div>
+                  <Label htmlFor="finish">{t('calc_finish')}</Label>
                   <Select
-                    value={config.material_config.door_material}
-                    onValueChange={(value) => setConfig({
-                      ...config,
-                      material_config: { ...config.material_config, door_material: value }
-                    })}
+                    value={config.finish}
+                    onValueChange={(value) => setConfig({ ...config, finish: value })}
                   >
-                    <SelectTrigger className="h-10">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-4 h-4 rounded border"
-                          style={{ backgroundColor: getMaterialColor(config.material_config.door_material) }}
-                        />
-                        <SelectValue placeholder="Selecteer materiaal" />
-                      </div>
+                    <SelectTrigger id="finish">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {materials.filter(m => m.category === 'panel').map((material) => (
-                        <SelectItem key={material.id} value={material.id}>
-                          <div className="flex items-center gap-2">
-                            <div 
-                              className="w-4 h-4 rounded border"
-                              style={{ backgroundColor: material.color || '#e5e7eb' }}
-                            />
-                            {material.name}
-                          </div>
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="matte">{t('calc_matte')}</SelectItem>
+                      <SelectItem value="glossy">{t('calc_gloss')}</SelectItem>
+                      <SelectItem value="textured">{t('calc_textured')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* Shelf Material */}
-                <div className="space-y-2">
-                  <Label className="text-sm">Legplanken</Label>
-                  <Select
-                    value={config.material_config.shelf_material}
-                    onValueChange={(value) => setConfig({
-                      ...config,
-                      material_config: { ...config.material_config, shelf_material: value }
-                    })}
-                  >
-                    <SelectTrigger className="h-10">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-4 h-4 rounded border"
-                          style={{ backgroundColor: getMaterialColor(config.material_config.shelf_material) }}
-                        />
-                        <SelectValue placeholder="Selecteer materiaal" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {materials.filter(m => m.category === 'panel').map((material) => (
-                        <SelectItem key={material.id} value={material.id}>
-                          <div className="flex items-center gap-2">
-                            <div 
-                              className="w-4 h-4 rounded border"
-                              style={{ backgroundColor: material.color || '#e5e7eb' }}
-                            />
-                            {material.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Edge & Finish */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-2">
-                    <Label className="text-sm">Kantafwerking</Label>
-                    <Select
-                      value={config.edge_banding}
-                      onValueChange={(value) => setConfig({ ...config, edge_banding: value })}
-                    >
-                      <SelectTrigger className="h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="PVC">PVC</SelectItem>
-                        <SelectItem value="ABS">ABS</SelectItem>
-                        <SelectItem value="veneer">Fineer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Afwerking</Label>
-                    <Select
-                      value={config.finish}
-                      onValueChange={(value) => setConfig({ ...config, finish: value })}
-                    >
-                      <SelectTrigger className="h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="matte">Mat</SelectItem>
-                        <SelectItem value="glossy">Glanzend</SelectItem>
-                        <SelectItem value="textured">Gestructureerd</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Door Type */}
-            <div className="p-3 bg-muted/50 rounded-lg space-y-2">
-              <div className="flex items-center gap-2">
-                <DoorOpen className="h-4 w-4 text-primary" />
-                <Label className="text-sm font-medium">Deurtype</Label>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { value: 'hinged', label: 'Scharnierend' },
-                  { value: 'sliding', label: 'Schuif' },
-                  { value: 'none', label: 'Geen' },
-                ].map(option => (
-                  <button
-                    key={option.value}
-                    onClick={() => setConfig({ ...config, door_type: option.value })}
-                    className={cn(
-                      "px-3 py-2 text-xs rounded-md border transition-colors",
-                      config.door_type === option.value 
-                        ? "bg-primary text-primary-foreground border-primary" 
-                        : "bg-background hover:bg-muted border-border"
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Interior Section */}
-            <Collapsible open={interiorOpen} onOpenChange={setInteriorOpen}>
-              <CollapsibleTrigger asChild>
-                <button className="w-full flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Grid3X3 className="h-4 w-4 text-primary" />
-                    <span className="font-medium">Interieur</span>
-                  </div>
-                  {interiorOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3">
-                <EnhancedCompartmentBuilder
-                  modelId={modelId}
-                  compartments={compartments}
-                  onCompartmentsChange={setCompartments}
-                />
-              </CollapsibleContent>
-            </Collapsible>
-
-            {/* Cost Summary */}
-            {costBreakdown && (
-              <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Materiaal</span>
-                  <span>€{costBreakdown.materials_cost.toFixed(2)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Beslag</span>
-                  <span>€{costBreakdown.hardware_cost.toFixed(2)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Arbeid ({costBreakdown.labor_minutes} min)</span>
-                  <span>€{costBreakdown.labor_cost.toFixed(2)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Overhead</span>
-                  <span>€{costBreakdown.overhead_cost.toFixed(2)}</span>
-                </div>
-                <div className="border-t pt-2 flex items-center justify-between font-bold">
-                  <span>Totaal</span>
-                  <span className="text-primary text-lg">€{costBreakdown.total_cost.toFixed(2)}</span>
-                </div>
-              </div>
-            )}
-          </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Main Content - 3D Preview */}
-        <div className="flex-1 flex flex-col">
-          {/* View Tabs */}
-          <div className="border-b bg-card px-4 py-2">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList>
-                <TabsTrigger value="3d" className="gap-2">
-                  <Box className="h-4 w-4" />
-                  3D Weergave
-                </TabsTrigger>
-                <TabsTrigger value="2d" className="gap-2">
-                  <Grid3X3 className="h-4 w-4" />
-                  2D Tekening
-                </TabsTrigger>
-                <TabsTrigger value="fronts" className="gap-2">
-                  <DoorOpen className="h-4 w-4" />
-                  Fronten
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
+        {/* Center: 3D Preview */}
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('calc_3d_preview')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Interactive3DCabinetVisualizer 
+                config={config}
+                materials={materials}
+                panels={panels}
+                fronts={fronts}
+                compartments={compartments}
+                legraboxConfigs={legraboxConfigs}
+              />
+            </CardContent>
+          </Card>
 
-          {/* View Content */}
-          <div className="flex-1 bg-muted/30">
-            {activeTab === '3d' && (
-              <div className="h-full">
-                <Interactive3DCabinetVisualizer 
-                  config={config}
-                  materials={materials}
-                  panels={panels}
-                  fronts={fronts}
-                  compartments={compartments}
-                  legraboxConfigs={legraboxConfigs}
-                />
-              </div>
-            )}
-            
-            {activeTab === '2d' && (
-              <div className="h-full p-4 overflow-auto">
-                <Enhanced2DVisualizer 
-                  config={config}
-                  panels={panels}
-                  fronts={fronts}
-                  compartments={compartments}
-                  selectedCompartmentId={selectedCompartmentId || undefined}
-                  onCompartmentSelect={setSelectedCompartmentId}
-                />
-                {selectedCompartment && (
-                  <div className="mt-4">
-                    <ModuleEditor
-                      compartment={selectedCompartment}
-                      materials={materials}
-                      onUpdateCompartment={handleUpdateCompartment}
-                    />
+          {/* Component Configuration Tabs */}
+          <Card className="mt-6">
+            <CardContent className="pt-6">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="structure">{t('calc_structure')}</TabsTrigger>
+                  <TabsTrigger value="fronts">{t('calc_fronts')}</TabsTrigger>
+                  <TabsTrigger value="compartments">{t('interior')}</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="structure" className="mt-4">
+                  <Enhanced2DVisualizer 
+                    config={config}
+                    panels={panels}
+                    fronts={fronts}
+                    compartments={compartments}
+                    selectedCompartmentId={selectedCompartmentId || undefined}
+                    onCompartmentSelect={setSelectedCompartmentId}
+                  />
+                  {selectedCompartment && (
+                    <div className="mt-4">
+                      <ModuleEditor
+                        compartment={selectedCompartment}
+                        materials={materials}
+                        onUpdateCompartment={handleUpdateCompartment}
+                      />
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="fronts" className="mt-4">
+                  <FrontBuilder
+                    modelId={modelId}
+                    fronts={fronts}
+                    onFrontsChange={setFronts}
+                  />
+                </TabsContent>
+
+                <TabsContent value="compartments" className="mt-4">
+                  <EnhancedCompartmentBuilder
+                    modelId={modelId}
+                    compartments={compartments}
+                    onCompartmentsChange={setCompartments}
+                  />
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+
+          {/* Cost Breakdown */}
+          {costBreakdown && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>{t('cost_breakdown')}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{t('materials_cost')}</span>
+                      <span className="font-medium">€{costBreakdown.materials_cost.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{t('hardware_cost')}</span>
+                      <span className="font-medium">€{costBreakdown.hardware_cost.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{t('labor')} ({costBreakdown.labor_minutes} min)</span>
+                      <span className="font-medium">€{costBreakdown.labor_cost.toFixed(2)}</span>
+                    </div>
                   </div>
-                )}
-              </div>
-            )}
-            
-            {activeTab === 'fronts' && (
-              <div className="h-full p-4 overflow-auto">
-                <FrontBuilder
-                  modelId={modelId}
-                  fronts={fronts}
-                  onFrontsChange={setFronts}
-                />
-              </div>
-            )}
-          </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="font-medium">€{costBreakdown.subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{t('calc_overhead')} ({costBreakdown.overhead_percentage}%)</span>
+                      <span className="font-medium">€{costBreakdown.overhead_cost.toFixed(2)}</span>
+                    </div>
+                    <div className="border-t pt-2 flex justify-between font-bold">
+                      <span>{t('total')}</span>
+                      <span className="text-primary">€{costBreakdown.total_cost.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
