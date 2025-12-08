@@ -22,6 +22,9 @@ interface CompartmentItem {
   has_drilling: boolean;
   drilling_pattern?: string;
   legrabox_id?: string;
+  legrabox_height_type?: 'M' | 'C' | 'F';
+  has_antislip_mat?: boolean;
+  has_tip_on?: boolean;
   material_type: string;
 }
 
@@ -47,6 +50,8 @@ interface LegraboxConfig {
   has_drawer_mat: boolean;
   nominal_length: number;
   price: number;
+  antislip_mat_cost: number;
+  tip_on_cost: number;
 }
 
 interface EnhancedCompartmentBuilderProps {
@@ -56,6 +61,7 @@ interface EnhancedCompartmentBuilderProps {
   defaultWidth?: number;
   defaultHeight?: number;
   defaultDepth?: number;
+  cabinetDepth?: number; // Net cabinet depth for auto-calculating drawer depth
 }
 
 export function EnhancedCompartmentBuilder({ 
@@ -65,6 +71,7 @@ export function EnhancedCompartmentBuilder({
   defaultWidth = 800,
   defaultHeight = 2000,
   defaultDepth = 600,
+  cabinetDepth = 600,
 }: EnhancedCompartmentBuilderProps) {
   const { toast } = useToast();
   const [selectedCompartmentId, setSelectedCompartmentId] = useState<string | null>(null);
@@ -440,6 +447,35 @@ export function EnhancedCompartmentBuilder({
 
                 {selectedItem.item_type === 'legrabox_drawer' ? (
                   <div className="space-y-4">
+                    {/* Height Type Selection */}
+                    <div>
+                      <Label>Drawer Height Type</Label>
+                      <Select
+                        value={selectedItem.legrabox_height_type || 'M'}
+                        onValueChange={(value: 'M' | 'C' | 'F') => {
+                          // Find matching legrabox config for this height type
+                          const netDepth = cabinetDepth - 18; // Subtract back panel thickness
+                          const matchingConfig = legraboxConfigs.find(
+                            c => c.height_type === value && c.nominal_length <= netDepth
+                          );
+                          updateItem(selectedCompartment.id, selectedItem.id, { 
+                            legrabox_height_type: value,
+                            legrabox_id: matchingConfig?.id || selectedItem.legrabox_id,
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="M">M - Low (66mm)</SelectItem>
+                          <SelectItem value="C">C - High (177mm)</SelectItem>
+                          <SelectItem value="F">F - Extra-High (243mm)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Legrabox Configuration - filtered by height type */}
                     <div>
                       <Label>Legrabox Configuration</Label>
                       <Select
@@ -452,13 +488,59 @@ export function EnhancedCompartmentBuilder({
                           <SelectValue placeholder="Select Legrabox..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {legraboxConfigs.map((config) => (
-                            <SelectItem key={config.id} value={config.id}>
-                              {config.name} ({config.height_type} - {config.height_mm}mm) - €{config.price}
-                            </SelectItem>
-                          ))}
+                          {legraboxConfigs
+                            .filter(config => !selectedItem.legrabox_height_type || config.height_type === selectedItem.legrabox_height_type)
+                            .map((config) => (
+                              <SelectItem key={config.id} value={config.id}>
+                                {config.name} ({config.height_type} - {config.height_mm}mm) - €{config.price}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Auto drawer depth: {Math.max(270, cabinetDepth - 50)}mm (based on cabinet depth)
+                      </p>
+                    </div>
+
+                    {/* Drawer Accessories */}
+                    <div className="p-4 border rounded-lg space-y-3">
+                      <h4 className="font-medium text-sm">Drawer Accessories</h4>
+                      
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-sm">Anti-slip Fiber Mat</Label>
+                          <p className="text-xs text-muted-foreground">
+                            {(() => {
+                              const config = legraboxConfigs.find(c => c.id === selectedItem.legrabox_id);
+                              return config ? `+€${(config.antislip_mat_cost || 0).toFixed(2)}` : '';
+                            })()}
+                          </p>
+                        </div>
+                        <Switch
+                          checked={selectedItem.has_antislip_mat || false}
+                          onCheckedChange={(checked) => 
+                            updateItem(selectedCompartment.id, selectedItem.id, { has_antislip_mat: checked })
+                          }
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-sm">TIP-ON (Touch to Open)</Label>
+                          <p className="text-xs text-muted-foreground">
+                            {(() => {
+                              const config = legraboxConfigs.find(c => c.id === selectedItem.legrabox_id);
+                              return config ? `+€${(config.tip_on_cost || 0).toFixed(2)}` : '';
+                            })()}
+                          </p>
+                        </div>
+                        <Switch
+                          checked={selectedItem.has_tip_on || false}
+                          onCheckedChange={(checked) => 
+                            updateItem(selectedCompartment.id, selectedItem.id, { has_tip_on: checked })
+                          }
+                        />
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
