@@ -758,6 +758,20 @@ export default function CabinetEditor() {
                     compartments={compartments}
                     selectedCompartmentId={selectedCompartmentId || undefined}
                     onCompartmentSelect={setSelectedCompartmentId}
+                    legraboxConfigs={legraboxConfigs}
+                    onItemUpdate={(compartmentId, itemId, updates) => {
+                      setCompartments(prev => prev.map(comp => {
+                        if (comp.id === compartmentId) {
+                          return {
+                            ...comp,
+                            items: comp.items.map((item: any) => 
+                              item.id === itemId ? { ...item, ...updates } : item
+                            )
+                          };
+                        }
+                        return comp;
+                      }));
+                    }}
                   />
                   {selectedCompartment && (
                     <div className="mt-4">
