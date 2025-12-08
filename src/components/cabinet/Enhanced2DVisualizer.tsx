@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react';
 import { ParametricPanel } from '@/types/cabinet';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { X } from 'lucide-react';
 
 interface CabinetFront {
   id: string;
@@ -25,6 +30,10 @@ interface CompartmentItem {
   position_x: string;
   thickness: string;
   quantity: number;
+  legrabox_id?: string;
+  legrabox_height_type?: string;
+  has_antislip_mat?: boolean;
+  has_tip_on?: boolean;
 }
 
 interface CompartmentData {
@@ -37,6 +46,16 @@ interface CompartmentData {
   height: string;
   depth: string;
   items: CompartmentItem[];
+}
+
+interface LegraboxConfig {
+  id: string;
+  name: string;
+  height_type: string;
+  height_mm: number;
+  price: number;
+  antislip_mat_cost?: number;
+  tip_on_cost?: number;
 }
 
 interface Enhanced2DVisualizerProps {
@@ -55,6 +74,14 @@ interface Enhanced2DVisualizerProps {
   compartments?: CompartmentData[];
   onCompartmentSelect?: (compartmentId: string) => void;
   selectedCompartmentId?: string;
+  legraboxConfigs?: LegraboxConfig[];
+  onItemUpdate?: (compartmentId: string, itemId: string, updates: Partial<CompartmentItem>) => void;
+}
+
+interface SelectedItem {
+  compartmentId: string;
+  item: CompartmentItem;
+  type: 'drawer' | 'shelf' | 'divider';
 }
 
 function evaluateExpression(expr: string | number, variables: Record<string, number>): number {
@@ -81,8 +108,11 @@ export function Enhanced2DVisualizer({
   compartments = [],
   onCompartmentSelect,
   selectedCompartmentId,
+  legraboxConfigs = [],
+  onItemUpdate,
 }: Enhanced2DVisualizerProps) {
   const [view, setView] = useState<'front' | 'side'>('front');
+  const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   
   const bodyThickness = config.material_config.body_thickness || 18;
   const doorThickness = config.material_config.door_thickness || 18;
@@ -105,6 +135,24 @@ export function Enhanced2DVisualizer({
   const scaledWidth = config.width * scale;
   const scaledHeight = config.height * scale;
   const scaledDepth = config.depth * scale;
+
+  const handleItemClick = (compartmentId: string, item: CompartmentItem, type: 'drawer' | 'shelf' | 'divider') => {
+    setSelectedItem({ compartmentId, item, type });
+  };
+
+  const handleItemPropertyChange = (property: 'has_antislip_mat' | 'has_tip_on', value: boolean) => {
+    if (!selectedItem || !onItemUpdate) return;
+    onItemUpdate(selectedItem.compartmentId, selectedItem.item.id, { [property]: value });
+    setSelectedItem(prev => prev ? {
+      ...prev,
+      item: { ...prev.item, [property]: value }
+    } : null);
+  };
+
+  const getLegraboxInfo = (legraboxId?: string) => {
+    if (!legraboxId) return null;
+    return legraboxConfigs.find(c => c.id === legraboxId);
+  };
 
   // Render front view with actual panels and fronts
   const renderFrontView = () => {
@@ -158,7 +206,7 @@ export function Enhanced2DVisualizer({
       }
     });
 
-    // Render compartment items (shelves, dividers)
+    // Render compartment items (shelves, dividers, drawers)
     compartments.forEach((comp) => {
       const compX = evaluateExpression(comp.position_x, variables);
       const compY = evaluateExpression(comp.position_y, variables);
@@ -182,8 +230,10 @@ export function Enhanced2DVisualizer({
         />
       );
 
-      // Render shelves and dividers
+      // Render shelves, dividers, and drawers
       (comp.items || []).forEach((item, idx) => {
+        const isItemSelected = selectedItem?.item.id === item.id;
+
         if (item.item_type === 'shelf' || item.item_type === 'horizontal_divider') {
           const posY = evaluateExpression(item.position_y, variables);
           const qty = item.quantity || 1;
@@ -191,45 +241,119 @@ export function Enhanced2DVisualizer({
           for (let i = 0; i < qty; i++) {
             const yOffset = qty > 1 ? (compH / (qty + 1)) * (i + 1) : posY;
             compartmentElements.push(
-              <line
+              <g
                 key={`shelf-${item.id}-${i}`}
-                x1={20 + compX * scale}
-                y1={20 + (config.height - compY - yOffset) * scale}
-                x2={20 + (compX + compW) * scale}
-                y2={20 + (config.height - compY - yOffset) * scale}
-                stroke="hsl(var(--primary))"
-                strokeWidth="2"
-              />
+                className="cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleItemClick(comp.id, item, 'shelf');
+                }}
+              >
+                <rect
+                  x={20 + compX * scale}
+                  y={20 + (config.height - compY - yOffset) * scale - 4}
+                  width={compW * scale}
+                  height={8}
+                  fill={isItemSelected ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.7)'}
+                  stroke={isItemSelected ? 'hsl(var(--foreground))' : 'hsl(var(--primary))'}
+                  strokeWidth={isItemSelected ? 2 : 1}
+                  rx="1"
+                />
+              </g>
             );
           }
         } else if (item.item_type === 'vertical_divider') {
           const posX = evaluateExpression(item.position_x, variables);
           compartmentElements.push(
-            <line
+            <g
               key={`divider-${item.id}`}
-              x1={20 + (compX + posX) * scale}
-              y1={20 + (config.height - compY - compH) * scale}
-              x2={20 + (compX + posX) * scale}
-              y2={20 + (config.height - compY) * scale}
-              stroke="hsl(var(--accent))"
-              strokeWidth="2"
-            />
+              className="cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleItemClick(comp.id, item, 'divider');
+              }}
+            >
+              <rect
+                x={20 + (compX + posX) * scale - 4}
+                y={20 + (config.height - compY - compH) * scale}
+                width={8}
+                height={compH * scale}
+                fill={isItemSelected ? 'hsl(var(--accent))' : 'hsl(var(--accent) / 0.7)'}
+                stroke={isItemSelected ? 'hsl(var(--foreground))' : 'hsl(var(--accent))'}
+                strokeWidth={isItemSelected ? 2 : 1}
+                rx="1"
+              />
+            </g>
           );
         } else if (item.item_type === 'legrabox_drawer') {
           const posY = evaluateExpression(item.position_y, variables);
-          compartmentElements.push(
-            <rect
-              key={`drawer-${item.id}`}
-              x={20 + (compX + 2) * scale}
-              y={20 + (config.height - compY - posY - 100) * scale}
-              width={(compW - 4) * scale}
-              height={80 * scale}
-              fill="hsl(var(--muted))"
-              stroke="hsl(var(--primary))"
-              strokeWidth="2"
-              rx="2"
-            />
-          );
+          const legrabox = getLegraboxInfo(item.legrabox_id);
+          const drawerHeight = legrabox?.height_mm || 100;
+          const qty = item.quantity || 1;
+
+          for (let i = 0; i < qty; i++) {
+            const yOffset = qty > 1 ? posY + (drawerHeight + 10) * i : posY;
+            compartmentElements.push(
+              <g
+                key={`drawer-${item.id}-${i}`}
+                className="cursor-pointer transition-all"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleItemClick(comp.id, item, 'drawer');
+                }}
+              >
+                {/* Drawer body */}
+                <rect
+                  x={20 + (compX + 4) * scale}
+                  y={20 + (config.height - compY - yOffset - drawerHeight) * scale}
+                  width={(compW - 8) * scale}
+                  height={drawerHeight * scale}
+                  fill={isItemSelected ? 'hsl(var(--primary) / 0.3)' : 'hsl(var(--muted))'}
+                  stroke={isItemSelected ? 'hsl(var(--primary))' : 'hsl(var(--border))'}
+                  strokeWidth={isItemSelected ? 3 : 2}
+                  rx="3"
+                />
+                {/* Drawer front */}
+                <rect
+                  x={20 + (compX + 2) * scale}
+                  y={20 + (config.height - compY - yOffset - drawerHeight) * scale}
+                  width={(compW - 4) * scale}
+                  height={drawerHeight * scale}
+                  fill={isItemSelected ? 'hsl(var(--background))' : 'hsl(var(--card))'}
+                  stroke={isItemSelected ? 'hsl(var(--primary))' : 'hsl(var(--foreground))'}
+                  strokeWidth={isItemSelected ? 3 : 2}
+                  rx="2"
+                />
+                {/* Handle */}
+                <line
+                  x1={20 + (compX + compW * 0.35) * scale}
+                  y1={20 + (config.height - compY - yOffset - drawerHeight / 2) * scale}
+                  x2={20 + (compX + compW * 0.65) * scale}
+                  y2={20 + (config.height - compY - yOffset - drawerHeight / 2) * scale}
+                  stroke={isItemSelected ? 'hsl(var(--primary))' : 'hsl(var(--foreground))'}
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                />
+                {/* Accessory indicators */}
+                {item.has_antislip_mat && (
+                  <circle
+                    cx={20 + (compX + 12) * scale}
+                    cy={20 + (config.height - compY - yOffset - drawerHeight + 12) * scale}
+                    r="5"
+                    fill="hsl(var(--chart-1))"
+                  />
+                )}
+                {item.has_tip_on && (
+                  <circle
+                    cx={20 + (compX + compW - 12) * scale}
+                    cy={20 + (config.height - compY - yOffset - drawerHeight + 12) * scale}
+                    r="5"
+                    fill="hsl(var(--chart-2))"
+                  />
+                )}
+              </g>
+            );
+          }
         }
       });
     });
@@ -398,13 +522,15 @@ export function Enhanced2DVisualizer({
       />
     );
 
-    // Render compartment shelves in side view
+    // Render compartment items in side view
     compartments.forEach((comp) => {
       const compY = evaluateExpression(comp.position_y, variables);
       const compH = evaluateExpression(comp.height, variables);
       const compD = evaluateExpression(comp.depth, variables);
 
       (comp.items || []).forEach((item) => {
+        const isItemSelected = selectedItem?.item.id === item.id;
+
         if (item.item_type === 'shelf' || item.item_type === 'horizontal_divider') {
           const posY = evaluateExpression(item.position_y, variables);
           const qty = item.quantity || 1;
@@ -412,24 +538,75 @@ export function Enhanced2DVisualizer({
           for (let i = 0; i < qty; i++) {
             const yOffset = qty > 1 ? (compH / (qty + 1)) * (i + 1) : posY;
             elements.push(
-              <rect
+              <g
                 key={`shelf-side-${item.id}-${i}`}
-                x={20 + bodyThickness * scale}
-                y={20 + (config.height - compY - yOffset) * scale - shelfThickness * scale / 2}
-                width={(compD - bodyThickness * 2) * scale}
-                height={shelfThickness * scale}
-                fill="hsl(var(--primary) / 0.5)"
-                stroke="hsl(var(--primary))"
-                strokeWidth="1"
-              />
+                className="cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleItemClick(comp.id, item, 'shelf');
+                }}
+              >
+                <rect
+                  x={20 + bodyThickness * scale}
+                  y={20 + (config.height - compY - yOffset) * scale - shelfThickness * scale / 2}
+                  width={(compD - bodyThickness * 2) * scale}
+                  height={shelfThickness * scale}
+                  fill={isItemSelected ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.5)'}
+                  stroke={isItemSelected ? 'hsl(var(--foreground))' : 'hsl(var(--primary))'}
+                  strokeWidth={isItemSelected ? 2 : 1}
+                />
+              </g>
+            );
+          }
+        } else if (item.item_type === 'legrabox_drawer') {
+          const posY = evaluateExpression(item.position_y, variables);
+          const legrabox = getLegraboxInfo(item.legrabox_id);
+          const drawerHeight = legrabox?.height_mm || 100;
+          const drawerDepth = Math.max(270, config.depth - 50); // Auto-calculated depth
+          const qty = item.quantity || 1;
+
+          for (let i = 0; i < qty; i++) {
+            const yOffset = qty > 1 ? posY + (drawerHeight + 10) * i : posY;
+            elements.push(
+              <g
+                key={`drawer-side-${item.id}-${i}`}
+                className="cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleItemClick(comp.id, item, 'drawer');
+                }}
+              >
+                {/* Drawer side rail */}
+                <rect
+                  x={20 + bodyThickness * scale}
+                  y={20 + (config.height - compY - yOffset - drawerHeight) * scale}
+                  width={drawerDepth * scale}
+                  height={drawerHeight * scale}
+                  fill={isItemSelected ? 'hsl(var(--primary) / 0.2)' : 'hsl(var(--muted) / 0.5)'}
+                  stroke={isItemSelected ? 'hsl(var(--primary))' : 'hsl(var(--border))'}
+                  strokeWidth={isItemSelected ? 2 : 1}
+                  rx="2"
+                />
+                {/* Drawer front (side view) */}
+                <rect
+                  x="16"
+                  y={20 + (config.height - compY - yOffset - drawerHeight) * scale}
+                  width={doorThickness * scale}
+                  height={drawerHeight * scale}
+                  fill={isItemSelected ? 'hsl(var(--background))' : 'hsl(var(--card))'}
+                  stroke={isItemSelected ? 'hsl(var(--primary))' : 'hsl(var(--foreground))'}
+                  strokeWidth={isItemSelected ? 2 : 1}
+                />
+              </g>
             );
           }
         }
       });
     });
 
-    // Door front (if visible)
-    if (fronts.some(f => f.visible)) {
+    // Door front (if visible doors exist)
+    const hasDoors = fronts.some(f => f.visible && f.front_type === 'hinged_door');
+    if (hasDoors) {
       elements.push(
         <rect
           key="door-front"
@@ -488,15 +665,178 @@ export function Enhanced2DVisualizer({
         </Button>
       </div>
 
-      <div className="border rounded-lg p-4 bg-muted/20 overflow-auto">
-        <svg
-          width={viewWidth}
-          height={viewHeight}
-          viewBox={`0 0 ${viewWidth} ${viewHeight}`}
-          className="mx-auto"
-        >
-          {view === 'front' ? renderFrontView() : renderSideView()}
-        </svg>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* SVG Drawing */}
+        <div className="lg:col-span-2 border rounded-lg p-4 bg-muted/20 overflow-auto">
+          <svg
+            width={viewWidth}
+            height={viewHeight}
+            viewBox={`0 0 ${viewWidth} ${viewHeight}`}
+            className="mx-auto"
+          >
+            {view === 'front' ? renderFrontView() : renderSideView()}
+          </svg>
+          
+          {/* Legend */}
+          <div className="flex gap-4 mt-4 text-xs text-muted-foreground justify-center">
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-[hsl(var(--chart-1))]" />
+              <span>Anti-slip Mat</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full bg-[hsl(var(--chart-2))]" />
+              <span>TIP-ON</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Selected Item Panel */}
+        <div className="lg:col-span-1">
+          {selectedItem ? (
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base capitalize">
+                    {selectedItem.type === 'drawer' ? 'Drawer' : 
+                     selectedItem.type === 'shelf' ? 'Shelf' : 'Divider'} Properties
+                  </CardTitle>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6"
+                    onClick={() => setSelectedItem(null)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {selectedItem.type === 'drawer' && (
+                  <>
+                    {/* Drawer Info */}
+                    {(() => {
+                      const legrabox = getLegraboxInfo(selectedItem.item.legrabox_id);
+                      return (
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Configuration</span>
+                            <span className="font-medium">{legrabox?.name || 'Not set'}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Height Type</span>
+                            <Badge variant="secondary">
+                              {selectedItem.item.legrabox_height_type || legrabox?.height_type || '-'}
+                            </Badge>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Height</span>
+                            <span>{legrabox?.height_mm || '-'} mm</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Auto Depth</span>
+                            <span>{Math.max(270, config.depth - 50)} mm</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Base Price</span>
+                            <span className="font-medium">€{legrabox?.price?.toFixed(2) || '0.00'}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <div className="border-t pt-4 space-y-4">
+                      <h4 className="font-medium text-sm">Accessories</h4>
+                      
+                      {/* Anti-slip Mat Toggle */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-sm">Anti-slip Fiber Mat</Label>
+                          <p className="text-xs text-muted-foreground">
+                            +€{(getLegraboxInfo(selectedItem.item.legrabox_id)?.antislip_mat_cost || 0).toFixed(2)}
+                          </p>
+                        </div>
+                        <Switch
+                          checked={selectedItem.item.has_antislip_mat || false}
+                          onCheckedChange={(checked) => handleItemPropertyChange('has_antislip_mat', checked)}
+                          disabled={!onItemUpdate}
+                        />
+                      </div>
+
+                      {/* TIP-ON Toggle */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-sm">TIP-ON (Touch to Open)</Label>
+                          <p className="text-xs text-muted-foreground">
+                            +€{(getLegraboxInfo(selectedItem.item.legrabox_id)?.tip_on_cost || 0).toFixed(2)}
+                          </p>
+                        </div>
+                        <Switch
+                          checked={selectedItem.item.has_tip_on || false}
+                          onCheckedChange={(checked) => handleItemPropertyChange('has_tip_on', checked)}
+                          disabled={!onItemUpdate}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Total Cost */}
+                    {(() => {
+                      const legrabox = getLegraboxInfo(selectedItem.item.legrabox_id);
+                      const basePrice = legrabox?.price || 0;
+                      const matCost = selectedItem.item.has_antislip_mat ? (legrabox?.antislip_mat_cost || 0) : 0;
+                      const tipOnCost = selectedItem.item.has_tip_on ? (legrabox?.tip_on_cost || 0) : 0;
+                      const total = basePrice + matCost + tipOnCost;
+                      
+                      return (
+                        <div className="border-t pt-4">
+                          <div className="flex justify-between font-medium">
+                            <span>Total (per drawer)</span>
+                            <span className="text-primary">€{total.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
+
+                {selectedItem.type === 'shelf' && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Type</span>
+                      <span className="capitalize">{selectedItem.item.item_type.replace(/_/g, ' ')}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Quantity</span>
+                      <span>{selectedItem.item.quantity || 1}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Position Y</span>
+                      <span>{selectedItem.item.position_y}</span>
+                    </div>
+                  </div>
+                )}
+
+                {selectedItem.type === 'divider' && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Type</span>
+                      <span>Vertical Divider</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Position X</span>
+                      <span>{selectedItem.item.position_x}</span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground text-sm">
+                Click on a drawer, shelf, or divider in the drawing to view and edit its properties
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );
