@@ -167,10 +167,11 @@ export default function CabinetEditor() {
         hardware: modelHardware,
         frontHardware,
         laborConfig,
+        legraboxConfigs,
       });
       setCostBreakdown(costs);
     }
-  }, [config, materials, panels, fronts, compartments, modelHardware, frontHardware, laborConfig]);
+  }, [config, materials, panels, fronts, compartments, modelHardware, frontHardware, laborConfig, legraboxConfigs]);
 
   const loadData = async () => {
     if (!modelId || !projectId) return;
@@ -782,7 +783,56 @@ export default function CabinetEditor() {
                     modelId={modelId}
                     compartments={compartments}
                     onCompartmentsChange={setCompartments}
+                    cabinetDepth={config.depth}
                   />
+                  
+                  {/* Drawer Summary with Accessories */}
+                  {(() => {
+                    const drawers = compartments.flatMap(c => 
+                      c.items.filter((i: any) => i.item_type === 'legrabox_drawer')
+                    );
+                    if (drawers.length === 0) return null;
+                    
+                    return (
+                      <Card className="mt-4">
+                        <CardHeader>
+                          <CardTitle className="text-base">Drawer Accessories Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            {drawers.map((drawer: any, index: number) => {
+                              const legrabox = legraboxConfigs.find((c: any) => c.id === drawer.legrabox_id);
+                              const matCost = drawer.has_antislip_mat && legrabox ? (legrabox.antislip_mat_cost || 0) : 0;
+                              const tipOnCost = drawer.has_tip_on && legrabox ? (legrabox.tip_on_cost || 0) : 0;
+                              
+                              return (
+                                <div key={drawer.id} className="flex items-center justify-between p-2 border rounded">
+                                  <div className="flex items-center gap-4">
+                                    <span className="font-medium">Drawer {index + 1}</span>
+                                    <span className="text-sm text-muted-foreground">
+                                      {legrabox?.name || 'Not configured'} 
+                                      {drawer.legrabox_height_type && ` (${drawer.legrabox_height_type})`}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-4 text-sm">
+                                    {drawer.has_antislip_mat && (
+                                      <Badge variant="secondary">Mat +€{matCost.toFixed(2)}</Badge>
+                                    )}
+                                    {drawer.has_tip_on && (
+                                      <Badge variant="secondary">TIP-ON +€{tipOnCost.toFixed(2)}</Badge>
+                                    )}
+                                    <span className="font-medium">
+                                      €{((legrabox?.price || 0) + matCost + tipOnCost).toFixed(2)}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })()}
                 </TabsContent>
               </Tabs>
             </CardContent>

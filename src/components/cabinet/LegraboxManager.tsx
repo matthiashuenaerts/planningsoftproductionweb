@@ -27,6 +27,8 @@ interface LegraboxConfig {
   supplier: string | null;
   notes: string | null;
   is_active: boolean;
+  antislip_mat_cost: number;
+  tip_on_cost: number;
 }
 
 const heightTypes = {
@@ -61,6 +63,8 @@ export function LegraboxManager() {
     supplier: 'Blum',
     notes: '',
     is_active: true,
+    antislip_mat_cost: 0,
+    tip_on_cost: 0,
   };
 
   const [formData, setFormData] = useState<Partial<LegraboxConfig>>(emptyConfig);
@@ -290,12 +294,26 @@ export function LegraboxManager() {
                       />
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={formData.has_drawer_mat}
-                        onCheckedChange={(checked) => setFormData({ ...formData, has_drawer_mat: checked })}
+                    <div>
+                      <Label>Antislip Mat Cost (€)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={formData.antislip_mat_cost || 0}
+                        onChange={(e) => setFormData({ ...formData, antislip_mat_cost: parseFloat(e.target.value) || 0 })}
+                        placeholder="Additional cost when mat selected"
                       />
-                      <Label>Include Drawer Mat</Label>
+                    </div>
+
+                    <div>
+                      <Label>TIP-ON Cost (€)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={formData.tip_on_cost || 0}
+                        onChange={(e) => setFormData({ ...formData, tip_on_cost: parseFloat(e.target.value) || 0 })}
+                        placeholder="Additional cost when TIP-ON selected"
+                      />
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -336,6 +354,8 @@ export function LegraboxManager() {
                   <TableHead>Length</TableHead>
                   <TableHead>Side Colour</TableHead>
                   <TableHead>Price</TableHead>
+                  <TableHead>Mat Cost</TableHead>
+                  <TableHead>TIP-ON</TableHead>
                   <TableHead>Active</TableHead>
                   <TableHead className="w-24">Actions</TableHead>
                 </TableRow>
@@ -348,6 +368,8 @@ export function LegraboxManager() {
                     <TableCell>{config.nominal_length}mm</TableCell>
                     <TableCell>{config.side_colour}</TableCell>
                     <TableCell>€{config.price.toFixed(2)}</TableCell>
+                    <TableCell>€{(config.antislip_mat_cost || 0).toFixed(2)}</TableCell>
+                    <TableCell>€{(config.tip_on_cost || 0).toFixed(2)}</TableCell>
                     <TableCell>{config.is_active ? '✓' : '—'}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">

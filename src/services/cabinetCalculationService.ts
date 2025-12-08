@@ -48,7 +48,33 @@ interface CompartmentData {
   width: string;
   height: string;
   depth: string;
-  items: any[];
+  items: CompartmentItem[];
+}
+
+interface CompartmentItem {
+  id: string;
+  item_type: string;
+  legrabox_id?: string;
+  legrabox_height_type?: string;
+  has_antislip_mat?: boolean;
+  has_tip_on?: boolean;
+  quantity?: number;
+  position_x?: string;
+  position_y?: string;
+  thickness?: string;
+  has_drilling?: boolean;
+  drilling_pattern?: string;
+  material_type?: string;
+}
+
+interface LegraboxConfig {
+  id: string;
+  name: string;
+  height_type: string;
+  height_mm: number;
+  price: number;
+  antislip_mat_cost: number;
+  tip_on_cost: number;
 }
 
 interface ModelParameters {
@@ -59,6 +85,7 @@ interface ModelParameters {
   hardware?: ModelHardware[];
   laborConfig?: LaborConfig;
   frontHardware?: any[];
+  legraboxConfigs?: LegraboxConfig[];
 }
 
 interface PanelCut {
@@ -177,11 +204,13 @@ export class CabinetCalculationService {
       shelfMaterial
     );
 
-    // Calculate hardware costs (model hardware + front hardware)
+    // Calculate hardware costs (model hardware + front hardware + drawer accessories)
     const hardwareResult = this.calculateHardwareCostsFromModel(
       modelParameters?.hardware || [],
       modelParameters?.frontHardware || [],
-      variables
+      variables,
+      modelParameters?.parametric_compartments || modelParameters?.compartments || [],
+      modelParameters?.legraboxConfigs || []
     );
 
     // Calculate labor with full variable context
@@ -305,7 +334,9 @@ export class CabinetCalculationService {
   private calculateHardwareCostsFromModel(
     hardware: ModelHardware[],
     frontHardware: any[],
-    variables: Record<string, number>
+    variables: Record<string, number>,
+    compartments: CompartmentData[] = [],
+    legraboxConfigs: LegraboxConfig[] = []
   ): { total: number; items: Array<{ name: string; quantity: number; unit_price: number; total_price: number }> } {
     const items: Array<{ name: string; quantity: number; unit_price: number; total_price: number }> = [];
     let total = 0;
@@ -338,6 +369,52 @@ export class CabinetCalculationService {
           total_price: totalPrice,
         });
       }
+    });
+
+    // Drawer accessories (Legrabox + mat + TIP-ON)
+    compartments.forEach((comp) => {
+      (comp.items || []).forEach((item) => {
+        if (item.item_type === 'legrabox_drawer' && item.legrabox_id) {
+          const legrabox = legraboxConfigs.find(c => c.id === item.legrabox_id);
+          if (legrabox) {
+            const qty = item.quantity || 1;
+            
+            // Base drawer cost
+            const drawerTotal = legrabox.price * qty;
+            total += drawerTotal;
+            items.push({
+              name: `Legrabox ${legrabox.height_type} - ${legrabox.name}`,
+              quantity: qty,
+              unit_price: legrabox.price,
+              total_price: drawerTotal,
+            });
+
+            // Anti-slip mat
+            if (item.has_antislip_mat && legrabox.antislip_mat_cost > 0) {
+              const matTotal = legrabox.antislip_mat_cost * qty;
+              total += matTotal;
+              items.push({
+                name: 'Anti-slip Fiber Mat',
+                quantity: qty,
+                unit_price: legrabox.antislip_mat_cost,
+                total_price: matTotal,
+              });
+            }
+
+            // TIP-ON
+            if (item.has_tip_on && legrabox.tip_on_cost > 0) {
+              const tipOnTotal = legrabox.tip_on_cost * qty;
+              total += tipOnTotal;
+              items.push({
+                name: 'TIP-ON Mechanical Opener',
+                quantity: qty,
+                unit_price: legrabox.tip_on_cost,
+                total_price: tipOnTotal,
+              });
+            }
+          }
+        }
+      });
     });
 
     return { total, items };

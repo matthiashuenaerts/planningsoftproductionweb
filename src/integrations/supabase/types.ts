@@ -1338,6 +1338,7 @@ export type Database = {
       }
       legrabox_configurations: {
         Row: {
+          antislip_mat_cost: number | null
           bottom_colour: string | null
           created_at: string
           has_drawer_mat: boolean | null
@@ -1353,9 +1354,11 @@ export type Database = {
           side_colour: string
           sku: string | null
           supplier: string | null
+          tip_on_cost: number | null
           updated_at: string
         }
         Insert: {
+          antislip_mat_cost?: number | null
           bottom_colour?: string | null
           created_at?: string
           has_drawer_mat?: boolean | null
@@ -1371,9 +1374,11 @@ export type Database = {
           side_colour?: string
           sku?: string | null
           supplier?: string | null
+          tip_on_cost?: number | null
           updated_at?: string
         }
         Update: {
+          antislip_mat_cost?: number | null
           bottom_colour?: string | null
           created_at?: string
           has_drawer_mat?: boolean | null
@@ -1389,6 +1394,7 @@ export type Database = {
           side_colour?: string
           sku?: string | null
           supplier?: string | null
+          tip_on_cost?: number | null
           updated_at?: string
         }
         Relationships: []
