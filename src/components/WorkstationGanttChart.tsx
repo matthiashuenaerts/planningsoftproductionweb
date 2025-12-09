@@ -89,6 +89,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
   const [generatingPlanning, setGeneratingPlanning] = useState(false);
+  const [scheduleGenerated, setScheduleGenerated] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const rowHeight = 60;
@@ -642,6 +643,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       setDailyAssignments(newAssignments);
       
       toast.success(`Planning gegenereerd: ${scheduledTasks.size} taken toegewezen voor ${daysToSchedule} dagen. Bekijk de Gantt chart voor details.`);
+      setScheduleGenerated(true);
       
     } catch (error) {
       console.error('Generate planning error:', error);
@@ -1018,16 +1020,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     // Map: workstationId -> workerIndex -> tasks (for rendering)
     const all = new Map<string, Map<number, { task: Task; start: Date; end: Date; isVisible: boolean }[]>>();
     
-    // Employee-based scheduling state
-    const employeeSchedules = new Map<string, Array<{ task: Task; start: Date; end: Date }>>();
-    const scheduledTaskEndTimes = new Map<string, Date>();
-    const scheduledTaskIds = new Set<string>();
-    const unassignedTasks: Task[] = [];
-    
-    const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
-    const today = format(new Date(), 'yyyy-MM-dd');
-
-    // Initialize workstation structures for rendering
+    // Initialize workstation structures for rendering (always needed for empty chart)
     workstations.forEach((ws) => {
       const workerCount = ws.active_workers || 1;
       const workerMap = new Map<number, { task: Task; start: Date; end: Date; isVisible: boolean }[]>();
@@ -1036,6 +1029,20 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       }
       all.set(ws.id, workerMap);
     });
+
+    // Return empty schedule if not generated yet
+    if (!scheduleGenerated) {
+      return all;
+    }
+    
+    // Employee-based scheduling state
+    const employeeSchedules = new Map<string, Array<{ task: Task; start: Date; end: Date }>>();
+    const scheduledTaskEndTimes = new Map<string, Date>();
+    const scheduledTaskIds = new Set<string>();
+    const unassignedTasks: Task[] = [];
+    
+    const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
+    const today = format(new Date(), 'yyyy-MM-dd');
 
     // Get all employees with their standard task capabilities
     const allEmployees = new Map<string, { id: string; name: string; standardTasks: string[]; workstations: string[] }>();
@@ -1385,7 +1392,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     }
 
     return all;
-  }, [tasks, workstations, selectedDate, workingHoursMap, holidaySet, limitTaskMap, searchTerm, dailyAssignments, workstationEmployeeLinks, employeeStandardTaskLinks]);
+  }, [tasks, workstations, selectedDate, workingHoursMap, holidaySet, limitTaskMap, searchTerm, dailyAssignments, workstationEmployeeLinks, employeeStandardTaskLinks, scheduleGenerated]);
 
   // Auto-assign on mount and when dependencies change
   // Auto-assign disabled to avoid auto-filling the chart; use the 'Genereer Planning' button instead
