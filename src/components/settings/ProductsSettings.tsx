@@ -304,6 +304,11 @@ const ProductsSettings: React.FC = () => {
             case 'location':
               product.location = value || null;
               break;
+            case 'price_per_unit':
+            case 'price per unit':
+            case 'price':
+              product.price_per_unit = parseFloat(value) || null;
+              break;
           }
         });
 
