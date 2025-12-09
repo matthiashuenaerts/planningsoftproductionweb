@@ -381,12 +381,15 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     return totalMinutes;
   };
 
-  // Generate comprehensive planning with task-to-employee assignments
+  // ========================================================================================
+  // OPTIMIZED PLANNING GENERATOR - Multi-pass algorithm with full constraint validation
+  // ========================================================================================
   const handleGeneratePlanning = async () => {
     try {
       setGeneratingPlanning(true);
+      console.log('🚀 Starting optimized planning generation...');
       
-      // Fetch all projects to check start dates
+      // Fetch all projects
       const { data: projects, error: projectsError } = await supabase
         .from('projects')
         .select('id, name, start_date, installation_date, status, client');
@@ -396,253 +399,644 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       const projectMap = new Map(projects?.map(p => [p.id, p]) || []);
       const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
       const today = format(new Date(), 'yyyy-MM-dd');
+      const daysToSchedule = 60;
       
-      // Get all employees linked to standard tasks
-      const allEmployees = new Map<string, { id: string; name: string; standardTasks: string[] }>();
+      // ===== DATA STRUCTURES =====
+      // Employee capabilities: id -> { name, standardTasks[], workstations[] }
+      const employeeCapabilities = new Map<string, { 
+        id: string; 
+        name: string; 
+        standardTasks: string[]; 
+        workstations: string[] 
+      }>();
+      
+      // Build employee capabilities from both links
       employeeStandardTaskLinks.forEach((employees) => {
         employees.forEach(emp => {
-          if (!allEmployees.has(emp.id)) {
-            allEmployees.set(emp.id, { id: emp.id, name: emp.name, standardTasks: [...emp.standardTasks] });
+          if (!employeeCapabilities.has(emp.id)) {
+            const linkedWorkstations: string[] = [];
+            workstations.forEach(ws => {
+              const links = workstationEmployeeLinks.get(ws.id) || [];
+              if (links.some(e => e.id === emp.id)) {
+                linkedWorkstations.push(ws.id);
+              }
+            });
+            
+            employeeCapabilities.set(emp.id, {
+              id: emp.id,
+              name: emp.name,
+              standardTasks: [...emp.standardTasks],
+              workstations: linkedWorkstations
+            });
           }
         });
       });
       
-      // Generate planning for next 60 days
-      const daysToSchedule = 60;
-      const newAssignments: DailyEmployeeAssignment[] = [];
-      
-      // Track per-day employee -> workstation assignment to prevent double-booking across workstations
-      const assignedEmployeeWorkstationByDate = new Map<string, Map<string, string>>();
-      
-      // Track employee schedules: employeeId -> date -> slots
-      const employeeSchedules = new Map<string, Map<string, Array<{ start: Date; end: Date; workstationId: string; taskId: string }>>>();
-      
-      // Initialize employee schedules
-      allEmployees.forEach((emp) => {
-        employeeSchedules.set(emp.id, new Map());
+      // Workstation capacity limits (max parallel tasks = active_workers)
+      const workstationCapacity = new Map<string, number>();
+      workstations.forEach(ws => {
+        workstationCapacity.set(ws.id, ws.active_workers || 1);
       });
       
-      // Task scheduling state
+      // Scheduling state structures
+      type TimeSlot = { start: Date; end: Date; taskId: string; workstationId: string };
+      type DaySchedule = Map<string, TimeSlot[]>; // employeeId -> slots
+      const masterSchedule = new Map<string, DaySchedule>(); // date -> DaySchedule
+      
+      // Workstation usage per time slot (for capacity validation)
+      type WorkstationSlot = { start: Date; end: Date; employeeId: string; taskId: string };
+      const workstationSchedule = new Map<string, Map<string, WorkstationSlot[]>>(); // date -> workstationId -> slots
+      
       const scheduledTasks = new Set<string>();
       const taskEndTimes = new Map<string, Date>();
+      const taskAssignments = new Map<string, { employeeId: string; workstationId: string; date: string }>();
+      const newAssignments: DailyEmployeeAssignment[] = [];
       
-      // Track workstation worker assignments per day
-      const workstationDailyWorkers = new Map<string, Map<string, Set<string>>>(); // workstationId -> date -> Set<employeeId>
+      // ===== HELPER FUNCTIONS =====
       
-      // Helper: Get task priority score
+      // Get priority score for a task (higher = more urgent)
       const getTaskPriorityScore = (task: Task): number => {
         const project = projectMap.get(task.phases?.projects?.id || '');
         if (!project) return -2000;
-        
-        // Critical: Don't schedule if project hasn't started
-        if (project.start_date > today) return -1000;
+        if (project.start_date > today) return -1000; // Project not started
         
         let score = 0;
+        
+        // Installation urgency (40% weight)
         const daysUntilInstallation = differenceInMinutes(new Date(project.installation_date), new Date()) / (24 * 60);
-        score += Math.max(0, 100 - daysUntilInstallation);
+        score += Math.max(0, 100 - daysUntilInstallation) * 0.4;
         
-        if (project.status === 'in_progress') score += 50;
-        else if (project.status === 'planned') score += 30;
-        else if (project.status === 'on_hold') score -= 20;
+        // Project status (25% weight)
+        if (project.status === 'in_progress') score += 50 * 0.25;
+        else if (project.status === 'planned') score += 30 * 0.25;
+        else if (project.status === 'on_hold') score -= 20 * 0.25;
         
-        if (task.priority === 'high') score += 30;
-        else if (task.priority === 'medium') score += 15;
-        else if (task.priority === 'low') score += 5;
+        // Task priority (20% weight)
+        if (task.priority === 'high') score += 40 * 0.2;
+        else if (task.priority === 'medium') score += 20 * 0.2;
+        else if (task.priority === 'low') score += 5 * 0.2;
         
+        // Due date urgency (15% weight)
         const daysUntilDue = differenceInMinutes(new Date(task.due_date), new Date()) / (24 * 60);
-        score += Math.max(0, 50 - daysUntilDue);
+        score += Math.max(0, 50 - daysUntilDue) * 0.15;
         
         return score;
       };
       
-      // Sort tasks by priority, filtering out tasks from projects that haven't started
-      const sortedTasks = [...tasks]
-        .filter(t => {
-          const project = projectMap.get(t.phases?.projects?.id || '');
-          return project && project.start_date <= today && (t.status === 'TODO' || t.status === 'HOLD');
-        })
-        .sort((a, b) => {
-          const scoreA = getTaskPriorityScore(a);
-          const scoreB = getTaskPriorityScore(b);
-          if (scoreA !== scoreB) return scoreB - scoreA;
-          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      // Check if workstation has capacity at a given time slot
+      const hasWorkstationCapacity = (workstationId: string, dateStr: string, start: Date, end: Date): boolean => {
+        const capacity = workstationCapacity.get(workstationId) || 1;
+        const dayWsSchedule = workstationSchedule.get(dateStr)?.get(workstationId) || [];
+        
+        // Count concurrent tasks at any point in the time range
+        let maxConcurrent = 0;
+        const allTimes = new Set<number>();
+        dayWsSchedule.forEach(slot => {
+          allTimes.add(slot.start.getTime());
+          allTimes.add(slot.end.getTime());
         });
-      
-      // Schedule tasks day by day
-      for (let dayOffset = 0; dayOffset < daysToSchedule; dayOffset++) {
-        const currentDate = addDays(timelineStart, dayOffset);
+        allTimes.add(start.getTime());
+        allTimes.add(end.getTime());
         
-        if (!isWorkingDay(currentDate)) continue;
-        
-        const workHours = getWorkHours(currentDate);
-        if (!workHours) continue;
-        
-        const dateStr = format(currentDate, 'yyyy-MM-dd');
-        // Ensure per-day assignment map exists
-        if (!assignedEmployeeWorkstationByDate.has(dateStr)) {
-          assignedEmployeeWorkstationByDate.set(dateStr, new Map());
-        }
-        const assignedToday = assignedEmployeeWorkstationByDate.get(dateStr)!;
-        
-        // For each task, try to assign to best available employee
-        for (const task of sortedTasks) {
-          if (scheduledTasks.has(task.id)) continue;
+        const sortedTimes = Array.from(allTimes).sort((a, b) => a - b);
+        for (const time of sortedTimes) {
+          const timePoint = new Date(time);
+          if (timePoint < start || timePoint >= end) continue;
           
-          // Check dependencies for HOLD tasks
-          if (task.status === 'HOLD') {
-            const dependencyEnd = getRequiredDependencyEndForTask(task, taskEndTimes);
-            if (dependencyEnd === null || dependencyEnd > currentDate) {
-              continue; // Can't schedule yet
+          let concurrent = 1; // The new task
+          for (const slot of dayWsSchedule) {
+            if (timePoint >= slot.start && timePoint < slot.end) {
+              concurrent++;
+            }
+          }
+          maxConcurrent = Math.max(maxConcurrent, concurrent);
+        }
+        
+        return maxConcurrent <= capacity;
+      };
+      
+      // Get employee's current workload on a date (in minutes)
+      const getEmployeeWorkload = (employeeId: string, dateStr: string): number => {
+        const daySchedule = masterSchedule.get(dateStr);
+        if (!daySchedule) return 0;
+        
+        const empSlots = daySchedule.get(employeeId) || [];
+        return empSlots.reduce((sum, slot) => sum + differenceInMinutes(slot.end, slot.start), 0);
+      };
+      
+      // Find first available time slot for an employee on a date
+      const findAvailableSlotOnDate = (
+        employeeId: string, 
+        dateStr: string, 
+        duration: number, 
+        minStart: Date,
+        workstationId: string
+      ): { start: Date; end: Date }[] | null => {
+        const date = new Date(dateStr);
+        const workHoursForDate = getWorkHours(date);
+        if (!workHoursForDate) return null;
+        
+        const daySchedule = masterSchedule.get(dateStr);
+        const empSlots = daySchedule?.get(employeeId) || [];
+        const sortedSlots = [...empSlots].sort((a, b) => a.start.getTime() - b.start.getTime());
+        
+        let candidateStart = minStart < workHoursForDate.start ? workHoursForDate.start : minStart;
+        if (candidateStart < workHoursForDate.start) candidateStart = workHoursForDate.start;
+        
+        // Try each gap between existing slots
+        for (let i = 0; i <= sortedSlots.length; i++) {
+          const gapEnd = i < sortedSlots.length ? sortedSlots[i].start : workHoursForDate.end;
+          
+          if (candidateStart >= gapEnd) {
+            if (i < sortedSlots.length) candidateStart = sortedSlots[i].end;
+            continue;
+          }
+          
+          const availableMinutes = differenceInMinutes(gapEnd, candidateStart);
+          if (availableMinutes >= duration) {
+            // Check workstation capacity for this slot
+            const potentialEnd = addMinutes(candidateStart, duration);
+            if (hasWorkstationCapacity(workstationId, dateStr, candidateStart, potentialEnd)) {
+              const slots = getTaskSlots(candidateStart, duration);
+              if (slots.length > 0) {
+                return slots;
+              }
             }
           }
           
-          // Find eligible employees for this task (those assigned to the standard task)
-          const eligibleEmployees = Array.from(allEmployees.values()).filter(emp => {
-            // Check if employee is linked to this task's standard_task_id
-            if (!task.standard_task_id) return false;
-            const isLinked = emp.standardTasks.includes(task.standard_task_id);
-            if (!isLinked) return false;
-            const alreadyAssignedWs = assignedToday.get(emp.id);
-            // Allow if not yet assigned today or already assigned to one of the task's workstations
-            return !alreadyAssignedWs || task.workstations?.some(taskWs => taskWs.id === alreadyAssignedWs);
+          if (i < sortedSlots.length) {
+            candidateStart = sortedSlots[i].end;
+          }
+        }
+        
+        return null;
+      };
+      
+      // Schedule a task to an employee
+      const scheduleTask = (
+        task: Task, 
+        employeeId: string, 
+        workstationId: string, 
+        dateStr: string, 
+        slots: { start: Date; end: Date }[]
+      ): boolean => {
+        // Initialize data structures if needed
+        if (!masterSchedule.has(dateStr)) {
+          masterSchedule.set(dateStr, new Map());
+        }
+        const daySchedule = masterSchedule.get(dateStr)!;
+        if (!daySchedule.has(employeeId)) {
+          daySchedule.set(employeeId, []);
+        }
+        
+        if (!workstationSchedule.has(dateStr)) {
+          workstationSchedule.set(dateStr, new Map());
+        }
+        const dayWsSchedule = workstationSchedule.get(dateStr)!;
+        if (!dayWsSchedule.has(workstationId)) {
+          dayWsSchedule.set(workstationId, []);
+        }
+        
+        // Add slots to employee schedule
+        const empSlots = daySchedule.get(employeeId)!;
+        for (const slot of slots) {
+          empSlots.push({ 
+            start: slot.start, 
+            end: slot.end, 
+            taskId: task.id, 
+            workstationId 
           });
+        }
+        
+        // Add to workstation schedule
+        const wsSlots = dayWsSchedule.get(workstationId)!;
+        for (const slot of slots) {
+          wsSlots.push({ 
+            start: slot.start, 
+            end: slot.end, 
+            employeeId, 
+            taskId: task.id 
+          });
+        }
+        
+        // Track task completion
+        const lastSlot = slots[slots.length - 1];
+        taskEndTimes.set(task.id, lastSlot.end);
+        scheduledTasks.add(task.id);
+        taskAssignments.set(task.id, { employeeId, workstationId, date: dateStr });
+        
+        return true;
+      };
+      
+      // ===== PREPARE TASKS =====
+      const validTasks = tasks.filter(t => {
+        const project = projectMap.get(t.phases?.projects?.id || '');
+        if (!project) return false;
+        if (project.start_date > today) return false;
+        if (t.status !== 'TODO' && t.status !== 'HOLD') return false;
+        if (!t.standard_task_id) return false;
+        return true;
+      });
+      
+      const sortedTasks = [...validTasks].sort((a, b) => {
+        const scoreA = getTaskPriorityScore(a);
+        const scoreB = getTaskPriorityScore(b);
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      });
+      
+      const todoTasks = sortedTasks.filter(t => t.status === 'TODO');
+      const holdTasks = sortedTasks.filter(t => t.status === 'HOLD');
+      const unassignedTasks: Task[] = [];
+      
+      console.log(`📋 Tasks to schedule: ${todoTasks.length} TODO, ${holdTasks.length} HOLD`);
+      
+      // ===== PHASE 1: Schedule TODO tasks with load balancing =====
+      console.log('📅 PHASE 1: Scheduling TODO tasks...');
+      
+      for (const task of todoTasks) {
+        // Find eligible employees
+        const eligibleEmployees = Array.from(employeeCapabilities.values()).filter(emp => 
+          emp.standardTasks.includes(task.standard_task_id!)
+        );
+        
+        if (eligibleEmployees.length === 0) {
+          unassignedTasks.push(task);
+          continue;
+        }
+        
+        // Determine which workstations this task can use
+        const taskWorkstationIds = task.workstations?.map(w => w.id) || [];
+        
+        let taskScheduled = false;
+        
+        // Try each day until task is scheduled
+        for (let dayOffset = 0; dayOffset < daysToSchedule && !taskScheduled; dayOffset++) {
+          const currentDate = addDays(timelineStart, dayOffset);
+          if (!isWorkingDay(currentDate)) continue;
           
-          if (eligibleEmployees.length === 0) continue;
+          const dateStr = format(currentDate, 'yyyy-MM-dd');
+          const workHoursForDay = getWorkHours(currentDate);
+          if (!workHoursForDay) continue;
           
-          // Sort employees by:
-          // 1. Current workload on this day (prefer less loaded)
-          // 2. Number of workstation switches needed
+          const totalDayMinutes = differenceInMinutes(workHoursForDay.end, workHoursForDay.start);
+          
+          // Score employees for this day (prefer load balancing)
           const employeeScores = eligibleEmployees.map(emp => {
-            const empSchedule = employeeSchedules.get(emp.id)?.get(dateStr) || [];
-            const currentWorkload = empSchedule.reduce((sum, slot) => 
-              sum + differenceInMinutes(slot.end, slot.start), 0
-            );
+            const currentWorkload = getEmployeeWorkload(emp.id, dateStr);
+            const utilizationRate = currentWorkload / totalDayMinutes;
             
-            // Check if employee is already at one of the task's workstations today
-            const alreadyAtWorkstation = empSchedule.some(slot =>
-              task.workstations?.some(taskWs => taskWs.id === slot.workstationId)
-            );
+            // Prefer employees with lower utilization
+            let score = 1000 - (utilizationRate * 1000);
             
-            const workstationSwitchPenalty = alreadyAtWorkstation ? 0 : 100;
+            // Bonus for employees already at a compatible workstation
+            const daySchedule = masterSchedule.get(dateStr);
+            const empSlots = daySchedule?.get(emp.id) || [];
+            const currentWorkstations = new Set(empSlots.map(s => s.workstationId));
             
-            return {
-              employee: emp,
-              score: -currentWorkload - workstationSwitchPenalty
-            };
+            for (const wsId of taskWorkstationIds) {
+              if (currentWorkstations.has(wsId) && emp.workstations.includes(wsId)) {
+                score += 200; // Minimize switching
+                break;
+              }
+            }
+            
+            // Bonus for employees linked to task workstations
+            for (const wsId of taskWorkstationIds) {
+              if (emp.workstations.includes(wsId)) {
+                score += 100;
+                break;
+              }
+            }
+            
+            return { employee: emp, score };
           }).sort((a, b) => b.score - a.score);
           
-          // Try to assign to best employee
-          let taskScheduled = false;
+          // Try each employee in order of preference
           for (const { employee } of employeeScores) {
-            // Find available time slot for this employee
-            const empSchedule = employeeSchedules.get(employee.id)?.get(dateStr) || [];
+            // Determine workstation (prefer one employee is already at)
+            let targetWorkstation: string | null = null;
+            const daySchedule = masterSchedule.get(dateStr);
+            const empSlots = daySchedule?.get(employee.id) || [];
+            const currentWsSet = new Set(empSlots.map(s => s.workstationId));
             
-            // Check if employee has any availability left
-            const workHours = getWorkHours(currentDate);
-            if (!workHours) continue;
+            // First, try to use a workstation employee is already at today
+            for (const wsId of taskWorkstationIds) {
+              if (currentWsSet.has(wsId) && employee.workstations.includes(wsId)) {
+                targetWorkstation = wsId;
+                break;
+              }
+            }
             
-            const totalAvailableMinutes = differenceInMinutes(workHours.end, workHours.start);
-            const usedMinutes = empSchedule.reduce((sum, slot) => 
-              sum + differenceInMinutes(slot.end, slot.start), 0
+            // Otherwise, use first compatible workstation
+            if (!targetWorkstation) {
+              for (const wsId of taskWorkstationIds) {
+                if (employee.workstations.includes(wsId)) {
+                  targetWorkstation = wsId;
+                  break;
+                }
+              }
+            }
+            
+            if (!targetWorkstation) continue;
+            
+            // Find available slot
+            const slots = findAvailableSlotOnDate(
+              employee.id, 
+              dateStr, 
+              task.duration, 
+              workHoursForDay.start,
+              targetWorkstation
             );
             
-            if (usedMinutes >= totalAvailableMinutes) continue; // Employee is fully booked
+            if (slots && slots.length > 0) {
+              scheduleTask(task, employee.id, targetWorkstation, dateStr, slots);
+              taskScheduled = true;
+              break;
+            }
+          }
+        }
+        
+        if (!taskScheduled) {
+          unassignedTasks.push(task);
+        }
+      }
+      
+      console.log(`✅ PHASE 1 Complete: ${scheduledTasks.size} tasks scheduled`);
+      
+      // ===== PHASE 2: Schedule HOLD tasks (dependency-aware) =====
+      console.log('📅 PHASE 2: Scheduling HOLD tasks with dependencies...');
+      
+      const remainingHold = new Set(holdTasks.map(t => t.id));
+      let iterations = 0;
+      const maxIterations = holdTasks.length * 10;
+      
+      while (remainingHold.size > 0 && iterations < maxIterations) {
+        iterations++;
+        let progressMade = false;
+        
+        for (const task of holdTasks) {
+          if (!remainingHold.has(task.id)) continue;
+          if (scheduledTasks.has(task.id)) {
+            remainingHold.delete(task.id);
+            continue;
+          }
+          
+          // Check dependencies
+          const dependencyEnd = getRequiredDependencyEndForTask(task, taskEndTimes);
+          if (dependencyEnd === null) continue; // Dependencies not yet scheduled
+          
+          // Find eligible employees
+          const eligibleEmployees = Array.from(employeeCapabilities.values()).filter(emp => 
+            emp.standardTasks.includes(task.standard_task_id!)
+          );
+          
+          if (eligibleEmployees.length === 0) {
+            remainingHold.delete(task.id);
+            unassignedTasks.push(task);
+            continue;
+          }
+          
+          const taskWorkstationIds = task.workstations?.map(w => w.id) || [];
+          let taskScheduled = false;
+          
+          // Find earliest date we can schedule (after dependency end)
+          const minStartDate = dependencyEnd > timelineStart ? dependencyEnd : timelineStart;
+          const startDayOffset = Math.max(0, Math.floor(differenceInMinutes(minStartDate, timelineStart) / (24 * 60)));
+          
+          for (let dayOffset = startDayOffset; dayOffset < daysToSchedule && !taskScheduled; dayOffset++) {
+            const currentDate = addDays(timelineStart, dayOffset);
+            if (!isWorkingDay(currentDate)) continue;
             
-            // Start from beginning of work day or after last task
-            let candidateStart = workHours.start;
+            const dateStr = format(currentDate, 'yyyy-MM-dd');
+            const workHoursForDay = getWorkHours(currentDate);
+            if (!workHoursForDay) continue;
             
-            // Sort existing slots by start time
-            const sortedSlots = [...empSchedule].sort((a, b) => a.start.getTime() - b.start.getTime());
+            const minStart = dependencyEnd > workHoursForDay.start ? dependencyEnd : workHoursForDay.start;
             
-            // Find a gap that fits the task
-            for (let i = 0; i <= sortedSlots.length; i++) {
-              const slotEnd = i < sortedSlots.length ? sortedSlots[i].start : workHours.end;
-              const availableMinutes = differenceInMinutes(slotEnd, candidateStart);
+            // Try each eligible employee
+            for (const employee of eligibleEmployees) {
+              let targetWorkstation: string | null = null;
               
-              if (availableMinutes >= task.duration) {
-                // Found a slot!
-                const taskSlots = getTaskSlots(candidateStart, task.duration);
-                
-                if (taskSlots.length > 0) {
-                  // Choose workstation (prefer one employee is already at today)
-                  let chosenWorkstation = task.workstations![0].id;
-                  const currentWorkstations = new Set(empSchedule.map(slot => slot.workstationId));
-                  for (const ws of task.workstations || []) {
-                    if (currentWorkstations.has(ws.id)) {
-                      chosenWorkstation = ws.id;
-                      break;
-                    }
-                  }
-                  
-                  // Prevent double-booking across workstations on the same day
-                  const prevWs = assignedToday.get(employee.id);
-                  if (prevWs && prevWs !== chosenWorkstation) {
-                    continue; // employee already assigned to another workstation today
-                  }
-                  
-                  // Track employee assignment to workstation for this day
-                  if (!workstationDailyWorkers.has(chosenWorkstation)) {
-                    workstationDailyWorkers.set(chosenWorkstation, new Map());
-                  }
-                  const wsDateMap = workstationDailyWorkers.get(chosenWorkstation)!;
-                  if (!wsDateMap.has(dateStr)) {
-                    wsDateMap.set(dateStr, new Set());
-                  }
-                  const employeesAtWs = wsDateMap.get(dateStr)!;
-                  
-                  // Only add assignment if this is the first time we see this employee at this workstation today
-                  if (!employeesAtWs.has(employee.id)) {
-                    employeesAtWs.add(employee.id);
-                    const workerIndex = Array.from(employeesAtWs).indexOf(employee.id);
-                    
-                    newAssignments.push({
-                      date: dateStr,
-                      workstationId: chosenWorkstation,
-                      workerIndex,
-                      employeeId: employee.id,
-                      employeeName: employee.name,
-                    });
-                    // Record per-day assignment to this workstation
-                    if (!assignedToday.get(employee.id)) {
-                      assignedToday.set(employee.id, chosenWorkstation);
-                    }
-                  }
-                  
-                  // Add to employee schedule
-                  taskSlots.forEach(slot => {
-                    if (!employeeSchedules.get(employee.id)!.has(format(slot.start, 'yyyy-MM-dd'))) {
-                      employeeSchedules.get(employee.id)!.set(format(slot.start, 'yyyy-MM-dd'), []);
-                    }
-                    employeeSchedules.get(employee.id)!.get(format(slot.start, 'yyyy-MM-dd'))!.push({
-                      start: slot.start,
-                      end: slot.end,
-                      workstationId: chosenWorkstation,
-                      taskId: task.id
-                    });
-                  });
-                  
-                  const lastSlot = taskSlots[taskSlots.length - 1];
-                  taskEndTimes.set(task.id, lastSlot.end);
-                  scheduledTasks.add(task.id);
-                  taskScheduled = true;
+              for (const wsId of taskWorkstationIds) {
+                if (employee.workstations.includes(wsId)) {
+                  targetWorkstation = wsId;
                   break;
                 }
               }
               
-              if (i < sortedSlots.length) {
-                candidateStart = sortedSlots[i].end;
+              if (!targetWorkstation) continue;
+              
+              const slots = findAvailableSlotOnDate(
+                employee.id, 
+                dateStr, 
+                task.duration, 
+                minStart,
+                targetWorkstation
+              );
+              
+              if (slots && slots.length > 0) {
+                scheduleTask(task, employee.id, targetWorkstation, dateStr, slots);
+                taskScheduled = true;
+                progressMade = true;
+                remainingHold.delete(task.id);
+                break;
+              }
+            }
+          }
+          
+          if (!taskScheduled && iterations >= holdTasks.length * 5) {
+            remainingHold.delete(task.id);
+            unassignedTasks.push(task);
+          }
+        }
+        
+        if (!progressMade && iterations > holdTasks.length) break;
+      }
+      
+      console.log(`✅ PHASE 2 Complete: ${scheduledTasks.size} total tasks scheduled`);
+      
+      // ===== PHASE 3: Gap-filling optimization =====
+      console.log('📅 PHASE 3: Filling gaps in schedule...');
+      
+      // Try to reschedule unassigned tasks into any available gaps
+      const stillUnassigned = [...unassignedTasks];
+      unassignedTasks.length = 0;
+      
+      for (const task of stillUnassigned) {
+        if (scheduledTasks.has(task.id)) continue;
+        
+        const eligibleEmployees = Array.from(employeeCapabilities.values()).filter(emp => 
+          emp.standardTasks.includes(task.standard_task_id!)
+        );
+        
+        if (eligibleEmployees.length === 0) {
+          unassignedTasks.push(task);
+          continue;
+        }
+        
+        const taskWorkstationIds = task.workstations?.map(w => w.id) || [];
+        let taskScheduled = false;
+        
+        for (let dayOffset = 0; dayOffset < daysToSchedule && !taskScheduled; dayOffset++) {
+          const currentDate = addDays(timelineStart, dayOffset);
+          if (!isWorkingDay(currentDate)) continue;
+          
+          const dateStr = format(currentDate, 'yyyy-MM-dd');
+          const workHoursForDay = getWorkHours(currentDate);
+          if (!workHoursForDay) continue;
+          
+          for (const employee of eligibleEmployees) {
+            let targetWorkstation: string | null = null;
+            
+            for (const wsId of taskWorkstationIds) {
+              if (employee.workstations.includes(wsId)) {
+                targetWorkstation = wsId;
+                break;
               }
             }
             
-            if (taskScheduled) break;
+            if (!targetWorkstation) continue;
+            
+            const slots = findAvailableSlotOnDate(
+              employee.id, 
+              dateStr, 
+              task.duration, 
+              workHoursForDay.start,
+              targetWorkstation
+            );
+            
+            if (slots && slots.length > 0) {
+              scheduleTask(task, employee.id, targetWorkstation, dateStr, slots);
+              taskScheduled = true;
+              break;
+            }
           }
+        }
+        
+        if (!taskScheduled) {
+          unassignedTasks.push(task);
         }
       }
       
-      // Update daily assignments to show on gantt chart
-      setDailyAssignments(newAssignments);
+      console.log(`✅ PHASE 3 Complete: ${scheduledTasks.size} total tasks scheduled`);
       
-      toast.success(`Planning gegenereerd: ${scheduledTasks.size} taken toegewezen voor ${daysToSchedule} dagen. Bekijk de Gantt chart voor details.`);
+      // ===== PHASE 4: Validation =====
+      console.log('🔍 PHASE 4: Validating schedule...');
+      
+      let validationErrors = 0;
+      
+      // Validate no employee overlaps
+      masterSchedule.forEach((daySchedule, dateStr) => {
+        daySchedule.forEach((slots, employeeId) => {
+          const sorted = [...slots].sort((a, b) => a.start.getTime() - b.start.getTime());
+          for (let i = 0; i < sorted.length - 1; i++) {
+            if (sorted[i].end > sorted[i + 1].start) {
+              console.error(`❌ Employee overlap: ${employeeId} on ${dateStr}`);
+              validationErrors++;
+            }
+          }
+        });
+      });
+      
+      // Validate workstation capacity
+      workstationSchedule.forEach((dayWsSchedule, dateStr) => {
+        dayWsSchedule.forEach((slots, workstationId) => {
+          const capacity = workstationCapacity.get(workstationId) || 1;
+          
+          // Check each time point
+          const allTimes = new Set<number>();
+          slots.forEach(slot => {
+            allTimes.add(slot.start.getTime());
+            allTimes.add(slot.end.getTime());
+          });
+          
+          const sortedTimes = Array.from(allTimes).sort((a, b) => a - b);
+          for (const time of sortedTimes) {
+            const timePoint = new Date(time);
+            let concurrent = 0;
+            for (const slot of slots) {
+              if (timePoint >= slot.start && timePoint < slot.end) {
+                concurrent++;
+              }
+            }
+            if (concurrent > capacity) {
+              console.error(`❌ Workstation over-capacity: ${workstationId} on ${dateStr} (${concurrent}/${capacity})`);
+              validationErrors++;
+            }
+          }
+        });
+      });
+      
+      console.log(validationErrors === 0 ? '✅ Validation passed!' : `⚠️ ${validationErrors} validation errors`);
+      
+      // ===== PHASE 5: Build daily assignments for UI =====
+      console.log('🎨 PHASE 5: Building UI assignments...');
+      
+      const employeeWorkstationDays = new Map<string, Set<string>>(); // "date|workstationId" -> Set<employeeId>
+      
+      taskAssignments.forEach(({ employeeId, workstationId, date }) => {
+        const key = `${date}|${workstationId}`;
+        if (!employeeWorkstationDays.has(key)) {
+          employeeWorkstationDays.set(key, new Set());
+        }
+        employeeWorkstationDays.get(key)!.add(employeeId);
+      });
+      
+      employeeWorkstationDays.forEach((employees, key) => {
+        const [date, workstationId] = key.split('|');
+        const employeeList = Array.from(employees);
+        
+        employeeList.forEach((employeeId, index) => {
+          const emp = employeeCapabilities.get(employeeId);
+          if (emp) {
+            newAssignments.push({
+              date,
+              workstationId,
+              workerIndex: index,
+              employeeId,
+              employeeName: emp.name,
+            });
+          }
+        });
+      });
+      
+      // ===== FINAL STATS =====
+      console.log('📊 ===== SCHEDULING STATISTICS =====');
+      console.log(`✅ Scheduled: ${scheduledTasks.size} tasks`);
+      console.log(`❌ Unassigned: ${unassignedTasks.length} tasks`);
+      console.log(`👥 Employees assigned: ${new Set(Array.from(taskAssignments.values()).map(a => a.employeeId)).size}`);
+      console.log(`📅 Days with tasks: ${masterSchedule.size}`);
+      
+      // Calculate utilization
+      let totalCapacityMinutes = 0;
+      let totalUsedMinutes = 0;
+      
+      masterSchedule.forEach((daySchedule, dateStr) => {
+        const workHoursForDay = getWorkHours(new Date(dateStr));
+        if (!workHoursForDay) return;
+        
+        const dayMinutes = differenceInMinutes(workHoursForDay.end, workHoursForDay.start);
+        daySchedule.forEach((slots) => {
+          totalCapacityMinutes += dayMinutes;
+          totalUsedMinutes += slots.reduce((sum, s) => sum + differenceInMinutes(s.end, s.start), 0);
+        });
+      });
+      
+      const utilizationRate = totalCapacityMinutes > 0 ? (totalUsedMinutes / totalCapacityMinutes * 100).toFixed(1) : 0;
+      console.log(`📈 Average utilization: ${utilizationRate}%`);
+      
+      if (unassignedTasks.length > 0) {
+        console.warn('⚠️ Unassigned tasks:', unassignedTasks.map(t => ({
+          title: t.title,
+          standardTask: t.standard_task_id,
+          workstations: t.workstations?.map(w => w.name).join(', '),
+          reason: 'No eligible employee or available slot'
+        })));
+      }
+      
+      setDailyAssignments(newAssignments);
+      toast.success(`Planning geoptimaliseerd: ${scheduledTasks.size} taken, ${utilizationRate}% benutting`);
       setScheduleGenerated(true);
       
     } catch (error) {
