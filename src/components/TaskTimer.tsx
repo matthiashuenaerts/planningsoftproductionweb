@@ -46,10 +46,8 @@ const navigate = useNavigate();
   const timerRef = useRef<HTMLDivElement>(null);
   const pipWindow = useRef<Window | null>(null);
 
-  // Don't render for workstation users or on general schedule page
-  if (currentEmployee?.role === 'workstation' || location.pathname.includes('/general-schedule')) {
-    return null;
-  }
+  // Determine if we should render - check is done after all hooks
+  const shouldHide = currentEmployee?.role === 'workstation' || location.pathname.includes('/general-schedule');
 
   // Update time every second
   useEffect(() => {
@@ -598,7 +596,8 @@ const navigate = useNavigate();
     const adjustedDurationMs = durationMinutes * 60 * 1000 / activeUsersOnTask;
     return adjustedDurationMs - elapsedMs < 0;
   };
-  if (isLoading || !currentEmployee) {
+  // Don't render for workstation users, on general schedule page, or while loading
+  if (isLoading || !currentEmployee || shouldHide) {
     return null;
   }
 
