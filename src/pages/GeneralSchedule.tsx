@@ -175,7 +175,7 @@ const GeneralSchedule: React.FC = () => {
     return employees.slice(startIndex, startIndex + USERS_PER_PAGE);
   };
 
-  // Auto-cycle through user groups every 10 seconds
+  // Auto-cycle through user groups every 15 seconds
   useEffect(() => {
     if (employees.length <= USERS_PER_PAGE) return;
 
@@ -184,10 +184,10 @@ const GeneralSchedule: React.FC = () => {
         const totalGroups = Math.ceil(employees.length / USERS_PER_PAGE);
         return (prev + 1) % totalGroups;
       });
-    }, 15000); // 10 seconds
+    }, 15000);
 
     return () => clearInterval(interval);
-  }, [employees.length, USERS_PER_PAGE]);
+  }, [employees.length]);
 
   // Get holiday info for employee
   const getHolidayInfo = (employeeId: string) => {
