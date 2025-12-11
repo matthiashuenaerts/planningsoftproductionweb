@@ -47,9 +47,29 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
       const tasks = await standardTasksService.getAll();
       setStandardTasks(tasks);
       
-      // Initialize all tasks as enabled (not excluded)
+      // Get phases for this project
+      const { data: phases } = await supabase
+        .from('phases')
+        .select('id')
+        .eq('project_id', projectId);
+      
+      const phaseIds = phases?.map(p => p.id) || [];
+      
+      // Get existing tasks for this project to determine which are excluded
+      const { data: existingTasks } = await supabase
+        .from('tasks')
+        .select('standard_task_id')
+        .in('phase_id', phaseIds)
+        .not('standard_task_id', 'is', null);
+      
+      const existingStandardTaskIds = new Set(existingTasks?.map(t => t.standard_task_id) || []);
+      
+      // Initialize exclusions based on existing tasks in the project
       const exclusions = new Map<string, boolean>();
-      tasks.forEach(task => exclusions.set(task.id, false));
+      tasks.forEach(task => {
+        // If task exists in project, it's not excluded; if it doesn't exist, it's excluded
+        exclusions.set(task.id, !existingStandardTaskIds.has(task.id));
+      });
       setTaskExclusions(exclusions);
     } catch (error: any) {
       console.error('Failed to load standard tasks:', error);
@@ -103,33 +123,20 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
         }
       }
       
-      // Determine which tasks should exist based on exclusions and limit phases
-      const tasksToDelete: string[] = [];
-      const tasksToCreate: string[] = [];
-      
+      // Collect excluded task IDs
+      const excludedTaskIds: string[] = [];
       for (const task of standardTasks) {
-        const isExcluded = taskExclusions.get(task.id) || false;
-        
-        if (isExcluded) {
-          tasksToDelete.push(task.id);
-        } else {
-          // Check if this task has limit phases that are all excluded
-          const limitPhases = limitPhasesMap.get(task.id) || [];
-          const allLimitPhasesExcluded = limitPhases.length > 0 && 
-            limitPhases.every(lpId => taskExclusions.get(lpId) === true);
-          
-          if (!allLimitPhasesExcluded) {
-            tasksToCreate.push(task.id);
-          }
+        if (taskExclusions.get(task.id) === true) {
+          excludedTaskIds.push(task.id);
         }
       }
       
       // Delete excluded tasks
-      if (tasksToDelete.length > 0 && phaseIds.length > 0) {
+      if (excludedTaskIds.length > 0 && phaseIds.length > 0) {
         const { error } = await supabase
           .from('tasks')
           .delete()
-          .in('standard_task_id', tasksToDelete)
+          .in('standard_task_id', excludedTaskIds)
           .in('phase_id', phaseIds);
         
         if (error) {
@@ -137,9 +144,43 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
         }
       }
       
+      // Find tasks that have their limit phases excluded and should be unlocked (set to TODO)
+      // A task should be unlocked if ANY of its prerequisite tasks were excluded
+      const tasksToUnlock: string[] = [];
+      for (const task of standardTasks) {
+        const isExcluded = taskExclusions.get(task.id) === true;
+        if (isExcluded) continue; // Skip excluded tasks
+        
+        const limitPhases = limitPhasesMap.get(task.id) || [];
+        if (limitPhases.length === 0) continue; // No dependencies
+        
+        // Check if any of the limit phases are excluded
+        const hasExcludedPrerequisite = limitPhases.some(lpId => excludedTaskIds.includes(lpId));
+        if (hasExcludedPrerequisite) {
+          tasksToUnlock.push(task.id);
+        }
+      }
+      
+      // Unlock tasks that have excluded prerequisites (set HOLD to TODO)
+      if (tasksToUnlock.length > 0 && phaseIds.length > 0) {
+        const { error } = await supabase
+          .from('tasks')
+          .update({ status: 'TODO' })
+          .in('standard_task_id', tasksToUnlock)
+          .in('phase_id', phaseIds)
+          .eq('status', 'HOLD');
+        
+        if (error) {
+          console.error('Failed to unlock tasks:', error);
+        } else {
+          console.log(`Unlocked ${tasksToUnlock.length} tasks that had excluded prerequisites`);
+        }
+      }
+      
       // Update task durations based on formulas for included tasks
       for (const rel of relationships) {
-        if (rel.formula && phaseIds.length > 0 && tasksToCreate.includes(rel.standard_task_id)) {
+        const isIncluded = taskExclusions.get(rel.standard_task_id) !== true;
+        if (rel.formula && phaseIds.length > 0 && isIncluded) {
           // Evaluate the formula with current variables
           const calculatedMinutes = evaluateFormula(rel.formula, variables as Record<string, number>);
           
@@ -158,7 +199,7 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
       
       toast({
         title: 'Success',
-        description: 'Variables saved and task durations updated'
+        description: 'Variables saved, task durations updated, and dependencies unlocked'
       });
     } catch (error: any) {
       toast({
