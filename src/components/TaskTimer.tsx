@@ -47,7 +47,7 @@ const navigate = useNavigate();
   const pipWindow = useRef<Window | null>(null);
 
   // Determine if we should render - check is done after all hooks
-  const shouldHide = currentEmployee?.role === 'workstation' || location.pathname.includes('/general-schedule');
+  const shouldHide = currentEmployee?.role === 'workstation' || location.pathname.includes('/general-schedule') || location.pathname.includes('/control-panel') || location.pathname.includes('/truck-loading');
 
   // Update time every second
   useEffect(() => {
