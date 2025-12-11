@@ -323,8 +323,27 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         progress: 0
       });
       
-      // Get selected tasks
+      // Get selected and unselected tasks
       const selectedTasks = tasks.filter(task => task.selected);
+      const unselectedTaskStandardIds = tasks
+        .filter(task => !task.selected && task.standard_task_id)
+        .map(task => task.standard_task_id!);
+      
+      // Build a map of which standard tasks have limit phases on unselected tasks
+      // These tasks should be set to TODO instead of HOLD since their prerequisites won't be met
+      const tasksWithUnselectedPrerequisites = new Set<string>();
+      
+      for (const task of selectedTasks) {
+        if (task.standard_task_id) {
+          const limitPhases = await standardTasksService.getLimitPhases(task.standard_task_id);
+          const hasUnselectedPrerequisite = limitPhases.some(
+            lp => unselectedTaskStandardIds.includes(lp.standard_task_id)
+          );
+          if (hasUnselectedPrerequisite) {
+            tasksWithUnselectedPrerequisites.add(task.standard_task_id);
+          }
+        }
+      }
       
       // Create all tasks with proper timing and link to workstations
       const createdTasks: Task[] = [];
@@ -356,15 +375,29 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         
         // Determine initial task status based on limit phases
         let initialStatus: 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD' = 'TODO';
+        
         if (task.standard_task_id) {
-          // Check if this standard task has limit phases that aren't completed yet
-          const limitPhasesCompleted = await standardTasksService.checkLimitPhasesCompleted(
-            task.standard_task_id, 
-            newProject.id
-          );
-          
-          if (!limitPhasesCompleted) {
-            initialStatus = 'HOLD';
+          // If this task's prerequisite was unchecked, set to TODO (not HOLD)
+          if (tasksWithUnselectedPrerequisites.has(task.standard_task_id)) {
+            initialStatus = 'TODO';
+          } else {
+            // Check if this standard task has limit phases that aren't completed yet
+            const limitPhases = await standardTasksService.getLimitPhases(task.standard_task_id);
+            
+            // Only check selected tasks that exist in the project
+            const selectedStandardTaskIds = selectedTasks
+              .filter(t => t.standard_task_id)
+              .map(t => t.standard_task_id!);
+            
+            // Filter limit phases to only those that are in the selected tasks
+            const relevantLimitPhases = limitPhases.filter(
+              lp => selectedStandardTaskIds.includes(lp.standard_task_id)
+            );
+            
+            // If there are relevant limit phases, task should be on HOLD
+            if (relevantLimitPhases.length > 0) {
+              initialStatus = 'HOLD';
+            }
           }
         }
         
