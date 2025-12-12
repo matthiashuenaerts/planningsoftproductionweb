@@ -23,6 +23,7 @@ import { PartsListViewer } from '@/components/PartsListViewer';
 import { PartsListDialog } from '@/components/PartsListDialog';
 import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import TaskCompletionChecklistDialog from '@/components/TaskCompletionChecklistDialog';
+import TaskExtraTimeDialog from '@/components/TaskExtraTimeDialog';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface WorkstationViewProps {
@@ -66,6 +67,14 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
     taskName: string;
   } | null>(null);
   const [activeUsersPerTask, setActiveUsersPerTask] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
+  const [showExtraTimeDialog, setShowExtraTimeDialog] = useState(false);
+  const [pendingNewTaskId, setPendingNewTaskId] = useState<string | null>(null);
+  const [pendingStopData, setPendingStopData] = useState<{
+    registrationId: string;
+    taskDetails: any;
+    overTimeMinutes: number;
+    elapsedMinutes: number;
+  } | null>(null);
   
   const {
     toast
@@ -80,6 +89,39 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
     createLocalizedPath
   } = useLanguage();
   
+  // Query active time registration for current employee
+  const { data: activeRegistration } = useQuery({
+    queryKey: ['activeTimeRegistration', currentEmployee?.id],
+    queryFn: async () => {
+      if (!currentEmployee?.id) return null;
+      const { data, error } = await supabase
+        .from('time_registrations')
+        .select('*')
+        .eq('employee_id', currentEmployee.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentEmployee?.id
+  });
+
+  // Get task details for active registration
+  const { data: activeTaskDetails } = useQuery({
+    queryKey: ['activeTaskDetails', activeRegistration?.task_id],
+    queryFn: async () => {
+      if (!activeRegistration?.task_id) return null;
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('title, duration')
+        .eq('id', activeRegistration.task_id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeRegistration?.task_id
+  });
+
   useEffect(() => {
     loadStandardTasks();
   }, []);
@@ -557,6 +599,73 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
     }
   };
 
+  // Handle extra time confirmation when starting a new task with negative timer
+  const handleExtraTimeConfirm = async (totalMinutes: number) => {
+    if (!pendingStopData || !currentEmployee) return;
+
+    try {
+      // Update the current task's duration
+      if (activeRegistration?.task_id) {
+        await supabase
+          .from('tasks')
+          .update({ duration: totalMinutes })
+          .eq('id', activeRegistration.task_id);
+      }
+
+      // Invalidate queries
+      await queryClient.invalidateQueries({ queryKey: ['activeTaskDetails'] });
+
+      // Stop the current time registration
+      await timeRegistrationService.stopTask(pendingStopData.registrationId);
+
+      // Invalidate active registration
+      await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+
+      toast({
+        title: t('task_duration_updated') || 'Task Duration Updated',
+        description: `${t('task_paused_with_new_duration') || 'Task paused with new duration:'} ${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
+      });
+
+      // Now start the new task if there's a pending one
+      if (pendingNewTaskId) {
+        const newTask = fetchedTasks.find(task => task.id === pendingNewTaskId);
+        const remainingDuration = newTask?.duration;
+        
+        startTimerMutation.mutate({
+          employeeId: currentEmployee.id,
+          taskId: pendingNewTaskId,
+          remainingDuration: remainingDuration
+        });
+
+        // Also update the task status to IN_PROGRESS
+        await supabase
+          .from('tasks')
+          .update({
+            status: 'IN_PROGRESS',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', pendingNewTaskId);
+
+        setTasks(prevTasks => 
+          prevTasks.map(task => 
+            task.id === pendingNewTaskId ? { ...task, status: 'IN_PROGRESS' } : task
+          )
+        );
+      }
+    } catch (error) {
+      toast({
+        title: t('error'),
+        description: t('failed_to_update_task_duration') || 'Failed to update task duration',
+        variant: 'destructive',
+      });
+      console.error('Update task duration error:', error);
+    }
+
+    setShowExtraTimeDialog(false);
+    setPendingStopData(null);
+    setPendingNewTaskId(null);
+  };
+
   const handleTaskUpdate = async (taskId: string, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     try {
       if (newStatus === 'COMPLETED') {
@@ -631,6 +740,39 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
       
       if (newStatus === 'IN_PROGRESS') {
         if (currentEmployee) {
+          // Check if there's an active registration with negative time
+          if (activeRegistration?.is_active && activeTaskDetails?.duration && activeRegistration.start_time) {
+            const start = new Date(activeRegistration.start_time);
+            const now = new Date();
+            const elapsedMs = now.getTime() - start.getTime();
+            const durationMs = activeTaskDetails.duration * 60 * 1000;
+            const remainingMs = durationMs - elapsedMs;
+            
+            if (remainingMs < 0) {
+              // Current timer is negative - must handle this first
+              const overTimeMinutes = Math.floor(Math.abs(remainingMs) / (1000 * 60));
+              
+              // Reset start_time to NOW so elapsed becomes 0
+              await supabase
+                .from('time_registrations')
+                .update({ start_time: new Date().toISOString() })
+                .eq('id', activeRegistration.id);
+              
+              // Invalidate to refresh the registration with new start_time
+              await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+              
+              setPendingNewTaskId(taskId);
+              setPendingStopData({
+                registrationId: activeRegistration.id,
+                taskDetails: activeTaskDetails,
+                overTimeMinutes,
+                elapsedMinutes: 0
+              });
+              setShowExtraTimeDialog(true);
+              return; // Don't start new task yet - wait for dialog
+            }
+          }
+          
           const currentTask = fetchedTasks.find(task => task.id === taskId);
           const remainingDuration = currentTask?.duration;
           startTimerMutation.mutate({
@@ -1161,6 +1303,20 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
           }}
         />
       )}
+      
+      {/* Extra Time Dialog for negative timer when starting new task */}
+      <TaskExtraTimeDialog
+        isOpen={showExtraTimeDialog}
+        onClose={() => {
+          setShowExtraTimeDialog(false);
+          setPendingStopData(null);
+          setPendingNewTaskId(null);
+        }}
+        taskTitle={pendingStopData?.taskDetails?.title || t('current_task') || 'Current Task'}
+        overTimeMinutes={pendingStopData?.overTimeMinutes || 0}
+        elapsedMinutes={pendingStopData?.elapsedMinutes || 0}
+        onConfirm={handleExtraTimeConfirm}
+      />
     </div>
   );
 };
