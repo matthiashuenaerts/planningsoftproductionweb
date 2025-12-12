@@ -38,6 +38,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { PartDetailDialog } from '@/components/PartDetailDialog';
 interface TaskWithTimeData extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
@@ -97,6 +98,8 @@ const ProjectDetails = () => {
   const [savingDescription, setSavingDescription] = useState(false);
   const [showProjectChat, setShowProjectChat] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [selectedPart, setSelectedPart] = useState<Part | null>(null);
+  const [showPartDetailDialog, setShowPartDetailDialog] = useState(false);
   const {
     currentEmployee
   } = useAuth();
@@ -1226,8 +1229,15 @@ const ProjectDetails = () => {
                                 </TableRow>
                               </TableHeader>
                                <TableBody>
-                                 {sortedAndFilteredParts.map(part => <TableRow key={part.id} className={`border ${getBackgroundColor(part.color_status)}`}>
-                                  <TableCell>
+                                 {sortedAndFilteredParts.map(part => <TableRow 
+                                   key={part.id} 
+                                   className={`border ${getBackgroundColor(part.color_status)} cursor-pointer hover:bg-muted/80`}
+                                   onClick={() => {
+                                     setSelectedPart(part);
+                                     setShowPartDetailDialog(true);
+                                   }}
+                                 >
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center gap-1">
                                       <Circle className={`h-4 w-4 ${getColorClass(part.color_status)}`} />
                                       <div className="flex gap-1 ml-2">
@@ -1613,6 +1623,11 @@ const ProjectDetails = () => {
 
       {selectedOrderId && <OrderEditModal open={showOrderEditModal} onOpenChange={setShowOrderEditModal} orderId={selectedOrderId} onSuccess={handleOrderEditSuccess} />}
       
+      <PartDetailDialog 
+        part={selectedPart} 
+        open={showPartDetailDialog} 
+        onOpenChange={setShowPartDetailDialog} 
+      />
     </div>
   );
 };
