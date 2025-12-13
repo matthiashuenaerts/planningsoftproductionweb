@@ -353,9 +353,8 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         // Calculate due date based on installation date and day counter
         const dueDate = standardTasksService.calculateTaskDueDate(data.installation_date, task.day_counter || 0);
         
-        // Create a task name with the ID prefix and duration
-        const durationText = task.duration ? ` (${task.duration} min)` : '';
-        const taskName = `${task.id} - ${task.name}${durationText}`;
+        // Create a task name with the ID prefix (duration will be shown dynamically from estimated_duration)
+        const taskName = `${task.id} - ${task.name}`;
         
         // Simple mapping of workstations to standard categories
         let workstationType: 'CUTTING' | 'WELDING' | 'PAINTING' | 'ASSEMBLY' | 'PACKAGING' | 'SHIPPING' = 'ASSEMBLY';
