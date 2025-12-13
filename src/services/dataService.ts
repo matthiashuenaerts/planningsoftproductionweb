@@ -49,6 +49,7 @@ export interface Task {
   rush_order_id?: string;
   standard_task_id?: string;
   duration?: number; // Task duration in minutes
+  estimated_duration?: number; // Estimated task duration in minutes
 }
 
 // Employee Types
