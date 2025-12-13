@@ -3387,6 +3387,7 @@ export type Database = {
           due_date: string
           duration: number | null
           efficiency_percentage: number | null
+          estimated_duration: number | null
           id: string
           phase_id: string
           priority: string
@@ -3408,6 +3409,7 @@ export type Database = {
           due_date: string
           duration?: number | null
           efficiency_percentage?: number | null
+          estimated_duration?: number | null
           id?: string
           phase_id: string
           priority: string
@@ -3429,6 +3431,7 @@ export type Database = {
           due_date?: string
           duration?: number | null
           efficiency_percentage?: number | null
+          estimated_duration?: number | null
           id?: string
           phase_id?: string
           priority?: string

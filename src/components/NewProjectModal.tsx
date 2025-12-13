@@ -402,6 +402,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         }
         
         // Create the task with duration and calculated due date
+        const taskDuration = task.duration || 60;
         const newTask = await taskService.create({
           phase_id: phase.id,
           assignee_id: null,
@@ -412,8 +413,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
           priority: index < 5 ? 'High' : index < 15 ? 'Medium' : 'Low',
           due_date: format(dueDate, 'yyyy-MM-dd'),
           standard_task_id: task.standard_task_id || null,
-          duration: task.duration || 60 // Save the calculated duration
-        });
+          duration: taskDuration, // Save the calculated duration
+          estimated_duration: taskDuration // Save the same value as estimated duration
+        } as any);
         
         createdTasks.push(newTask);
         
