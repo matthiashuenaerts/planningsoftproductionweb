@@ -187,7 +187,7 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
           // Update all tasks in this project with this standard_task_id
           const { error } = await supabase
             .from('tasks')
-            .update({ duration: calculatedMinutes })
+            .update({ duration: calculatedMinutes, estimated_duration: calculatedMinutes })
             .eq('standard_task_id', rel.standard_task_id)
             .in('phase_id', phaseIds);
           
