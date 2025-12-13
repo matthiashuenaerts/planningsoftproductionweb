@@ -369,8 +369,8 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
           workstationType = 'ASSEMBLY';
         }
         
-        // Create task description with workstation info (duration is stored in estimated_duration field)
-        const taskDescription = task.workstation ? `Workstation: ${task.workstation}` : '';
+        // Create task description with duration and workstation info
+        const taskDescription = `Duration: ${task.duration || 60} minutes\n${task.workstation ? `Workstation: ${task.workstation}` : ''}`;
         
         // Determine initial task status based on limit phases
         let initialStatus: 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'HOLD' = 'TODO';
