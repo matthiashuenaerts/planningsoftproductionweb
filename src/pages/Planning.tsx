@@ -1982,7 +1982,7 @@ const Planning = () => {
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`w-full p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : ''}`}>
+        <div className={`w-full p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : 'pt-16'}`}>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
         </div>
       </div>
@@ -2000,7 +2000,7 @@ const Planning = () => {
         {isMobile && <Navbar />}
         <div 
           ref={mainContentRef}
-          className={`w-full p-4 md:p-6 overflow-y-auto ${!isMobile ? 'md:ml-64' : ''}`}
+          className={`w-full p-4 md:p-6 overflow-y-auto ${!isMobile ? 'md:ml-64' : 'pt-16'}`}
           style={{ height: '100vh' }}
         >
           <div className="max-w-7xl mx-auto">

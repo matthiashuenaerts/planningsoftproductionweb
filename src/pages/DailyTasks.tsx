@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import InstallationTeamCalendar from '@/components/InstallationTeamCalendar';
 import TruckLoadingCalendar from '@/components/TruckLoadingCalendar';
 import OrdersGanttChart from '@/components/OrdersGanttChart';
+import { useIsMobile } from '@/hooks/use-mobile';
 interface ProjectWithTeam {
   id: string;
   name: string;
@@ -27,6 +28,7 @@ const DailyTasks: React.FC = () => {
   const [allProjects, setAllProjects] = useState<ProjectWithTeam[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   // Fetch all projects with installation dates and team assignments
   useEffect(() => {
@@ -65,10 +67,13 @@ const DailyTasks: React.FC = () => {
     fetchAllProjects();
   }, [toast]);
   return <div className="flex min-h-screen">
-      <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-        <Navbar />
-      </div>
-      <div className="ml-64 w-full p-6 my-[70px]">
+      {!isMobile && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+      {isMobile && <Navbar />}
+      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
             <h1 className="text-2xl font-bold">Installation Calendar</h1>

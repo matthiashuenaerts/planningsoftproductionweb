@@ -54,7 +54,7 @@ const RushOrders = () => {
           <Navbar />
         </div>
       )}
-      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : ''}`}>
+      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold">{t('rush_orders')}</h1>

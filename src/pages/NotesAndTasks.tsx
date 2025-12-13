@@ -224,7 +224,7 @@ const NotesAndTasks = () => {
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`flex-1 ${!isMobile ? 'ml-64' : ''}`}>
+        <div className={`flex-1 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
           <div className="flex items-center justify-center h-64">
             <p className="text-gray-500">Please log in to access your notes and tasks.</p>
           </div>
@@ -242,7 +242,7 @@ const NotesAndTasks = () => {
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`flex-1 ${!isMobile ? 'ml-64' : ''}`}>
+        <div className={`flex-1 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           </div>
@@ -259,7 +259,7 @@ const NotesAndTasks = () => {
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`flex-1 ${!isMobile ? 'ml-64' : ''}`}>
+      <div className={`flex-1 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold">Notes & Tasks</h1>

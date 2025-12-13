@@ -877,7 +877,7 @@ const ProjectDetails = () => {
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`w-full p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : ''}`}>
+        <div className={`w-full p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : 'pt-16'}`}>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
         </div>
       </div>;
@@ -890,7 +890,7 @@ const ProjectDetails = () => {
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`w-full p-6 ${!isMobile ? 'ml-64' : ''}`}>
+        <div className={`w-full p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
           <div className="max-w-3xl mx-auto">
             <div className="text-center">
               <h2 className="text-2xl font-bold mb-2">{t('project_not_found')}</h2>
@@ -1003,7 +1003,7 @@ const ProjectDetails = () => {
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : ''}`}>
+      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <Button variant="outline" onClick={() => navigate(createLocalizedPath('/projects'))} className="mb-4">

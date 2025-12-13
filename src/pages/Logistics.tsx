@@ -215,7 +215,7 @@ const Logistics = () => {
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : ''}`}>
+        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
           <div>{t("loading")}</div>
         </div>
       </div>
@@ -230,7 +230,7 @@ const Logistics = () => {
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`flex-1 p-6 max-w-none ${!isMobile ? 'ml-64' : ''}`}>
+      <div className={`flex-1 p-6 max-w-none ${!isMobile ? 'ml-64' : 'pt-16'}`}>
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">{t("logistics_title")}</h1>
           <p className="text-gray-600 mt-2">{t("logistics_description")}</p>

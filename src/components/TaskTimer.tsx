@@ -6,10 +6,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
-import { Play, Pause, Clock, Timer, Move, Minimize2, Maximize2, PictureInPicture } from 'lucide-react';
+import { Play, Pause, Clock, Timer, Move, Minimize2, Maximize2, PictureInPicture, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import TaskExtraTimeDialog from './TaskExtraTimeDialog';
+import { useIsMobile } from '@/hooks/use-mobile';
+
 const TaskTimer = () => {
   const {
     currentEmployee
@@ -20,9 +22,10 @@ const TaskTimer = () => {
   const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
   const location = useLocation();
-const navigate = useNavigate();
+  const navigate = useNavigate();
   const { createLocalizedPath } = useLanguage();
   const [activeUsersOnTask, setActiveUsersOnTask] = useState(1);
+  const isMobile = useIsMobile();
 
   // Draggable and UI state
   const [position, setPosition] = useState({
@@ -35,6 +38,7 @@ const navigate = useNavigate();
     y: 0
   });
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isMobileExpanded, setIsMobileExpanded] = useState(false);
   const [isPictureInPicture, setIsPictureInPicture] = useState(false);
   const [showExtraTimeDialog, setShowExtraTimeDialog] = useState(false);
   const [pendingStopData, setPendingStopData] = useState<{
@@ -687,6 +691,97 @@ const navigate = useNavigate();
       }
     }, 1000);
   }
+  // Mobile collapsed circle view
+  if (isMobile && !isMobileExpanded) {
+    return <>
+      <TaskExtraTimeDialog isOpen={showExtraTimeDialog} onClose={() => {}} onConfirm={handleExtraTimeConfirm} taskTitle={pendingStopData?.taskDetails?.title || ''} overTimeMinutes={pendingStopData?.overTimeMinutes || 0} elapsedMinutes={pendingStopData?.elapsedMinutes || 0} />
+      
+      <div 
+        className="fixed top-4 right-4 z-[9999] cursor-pointer"
+        onClick={() => setIsMobileExpanded(true)}
+      >
+        <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all ${activeRegistration && activeRegistration.is_active ? 'bg-green-500' : 'bg-red-500'}`}>
+          {activeRegistration && activeRegistration.is_active ? (
+            <Pause className="h-5 w-5 text-white" />
+          ) : (
+            <Play className="h-5 w-5 text-white" />
+          )}
+        </div>
+        {activeRegistration && activeRegistration.is_active && (
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-background text-foreground text-[10px] font-mono px-1 rounded shadow">
+            {formatDuration(activeRegistration.start_time).slice(0, 5)}
+          </div>
+        )}
+      </div>
+    </>;
+  }
+
+  // Mobile expanded view
+  if (isMobile && isMobileExpanded) {
+    return <>
+      <TaskExtraTimeDialog isOpen={showExtraTimeDialog} onClose={() => {}} onConfirm={handleExtraTimeConfirm} taskTitle={pendingStopData?.taskDetails?.title || ''} overTimeMinutes={pendingStopData?.overTimeMinutes || 0} elapsedMinutes={pendingStopData?.elapsedMinutes || 0} />
+      
+      <div className="fixed inset-0 bg-black/50 z-[9998]" onClick={() => setIsMobileExpanded(false)} />
+      <div className="fixed top-4 right-4 z-[9999] w-[calc(100%-2rem)] max-w-sm">
+        <Card className={`transition-all duration-200 ${activeRegistration && activeRegistration.is_active ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'} shadow-lg`}>
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-medium text-sm">Task Timer</span>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setIsMobileExpanded(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center space-x-3">
+              <div 
+                className={`p-3 rounded-full cursor-pointer ${activeRegistration && activeRegistration.is_active ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`} 
+                onClick={handleTimerClick}
+              >
+                {activeRegistration && activeRegistration.is_active ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                {activeRegistration && taskDetails ? (
+                  <div>
+                    <p className="font-medium text-sm truncate">{taskDetails.project_name}</p>
+                    <p className="text-xs text-gray-600 truncate">{taskDetails.title}</p>
+                  </div>
+                ) : lastWorkedTask ? (
+                  <div>
+                    <p className="font-medium text-sm text-gray-500 truncate">{lastWorkedTask.project_name}</p>
+                    <p className="text-xs text-gray-400 truncate">{lastWorkedTask.title}</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-medium text-sm text-gray-500">No Previous Task</p>
+                    <p className="text-xs text-gray-400">Start from tasks page</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="text-right">
+                <div className="flex items-center space-x-1">
+                  <Clock className="h-3 w-3 text-gray-500" />
+                  <span className="font-mono text-sm font-medium">
+                    {activeRegistration && activeRegistration.is_active ? formatDuration(activeRegistration.start_time) : '00:00:00'}
+                  </span>
+                </div>
+                {activeRegistration && activeRegistration.is_active && taskDetails?.duration != null && (
+                  <div className="flex items-center space-x-1">
+                    <Timer className="h-3 w-3 text-gray-500" />
+                    <span className={`font-mono text-sm font-medium ${isTimeNegative(activeRegistration.start_time, taskDetails.duration) ? 'text-red-500' : ''}`}>
+                      {formatRemainingDuration(activeRegistration.start_time, taskDetails.duration)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </>;
+  }
+
+  // Desktop view (original)
   return <>
       <TaskExtraTimeDialog isOpen={showExtraTimeDialog} onClose={() => {}} onConfirm={handleExtraTimeConfirm} taskTitle={pendingStopData?.taskDetails?.title || ''} overTimeMinutes={pendingStopData?.overTimeMinutes || 0} elapsedMinutes={pendingStopData?.elapsedMinutes || 0} />
       

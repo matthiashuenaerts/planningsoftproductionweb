@@ -513,7 +513,7 @@ const PersonalTasks = () => {
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : ''}`}>
+        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           </div>
@@ -530,7 +530,7 @@ const PersonalTasks = () => {
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`flex-1 p-6 max-w-none ${!isMobile ? 'ml-64' : ''}`}>
+      <div className={`flex-1 p-6 max-w-none ${!isMobile ? 'ml-64' : 'pt-16'}`}>
         {/* Date Navigation Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
