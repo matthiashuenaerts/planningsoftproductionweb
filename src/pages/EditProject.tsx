@@ -168,14 +168,14 @@ const EditProject = () => {
   const handleTaskDurationUpdate = async (taskId: string, newDuration: number) => {
     try {
       setSavingTask(taskId);
-      await taskService.update(taskId, { duration: newDuration });
+      await taskService.update(taskId, { duration: newDuration, estimated_duration: newDuration });
       
       // Update local state
       setTasks(prevTasks => {
         const updatedTasks = { ...prevTasks };
         Object.keys(updatedTasks).forEach(phaseId => {
           updatedTasks[phaseId] = updatedTasks[phaseId].map(task =>
-            task.id === taskId ? { ...task, duration: newDuration } : task
+            task.id === taskId ? { ...task, duration: newDuration, estimated_duration: newDuration } : task
           );
         });
         return updatedTasks;
