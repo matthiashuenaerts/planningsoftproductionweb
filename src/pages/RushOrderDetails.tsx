@@ -28,7 +28,7 @@ const RushOrderDetails = () => {
           <Navbar />
         </div>
       )}
-      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : ''}`}>
+      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <Button

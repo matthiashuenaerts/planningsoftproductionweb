@@ -495,7 +495,7 @@ const TimeRegistrations = () => {
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : ''}`}>
+        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
           <div>{t("loading")}</div>
         </div>
       </div>
@@ -511,7 +511,7 @@ const TimeRegistrations = () => {
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : ''}`}>
+        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">{t("my_time_registrations")}</h1>
             <p className="text-gray-600 mt-2">{t("my_time_registrations_description")}</p>
@@ -743,7 +743,7 @@ const TimeRegistrations = () => {
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : ''}`}>
+      <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">{t("time_registration_dashboard")}</h1>
           <p className="text-gray-600 mt-2">{t("time_registration_dashboard_description")}</p>
