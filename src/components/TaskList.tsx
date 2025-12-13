@@ -23,6 +23,7 @@ interface ExtendedTask extends Task {
   total_duration?: number;
   completed_by_employee?: { name: string };
   is_workstation_task?: boolean;
+  estimated_duration?: number;
 }
 
 interface TaskListProps {
@@ -480,8 +481,12 @@ const TaskList: React.FC<TaskListProps> = ({
               </div>
             </CardHeader>
             <CardContent>
-              {task.description && !compact && (
-                <p className="text-gray-600 mb-4">{task.description}</p>
+              {!compact && (
+                <p className="text-muted-foreground mb-4">
+                  {task.estimated_duration && `Duration: ${task.estimated_duration} minutes`}
+                  {task.estimated_duration && task.description && '\n'}
+                  {task.description}
+                </p>
               )}
               
               {task.status === 'HOLD' && (
