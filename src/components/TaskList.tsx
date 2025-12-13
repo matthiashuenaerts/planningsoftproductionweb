@@ -480,8 +480,13 @@ const TaskList: React.FC<TaskListProps> = ({
               </div>
             </CardHeader>
             <CardContent>
-              {task.description && !compact && (
-                <p className="text-gray-600 mb-4">{task.description}</p>
+              {!compact && (
+                <div className="text-gray-600 mb-4">
+                  {(task as any).estimated_duration && (
+                    <p>Duration: {(task as any).estimated_duration} minutes</p>
+                  )}
+                  {task.description && <p>{task.description}</p>}
+                </div>
               )}
               
               {task.status === 'HOLD' && (
