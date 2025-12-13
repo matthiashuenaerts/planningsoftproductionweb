@@ -151,11 +151,11 @@ const ProjectDetails = () => {
     // Process only tasks that need calculation
     for (const task of tasksNeedingCalculation) {
       const actualMinutes = timeRegsByTask.get(task.id) || 0;
-      const plannedMinutes = task.duration || 0;
-      console.log(`Task ${task.id}: Planned ${plannedMinutes}min, Actual ${actualMinutes}min`);
-      if (plannedMinutes > 0 && actualMinutes > 0) {
-        const efficiency = (plannedMinutes - actualMinutes) / plannedMinutes * 100;
-        totalPlannedMinutes += plannedMinutes;
+      const estimatedMinutes = (task as any).estimated_duration || task.duration || 0;
+      console.log(`Task ${task.id}: Estimated ${estimatedMinutes}min, Actual ${actualMinutes}min`);
+      if (estimatedMinutes > 0 && actualMinutes > 0) {
+        const efficiency = (estimatedMinutes - actualMinutes) / estimatedMinutes * 100;
+        totalPlannedMinutes += estimatedMinutes;
         totalActualMinutes += actualMinutes;
         tasksToUpdate.push({
           id: task.id,
@@ -173,7 +173,7 @@ const ProjectDetails = () => {
           };
         }
       } else {
-        console.log(`Skipping task ${task.id}: plannedMinutes=${plannedMinutes}, actualMinutes=${actualMinutes}`);
+        console.log(`Skipping task ${task.id}: estimatedMinutes=${estimatedMinutes}, actualMinutes=${actualMinutes}`);
       }
     }
 

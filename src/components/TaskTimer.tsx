@@ -372,9 +372,10 @@ const navigate = useNavigate();
         
         if (currentTask) {
           const newActualDuration = (currentTask.actual_duration_minutes || 0) + elapsedMinutes;
-          const efficiencyPercentage = currentTask.duration > 0 
-            ? Math.round((currentTask.duration / newActualDuration) * 100)
-            : 100;
+          const estimatedDuration = (currentTask as any).estimated_duration || currentTask.duration || 0;
+          const efficiencyPercentage = estimatedDuration > 0 
+            ? Math.round(((estimatedDuration - newActualDuration) / estimatedDuration) * 100)
+            : 0;
           
           // Update task with new actual duration and efficiency
           await supabase
