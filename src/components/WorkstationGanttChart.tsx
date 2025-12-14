@@ -9,6 +9,7 @@ import {
   setMinutes,
   addDays,
   getDay,
+  isBefore,
 } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { workstationService, Workstation } from '@/services/workstationService';
@@ -21,6 +22,17 @@ import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus, ChevronDown, ChevronRi
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { ProjectDeadlineWarningDialog } from './ProjectDeadlineWarningDialog';
+
+interface ProjectDeadlineWarning {
+  projectId: string;
+  projectName: string;
+  clientName: string;
+  installationDate: Date;
+  estimatedCompletionDate: Date;
+  daysOverdue: number;
+  canReschedule: boolean;
+}
 
 interface Project {
   id: string;
@@ -90,6 +102,10 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
   const [generatingPlanning, setGeneratingPlanning] = useState(false);
   const [scheduleGenerated, setScheduleGenerated] = useState(false);
+  const [deadlineWarnings, setDeadlineWarnings] = useState<ProjectDeadlineWarning[]>([]);
+  const [showDeadlineWarning, setShowDeadlineWarning] = useState(false);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [capacityIssue, setCapacityIssue] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const rowHeight = 60;
@@ -97,9 +113,10 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const workstationLabelWidth = 250;
 
   const scale = useMemo(() => {
-    if (zoom >= 2) return { unitInMinutes: 15, unitWidth: 8 * zoom, totalUnits: (24 * 60 * 3) / 15, format: (d: Date) => format(d, 'HH:mm') };
-    if (zoom >= 1) return { unitInMinutes: 60, unitWidth: 40 * zoom, totalUnits: 24 * 3, format: (d: Date) => format(d, 'HH:mm') };
-    return { unitInMinutes: 1440, unitWidth: 120 * zoom, totalUnits: 10, format: (d: Date) => format(d, 'dd MMM') };
+    // Extended timeline: 90 days at day level, much more at hour/minute level
+    if (zoom >= 2) return { unitInMinutes: 15, unitWidth: 8 * zoom, totalUnits: (24 * 60 * 14) / 15, format: (d: Date) => format(d, 'HH:mm') };
+    if (zoom >= 1) return { unitInMinutes: 60, unitWidth: 40 * zoom, totalUnits: 24 * 14, format: (d: Date) => format(d, 'HH:mm') };
+    return { unitInMinutes: 1440, unitWidth: 120 * zoom, totalUnits: 90, format: (d: Date) => format(d, 'dd MMM') };
   }, [zoom]);
 
   // fetch all once
@@ -391,7 +408,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       
       const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
       const today = format(new Date(), 'yyyy-MM-dd');
-      const daysToSchedule = 60;
+      const daysToSchedule = 120; // Extended to 120 days to schedule all tasks
       
       // Build employee data
       const employees: Array<{
@@ -810,13 +827,495 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       
       setDailyAssignments(newAssignments);
       setScheduleGenerated(true);
-      toast.success(`Planning: ${scheduledTasks.size} taken, gemiddeld ${avgPerEmployee} min/werknemer`);
+      
+      // ===== PHASE 6: Check project deadlines =====
+      console.log('🔍 PHASE 6: Checking project deadlines...');
+      const projectCompletionDates = new Map<string, { lastEndDate: Date; project: any; tasks: typeof scheduleTasks }>();
+      
+      // Group tasks by project and find the latest end date for each project
+      taskAssignments.forEach(({ start, end }, taskId) => {
+        const task = scheduleTasks.find(t => t.id === taskId);
+        if (!task?.project) return;
+        
+        const existing = projectCompletionDates.get(task.project.id);
+        if (!existing || end > existing.lastEndDate) {
+          projectCompletionDates.set(task.project.id, {
+            lastEndDate: end,
+            project: task.project,
+            tasks: existing ? [...existing.tasks, task] : [task]
+          });
+        } else if (existing) {
+          existing.tasks.push(task);
+        }
+      });
+      
+      // Also check for unassigned tasks by project
+      const projectsWithUnassignedTasks = new Set<string>();
+      unassignedTasks.forEach(task => {
+        if (task.project?.id) {
+          projectsWithUnassignedTasks.add(task.project.id);
+        }
+      });
+      
+      const warnings: ProjectDeadlineWarning[] = [];
+      let hasCapacityIssue = false;
+      
+      projectCompletionDates.forEach(({ lastEndDate, project }, projectId) => {
+        const installationDate = new Date(project.installation_date);
+        
+        // Check if project will be completed after installation date
+        if (lastEndDate > installationDate) {
+          const daysOverdue = Math.ceil(differenceInMinutes(lastEndDate, installationDate) / (24 * 60));
+          
+          warnings.push({
+            projectId,
+            projectName: project.name,
+            clientName: project.client || 'Onbekende klant',
+            installationDate,
+            estimatedCompletionDate: lastEndDate,
+            daysOverdue,
+            canReschedule: !projectsWithUnassignedTasks.has(projectId)
+          });
+          
+          // If project has unassigned tasks, it's a capacity issue
+          if (projectsWithUnassignedTasks.has(projectId)) {
+            hasCapacityIssue = true;
+          }
+        }
+      });
+      
+      // Check for completely unscheduled projects (all tasks unassigned)
+      const unscheduledProjects = new Map<string, { project: any; tasks: typeof scheduleTasks }>();
+      unassignedTasks.forEach(task => {
+        if (!task.project) return;
+        const existing = unscheduledProjects.get(task.project.id);
+        if (existing) {
+          existing.tasks.push(task);
+        } else {
+          unscheduledProjects.set(task.project.id, {
+            project: task.project,
+            tasks: [task]
+          });
+        }
+      });
+      
+      unscheduledProjects.forEach(({ project, tasks }, projectId) => {
+        // Only add if not already in warnings
+        if (!warnings.some(w => w.projectId === projectId)) {
+          const installationDate = new Date(project.installation_date);
+          const estimatedDuration = tasks.reduce((sum, t) => sum + t.duration, 0);
+          const estimatedDays = Math.ceil(estimatedDuration / (8 * 60)); // Assuming 8-hour workdays
+          const estimatedCompletion = addDays(new Date(), estimatedDays + 30); // Add buffer
+          
+          if (isBefore(installationDate, estimatedCompletion)) {
+            warnings.push({
+              projectId,
+              projectName: project.name,
+              clientName: project.client || 'Onbekende klant',
+              installationDate,
+              estimatedCompletionDate: estimatedCompletion,
+              daysOverdue: Math.ceil(differenceInMinutes(estimatedCompletion, installationDate) / (24 * 60)),
+              canReschedule: false
+            });
+            hasCapacityIssue = true;
+          }
+        }
+      });
+      
+      // Sort warnings by overdue days (most urgent first)
+      warnings.sort((a, b) => b.daysOverdue - a.daysOverdue);
+      
+      if (warnings.length > 0) {
+        console.warn(`⚠️ ${warnings.length} projects cannot meet their deadlines:`, warnings);
+        setDeadlineWarnings(warnings);
+        setCapacityIssue(hasCapacityIssue);
+        setShowDeadlineWarning(true);
+      } else {
+        console.log('✅ All projects scheduled to complete before their installation dates');
+        toast.success(`Planning: ${scheduledTasks.size} taken, gemiddeld ${avgPerEmployee} min/werknemer - Alle deadlines gehaald!`);
+      }
       
     } catch (error) {
       console.error('Generate planning error:', error);
       toast.error('Fout bij het genereren van planning');
     } finally {
       setGeneratingPlanning(false);
+    }
+  };
+  
+  // Reschedule to prioritize projects that are at risk of missing deadlines
+  const handleRescheduleForDeadlines = async () => {
+    setIsRescheduling(true);
+    setShowDeadlineWarning(false);
+    
+    try {
+      // Get projects that need prioritization
+      const urgentProjectIds = new Set(deadlineWarnings.filter(w => w.canReschedule).map(w => w.projectId));
+      
+      console.log('🚨 Rescheduling with urgent project prioritization:', urgentProjectIds);
+      
+      const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const daysToSchedule = 120;
+      
+      // Build employee data
+      const employees: Array<{
+        id: string;
+        name: string;
+        standardTasks: string[];
+        workstations: string[];
+      }> = [];
+      
+      employeeStandardTaskLinks.forEach((empList) => {
+        empList.forEach(emp => {
+          if (employees.some(e => e.id === emp.id)) return;
+          
+          const linkedWorkstations: string[] = [];
+          workstations.forEach(ws => {
+            const links = workstationEmployeeLinks.get(ws.id) || [];
+            if (links.some(e => e.id === emp.id)) {
+              linkedWorkstations.push(ws.id);
+            }
+          });
+          
+          employees.push({
+            id: emp.id,
+            name: emp.name,
+            standardTasks: [...emp.standardTasks],
+            workstations: linkedWorkstations
+          });
+        });
+      });
+      
+      // Build workstation capacity
+      const wsCapacity = new Map<string, number>();
+      workstations.forEach(ws => wsCapacity.set(ws.id, ws.active_workers || 1));
+      
+      // Build working hours config
+      const whConfig = new Map<number, { start_time: string; end_time: string; breaks?: Array<{ start_time: string; end_time: string }> }>();
+      workingHours
+        .filter(w => w.team === 'production' && w.is_active)
+        .forEach(w => {
+          whConfig.set(w.day_of_week, {
+            start_time: w.start_time,
+            end_time: w.end_time,
+            breaks: w.breaks
+          });
+        });
+      
+      // Prepare tasks with project info
+      const scheduleTasks = tasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        duration: t.duration,
+        status: t.status,
+        due_date: t.due_date,
+        standard_task_id: t.standard_task_id,
+        priority: t.priority,
+        project: t.phases?.projects,
+        workstations: t.workstations
+      }));
+      
+      const scheduledTasks = new Set<string>();
+      const taskEndTimes = new Map<string, Date>();
+      const taskAssignments = new Map<string, { employeeId: string; employeeName: string; workstationId: string; start: Date; end: Date }>();
+      const employeeSchedule = new Map<string, Array<{ start: Date; end: Date; taskId: string; workstationId: string }>>();
+      employees.forEach(e => employeeSchedule.set(e.id, []));
+      const wsSchedule = new Map<string, Map<string, Array<{ start: Date; end: Date; empId: string }>>>();
+      
+      // Enhanced priority scoring that strongly prioritizes urgent projects
+      const getScore = (task: typeof scheduleTasks[0]): number => {
+        if (!task.project) return -2000;
+        if (task.project.start_date > today) return -1000;
+        
+        let score = 0;
+        
+        // MASSIVE boost for urgent projects
+        if (urgentProjectIds.has(task.project.id)) {
+          score += 10000;
+        }
+        
+        const daysToInstall = differenceInMinutes(new Date(task.project.installation_date), new Date()) / (24 * 60);
+        score += Math.max(0, 100 - daysToInstall) * 2; // Double the installation urgency weight
+        
+        if (task.project.status === 'in_progress') score += 50;
+        if (task.priority === 'high') score += 100;
+        else if (task.priority === 'medium') score += 50;
+        
+        return score;
+      };
+      
+      // Helper functions (same as in handleGeneratePlanning)
+      const isWorkDay = (date: Date): boolean => {
+        const day = getDay(date);
+        return !isWeekend(date) && whConfig.has(day) && !holidaySet.has(format(date, 'yyyy-MM-dd'));
+      };
+      
+      const getNextWorkDay = (date: Date): Date => {
+        let d = addDays(date, 1);
+        while (!isWorkDay(d)) d = addDays(d, 1);
+        return d;
+      };
+      
+      const getDayHours = (date: Date) => {
+        const wh = whConfig.get(getDay(date));
+        if (!wh) return null;
+        const [sh, sm] = wh.start_time.split(':').map(Number);
+        const [eh, em] = wh.end_time.split(':').map(Number);
+        return {
+          start: setMinutes(setHours(startOfDay(date), sh), sm),
+          end: setMinutes(setHours(startOfDay(date), eh), em),
+          breaks: (wh.breaks || []).map(b => ({
+            start: setMinutes(setHours(startOfDay(date), parseInt(b.start_time.split(':')[0])), parseInt(b.start_time.split(':')[1])),
+            end: setMinutes(setHours(startOfDay(date), parseInt(b.end_time.split(':')[0])), parseInt(b.end_time.split(':')[1]))
+          }))
+        };
+      };
+      
+      const hasWsCapacity = (wsId: string, dateStr: string, start: Date, end: Date): boolean => {
+        const cap = wsCapacity.get(wsId) || 1;
+        if (!wsSchedule.has(dateStr)) return true;
+        const dayWs = wsSchedule.get(dateStr)!.get(wsId);
+        if (!dayWs) return true;
+        
+        const times = new Set<number>([start.getTime(), end.getTime()]);
+        dayWs.forEach(s => { times.add(s.start.getTime()); times.add(s.end.getTime()); });
+        
+        for (const t of times) {
+          if (t < start.getTime() || t >= end.getTime()) continue;
+          let concurrent = 1;
+          for (const slot of dayWs) {
+            if (t >= slot.start.getTime() && t < slot.end.getTime()) concurrent++;
+          }
+          if (concurrent > cap) return false;
+        }
+        return true;
+      };
+      
+      const findSlot = (
+        empId: string,
+        duration: number,
+        wsId: string,
+        minStart: Date
+      ): { start: Date; end: Date; dateStr: string } | null => {
+        const empSlots = employeeSchedule.get(empId) || [];
+        const sorted = [...empSlots].sort((a, b) => a.start.getTime() - b.start.getTime());
+        
+        for (let dayOffset = 0; dayOffset < daysToSchedule; dayOffset++) {
+          const date = addDays(startOfDay(timelineStart), dayOffset);
+          if (!isWorkDay(date)) continue;
+          
+          const dateStr = format(date, 'yyyy-MM-dd');
+          const hours = getDayHours(date);
+          if (!hours) continue;
+          
+          const daySlots = sorted
+            .filter(s => format(s.start, 'yyyy-MM-dd') === dateStr)
+            .sort((a, b) => a.start.getTime() - b.start.getTime());
+          
+          let candidate = date.getTime() < minStart.getTime() && format(minStart, 'yyyy-MM-dd') === dateStr
+            ? (minStart < hours.start ? hours.start : minStart)
+            : hours.start;
+          
+          const boundaries: { time: Date; type: 'slot_start' | 'slot_end' | 'break_start' | 'break_end' | 'day_end' }[] = [
+            ...daySlots.map(s => ({ time: s.start, type: 'slot_start' as const })),
+            ...daySlots.map(s => ({ time: s.end, type: 'slot_end' as const })),
+            ...hours.breaks.map(b => ({ time: b.start, type: 'break_start' as const })),
+            ...hours.breaks.map(b => ({ time: b.end, type: 'break_end' as const })),
+            { time: hours.end, type: 'day_end' as const }
+          ].sort((a, b) => a.time.getTime() - b.time.getTime());
+          
+          for (const boundary of boundaries) {
+            if (boundary.time.getTime() <= candidate.getTime()) {
+              if (boundary.type === 'slot_end' || boundary.type === 'break_end') {
+                if (boundary.time > candidate) candidate = boundary.time;
+              }
+              continue;
+            }
+            
+            const inBreak = hours.breaks.some(b => candidate >= b.start && candidate < b.end);
+            if (inBreak) {
+              const brk = hours.breaks.find(b => candidate >= b.start && candidate < b.end)!;
+              candidate = brk.end;
+              continue;
+            }
+            
+            const inSlot = daySlots.some(s => candidate >= s.start && candidate < s.end);
+            if (inSlot) {
+              const slot = daySlots.find(s => candidate >= s.start && candidate < s.end)!;
+              candidate = slot.end;
+              continue;
+            }
+            
+            const available = differenceInMinutes(boundary.time, candidate);
+            if (available >= duration) {
+              const potentialEnd = addMinutes(candidate, duration);
+              if (hasWsCapacity(wsId, dateStr, candidate, potentialEnd)) {
+                return { start: candidate, end: potentialEnd, dateStr };
+              }
+            }
+            
+            if (boundary.type === 'slot_end' || boundary.type === 'break_end') {
+              candidate = boundary.time;
+            } else if (boundary.type === 'slot_start') {
+              const s = daySlots.find(x => x.start.getTime() === boundary.time.getTime());
+              if (s) candidate = s.end;
+            } else if (boundary.type === 'break_start') {
+              const b = hours.breaks.find(x => x.start.getTime() === boundary.time.getTime());
+              if (b) candidate = b.end;
+            }
+          }
+        }
+        return null;
+      };
+      
+      const scheduleTask = (
+        task: typeof scheduleTasks[0],
+        empId: string,
+        empName: string,
+        wsId: string,
+        start: Date,
+        end: Date,
+        dateStr: string
+      ) => {
+        employeeSchedule.get(empId)!.push({ start, end, taskId: task.id, workstationId: wsId });
+        
+        if (!wsSchedule.has(dateStr)) wsSchedule.set(dateStr, new Map());
+        if (!wsSchedule.get(dateStr)!.has(wsId)) wsSchedule.get(dateStr)!.set(wsId, []);
+        wsSchedule.get(dateStr)!.get(wsId)!.push({ start, end, empId });
+        
+        taskEndTimes.set(task.id, end);
+        scheduledTasks.add(task.id);
+        taskAssignments.set(task.id, { employeeId: empId, employeeName: empName, workstationId: wsId, start, end });
+      };
+      
+      const tryAssign = (task: typeof scheduleTasks[0]): boolean => {
+        if (!task.standard_task_id) return false;
+        
+        const eligible = employees.filter(e => e.standardTasks.includes(task.standard_task_id!));
+        if (eligible.length === 0) return false;
+        
+        const taskWsIds = task.workstations?.map(w => w.id) || [];
+        
+        const scored = eligible.map(emp => {
+          const slots = employeeSchedule.get(emp.id) || [];
+          const workload = slots.reduce((sum, s) => sum + differenceInMinutes(s.end, s.start), 0);
+          const wsMatch = taskWsIds.some(wsId => emp.workstations.includes(wsId)) ? 500 : 0;
+          return { emp, score: (100000 - workload) + wsMatch };
+        }).sort((a, b) => b.score - a.score);
+        
+        for (const { emp } of scored) {
+          const compatWs = taskWsIds.filter(wsId => emp.workstations.includes(wsId));
+          const wsToTry = compatWs.length > 0 ? compatWs : emp.workstations;
+          
+          for (const wsId of wsToTry) {
+            const slot = findSlot(emp.id, task.duration, wsId, timelineStart);
+            if (slot) {
+              scheduleTask(task, emp.id, emp.name, wsId, slot.start, slot.end, slot.dateStr);
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      
+      // Filter and sort tasks with urgent projects first
+      const validTasks = scheduleTasks.filter(t => {
+        if (!t.standard_task_id) return false;
+        if (t.status !== 'TODO' && t.status !== 'HOLD') return false;
+        if (t.project && t.project.start_date > today) return false;
+        return true;
+      });
+      
+      const sortedTasks = [...validTasks].sort((a, b) => {
+        const scoreA = getScore(a);
+        const scoreB = getScore(b);
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      });
+      
+      // Schedule all tasks
+      const unassignedTasks: typeof scheduleTasks = [];
+      for (const task of sortedTasks) {
+        if (!tryAssign(task)) {
+          unassignedTasks.push(task);
+        }
+      }
+      
+      // Build UI assignments
+      const newAssignments: DailyEmployeeAssignment[] = [];
+      const empWsDays = new Map<string, Set<string>>();
+      
+      taskAssignments.forEach(({ employeeId, workstationId, start }) => {
+        const dateStr = format(start, 'yyyy-MM-dd');
+        const key = `${dateStr}|${workstationId}`;
+        if (!empWsDays.has(key)) empWsDays.set(key, new Set());
+        empWsDays.get(key)!.add(employeeId);
+      });
+      
+      empWsDays.forEach((emps, key) => {
+        const [date, wsId] = key.split('|');
+        Array.from(emps).forEach((empId, index) => {
+          const emp = employees.find(e => e.id === empId);
+          if (emp) {
+            newAssignments.push({
+              date,
+              workstationId: wsId,
+              workerIndex: index,
+              employeeId: empId,
+              employeeName: emp.name,
+            });
+          }
+        });
+      });
+      
+      setDailyAssignments(newAssignments);
+      
+      // Recheck deadlines
+      const projectCompletionDates = new Map<string, { lastEndDate: Date; project: any }>();
+      taskAssignments.forEach(({ end }, taskId) => {
+        const task = scheduleTasks.find(t => t.id === taskId);
+        if (!task?.project) return;
+        
+        const existing = projectCompletionDates.get(task.project.id);
+        if (!existing || end > existing.lastEndDate) {
+          projectCompletionDates.set(task.project.id, {
+            lastEndDate: end,
+            project: task.project
+          });
+        }
+      });
+      
+      const newWarnings: ProjectDeadlineWarning[] = [];
+      projectCompletionDates.forEach(({ lastEndDate, project }, projectId) => {
+        const installationDate = new Date(project.installation_date);
+        if (lastEndDate > installationDate) {
+          newWarnings.push({
+            projectId,
+            projectName: project.name,
+            clientName: project.client || 'Onbekende klant',
+            installationDate,
+            estimatedCompletionDate: lastEndDate,
+            daysOverdue: Math.ceil(differenceInMinutes(lastEndDate, installationDate) / (24 * 60)),
+            canReschedule: false
+          });
+        }
+      });
+      
+      if (newWarnings.length > 0) {
+        setDeadlineWarnings(newWarnings);
+        setCapacityIssue(true);
+        setShowDeadlineWarning(true);
+        toast.error(`${newWarnings.length} projecten kunnen niet op tijd worden afgerond - onvoldoende capaciteit`);
+      } else {
+        toast.success('Herplanning succesvol - alle projecten worden op tijd afgerond!');
+      }
+      
+    } catch (error) {
+      console.error('Reschedule error:', error);
+      toast.error('Fout bij het herplannen');
+    } finally {
+      setIsRescheduling(false);
     }
   };
 
@@ -1627,6 +2126,15 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   };
 
   return (
+    <>
+    <ProjectDeadlineWarningDialog
+      isOpen={showDeadlineWarning}
+      onClose={() => setShowDeadlineWarning(false)}
+      warnings={deadlineWarnings}
+      onReschedule={handleRescheduleForDeadlines}
+      isRescheduling={isRescheduling}
+      capacityIssue={capacityIssue}
+    />
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center gap-4 flex-wrap">
@@ -1978,6 +2486,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         )}
       </CardContent>
     </Card>
+    </>
   );
 });
 
