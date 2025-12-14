@@ -2170,15 +2170,15 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       const empSchedule = employeeSchedules.get(employeeId)!;
       empSchedule.push({ task, start: slots[0].start, end: slots[slots.length - 1].end });
 
-      // Add to workstation rendering (choose first workstation employee is linked to that task uses)
+      // Add to workstation rendering - ALWAYS use the task's assigned workstation
       let targetWorkstation: string | null = null;
-      for (const taskWs of task.workstations || []) {
-        if (employee.workstations.includes(taskWs.id)) {
-          targetWorkstation = taskWs.id;
-          break;
-        }
+      
+      // Priority 1: Use the task's assigned workstation (this is the correct workstation for the task)
+      if (task.workstations && task.workstations.length > 0) {
+        targetWorkstation = task.workstations[0].id;
       }
       
+      // Priority 2: Only if task has no workstation, use employee's linked workstation
       if (!targetWorkstation && employee.workstations.length > 0) {
         targetWorkstation = employee.workstations[0];
       }
