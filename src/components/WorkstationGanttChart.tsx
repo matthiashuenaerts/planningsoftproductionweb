@@ -105,6 +105,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [deadlineWarnings, setDeadlineWarnings] = useState<ProjectDeadlineWarning[]>([]);
   const [showDeadlineWarning, setShowDeadlineWarning] = useState(false);
   const [isRescheduling, setIsRescheduling] = useState(false);
+  const [reschedulingProjectId, setReschedulingProjectId] = useState<string | null>(null);
   const [capacityIssue, setCapacityIssue] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -1316,6 +1317,357 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       toast.error('Fout bij het herplannen');
     } finally {
       setIsRescheduling(false);
+      setReschedulingProjectId(null);
+    }
+  };
+
+  // Reschedule a single project to prioritize it
+  const handleRescheduleProject = async (projectId: string) => {
+    setIsRescheduling(true);
+    setReschedulingProjectId(projectId);
+    
+    try {
+      console.log('🚨 Rescheduling single project:', projectId);
+      
+      const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const daysToSchedule = 120;
+      
+      // Build employee data
+      const employees: Array<{
+        id: string;
+        name: string;
+        standardTasks: string[];
+        workstations: string[];
+      }> = [];
+      
+      employeeStandardTaskLinks.forEach((empList) => {
+        empList.forEach(emp => {
+          if (employees.some(e => e.id === emp.id)) return;
+          
+          const linkedWorkstations: string[] = [];
+          workstations.forEach(ws => {
+            const links = workstationEmployeeLinks.get(ws.id) || [];
+            if (links.some(e => e.id === emp.id)) {
+              linkedWorkstations.push(ws.id);
+            }
+          });
+          
+          employees.push({
+            id: emp.id,
+            name: emp.name,
+            standardTasks: [...emp.standardTasks],
+            workstations: linkedWorkstations
+          });
+        });
+      });
+      
+      // Build workstation capacity
+      const wsCapacity = new Map<string, number>();
+      workstations.forEach(ws => wsCapacity.set(ws.id, ws.active_workers || 1));
+      
+      // Build working hours config
+      const whConfig = new Map<number, { start_time: string; end_time: string; breaks?: Array<{ start_time: string; end_time: string }> }>();
+      workingHours
+        .filter(w => w.team === 'production' && w.is_active)
+        .forEach(w => {
+          whConfig.set(w.day_of_week, {
+            start_time: w.start_time,
+            end_time: w.end_time,
+            breaks: w.breaks
+          });
+        });
+      
+      // Prepare tasks with project info
+      const scheduleTasks = tasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        duration: t.duration,
+        status: t.status,
+        due_date: t.due_date,
+        standard_task_id: t.standard_task_id,
+        priority: t.priority,
+        project: t.phases?.projects,
+        workstations: t.workstations
+      }));
+      
+      const scheduledTasks = new Set<string>();
+      const taskEndTimes = new Map<string, Date>();
+      const taskAssignments = new Map<string, { employeeId: string; employeeName: string; workstationId: string; start: Date; end: Date }>();
+      const employeeSchedule = new Map<string, Array<{ start: Date; end: Date; taskId: string; workstationId: string }>>();
+      employees.forEach(e => employeeSchedule.set(e.id, []));
+      const wsSchedule = new Map<string, Map<string, Array<{ start: Date; end: Date; empId: string }>>>();
+      
+      // Priority scoring with MASSIVE boost for the selected project
+      const getScore = (task: typeof scheduleTasks[0]): number => {
+        if (!task.project) return -2000;
+        if (task.project.start_date > today) return -1000;
+        
+        let score = 0;
+        
+        // MASSIVE boost for the selected project
+        if (task.project.id === projectId) {
+          score += 50000;
+        }
+        
+        const daysToInstall = differenceInMinutes(new Date(task.project.installation_date), new Date()) / (24 * 60);
+        score += Math.max(0, 100 - daysToInstall) * 2;
+        
+        if (task.project.status === 'in_progress') score += 50;
+        if (task.priority === 'high') score += 100;
+        else if (task.priority === 'medium') score += 50;
+        
+        return score;
+      };
+      
+      // Helper functions (same as main scheduling)
+      const isWorkDay = (date: Date): boolean => {
+        const dayOfWeek = date.getDay();
+        const dateStr = format(date, 'yyyy-MM-dd');
+        if (holidaySet.has(dateStr)) return false;
+        return whConfig.has(dayOfWeek);
+      };
+      
+      const getNextSlotForEmployee = (empId: string, wsId: string, duration: number, minStart: Date): { start: Date; end: Date } | null => {
+        const slots = employeeSchedule.get(empId) || [];
+        let cursor = new Date(Math.max(minStart.getTime(), timelineStart.getTime()));
+        const maxDate = addDays(timelineStart, daysToSchedule);
+        
+        while (cursor < maxDate) {
+          if (!isWorkDay(cursor)) {
+            cursor = addDays(startOfDay(cursor), 1);
+            continue;
+          }
+          
+          const dayOfWeek = cursor.getDay();
+          const wh = whConfig.get(dayOfWeek);
+          if (!wh) {
+            cursor = addDays(startOfDay(cursor), 1);
+            continue;
+          }
+          
+          const [sh, sm] = wh.start_time.split(':').map(Number);
+          const [eh, em] = wh.end_time.split(':').map(Number);
+          const dayStart = setHours(setMinutes(startOfDay(cursor), sm), sh);
+          const dayEnd = setHours(setMinutes(startOfDay(cursor), em), eh);
+          
+          if (cursor < dayStart) cursor = dayStart;
+          if (cursor >= dayEnd) {
+            cursor = addDays(startOfDay(cursor), 1);
+            continue;
+          }
+          
+          const potentialEnd = addMinutes(cursor, duration);
+          if (potentialEnd > dayEnd) {
+            cursor = addDays(startOfDay(cursor), 1);
+            continue;
+          }
+          
+          const hasConflict = slots.some(s => 
+            (cursor >= s.start && cursor < s.end) ||
+            (potentialEnd > s.start && potentialEnd <= s.end) ||
+            (cursor <= s.start && potentialEnd >= s.end)
+          );
+          
+          if (!hasConflict) {
+            const dateStr = format(cursor, 'yyyy-MM-dd');
+            if (!wsSchedule.has(wsId)) wsSchedule.set(wsId, new Map());
+            const daySchedule = wsSchedule.get(wsId)!;
+            if (!daySchedule.has(dateStr)) daySchedule.set(dateStr, []);
+            const daySlots = daySchedule.get(dateStr)!;
+            
+            const concurrentWorkers = daySlots.filter(s =>
+              (cursor >= s.start && cursor < s.end) ||
+              (potentialEnd > s.start && potentialEnd <= s.end) ||
+              (cursor <= s.start && potentialEnd >= s.end)
+            ).length;
+            
+            const capacity = wsCapacity.get(wsId) || 1;
+            if (concurrentWorkers >= capacity) {
+              cursor = addMinutes(cursor, 15);
+              continue;
+            }
+            
+            return { start: cursor, end: potentialEnd };
+          }
+          
+          cursor = addMinutes(cursor, 15);
+        }
+        return null;
+      };
+      
+      const tryAssign = (task: typeof scheduleTasks[0]): boolean => {
+        if (!task.standard_task_id) return false;
+        if (scheduledTasks.has(task.id)) return true;
+        
+        const eligible = employees.filter(e => e.standardTasks.includes(task.standard_task_id!));
+        if (eligible.length === 0) return false;
+        
+        const taskWsIds = task.workstations?.map(w => w.id) || [];
+        
+        const scored = eligible.map(emp => {
+          const slots = employeeSchedule.get(emp.id) || [];
+          const workload = slots.reduce((sum, s) => sum + differenceInMinutes(s.end, s.start), 0);
+          const wsMatch = taskWsIds.some(wsId => emp.workstations.includes(wsId)) ? 500 : 0;
+          return { emp, score: (100000 - workload) + wsMatch };
+        }).sort((a, b) => b.score - a.score);
+        
+        for (const { emp } of scored) {
+          const compatWs = taskWsIds.filter(wsId => emp.workstations.includes(wsId));
+          const wsToTry = compatWs.length > 0 ? compatWs : emp.workstations;
+          
+          for (const wsId of wsToTry) {
+            const slot = getNextSlotForEmployee(emp.id, wsId, task.duration, timelineStart);
+            if (slot) {
+              scheduledTasks.add(task.id);
+              taskEndTimes.set(task.id, slot.end);
+              taskAssignments.set(task.id, {
+                employeeId: emp.id,
+                employeeName: emp.name,
+                workstationId: wsId,
+                start: slot.start,
+                end: slot.end
+              });
+              
+              const empSlots = employeeSchedule.get(emp.id)!;
+              empSlots.push({ start: slot.start, end: slot.end, taskId: task.id, workstationId: wsId });
+              
+              const dateStr = format(slot.start, 'yyyy-MM-dd');
+              if (!wsSchedule.has(wsId)) wsSchedule.set(wsId, new Map());
+              if (!wsSchedule.get(wsId)!.has(dateStr)) wsSchedule.get(wsId)!.set(dateStr, []);
+              wsSchedule.get(wsId)!.get(dateStr)!.push({ start: slot.start, end: slot.end, empId: emp.id });
+              
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      
+      // Schedule tasks with priority scoring
+      const todoTasks = scheduleTasks.filter(t => t.status === 'TODO' && !scheduledTasks.has(t.id));
+      const holdTasks = scheduleTasks.filter(t => t.status === 'HOLD' && !scheduledTasks.has(t.id));
+      const unassignedTasks: typeof scheduleTasks = [];
+      
+      todoTasks.sort((a, b) => getScore(b) - getScore(a));
+      holdTasks.sort((a, b) => getScore(b) - getScore(a));
+      
+      // Schedule TODO tasks first
+      for (const task of todoTasks) {
+        if (!tryAssign(task)) unassignedTasks.push(task);
+      }
+      
+      // Schedule HOLD tasks
+      for (const task of holdTasks) {
+        if (!tryAssign(task)) unassignedTasks.push(task);
+      }
+      
+      // Gap-filling
+      const stillUnassigned = [...unassignedTasks];
+      unassignedTasks.length = 0;
+      for (const task of stillUnassigned) {
+        if (!tryAssign(task)) unassignedTasks.push(task);
+      }
+      
+      // Build UI assignments
+      const newAssignments: DailyEmployeeAssignment[] = [];
+      const empWsDays = new Map<string, Set<string>>();
+      
+      taskAssignments.forEach(({ employeeId, workstationId, start }) => {
+        const dateStr = format(start, 'yyyy-MM-dd');
+        const key = `${dateStr}|${workstationId}`;
+        if (!empWsDays.has(key)) empWsDays.set(key, new Set());
+        empWsDays.get(key)!.add(employeeId);
+      });
+      
+      empWsDays.forEach((emps, key) => {
+        const [date, wsId] = key.split('|');
+        Array.from(emps).forEach((empId, index) => {
+          const emp = employees.find(e => e.id === empId);
+          if (emp) {
+            newAssignments.push({
+              date,
+              workstationId: wsId,
+              workerIndex: index,
+              employeeId: empId,
+              employeeName: emp.name,
+            });
+          }
+        });
+      });
+      
+      setDailyAssignments(newAssignments);
+      setScheduleGenerated(true);
+      
+      // Check if the project is now on time
+      let projectOnTime = true;
+      let projectEndDate: Date | null = null;
+      
+      taskAssignments.forEach(({ start, end }, taskId) => {
+        const task = scheduleTasks.find(t => t.id === taskId);
+        if (task?.project?.id === projectId) {
+          if (!projectEndDate || end > projectEndDate) {
+            projectEndDate = end;
+          }
+        }
+      });
+      
+      const targetProject = deadlineWarnings.find(w => w.projectId === projectId);
+      if (targetProject && projectEndDate) {
+        if (projectEndDate > targetProject.installationDate) {
+          projectOnTime = false;
+        }
+      }
+      
+      // Update warnings
+      const projectCompletionDates = new Map<string, { lastEndDate: Date; project: any }>();
+      taskAssignments.forEach(({ start, end }, taskId) => {
+        const task = scheduleTasks.find(t => t.id === taskId);
+        if (!task?.project) return;
+        
+        const existing = projectCompletionDates.get(task.project.id);
+        if (!existing || end > existing.lastEndDate) {
+          projectCompletionDates.set(task.project.id, {
+            lastEndDate: end,
+            project: task.project
+          });
+        }
+      });
+      
+      const newWarnings: ProjectDeadlineWarning[] = [];
+      projectCompletionDates.forEach(({ lastEndDate, project }, pId) => {
+        const installationDate = new Date(project.installation_date);
+        if (lastEndDate > installationDate) {
+          newWarnings.push({
+            projectId: pId,
+            projectName: project.name,
+            clientName: project.client || 'Onbekende klant',
+            installationDate,
+            estimatedCompletionDate: lastEndDate,
+            daysOverdue: Math.ceil(differenceInMinutes(lastEndDate, installationDate) / (24 * 60)),
+            canReschedule: true
+          });
+        }
+      });
+      
+      newWarnings.sort((a, b) => b.daysOverdue - a.daysOverdue);
+      setDeadlineWarnings(newWarnings);
+      
+      if (projectOnTime) {
+        toast.success(`Project "${targetProject?.projectName}" wordt nu op tijd afgerond!`);
+        if (newWarnings.length === 0) {
+          setShowDeadlineWarning(false);
+        }
+      } else {
+        toast.warning(`Project "${targetProject?.projectName}" kan nog steeds niet op tijd worden afgerond - onvoldoende capaciteit`);
+      }
+      
+    } catch (error) {
+      console.error('Reschedule project error:', error);
+      toast.error('Fout bij het herplannen van project');
+    } finally {
+      setIsRescheduling(false);
+      setReschedulingProjectId(null);
     }
   };
 
@@ -2132,7 +2484,9 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       onClose={() => setShowDeadlineWarning(false)}
       warnings={deadlineWarnings}
       onReschedule={handleRescheduleForDeadlines}
+      onRescheduleProject={handleRescheduleProject}
       isRescheduling={isRescheduling}
+      reschedulingProjectId={reschedulingProjectId}
       capacityIssue={capacityIssue}
     />
     <Card>

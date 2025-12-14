@@ -20,7 +20,9 @@ interface ProjectDeadlineWarningDialogProps {
   onClose: () => void;
   warnings: ProjectDeadlineWarning[];
   onReschedule: () => void;
+  onRescheduleProject: (projectId: string) => void;
   isRescheduling: boolean;
+  reschedulingProjectId: string | null;
   capacityIssue: boolean;
 }
 
@@ -29,7 +31,9 @@ export const ProjectDeadlineWarningDialog: React.FC<ProjectDeadlineWarningDialog
   onClose,
   warnings,
   onReschedule,
+  onRescheduleProject,
   isRescheduling,
+  reschedulingProjectId,
   capacityIssue,
 }) => {
   const canRescheduleAny = warnings.some(w => w.canReschedule);
@@ -59,10 +63,29 @@ export const ProjectDeadlineWarningDialog: React.FC<ProjectDeadlineWarningDialog
                     <h4 className="font-semibold text-foreground">{warning.projectName}</h4>
                     <p className="text-sm text-muted-foreground">{warning.clientName}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="flex items-center gap-2">
                     <span className="px-2 py-1 text-xs font-medium bg-destructive/10 text-destructive rounded">
                       {warning.daysOverdue} dagen te laat
                     </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onRescheduleProject(warning.projectId)}
+                      disabled={isRescheduling}
+                      className="h-7 text-xs"
+                    >
+                      {reschedulingProjectId === warning.projectId ? (
+                        <>
+                          <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                          Bezig...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-3 h-3 mr-1" />
+                          Inplannen
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
