@@ -671,21 +671,20 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         const eligible = employees.filter(e => e.standardTasks.includes(task.standard_task_id!));
         if (eligible.length === 0) return false;
         
+        // Use the task's workstations directly - ignore employee_workstation_links
         const taskWsIds = task.workstations?.map(w => w.id) || [];
+        if (taskWsIds.length === 0) return false;
         
-        // Score employees: least loaded + workstation match
+        // Score employees: least loaded only (no workstation matching)
         const scored = eligible.map(emp => {
           const slots = employeeSchedule.get(emp.id) || [];
           const workload = slots.reduce((sum, s) => sum + differenceInMinutes(s.end, s.start), 0);
-          const wsMatch = taskWsIds.some(wsId => emp.workstations.includes(wsId)) ? 500 : 0;
-          return { emp, score: (100000 - workload) + wsMatch };
+          return { emp, score: (100000 - workload) };
         }).sort((a, b) => b.score - a.score);
         
+        // Try to assign using task's workstations directly
         for (const { emp } of scored) {
-          const compatWs = taskWsIds.filter(wsId => emp.workstations.includes(wsId));
-          const wsToTry = compatWs.length > 0 ? compatWs : emp.workstations;
-          
-          for (const wsId of wsToTry) {
+          for (const wsId of taskWsIds) {
             const slot = findSlot(emp.id, task.duration, wsId, timelineStart);
             if (slot) {
               scheduleTask(task, emp.id, emp.name, wsId, slot.start, slot.end, slot.dateStr);
@@ -1503,20 +1502,20 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         const eligible = employees.filter(e => e.standardTasks.includes(task.standard_task_id!));
         if (eligible.length === 0) return false;
         
+        // Use the task's workstations directly - ignore employee_workstation_links
         const taskWsIds = task.workstations?.map(w => w.id) || [];
+        if (taskWsIds.length === 0) return false;
         
+        // Score employees: least loaded only (no workstation matching)
         const scored = eligible.map(emp => {
           const slots = employeeSchedule.get(emp.id) || [];
           const workload = slots.reduce((sum, s) => sum + differenceInMinutes(s.end, s.start), 0);
-          const wsMatch = taskWsIds.some(wsId => emp.workstations.includes(wsId)) ? 500 : 0;
-          return { emp, score: (100000 - workload) + wsMatch };
+          return { emp, score: (100000 - workload) };
         }).sort((a, b) => b.score - a.score);
         
+        // Try to assign using task's workstations directly
         for (const { emp } of scored) {
-          const compatWs = taskWsIds.filter(wsId => emp.workstations.includes(wsId));
-          const wsToTry = compatWs.length > 0 ? compatWs : emp.workstations;
-          
-          for (const wsId of wsToTry) {
+          for (const wsId of taskWsIds) {
             const slot = getNextSlotForEmployee(emp.id, wsId, task.duration, timelineStart);
             if (slot) {
               scheduledTasks.add(task.id);
@@ -2252,24 +2251,19 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         continue;
       }
 
-      // Score each employee based on current workload and capability
+      // Score each employee based on current workload only (ignore workstation links)
       const employeeScores = eligibleEmployees.map(emp => {
         const empSchedule = employeeSchedules.get(emp.id) || [];
         const currentWorkload = empSchedule.reduce((sum, s) => 
           sum + differenceInMinutes(s.end, s.start), 0
         );
         
-        // Prefer less loaded employees
+        // Prefer less loaded employees only
         const workloadScore = 10000 - currentWorkload;
-        
-        // Prefer employees working at task's workstations
-        const workstationMatchScore = task.workstations?.some(taskWs => 
-          emp.workstations.includes(taskWs.id)
-        ) ? 1000 : 0;
         
         return {
           employee: emp,
-          score: workloadScore + workstationMatchScore
+          score: workloadScore
         };
       }).sort((a, b) => b.score - a.score);
 
