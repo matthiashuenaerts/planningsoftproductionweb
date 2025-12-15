@@ -17,12 +17,32 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { 
-      automated = true,
-      baseUrl = 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
-      username = 'Matthias HUENAERTS',
-      password = '8pJ1A24z'
-    } = await req.json().catch(() => ({ automated: true }));
+    const body = await req.json().catch(() => ({ automated: true }));
+    const { automated = true } = body;
+    
+    // Load external DB credentials from database if not provided in request
+    let baseUrl = body.baseUrl;
+    let username = body.username;
+    let password = body.password;
+    
+    if (!baseUrl || !username || !password) {
+      console.log('Loading orders API config from database...');
+      const { data: configData, error: configError } = await supabase
+        .from('external_api_configs')
+        .select('*')
+        .eq('api_type', 'orders')
+        .single();
+      
+      if (configError || !configData) {
+        console.error('Failed to load orders API config from database:', configError);
+        throw new Error('Orders API configuration not found. Please save the configuration in Settings first.');
+      }
+      
+      baseUrl = configData.base_url;
+      username = configData.username;
+      password = configData.password;
+      console.log('Loaded orders API config from database');
+    }
     
     console.log(`Starting ${automated ? 'automated' : 'manual'} orders sync...`);
     
