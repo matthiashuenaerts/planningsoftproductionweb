@@ -1130,6 +1130,36 @@ export type Database = {
         }
         Relationships: []
       }
+      external_api_configs: {
+        Row: {
+          api_type: string
+          base_url: string
+          created_at: string
+          id: string
+          password: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          api_type: string
+          base_url: string
+          created_at?: string
+          id?: string
+          password: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          api_type?: string
+          base_url?: string
+          created_at?: string
+          id?: string
+          password?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
       front_hardware: {
         Row: {
           created_at: string

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,6 +59,7 @@ const ExternalDatabaseSettings: React.FC = () => {
   
   // Projects API state
   const [loading, setLoading] = useState(false);
+  const [loadingConfig, setLoadingConfig] = useState(true);
   const [testingConnection, setTestingConnection] = useState(false);
   const [testingQuery, setTestingQuery] = useState(false);
   const [syncingProjects, setSyncingProjects] = useState(false);
@@ -68,10 +69,10 @@ const ExternalDatabaseSettings: React.FC = () => {
   const [syncResult, setSyncResult] = useState<string>('');
   
   const [config, setConfig] = useState({
-    baseUrl: 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
-    username: 'Matthias HUENAERTS',
-    password: '8pJ1A24z',
-    testOrderNumber: '24000079'
+    baseUrl: '',
+    username: '',
+    password: '',
+    testOrderNumber: ''
   });
 
   // Orders API state
@@ -87,12 +88,58 @@ const ExternalDatabaseSettings: React.FC = () => {
   const [ordersSyncResult, setOrdersSyncResult] = useState<string>('');
   
   const [ordersConfig, setOrdersConfig] = useState({
-    baseUrl: 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
-    username: 'Matthias HUENAERTS',
-    password: '8pJ1A24z',
-    testOrderNumber: '25031020',
+    baseUrl: '',
+    username: '',
+    password: '',
+    testOrderNumber: '',
     enableDeliveryConfirmation: true
   });
+
+  // Load saved configurations on mount
+  useEffect(() => {
+    loadConfigurations();
+  }, []);
+
+  const loadConfigurations = async () => {
+    setLoadingConfig(true);
+    try {
+      const { data, error } = await supabase
+        .from('external_api_configs')
+        .select('*');
+
+      if (error) {
+        console.error('Error loading API configs:', error);
+        return;
+      }
+
+      if (data) {
+        const projectsConfig = data.find(c => c.api_type === 'projects');
+        const ordersConfigData = data.find(c => c.api_type === 'orders');
+
+        if (projectsConfig) {
+          setConfig(prev => ({
+            ...prev,
+            baseUrl: projectsConfig.base_url || '',
+            username: projectsConfig.username || '',
+            password: projectsConfig.password || ''
+          }));
+        }
+
+        if (ordersConfigData) {
+          setOrdersConfig(prev => ({
+            ...prev,
+            baseUrl: ordersConfigData.base_url || '',
+            username: ordersConfigData.username || '',
+            password: ordersConfigData.password || ''
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load configurations:', error);
+    } finally {
+      setLoadingConfig(false);
+    }
+  };
 
   const handleConfigChange = (field: string, value: string) => {
     setConfig(prev => ({ ...prev, [field]: value }));
@@ -286,19 +333,39 @@ const ExternalDatabaseSettings: React.FC = () => {
   };
 
   const saveConfiguration = async () => {
+    if (!config.baseUrl || !config.username || !config.password) {
+      toast({
+        title: "Configuration Required",
+        description: "Please fill in all required fields (URL, username, password)",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await supabase
+        .from('external_api_configs')
+        .upsert({
+          api_type: 'projects',
+          base_url: config.baseUrl,
+          username: config.username,
+          password: config.password,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'api_type' });
+
+      if (error) throw error;
       
       toast({
         title: "Configuration Saved",
-        description: "External database API configuration has been saved",
+        description: "Projects API configuration has been saved and will be used for sync operations",
       });
     } catch (error) {
+      console.error('Save configuration error:', error);
       toast({
         title: "Save Failed",
-        description: "Failed to save configuration",
+        description: error instanceof Error ? error.message : "Failed to save configuration",
         variant: "destructive"
       });
     } finally {
@@ -452,19 +519,39 @@ const ExternalDatabaseSettings: React.FC = () => {
   };
 
   const saveOrdersConfiguration = async () => {
+    if (!ordersConfig.baseUrl || !ordersConfig.username || !ordersConfig.password) {
+      toast({
+        title: "Configuration Required",
+        description: "Please fill in all required fields (URL, username, password)",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setOrdersLoading(true);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await supabase
+        .from('external_api_configs')
+        .upsert({
+          api_type: 'orders',
+          base_url: ordersConfig.baseUrl,
+          username: ordersConfig.username,
+          password: ordersConfig.password,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'api_type' });
+
+      if (error) throw error;
       
       toast({
         title: "Orders Configuration Saved",
-        description: "Orders API configuration has been saved",
+        description: "Orders API configuration has been saved and will be used for import operations",
       });
     } catch (error) {
+      console.error('Save orders configuration error:', error);
       toast({
         title: "Save Failed",
-        description: "Failed to save orders configuration",
+        description: error instanceof Error ? error.message : "Failed to save orders configuration",
         variant: "destructive"
       });
     } finally {

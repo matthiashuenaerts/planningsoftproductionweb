@@ -98,12 +98,29 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // External DB credentials - use from request or fallback to defaults
-    const externalDbConfig = body.config || {
-      baseUrl: 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
-      username: 'Matthias HUENAERTS',
-      password: '8pJ1A24z'
-    };
+    // Load external DB credentials from database if not provided in request
+    let externalDbConfig = body.config;
+    
+    if (!externalDbConfig) {
+      console.log('Loading API config from database...');
+      const { data: configData, error: configError } = await supabase
+        .from('external_api_configs')
+        .select('*')
+        .eq('api_type', 'projects')
+        .single();
+      
+      if (configError || !configData) {
+        console.error('Failed to load projects API config from database:', configError);
+        throw new Error('Projects API configuration not found. Please save the configuration in Settings first.');
+      }
+      
+      externalDbConfig = {
+        baseUrl: configData.base_url,
+        username: configData.username,
+        password: configData.password
+      };
+      console.log('Loaded API config from database');
+    }
 
     console.log('Using external DB config:', {
       baseUrl: externalDbConfig.baseUrl,
