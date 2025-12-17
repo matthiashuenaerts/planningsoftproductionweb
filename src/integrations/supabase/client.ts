@@ -5,25 +5,25 @@ import type { Database } from './types';
 const DEFAULT_SUPABASE_URL = "https://pqzfmphitzlgwnmexrbx.supabase.co";
 const DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4";
 
-// Try to load custom configuration from localStorage
-const getSupabaseConfig = () => {
-  if (typeof window !== 'undefined') {
-    try {
-      const saved = localStorage.getItem('supabase_connection_config');
-      if (saved) {
-        const config = JSON.parse(saved);
-        if (config.url && config.anonKey) {
-          return { url: config.url, key: config.anonKey };
-        }
+// Get Supabase config - try localStorage first, fall back to defaults
+let SUPABASE_URL = DEFAULT_SUPABASE_URL;
+let SUPABASE_PUBLISHABLE_KEY = DEFAULT_SUPABASE_KEY;
+
+try {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const saved = localStorage.getItem('supabase_connection_config');
+    if (saved) {
+      const config = JSON.parse(saved);
+      if (config.url && config.anonKey) {
+        SUPABASE_URL = config.url;
+        SUPABASE_PUBLISHABLE_KEY = config.anonKey;
       }
-    } catch (e) {
-      console.error('Failed to load Supabase config from localStorage:', e);
     }
   }
-  return { url: DEFAULT_SUPABASE_URL, key: DEFAULT_SUPABASE_KEY };
-};
-
-const { url: SUPABASE_URL, key: SUPABASE_PUBLISHABLE_KEY } = getSupabaseConfig();
+} catch (e) {
+  // Silently fall back to defaults if localStorage access fails
+  console.warn('Failed to load Supabase config from localStorage, using defaults');
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
