@@ -473,23 +473,16 @@ const TaskTimer = () => {
         const remainingMs = adjustedDurationMs - elapsedMs;
         
         if (remainingMs < 0) {
-          // Timer is negative - first reset timer to zero by updating start_time to NOW
+          // Timer is negative - show extra time dialog but keep original start_time
+          // so the time registration records the actual elapsed time correctly
           const overTimeMinutes = Math.floor(Math.abs(remainingMs) / (1000 * 60));
-          
-          // Reset start_time to NOW so elapsed becomes 0
-          await supabase
-            .from('time_registrations')
-            .update({ start_time: new Date().toISOString() })
-            .eq('id', activeRegistration.id);
-          
-          // Invalidate to refresh the registration with new start_time
-          await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+          const actualElapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
           
           setPendingStopData({
             registrationId: activeRegistration.id,
             taskDetails,
             overTimeMinutes,
-            elapsedMinutes: 0 // Now elapsed is 0
+            elapsedMinutes: actualElapsedMinutes
           });
           setShowExtraTimeDialog(true);
           return;
