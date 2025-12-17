@@ -18,6 +18,7 @@ import StockLocationsSettings from '@/components/settings/StockLocationsSettings
 import InstallationTeamsSettings from '@/components/settings/InstallationTeamsSettings';
 import PasswordSettings from '@/components/settings/PasswordSettings';
 import MaterialSettings from '@/components/settings/MaterialSettings';
+import SupabaseConnectionSettings from '@/components/settings/SupabaseConnectionSettings';
 import { Button } from '@/components/ui/button';
 import { Settings as SettingsIcon } from 'lucide-react';
 
@@ -100,6 +101,7 @@ const Settings: React.FC = () => {
               <TabsTrigger value="materials">Materials</TabsTrigger>
               <TabsTrigger value="installation-teams">Installation Teams</TabsTrigger>
               <TabsTrigger value="external-database">External Database API</TabsTrigger>
+              <TabsTrigger value="supabase">Supabase Connection</TabsTrigger>
               <TabsTrigger value="mail">Mail</TabsTrigger>
               <TabsTrigger value="help">Help Management</TabsTrigger>
             </TabsList>
@@ -150,6 +152,10 @@ const Settings: React.FC = () => {
 
             <TabsContent value="external-database">
               <ExternalDatabaseSettings />
+            </TabsContent>
+
+            <TabsContent value="supabase">
+              <SupabaseConnectionSettings />
             </TabsContent>
 
             <TabsContent value="mail">

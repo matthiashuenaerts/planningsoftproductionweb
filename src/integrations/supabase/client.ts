@@ -2,8 +2,28 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://pqzfmphitzlgwnmexrbx.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4";
+const DEFAULT_SUPABASE_URL = "https://pqzfmphitzlgwnmexrbx.supabase.co";
+const DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4";
+
+// Try to load custom configuration from localStorage
+const getSupabaseConfig = () => {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('supabase_connection_config');
+      if (saved) {
+        const config = JSON.parse(saved);
+        if (config.url && config.anonKey) {
+          return { url: config.url, key: config.anonKey };
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load Supabase config from localStorage:', e);
+    }
+  }
+  return { url: DEFAULT_SUPABASE_URL, key: DEFAULT_SUPABASE_KEY };
+};
+
+const { url: SUPABASE_URL, key: SUPABASE_PUBLISHABLE_KEY } = getSupabaseConfig();
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
