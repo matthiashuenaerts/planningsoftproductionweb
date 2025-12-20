@@ -60,6 +60,10 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [pageAnnotations, setPageAnnotations] = useState<Map<number, any[]>>(new Map());
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasUnsavedChanges = useRef(false);
 
   // Initialize PDF and Fabric canvas
   useEffect(() => {
@@ -141,6 +145,9 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       const pdfLibDocument = await PDFDocument.load(pdfBytes);
       setPdfLibDoc(pdfLibDocument);
 
+      // Load saved annotations from database
+      await loadAnnotationsFromDatabase();
+
       setLoading(false);
     } catch (error) {
       console.error('Error loading PDF:', error);
@@ -152,6 +159,198 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       setLoading(false);
     }
   };
+
+  // Load annotations from database
+  const loadAnnotationsFromDatabase = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('pdf_annotations')
+        .select('page_number, annotations')
+        .eq('project_id', projectId)
+        .eq('file_name', fileName);
+
+      if (error) {
+        console.error('Error loading annotations:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const annotationsMap = new Map<number, any[]>();
+        data.forEach(row => {
+          annotationsMap.set(row.page_number, row.annotations as any[]);
+        });
+        setPageAnnotations(annotationsMap);
+        console.log('Loaded annotations from database for', data.length, 'pages');
+      }
+    } catch (error) {
+      console.error('Error loading annotations from database:', error);
+    }
+  };
+
+  // Save annotations to database (debounced)
+  const saveAnnotationsToDatabase = async (pageNum: number, annotations: any[]) => {
+    try {
+      const { error } = await supabase
+        .from('pdf_annotations')
+        .upsert({
+          project_id: projectId,
+          file_name: fileName,
+          page_number: pageNum,
+          annotations: annotations
+        }, {
+          onConflict: 'project_id,file_name,page_number'
+        });
+
+      if (error) {
+        console.error('Error saving annotations to database:', error);
+        return false;
+      }
+      
+      console.log('Saved annotations to database for page', pageNum);
+      return true;
+    } catch (error) {
+      console.error('Error saving annotations to database:', error);
+      return false;
+    }
+  };
+
+  // Debounced auto-save function
+  const triggerAutoSave = () => {
+    hasUnsavedChanges.current = true;
+    
+    // Clear existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    
+    // Set new timeout for auto-save (2 seconds after last change)
+    autoSaveTimeoutRef.current = setTimeout(async () => {
+      if (hasUnsavedChanges.current) {
+        await performAutoSave();
+      }
+    }, 2000);
+  };
+
+  // Perform the actual auto-save
+  const performAutoSave = async () => {
+    if (!pdfLibDoc || !originalPdfBytes) return;
+    
+    setAutoSaving(true);
+    try {
+      // Save current page annotations first
+      savePageAnnotations(currentPage);
+      
+      // Save all page annotations to database
+      for (const [pageNum, annotations] of pageAnnotations.entries()) {
+        await saveAnnotationsToDatabase(pageNum, annotations);
+      }
+      
+      // Also save to PDF file
+      await saveToPDFSilent();
+      
+      hasUnsavedChanges.current = false;
+      setLastSaved(new Date());
+      console.log('Auto-save completed');
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+    } finally {
+      setAutoSaving(false);
+    }
+  };
+
+  // Silent save to PDF (no toast notifications)
+  const saveToPDFSilent = async () => {
+    if (!pdfLibDoc || !originalPdfBytes) return;
+
+    try {
+      // Create a new PDF document from the original
+      const newPdfDoc = await PDFDocument.load(originalPdfBytes);
+      const font = await newPdfDoc.embedFont(StandardFonts.Helvetica);
+
+      // Apply annotations to each page
+      for (const [pageNum, annotations] of pageAnnotations.entries()) {
+        const page = newPdfDoc.getPage(pageNum - 1);
+        const { width, height } = page.getSize();
+        
+        const scaleX = width / (fabricCanvasRef.current?.width || 800);
+        const scaleY = height / (fabricCanvasRef.current?.height || 600);
+
+        for (const annotation of annotations) {
+          const x = annotation.left * scaleX;
+          const y = height - (annotation.top * scaleY);
+
+          switch (annotation.type) {
+            case 'textbox':
+              if (annotation.text) {
+                const fontSize = (annotation.fontSize || 18) * scaleX;
+                const colorArray = hexToRgb(annotation.fill || '#000000');
+                page.drawText(annotation.text, {
+                  x,
+                  y,
+                  size: fontSize,
+                  font,
+                  color: rgb(colorArray.r / 255, colorArray.g / 255, colorArray.b / 255),
+                });
+              }
+              break;
+            case 'rect':
+              const rectWidth = annotation.width * scaleX;
+              const rectHeight = annotation.height * scaleY;
+              const rectColorArray = hexToRgb(annotation.stroke || '#000000');
+              page.drawRectangle({
+                x,
+                y: y - rectHeight,
+                width: rectWidth,
+                height: rectHeight,
+                borderColor: rgb(rectColorArray.r / 255, rectColorArray.g / 255, rectColorArray.b / 255),
+                borderWidth: annotation.strokeWidth || 1,
+              });
+              break;
+            case 'circle':
+              const radius = annotation.radius * scaleX;
+              const circleColorArray = hexToRgb(annotation.stroke || '#000000');
+              page.drawCircle({
+                x: x + radius,
+                y: y - radius,
+                size: radius,
+                borderColor: rgb(circleColorArray.r / 255, circleColorArray.g / 255, circleColorArray.b / 255),
+                borderWidth: annotation.strokeWidth || 1,
+              });
+              break;
+          }
+        }
+      }
+
+      // Save the modified PDF
+      const pdfBytes = await newPdfDoc.save();
+      
+      // Upload the modified PDF back to Supabase
+      const filePath = `${projectId}/${fileName}`;
+      const { error } = await supabase
+        .storage
+        .from('project_files')
+        .upload(filePath, new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' }), { 
+          upsert: true 
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Silent PDF save failed:', error);
+    }
+  };
+
+  // Cleanup auto-save timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      // Perform final save on unmount if there are unsaved changes
+      if (hasUnsavedChanges.current) {
+        performAutoSave();
+      }
+    };
+  }, []);
 
   const initializeFabricCanvas = () => {
     if (!canvasRef.current) {
@@ -349,6 +548,7 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     console.log('Drawing created');
     saveCanvasState();
     savePageAnnotations(currentPage);
+    triggerAutoSave();
   };
 
   const handleObjectAdded = () => {
@@ -361,12 +561,14 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     console.log('Object modified');
     saveCanvasState();
     savePageAnnotations(currentPage);
+    triggerAutoSave();
   };
 
   const handleObjectRemoved = () => {
     console.log('Object removed');
     saveCanvasState();
     savePageAnnotations(currentPage);
+    triggerAutoSave();
   };
 
   const handleToolChange = (tool: typeof activeTool) => {
@@ -426,10 +628,23 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       transparentCorners: false
     });
 
+    // Listen for text changes
+    textbox.on('changed', () => {
+      savePageAnnotations(currentPage);
+      triggerAutoSave();
+    });
+
+    textbox.on('editing:exited', () => {
+      savePageAnnotations(currentPage);
+      triggerAutoSave();
+    });
+
     fabricCanvasRef.current.add(textbox);
     fabricCanvasRef.current.setActiveObject(textbox);
     textbox.enterEditing();
     saveCanvasState();
+    savePageAnnotations(currentPage);
+    triggerAutoSave();
   };
 
   const addRectangle = () => {
@@ -451,6 +666,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     fabricCanvasRef.current.add(rect);
     fabricCanvasRef.current.setActiveObject(rect);
     saveCanvasState();
+    savePageAnnotations(currentPage);
+    triggerAutoSave();
   };
 
   const addCircle = () => {
@@ -471,6 +688,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     fabricCanvasRef.current.add(circle);
     fabricCanvasRef.current.setActiveObject(circle);
     saveCanvasState();
+    savePageAnnotations(currentPage);
+    triggerAutoSave();
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -494,6 +713,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
           fabricCanvasRef.current.add(img);
           fabricCanvasRef.current.setActiveObject(img);
           saveCanvasState();
+          savePageAnnotations(currentPage);
+          triggerAutoSave();
         }
       });
     };
@@ -511,6 +732,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       if (activeTool === 'erase' && e.target) {
         fabricCanvasRef.current?.remove(e.target);
         saveCanvasState();
+        savePageAnnotations(currentPage);
+        triggerAutoSave();
       }
     });
   };
@@ -522,6 +745,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       fabricCanvasRef.current.loadFromJSON(state, () => {
         fabricCanvasRef.current?.renderAll();
         setHistoryIndex(newIndex);
+        savePageAnnotations(currentPage);
+        triggerAutoSave();
       });
     }
   };
@@ -533,6 +758,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       fabricCanvasRef.current.loadFromJSON(state, () => {
         fabricCanvasRef.current?.renderAll();
         setHistoryIndex(newIndex);
+        savePageAnnotations(currentPage);
+        triggerAutoSave();
       });
     }
   };
@@ -544,13 +771,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     objects.forEach(obj => fabricCanvasRef.current?.remove(obj));
     fabricCanvasRef.current.renderAll();
     saveCanvasState();
-  };
-
-  const autoSaveToPDF = async () => {
-    if (!pdfLibDoc || !originalPdfBytes) return;
-    
-    console.log('Auto-saving annotations to PDF...');
-    // The actual saving will happen when user clicks "Save to PDF"
+    savePageAnnotations(currentPage);
+    triggerAutoSave();
   };
 
   const saveToPDF = async () => {
@@ -848,10 +1070,17 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
               </Button>
             </div>
             
-            {saving && (
+            {(saving || autoSaving) && (
               <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-3 py-1 rounded">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                <span className="text-sm">Saving...</span>
+                <span className="text-sm">{autoSaving ? 'Auto-saving...' : 'Saving...'}</span>
+              </div>
+            )}
+            
+            {lastSaved && !saving && !autoSaving && (
+              <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1 rounded">
+                <Save className="h-4 w-4" />
+                <span className="text-sm">Saved {lastSaved.toLocaleTimeString()}</span>
               </div>
             )}
           </div>
