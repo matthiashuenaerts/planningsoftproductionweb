@@ -515,10 +515,13 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
     }
   };
 
-  const endDate = format(
-    new Date(new Date(startDate).getTime() + (duration - 1) * 24 * 60 * 60 * 1000),
-    'yyyy-MM-dd'
-  );
+  // Safely compute endDate only if startDate is valid
+  const endDate = startDate && !isNaN(new Date(startDate).getTime())
+    ? format(
+        new Date(new Date(startDate).getTime() + (duration - 1) * 24 * 60 * 60 * 1000),
+        'yyyy-MM-dd'
+      )
+    : '';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
