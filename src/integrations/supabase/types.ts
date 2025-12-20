@@ -1871,6 +1871,36 @@ export type Database = {
           },
         ]
       }
+      pdf_annotations: {
+        Row: {
+          annotations: Json
+          created_at: string
+          file_name: string
+          id: string
+          page_number: number
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          annotations?: Json
+          created_at?: string
+          file_name: string
+          id?: string
+          page_number: number
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          annotations?: Json
+          created_at?: string
+          file_name?: string
+          id?: string
+          page_number?: number
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       personal_item_attachments: {
         Row: {
           created_at: string
