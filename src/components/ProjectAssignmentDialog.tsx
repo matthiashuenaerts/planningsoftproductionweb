@@ -263,21 +263,50 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
         return;
       }
 
-      console.log('Updating project team assignment...');
-      // Update project team assignment
-      const { error: assignmentError } = await supabase
+      // Check if a team assignment already exists for this project
+      const { data: existingAssignment, error: checkError } = await supabase
         .from('project_team_assignments')
-        .update({
-          team_id: selectedTeamId,
-          team: selectedTeam.name,
-          start_date: startDate,
-          duration: duration,
-        })
-        .eq('project_id', projectId);
+        .select('id')
+        .eq('project_id', projectId)
+        .maybeSingle();
 
-      if (assignmentError) {
-        console.error('Assignment error:', assignmentError);
-        throw assignmentError;
+      if (checkError) {
+        console.error('Check assignment error:', checkError);
+        throw checkError;
+      }
+
+      if (existingAssignment) {
+        console.log('Updating existing project team assignment...');
+        const { error: assignmentError } = await supabase
+          .from('project_team_assignments')
+          .update({
+            team_id: selectedTeamId,
+            team: selectedTeam.name,
+            start_date: startDate,
+            duration: duration,
+          })
+          .eq('project_id', projectId);
+
+        if (assignmentError) {
+          console.error('Assignment update error:', assignmentError);
+          throw assignmentError;
+        }
+      } else {
+        console.log('Creating new project team assignment...');
+        const { error: insertError } = await supabase
+          .from('project_team_assignments')
+          .insert({
+            project_id: projectId,
+            team_id: selectedTeamId,
+            team: selectedTeam.name,
+            start_date: startDate,
+            duration: duration,
+          });
+
+        if (insertError) {
+          console.error('Assignment insert error:', insertError);
+          throw insertError;
+        }
       }
 
       console.log('Updating project installation date...');
