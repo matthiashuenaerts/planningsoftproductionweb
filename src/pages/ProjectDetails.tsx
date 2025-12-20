@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Loader2, Circle, Eye, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, MapPin } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Loader2, Circle, Eye, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, MapPin, DollarSign } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -39,6 +39,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PartDetailDialog } from '@/components/PartDetailDialog';
+import { ProjectCostingTab } from '@/components/ProjectCostingTab';
 interface TaskWithTimeData extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
@@ -1048,6 +1049,11 @@ const ProjectDetails = () => {
                 <Button variant={activeTab === 'onedrive' ? 'default' : 'outline'} onClick={() => setActiveTab('onedrive')}>
                   <Folder className="mr-2 h-4 w-4" /> {t('onedrive')}
                 </Button>
+                {currentEmployee?.role === 'admin' && (
+                  <Button variant={activeTab === 'costing' ? 'default' : 'outline'} onClick={() => setActiveTab('costing')}>
+                    <DollarSign className="mr-2 h-4 w-4" /> Costing
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -1454,7 +1460,7 @@ const ProjectDetails = () => {
                     </div>}
                 </div>
               </CardContent>
-            </Card> : activeTab === 'accessories' ? <AccessoriesInlineView projectId={projectId!} /> : <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            </Card> : activeTab === 'accessories' ? <AccessoriesInlineView projectId={projectId!} /> : activeTab === 'costing' ? <ProjectCostingTab projectId={projectId!} /> : <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-1">
                 <CardHeader className="py-[15px]">
                   <CardTitle>{t('project_summary')}</CardTitle>
