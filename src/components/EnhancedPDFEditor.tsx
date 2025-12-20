@@ -104,21 +104,39 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     loadPdfJs();
   }, [pdfUrl]);
 
-  // Initialize Fabric canvas when PDF is loaded
+  // Initialize Fabric canvas when PDF is loaded and canvas is available
   useEffect(() => {
-    if (pdfDoc && canvasRef.current && !fabricCanvasRef.current) {
+    if (pdfDoc && canvasRef.current && !fabricCanvasRef.current && !loading) {
       console.log('Initializing Fabric canvas...');
-      initializeFabricCanvas();
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        initializeFabricCanvas();
+        // Render the first page after canvas is initialized
+        setTimeout(() => {
+          if (fabricCanvasRef.current) {
+            renderPage(currentPage);
+          }
+        }, 200);
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [pdfDoc, canvasSize]);
+  }, [pdfDoc, canvasSize, loading]);
 
   // Re-render when page or scale changes
   useEffect(() => {
     if (pdfDoc && !loading && initialized && fabricCanvasRef.current) {
-      console.log('Rendering page:', currentPage);
+      console.log('Rendering page due to change:', currentPage, 'scale:', scale);
       renderPage(currentPage);
     }
-  }, [currentPage, scale, pdfDoc, initialized]);
+  }, [currentPage, scale, initialized]);
+
+  // Force re-render when fabricCanvas is created
+  useEffect(() => {
+    if (fabricCanvasRef.current && pdfDoc && !loading) {
+      console.log('Fabric canvas ready, rendering page');
+      renderPage(currentPage);
+    }
+  }, [fabricCanvasRef.current, pdfDoc, loading]);
 
   const loadPDF = async () => {
     try {
@@ -393,8 +411,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
   };
 
   const renderPage = async (pageNum: number) => {
-    if (!pdfDoc || !fabricCanvasRef.current || loading) {
-      console.log('Cannot render page - missing dependencies');
+    if (!pdfDoc || !fabricCanvasRef.current) {
+      console.log('Cannot render page - missing dependencies', { pdfDoc: !!pdfDoc, fabricCanvas: !!fabricCanvasRef.current });
       return;
     }
 
@@ -407,7 +425,10 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       // Create a temporary canvas for PDF rendering
       const tempCanvas = document.createElement('canvas');
       const tempContext = tempCanvas.getContext('2d');
-      if (!tempContext) return;
+      if (!tempContext) {
+        console.error('Could not get 2D context');
+        return;
+      }
       
       tempCanvas.height = viewport.height;
       tempCanvas.width = viewport.width;
@@ -418,26 +439,36 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       };
 
       await page.render(renderContext).promise;
+      console.log('PDF page rendered to temp canvas');
       
-      // Update Fabric canvas size and background
+      // Update Fabric canvas size
       fabricCanvasRef.current.setDimensions({
         width: viewport.width,
         height: viewport.height
       });
 
-      // Set PDF as background
-      const dataURL = tempCanvas.toDataURL();
-      FabricImage.fromURL(dataURL).then((img) => {
-        if (fabricCanvasRef.current) {
+      // Set PDF as background using the data URL
+      const dataURL = tempCanvas.toDataURL('image/png');
+      console.log('Created data URL, setting as background...');
+      
+      try {
+        const img = await FabricImage.fromURL(dataURL);
+        if (fabricCanvasRef.current && img) {
+          // Scale image to fit the canvas
+          img.scaleToWidth(viewport.width);
+          img.scaleToHeight(viewport.height);
+          
           fabricCanvasRef.current.backgroundImage = img;
           fabricCanvasRef.current.renderAll();
           
           // Load annotations for this page
           loadPageAnnotations(pageNum);
           
-          console.log('Page rendered successfully');
+          console.log('Page rendered successfully with background');
         }
-      });
+      } catch (imgError) {
+        console.error('Error loading background image:', imgError);
+      }
     } catch (error) {
       console.error('Error rendering page:', error);
       toast({
@@ -1088,14 +1119,16 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
         
         {/* Canvas Container */}
         <div className="bg-white rounded-lg shadow-sm p-4 overflow-auto max-h-[70vh]">
-          <div className="flex justify-center min-h-[500px]">
+          <div className="flex justify-center min-h-[500px] items-start">
             <canvas 
               ref={canvasRef} 
+              width={canvasSize.width * scale}
+              height={canvasSize.height * scale}
               className="border border-gray-200 rounded shadow-sm" 
               style={{ 
                 display: 'block',
                 maxWidth: '100%',
-                height: 'auto'
+                backgroundColor: '#fff'
               }}
             />
           </div>
