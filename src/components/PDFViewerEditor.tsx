@@ -161,8 +161,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       const pdfBytes = new Uint8Array(await response.arrayBuffer());
       setOriginalPdfBytes(pdfBytes);
 
-      // Load with PDF.js
-      const pdf = await window.pdfjsLib.getDocument(pdfUrl).promise;
+      // Load with PDF.js (use in-memory bytes so blob URLs + workers don't break)
+      const pdf = await (window.pdfjsLib as any).getDocument({ data: pdfBytes }).promise;
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
       
@@ -485,17 +485,17 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Apply tool settings
   const applyToolSettings = (tool: ToolType) => {
     if (!fabricCanvasRef.current) return;
-    
+
     const canvas = fabricCanvasRef.current;
-    
+
     // Reset modes
     canvas.isDrawingMode = false;
     canvas.selection = true;
     canvas.defaultCursor = 'default';
-    
+
     // Remove previous click handlers
     canvas.off('mouse:down');
-    
+
     switch (tool) {
       case 'draw':
         canvas.isDrawingMode = true;
@@ -505,17 +505,111 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           canvas.freeDrawingBrush.width = strokeWidth;
         }
         break;
+
       case 'erase':
         canvas.selection = false;
         canvas.defaultCursor = 'crosshair';
         canvas.on('mouse:down', (e) => {
-          if (e.target && activeTool === 'erase') {
+          if (e.target) {
             canvas.remove(e.target);
+            saveCanvasState();
             triggerAutoSave();
           }
         });
         break;
+
+      case 'text':
+        canvas.selection = false;
+        canvas.defaultCursor = 'text';
+        canvas.on('mouse:down', (e) => {
+          const pointer = canvas.getPointer(e.e);
+          const textbox = new Textbox('Type...', {
+            left: pointer.x,
+            top: pointer.y,
+            width: 220,
+            fontSize,
+            fontFamily,
+            fill: drawingColor,
+            borderColor: '#0066ff',
+            cornerColor: '#0066ff',
+            cornerSize: 8,
+            transparentCorners: false,
+          });
+
+          textbox.on('changed', () => triggerAutoSave());
+          textbox.on('editing:exited', () => triggerAutoSave());
+
+          canvas.add(textbox);
+          canvas.setActiveObject(textbox);
+          textbox.enterEditing();
+          saveCanvasState();
+          triggerAutoSave();
+
+          // Return to select mode after placing
+          setActiveTool('select');
+          setTimeout(() => applyToolSettings('select'), 0);
+        });
+        break;
+
+      case 'rectangle':
+        canvas.selection = false;
+        canvas.defaultCursor = 'crosshair';
+        canvas.on('mouse:down', (e) => {
+          const pointer = canvas.getPointer(e.e);
+          const rect = new Rect({
+            left: pointer.x,
+            top: pointer.y,
+            width: 160,
+            height: 100,
+            fill: 'transparent',
+            stroke: drawingColor,
+            strokeWidth,
+            borderColor: '#0066ff',
+            cornerColor: '#0066ff',
+            cornerSize: 8,
+            transparentCorners: false,
+          });
+
+          canvas.add(rect);
+          canvas.setActiveObject(rect);
+          saveCanvasState();
+          triggerAutoSave();
+
+          setActiveTool('select');
+          setTimeout(() => applyToolSettings('select'), 0);
+        });
+        break;
+
+      case 'circle':
+        canvas.selection = false;
+        canvas.defaultCursor = 'crosshair';
+        canvas.on('mouse:down', (e) => {
+          const pointer = canvas.getPointer(e.e);
+          const circle = new FabricCircle({
+            left: pointer.x,
+            top: pointer.y,
+            radius: 60,
+            fill: 'transparent',
+            stroke: drawingColor,
+            strokeWidth,
+            borderColor: '#0066ff',
+            cornerColor: '#0066ff',
+            cornerSize: 8,
+            transparentCorners: false,
+          });
+
+          canvas.add(circle);
+          canvas.setActiveObject(circle);
+          saveCanvasState();
+          triggerAutoSave();
+
+          setActiveTool('select');
+          setTimeout(() => applyToolSettings('select'), 0);
+        });
+        break;
+
       case 'select':
+      default:
         canvas.selection = true;
         break;
     }
@@ -524,19 +618,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Handle tool change
   const handleToolChange = (tool: ToolType) => {
     setActiveTool(tool);
-    
-    if (tool === 'text') {
-      addTextbox();
-      setActiveTool('select');
-    } else if (tool === 'rectangle') {
-      addRectangle();
-      setActiveTool('select');
-    } else if (tool === 'circle') {
-      addCircle();
-      setActiveTool('select');
-    } else {
-      applyToolSettings(tool);
-    }
+    applyToolSettings(tool);
   };
 
   // Add textbox
@@ -895,12 +977,24 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       // Leaving edit mode - save annotations
       saveCurrentPageAnnotations();
       performAutoSave();
+
+      // Dispose Fabric canvas so the underlying <canvas> can be used by PDF.js preview rendering
+      if (fabricCanvasRef.current) {
+        fabricCanvasRef.current.dispose();
+        fabricCanvasRef.current = null;
+      }
     }
     setIsEditMode(!isEditMode);
   };
 
   // Cancel edits
   const cancelEdits = () => {
+    // Dispose Fabric canvas immediately
+    if (fabricCanvasRef.current) {
+      fabricCanvasRef.current.dispose();
+      fabricCanvasRef.current = null;
+    }
+
     // Reload from database
     pageAnnotationsRef.current.clear();
     loadAnnotationsFromDatabase().then(() => {
@@ -932,7 +1026,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full bg-background" ref={containerRef}>
+    <div className="flex flex-col min-h-[70vh] h-[80vh] bg-background" ref={containerRef}>
       {/* Header Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 p-3 border-b bg-card">
         {/* Left: Navigation */}
@@ -1159,7 +1253,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       {/* Canvas Container */}
       <div 
         ref={canvasContainerRef}
-        className="flex-1 overflow-auto bg-muted/50 p-4"
+        className="flex-1 min-h-0 overflow-auto bg-muted/50 p-4"
       >
         <div className="flex justify-center">
           <canvas 
@@ -1167,10 +1261,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             width={canvasSize.width * scale}
             height={canvasSize.height * scale}
             className="shadow-lg bg-white"
-            style={{
-              maxWidth: '100%',
-              height: 'auto'
-            }}
+            style={{ display: 'block' }}
+            aria-label="PDF canvas"
           />
         </div>
       </div>
