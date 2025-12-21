@@ -156,30 +156,62 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
   const loadPDF = async () => {
     try {
+      console.log('Loading PDF from URL:', pdfUrl);
+      
       // Fetch PDF bytes
       const response = await fetch(pdfUrl);
-      const pdfBytes = new Uint8Array(await response.arrayBuffer());
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      const pdfBytes = new Uint8Array(arrayBuffer);
+      
+      console.log('PDF bytes loaded, size:', pdfBytes.length);
+      
+      // Validate PDF header
+      if (pdfBytes.length < 5) {
+        throw new Error('PDF file is too small or empty');
+      }
+      
+      // Check for PDF magic number (%PDF-)
+      const header = String.fromCharCode(pdfBytes[0], pdfBytes[1], pdfBytes[2], pdfBytes[3], pdfBytes[4]);
+      console.log('PDF header:', header);
+      
+      if (!header.startsWith('%PDF-')) {
+        console.error('Invalid PDF header. First 20 bytes:', 
+          Array.from(pdfBytes.slice(0, 20)).map(b => String.fromCharCode(b)).join(''));
+        throw new Error('Invalid PDF file - missing PDF header');
+      }
+      
       setOriginalPdfBytes(pdfBytes);
 
-      // Load with PDF.js (use in-memory bytes so blob URLs + workers don't break)
-      const pdf = await (window.pdfjsLib as any).getDocument({ data: pdfBytes }).promise;
+      // Load with PDF.js
+      console.log('Loading PDF with PDF.js...');
+      const loadingTask = (window.pdfjsLib as any).getDocument({ data: pdfBytes.slice() });
+      const pdf = await loadingTask.promise;
+      
+      console.log('PDF.js loaded successfully. Pages:', pdf.numPages);
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
       
       // Get first page dimensions
       const page = await pdf.getPage(1);
       const viewport = page.getViewport({ scale: 1.0 });
+      console.log('First page viewport:', viewport.width, 'x', viewport.height);
       setCanvasSize({ width: viewport.width, height: viewport.height });
       
       // Load saved annotations
       await loadAnnotationsFromDatabase();
       
       setLoading(false);
+      console.log('PDF loading complete');
     } catch (error) {
       console.error('Error loading PDF:', error);
       toast({
         title: "Error",
-        description: "Failed to load PDF document",
+        description: `Failed to load PDF: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
       setLoading(false);
@@ -214,24 +246,37 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
   // Render PDF page (preview mode or as background in edit mode)
   const renderPDFPage = useCallback(async (pageNum: number, targetCanvas?: HTMLCanvasElement) => {
-    if (!pdfDoc) return null;
+    console.log('renderPDFPage called, pageNum:', pageNum, 'pdfDoc:', !!pdfDoc);
+    
+    if (!pdfDoc) {
+      console.error('Cannot render: pdfDoc is null');
+      return null;
+    }
     
     try {
+      console.log('Getting page', pageNum);
       const page = await pdfDoc.getPage(pageNum);
       const viewport = page.getViewport({ scale });
       
+      console.log('Page viewport:', viewport.width, 'x', viewport.height);
+      
       const canvas = targetCanvas || document.createElement('canvas');
       const context = canvas.getContext('2d');
-      if (!context) return null;
+      if (!context) {
+        console.error('Cannot get 2D context');
+        return null;
+      }
       
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       
+      console.log('Rendering page to canvas...');
       await page.render({
         canvasContext: context,
         viewport: viewport
       }).promise;
       
+      console.log('Page rendered successfully');
       return { canvas, viewport };
     } catch (error) {
       console.error('Error rendering PDF page:', error);
@@ -241,19 +286,29 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
   // Initialize/update Fabric canvas for edit mode
   const initializeFabricCanvas = useCallback(async () => {
-    if (!canvasRef.current || !pdfDoc) return;
+    console.log('initializeFabricCanvas called, canvasRef:', !!canvasRef.current, 'pdfDoc:', !!pdfDoc);
+    
+    if (!canvasRef.current || !pdfDoc) {
+      console.error('Cannot initialize Fabric: missing refs');
+      return;
+    }
     
     // Render PDF page first
+    console.log('Rendering PDF page for background...');
     const result = await renderPDFPage(currentPage);
-    if (!result) return;
+    if (!result) {
+      console.error('Failed to render PDF page for background');
+      return;
+    }
     
     const { canvas: pdfCanvas, viewport } = result;
+    console.log('PDF page rendered, creating Fabric canvas...');
     
     // Dispose existing canvas
     if (fabricCanvasRef.current) {
-      // Save current annotations before disposing
       saveCurrentPageAnnotations();
       fabricCanvasRef.current.dispose();
+      fabricCanvasRef.current = null;
     }
     
     // Create new Fabric canvas
@@ -264,9 +319,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       preserveObjectStacking: true
     });
     
+    console.log('Fabric canvas created, setting background...');
+    
     // Set PDF as background
     try {
       const dataUrl = pdfCanvas.toDataURL('image/png');
+      console.log('Data URL created, length:', dataUrl.length);
+      
       const img = await FabricImage.fromURL(dataUrl);
       img.set({
         selectable: false,
@@ -279,6 +338,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       img.scaleToWidth(viewport.width);
       fabricCanvas.backgroundImage = img;
       fabricCanvas.renderAll();
+      console.log('Background image set successfully');
     } catch (error) {
       console.error('Error setting background:', error);
     }
@@ -315,21 +375,26 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     
     // Apply current tool
     applyToolSettings(activeTool);
+    
+    console.log('Fabric canvas initialization complete');
   }, [pdfDoc, currentPage, scale, drawingColor, strokeWidth]);
 
   // Effect to initialize fabric canvas when entering edit mode
   useEffect(() => {
+    console.log('Edit mode effect - isEditMode:', isEditMode, 'pdfDoc:', !!pdfDoc, 'loading:', loading);
     if (isEditMode && pdfDoc && !loading) {
       const timer = setTimeout(() => {
         initializeFabricCanvas();
-      }, 100);
+      }, 150);
       return () => clearTimeout(timer);
     }
   }, [isEditMode, pdfDoc, loading, currentPage, scale]);
 
   // Effect to render preview mode
   useEffect(() => {
+    console.log('Preview mode effect - isEditMode:', isEditMode, 'pdfDoc:', !!pdfDoc, 'canvasRef:', !!canvasRef.current, 'loading:', loading);
     if (!isEditMode && pdfDoc && canvasRef.current && !loading) {
+      console.log('Rendering preview...');
       renderPDFPage(currentPage, canvasRef.current);
     }
   }, [isEditMode, pdfDoc, currentPage, scale, loading, renderPDFPage]);
@@ -765,10 +830,24 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
   // Save annotations to PDF file
   const saveToPDF = async () => {
-    if (!originalPdfBytes) {
+    console.log('saveToPDF called, originalPdfBytes:', originalPdfBytes?.length);
+    
+    if (!originalPdfBytes || originalPdfBytes.length < 5) {
       toast({
         title: "Error",
-        description: "PDF not loaded properly",
+        description: "PDF not loaded properly - no data available",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Validate PDF header
+    const header = String.fromCharCode(originalPdfBytes[0], originalPdfBytes[1], originalPdfBytes[2], originalPdfBytes[3], originalPdfBytes[4]);
+    if (!header.startsWith('%PDF-')) {
+      console.error('Invalid PDF bytes in save. Header:', header);
+      toast({
+        title: "Error",
+        description: "PDF data is corrupted - please reload the document",
         variant: "destructive"
       });
       return;
@@ -781,8 +860,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         saveCurrentPageAnnotations();
       }
       
-      // Create new PDF from original
-      const newPdfDoc = await PDFDocument.load(originalPdfBytes);
+      console.log('Loading PDF for modification...');
+      // Create new PDF from original - use a copy of the bytes
+      const pdfBytesArray = originalPdfBytes.slice();
+      const newPdfDoc = await PDFDocument.load(pdfBytesArray);
       const font = await newPdfDoc.embedFont(StandardFonts.Helvetica);
       
       // Apply annotations to each page
