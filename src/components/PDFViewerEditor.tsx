@@ -1049,26 +1049,26 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   };
 
   // Toggle edit mode
-  const toggleEditMode = () => {
+  const toggleEditMode = useCallback(() => {
     if (isEditMode) {
-      // Leaving edit mode - save annotations
+      // Leaving edit mode - save annotations first, then dispose Fabric BEFORE state change
       saveCurrentPageAnnotations();
       performAutoSave();
 
-      // Dispose Fabric canvas so the underlying <canvas> can be used by PDF.js preview rendering
+      // Dispose Fabric canvas BEFORE React re-renders
       if (fabricCanvasRef.current) {
         fabricCanvasRef.current.dispose();
         fabricCanvasRef.current = null;
       }
 
       setActiveTool('select');
+      setIsEditMode(false);
     } else {
       // Entering edit mode: default to pencil so users can start annotating immediately
       setActiveTool('draw');
+      setIsEditMode(true);
     }
-
-    setIsEditMode(!isEditMode);
-  };
+  }, [isEditMode, saveCurrentPageAnnotations, performAutoSave]);
 
   // Cancel edits
   const cancelEdits = () => {
@@ -1352,20 +1352,23 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               aria-label="PDF preview canvas"
             />
 
-            {/* Fabric overlay for annotations – only mounted in edit mode */}
-            {isEditMode && (
-              <div
-                className="absolute top-0 left-0"
-                style={{ width: canvasSize.width, height: canvasSize.height, pointerEvents: 'auto' }}
-              >
-                <canvas
-                  ref={overlayCanvasRef}
-                  className="block"
-                  style={{ display: 'block' }}
-                  aria-label="PDF annotation canvas"
-                />
-              </div>
-            )}
+            {/* Fabric overlay for annotations – always mounted but hidden when not editing */}
+            <div
+              className="absolute top-0 left-0"
+              style={{
+                width: canvasSize.width,
+                height: canvasSize.height,
+                pointerEvents: isEditMode ? 'auto' : 'none',
+                visibility: isEditMode ? 'visible' : 'hidden',
+              }}
+            >
+              <canvas
+                ref={overlayCanvasRef}
+                className="block"
+                style={{ display: 'block' }}
+                aria-label="PDF annotation canvas"
+              />
+            </div>
           </div>
         </div>
       </div>
