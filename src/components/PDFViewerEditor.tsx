@@ -84,7 +84,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Canvas state
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const editCanvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<FabricCanvas | null>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 1000 });
   
@@ -286,13 +287,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
   // Initialize/update Fabric canvas for edit mode
   const initializeFabricCanvas = useCallback(async () => {
-    console.log('initializeFabricCanvas called, canvasRef:', !!canvasRef.current, 'pdfDoc:', !!pdfDoc);
-    
-    if (!canvasRef.current || !pdfDoc) {
+    console.log('initializeFabricCanvas called, editCanvasRef:', !!editCanvasRef.current, 'pdfDoc:', !!pdfDoc);
+
+    if (!editCanvasRef.current || !pdfDoc) {
       console.error('Cannot initialize Fabric: missing refs');
       return;
     }
-    
+
     // Render PDF page first
     console.log('Rendering PDF page for background...');
     const result = await renderPDFPage(currentPage);
@@ -300,27 +301,26 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       console.error('Failed to render PDF page for background');
       return;
     }
-    
+
     const { canvas: pdfCanvas, viewport } = result;
     console.log('PDF page rendered, creating Fabric canvas...');
-    
+
     // Dispose existing canvas
     if (fabricCanvasRef.current) {
       saveCurrentPageAnnotations();
       fabricCanvasRef.current.dispose();
       fabricCanvasRef.current = null;
     }
-    
+
     // Create new Fabric canvas
-    const fabricCanvas = new FabricCanvas(canvasRef.current, {
+    const fabricCanvas = new FabricCanvas(editCanvasRef.current, {
       width: viewport.width,
       height: viewport.height,
       backgroundColor: 'white',
-      preserveObjectStacking: true
+      preserveObjectStacking: true,
     });
-    
+
     console.log('Fabric canvas created, setting background...');
-    
     // Set PDF as background
     try {
       const dataUrl = pdfCanvas.toDataURL('image/png');
@@ -392,10 +392,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
   // Effect to render preview mode
   useEffect(() => {
-    console.log('Preview mode effect - isEditMode:', isEditMode, 'pdfDoc:', !!pdfDoc, 'canvasRef:', !!canvasRef.current, 'loading:', loading);
-    if (!isEditMode && pdfDoc && canvasRef.current && !loading) {
+    console.log('Preview mode effect - isEditMode:', isEditMode, 'pdfDoc:', !!pdfDoc, 'previewCanvasRef:', !!previewCanvasRef.current, 'loading:', loading);
+    if (!isEditMode && pdfDoc && previewCanvasRef.current && !loading) {
       console.log('Rendering preview...');
-      renderPDFPage(currentPage, canvasRef.current);
+      renderPDFPage(currentPage, previewCanvasRef.current);
     }
   }, [isEditMode, pdfDoc, currentPage, scale, loading, renderPDFPage]);
 
@@ -1064,7 +1064,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         fabricCanvasRef.current.dispose();
         fabricCanvasRef.current = null;
       }
+
+      setActiveTool('select');
+    } else {
+      // Entering edit mode: default to pencil so users can start annotating immediately
+      setActiveTool('draw');
     }
+
     setIsEditMode(!isEditMode);
   };
 
@@ -1337,14 +1343,21 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         className="flex-1 min-h-0 overflow-auto bg-muted/50 p-4"
       >
         <div className="flex justify-center">
-          <canvas 
-            ref={canvasRef}
-            width={canvasSize.width * scale}
-            height={canvasSize.height * scale}
-            className="shadow-lg bg-white"
-            style={{ display: 'block' }}
-            aria-label="PDF canvas"
-          />
+          {!isEditMode ? (
+            <canvas
+              ref={previewCanvasRef}
+              className="shadow-lg bg-white"
+              style={{ display: 'block' }}
+              aria-label="PDF preview canvas"
+            />
+          ) : (
+            <canvas
+              ref={editCanvasRef}
+              className="shadow-lg bg-white"
+              style={{ display: 'block' }}
+              aria-label="PDF edit canvas"
+            />
+          )}
         </div>
       </div>
     </div>
