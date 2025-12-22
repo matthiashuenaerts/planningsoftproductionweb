@@ -28,7 +28,7 @@ import {
   Check,
   RotateCcw
 } from 'lucide-react';
-import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Textbox, Path, FabricImage } from 'fabric';
+import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Textbox, Path } from 'fabric';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 interface PDFViewerEditorProps {
@@ -84,8 +84,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Canvas state
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
-  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
-  const editCanvasRef = useRef<HTMLCanvasElement>(null);
+  const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<FabricCanvas | null>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 1000 });
   
@@ -115,6 +115,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         setLoading(true);
         
         if (window.pdfjsLib) {
+          // Ensure worker is configured even when PDF.js is already present
+          (window.pdfjsLib as any).GlobalWorkerOptions.workerSrc =
+            (window.pdfjsLib as any).GlobalWorkerOptions.workerSrc ||
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
           await loadPDF();
           return;
         }
@@ -248,35 +252,38 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Render PDF page (preview mode or as background in edit mode)
   const renderPDFPage = useCallback(async (pageNum: number, targetCanvas?: HTMLCanvasElement) => {
     console.log('renderPDFPage called, pageNum:', pageNum, 'pdfDoc:', !!pdfDoc);
-    
+
     if (!pdfDoc) {
       console.error('Cannot render: pdfDoc is null');
       return null;
     }
-    
+
     try {
       console.log('Getting page', pageNum);
       const page = await pdfDoc.getPage(pageNum);
       const viewport = page.getViewport({ scale });
-      
+
       console.log('Page viewport:', viewport.width, 'x', viewport.height);
-      
+
       const canvas = targetCanvas || document.createElement('canvas');
       const context = canvas.getContext('2d');
       if (!context) {
         console.error('Cannot get 2D context');
         return null;
       }
-      
+
+      // Keep wrapper + overlay in sync with the actual rendered viewport
+      setCanvasSize({ width: viewport.width, height: viewport.height });
+
       canvas.width = viewport.width;
       canvas.height = viewport.height;
-      
+
       console.log('Rendering page to canvas...');
       await page.render({
         canvasContext: context,
-        viewport: viewport
+        viewport: viewport,
       }).promise;
-      
+
       console.log('Page rendered successfully');
       return { canvas, viewport };
     } catch (error) {
@@ -285,97 +292,80 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
   }, [pdfDoc, scale]);
 
-  // Initialize/update Fabric canvas for edit mode
+  // Initialize/update Fabric canvas for edit mode (overlay on top of a real PDF.js canvas)
   const initializeFabricCanvas = useCallback(async () => {
-    console.log('initializeFabricCanvas called, editCanvasRef:', !!editCanvasRef.current, 'pdfDoc:', !!pdfDoc);
+    console.log(
+      'initializeFabricCanvas called, overlayCanvasRef:',
+      !!overlayCanvasRef.current,
+      'pdfCanvasRef:',
+      !!pdfCanvasRef.current,
+      'pdfDoc:',
+      !!pdfDoc,
+    );
 
-    if (!editCanvasRef.current || !pdfDoc) {
+    if (!overlayCanvasRef.current || !pdfCanvasRef.current || !pdfDoc) {
       console.error('Cannot initialize Fabric: missing refs');
       return;
     }
 
-    // Render PDF page first
-    console.log('Rendering PDF page for background...');
-    const result = await renderPDFPage(currentPage);
+    // Render PDF page into the underlying PDF canvas
+    const result = await renderPDFPage(currentPage, pdfCanvasRef.current);
     if (!result) {
-      console.error('Failed to render PDF page for background');
+      console.error('Failed to render PDF page');
       return;
     }
 
-    const { canvas: pdfCanvas, viewport } = result;
-    console.log('PDF page rendered, creating Fabric canvas...');
+    const { viewport } = result;
 
-    // Dispose existing canvas
+    // Dispose existing fabric canvas
     if (fabricCanvasRef.current) {
       saveCurrentPageAnnotations();
       fabricCanvasRef.current.dispose();
       fabricCanvasRef.current = null;
     }
 
-    // Create new Fabric canvas
-    const fabricCanvas = new FabricCanvas(editCanvasRef.current, {
+    // Create overlay Fabric canvas
+    const fabricCanvas = new FabricCanvas(overlayCanvasRef.current, {
       width: viewport.width,
       height: viewport.height,
-      backgroundColor: 'white',
+      backgroundColor: 'transparent',
       preserveObjectStacking: true,
+      selection: true,
     });
 
-    console.log('Fabric canvas created, setting background...');
-    // Set PDF as background
-    try {
-      const dataUrl = pdfCanvas.toDataURL('image/png');
-      console.log('Data URL created, length:', dataUrl.length);
-      
-      const img = await FabricImage.fromURL(dataUrl);
-      img.set({
-        selectable: false,
-        evented: false,
-        originX: 'left',
-        originY: 'top',
-        left: 0,
-        top: 0
-      });
-      img.scaleToWidth(viewport.width);
-      fabricCanvas.backgroundImage = img;
-      fabricCanvas.renderAll();
-      console.log('Background image set successfully');
-    } catch (error) {
-      console.error('Error setting background:', error);
-    }
-    
     // Configure brush
     if (fabricCanvas.freeDrawingBrush) {
       fabricCanvas.freeDrawingBrush.color = drawingColor;
       fabricCanvas.freeDrawingBrush.width = strokeWidth;
     }
-    
+
     // Add event listeners
     fabricCanvas.on('path:created', () => {
       saveCanvasState();
       triggerAutoSave();
     });
-    
+
     fabricCanvas.on('object:modified', () => {
       saveCanvasState();
       triggerAutoSave();
     });
-    
+
     fabricCanvas.on('object:removed', () => {
       saveCanvasState();
       triggerAutoSave();
     });
-    
+
     fabricCanvasRef.current = fabricCanvas;
-    
+
     // Load annotations for this page
     loadPageAnnotations(currentPage);
-    
+
     // Save initial state
     saveCanvasState();
-    
+
     // Apply current tool
     applyToolSettings(activeTool);
-    
+
     console.log('Fabric canvas initialization complete');
   }, [pdfDoc, currentPage, scale, drawingColor, strokeWidth]);
 
@@ -392,10 +382,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
   // Effect to render preview mode
   useEffect(() => {
-    console.log('Preview mode effect - isEditMode:', isEditMode, 'pdfDoc:', !!pdfDoc, 'previewCanvasRef:', !!previewCanvasRef.current, 'loading:', loading);
-    if (!isEditMode && pdfDoc && previewCanvasRef.current && !loading) {
+    console.log('Preview mode effect - isEditMode:', isEditMode, 'pdfDoc:', !!pdfDoc, 'pdfCanvasRef:', !!pdfCanvasRef.current, 'loading:', loading);
+    if (!isEditMode && pdfDoc && pdfCanvasRef.current && !loading) {
       console.log('Rendering preview...');
-      renderPDFPage(currentPage, previewCanvasRef.current);
+      renderPDFPage(currentPage, pdfCanvasRef.current);
     }
   }, [isEditMode, pdfDoc, currentPage, scale, loading, renderPDFPage]);
 
@@ -1338,26 +1328,32 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       )}
 
       {/* Canvas Container */}
-      <div 
+      <div
         ref={canvasContainerRef}
         className="flex-1 min-h-0 overflow-auto bg-muted/50 p-4"
       >
         <div className="flex justify-center">
-          {!isEditMode ? (
+          <div
+            className="relative shadow-lg bg-white"
+            style={{ width: canvasSize.width, height: canvasSize.height }}
+            aria-label="PDF canvas wrapper"
+          >
             <canvas
-              ref={previewCanvasRef}
-              className="shadow-lg bg-white"
+              ref={pdfCanvasRef}
+              className="block"
               style={{ display: 'block' }}
               aria-label="PDF preview canvas"
             />
-          ) : (
-            <canvas
-              ref={editCanvasRef}
-              className="shadow-lg bg-white"
-              style={{ display: 'block' }}
-              aria-label="PDF edit canvas"
-            />
-          )}
+
+            {isEditMode && (
+              <canvas
+                ref={overlayCanvasRef}
+                className="absolute inset-0 block"
+                style={{ display: 'block' }}
+                aria-label="PDF annotation canvas"
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>
