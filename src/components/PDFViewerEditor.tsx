@@ -324,7 +324,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       fabricCanvasRef.current = null;
     }
 
-    // Create overlay Fabric canvas
+    // Create overlay Fabric canvas with same size as PDF
+    overlayCanvasRef.current.width = viewport.width;
+    overlayCanvasRef.current.height = viewport.height;
+
     const fabricCanvas = new FabricCanvas(overlayCanvasRef.current, {
       width: viewport.width,
       height: viewport.height,
@@ -332,6 +335,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       preserveObjectStacking: true,
       selection: true,
     });
+
+    // Immediately enable drawing mode
+    fabricCanvas.isDrawingMode = true;
 
     // Configure brush
     if (fabricCanvas.freeDrawingBrush) {
@@ -1334,24 +1340,31 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       >
         <div className="flex justify-center">
           <div
-            className="relative shadow-lg bg-white"
+            className="relative shadow-lg bg-white overflow-hidden"
             style={{ width: canvasSize.width, height: canvasSize.height }}
             aria-label="PDF canvas wrapper"
           >
+            {/* PDF rendered by PDF.js */}
             <canvas
               ref={pdfCanvasRef}
-              className="block"
+              className="absolute top-0 left-0 block"
               style={{ display: 'block' }}
               aria-label="PDF preview canvas"
             />
 
+            {/* Fabric overlay for annotations – only mounted in edit mode */}
             {isEditMode && (
-              <canvas
-                ref={overlayCanvasRef}
-                className="absolute inset-0 block"
-                style={{ display: 'block' }}
-                aria-label="PDF annotation canvas"
-              />
+              <div
+                className="absolute top-0 left-0"
+                style={{ width: canvasSize.width, height: canvasSize.height, pointerEvents: 'auto' }}
+              >
+                <canvas
+                  ref={overlayCanvasRef}
+                  className="block"
+                  style={{ display: 'block' }}
+                  aria-label="PDF annotation canvas"
+                />
+              </div>
             )}
           </div>
         </div>
