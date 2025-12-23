@@ -13,6 +13,7 @@ interface ProjectCostingTabProps {
 interface TimeRegistrationCost {
   employeeName: string;
   totalMinutes: number;
+  totalCost: number;
   taskCount: number;
 }
 
@@ -34,7 +35,7 @@ interface CostingSummary {
   orderItems: OrderItemCost[];
 }
 
-const HOURLY_RATE = 45; // Default hourly rate in EUR - could be made configurable
+const DEFAULT_HOURLY_RATE = 45; // Fallback hourly rate if task has no hourly_cost defined
 
 export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId }) => {
   const [loading, setLoading] = useState(true);
@@ -45,12 +46,13 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
     const fetchCostingData = async () => {
       setLoading(true);
       try {
-        // Fetch time registrations for all tasks in this project
+        // Fetch tasks for this project with their standard_task_id
         const { data: tasks, error: tasksError } = await supabase
           .from('tasks')
           .select(`
             id,
             title,
+            standard_task_id,
             phases!inner(project_id)
           `)
           .eq('phases.project_id', projectId);
@@ -58,10 +60,30 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
         if (tasksError) throw tasksError;
 
         const taskIds = tasks?.map(t => t.id) || [];
+        
+        // Create a map of task_id to standard_task_id
+        const taskToStandardTaskMap = new Map<string, string | null>();
+        tasks?.forEach(t => {
+          taskToStandardTaskMap.set(t.id, t.standard_task_id);
+        });
+
+        // Fetch all standard tasks to get their hourly_cost
+        const { data: standardTasks, error: standardTasksError } = await supabase
+          .from('standard_tasks')
+          .select('id, hourly_cost');
+
+        if (standardTasksError) throw standardTasksError;
+
+        // Create a map of standard_task_id to hourly_cost
+        const standardTaskCostMap = new Map<string, number>();
+        standardTasks?.forEach(st => {
+          standardTaskCostMap.set(st.id, st.hourly_cost || DEFAULT_HOURLY_RATE);
+        });
 
         // Fetch time registrations for these tasks
         let employeeCosts: TimeRegistrationCost[] = [];
         let totalLaborMinutes = 0;
+        let totalLaborCost = 0;
 
         if (taskIds.length > 0) {
           const { data: timeRegs, error: timeRegsError } = await supabase
@@ -69,6 +91,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
             .select(`
               id,
               employee_id,
+              task_id,
               duration_minutes,
               employees(name)
             `)
@@ -77,32 +100,42 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
 
           if (timeRegsError) throw timeRegsError;
 
-          // Group by employee
-          const employeeMap = new Map<string, { name: string; totalMinutes: number; taskCount: number }>();
+          // Group by employee with cost calculation based on task's standard_task hourly_cost
+          const employeeMap = new Map<string, { name: string; totalMinutes: number; totalCost: number; taskCount: number }>();
           
           timeRegs?.forEach(reg => {
             const employeeId = reg.employee_id;
             const employeeName = (reg.employees as any)?.name || 'Unknown';
             const minutes = reg.duration_minutes || 0;
+            const taskId = reg.task_id;
+            
+            // Get the hourly cost for this task
+            const standardTaskId = taskToStandardTaskMap.get(taskId);
+            const hourlyCost = standardTaskId ? (standardTaskCostMap.get(standardTaskId) || DEFAULT_HOURLY_RATE) : DEFAULT_HOURLY_RATE;
+            const registrationCost = (minutes / 60) * hourlyCost;
             
             if (employeeMap.has(employeeId)) {
               const existing = employeeMap.get(employeeId)!;
               existing.totalMinutes += minutes;
+              existing.totalCost += registrationCost;
               existing.taskCount += 1;
             } else {
               employeeMap.set(employeeId, {
                 name: employeeName,
                 totalMinutes: minutes,
+                totalCost: registrationCost,
                 taskCount: 1
               });
             }
             
             totalLaborMinutes += minutes;
+            totalLaborCost += registrationCost;
           });
 
           employeeCosts = Array.from(employeeMap.values()).map(e => ({
             employeeName: e.name,
             totalMinutes: e.totalMinutes,
+            totalCost: e.totalCost,
             taskCount: e.taskCount
           }));
         }
@@ -145,8 +178,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
           });
         });
 
-        // Calculate total costs
-        const totalLaborCost = (totalLaborMinutes / 60) * HOURLY_RATE;
+        // Calculate total project cost
         const totalProjectCost = totalLaborCost + totalMaterialCost;
 
         setCostingSummary({
@@ -264,7 +296,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                   <TableHead>Employee</TableHead>
                   <TableHead className="text-right">Tasks</TableHead>
                   <TableHead className="text-right">Time Spent</TableHead>
-                  <TableHead className="text-right">Cost (@ €{HOURLY_RATE}/hr)</TableHead>
+                  <TableHead className="text-right">Cost</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -273,7 +305,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     <TableCell className="font-medium">{emp.employeeName}</TableCell>
                     <TableCell className="text-right">{emp.taskCount}</TableCell>
                     <TableCell className="text-right">{formatTime(emp.totalMinutes)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency((emp.totalMinutes / 60) * HOURLY_RATE)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(emp.totalCost)}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/50 font-bold">
