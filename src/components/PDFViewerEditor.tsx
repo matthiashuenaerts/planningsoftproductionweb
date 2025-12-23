@@ -20,7 +20,6 @@ import {
   Circle,
   Undo,
   Redo,
-  Brush,
   Pencil,
   Eraser,
   Move,
@@ -337,7 +336,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       selection: true,
     });
 
-    // Ensure the Fabric wrapper container is properly positioned
+    // Ensure the Fabric wrapper container is properly positioned and always sits above the PDF canvas
     const fabricWrapper = fabricCanvas.wrapperEl;
     if (fabricWrapper) {
       fabricWrapper.style.position = 'absolute';
@@ -345,12 +344,19 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       fabricWrapper.style.left = '0';
       fabricWrapper.style.width = `${viewport.width}px`;
       fabricWrapper.style.height = `${viewport.height}px`;
+      fabricWrapper.style.zIndex = '20';
+      fabricWrapper.style.pointerEvents = 'auto';
     }
 
-    // Immediately enable drawing mode
-    fabricCanvas.isDrawingMode = true;
-    fabricCanvas.freeDrawingBrush.color = drawingColor;
-    fabricCanvas.freeDrawingBrush.width = strokeWidth;
+    // Keep Fabric internal canvases in sync and make sure offsets are correct
+    fabricCanvas.setDimensions({ width: viewport.width, height: viewport.height });
+    fabricCanvas.calcOffset();
+
+    // Configure brush (safe)
+    if (fabricCanvas.freeDrawingBrush) {
+      fabricCanvas.freeDrawingBrush.color = drawingColor;
+      fabricCanvas.freeDrawingBrush.width = strokeWidth;
+    }
 
     // Add event listeners
     fabricCanvas.on('path:created', () => {
@@ -376,20 +382,12 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     // Save initial state
     saveCanvasState();
 
-    // Apply drawing mode by default when entering edit mode
-    // Use a small delay to ensure the canvas is fully ready
-    setTimeout(() => {
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.isDrawingMode = true;
-        fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
-        fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
-        fabricCanvasRef.current.renderAll();
-        console.log('Drawing mode enabled, isDrawingMode:', fabricCanvasRef.current.isDrawingMode);
-      }
-    }, 50);
+    // Apply the currently selected tool (default is set to 'draw' when entering edit mode)
+    applyToolSettings(activeTool);
+    fabricCanvas.requestRenderAll();
 
     console.log('Fabric canvas initialization complete');
-  }, [pdfDoc, currentPage, scale, drawingColor, strokeWidth]);
+  }, [pdfDoc, currentPage, scale, drawingColor, strokeWidth, activeTool]);
 
   // Effect to initialize fabric canvas when entering edit mode
   useEffect(() => {
@@ -400,7 +398,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       }, 150);
       return () => clearTimeout(timer);
     }
-  }, [isEditMode, pdfDoc, loading, currentPage, scale]);
+  }, [isEditMode, pdfDoc, loading, currentPage, scale, initializeFabricCanvas]);
 
   // Effect to render preview mode
   useEffect(() => {
@@ -1112,6 +1110,14 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
     }
   }, [drawingColor, strokeWidth, activeTool]);
+
+  // Ensure the active tool is always applied after Fabric finishes initializing
+  useEffect(() => {
+    if (!isEditMode || !fabricCanvasRef.current) return;
+    applyToolSettings(activeTool);
+    fabricCanvasRef.current.calcOffset();
+    fabricCanvasRef.current.requestRenderAll();
+  }, [isEditMode, activeTool, drawingColor, strokeWidth, fontFamily, fontSize]);
 
   if (loading) {
     return (
