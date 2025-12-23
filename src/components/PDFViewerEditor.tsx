@@ -21,6 +21,7 @@ import {
   Undo,
   Redo,
   Brush,
+  Pencil,
   Eraser,
   Move,
   Trash2,
@@ -336,14 +337,20 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       selection: true,
     });
 
+    // Ensure the Fabric wrapper container is properly positioned
+    const fabricWrapper = fabricCanvas.wrapperEl;
+    if (fabricWrapper) {
+      fabricWrapper.style.position = 'absolute';
+      fabricWrapper.style.top = '0';
+      fabricWrapper.style.left = '0';
+      fabricWrapper.style.width = `${viewport.width}px`;
+      fabricWrapper.style.height = `${viewport.height}px`;
+    }
+
     // Immediately enable drawing mode
     fabricCanvas.isDrawingMode = true;
-
-    // Configure brush
-    if (fabricCanvas.freeDrawingBrush) {
-      fabricCanvas.freeDrawingBrush.color = drawingColor;
-      fabricCanvas.freeDrawingBrush.width = strokeWidth;
-    }
+    fabricCanvas.freeDrawingBrush.color = drawingColor;
+    fabricCanvas.freeDrawingBrush.width = strokeWidth;
 
     // Add event listeners
     fabricCanvas.on('path:created', () => {
@@ -369,8 +376,17 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     // Save initial state
     saveCanvasState();
 
-    // Apply current tool
-    applyToolSettings(activeTool);
+    // Apply drawing mode by default when entering edit mode
+    // Use a small delay to ensure the canvas is fully ready
+    setTimeout(() => {
+      if (fabricCanvasRef.current) {
+        fabricCanvasRef.current.isDrawingMode = true;
+        fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
+        fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
+        fabricCanvasRef.current.renderAll();
+        console.log('Drawing mode enabled, isDrawingMode:', fabricCanvasRef.current.isDrawingMode);
+      }
+    }, 50);
 
     console.log('Fabric canvas initialization complete');
   }, [pdfDoc, currentPage, scale, drawingColor, strokeWidth]);
@@ -1227,9 +1243,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               onClick={() => handleToolChange('draw')}
               size="sm"
               variant={activeTool === 'draw' ? 'default' : 'ghost'}
-              title="Draw"
+              title="Draw / Pencil"
+              className={activeTool === 'draw' ? 'bg-primary text-primary-foreground ring-2 ring-primary' : ''}
             >
-              <Brush className="h-4 w-4" />
+              <Pencil className="h-4 w-4" />
             </Button>
             <Button
               onClick={() => handleToolChange('text')}
@@ -1359,13 +1376,14 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 width: canvasSize.width,
                 height: canvasSize.height,
                 pointerEvents: isEditMode ? 'auto' : 'none',
-                visibility: isEditMode ? 'visible' : 'hidden',
+                opacity: isEditMode ? 1 : 0,
+                zIndex: isEditMode ? 10 : -1,
               }}
             >
               <canvas
                 ref={overlayCanvasRef}
                 className="block"
-                style={{ display: 'block' }}
+                style={{ display: 'block', cursor: isEditMode && activeTool === 'draw' ? 'crosshair' : 'default' }}
                 aria-label="PDF annotation canvas"
               />
             </div>
