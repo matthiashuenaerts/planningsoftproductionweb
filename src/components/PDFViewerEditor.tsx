@@ -694,11 +694,26 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         break;
 
       case 'text':
-        canvas.selection = false;
+        canvas.selection = true; // Allow selection so user can click existing textboxes
         canvas.defaultCursor = 'text';
         canvas.on('mouse:down', (e) => {
+          // If clicked on existing textbox, let user edit it
+          if (e.target && e.target.type === 'textbox') {
+            const existingTextbox = e.target as Textbox;
+            canvas.setActiveObject(existingTextbox);
+            setTimeout(() => {
+              existingTextbox.enterEditing();
+              const hiddenTextarea = (existingTextbox as any).hiddenTextarea as HTMLTextAreaElement | undefined;
+              if (hiddenTextarea) {
+                hiddenTextarea.focus();
+                hiddenTextarea.select();
+              }
+            }, 50);
+            return;
+          }
+
           const pointer = canvas.getPointer(e.e);
-          const textbox = new Textbox('', {
+          const textbox = new Textbox('Type here...', {
             left: pointer.x,
             top: pointer.y,
             width: 220,
@@ -716,7 +731,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           textbox.on('editing:exited', () => {
             triggerAutoSave();
             // Remove empty textboxes when user exits without typing
-            if (!textbox.text || textbox.text.trim() === '') {
+            if (!textbox.text || textbox.text.trim() === '' || textbox.text === 'Type here...') {
               canvas.remove(textbox);
               saveCanvasState();
             }
@@ -726,15 +741,18 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           canvas.setActiveObject(textbox);
           canvas.requestRenderAll();
 
-          // Enter editing mode immediately so user can type
-          textbox.enterEditing();
-          (textbox as any).hiddenTextarea?.focus?.();
-          textbox.selectAll();
+          // Use setTimeout to ensure the textbox is fully rendered before entering editing
+          setTimeout(() => {
+            textbox.enterEditing();
+            const hiddenTextarea = (textbox as any).hiddenTextarea as HTMLTextAreaElement | undefined;
+            if (hiddenTextarea) {
+              hiddenTextarea.focus();
+              hiddenTextarea.select();
+            }
+          }, 50);
 
           saveCanvasState();
           triggerAutoSave();
-
-          // IMPORTANT: do NOT auto-switch tools here; it interrupts editing on some browsers.
         });
         break;
 
@@ -812,7 +830,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const addTextbox = () => {
     if (!fabricCanvasRef.current) return;
 
-    const textbox = new Textbox('', {
+    const canvas = fabricCanvasRef.current;
+    const textbox = new Textbox('Type here...', {
       left: 100,
       top: 100,
       width: 200,
@@ -829,17 +848,24 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     textbox.on('changed', () => triggerAutoSave());
     textbox.on('editing:exited', () => {
       triggerAutoSave();
-      if (!textbox.text || textbox.text.trim() === '') {
+      if (!textbox.text || textbox.text.trim() === '' || textbox.text === 'Type here...') {
         fabricCanvasRef.current?.remove(textbox);
       }
     });
 
-    fabricCanvasRef.current.add(textbox);
-    fabricCanvasRef.current.setActiveObject(textbox);
-    fabricCanvasRef.current.requestRenderAll();
-    textbox.enterEditing();
-    (textbox as any).hiddenTextarea?.focus?.();
-    textbox.selectAll();
+    canvas.add(textbox);
+    canvas.setActiveObject(textbox);
+    canvas.requestRenderAll();
+
+    setTimeout(() => {
+      textbox.enterEditing();
+      const hiddenTextarea = (textbox as any).hiddenTextarea as HTMLTextAreaElement | undefined;
+      if (hiddenTextarea) {
+        hiddenTextarea.focus();
+        hiddenTextarea.select();
+      }
+    }, 50);
+
     saveCanvasState();
   };
 
