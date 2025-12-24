@@ -322,7 +322,12 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
     // If we're already initialized for this page/zoom, don't recreate the canvas (this breaks drawing)
     if (fabricCanvasRef.current && fabricInitKeyRef.current === initKey) {
-      applyToolSettings(activeTool);
+      // In Preview mode we keep the overlay visible but non-interactive.
+      applyToolSettings(isEditMode ? activeTool : 'select');
+      if (!isEditMode) {
+        fabricCanvasRef.current.discardActiveObject();
+        fabricCanvasRef.current.selection = false;
+      }
       fabricCanvasRef.current.calcOffset();
       fabricCanvasRef.current.requestRenderAll();
       return;
@@ -359,19 +364,19 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       fabricWrapper.style.zIndex = '20';
       fabricWrapper.style.pointerEvents = 'auto';
 
-      // Critical for iPad/Apple Pencil: prevent browser panning/scrolling from swallowing events
-      (fabricWrapper.style as any).touchAction = 'none';
-      (fabricWrapper.style as any).webkitUserSelect = 'none';
-      fabricWrapper.style.userSelect = 'none';
+      // Interaction styles are applied dynamically in applyToolSettings
+      (fabricWrapper.style as any).touchAction = 'manipulation';
+      (fabricWrapper.style as any).webkitUserSelect = 'auto';
+      fabricWrapper.style.userSelect = 'auto';
     }
 
-    // Ensure the canvases capture pen/touch input reliably
+    // Ensure the canvases capture input reliably
     const setInputCaptureStyles = (el?: HTMLCanvasElement | null) => {
       if (!el) return;
       el.style.pointerEvents = 'auto';
-      (el.style as any).touchAction = 'none';
-      (el.style as any).webkitUserSelect = 'none';
-      el.style.userSelect = 'none';
+      (el.style as any).touchAction = 'manipulation';
+      (el.style as any).webkitUserSelect = 'auto';
+      el.style.userSelect = 'auto';
     };
 
     setInputCaptureStyles(overlayCanvasRef.current);
@@ -419,32 +424,28 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     // Save initial state
     saveCanvasState();
 
-    // Apply the currently selected tool (default is set to 'draw' when entering edit mode)
-    applyToolSettings(activeTool);
+    // Apply tool settings only when editing; keep preview overlay non-interactive
+    applyToolSettings(isEditMode ? activeTool : 'select');
+    if (!isEditMode) {
+      fabricCanvas.selection = false;
+      fabricCanvas.discardActiveObject();
+    }
     fabricCanvas.requestRenderAll();
 
     console.log('Fabric canvas initialization complete');
   }, [pdfDoc, currentPage, scale, drawingColor, strokeWidth, activeTool]);
 
-  // Effect to initialize fabric canvas when entering edit mode
+  // Keep canvases (PDF + annotations overlay) in sync whenever page/zoom changes.
+  // We always initialize Fabric so annotations are visible in Preview too; we only enable interaction in Edit mode.
   useEffect(() => {
-    console.log('Edit mode effect - isEditMode:', isEditMode, 'pdfDoc:', !!pdfDoc, 'loading:', loading);
-    if (isEditMode && pdfDoc && !loading) {
+    console.log('Canvas sync effect - isEditMode:', isEditMode, 'pdfDoc:', !!pdfDoc, 'loading:', loading);
+    if (pdfDoc && !loading) {
       const raf = window.requestAnimationFrame(() => {
         initializeFabricCanvas();
       });
       return () => window.cancelAnimationFrame(raf);
     }
   }, [isEditMode, pdfDoc, loading, currentPage, scale, initializeFabricCanvas]);
-
-  // Effect to render preview mode
-  useEffect(() => {
-    console.log('Preview mode effect - isEditMode:', isEditMode, 'pdfDoc:', !!pdfDoc, 'pdfCanvasRef:', !!pdfCanvasRef.current, 'loading:', loading);
-    if (!isEditMode && pdfDoc && pdfCanvasRef.current && !loading) {
-      console.log('Rendering preview...');
-      renderPDFPage(currentPage, pdfCanvasRef.current);
-    }
-  }, [isEditMode, pdfDoc, currentPage, scale, loading, renderPDFPage]);
 
   // Save current page annotations
   const saveCurrentPageAnnotations = () => {
@@ -600,6 +601,24 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
     const canvas = fabricCanvasRef.current;
 
+    // Keep wrapper/canvases in the correct interaction mode.
+    // (Draw/erase need touchAction=none; text needs selection/focus.)
+    const isDrawLike = isEditMode && (tool === 'draw' || tool === 'erase');
+    const wrapper = canvas.wrapperEl;
+    const upper = (canvas as any).upperCanvasEl as HTMLCanvasElement | undefined;
+    const lower = (canvas as any).lowerCanvasEl as HTMLCanvasElement | undefined;
+
+    const applyInteraction = (el?: HTMLElement | null) => {
+      if (!el) return;
+      (el.style as any).touchAction = isDrawLike ? 'none' : 'manipulation';
+      (el.style as any).webkitUserSelect = isDrawLike ? 'none' : 'auto';
+      el.style.userSelect = isDrawLike ? 'none' : 'auto';
+    };
+
+    applyInteraction(wrapper);
+    applyInteraction(upper);
+    applyInteraction(lower);
+
     // Make sure pointer math is up-to-date right before switching modes
     canvas.calcOffset();
 
@@ -668,20 +687,21 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             // Remove empty textboxes when user exits without typing
             if (!textbox.text || textbox.text.trim() === '') {
               canvas.remove(textbox);
+              saveCanvasState();
             }
           });
 
           canvas.add(textbox);
           canvas.setActiveObject(textbox);
+
           // Enter editing mode immediately so user can type
           textbox.enterEditing();
           textbox.selectAll();
+
           saveCanvasState();
           triggerAutoSave();
 
-          // Return to select mode after placing
-          setActiveTool('select');
-          setTimeout(() => applyToolSettings('select'), 0);
+          // IMPORTANT: do NOT auto-switch tools here; it interrupts editing on some browsers.
         });
         break;
 
@@ -1202,14 +1222,16 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Toggle edit mode
   const toggleEditMode = useCallback(() => {
     if (isEditMode) {
-      // Leaving edit mode - save annotations first, then dispose Fabric BEFORE state change
+      // Leaving edit mode: persist to DB, keep overlay visible in Preview
       saveCurrentPageAnnotations();
       performAutoSave();
 
-      // Dispose Fabric canvas BEFORE React re-renders
+      // Disable interactions (overlay stays visible)
       if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.dispose();
-        fabricCanvasRef.current = null;
+        fabricCanvasRef.current.isDrawingMode = false;
+        fabricCanvasRef.current.discardActiveObject();
+        fabricCanvasRef.current.selection = false;
+        fabricCanvasRef.current.requestRenderAll();
       }
 
       setActiveTool('select');
@@ -1534,15 +1556,15 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               aria-label="PDF preview canvas"
             />
 
-            {/* Fabric overlay for annotations – always mounted but hidden when not editing */}
+            {/* Fabric overlay for annotations */}
             <div
               className="absolute top-0 left-0"
               style={{
                 width: canvasSize.width,
                 height: canvasSize.height,
                 pointerEvents: isEditMode ? 'auto' : 'none',
-                opacity: isEditMode ? 1 : 0,
-                zIndex: isEditMode ? 10 : -1,
+                opacity: 1,
+                zIndex: 10,
                 // Important for iPad/Apple Pencil: prevent scroll/zoom gestures from swallowing draw events
                 touchAction:
                   isEditMode && (activeTool === 'draw' || activeTool === 'erase')
@@ -1555,7 +1577,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 className="block"
                 style={{
                   display: 'block',
-                  cursor: isEditMode && activeTool === 'draw' ? 'crosshair' : 'default',
+                  cursor: isEditMode && activeTool === 'draw' ? 'crosshair' : isEditMode && activeTool === 'text' ? 'text' : 'default',
                   touchAction: isEditMode && (activeTool === 'draw' || activeTool === 'erase') ? 'none' : 'manipulation',
                 }}
                 aria-label="PDF annotation canvas"
