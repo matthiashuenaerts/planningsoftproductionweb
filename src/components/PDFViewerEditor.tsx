@@ -87,6 +87,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<FabricCanvas | null>(null);
+  const fabricInitKeyRef = useRef<string | null>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 1000 });
   
   // Tool state
@@ -317,11 +318,22 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
     const { viewport } = result;
 
+    const initKey = `${currentPage}-${scale}-${viewport.width}-${viewport.height}`;
+
+    // If we're already initialized for this page/zoom, don't recreate the canvas (this breaks drawing)
+    if (fabricCanvasRef.current && fabricInitKeyRef.current === initKey) {
+      applyToolSettings(activeTool);
+      fabricCanvasRef.current.calcOffset();
+      fabricCanvasRef.current.requestRenderAll();
+      return;
+    }
+
     // Dispose existing fabric canvas
     if (fabricCanvasRef.current) {
       saveCurrentPageAnnotations();
       fabricCanvasRef.current.dispose();
       fabricCanvasRef.current = null;
+      fabricInitKeyRef.current = null;
     }
 
     // Create overlay Fabric canvas with same size as PDF
@@ -393,6 +405,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     });
 
     fabricCanvasRef.current = fabricCanvas;
+    fabricInitKeyRef.current = initKey;
 
     // Load annotations for this page
     loadPageAnnotations(currentPage);
@@ -411,10 +424,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   useEffect(() => {
     console.log('Edit mode effect - isEditMode:', isEditMode, 'pdfDoc:', !!pdfDoc, 'loading:', loading);
     if (isEditMode && pdfDoc && !loading) {
-      const timer = setTimeout(() => {
+      const raf = window.requestAnimationFrame(() => {
         initializeFabricCanvas();
-      }, 150);
-      return () => clearTimeout(timer);
+      });
+      return () => window.cancelAnimationFrame(raf);
     }
   }, [isEditMode, pdfDoc, loading, currentPage, scale, initializeFabricCanvas]);
 
@@ -593,6 +606,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       case 'draw':
         canvas.isDrawingMode = true;
         canvas.selection = false;
+        canvas.defaultCursor = 'crosshair';
+        (canvas as any).freeDrawingCursor = 'crosshair';
         if (canvas.freeDrawingBrush) {
           canvas.freeDrawingBrush.color = drawingColor;
           canvas.freeDrawingBrush.width = strokeWidth;
