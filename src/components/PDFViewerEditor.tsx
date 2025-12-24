@@ -648,7 +648,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         canvas.defaultCursor = 'text';
         canvas.on('mouse:down', (e) => {
           const pointer = canvas.getPointer(e.e);
-          const textbox = new Textbox('Type...', {
+          const textbox = new Textbox('', {
             left: pointer.x,
             top: pointer.y,
             width: 220,
@@ -659,14 +659,23 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             cornerColor: '#0066ff',
             cornerSize: 8,
             transparentCorners: false,
+            editable: true,
           });
 
           textbox.on('changed', () => triggerAutoSave());
-          textbox.on('editing:exited', () => triggerAutoSave());
+          textbox.on('editing:exited', () => {
+            triggerAutoSave();
+            // Remove empty textboxes when user exits without typing
+            if (!textbox.text || textbox.text.trim() === '') {
+              canvas.remove(textbox);
+            }
+          });
 
           canvas.add(textbox);
           canvas.setActiveObject(textbox);
+          // Enter editing mode immediately so user can type
           textbox.enterEditing();
+          textbox.selectAll();
           saveCanvasState();
           triggerAutoSave();
 
@@ -750,7 +759,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const addTextbox = () => {
     if (!fabricCanvasRef.current) return;
     
-    const textbox = new Textbox('Click to edit', {
+    const textbox = new Textbox('', {
       left: 100,
       top: 100,
       width: 200,
@@ -760,15 +769,22 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       borderColor: '#0066ff',
       cornerColor: '#0066ff',
       cornerSize: 8,
-      transparentCorners: false
+      transparentCorners: false,
+      editable: true,
     });
     
     textbox.on('changed', () => triggerAutoSave());
-    textbox.on('editing:exited', () => triggerAutoSave());
+    textbox.on('editing:exited', () => {
+      triggerAutoSave();
+      if (!textbox.text || textbox.text.trim() === '') {
+        fabricCanvasRef.current?.remove(textbox);
+      }
+    });
     
     fabricCanvasRef.current.add(textbox);
     fabricCanvasRef.current.setActiveObject(textbox);
     textbox.enterEditing();
+    textbox.selectAll();
     saveCanvasState();
   };
 
@@ -977,6 +993,42 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 borderWidth: annotation.strokeWidth || 1,
               });
               break;
+            case 'path':
+              // Draw path (freehand drawings) as lines
+              if (annotation.path && Array.isArray(annotation.path)) {
+                const pathColor = hexToRgb(annotation.stroke || '#000000');
+                const pathScaleX = (annotation.scaleX || 1) * scaleX;
+                const pathScaleY = (annotation.scaleY || 1) * scaleY;
+                const pathStrokeWidth = (annotation.strokeWidth || 2) * Math.min(pathScaleX, pathScaleY);
+                
+                // Build SVG path string for pdf-lib
+                let svgPathStr = '';
+                for (const cmd of annotation.path) {
+                  if (cmd[0] === 'M') {
+                    const px = (annotation.left + cmd[1] * (annotation.scaleX || 1)) * scaleX;
+                    const py = height - ((annotation.top + cmd[2] * (annotation.scaleY || 1)) * scaleY);
+                    svgPathStr += `M ${px} ${py} `;
+                  } else if (cmd[0] === 'Q') {
+                    const cpx = (annotation.left + cmd[1] * (annotation.scaleX || 1)) * scaleX;
+                    const cpy = height - ((annotation.top + cmd[2] * (annotation.scaleY || 1)) * scaleY);
+                    const endx = (annotation.left + cmd[3] * (annotation.scaleX || 1)) * scaleX;
+                    const endy = height - ((annotation.top + cmd[4] * (annotation.scaleY || 1)) * scaleY);
+                    svgPathStr += `Q ${cpx} ${cpy} ${endx} ${endy} `;
+                  } else if (cmd[0] === 'L') {
+                    const lx = (annotation.left + cmd[1] * (annotation.scaleX || 1)) * scaleX;
+                    const ly = height - ((annotation.top + cmd[2] * (annotation.scaleY || 1)) * scaleY);
+                    svgPathStr += `L ${lx} ${ly} `;
+                  }
+                }
+                
+                if (svgPathStr.trim()) {
+                  page.drawSvgPath(svgPathStr.trim(), {
+                    borderColor: rgb(pathColor.r / 255, pathColor.g / 255, pathColor.b / 255),
+                    borderWidth: pathStrokeWidth,
+                  });
+                }
+              }
+              break;
           }
         }
       }
@@ -1071,15 +1123,50 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               });
               break;
             case 'circle':
-              const radius = (annotation.radius || 0) * (annotation.scaleX || 1) * scaleX;
-              const circleColorArray = hexToRgb(annotation.stroke || '#000000');
+              const dlRadius = (annotation.radius || 0) * (annotation.scaleX || 1) * scaleX;
+              const dlCircleColorArray = hexToRgb(annotation.stroke || '#000000');
               page.drawCircle({
-                x: x + radius,
-                y: y - radius,
-                size: radius,
-                borderColor: rgb(circleColorArray.r / 255, circleColorArray.g / 255, circleColorArray.b / 255),
+                x: x + dlRadius,
+                y: y - dlRadius,
+                size: dlRadius,
+                borderColor: rgb(dlCircleColorArray.r / 255, dlCircleColorArray.g / 255, dlCircleColorArray.b / 255),
                 borderWidth: annotation.strokeWidth || 1,
               });
+              break;
+            case 'path':
+              // Draw path (freehand drawings) as lines
+              if (annotation.path && Array.isArray(annotation.path)) {
+                const dlPathColor = hexToRgb(annotation.stroke || '#000000');
+                const dlPathScaleX = (annotation.scaleX || 1) * scaleX;
+                const dlPathScaleY = (annotation.scaleY || 1) * scaleY;
+                const dlPathStrokeWidth = (annotation.strokeWidth || 2) * Math.min(dlPathScaleX, dlPathScaleY);
+                
+                let dlSvgPathStr = '';
+                for (const cmd of annotation.path) {
+                  if (cmd[0] === 'M') {
+                    const px = (annotation.left + cmd[1] * (annotation.scaleX || 1)) * scaleX;
+                    const py = height - ((annotation.top + cmd[2] * (annotation.scaleY || 1)) * scaleY);
+                    dlSvgPathStr += `M ${px} ${py} `;
+                  } else if (cmd[0] === 'Q') {
+                    const cpx = (annotation.left + cmd[1] * (annotation.scaleX || 1)) * scaleX;
+                    const cpy = height - ((annotation.top + cmd[2] * (annotation.scaleY || 1)) * scaleY);
+                    const endx = (annotation.left + cmd[3] * (annotation.scaleX || 1)) * scaleX;
+                    const endy = height - ((annotation.top + cmd[4] * (annotation.scaleY || 1)) * scaleY);
+                    dlSvgPathStr += `Q ${cpx} ${cpy} ${endx} ${endy} `;
+                  } else if (cmd[0] === 'L') {
+                    const lx = (annotation.left + cmd[1] * (annotation.scaleX || 1)) * scaleX;
+                    const ly = height - ((annotation.top + cmd[2] * (annotation.scaleY || 1)) * scaleY);
+                    dlSvgPathStr += `L ${lx} ${ly} `;
+                  }
+                }
+                
+                if (dlSvgPathStr.trim()) {
+                  page.drawSvgPath(dlSvgPathStr.trim(), {
+                    borderColor: rgb(dlPathColor.r / 255, dlPathColor.g / 255, dlPathColor.b / 255),
+                    borderWidth: dlPathStrokeWidth,
+                  });
+                }
+              }
               break;
           }
         }
