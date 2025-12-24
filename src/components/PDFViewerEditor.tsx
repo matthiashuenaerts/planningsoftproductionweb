@@ -346,7 +346,25 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       fabricWrapper.style.height = `${viewport.height}px`;
       fabricWrapper.style.zIndex = '20';
       fabricWrapper.style.pointerEvents = 'auto';
+
+      // Critical for iPad/Apple Pencil: prevent browser panning/scrolling from swallowing events
+      (fabricWrapper.style as any).touchAction = 'none';
+      (fabricWrapper.style as any).webkitUserSelect = 'none';
+      fabricWrapper.style.userSelect = 'none';
     }
+
+    // Ensure the canvases capture pen/touch input reliably
+    const setInputCaptureStyles = (el?: HTMLCanvasElement | null) => {
+      if (!el) return;
+      el.style.pointerEvents = 'auto';
+      (el.style as any).touchAction = 'none';
+      (el.style as any).webkitUserSelect = 'none';
+      el.style.userSelect = 'none';
+    };
+
+    setInputCaptureStyles(overlayCanvasRef.current);
+    setInputCaptureStyles((fabricCanvas as any).upperCanvasEl as HTMLCanvasElement | undefined);
+    setInputCaptureStyles((fabricCanvas as any).lowerCanvasEl as HTMLCanvasElement | undefined);
 
     // Keep Fabric internal canvases in sync and make sure offsets are correct
     fabricCanvas.setDimensions({ width: viewport.width, height: viewport.height });
@@ -1384,12 +1402,21 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 pointerEvents: isEditMode ? 'auto' : 'none',
                 opacity: isEditMode ? 1 : 0,
                 zIndex: isEditMode ? 10 : -1,
+                // Important for iPad/Apple Pencil: prevent scroll/zoom gestures from swallowing draw events
+                touchAction:
+                  isEditMode && (activeTool === 'draw' || activeTool === 'erase')
+                    ? 'none'
+                    : 'manipulation',
               }}
             >
               <canvas
                 ref={overlayCanvasRef}
                 className="block"
-                style={{ display: 'block', cursor: isEditMode && activeTool === 'draw' ? 'crosshair' : 'default' }}
+                style={{
+                  display: 'block',
+                  cursor: isEditMode && activeTool === 'draw' ? 'crosshair' : 'default',
+                  touchAction: isEditMode && (activeTool === 'draw' || activeTool === 'erase') ? 'none' : 'manipulation',
+                }}
                 aria-label="PDF annotation canvas"
               />
             </div>
