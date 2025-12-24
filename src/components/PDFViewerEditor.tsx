@@ -28,7 +28,7 @@ import {
   Check,
   RotateCcw
 } from 'lucide-react';
-import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Textbox, Path } from 'fabric';
+import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Textbox, Path, PencilBrush } from 'fabric';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 interface PDFViewerEditorProps {
@@ -389,7 +389,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
 
     // Add event listeners
-    fabricCanvas.on('path:created', () => {
+    fabricCanvas.on('path:created', (e: any) => {
+      // Debug: helps verify drawing is actually producing paths
+      console.log('Fabric path:created', {
+        stroke: e?.path?.stroke,
+        strokeWidth: e?.path?.strokeWidth,
+        pointerType: e?.e?.pointerType,
+      });
       saveCanvasState();
       triggerAutoSave();
     });
@@ -594,6 +600,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
     const canvas = fabricCanvasRef.current;
 
+    // Make sure pointer math is up-to-date right before switching modes
+    canvas.calcOffset();
+
     // Reset modes
     canvas.isDrawingMode = false;
     canvas.selection = true;
@@ -603,16 +612,24 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     canvas.off('mouse:down');
 
     switch (tool) {
-      case 'draw':
+      case 'draw': {
         canvas.isDrawingMode = true;
         canvas.selection = false;
         canvas.defaultCursor = 'crosshair';
         (canvas as any).freeDrawingCursor = 'crosshair';
-        if (canvas.freeDrawingBrush) {
-          canvas.freeDrawingBrush.color = drawingColor;
-          canvas.freeDrawingBrush.width = strokeWidth;
+
+        // Ensure a PencilBrush exists (required for reliable mouse + pen drawing in Fabric v6)
+        if (!canvas.freeDrawingBrush) {
+          canvas.freeDrawingBrush = new PencilBrush(canvas);
         }
+
+        canvas.freeDrawingBrush.color = drawingColor;
+        canvas.freeDrawingBrush.width = strokeWidth;
+        // Optional smoothing; keep mild so cursor drawing feels natural
+        (canvas.freeDrawingBrush as any).decimate = 0;
+
         break;
+      }
 
       case 'erase':
         canvas.selection = false;
@@ -1143,6 +1160,28 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
     }
   }, [drawingColor, strokeWidth, activeTool]);
+
+  // When the scroll container moves (or viewport resizes), Fabric's pointer offset becomes stale.
+  // If offset is wrong, paths can be drawn "off-canvas" and appear invisible.
+  useEffect(() => {
+    if (!isEditMode) return;
+
+    const scrollEl = canvasContainerRef.current;
+    const syncOffset = () => {
+      if (!fabricCanvasRef.current) return;
+      fabricCanvasRef.current.calcOffset();
+    };
+
+    syncOffset();
+
+    scrollEl?.addEventListener('scroll', syncOffset, { passive: true });
+    window.addEventListener('resize', syncOffset);
+
+    return () => {
+      scrollEl?.removeEventListener('scroll', syncOffset);
+      window.removeEventListener('resize', syncOffset);
+    };
+  }, [isEditMode]);
 
   // Ensure the active tool is always applied after Fabric finishes initializing
   useEffect(() => {
