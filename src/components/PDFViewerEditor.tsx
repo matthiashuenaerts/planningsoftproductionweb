@@ -402,6 +402,11 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         pointerType: e?.e?.pointerType,
       });
       saveCanvasState();
+
+      // Save immediately after each stroke (so user doesn't need to switch tools)
+      void saveCurrentPageAnnotationsToDb();
+
+      // Also keep the normal debounce autosave for other changes
       triggerAutoSave();
     });
 
@@ -553,11 +558,11 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Auto-save trigger
   const triggerAutoSave = () => {
     hasUnsavedChanges.current = true;
-    
+
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
-    
+
     autoSaveTimeoutRef.current = setTimeout(async () => {
       if (hasUnsavedChanges.current) {
         await performAutoSave();
@@ -565,11 +570,37 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }, 3000);
   };
 
+  const saveCurrentPageAnnotationsToDb = async () => {
+    try {
+      saveCurrentPageAnnotations();
+      const annotations = pageAnnotationsRef.current.get(currentPage) || [];
+
+      const { error } = await supabase
+        .from('pdf_annotations')
+        .upsert(
+          {
+            project_id: projectId,
+            file_name: fileName,
+            page_number: currentPage,
+            annotations: annotations as unknown as any,
+          },
+          {
+            onConflict: 'project_id,file_name,page_number',
+          },
+        );
+
+      if (error) throw error;
+      setLastSaved(new Date());
+    } catch (error) {
+      console.error('Immediate annotation save failed:', error);
+    }
+  };
+
   // Perform auto-save
   const performAutoSave = async () => {
     try {
       saveCurrentPageAnnotations();
-      
+
       // Save to database
       for (const [pageNum, annotations] of pageAnnotationsRef.current.entries()) {
         const { error } = await supabase
@@ -579,15 +610,15 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               project_id: projectId,
               file_name: fileName,
               page_number: pageNum,
-              annotations: annotations as unknown as any
+              annotations: annotations as unknown as any,
             },
             {
-              onConflict: 'project_id,file_name,page_number'
-            }
+              onConflict: 'project_id,file_name,page_number',
+            },
           );
         if (error) console.error('Error saving annotation:', error);
       }
-      
+
       hasUnsavedChanges.current = false;
       setLastSaved(new Date());
     } catch (error) {
@@ -693,9 +724,11 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
           canvas.add(textbox);
           canvas.setActiveObject(textbox);
+          canvas.requestRenderAll();
 
           // Enter editing mode immediately so user can type
           textbox.enterEditing();
+          (textbox as any).hiddenTextarea?.focus?.();
           textbox.selectAll();
 
           saveCanvasState();
@@ -778,7 +811,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Add textbox
   const addTextbox = () => {
     if (!fabricCanvasRef.current) return;
-    
+
     const textbox = new Textbox('', {
       left: 100,
       top: 100,
@@ -792,7 +825,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       transparentCorners: false,
       editable: true,
     });
-    
+
     textbox.on('changed', () => triggerAutoSave());
     textbox.on('editing:exited', () => {
       triggerAutoSave();
@@ -800,10 +833,12 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         fabricCanvasRef.current?.remove(textbox);
       }
     });
-    
+
     fabricCanvasRef.current.add(textbox);
     fabricCanvasRef.current.setActiveObject(textbox);
+    fabricCanvasRef.current.requestRenderAll();
     textbox.enterEditing();
+    (textbox as any).hiddenTextarea?.focus?.();
     textbox.selectAll();
     saveCanvasState();
   };
