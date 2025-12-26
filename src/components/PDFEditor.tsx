@@ -40,6 +40,8 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isSavingRef = useRef(false);
 
   // Load PDF.js library and initialize - only once
   useEffect(() => {
@@ -82,6 +84,15 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
     loadPdfJs();
     loadAnnotations();
   }, [pdfUrl]); // Only depend on pdfUrl
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Re-render page when page or scale changes
   useEffect(() => {
@@ -322,8 +333,27 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
     }
   };
 
-  const autoSave = async (annotationsToSave = annotations) => {
+  const autoSave = (annotationsToSave = annotations) => {
+    // Clear any pending save timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Debounce the save by 500ms to prevent duplicate saves
+    saveTimeoutRef.current = setTimeout(() => {
+      performSave(annotationsToSave);
+    }, 500);
+  };
+
+  const performSave = async (annotationsToSave: TextAnnotation[]) => {
+    // Prevent concurrent saves
+    if (isSavingRef.current) {
+      return;
+    }
+    
+    isSavingRef.current = true;
     setSaving(true);
+    
     try {
       const annotationKey = `${projectId}/${fileName}_annotations.json`;
       const blob = new Blob([JSON.stringify(annotationsToSave, null, 2)], { 
@@ -346,6 +376,7 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
         variant: "destructive"
       });
     } finally {
+      isSavingRef.current = false;
       setSaving(false);
     }
   };
