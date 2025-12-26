@@ -641,12 +641,19 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     canvas.requestRenderAll();
 
     const tryFocus = () => {
+      // Enter editing first so Fabric creates the hidden textarea
       textbox.enterEditing();
       textbox.selectAll();
 
       const ta =
         ((textbox as any).hiddenTextarea as HTMLTextAreaElement | undefined) ??
         ((canvas as any).hiddenTextarea as HTMLTextAreaElement | undefined);
+
+      // If we're inside a modal (Radix Dialog), focusing an element outside the dialog
+      // is blocked by the focus trap. Keep the hidden textarea inside the canvas wrapper.
+      if (ta && canvas.wrapperEl && ta.parentElement !== canvas.wrapperEl) {
+        canvas.wrapperEl.appendChild(ta);
+      }
 
       if (ta) {
         ta.focus();
