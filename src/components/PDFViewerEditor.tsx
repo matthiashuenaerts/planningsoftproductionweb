@@ -483,10 +483,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const loadPageAnnotations = (pageNum: number) => {
     if (!fabricCanvasRef.current) return;
     
-    // Clear existing objects first to prevent duplicate stacking
-    fabricCanvasRef.current.clear();
-    fabricCanvasRef.current.backgroundColor = 'transparent';
-    
     const annotations = pageAnnotationsRef.current.get(pageNum) || [];
     
     annotations.forEach(annotation => {
@@ -752,18 +748,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           // If clicked on existing textbox, let user edit it
           if (e.target && e.target.type === 'textbox') {
             focusTextboxEditing(e.target as Textbox);
-            return;
-          }
-
-          // If clicked on empty space while a textbox is being edited, exit editing and switch to select
-          const activeObj = canvas.getActiveObject();
-          if (activeObj && activeObj.type === 'textbox' && (activeObj as any).isEditing) {
-            (activeObj as Textbox).exitEditing();
-            canvas.discardActiveObject();
-            canvas.requestRenderAll();
-            // Switch back to select mode
-            setActiveTool('select');
-            setTimeout(() => applyToolSettings('select'), 0);
             return;
           }
 
