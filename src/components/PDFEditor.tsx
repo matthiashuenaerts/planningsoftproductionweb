@@ -167,33 +167,39 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
     
     pageAnnotations.forEach(annotation => {
       context.save();
+      
+      // Scale annotation position and font size based on current scale
+      const scaledX = annotation.x * scale;
+      const scaledY = annotation.y * scale;
+      const scaledFontSize = annotation.fontSize * scale;
+      
       context.fillStyle = annotation.color;
-      context.font = `${annotation.fontSize}px Arial`;
+      context.font = `${scaledFontSize}px Arial`;
       context.textBaseline = 'top';
       
       // Add background for better readability
       const textMetrics = context.measureText(annotation.text);
-      const textHeight = annotation.fontSize;
+      const textHeight = scaledFontSize;
       
       context.fillStyle = 'rgba(255, 255, 255, 0.8)';
       context.fillRect(
-        annotation.x - 2,
-        annotation.y - 2,
+        scaledX - 2,
+        scaledY - 2,
         textMetrics.width + 4,
         textHeight + 4
       );
       
       // Draw text
       context.fillStyle = annotation.color;
-      context.fillText(annotation.text, annotation.x, annotation.y);
+      context.fillText(annotation.text, scaledX, scaledY);
       
       // Add selection border if selected
       if (selectedAnnotation === annotation.id) {
         context.strokeStyle = '#3b82f6';
         context.lineWidth = 2;
         context.strokeRect(
-          annotation.x - 4, 
-          annotation.y - 4, 
+          scaledX - 4, 
+          scaledY - 4, 
           textMetrics.width + 8, 
           textHeight + 8
         );
@@ -207,13 +213,18 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
     if (!canvasRef.current || loading) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = (event.clientX - rect.left) * (canvasRef.current.width / rect.width);
-    const y = (event.clientY - rect.top) * (canvasRef.current.height / rect.height);
+    // Get canvas coordinates
+    const canvasX = (event.clientX - rect.left) * (canvasRef.current.width / rect.width);
+    const canvasY = (event.clientY - rect.top) * (canvasRef.current.height / rect.height);
+    
+    // Convert to normalized (unscaled) coordinates for storage
+    const normalizedX = canvasX / scale;
+    const normalizedY = canvasY / scale;
 
     if (isAddingText) {
-      addTextAnnotation(x, y);
+      addTextAnnotation(normalizedX, normalizedY);
     } else {
-      selectAnnotationAt(x, y);
+      selectAnnotationAt(canvasX, canvasY);
     }
   };
 
@@ -254,7 +265,7 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
     });
   };
 
-  const selectAnnotationAt = (x: number, y: number) => {
+  const selectAnnotationAt = (canvasX: number, canvasY: number) => {
     const pageAnnotations = annotations.filter(ann => ann.page === currentPage);
     
     if (!canvasRef.current) return;
@@ -262,15 +273,20 @@ const PDFEditor: React.FC<PDFEditorProps> = ({
     if (!context) return;
     
     for (const annotation of pageAnnotations) {
-      context.font = `${annotation.fontSize}px Arial`;
+      // Scale annotation position and font for hit testing
+      const scaledX = annotation.x * scale;
+      const scaledY = annotation.y * scale;
+      const scaledFontSize = annotation.fontSize * scale;
+      
+      context.font = `${scaledFontSize}px Arial`;
       const textMetrics = context.measureText(annotation.text);
-      const textHeight = annotation.fontSize;
+      const textHeight = scaledFontSize;
       
       if (
-        x >= annotation.x - 4 && 
-        x <= annotation.x + textMetrics.width + 4 &&
-        y >= annotation.y - 4 && 
-        y <= annotation.y + textHeight + 4
+        canvasX >= scaledX - 4 && 
+        canvasX <= scaledX + textMetrics.width + 4 &&
+        canvasY >= scaledY - 4 && 
+        canvasY <= scaledY + textHeight + 4
       ) {
         setSelectedAnnotation(annotation.id);
         setTimeout(() => renderAnnotations(), 50);
