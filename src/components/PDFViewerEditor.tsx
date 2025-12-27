@@ -452,25 +452,42 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
   }, [isEditMode, pdfDoc, loading, currentPage, scale, initializeFabricCanvas]);
 
-  // Save current page annotations
+  // Helper function to normalize path data (divide by scale)
+  const normalizePathData = (pathData: any, currentScale: number): any => {
+    if (!Array.isArray(pathData)) return pathData;
+    
+    return pathData.map((segment: any) => {
+      if (!Array.isArray(segment)) return segment;
+      
+      // First element is the command (M, L, C, Q, etc.), rest are coordinates
+      const [command, ...coords] = segment;
+      const normalizedCoords = coords.map((coord: any) => 
+        typeof coord === 'number' ? coord / currentScale : coord
+      );
+      return [command, ...normalizedCoords];
+    });
+  };
+
+  // Save current page annotations - normalize coordinates to scale 1.0
   const saveCurrentPageAnnotations = () => {
     if (!fabricCanvasRef.current) return;
     
     const objects = fabricCanvasRef.current.getObjects();
+    // Normalize all coordinates by dividing by current scale so they're stored relative to scale 1.0
     const annotations: AnnotationData[] = objects.map(obj => ({
       type: obj.type || 'unknown',
-      left: obj.left || 0,
-      top: obj.top || 0,
-      width: (obj as any).width,
-      height: (obj as any).height,
+      left: (obj.left || 0) / scale,
+      top: (obj.top || 0) / scale,
+      width: (obj as any).width ? (obj as any).width / scale : undefined,
+      height: (obj as any).height ? (obj as any).height / scale : undefined,
       fill: obj.fill as string,
       stroke: obj.stroke as string,
-      strokeWidth: obj.strokeWidth,
+      strokeWidth: obj.strokeWidth ? obj.strokeWidth / scale : undefined,
       text: obj.type === 'textbox' ? (obj as Textbox).text : undefined,
-      fontSize: obj.type === 'textbox' ? (obj as Textbox).fontSize : undefined,
+      fontSize: obj.type === 'textbox' ? ((obj as Textbox).fontSize || 18) / scale : undefined,
       fontFamily: obj.type === 'textbox' ? (obj as Textbox).fontFamily : undefined,
-      radius: obj.type === 'circle' ? (obj as FabricCircle).radius : undefined,
-      path: obj.type === 'path' ? (obj as Path).path : undefined,
+      radius: obj.type === 'circle' ? ((obj as FabricCircle).radius || 0) / scale : undefined,
+      path: obj.type === 'path' ? normalizePathData((obj as Path).path, scale) : undefined,
       scaleX: obj.scaleX,
       scaleY: obj.scaleY,
       angle: obj.angle
@@ -479,7 +496,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     pageAnnotationsRef.current.set(currentPage, annotations);
   };
 
-  // Load annotations for a specific page
+  // Load annotations for a specific page - scale coordinates from normalized (scale 1.0) to current scale
   const loadPageAnnotations = (pageNum: number) => {
     if (!fabricCanvasRef.current) return;
     
@@ -487,9 +504,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     
     annotations.forEach(annotation => {
       let obj;
+      // Scale all coordinates from normalized (scale 1.0) to current scale
       const commonProps = {
-        left: annotation.left,
-        top: annotation.top,
+        left: (annotation.left || 0) * scale,
+        top: (annotation.top || 0) * scale,
         scaleX: annotation.scaleX || 1,
         scaleY: annotation.scaleY || 1,
         angle: annotation.angle || 0
@@ -499,37 +517,39 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         case 'rect':
           obj = new Rect({
             ...commonProps,
-            width: annotation.width,
-            height: annotation.height,
+            width: (annotation.width || 0) * scale,
+            height: (annotation.height || 0) * scale,
             fill: annotation.fill || 'transparent',
             stroke: annotation.stroke,
-            strokeWidth: annotation.strokeWidth
+            strokeWidth: (annotation.strokeWidth || 1) * scale
           });
           break;
         case 'circle':
           obj = new FabricCircle({
             ...commonProps,
-            radius: annotation.radius,
+            radius: (annotation.radius || 0) * scale,
             fill: annotation.fill || 'transparent',
             stroke: annotation.stroke,
-            strokeWidth: annotation.strokeWidth
+            strokeWidth: (annotation.strokeWidth || 1) * scale
           });
           break;
         case 'textbox':
           obj = new Textbox(annotation.text || '', {
             ...commonProps,
-            width: annotation.width,
-            fontSize: annotation.fontSize || 18,
+            width: (annotation.width || 200) * scale,
+            fontSize: (annotation.fontSize || 18) * scale,
             fontFamily: annotation.fontFamily || 'Arial',
             fill: annotation.fill || '#000000'
           });
           break;
         case 'path':
           if (annotation.path) {
-            obj = new Path(annotation.path, {
+            // For paths, we need to scale the path data itself
+            const scaledPath = scalePathData(annotation.path, scale);
+            obj = new Path(scaledPath, {
               ...commonProps,
               stroke: annotation.stroke,
-              strokeWidth: annotation.strokeWidth,
+              strokeWidth: (annotation.strokeWidth || 1) * scale,
               fill: 'transparent'
             });
           }
@@ -542,6 +562,22 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     });
     
     fabricCanvasRef.current.renderAll();
+  };
+  
+  // Helper function to scale path data
+  const scalePathData = (pathData: any, targetScale: number): any => {
+    if (!Array.isArray(pathData)) return pathData;
+    
+    return pathData.map((segment: any) => {
+      if (!Array.isArray(segment)) return segment;
+      
+      // First element is the command (M, L, C, Q, etc.), rest are coordinates
+      const [command, ...coords] = segment;
+      const scaledCoords = coords.map((coord: any) => 
+        typeof coord === 'number' ? coord * targetScale : coord
+      );
+      return [command, ...scaledCoords];
+    });
   };
 
   // Save canvas state for undo/redo
