@@ -377,41 +377,23 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         obj.setCoords();
       });
 
-      // Resize the canvas
-      overlayCanvasRef.current.width = viewport.width;
-      overlayCanvasRef.current.height = viewport.height;
+      // Resize the canvas (let Fabric handle retina scaling; do NOT manually set canvas.width/height)
       canvas.setDimensions({ width: viewport.width, height: viewport.height });
-      
-      // Update wrapper and internal canvas styles
-      const fabricWrapper = canvas.wrapperEl;
-      if (fabricWrapper) {
-        fabricWrapper.style.width = `${viewport.width}px`;
-        fabricWrapper.style.height = `${viewport.height}px`;
-      }
-      
-      // Also update the internal upper/lower canvas elements
-      const upperCanvas = (canvas as any).upperCanvasEl as HTMLCanvasElement | undefined;
-      const lowerCanvas = (canvas as any).lowerCanvasEl as HTMLCanvasElement | undefined;
-      if (upperCanvas) {
-        upperCanvas.width = viewport.width;
-        upperCanvas.height = viewport.height;
-      }
-      if (lowerCanvas) {
-        lowerCanvas.width = viewport.width;
-        lowerCanvas.height = viewport.height;
-      }
 
-      canvas.calcOffset();
-      canvas.requestRenderAll();
-      
       previousScaleRef.current = scale;
       fabricInitKeyRef.current = initKey;
-      
-      applyToolSettings(isEditMode ? activeTool : 'select');
-      if (!isEditMode) {
-        canvas.discardActiveObject();
-        canvas.selection = false;
-      }
+
+      // Offsets can be wrong immediately after resize; recalc + re-apply tool on next frame
+      requestAnimationFrame(() => {
+        canvas.calcOffset();
+        applyToolSettings(isEditMode ? activeTool : 'select');
+        if (!isEditMode) {
+          canvas.discardActiveObject();
+          canvas.selection = false;
+        }
+        canvas.requestRenderAll();
+      });
+
       return;
     }
 
@@ -1497,6 +1479,15 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       window.removeEventListener('resize', syncOffset);
     };
   }, [isEditMode]);
+
+  // Re-sync Fabric offsets after zoom/page size changes (prevents cursor mismatch)
+  useEffect(() => {
+    if (!isEditMode || !fabricCanvasRef.current) return;
+    const raf = requestAnimationFrame(() => {
+      fabricCanvasRef.current?.calcOffset();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isEditMode, scale, canvasSize.width, canvasSize.height]);
 
   // Ensure the active tool is always applied after Fabric finishes initializing
   useEffect(() => {
