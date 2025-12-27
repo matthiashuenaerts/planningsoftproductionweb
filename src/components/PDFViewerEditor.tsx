@@ -107,6 +107,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Annotations per page
   const pageAnnotationsRef = useRef<Map<number, AnnotationData[]>>(new Map());
   
+  // Track previous scale for rescaling existing objects
+  const previousScaleRef = useRef<number>(1.0);
+  
   // Auto-save state
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -321,11 +324,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
     const { viewport } = result;
 
+    const pageKey = `${currentPage}`;
     const initKey = `${currentPage}-${scale}-${viewport.width}-${viewport.height}`;
+    const previousKey = fabricInitKeyRef.current;
+    const previousPageKey = previousKey ? previousKey.split('-')[0] : null;
 
-    // If we're already initialized for this page/zoom, don't recreate the canvas (this breaks drawing)
+    // If we're already initialized for this page/zoom, don't recreate the canvas
     if (fabricCanvasRef.current && fabricInitKeyRef.current === initKey) {
-      // In Preview mode we keep the overlay visible but non-interactive.
       applyToolSettings(isEditMode ? activeTool : 'select');
       if (!isEditMode) {
         fabricCanvasRef.current.discardActiveObject();
@@ -336,7 +341,81 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       return;
     }
 
-    // Dispose existing fabric canvas
+    // Check if only scale changed (same page) - rescale existing objects instead of recreating
+    if (fabricCanvasRef.current && previousPageKey === pageKey && previousScaleRef.current !== scale) {
+      const scaleRatio = scale / previousScaleRef.current;
+      const canvas = fabricCanvasRef.current;
+      
+      // Rescale all existing objects
+      canvas.getObjects().forEach(obj => {
+        // Scale position
+        obj.set({
+          left: (obj.left || 0) * scaleRatio,
+          top: (obj.top || 0) * scaleRatio,
+        });
+        
+        // For paths, scale via scaleX/scaleY (preserves path shape)
+        if (obj.type === 'path') {
+          obj.set({
+            scaleX: (obj.scaleX || 1) * scaleRatio,
+            scaleY: (obj.scaleY || 1) * scaleRatio,
+            strokeWidth: (obj.strokeWidth || 1) * scaleRatio
+          });
+        } else {
+          // For shapes like rect, circle, textbox - scale their actual dimensions
+          obj.set({
+            scaleX: (obj.scaleX || 1) * scaleRatio,
+            scaleY: (obj.scaleY || 1) * scaleRatio,
+          });
+          
+          // Update stroke width for shapes
+          if (obj.strokeWidth) {
+            obj.set({ strokeWidth: obj.strokeWidth * scaleRatio });
+          }
+        }
+        
+        obj.setCoords();
+      });
+
+      // Resize the canvas
+      overlayCanvasRef.current.width = viewport.width;
+      overlayCanvasRef.current.height = viewport.height;
+      canvas.setDimensions({ width: viewport.width, height: viewport.height });
+      
+      // Update wrapper and internal canvas styles
+      const fabricWrapper = canvas.wrapperEl;
+      if (fabricWrapper) {
+        fabricWrapper.style.width = `${viewport.width}px`;
+        fabricWrapper.style.height = `${viewport.height}px`;
+      }
+      
+      // Also update the internal upper/lower canvas elements
+      const upperCanvas = (canvas as any).upperCanvasEl as HTMLCanvasElement | undefined;
+      const lowerCanvas = (canvas as any).lowerCanvasEl as HTMLCanvasElement | undefined;
+      if (upperCanvas) {
+        upperCanvas.width = viewport.width;
+        upperCanvas.height = viewport.height;
+      }
+      if (lowerCanvas) {
+        lowerCanvas.width = viewport.width;
+        lowerCanvas.height = viewport.height;
+      }
+
+      canvas.calcOffset();
+      canvas.requestRenderAll();
+      
+      previousScaleRef.current = scale;
+      fabricInitKeyRef.current = initKey;
+      
+      applyToolSettings(isEditMode ? activeTool : 'select');
+      if (!isEditMode) {
+        canvas.discardActiveObject();
+        canvas.selection = false;
+      }
+      return;
+    }
+
+    // Dispose existing fabric canvas (page changed or first init)
     if (fabricCanvasRef.current) {
       saveCurrentPageAnnotations();
       fabricCanvasRef.current.dispose();
@@ -425,6 +504,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
     fabricCanvasRef.current = fabricCanvas;
     fabricInitKeyRef.current = initKey;
+    previousScaleRef.current = scale;
 
     // Load annotations for this page
     loadPageAnnotations(currentPage);
@@ -475,26 +555,34 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const saveCurrentPageAnnotations = () => {
     if (!fabricCanvasRef.current) return;
     
+    const currentScale = previousScaleRef.current; // Use tracked scale for accurate normalization
     const objects = fabricCanvasRef.current.getObjects();
+    
     // Normalize all coordinates by dividing by current scale so they're stored relative to scale 1.0
-    const annotations: AnnotationData[] = objects.map(obj => ({
-      type: obj.type || 'unknown',
-      left: (obj.left || 0) / scale,
-      top: (obj.top || 0) / scale,
-      width: (obj as any).width ? (obj as any).width / scale : undefined,
-      height: (obj as any).height ? (obj as any).height / scale : undefined,
-      fill: obj.fill as string,
-      stroke: obj.stroke as string,
-      strokeWidth: obj.strokeWidth ? obj.strokeWidth / scale : undefined,
-      text: obj.type === 'textbox' ? (obj as Textbox).text : undefined,
-      fontSize: obj.type === 'textbox' ? ((obj as Textbox).fontSize || 18) / scale : undefined,
-      fontFamily: obj.type === 'textbox' ? (obj as Textbox).fontFamily : undefined,
-      radius: obj.type === 'circle' ? ((obj as FabricCircle).radius || 0) / scale : undefined,
-      path: obj.type === 'path' ? normalizePathData((obj as Path).path, scale) : undefined,
-      scaleX: obj.scaleX,
-      scaleY: obj.scaleY,
-      angle: obj.angle
-    }));
+    const annotations: AnnotationData[] = objects.map(obj => {
+      // Get the actual object dimensions accounting for any transforms
+      const objScaleX = obj.scaleX || 1;
+      const objScaleY = obj.scaleY || 1;
+      
+      return {
+        type: obj.type || 'unknown',
+        left: (obj.left || 0) / currentScale,
+        top: (obj.top || 0) / currentScale,
+        width: (obj as any).width ? ((obj as any).width * objScaleX) / currentScale : undefined,
+        height: (obj as any).height ? ((obj as any).height * objScaleY) / currentScale : undefined,
+        fill: obj.fill as string,
+        stroke: obj.stroke as string,
+        strokeWidth: obj.strokeWidth ? obj.strokeWidth / currentScale : undefined,
+        text: obj.type === 'textbox' ? (obj as Textbox).text : undefined,
+        fontSize: obj.type === 'textbox' ? ((obj as Textbox).fontSize || 18) / currentScale : undefined,
+        fontFamily: obj.type === 'textbox' ? (obj as Textbox).fontFamily : undefined,
+        radius: obj.type === 'circle' ? (((obj as FabricCircle).radius || 0) * objScaleX) / currentScale : undefined,
+        path: obj.type === 'path' ? normalizePathData((obj as Path).path, currentScale) : undefined,
+        scaleX: 1, // Bake in transforms, reset to 1
+        scaleY: 1,
+        angle: obj.angle
+      };
+    });
     
     pageAnnotationsRef.current.set(currentPage, annotations);
   };
