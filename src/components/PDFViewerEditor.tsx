@@ -122,15 +122,16 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const pointerHoldPositionRef = useRef<{ x: number; y: number } | null>(null);
   const [lineSnapEnabled, setLineSnapEnabled] = useState(true);
   const lineSnapEnabledRef = useRef(true); // Ref to access current value in callbacks
+  const [fabricCanvasReady, setFabricCanvasReady] = useState(false); // Track canvas readiness
   
   // Keep ref in sync with state
   useEffect(() => {
     lineSnapEnabledRef.current = lineSnapEnabled;
   }, [lineSnapEnabled]);
   
-  // Line snap configuration
-  const LINE_SNAP_HOLD_DURATION = 400; // ms to hold before snapping
-  const LINE_STRAIGHTNESS_THRESHOLD = 0.15; // max allowed deviation ratio (lower = stricter)
+  // Line snap configuration - increased tolerances for easier detection
+  const LINE_SNAP_HOLD_DURATION = 200; // ms to hold before snapping (reduced for faster detection)
+  const LINE_STRAIGHTNESS_THRESHOLD = 0.25; // max allowed deviation ratio (increased for easier detection)
 
   // Load PDF.js
   useEffect(() => {
@@ -420,6 +421,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       fabricCanvasRef.current.dispose();
       fabricCanvasRef.current = null;
       fabricInitKeyRef.current = null;
+      setFabricCanvasReady(false); // Reset ready flag
     }
 
     // Create overlay Fabric canvas with same size as PDF
@@ -520,6 +522,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     fabricCanvas.requestRenderAll();
 
     console.log('Fabric canvas initialization complete');
+    
+    // Signal that canvas is ready for line snap listeners
+    setFabricCanvasReady(true);
   }, [pdfDoc, currentPage, scale, drawingColor, strokeWidth, activeTool]);
 
   // Keep canvases (PDF + annotations overlay) in sync whenever page/zoom changes.
@@ -741,12 +746,18 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
   // Set up smart line straightening event listeners on fabric canvas
   useEffect(() => {
-    if (!fabricCanvasRef.current || !isEditMode) return;
+    // Wait for canvas to be ready and edit mode to be enabled
+    if (!fabricCanvasReady || !fabricCanvasRef.current || !isEditMode) {
+      console.log('Line snap setup skipped:', { fabricCanvasReady, hasCanvas: !!fabricCanvasRef.current, isEditMode });
+      return;
+    }
     
     const canvas = fabricCanvasRef.current;
+    console.log('Setting up line snap event listeners');
     
     // Handler for path:created - starts line snap detection
     const handlePathCreated = (e: any) => {
+      console.log('Line snap: path:created detected, lineSnapEnabled:', lineSnapEnabledRef.current);
       if (e?.path && lineSnapEnabledRef.current) {
         startLineSnapDetection(e.path as Path);
       }
@@ -763,10 +774,11 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     canvas.on('mouse:move', handleMouseMove);
     
     return () => {
+      console.log('Cleaning up line snap event listeners');
       canvas.off('path:created', handlePathCreated);
       canvas.off('mouse:move', handleMouseMove);
     };
-  }, [isEditMode, fabricCanvasRef.current]);
+  }, [isEditMode, fabricCanvasReady]);
 
   // Helper function to normalize path data (divide by scale)
   const normalizePathData = (pathData: any, currentScale: number): any => {
