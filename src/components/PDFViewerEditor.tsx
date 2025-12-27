@@ -26,7 +26,8 @@ import {
   Trash2,
   X,
   Check,
-  RotateCcw
+  RotateCcw,
+  ExternalLink
 } from 'lucide-react';
 import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Textbox, Path, PencilBrush } from 'fabric';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
@@ -37,6 +38,7 @@ interface PDFViewerEditorProps {
   fileName: string;
   onSave?: () => void;
   onClose?: () => void;
+  fullscreen?: boolean;
 }
 
 type ToolType = 'select' | 'draw' | 'text' | 'rectangle' | 'circle' | 'erase';
@@ -65,7 +67,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   projectId, 
   fileName, 
   onSave,
-  onClose
+  onClose,
+  fullscreen = false
 }) => {
   const { toast } = useToast();
   
@@ -1426,8 +1429,19 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     );
   }
 
+  // Open PDF in new tab for full-screen editing
+  const openInNewTab = () => {
+    const params = new URLSearchParams({
+      url: pdfUrl,
+      projectId: projectId,
+      fileName: fileName,
+      returnUrl: window.location.pathname + window.location.search
+    });
+    window.open(`/pdf-editor?${params.toString()}`, '_blank');
+  };
+
   return (
-    <div className="flex flex-col min-h-[70vh] h-[80vh] bg-background" ref={containerRef}>
+    <div className={`flex flex-col bg-background ${fullscreen ? 'h-full' : 'min-h-[70vh] h-[80vh]'}`} ref={containerRef}>
       {/* Header Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 p-3 border-b bg-card">
         {/* Left: Navigation */}
@@ -1525,6 +1539,12 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           <Button onClick={downloadPDF} size="sm" variant="outline">
             <Download className="h-4 w-4" />
           </Button>
+          
+          {!fullscreen && (
+            <Button onClick={openInNewTab} size="sm" variant="outline" title="Open in new tab">
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
