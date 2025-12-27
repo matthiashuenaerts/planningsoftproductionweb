@@ -121,6 +121,12 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const lineSnapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pointerHoldPositionRef = useRef<{ x: number; y: number } | null>(null);
   const [lineSnapEnabled, setLineSnapEnabled] = useState(true);
+  const lineSnapEnabledRef = useRef(true); // Ref to access current value in callbacks
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    lineSnapEnabledRef.current = lineSnapEnabled;
+  }, [lineSnapEnabled]);
   
   // Line snap configuration
   const LINE_SNAP_HOLD_DURATION = 400; // ms to hold before snapping
@@ -483,18 +489,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
       // Also keep the normal debounce autosave for other changes
       triggerAutoSave();
-      
-      // Start smart line straightening detection
-      if (e?.path) {
-        startLineSnapDetection(e.path as Path, e?.e);
-      }
-    });
-    
-    // Track pointer movement to cancel line snap if user moves away
-    fabricCanvas.on('mouse:move', (e: any) => {
-      if (pointerHoldPositionRef.current && e.pointer) {
-        cancelLineSnapIfMoved(e.pointer.x, e.pointer.y);
-      }
     });
 
     fabricCanvas.on('object:modified', () => {
@@ -664,7 +658,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
   // Analyze and potentially straighten a drawn path
   const analyzeAndStraightenPath = (path: Path) => {
-    if (!lineSnapEnabled) return;
+    if (!lineSnapEnabledRef.current) return;
     
     const pathData = path.path;
     if (!pathData) return;
@@ -683,7 +677,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
   // Start hold detection after a path is drawn
   const startLineSnapDetection = (path: Path, pointerEvent?: PointerEvent | MouseEvent | TouchEvent) => {
-    if (!lineSnapEnabled) return;
+    if (!lineSnapEnabledRef.current) return;
     
     // Clear any existing timer
     if (lineSnapTimeoutRef.current) {
@@ -744,6 +738,35 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       }
     };
   }, []);
+
+  // Set up smart line straightening event listeners on fabric canvas
+  useEffect(() => {
+    if (!fabricCanvasRef.current || !isEditMode) return;
+    
+    const canvas = fabricCanvasRef.current;
+    
+    // Handler for path:created - starts line snap detection
+    const handlePathCreated = (e: any) => {
+      if (e?.path && lineSnapEnabledRef.current) {
+        startLineSnapDetection(e.path as Path);
+      }
+    };
+    
+    // Handler for mouse:move - cancels snap if user moves away
+    const handleMouseMove = (e: any) => {
+      if (pointerHoldPositionRef.current && e.pointer) {
+        cancelLineSnapIfMoved(e.pointer.x, e.pointer.y);
+      }
+    };
+    
+    canvas.on('path:created', handlePathCreated);
+    canvas.on('mouse:move', handleMouseMove);
+    
+    return () => {
+      canvas.off('path:created', handlePathCreated);
+      canvas.off('mouse:move', handleMouseMove);
+    };
+  }, [isEditMode, fabricCanvasRef.current]);
 
   // Helper function to normalize path data (divide by scale)
   const normalizePathData = (pathData: any, currentScale: number): any => {
