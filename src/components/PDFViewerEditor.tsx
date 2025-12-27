@@ -27,9 +27,10 @@ import {
   X,
   Check,
   RotateCcw,
-  ExternalLink
+  ExternalLink,
+  Ruler
 } from 'lucide-react';
-import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Textbox, Path, PencilBrush } from 'fabric';
+import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Textbox, Path, PencilBrush, Line } from 'fabric';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 interface PDFViewerEditorProps {
@@ -114,6 +115,16 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasUnsavedChanges = useRef(false);
+  
+  // Smart line straightening state
+  const lastDrawnPathRef = useRef<Path | null>(null);
+  const lineSnapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pointerHoldPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const [lineSnapEnabled, setLineSnapEnabled] = useState(true);
+  
+  // Line snap configuration
+  const LINE_SNAP_HOLD_DURATION = 400; // ms to hold before snapping
+  const LINE_STRAIGHTNESS_THRESHOLD = 0.15; // max allowed deviation ratio (lower = stricter)
 
   // Load PDF.js
   useEffect(() => {
@@ -472,6 +483,18 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
       // Also keep the normal debounce autosave for other changes
       triggerAutoSave();
+      
+      // Start smart line straightening detection
+      if (e?.path) {
+        startLineSnapDetection(e.path as Path, e?.e);
+      }
+    });
+    
+    // Track pointer movement to cancel line snap if user moves away
+    fabricCanvas.on('mouse:move', (e: any) => {
+      if (pointerHoldPositionRef.current && e.pointer) {
+        cancelLineSnapIfMoved(e.pointer.x, e.pointer.y);
+      }
     });
 
     fabricCanvas.on('object:modified', () => {
@@ -516,6 +539,211 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       return () => window.cancelAnimationFrame(raf);
     }
   }, [isEditMode, pdfDoc, loading, currentPage, scale, initializeFabricCanvas]);
+
+  // Smart Line Straightening: Extract points from a Fabric.js path
+  const extractPathPoints = (pathData: any[]): { x: number; y: number }[] => {
+    const points: { x: number; y: number }[] = [];
+    if (!Array.isArray(pathData)) return points;
+    
+    for (const segment of pathData) {
+      if (!Array.isArray(segment)) continue;
+      const [command, ...coords] = segment;
+      
+      // Handle different path commands
+      if (command === 'M' || command === 'L') {
+        // MoveTo or LineTo: coords are [x, y]
+        if (coords.length >= 2) {
+          points.push({ x: coords[0], y: coords[1] });
+        }
+      } else if (command === 'Q') {
+        // Quadratic curve: coords are [cpX, cpY, x, y] - use endpoint
+        if (coords.length >= 4) {
+          points.push({ x: coords[2], y: coords[3] });
+        }
+      } else if (command === 'C') {
+        // Cubic curve: coords are [cp1X, cp1Y, cp2X, cp2Y, x, y] - use endpoint
+        if (coords.length >= 6) {
+          points.push({ x: coords[4], y: coords[5] });
+        }
+      }
+    }
+    return points;
+  };
+
+  // Calculate the maximum perpendicular distance from points to the ideal line
+  const calculateStraightnessScore = (points: { x: number; y: number }[]): number => {
+    if (points.length < 2) return 0;
+    
+    const start = points[0];
+    const end = points[points.length - 1];
+    
+    // Calculate line length
+    const lineLength = Math.sqrt(
+      Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)
+    );
+    
+    if (lineLength < 10) return 1; // Very short strokes don't qualify
+    
+    // Calculate max perpendicular distance from the ideal line
+    let maxDistance = 0;
+    
+    for (const point of points) {
+      // Perpendicular distance from point to line (start -> end)
+      const distance = Math.abs(
+        (end.y - start.y) * point.x - 
+        (end.x - start.x) * point.y + 
+        end.x * start.y - 
+        end.y * start.x
+      ) / lineLength;
+      
+      maxDistance = Math.max(maxDistance, distance);
+    }
+    
+    // Return the ratio of max deviation to line length
+    return maxDistance / lineLength;
+  };
+
+  // Replace a freehand path with a straight line
+  const replaceWithStraightLine = (path: Path) => {
+    if (!fabricCanvasRef.current) return;
+    
+    const pathData = path.path;
+    if (!pathData) return;
+    
+    const points = extractPathPoints(pathData);
+    if (points.length < 2) return;
+    
+    const canvas = fabricCanvasRef.current;
+    const start = points[0];
+    const end = points[points.length - 1];
+    
+    // Get path properties
+    const pathLeft = path.left || 0;
+    const pathTop = path.top || 0;
+    
+    // Calculate absolute positions (path points are relative to path origin)
+    const startX = pathLeft + start.x;
+    const startY = pathTop + start.y;
+    const endX = pathLeft + end.x;
+    const endY = pathTop + end.y;
+    
+    // Create a straight line with same styling
+    const straightLine = new Line([startX, startY, endX, endY], {
+      stroke: path.stroke as string,
+      strokeWidth: path.strokeWidth,
+      strokeLineCap: 'round',
+      strokeLineJoin: 'round',
+      fill: 'transparent',
+      selectable: true,
+      evented: true,
+    });
+    
+    // Animate the transition (brief visual feedback)
+    path.set({ opacity: 0.5 });
+    canvas.add(straightLine);
+    canvas.remove(path);
+    canvas.requestRenderAll();
+    
+    // Flash effect for feedback
+    straightLine.set({ opacity: 0 });
+    canvas.requestRenderAll();
+    
+    // Fade in the straight line
+    let opacity = 0;
+    const fadeIn = setInterval(() => {
+      opacity += 0.2;
+      straightLine.set({ opacity: Math.min(1, opacity) });
+      canvas.requestRenderAll();
+      if (opacity >= 1) {
+        clearInterval(fadeIn);
+        saveCanvasState();
+        triggerAutoSave();
+      }
+    }, 30);
+  };
+
+  // Analyze and potentially straighten a drawn path
+  const analyzeAndStraightenPath = (path: Path) => {
+    if (!lineSnapEnabled) return;
+    
+    const pathData = path.path;
+    if (!pathData) return;
+    
+    const points = extractPathPoints(pathData);
+    if (points.length < 3) return; // Need at least 3 points to analyze
+    
+    const straightnessScore = calculateStraightnessScore(points);
+    
+    console.log('Line straightness score:', straightnessScore, '(threshold:', LINE_STRAIGHTNESS_THRESHOLD, ')');
+    
+    if (straightnessScore <= LINE_STRAIGHTNESS_THRESHOLD) {
+      replaceWithStraightLine(path);
+    }
+  };
+
+  // Start hold detection after a path is drawn
+  const startLineSnapDetection = (path: Path, pointerEvent?: PointerEvent | MouseEvent | TouchEvent) => {
+    if (!lineSnapEnabled) return;
+    
+    // Clear any existing timer
+    if (lineSnapTimeoutRef.current) {
+      clearTimeout(lineSnapTimeoutRef.current);
+    }
+    
+    lastDrawnPathRef.current = path;
+    
+    // Get the end position of the stroke
+    const pathData = path.path;
+    if (!pathData) return;
+    
+    const points = extractPathPoints(pathData);
+    if (points.length < 2) return;
+    
+    const lastPoint = points[points.length - 1];
+    const pathLeft = path.left || 0;
+    const pathTop = path.top || 0;
+    
+    pointerHoldPositionRef.current = {
+      x: pathLeft + lastPoint.x,
+      y: pathTop + lastPoint.y
+    };
+    
+    // Start hold detection timer
+    lineSnapTimeoutRef.current = setTimeout(() => {
+      if (lastDrawnPathRef.current === path) {
+        analyzeAndStraightenPath(path);
+      }
+      lastDrawnPathRef.current = null;
+      pointerHoldPositionRef.current = null;
+    }, LINE_SNAP_HOLD_DURATION);
+  };
+
+  // Cancel line snap if pointer moves significantly
+  const cancelLineSnapIfMoved = (x: number, y: number) => {
+    if (!pointerHoldPositionRef.current || !lineSnapTimeoutRef.current) return;
+    
+    const holdRadius = 15; // pixels
+    const distance = Math.sqrt(
+      Math.pow(x - pointerHoldPositionRef.current.x, 2) +
+      Math.pow(y - pointerHoldPositionRef.current.y, 2)
+    );
+    
+    if (distance > holdRadius) {
+      clearTimeout(lineSnapTimeoutRef.current);
+      lineSnapTimeoutRef.current = null;
+      lastDrawnPathRef.current = null;
+      pointerHoldPositionRef.current = null;
+    }
+  };
+
+  // Cleanup line snap timers on unmount
+  useEffect(() => {
+    return () => {
+      if (lineSnapTimeoutRef.current) {
+        clearTimeout(lineSnapTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Helper function to normalize path data (divide by scale)
   const normalizePathData = (pathData: any, currentScale: number): any => {
@@ -1734,7 +1962,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 border-r pr-3">
             <Button onClick={undo} size="sm" variant="ghost" disabled={historyIndex <= 0} title="Undo">
               <Undo className="h-4 w-4" />
             </Button>
@@ -1746,6 +1974,20 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             </Button>
             <Button onClick={clearAnnotations} size="sm" variant="ghost" title="Clear All">
               <RotateCcw className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* Smart line snap toggle */}
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setLineSnapEnabled(!lineSnapEnabled)}
+              size="sm"
+              variant={lineSnapEnabled ? 'default' : 'ghost'}
+              title={lineSnapEnabled ? 'Line snap enabled (hold after drawing to straighten)' : 'Line snap disabled'}
+              className={lineSnapEnabled ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+            >
+              <Ruler className="h-4 w-4 mr-1" />
+              <span className="text-xs">Snap</span>
             </Button>
           </div>
         </div>
