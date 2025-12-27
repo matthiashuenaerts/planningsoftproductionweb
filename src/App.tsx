@@ -36,6 +36,7 @@ import NotesAndTasks from './pages/NotesAndTasks';
 import ControlPanel from './pages/ControlPanel';
 import WorkstationControl from './pages/WorkstationControl';
 import TruckLoadingView from './pages/TruckLoadingView';
+import PDFEditorFullscreen from './pages/PDFEditorFullscreen';
 import { AuthProvider } from '@/context/AuthContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -69,6 +70,7 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/pdf-editor" element={<ProtectedRoute><PDFEditorFullscreen /></ProtectedRoute>} />
                 <Route path="/migrate-auth" element={<ProtectedRoute><MigrateAuth /></ProtectedRoute>} />
                 <Route path="/:lang/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/:lang/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
