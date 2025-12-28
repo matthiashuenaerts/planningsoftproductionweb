@@ -116,12 +116,21 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasUnsavedChanges = useRef(false);
   
-  // Smart line straightening state
-  const lastDrawnPathRef = useRef<Path | null>(null);
-  const lineSnapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const pointerHoldPositionRef = useRef<{ x: number; y: number } | null>(null);
+  // Smart line straightening (hold-to-straighten) state
   const [lineSnapEnabled, setLineSnapEnabled] = useState(true);
   const lineSnapEnabledRef = useRef(true); // Ref to access current value in callbacks
+
+  // Fabric only emits `path:created` when the pointer is released.
+  // To support "draw a somewhat straight line and HOLD at the end", we detect whether
+  // the pointer stopped moving for LINE_SNAP_HOLD_DURATION right before mouse:up.
+  const isStrokeInProgressRef = useRef(false);
+  const lastSignificantMoveAtRef = useRef<number>(0);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const shouldStraightenNextPathRef = useRef(false);
+
+  // Track tool-specific mouse handlers so we don't accidentally remove global listeners
+  const toolMouseDownHandlerRef = useRef<((e: any) => void) | null>(null);
+
   const [fabricCanvasReady, setFabricCanvasReady] = useState(false); // Track canvas readiness
   
   // Keep ref in sync with state
@@ -680,105 +689,78 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
   };
 
-  // Start hold detection after a path is drawn
-  const startLineSnapDetection = (path: Path, pointerEvent?: PointerEvent | MouseEvent | TouchEvent) => {
-    if (!lineSnapEnabledRef.current) return;
-    
-    // Clear any existing timer
-    if (lineSnapTimeoutRef.current) {
-      clearTimeout(lineSnapTimeoutRef.current);
-    }
-    
-    lastDrawnPathRef.current = path;
-    
-    // Get the end position of the stroke
-    const pathData = path.path;
-    if (!pathData) return;
-    
-    const points = extractPathPoints(pathData);
-    if (points.length < 2) return;
-    
-    const lastPoint = points[points.length - 1];
-    const pathLeft = path.left || 0;
-    const pathTop = path.top || 0;
-    
-    pointerHoldPositionRef.current = {
-      x: pathLeft + lastPoint.x,
-      y: pathTop + lastPoint.y
-    };
-    
-    // Start hold detection timer
-    lineSnapTimeoutRef.current = setTimeout(() => {
-      if (lastDrawnPathRef.current === path) {
-        analyzeAndStraightenPath(path);
-      }
-      lastDrawnPathRef.current = null;
-      pointerHoldPositionRef.current = null;
-    }, LINE_SNAP_HOLD_DURATION);
-  };
+  // Hold-to-straighten is handled via Fabric mouse events (see the effect below).
 
-  // Cancel line snap if pointer moves significantly
-  const cancelLineSnapIfMoved = (x: number, y: number) => {
-    if (!pointerHoldPositionRef.current || !lineSnapTimeoutRef.current) return;
-    
-    const holdRadius = 15; // pixels
-    const distance = Math.sqrt(
-      Math.pow(x - pointerHoldPositionRef.current.x, 2) +
-      Math.pow(y - pointerHoldPositionRef.current.y, 2)
-    );
-    
-    if (distance > holdRadius) {
-      clearTimeout(lineSnapTimeoutRef.current);
-      lineSnapTimeoutRef.current = null;
-      lastDrawnPathRef.current = null;
-      pointerHoldPositionRef.current = null;
-    }
-  };
-
-  // Cleanup line snap timers on unmount
+  // Set up hold-to-straighten listeners on the Fabric canvas
   useEffect(() => {
-    return () => {
-      if (lineSnapTimeoutRef.current) {
-        clearTimeout(lineSnapTimeoutRef.current);
-      }
-    };
-  }, []);
+    if (!fabricCanvasReady || !fabricCanvasRef.current || !isEditMode) return;
 
-  // Set up smart line straightening event listeners on fabric canvas
-  useEffect(() => {
-    // Wait for canvas to be ready and edit mode to be enabled
-    if (!fabricCanvasReady || !fabricCanvasRef.current || !isEditMode) {
-      console.log('Line snap setup skipped:', { fabricCanvasReady, hasCanvas: !!fabricCanvasRef.current, isEditMode });
-      return;
-    }
-    
     const canvas = fabricCanvasRef.current;
-    console.log('Setting up line snap event listeners');
-    
-    // Handler for path:created - starts line snap detection
-    const handlePathCreated = (e: any) => {
-      console.log('Line snap: path:created detected, lineSnapEnabled:', lineSnapEnabledRef.current);
-      if (e?.path && lineSnapEnabledRef.current) {
-        startLineSnapDetection(e.path as Path);
+    const MOVE_EPS = 2; // px of movement that counts as "still"
+
+    const onMouseDown = (e: any) => {
+      if (!lineSnapEnabledRef.current) return;
+      if (activeTool !== 'draw') return;
+
+      isStrokeInProgressRef.current = true;
+      shouldStraightenNextPathRef.current = false;
+
+      const p = canvas.getPointer(e.e);
+      lastPointerRef.current = { x: p.x, y: p.y };
+      lastSignificantMoveAtRef.current = Date.now();
+    };
+
+    const onMouseMove = (e: any) => {
+      if (!isStrokeInProgressRef.current) return;
+      if (activeTool !== 'draw') return;
+
+      const p = canvas.getPointer(e.e);
+      const prev = lastPointerRef.current;
+      if (!prev) {
+        lastPointerRef.current = { x: p.x, y: p.y };
+        return;
+      }
+
+      const dist = Math.hypot(p.x - prev.x, p.y - prev.y);
+      if (dist >= MOVE_EPS) {
+        lastPointerRef.current = { x: p.x, y: p.y };
+        lastSignificantMoveAtRef.current = Date.now();
       }
     };
-    
-    // Handler for mouse:move - cancels snap if user moves away
-    const handleMouseMove = (e: any) => {
-      if (pointerHoldPositionRef.current && e.pointer) {
-        cancelLineSnapIfMoved(e.pointer.x, e.pointer.y);
+
+    const onMouseUp = () => {
+      if (!isStrokeInProgressRef.current) return;
+
+      isStrokeInProgressRef.current = false;
+      lastPointerRef.current = null;
+
+      const heldForMs = Date.now() - lastSignificantMoveAtRef.current;
+      shouldStraightenNextPathRef.current = heldForMs >= LINE_SNAP_HOLD_DURATION;
+    };
+
+    const onPathCreated = (e: any) => {
+      if (!lineSnapEnabledRef.current) return;
+      if (activeTool !== 'draw') return;
+      if (!e?.path) return;
+
+      if (shouldStraightenNextPathRef.current) {
+        shouldStraightenNextPathRef.current = false;
+        analyzeAndStraightenPath(e.path as Path);
       }
     };
-    
-    canvas.on('path:created', handlePathCreated);
-    canvas.on('mouse:move', handleMouseMove);
-    
+
+    canvas.on('mouse:down', onMouseDown);
+    canvas.on('mouse:move', onMouseMove);
+    canvas.on('mouse:up', onMouseUp);
+    canvas.on('path:created', onPathCreated);
+
     return () => {
-      console.log('Cleaning up line snap event listeners');
-      canvas.off('path:created', handlePathCreated);
-      canvas.off('mouse:move', handleMouseMove);
+      canvas.off('mouse:down', onMouseDown);
+      canvas.off('mouse:move', onMouseMove);
+      canvas.off('mouse:up', onMouseUp);
+      canvas.off('path:created', onPathCreated);
     };
-  }, [isEditMode, fabricCanvasReady]);
+  }, [isEditMode, fabricCanvasReady, activeTool]);
 
   // Helper function to normalize path data (divide by scale)
   const normalizePathData = (pathData: any, currentScale: number): any => {
@@ -1078,8 +1060,11 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     canvas.selection = true;
     canvas.defaultCursor = 'default';
 
-    // Remove previous click handlers
-    canvas.off('mouse:down');
+    // Remove previous tool-specific click handler (do NOT remove global listeners)
+    if (toolMouseDownHandlerRef.current) {
+      canvas.off('mouse:down', toolMouseDownHandlerRef.current);
+      toolMouseDownHandlerRef.current = null;
+    }
 
     switch (tool) {
       case 'draw': {
@@ -1101,22 +1086,29 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         break;
       }
 
-      case 'erase':
+      case 'erase': {
         canvas.selection = false;
         canvas.defaultCursor = 'crosshair';
-        canvas.on('mouse:down', (e) => {
+
+        const handler = (e: any) => {
           if (e.target) {
             canvas.remove(e.target);
             saveCanvasState();
             triggerAutoSave();
           }
-        });
-        break;
+        };
 
-      case 'text':
+        canvas.on('mouse:down', handler);
+        toolMouseDownHandlerRef.current = handler;
+        break;
+      }
+
+
+      case 'text': {
         canvas.selection = true;
         canvas.defaultCursor = 'text';
-        canvas.on('mouse:down', (e) => {
+
+        const handler = (e: any) => {
           // If clicked on existing textbox, let user edit it
           if (e.target && e.target.type === 'textbox') {
             focusTextboxEditing(e.target as Textbox);
@@ -1153,13 +1145,19 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
           saveCanvasState();
           triggerAutoSave();
-        });
-        break;
+        };
 
-      case 'rectangle':
+        canvas.on('mouse:down', handler);
+        toolMouseDownHandlerRef.current = handler;
+        break;
+      }
+
+
+      case 'rectangle': {
         canvas.selection = false;
         canvas.defaultCursor = 'crosshair';
-        canvas.on('mouse:down', (e) => {
+
+        const handler = (e: any) => {
           const pointer = canvas.getPointer(e.e);
           const rect = new Rect({
             left: pointer.x,
@@ -1182,13 +1180,19 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
           setActiveTool('select');
           setTimeout(() => applyToolSettings('select'), 0);
-        });
-        break;
+        };
 
-      case 'circle':
+        canvas.on('mouse:down', handler);
+        toolMouseDownHandlerRef.current = handler;
+        break;
+      }
+
+
+      case 'circle': {
         canvas.selection = false;
         canvas.defaultCursor = 'crosshair';
-        canvas.on('mouse:down', (e) => {
+
+        const handler = (e: any) => {
           const pointer = canvas.getPointer(e.e);
           const circle = new FabricCircle({
             left: pointer.x,
@@ -1210,8 +1214,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
           setActiveTool('select');
           setTimeout(() => applyToolSettings('select'), 0);
-        });
+        };
+
+        canvas.on('mouse:down', handler);
+        toolMouseDownHandlerRef.current = handler;
         break;
+      }
+
 
       case 'select':
       default:
