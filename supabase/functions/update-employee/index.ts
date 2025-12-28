@@ -65,6 +65,12 @@ serve(async (req) => {
       }
       
       if (password !== undefined && password !== '') {
+        if (password.length < 6) {
+          return new Response(
+            JSON.stringify({ error: 'Password must be at least 6 characters' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+          );
+        }
         authUpdateData.password = password;
       }
       
