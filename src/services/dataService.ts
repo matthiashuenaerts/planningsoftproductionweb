@@ -856,36 +856,37 @@ export const employeeService = {
     password: string; 
     role: string; 
     workstation?: string;
+    logistics?: boolean;
   }): Promise<Employee> {
-    const { data, error } = await supabase
-      .from('employees')
-      .insert([employee])
-      .select()
-      .single();
+    // Use edge function to create both auth user and employee
+    const { data, error } = await supabase.functions.invoke('create-employee', {
+      body: employee
+    });
     
     if (error) throw error;
-    return data as Employee;
+    if (data?.error) throw new Error(data.error);
+    return data.employee as Employee;
   },
 
   async update(id: string, employee: Partial<Omit<Employee, 'id' | 'created_at'>>): Promise<Employee> {
-    const { data, error } = await supabase
-      .from('employees')
-      .update(employee)
-      .eq('id', id)
-      .select()
-      .single();
+    // Use edge function to update both auth user and employee
+    const { data, error } = await supabase.functions.invoke('update-employee', {
+      body: { id, ...employee }
+    });
 
     if (error) throw error;
-    return data as Employee;
+    if (data?.error) throw new Error(data.error);
+    return data.employee as Employee;
   },
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('employees')
-      .delete()
-      .eq('id', id);
+    // Use edge function to delete related records, employee, and auth user
+    const { data, error } = await supabase.functions.invoke('delete-employee', {
+      body: { id }
+    });
 
     if (error) throw error;
+    if (data?.error) throw new Error(data.error);
   }
 };
 
