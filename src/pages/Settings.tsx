@@ -16,7 +16,7 @@ import { HelpManagement } from '@/components/help/HelpManagement';
 import MailSettings from '@/components/settings/MailSettings';
 import StockLocationsSettings from '@/components/settings/StockLocationsSettings';
 import InstallationTeamsSettings from '@/components/settings/InstallationTeamsSettings';
-import PasswordSettings from '@/components/settings/PasswordSettings';
+
 import MaterialSettings from '@/components/settings/MaterialSettings';
 import SupabaseConnectionSettings from '@/components/settings/SupabaseConnectionSettings';
 import { Button } from '@/components/ui/button';
@@ -91,7 +91,7 @@ const Settings: React.FC = () => {
             <TabsList className="mb-4 overflow-x-auto w-full justify-start">
               <TabsTrigger value="workstations">Workstations</TabsTrigger>
               <TabsTrigger value="employees">Employees</TabsTrigger>
-              <TabsTrigger value="password">Password</TabsTrigger>
+              
               <TabsTrigger value="standard-tasks">Standard Tasks</TabsTrigger>
               <TabsTrigger value="calculation-relationships">Calculation Relationships</TabsTrigger>
               <TabsTrigger value="holiday-planner">Holiday Planner</TabsTrigger>
@@ -114,9 +114,6 @@ const Settings: React.FC = () => {
               <EmployeeSettings />
             </TabsContent>
 
-            <TabsContent value="password">
-              <PasswordSettings />
-            </TabsContent>
 
             <TabsContent value="standard-tasks">
               <StandardTasksSettings />
