@@ -76,7 +76,7 @@ serve(async (req) => {
       }
 
       if (Object.keys(authUpdateData).length > 0) {
-        console.log(`Updating auth user ${currentEmployee.auth_user_id}`);
+        console.log(`Updating auth user ${currentEmployee.auth_user_id} with:`, Object.keys(authUpdateData));
         const { error: authUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
           currentEmployee.auth_user_id,
           authUpdateData
@@ -84,8 +84,12 @@ serve(async (req) => {
 
         if (authUpdateError) {
           console.error('Auth user update error:', authUpdateError);
-          // Continue with employee update even if auth update fails
+          return new Response(
+            JSON.stringify({ error: `Failed to update auth user: ${authUpdateError.message}` }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+          );
         }
+        console.log('Auth user updated successfully');
       }
     }
 
