@@ -490,5 +490,17 @@ export const timeRegistrationService = {
     
     if (error) throw error;
     return data || [];
+  },
+
+  async deleteRegistrationsOlderThan(cutoffDate: Date): Promise<number> {
+    const { data, error } = await supabase
+      .from('time_registrations')
+      .delete()
+      .lt('start_time', cutoffDate.toISOString())
+      .eq('is_active', false)
+      .select('id');
+    
+    if (error) throw error;
+    return data?.length || 0;
   }
 };

@@ -784,5 +784,17 @@
   "calc_import": "Importer",
   "calc_cabinet_imported": "Armoire importée avec succès",
   "calc_import_failed": "Impossible d'importer l'armoire",
-  "calc_fill_required_fields": "Remplissez tous les champs obligatoires"
+  "calc_fill_required_fields": "Remplissez tous les champs obligatoires",
+  "delete_old": "Supprimer ancien",
+  "older_than_week": "Plus ancien qu'1 semaine",
+  "older_than_month": "Plus ancien qu'1 mois",
+  "older_than_6months": "Plus ancien que 6 mois",
+  "older_than_year": "Plus ancien qu'1 an",
+  "confirm_delete": "Confirmer la suppression",
+  "delete_registrations_warning": "Ceci supprimera définitivement tous les enregistrements de temps terminés plus anciens que la période sélectionnée. Les enregistrements actifs ne seront pas supprimés. Cette action ne peut pas être annulée.",
+  "registrations_deleted": "Enregistrements supprimés",
+  "deleted_count": "{{count}} enregistrement(s) supprimé(s)",
+  "failed_to_delete_registrations": "Échec de la suppression des enregistrements",
+  "deleting": "Suppression...",
+  "delete": "Supprimer"
 }
