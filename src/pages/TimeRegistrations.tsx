@@ -8,7 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { useAuth } from '@/context/AuthContext';
-import { Clock, Users, Calendar, BarChart3, Download, Filter, DollarSign, Plus, Edit, FileText } from 'lucide-react';
+import { Clock, Users, Calendar, BarChart3, Download, Filter, DollarSign, Plus, Edit, FileText, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useQueryClient } from '@tanstack/react-query';
+import { subWeeks, subMonths } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -42,6 +46,10 @@ const TimeRegistrations = () => {
     endDate: format(new Date(), 'yyyy-MM-dd')
   });
   const isMobile = useIsMobile();
+  const queryClient = useQueryClient();
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTimeframe, setDeleteTimeframe] = useState<'week' | 'month' | '6months' | 'year' | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Check if user is admin or manager
   const canViewAllRegistrations = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
@@ -206,6 +214,54 @@ const TimeRegistrations = () => {
   );
 
   const activeRegistrations = filteredRegistrations.filter((reg: any) => reg.is_active);
+
+  const handleDeleteOldRegistrations = async () => {
+    if (!deleteTimeframe) return;
+    
+    setIsDeleting(true);
+    try {
+      const now = new Date();
+      let cutoffDate: Date;
+      
+      switch (deleteTimeframe) {
+        case 'week':
+          cutoffDate = subWeeks(now, 1);
+          break;
+        case 'month':
+          cutoffDate = subMonths(now, 1);
+          break;
+        case '6months':
+          cutoffDate = subMonths(now, 6);
+          break;
+        case 'year':
+          cutoffDate = subMonths(now, 12);
+          break;
+        default:
+          return;
+      }
+      
+      const deletedCount = await timeRegistrationService.deleteRegistrationsOlderThan(cutoffDate);
+      
+      toast({
+        title: t("registrations_deleted"),
+        description: t("deleted_count", { count: deletedCount.toString() }),
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['allTimeRegistrations'] });
+      queryClient.invalidateQueries({ queryKey: ['myTimeRegistrations'] });
+    } catch (error) {
+      console.error('Error deleting registrations:', error);
+      toast({
+        title: t("error"),
+        description: t("failed_to_delete_registrations"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmOpen(false);
+      setDeleteTimeframe(null);
+    }
+  };
 
   const generateMonthlyReport = () => {
     try {
@@ -927,10 +983,34 @@ const TimeRegistrations = () => {
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle>{t("time_registration_history")}</CardTitle>
-              <Button onClick={() => setShowAddDialog(true)} variant="default" size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                {t("add_manual_registration")}
-              </Button>
+              <div className="flex gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {t("delete_old")}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => { setDeleteTimeframe('week'); setDeleteConfirmOpen(true); }}>
+                      {t("older_than_week")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setDeleteTimeframe('month'); setDeleteConfirmOpen(true); }}>
+                      {t("older_than_month")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setDeleteTimeframe('6months'); setDeleteConfirmOpen(true); }}>
+                      {t("older_than_6months")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setDeleteTimeframe('year'); setDeleteConfirmOpen(true); }}>
+                      {t("older_than_year")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button onClick={() => setShowAddDialog(true)} variant="default" size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t("add_manual_registration")}
+                </Button>
+              </div>
             </div>
             <CardDescription>
               {t("showing_sessions", { count: filteredRegistrations.length.toString() })}
@@ -1150,6 +1230,23 @@ const TimeRegistrations = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t("confirm_delete")}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("delete_registrations_warning")}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>{t("cancel")}</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteOldRegistrations} disabled={isDeleting}>
+                {isDeleting ? t("deleting") : t("delete")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

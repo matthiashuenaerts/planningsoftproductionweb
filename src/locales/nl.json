@@ -784,5 +784,17 @@
   "calc_import": "Importeren",
   "calc_cabinet_imported": "Kast succesvol geïmporteerd",
   "calc_import_failed": "Kon kast niet importeren",
-  "calc_fill_required_fields": "Vul alle verplichte velden in"
+  "calc_fill_required_fields": "Vul alle verplichte velden in",
+  "delete_old": "Verwijder oud",
+  "older_than_week": "Ouder dan 1 week",
+  "older_than_month": "Ouder dan 1 maand",
+  "older_than_6months": "Ouder dan 6 maanden",
+  "older_than_year": "Ouder dan 1 jaar",
+  "confirm_delete": "Bevestig verwijderen",
+  "delete_registrations_warning": "Dit zal alle voltooide tijdregistraties ouder dan de geselecteerde periode permanent verwijderen. Actieve registraties worden niet verwijderd. Deze actie kan niet ongedaan worden gemaakt.",
+  "registrations_deleted": "Registraties verwijderd",
+  "deleted_count": "{{count}} registratie(s) verwijderd",
+  "failed_to_delete_registrations": "Kon registraties niet verwijderen",
+  "deleting": "Verwijderen...",
+  "delete": "Verwijderen"
 }

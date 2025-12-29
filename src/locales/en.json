@@ -303,5 +303,17 @@
   "dashboard_projects": "Projects",
   "dashboard_est_hours": "Est. Hours",
   "dashboard_all_tasks_completed": "All tasks completed!",
-  "dashboard_no_workstations": "No workstations configured yet."
+  "dashboard_no_workstations": "No workstations configured yet.",
+  "delete_old": "Delete old",
+  "older_than_week": "Older than 1 week",
+  "older_than_month": "Older than 1 month",
+  "older_than_6months": "Older than 6 months",
+  "older_than_year": "Older than 1 year",
+  "confirm_delete": "Confirm delete",
+  "delete_registrations_warning": "This will permanently delete all completed time registrations older than the selected period. Active registrations will not be deleted. This action cannot be undone.",
+  "registrations_deleted": "Registrations deleted",
+  "deleted_count": "{{count}} registration(s) deleted",
+  "failed_to_delete_registrations": "Failed to delete registrations",
+  "deleting": "Deleting...",
+  "delete": "Delete"
 }
