@@ -796,5 +796,6 @@
   "deleted_count": "{{count}} registratie(s) verwijderd",
   "failed_to_delete_registrations": "Kon registraties niet verwijderen",
   "deleting": "Verwijderen...",
-  "delete": "Verwijderen"
+  "delete": "Verwijderen",
+  "add_manual_registration": "Handmatige registratie toevoegen"
 }

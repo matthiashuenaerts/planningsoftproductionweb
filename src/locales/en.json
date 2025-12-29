@@ -315,5 +315,6 @@
   "deleted_count": "{{count}} registration(s) deleted",
   "failed_to_delete_registrations": "Failed to delete registrations",
   "deleting": "Deleting...",
-  "delete": "Delete"
+  "delete": "Delete",
+  "add_manual_registration": "Add manual registration"
 }

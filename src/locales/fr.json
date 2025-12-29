@@ -796,5 +796,6 @@
   "deleted_count": "{{count}} enregistrement(s) supprimé(s)",
   "failed_to_delete_registrations": "Échec de la suppression des enregistrements",
   "deleting": "Suppression...",
-  "delete": "Supprimer"
+  "delete": "Supprimer",
+  "add_manual_registration": "Ajouter un enregistrement manuel"
 }
