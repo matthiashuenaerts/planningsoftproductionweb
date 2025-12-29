@@ -14,6 +14,7 @@ interface EmailConfiguration {
   function_name: string;
   recipient_emails: string[];
   description: string;
+  language: string | null;
 }
 
 interface ScheduleConfig {
@@ -189,6 +190,36 @@ const MailSettings: React.FC = () => {
     }
   };
 
+  const handleUpdateLanguage = async (configId: string, language: string) => {
+    setSaving(configId);
+    try {
+      const { error } = await supabase
+        .from('email_configurations')
+        .update({ language })
+        .eq('id', configId);
+
+      if (error) throw error;
+
+      setConfigs(prev =>
+        prev.map(c => c.id === configId ? { ...c, language } : c)
+      );
+
+      toast({
+        title: 'Success',
+        description: 'Language updated successfully',
+      });
+    } catch (error) {
+      console.error('Error updating language:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update language',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(null);
+    }
+  };
+
   const handleTriggerEmail = async (functionName: string) => {
     setTriggering(functionName);
     try {
@@ -302,6 +333,27 @@ const MailSettings: React.FC = () => {
                   </Button>
                 </div>
               </div>
+
+              {/* Language configuration for holiday functions */}
+              {(config.function_name === 'holiday_request' || config.function_name === 'holiday_status') && (
+                <div className="space-y-2 mt-4 pt-4 border-t">
+                  <Label>Email Language</Label>
+                  <Select
+                    value={config.language || 'nl'}
+                    onValueChange={(value) => handleUpdateLanguage(config.id, value)}
+                    disabled={saving === config.id}
+                  >
+                    <SelectTrigger className="w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nl">Nederlands</SelectItem>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="fr">Français</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Schedule configuration for project forecast */}
               {config.function_name === 'send_project_forecast' && scheduleConfigs[config.function_name] && (
