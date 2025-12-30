@@ -263,8 +263,10 @@ const TimeRegistrations = () => {
     }
   };
 
-  const generateMonthlyReport = () => {
+  const generateMonthlyReport = async () => {
     try {
+      const { jsPDF } = await import('jspdf');
+      
       // Get working hours configuration for overtime calculation
       const getWorkingHoursForDate = (date: Date, team: 'production' | 'installation' | 'preparation') => {
         const dayOfWeek = date.getDay();
@@ -304,7 +306,7 @@ const TimeRegistrations = () => {
       };
 
       const dailyDataMap = new Map<string, DailyData>();
-      const employeeTotals = new Map<string, { totalMinutes: number; overtimeMinutes: number }>();
+      const employeeTotals = new Map<string, { totalMinutes: number; overtimeMinutes: number; days: number }>();
 
       reportRegistrations.forEach((reg: any) => {
         if (!reg.start_time || !reg.end_time) return;
@@ -340,7 +342,6 @@ const TimeRegistrations = () => {
         }
 
         // Calculate overtime based on configured working hours
-        // Try to determine team from employee's workstation or default to production
         const team = (reg.employees?.workstation?.toLowerCase().includes('install') ? 'installation' : 
                      reg.employees?.workstation?.toLowerCase().includes('prep') ? 'preparation' : 
                      'production') as 'production' | 'installation' | 'preparation';
@@ -363,11 +364,16 @@ const TimeRegistrations = () => {
 
         // Update employee totals
         if (!employeeTotals.has(employeeName)) {
-          employeeTotals.set(employeeName, { totalMinutes: 0, overtimeMinutes: 0 });
+          employeeTotals.set(employeeName, { totalMinutes: 0, overtimeMinutes: 0, days: 0 });
         }
-        const totals = employeeTotals.get(employeeName)!;
-        totals.totalMinutes += reg.duration_minutes || 0;
-        totals.overtimeMinutes += dailyData.overtimeMinutes;
+      });
+
+      // Calculate employee totals from daily data
+      dailyDataMap.forEach((data) => {
+        const totals = employeeTotals.get(data.employeeName)!;
+        totals.totalMinutes += data.totalMinutes;
+        totals.overtimeMinutes += data.overtimeMinutes;
+        totals.days += 1;
       });
 
       // Sort by employee name and date
@@ -377,87 +383,184 @@ const TimeRegistrations = () => {
         return a.date.localeCompare(b.date);
       });
 
-      // Prepare CSV headers
-      const headers = [
-        t("employee"),
-        t("date"),
-        t("earliest_start"),
-        t("latest_finish"),
-        t("total_hours"),
-        t("overtime_hours")
-      ];
+      // Create PDF
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - (margin * 2);
+      let yPos = margin;
 
-      // Prepare CSV data with daily entries
-      const csvRows: string[][] = [];
-      let currentEmployee = '';
-      
-      sortedData.forEach((data) => {
-        // Add employee total row before switching to new employee
-        if (currentEmployee && currentEmployee !== data.employeeName) {
-          const totals = employeeTotals.get(currentEmployee)!;
-          csvRows.push([
-            `${currentEmployee} - TOTAL`,
-            '',
-            '',
-            '',
-            formatDuration(totals.totalMinutes),
-            formatDuration(Math.round(totals.overtimeMinutes))
-          ]);
-          csvRows.push([]); // Empty row for separation
+      // Helper function to add new page if needed
+      const checkPageBreak = (requiredSpace: number) => {
+        if (yPos + requiredSpace > pageHeight - margin) {
+          pdf.addPage();
+          yPos = margin;
+          return true;
         }
-        
-        currentEmployee = data.employeeName;
-        
-        csvRows.push([
-          data.employeeName,
-          format(new Date(data.date), 'dd/MM/yyyy'),
-          data.earliestStart ? format(data.earliestStart, 'HH:mm') : '-',
-          data.latestEnd ? format(data.latestEnd, 'HH:mm') : '-',
-          formatDuration(data.totalMinutes),
-          formatDuration(Math.round(data.overtimeMinutes))
-        ]);
-      });
+        return false;
+      };
 
-      // Add final employee total
-      if (currentEmployee) {
-        const totals = employeeTotals.get(currentEmployee)!;
-        csvRows.push([
-          `${currentEmployee} - TOTAL`,
-          '',
-          '',
-          '',
-          formatDuration(totals.totalMinutes),
-          formatDuration(Math.round(totals.overtimeMinutes))
-        ]);
-      }
+      // Header
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(t("monthly_report"), pageWidth / 2, yPos, { align: 'center' });
+      yPos += 10;
 
-      // Add grand total
-      csvRows.push([]);
+      // Date range
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      const dateRangeText = `${format(new Date(monthlyReportDates.startDate), 'dd/MM/yyyy')} - ${format(new Date(monthlyReportDates.endDate), 'dd/MM/yyyy')}`;
+      pdf.text(dateRangeText, pageWidth / 2, yPos, { align: 'center' });
+      yPos += 8;
+
+      // Generated date
+      pdf.setFontSize(9);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(`${t("generated")}: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, pageWidth / 2, yPos, { align: 'center' });
+      pdf.setTextColor(0, 0, 0);
+      yPos += 15;
+
+      // Summary section
       const grandTotalMinutes = Array.from(employeeTotals.values()).reduce((sum, emp) => sum + emp.totalMinutes, 0);
       const grandTotalOvertime = Array.from(employeeTotals.values()).reduce((sum, emp) => sum + emp.overtimeMinutes, 0);
-      csvRows.push([
-        'GRAND TOTAL',
-        '',
-        '',
-        '',
-        formatDuration(grandTotalMinutes),
-        formatDuration(Math.round(grandTotalOvertime))
-      ]);
+      const totalEmployees = employeeTotals.size;
+      const totalDays = Array.from(employeeTotals.values()).reduce((sum, emp) => sum + emp.days, 0);
 
-      const csvContent = [
-        headers.join(','),
-        ...csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      ].join('\n');
+      // Summary box
+      pdf.setFillColor(245, 245, 245);
+      pdf.roundedRect(margin, yPos, contentWidth, 30, 3, 3, 'F');
+      yPos += 8;
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `monthly_report_${monthlyReportDates.startDate}_to_${monthlyReportDates.endDate}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(t("summary"), margin + 5, yPos);
+      yPos += 7;
+
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      const summaryCol1 = margin + 5;
+      const summaryCol2 = margin + contentWidth / 2;
+
+      pdf.text(`${t("total_employees")}: ${totalEmployees}`, summaryCol1, yPos);
+      pdf.text(`${t("total_hours")}: ${formatDuration(grandTotalMinutes)}`, summaryCol2, yPos);
+      yPos += 6;
+      pdf.text(`${t("total_days")}: ${totalDays}`, summaryCol1, yPos);
+      pdf.text(`${t("overtime_hours")}: ${formatDuration(Math.round(grandTotalOvertime))}`, summaryCol2, yPos);
+      yPos += 15;
+
+      // Employee details
+      let currentEmployee = '';
+      const colWidths = [45, 25, 25, 25, 25, 25];
+      const colStarts = [margin];
+      for (let i = 1; i < colWidths.length; i++) {
+        colStarts.push(colStarts[i - 1] + colWidths[i - 1]);
+      }
+
+      sortedData.forEach((data, index) => {
+        // Check if we're starting a new employee
+        if (currentEmployee !== data.employeeName) {
+          // Add previous employee total if not first employee
+          if (currentEmployee) {
+            checkPageBreak(20);
+            const prevTotals = employeeTotals.get(currentEmployee)!;
+            
+            // Employee total row
+            pdf.setFillColor(230, 230, 230);
+            pdf.rect(margin, yPos - 4, contentWidth, 8, 'F');
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(9);
+            pdf.text(`${t("total")} ${currentEmployee}`, colStarts[0], yPos);
+            pdf.text(formatDuration(prevTotals.totalMinutes), colStarts[4], yPos);
+            pdf.text(formatDuration(Math.round(prevTotals.overtimeMinutes)), colStarts[5], yPos);
+            yPos += 12;
+          }
+
+          currentEmployee = data.employeeName;
+          
+          checkPageBreak(25);
+
+          // Employee header
+          pdf.setFillColor(59, 130, 246);
+          pdf.setTextColor(255, 255, 255);
+          pdf.roundedRect(margin, yPos - 5, contentWidth, 10, 2, 2, 'F');
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(data.employeeName, margin + 5, yPos);
+          pdf.setTextColor(0, 0, 0);
+          yPos += 10;
+
+          // Table header
+          pdf.setFillColor(240, 240, 240);
+          pdf.rect(margin, yPos - 4, contentWidth, 8, 'F');
+          pdf.setFontSize(9);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(t("date"), colStarts[0], yPos);
+          pdf.text(t("earliest_start"), colStarts[1], yPos);
+          pdf.text(t("latest_finish"), colStarts[2], yPos);
+          pdf.text(t("tasks"), colStarts[3], yPos);
+          pdf.text(t("total_hours"), colStarts[4], yPos);
+          pdf.text(t("overtime"), colStarts[5], yPos);
+          yPos += 8;
+        }
+
+        checkPageBreak(10);
+
+        // Data row
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9);
+        
+        // Alternate row background
+        if (index % 2 === 0) {
+          pdf.setFillColor(250, 250, 250);
+          pdf.rect(margin, yPos - 4, contentWidth, 7, 'F');
+        }
+
+        pdf.text(format(new Date(data.date), 'dd/MM/yyyy'), colStarts[0], yPos);
+        pdf.text(data.earliestStart ? format(data.earliestStart, 'HH:mm') : '-', colStarts[1], yPos);
+        pdf.text(data.latestEnd ? format(data.latestEnd, 'HH:mm') : '-', colStarts[2], yPos);
+        pdf.text(String(data.registrations.length), colStarts[3], yPos);
+        pdf.text(formatDuration(data.totalMinutes), colStarts[4], yPos);
+        
+        // Highlight overtime
+        if (data.overtimeMinutes > 0) {
+          pdf.setTextColor(220, 38, 38);
+        }
+        pdf.text(formatDuration(Math.round(data.overtimeMinutes)), colStarts[5], yPos);
+        pdf.setTextColor(0, 0, 0);
+        
+        yPos += 7;
+      });
+
+      // Final employee total
+      if (currentEmployee) {
+        checkPageBreak(20);
+        const lastTotals = employeeTotals.get(currentEmployee)!;
+        
+        pdf.setFillColor(230, 230, 230);
+        pdf.rect(margin, yPos - 4, contentWidth, 8, 'F');
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(9);
+        pdf.text(`${t("total")} ${currentEmployee}`, colStarts[0], yPos);
+        pdf.text(formatDuration(lastTotals.totalMinutes), colStarts[4], yPos);
+        pdf.text(formatDuration(Math.round(lastTotals.overtimeMinutes)), colStarts[5], yPos);
+        yPos += 15;
+      }
+
+      // Grand total
+      checkPageBreak(20);
+      pdf.setFillColor(59, 130, 246);
+      pdf.setTextColor(255, 255, 255);
+      pdf.roundedRect(margin, yPos - 5, contentWidth, 12, 2, 2, 'F');
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('GRAND TOTAL', colStarts[0] + 5, yPos + 2);
+      pdf.text(formatDuration(grandTotalMinutes), colStarts[4], yPos + 2);
+      pdf.text(formatDuration(Math.round(grandTotalOvertime)), colStarts[5], yPos + 2);
+      pdf.setTextColor(0, 0, 0);
+
+      // Save PDF
+      pdf.save(`monthly_report_${monthlyReportDates.startDate}_to_${monthlyReportDates.endDate}.pdf`);
 
       setShowMonthlyReportDialog(false);
       
@@ -466,6 +569,7 @@ const TimeRegistrations = () => {
         description: t("monthly_report_exported"),
       });
     } catch (error) {
+      console.error('Error generating PDF report:', error);
       toast({
         title: t("error"),
         description: t("export_failed"),
