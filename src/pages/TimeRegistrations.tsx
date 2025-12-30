@@ -263,6 +263,92 @@ const TimeRegistrations = () => {
     }
   };
 
+  // Draw branded header for PDF exports
+  const drawBrandedHeader = (pdf: any, pageWidth: number, margin: number) => {
+    let yPos = margin;
+    const brandColor = { r: 45, g: 115, b: 135 }; // Teal color from logo
+    
+    // Draw hexagonal logo (simplified version)
+    const logoX = pageWidth / 2;
+    const logoY = yPos + 15;
+    const logoSize = 18;
+    
+    // Draw hexagon background
+    pdf.setFillColor(brandColor.r, brandColor.g, brandColor.b);
+    const hexPoints: [number, number][] = [];
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 3) * i - Math.PI / 2;
+      hexPoints.push([
+        logoX + logoSize * Math.cos(angle),
+        logoY + logoSize * Math.sin(angle)
+      ]);
+    }
+    pdf.setLineWidth(0);
+    pdf.moveTo(hexPoints[0][0], hexPoints[0][1]);
+    for (let i = 1; i < hexPoints.length; i++) {
+      pdf.lineTo(hexPoints[i][0], hexPoints[i][1]);
+    }
+    pdf.lineTo(hexPoints[0][0], hexPoints[0][1]);
+    pdf.fill();
+    
+    // Draw network nodes inside hexagon (simplified)
+    pdf.setFillColor(255, 255, 255);
+    const nodePositions = [
+      { x: logoX, y: logoY - 8 },
+      { x: logoX - 8, y: logoY + 4 },
+      { x: logoX + 8, y: logoY + 4 },
+      { x: logoX, y: logoY + 2 }
+    ];
+    
+    // Draw connecting lines
+    pdf.setDrawColor(255, 255, 255);
+    pdf.setLineWidth(0.8);
+    pdf.line(nodePositions[0].x, nodePositions[0].y, nodePositions[3].x, nodePositions[3].y);
+    pdf.line(nodePositions[1].x, nodePositions[1].y, nodePositions[3].x, nodePositions[3].y);
+    pdf.line(nodePositions[2].x, nodePositions[2].y, nodePositions[3].x, nodePositions[3].y);
+    pdf.line(nodePositions[1].x, nodePositions[1].y, nodePositions[2].x, nodePositions[2].y);
+    pdf.line(nodePositions[0].x, nodePositions[0].y, nodePositions[1].x, nodePositions[1].y);
+    pdf.line(nodePositions[0].x, nodePositions[0].y, nodePositions[2].x, nodePositions[2].y);
+    
+    // Draw nodes
+    nodePositions.forEach((pos, i) => {
+      pdf.setFillColor(255, 255, 255);
+      pdf.circle(pos.x, pos.y, i === 3 ? 2.5 : 3, 'F');
+      if (i !== 3) {
+        pdf.setFillColor(brandColor.r, brandColor.g, brandColor.b);
+        pdf.circle(pos.x, pos.y, 1.5, 'F');
+      }
+    });
+    
+    yPos = logoY + logoSize + 8;
+    
+    // Company name
+    pdf.setFontSize(18);
+    pdf.setFont('helvetica', 'bolditalic');
+    pdf.setTextColor(brandColor.r, brandColor.g, brandColor.b);
+    pdf.text('AutoMattiOn', pageWidth / 2 - 2, yPos, { align: 'right' });
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(80, 180, 210);
+    pdf.text(' Compass', pageWidth / 2 - 2, yPos, { align: 'left' });
+    yPos += 6;
+    
+    // Slogan
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'italic');
+    pdf.setTextColor(80, 180, 210);
+    pdf.text('Guiding your production to perfection!', pageWidth / 2, yPos, { align: 'center' });
+    pdf.setTextColor(0, 0, 0);
+    yPos += 10;
+    
+    // Divider line
+    pdf.setDrawColor(brandColor.r, brandColor.g, brandColor.b);
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 8;
+    
+    return yPos;
+  };
+
   const generateMonthlyReport = async () => {
     try {
       const { jsPDF } = await import('jspdf');
@@ -389,7 +475,9 @@ const TimeRegistrations = () => {
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 15;
       const contentWidth = pageWidth - (margin * 2);
-      let yPos = margin;
+      
+      // Draw branded header
+      let yPos = drawBrandedHeader(pdf, pageWidth, margin);
 
       // Helper function to add new page if needed
       const checkPageBreak = (requiredSpace: number) => {
@@ -401,25 +489,26 @@ const TimeRegistrations = () => {
         return false;
       };
 
-      // Header
-      pdf.setFontSize(20);
+      // Report title
+      pdf.setFontSize(16);
       pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(0, 0, 0);
       pdf.text(t("monthly_report"), pageWidth / 2, yPos, { align: 'center' });
-      yPos += 10;
+      yPos += 8;
 
       // Date range
-      pdf.setFontSize(12);
+      pdf.setFontSize(11);
       pdf.setFont('helvetica', 'normal');
       const dateRangeText = `${format(new Date(monthlyReportDates.startDate), 'dd/MM/yyyy')} - ${format(new Date(monthlyReportDates.endDate), 'dd/MM/yyyy')}`;
       pdf.text(dateRangeText, pageWidth / 2, yPos, { align: 'center' });
-      yPos += 8;
+      yPos += 6;
 
       // Generated date
       pdf.setFontSize(9);
       pdf.setTextColor(100, 100, 100);
       pdf.text(`${t("generated")}: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, pageWidth / 2, yPos, { align: 'center' });
       pdf.setTextColor(0, 0, 0);
-      yPos += 15;
+      yPos += 12;
 
       // Summary section
       const grandTotalMinutes = Array.from(employeeTotals.values()).reduce((sum, emp) => sum + emp.totalMinutes, 0);
@@ -578,20 +667,109 @@ const TimeRegistrations = () => {
     }
   };
 
-  const exportToCSV = () => {
+  const exportToPDF = async () => {
     try {
-      const headers = [
-        t("employee"),
-        t("project"),
-        t("task"),
-        t("start_time"),
-        t("end_time"),
-        t("duration_hours"),
-        t("cost"),
-        t("status")
-      ];
-
-      const csvData = filteredRegistrations.map((reg: any) => {
+      const { jsPDF } = await import('jspdf');
+      
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - (margin * 2);
+      
+      // Draw branded header
+      let yPos = drawBrandedHeader(pdf, pageWidth, margin);
+      
+      // Title
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(0, 0, 0);
+      pdf.text(t("filtered_time_registrations"), pageWidth / 2, yPos, { align: 'center' });
+      yPos += 6;
+      
+      // Date range info
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      let filterInfo = `${t("generated")}: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`;
+      if (dateFilter.startDate || dateFilter.endDate) {
+        filterInfo += ` | ${t("period")}: ${dateFilter.startDate || '-'} - ${dateFilter.endDate || '-'}`;
+      }
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(filterInfo, pageWidth / 2, yPos, { align: 'center' });
+      pdf.setTextColor(0, 0, 0);
+      yPos += 10;
+      
+      // Summary box
+      pdf.setFillColor(245, 245, 245);
+      pdf.roundedRect(margin, yPos, contentWidth, 20, 3, 3, 'F');
+      yPos += 8;
+      
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(t("summary"), margin + 5, yPos);
+      yPos += 6;
+      
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`${t("total_registrations")}: ${filteredRegistrations.length}`, margin + 5, yPos);
+      pdf.text(`${t("total_hours")}: ${formatDuration(totalFilteredMinutes)}`, margin + contentWidth / 3, yPos);
+      pdf.text(`${t("total_cost")}: ${formatCurrency(totalCost)}`, margin + (contentWidth * 2) / 3, yPos);
+      yPos += 12;
+      
+      // Table headers
+      const headers = canViewAllRegistrations 
+        ? [t("employee"), t("project"), t("task"), t("start_time"), t("end_time"), t("duration"), t("cost")]
+        : [t("project"), t("task"), t("start_time"), t("end_time"), t("duration"), t("cost")];
+      
+      const colWidths = canViewAllRegistrations 
+        ? [28, 32, 32, 28, 28, 18, 18]
+        : [40, 40, 32, 32, 20, 20];
+      
+      const colStarts = [margin];
+      for (let i = 1; i < colWidths.length; i++) {
+        colStarts.push(colStarts[i - 1] + colWidths[i - 1]);
+      }
+      
+      // Helper function to check page break
+      const checkPageBreak = (requiredSpace: number) => {
+        if (yPos + requiredSpace > pageHeight - margin) {
+          pdf.addPage();
+          yPos = margin;
+          return true;
+        }
+        return false;
+      };
+      
+      // Draw table header
+      const drawTableHeader = () => {
+        pdf.setFillColor(45, 115, 135);
+        pdf.rect(margin, yPos - 4, contentWidth, 8, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'bold');
+        headers.forEach((header, i) => {
+          pdf.text(header, colStarts[i] + 1, yPos);
+        });
+        pdf.setTextColor(0, 0, 0);
+        yPos += 6;
+      };
+      
+      drawTableHeader();
+      
+      // Table data
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      
+      filteredRegistrations.forEach((reg: any, index: number) => {
+        if (checkPageBreak(10)) {
+          drawTableHeader();
+        }
+        
+        // Alternate row background
+        if (index % 2 === 0) {
+          pdf.setFillColor(250, 250, 250);
+          pdf.rect(margin, yPos - 3.5, contentWidth, 6, 'F');
+        }
+        
         const duration = reg.duration_minutes || 0;
         const hourlyCost = reg.tasks?.standard_tasks?.hourly_cost;
         let cost = 0;
@@ -599,45 +777,61 @@ const TimeRegistrations = () => {
           cost = parseFloat(((duration / 60) * hourlyCost).toFixed(2));
         }
         
-        const rowData = [
-          reg.employees?.name || (currentEmployee?.name || t("unknown_employee")),
-          reg.tasks?.phases?.projects?.name || (reg.workstation_tasks?.workstations ? `${t("workstation_prefix")}${reg.workstation_tasks.workstations.name}` : t("unknown_project")),
-          reg.tasks?.title || reg.workstation_tasks?.task_name || t("unknown_task"),
-          formatDateTime(reg.start_time),
-          reg.end_time ? formatDateTime(reg.end_time) : '',
-          reg.duration_minutes || 0,
-          cost,
-          reg.is_active ? t("active") : t("completed")
-        ];
-
-        if(!canViewAllRegistrations){
-          return rowData.slice(1); // remove employee from personal view
+        const employeeName = reg.employees?.name || (currentEmployee?.name || t("unknown_employee"));
+        const projectName = reg.tasks?.phases?.projects?.name || 
+          (reg.workstation_tasks?.workstations ? reg.workstation_tasks.workstations.name : t("unknown_project"));
+        const taskName = reg.tasks?.title || reg.workstation_tasks?.task_name || t("unknown_task");
+        
+        // Truncate text to fit columns
+        const truncate = (text: string, maxLen: number) => {
+          return text.length > maxLen ? text.substring(0, maxLen - 2) + '..' : text;
+        };
+        
+        if (canViewAllRegistrations) {
+          pdf.text(truncate(employeeName, 16), colStarts[0] + 1, yPos);
+          pdf.text(truncate(projectName, 18), colStarts[1] + 1, yPos);
+          pdf.text(truncate(taskName, 18), colStarts[2] + 1, yPos);
+          pdf.text(format(parseISO(reg.start_time), 'dd/MM HH:mm'), colStarts[3] + 1, yPos);
+          pdf.text(reg.end_time ? format(parseISO(reg.end_time), 'dd/MM HH:mm') : '-', colStarts[4] + 1, yPos);
+          pdf.text(formatDuration(duration), colStarts[5] + 1, yPos);
+          pdf.text(formatCurrency(cost), colStarts[6] + 1, yPos);
+        } else {
+          pdf.text(truncate(projectName, 22), colStarts[0] + 1, yPos);
+          pdf.text(truncate(taskName, 22), colStarts[1] + 1, yPos);
+          pdf.text(format(parseISO(reg.start_time), 'dd/MM HH:mm'), colStarts[2] + 1, yPos);
+          pdf.text(reg.end_time ? format(parseISO(reg.end_time), 'dd/MM HH:mm') : '-', colStarts[3] + 1, yPos);
+          pdf.text(formatDuration(duration), colStarts[4] + 1, yPos);
+          pdf.text(formatCurrency(cost), colStarts[5] + 1, yPos);
         }
-        return rowData;
+        
+        yPos += 6;
       });
-
-      const csvHeaders = canViewAllRegistrations ? headers : headers.slice(1);
-
-      const csvContent = [
-        csvHeaders.join(','),
-        ...csvData.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `time_registrations_${format(new Date(), 'yyyy-MM-dd')}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      
+      // Total row
+      checkPageBreak(15);
+      yPos += 2;
+      pdf.setFillColor(45, 115, 135);
+      pdf.rect(margin, yPos - 4, contentWidth, 8, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('TOTAL', margin + 5, yPos);
+      
+      const totalColIndex = canViewAllRegistrations ? 5 : 4;
+      const costColIndex = canViewAllRegistrations ? 6 : 5;
+      pdf.text(formatDuration(totalFilteredMinutes), colStarts[totalColIndex] + 1, yPos);
+      pdf.text(formatCurrency(totalCost), colStarts[costColIndex] + 1, yPos);
+      pdf.setTextColor(0, 0, 0);
+      
+      // Save PDF
+      pdf.save(`time_registrations_filtered_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
 
       toast({
         title: t("success"),
         description: t("export_success"),
       });
     } catch (error) {
+      console.error('Error generating PDF:', error);
       toast({
         title: t("error"),
         description: t("export_failed"),
@@ -796,7 +990,7 @@ const TimeRegistrations = () => {
                 >
                   {t("clear_filters")}
                 </Button>
-                <Button onClick={exportToCSV} variant="outline">
+                <Button onClick={exportToPDF} variant="outline">
                   <Download className="h-4 w-4 mr-2" />
                   {t("export_filtered_data")}
                 </Button>
@@ -813,7 +1007,7 @@ const TimeRegistrations = () => {
               <div className="flex justify-between items-center">
                 <CardTitle>{t("time_registration_history")}</CardTitle>
                 <div className="flex gap-2">
-                  <Button onClick={exportToCSV} variant="outline" size="sm">
+                  <Button onClick={exportToPDF} variant="outline" size="sm">
                     <Download className="h-4 w-4 mr-2" />
                     {t("export_timesheet")}
                   </Button>
@@ -1070,7 +1264,7 @@ const TimeRegistrations = () => {
               >
                 {t("clear_filters")}
               </Button>
-              <Button onClick={exportToCSV} variant="outline">
+              <Button onClick={exportToPDF} variant="outline">
                 <Download className="h-4 w-4 mr-2" />
                 {t("export_filtered_data")}
               </Button>
