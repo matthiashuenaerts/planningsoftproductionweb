@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package, Barcode, Loader2 } from 'lucide-react';
+import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package, Barcode, Loader2, CheckCircle } from 'lucide-react';
 import { format, differenceInDays, isAfter, isBefore } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
@@ -1003,125 +1003,140 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                   return (
                     <div
                       key={task.id}
-                      className={`border rounded-lg p-4 relative transition-opacity ${isCompleting ? 'opacity-50' : ''}`}
+                      className={`group border border-border/60 rounded-xl p-4 relative transition-all duration-200 bg-card/50 hover:bg-accent/30 hover:border-primary/30 shadow-sm hover:shadow-md ${isCompleting ? 'opacity-50' : ''}`}
                       style={{
                         borderLeftWidth: '4px',
-                        borderLeftColor: taskColor || '#e5e7eb',
+                        borderLeftColor: taskColor || 'hsl(var(--border))',
                         borderLeftStyle: 'solid'
                       }}
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{task.project_name}</h3>
-                          <p className="text-sm text-gray-600">{task.title}</p>
-                          {task.assignee_name && (
-                            <p className="text-sm text-blue-600">
-                              {t('assigned_to_label', { name: task.assignee_name })}
+                      {/* Task Info Section */}
+                      <div className="space-y-2 mb-4">
+                        <h3 className="font-semibold text-base sm:text-lg leading-tight text-foreground">{task.project_name}</h3>
+                        <p className="text-sm text-muted-foreground">{task.title}</p>
+                        
+                        {task.assignee_name && (
+                          <p className="text-sm text-primary font-medium">
+                            {t('assigned_to_label', { name: task.assignee_name })}
+                          </p>
+                        )}
+                        
+                        {/* Active Users Display */}
+                        {(() => {
+                          const activeUsers = activeUsersPerTask.get(task.id) || [];
+                          if (activeUsers.length > 0) {
+                            return (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Users className="h-4 w-4 text-primary" />
+                                <span className="text-primary font-medium">
+                                  {activeUsers.length === 1 ? 'Active: ' : `${activeUsers.length} users active: `}
+                                  {activeUsers.map(u => u.name).join(', ')}
+                                </span>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                        
+                        {task.due_date && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm text-muted-foreground">
+                              {t('due_date_label', { date: format(new Date(task.due_date), 'MMM dd, yyyy') })}
                             </p>
-                          )}
-                          {/* Active Users Display */}
-                          {(() => {
-                            const activeUsers = activeUsersPerTask.get(task.id) || [];
-                            if (activeUsers.length > 0) {
-                              return (
-                                <div className="flex items-center gap-2 text-sm mt-1">
-                                  <Users className="h-4 w-4 text-blue-600" />
-                                  <span className="text-blue-600 font-medium">
-                                    {activeUsers.length === 1 ? 'Active: ' : `${activeUsers.length} users active: `}
-                                    {activeUsers.map(u => u.name).join(', ')}
-                                  </span>
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
-                          {task.due_date && (
-                            <div className="flex items-center gap-2 mt-1">
-                              <p className="text-sm text-gray-500">
-                                {t('due_date_label', { date: format(new Date(task.due_date), 'MMM dd, yyyy') })}
-                              </p>
-                              {urgency && (
-                                <Badge variant={urgency.variant} className="text-xs">
-                                  {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-1" />}
-                                  {urgency.label}
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                          {task.timeRemaining && (
-                            <p className={`text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-green-600'}`}>
-                              {t('time_remaining_label', { time: task.timeRemaining })}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
+                            {urgency && (
+                              <Badge variant={urgency.variant} className="text-xs">
+                                {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-1" />}
+                                {urgency.label}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                        
+                        {task.timeRemaining && (
+                          <p className={`text-sm font-mono font-semibold ${task.isOvertime ? 'text-destructive' : 'text-green-600'}`}>
+                            {t('time_remaining_label', { time: task.timeRemaining })}
+                          </p>
+                        )}
+                      </div>
+                      
+                      {/* Action Buttons - Grid on mobile, row on desktop */}
+                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleShowProjectParts(task)}
+                          title={t('view_parts')}
+                          className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
+                        >
+                          <Package className="h-4 w-4" />
+                          <span className="text-xs sm:text-sm">{t('view_parts')}</span>
+                        </Button>
+                        
+                        {task.project_id && (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleShowProjectParts(task)}
-                            title={t('view_parts')}
+                            onClick={() => handleGoToFiles(task)}
+                            title={t('view_files')}
+                            className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
                           >
-                            <Package className="h-4 w-4" />
-                            {t('view_parts')}
+                            <FileText className="h-4 w-4" />
+                            <span className="text-xs sm:text-sm">{t('view_files')}</span>
                           </Button>
-                          {task.project_id && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleGoToFiles(task)}
-                              title={t('view_files')}
-                            >
-                              <FileText className="h-4 w-4" />
-                              {t('view_files')}
-                            </Button>
-                          )}
-                          {task.project_id && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleShowBarcode(task)}
-                              title={t('show_barcode')}
-                            >
-                              <Barcode className="h-4 w-4" />
-                              {t('show_barcode')}
-                            </Button>
-                          )}
-                          {task.project_id && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate(createLocalizedPath(`/projects/${task.project_id}`))}
-                              title={t('go_to_project')}
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                              {t('go_to_project')}
-                            </Button>
-                          )}
-                          <button
-                            onClick={() => handleJoinTask(task.id)}
-                            className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-                            disabled={isCompleting}
+                        )}
+                        
+                        {task.project_id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleShowBarcode(task)}
+                            title={t('show_barcode')}
+                            className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
                           >
-                            {t('join_task')}
-                          </button>
-                          {(() => {
-                            const activeUsers = activeUsersPerTask.get(task.id) || [];
-                            const canComplete = activeUsers.length === 0 || 
-                                              (activeUsers.length === 1 && currentEmployee && activeUsers[0].id === currentEmployee.id);
-                            
-                            return (
-                              <button
-                                onClick={() => handleTaskUpdate(task.id, 'COMPLETED')}
-                                className={`px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 flex items-center gap-1 ${!canComplete ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                disabled={isCompleting || !canComplete}
-                                title={!canComplete ? 'Multiple users are working on this task' : ''}
-                              >
-                                {isCompleting && <Loader2 className="h-3 w-3 animate-spin" />}
-                                {t('complete_task')}
-                              </button>
-                            );
-                          })()}
-                        </div>
+                            <Barcode className="h-4 w-4" />
+                            <span className="text-xs sm:text-sm">{t('show_barcode')}</span>
+                          </Button>
+                        )}
+                        
+                        {task.project_id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(createLocalizedPath(`/projects/${task.project_id}`))}
+                            title={t('go_to_project')}
+                            className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            <span className="text-xs sm:text-sm">{t('go_to_project')}</span>
+                          </Button>
+                        )}
+                        
+                        <Button
+                          onClick={() => handleJoinTask(task.id)}
+                          disabled={isCompleting}
+                          className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 bg-primary hover:bg-primary/90 text-primary-foreground"
+                        >
+                          <PlayCircle className="h-4 w-4" />
+                          <span className="text-xs sm:text-sm">{t('join_task')}</span>
+                        </Button>
+                        
+                        {(() => {
+                          const activeUsers = activeUsersPerTask.get(task.id) || [];
+                          const canComplete = activeUsers.length === 0 || 
+                                            (activeUsers.length === 1 && currentEmployee && activeUsers[0].id === currentEmployee.id);
+                          
+                          return (
+                            <Button
+                              onClick={() => handleTaskUpdate(task.id, 'COMPLETED')}
+                              disabled={isCompleting || !canComplete}
+                              title={!canComplete ? 'Multiple users are working on this task' : ''}
+                              className={`h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 bg-green-600 hover:bg-green-700 text-white ${!canComplete ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              {isCompleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                              <span className="text-xs sm:text-sm">{t('complete_task')}</span>
+                            </Button>
+                          );
+                        })()}
                       </div>
                     </div>
                   );
@@ -1150,81 +1165,92 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                   return (
                     <div
                       key={task.id}
-                      className="border rounded-lg p-4 relative"
+                      className="group border border-border/60 rounded-xl p-4 relative transition-all duration-200 bg-card/50 hover:bg-accent/30 hover:border-primary/30 shadow-sm hover:shadow-md"
                       style={{
                         borderLeftWidth: '4px',
-                        borderLeftColor: taskColor || '#e5e7eb',
+                        borderLeftColor: taskColor || 'hsl(var(--border))',
                         borderLeftStyle: 'solid'
                       }}
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{task.project_name}</h3>
-                          <p className="text-sm text-gray-600">{task.title}</p>
-                          {task.due_date && (
-                            <div className="flex items-center gap-2 mt-1">
-                              <p className="text-sm text-gray-500">
-                                {t('due_date_label', { date: format(new Date(task.due_date), 'MMM dd, yyyy') })}
-                              </p>
-                              {urgency && (
-                                <Badge variant={urgency.variant} className="text-xs">
-                                  {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-1" />}
-                                  {urgency.label}
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
+                      {/* Task Info Section */}
+                      <div className="space-y-2 mb-4">
+                        <h3 className="font-semibold text-base sm:text-lg leading-tight text-foreground">{task.project_name}</h3>
+                        <p className="text-sm text-muted-foreground">{task.title}</p>
+                        
+                        {task.due_date && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm text-muted-foreground">
+                              {t('due_date_label', { date: format(new Date(task.due_date), 'MMM dd, yyyy') })}
+                            </p>
+                            {urgency && (
+                              <Badge variant={urgency.variant} className="text-xs">
+                                {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-1" />}
+                                {urgency.label}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Action Buttons - Grid on mobile, row on desktop */}
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleShowProjectParts(task)}
+                          title={t('view_parts')}
+                          className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
+                        >
+                          <Package className="h-4 w-4" />
+                          <span className="text-xs sm:text-sm">{t('view_parts')}</span>
+                        </Button>
+                        
+                        {task.project_id && (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleShowProjectParts(task)}
-                            title={t('view_parts')}
+                            onClick={() => handleGoToFiles(task)}
+                            title={t('view_files')}
+                            className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
                           >
-                            <Package className="h-4 w-4" />
-                            {t('view_parts')}
+                            <FileText className="h-4 w-4" />
+                            <span className="text-xs sm:text-sm">{t('view_files')}</span>
                           </Button>
-                          {task.project_id && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleGoToFiles(task)}
-                              title={t('view_files')}
-                            >
-                              <FileText className="h-4 w-4" />
-                              {t('view_files')}
-                            </Button>
-                          )}
-                          {task.project_id && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleShowBarcode(task)}
-                              title={t('show_barcode')}
-                            >
-                              <Barcode className="h-4 w-4" />
-                              {t('show_barcode')}
-                            </Button>
-                          )}
-                          {task.project_id && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate(createLocalizedPath(`/projects/${task.project_id}`))}
-                              title={t('go_to_project')}
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                              {t('go_to_project')}
-                            </Button>
-                          )}
-                          <button
-                            onClick={() => handleTaskUpdate(task.id, 'IN_PROGRESS')}
-                            className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                        )}
+                        
+                        {task.project_id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleShowBarcode(task)}
+                            title={t('show_barcode')}
+                            className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
                           >
-                            {t('start')}
-                          </button>
-                        </div>
+                            <Barcode className="h-4 w-4" />
+                            <span className="text-xs sm:text-sm">{t('show_barcode')}</span>
+                          </Button>
+                        )}
+                        
+                        {task.project_id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(createLocalizedPath(`/projects/${task.project_id}`))}
+                            title={t('go_to_project')}
+                            className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            <span className="text-xs sm:text-sm">{t('go_to_project')}</span>
+                          </Button>
+                        )}
+                        
+                        <Button
+                          onClick={() => handleTaskUpdate(task.id, 'IN_PROGRESS')}
+                          className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 bg-primary hover:bg-primary/90 text-primary-foreground col-span-3 sm:col-span-1"
+                        >
+                          <PlayCircle className="h-4 w-4" />
+                          <span className="text-xs sm:text-sm">{t('start')}</span>
+                        </Button>
                       </div>
                     </div>
                   );
