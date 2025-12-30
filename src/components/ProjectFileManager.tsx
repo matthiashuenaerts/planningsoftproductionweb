@@ -553,55 +553,72 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
             </div>
           ) : files.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {files.map((file) => (
                 <div 
                   key={file.id} 
-                  className="flex items-center justify-between border p-3 rounded-md"
+                  className="group border border-border/60 rounded-xl p-4 bg-card/50 hover:bg-accent/30 hover:border-primary/30 transition-all duration-200 shadow-sm hover:shadow-md"
                 >
-                  <div className="flex items-center space-x-3">
-                    <File className="h-5 w-5 text-blue-500" />
-                    <div>
-                      <p className="font-medium">{file.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatFileSize(file.size)}
-                      </p>
+                  {/* Mobile: Stack layout, Desktop: Row layout */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    {/* File info */}
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <File className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm sm:text-base truncate" title={file.name}>
+                          {file.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(file.size)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handlePreviewFile(file.name)}
-                      title="Preview"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => openFile(file.name)}
-                      title="Open"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => downloadFile(file.name)}
-                      title="Download"
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="text-red-600 hover:text-red-600 hover:bg-red-50"
-                      onClick={() => setFileToDelete(file.name)}
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    
+                    {/* Action buttons - Grid on mobile, flex on desktop */}
+                    <div className="grid grid-cols-4 gap-2 sm:flex sm:gap-1 mt-2 sm:mt-0">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handlePreviewFile(file.name)}
+                        title="Preview"
+                        className="h-10 sm:h-8 flex items-center justify-center gap-1.5 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span className="text-xs sm:hidden">View</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => openFile(file.name)}
+                        title="Open"
+                        className="h-10 sm:h-8 flex items-center justify-center gap-1.5 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        <span className="text-xs sm:hidden">Open</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => downloadFile(file.name)}
+                        title="Download"
+                        className="h-10 sm:h-8 flex items-center justify-center gap-1.5 hover:bg-green-500/10 hover:text-green-600 hover:border-green-500/30 transition-colors"
+                      >
+                        <Download className="h-4 w-4" />
+                        <span className="text-xs sm:hidden">Save</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="h-10 sm:h-8 flex items-center justify-center gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 hover:border-destructive/30 transition-colors"
+                        onClick={() => setFileToDelete(file.name)}
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="text-xs sm:hidden">Delete</span>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
