@@ -264,63 +264,31 @@ const TimeRegistrations = () => {
   };
 
   // Draw branded header for PDF exports
-  const drawBrandedHeader = (pdf: any, pageWidth: number, margin: number) => {
+  const drawBrandedHeader = async (pdf: any, pageWidth: number, margin: number): Promise<number> => {
     let yPos = margin;
     const brandColor = { r: 45, g: 115, b: 135 }; // Teal color from logo
     
-    // Draw hexagonal logo (simplified version)
-    const logoX = pageWidth / 2;
-    const logoY = yPos + 15;
-    const logoSize = 18;
-    
-    // Draw hexagon background
-    pdf.setFillColor(brandColor.r, brandColor.g, brandColor.b);
-    const hexPoints: [number, number][] = [];
-    for (let i = 0; i < 6; i++) {
-      const angle = (Math.PI / 3) * i - Math.PI / 2;
-      hexPoints.push([
-        logoX + logoSize * Math.cos(angle),
-        logoY + logoSize * Math.sin(angle)
-      ]);
+    // Load and add logo image
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      
+      await new Promise<void>((resolve, reject) => {
+        logoImg.onload = () => resolve();
+        logoImg.onerror = () => reject(new Error('Failed to load logo'));
+        logoImg.src = '/images/automattion-compass-logo.png';
+      });
+      
+      // Add logo to PDF (centered)
+      const logoWidth = 30;
+      const logoHeight = 30;
+      const logoX = (pageWidth - logoWidth) / 2;
+      pdf.addImage(logoImg, 'PNG', logoX, yPos, logoWidth, logoHeight);
+      yPos += logoHeight + 5;
+    } catch (error) {
+      console.warn('Could not load logo, using placeholder');
+      yPos += 35;
     }
-    pdf.setLineWidth(0);
-    pdf.moveTo(hexPoints[0][0], hexPoints[0][1]);
-    for (let i = 1; i < hexPoints.length; i++) {
-      pdf.lineTo(hexPoints[i][0], hexPoints[i][1]);
-    }
-    pdf.lineTo(hexPoints[0][0], hexPoints[0][1]);
-    pdf.fill();
-    
-    // Draw network nodes inside hexagon (simplified)
-    pdf.setFillColor(255, 255, 255);
-    const nodePositions = [
-      { x: logoX, y: logoY - 8 },
-      { x: logoX - 8, y: logoY + 4 },
-      { x: logoX + 8, y: logoY + 4 },
-      { x: logoX, y: logoY + 2 }
-    ];
-    
-    // Draw connecting lines
-    pdf.setDrawColor(255, 255, 255);
-    pdf.setLineWidth(0.8);
-    pdf.line(nodePositions[0].x, nodePositions[0].y, nodePositions[3].x, nodePositions[3].y);
-    pdf.line(nodePositions[1].x, nodePositions[1].y, nodePositions[3].x, nodePositions[3].y);
-    pdf.line(nodePositions[2].x, nodePositions[2].y, nodePositions[3].x, nodePositions[3].y);
-    pdf.line(nodePositions[1].x, nodePositions[1].y, nodePositions[2].x, nodePositions[2].y);
-    pdf.line(nodePositions[0].x, nodePositions[0].y, nodePositions[1].x, nodePositions[1].y);
-    pdf.line(nodePositions[0].x, nodePositions[0].y, nodePositions[2].x, nodePositions[2].y);
-    
-    // Draw nodes
-    nodePositions.forEach((pos, i) => {
-      pdf.setFillColor(255, 255, 255);
-      pdf.circle(pos.x, pos.y, i === 3 ? 2.5 : 3, 'F');
-      if (i !== 3) {
-        pdf.setFillColor(brandColor.r, brandColor.g, brandColor.b);
-        pdf.circle(pos.x, pos.y, 1.5, 'F');
-      }
-    });
-    
-    yPos = logoY + logoSize + 8;
     
     // Company name
     pdf.setFontSize(18);
@@ -477,7 +445,7 @@ const TimeRegistrations = () => {
       const contentWidth = pageWidth - (margin * 2);
       
       // Draw branded header
-      let yPos = drawBrandedHeader(pdf, pageWidth, margin);
+      let yPos = await drawBrandedHeader(pdf, pageWidth, margin);
 
       // Helper function to add new page if needed
       const checkPageBreak = (requiredSpace: number) => {
@@ -678,7 +646,7 @@ const TimeRegistrations = () => {
       const contentWidth = pageWidth - (margin * 2);
       
       // Draw branded header
-      let yPos = drawBrandedHeader(pdf, pageWidth, margin);
+      let yPos = await drawBrandedHeader(pdf, pageWidth, margin);
       
       // Title
       pdf.setFontSize(16);
