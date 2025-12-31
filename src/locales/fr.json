@@ -797,5 +797,20 @@
   "failed_to_delete_registrations": "Échec de la suppression des enregistrements",
   "deleting": "Suppression...",
   "delete": "Supprimer",
-  "add_manual_registration": "Ajouter un enregistrement manuel"
+  "add_manual_registration": "Ajouter un enregistrement manuel",
+  
+  "holiday": "Congé",
+  "holiday_requests": "Demandes de Congé",
+  "my_holiday_requests": "Mes Demandes de Congé",
+  "manage_requests": "Gérer les Demandes",
+  "general_schedule": "Planning Général",
+  "upcoming": "À venir",
+  "past": "Passé",
+  "reason": "Raison",
+  "requested": "Demandé",
+  "add_new_holiday_request": "Ajouter une Nouvelle Demande de Congé",
+  "close": "Fermer",
+  "pending_count": "{{count}} en attente",
+  "approved": "Approuvé",
+  "rejected": "Rejeté"
 }

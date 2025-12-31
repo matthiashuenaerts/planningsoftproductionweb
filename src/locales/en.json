@@ -316,5 +316,20 @@
   "failed_to_delete_registrations": "Failed to delete registrations",
   "deleting": "Deleting...",
   "delete": "Delete",
-  "add_manual_registration": "Add manual registration"
+  "add_manual_registration": "Add manual registration",
+  
+  "holiday": "Holiday",
+  "holiday_requests": "Holiday Requests",
+  "my_holiday_requests": "My Holiday Requests",
+  "manage_requests": "Manage Requests",
+  "general_schedule": "General Schedule",
+  "upcoming": "Upcoming",
+  "past": "Past",
+  "reason": "Reason",
+  "requested": "Requested",
+  "add_new_holiday_request": "Add New Holiday Request",
+  "close": "Close",
+  "pending_count": "{{count}} pending",
+  "approved": "Approved",
+  "rejected": "Rejected"
 }

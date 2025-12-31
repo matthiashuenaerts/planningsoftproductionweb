@@ -17,7 +17,7 @@ const UserMenu: React.FC = () => {
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const { currentEmployee } = useAuth();
-  const { createLocalizedPath } = useLanguage();
+  const { createLocalizedPath, t } = useLanguage();
   const navigate = useNavigate();
 
   const canManageRequests = currentEmployee?.role === 'admin' || 
@@ -57,12 +57,12 @@ const UserMenu: React.FC = () => {
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => setShowHolidayModal(true)}>
             <CalendarDays className="mr-2 h-4 w-4" />
-            Holiday
+            {t('holiday')}
           </DropdownMenuItem>
           {canViewGeneralSchedule && (
             <DropdownMenuItem onSelect={() => navigate(createLocalizedPath('/general-schedule'))}>
               <Calendar className="mr-2 h-4 w-4" />
-              General Schedule
+              {t('general_schedule')}
             </DropdownMenuItem>
           )}
           {canManageRequests && (
@@ -70,7 +70,7 @@ const UserMenu: React.FC = () => {
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center">
                   <Users className="mr-2 h-4 w-4" />
-                  Manage Requests
+                  {t('manage_requests')}
                 </div>
                 {pendingCount > 0 && (
                   <Badge variant="destructive" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
@@ -88,7 +88,7 @@ const UserMenu: React.FC = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5" />
-              Holiday Requests
+              {t('holiday_requests')}
             </DialogTitle>
           </DialogHeader>
           
@@ -99,7 +99,7 @@ const UserMenu: React.FC = () => {
               <HolidayRequestDialog>
                 <Button className="flex items-center gap-2">
                   <Plus className="h-4 w-4" />
-                  Add New Holiday Request
+                  {t('add_new_holiday_request')}
                 </Button>
               </HolidayRequestDialog>
             </div>
@@ -113,10 +113,10 @@ const UserMenu: React.FC = () => {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Manage Holiday Requests
+                {t('manage_requests')}
                 {pendingCount > 0 && (
                   <Badge variant="destructive" className="ml-2">
-                    {pendingCount} pending
+                    {t('pending_count', { count: pendingCount.toString() })}
                   </Badge>
                 )}
               </DialogTitle>
