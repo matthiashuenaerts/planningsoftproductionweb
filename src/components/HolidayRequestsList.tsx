@@ -10,6 +10,7 @@ import { holidayRequestService, HolidayRequest } from '@/services/holidayRequest
 import { CalendarDays, Clock, User, CheckCircle, XCircle, RefreshCw, Eye } from 'lucide-react';
 import { format, parseISO, isAfter, startOfToday, isBefore, isToday } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface HolidayRequestsListProps {
   showAllRequests?: boolean;
@@ -23,6 +24,7 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
   const [processingId, setProcessingId] = useState<string | null>(null);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const canManageRequests = currentEmployee?.role === 'admin' || 
                            currentEmployee?.role === 'teamleader' || 
@@ -147,6 +149,17 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
     return isBefore(startDate, today) && request.status !== 'pending';
   });
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return t('approved');
+      case 'rejected':
+        return t('rejected');
+      default:
+        return t('pending');
+    }
+  };
+
   const renderRequestCard = (request: HolidayRequest) => (
     <div
       key={request.id}
@@ -165,7 +178,7 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
         <div className="flex items-center gap-2">
           <Badge variant={getStatusBadgeVariant(request.status)} className="flex items-center gap-1">
             {getStatusIcon(request.status)}
-            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+            {getStatusLabel(request.status)}
           </Badge>
           {canManageRequests && showAllRequests && request.status === 'pending' && (
             <Button
@@ -176,7 +189,7 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
                 setAdminNotes('');
               }}
             >
-              Review
+              {t('review')}
             </Button>
           )}
           <Dialog>
@@ -187,44 +200,44 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Request Details</DialogTitle>
+                <DialogTitle>{t('request_details')}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium">Employee</label>
+                  <label className="text-sm font-medium">{t('employee')}</label>
                   <p className="text-sm text-gray-600">{request.employee_name}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Dates</label>
+                  <label className="text-sm font-medium">{t('dates')}</label>
                   <p className="text-sm text-gray-600">
                     {format(parseISO(request.start_date), 'MMMM dd, yyyy')} - {format(parseISO(request.end_date), 'MMMM dd, yyyy')}
                   </p>
                 </div>
                 {request.reason && (
                   <div>
-                    <label className="text-sm font-medium">Reason</label>
+                    <label className="text-sm font-medium">{t('reason')}</label>
                     <p className="text-sm text-gray-600">{request.reason}</p>
                   </div>
                 )}
                 <div>
-                  <label className="text-sm font-medium">Status</label>
+                  <label className="text-sm font-medium">{t('status')}</label>
                   <div className="flex items-center gap-2 mt-1">
                     <Badge variant={getStatusBadgeVariant(request.status)} className="flex items-center gap-1">
                       {getStatusIcon(request.status)}
-                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                      {getStatusLabel(request.status)}
                     </Badge>
                   </div>
                 </div>
                 {request.admin_notes && (
                   <div>
-                    <label className="text-sm font-medium">Admin Notes</label>
+                    <label className="text-sm font-medium">{t('admin_notes')}</label>
                     <p className="text-sm text-gray-600 bg-blue-50 p-2 rounded">{request.admin_notes}</p>
                   </div>
                 )}
                 <div className="text-xs text-gray-500">
-                  <p>Submitted: {format(parseISO(request.created_at), 'MMM dd, yyyy HH:mm')}</p>
+                  <p>{t('submitted')}: {format(parseISO(request.created_at), 'MMM dd, yyyy HH:mm')}</p>
                   {request.updated_at !== request.created_at && (
-                    <p>Updated: {format(parseISO(request.updated_at), 'MMM dd, yyyy HH:mm')}</p>
+                    <p>{t('updated')}: {format(parseISO(request.updated_at), 'MMM dd, yyyy HH:mm')}</p>
                   )}
                 </div>
               </div>
@@ -236,7 +249,7 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
       {request.reason && (
         <div className="mb-2">
           <p className="text-sm text-gray-600">
-            <strong>Reason:</strong> {request.reason}
+            <strong>{t('reason')}:</strong> {request.reason}
           </p>
         </div>
       )}
@@ -244,15 +257,15 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
       {request.admin_notes && (
         <div className="bg-blue-50 p-3 rounded border-l-4 border-blue-400">
           <p className="text-sm text-blue-800">
-            <strong>Admin Notes:</strong> {request.admin_notes}
+            <strong>{t('admin_notes')}:</strong> {request.admin_notes}
           </p>
         </div>
       )}
       
       <div className="flex justify-between text-xs text-gray-500 mt-2">
-        <span>Requested: {format(parseISO(request.created_at), 'MMM dd, yyyy HH:mm')}</span>
+        <span>{t('requested')}: {format(parseISO(request.created_at), 'MMM dd, yyyy HH:mm')}</span>
         {request.updated_at !== request.created_at && (
-          <span>Updated: {format(parseISO(request.updated_at), 'MMM dd, yyyy HH:mm')}</span>
+          <span>{t('updated')}: {format(parseISO(request.updated_at), 'MMM dd, yyyy HH:mm')}</span>
         )}
       </div>
     </div>
@@ -264,7 +277,7 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5" />
-            Holiday Requests
+            {t('holiday_requests')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -283,7 +296,7 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5" />
-              {showAllRequests ? 'All Holiday Requests' : 'My Holiday Requests'}
+              {showAllRequests ? t('all_holiday_requests') : t('my_holiday_requests')}
             </CardTitle>
             <Button
               variant="outline"
@@ -299,19 +312,19 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
           {requests.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <CalendarDays className="mx-auto h-12 w-12 mb-4 opacity-30" />
-              <p>No holiday requests found</p>
+              <p>{t('no_holiday_requests')}</p>
               {!showAllRequests && (
-                <p className="text-sm mt-2">Submit your first holiday request to see it here</p>
+                <p className="text-sm mt-2">{t('submit_first_request')}</p>
               )}
             </div>
           ) : (
             <Tabs defaultValue="upcoming" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="upcoming">
-                  Upcoming ({upcomingRequests.length})
+                  {t('upcoming')} ({upcomingRequests.length})
                 </TabsTrigger>
                 <TabsTrigger value="past">
-                  Past ({pastRequests.length})
+                  {t('past')} ({pastRequests.length})
                 </TabsTrigger>
               </TabsList>
               
@@ -319,7 +332,7 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
                 {upcomingRequests.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <CalendarDays className="mx-auto h-8 w-8 mb-2 opacity-30" />
-                    <p>No upcoming holiday requests</p>
+                    <p>{t('no_upcoming_requests')}</p>
                   </div>
                 ) : (
                   upcomingRequests.map(renderRequestCard)
@@ -330,7 +343,7 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
                 {pastRequests.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <CalendarDays className="mx-auto h-8 w-8 mb-2 opacity-30" />
-                    <p>No past holiday requests</p>
+                    <p>{t('no_past_requests')}</p>
                   </div>
                 ) : (
                   pastRequests.map(renderRequestCard)
@@ -345,17 +358,17 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
         <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Review Holiday Request</DialogTitle>
+              <DialogTitle>{t('review_holiday_request')}</DialogTitle>
             </DialogHeader>
             
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium">Employee</label>
+                  <label className="text-sm font-medium">{t('employee')}</label>
                   <p className="text-sm text-gray-600">{selectedRequest.employee_name}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Dates</label>
+                  <label className="text-sm font-medium">{t('dates')}</label>
                   <p className="text-sm text-gray-600">
                     {format(parseISO(selectedRequest.start_date), 'MMM dd')} - {format(parseISO(selectedRequest.end_date), 'MMM dd, yyyy')}
                   </p>
@@ -364,15 +377,15 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
               
               {selectedRequest.reason && (
                 <div>
-                  <label className="text-sm font-medium">Reason</label>
+                  <label className="text-sm font-medium">{t('reason')}</label>
                   <p className="text-sm text-gray-600">{selectedRequest.reason}</p>
                 </div>
               )}
               
               <div>
-                <label className="text-sm font-medium mb-2 block">Admin Notes (Optional)</label>
+                <label className="text-sm font-medium mb-2 block">{t('admin_notes_optional')}</label>
                 <Textarea
-                  placeholder="Add notes about this request..."
+                  placeholder={t('add_notes_placeholder')}
                   value={adminNotes}
                   onChange={(e) => setAdminNotes(e.target.value)}
                   rows={3}
@@ -385,20 +398,20 @@ const HolidayRequestsList: React.FC<HolidayRequestsListProps> = ({ showAllReques
                   onClick={() => setSelectedRequest(null)}
                   disabled={processingId === selectedRequest.id}
                 >
-                  Cancel
+                  {t('cancel')}
                 </Button>
                 <Button
                   variant="destructive"
                   onClick={() => handleStatusUpdate(selectedRequest.id, 'rejected')}
                   disabled={processingId === selectedRequest.id}
                 >
-                  {processingId === selectedRequest.id ? 'Processing...' : 'Reject'}
+                  {processingId === selectedRequest.id ? t('processing') : t('reject')}
                 </Button>
                 <Button
                   onClick={() => handleStatusUpdate(selectedRequest.id, 'approved')}
                   disabled={processingId === selectedRequest.id}
                 >
-                  {processingId === selectedRequest.id ? 'Processing...' : 'Approve'}
+                  {processingId === selectedRequest.id ? t('processing') : t('approve')}
                 </Button>
               </div>
             </div>
