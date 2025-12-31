@@ -797,5 +797,20 @@
   "failed_to_delete_registrations": "Kon registraties niet verwijderen",
   "deleting": "Verwijderen...",
   "delete": "Verwijderen",
-  "add_manual_registration": "Handmatige registratie toevoegen"
+  "add_manual_registration": "Handmatige registratie toevoegen",
+  
+  "holiday": "Verlof",
+  "holiday_requests": "Verlofaanvragen",
+  "my_holiday_requests": "Mijn Verlofaanvragen",
+  "manage_requests": "Aanvragen Beheren",
+  "general_schedule": "Algemeen Schema",
+  "upcoming": "Aankomend",
+  "past": "Verleden",
+  "reason": "Reden",
+  "requested": "Aangevraagd",
+  "add_new_holiday_request": "Nieuwe Verlofaanvraag Toevoegen",
+  "close": "Sluiten",
+  "pending_count": "{{count}} in afwachting",
+  "approved": "Goedgekeurd",
+  "rejected": "Afgewezen"
 }
