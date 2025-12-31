@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Loader2, Circle, Eye, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, MapPin, DollarSign } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Loader2, Circle, Eye, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, MapPin, DollarSign, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -428,6 +428,120 @@ const ProjectDetails = () => {
       });
     }
   };
+
+  const printItemLabel = (item: any, order: any) => {
+    const installationDate = project?.installation_date 
+      ? new Date(project.installation_date).toLocaleDateString()
+      : 'Not set';
+    
+    const currentDate = new Date().toLocaleDateString('en-GB', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric' 
+    });
+
+    const labelContent = `
+      <div style="
+        width: 89mm; 
+        height: 32mm; 
+        padding: 1.5mm; 
+        font-family: Arial, sans-serif; 
+        line-height: 1.1; 
+        box-sizing: border-box; 
+        display: flex; 
+        flex-direction: column; 
+        justify-content: space-between;
+      ">
+        <!-- Project Name (Full Width, Top, Wrapping, Scaled Font) -->
+        <div style="
+          width: 100%;
+          text-align: center;
+          font-weight: bold;
+          font-size: clamp(10pt, 5vw, 16pt);
+          line-height: 1.1;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          margin-bottom: 1mm;
+          white-space: normal;
+        ">
+          ${project?.name || 'Unknown Project'}
+        </div>
+
+        <!-- Stock Location (if any) -->
+        ${item.stock_location ? `
+        <div style="
+          font-weight: bold;
+          font-size: 14pt;
+          text-align: center;
+          border: 1px solid #ccc;
+          padding: 1mm;
+          background: #f0f0f0;
+          margin-bottom: 1mm;
+        ">
+          ${item.stock_location}
+        </div>
+        ` : ''}
+
+        <!-- Item Details -->
+        <div style="font-size: 8pt; display: flex; justify-content: space-between; margin-bottom: 0.5mm;">
+          <div>Art: ${item.article_code || item.description || 'N/A'}</div>
+          <div>Qty: ${item.delivered_quantity || item.quantity || 0}</div>
+        </div>
+
+        <!-- Dates -->
+        <div style="font-size: 8pt; display: flex; justify-content: space-between;">
+          <div>Completed: ${currentDate}</div>
+          <div>Install: ${installationDate}</div>
+        </div>
+
+        <!-- Supplier (Bottom) -->
+        <div style="
+          font-size: 8pt; 
+          text-align: right; 
+          margin-top: 1mm; 
+          border-top: 1px solid #ccc; 
+          padding-top: 0.5mm;
+        ">
+          ${order.supplier || ''}
+        </div>
+      </div>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Label Print - ${item.description || item.article_code}</title>
+            <style>
+              @page {
+                size: 89mm 35mm;
+                margin: 0;
+              }
+              body {
+                margin: 0;
+                padding: 0;
+                width: 89mm;
+              }
+            </style>
+          </head>
+          <body>
+            ${labelContent}
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+      printWindow.close();
+    }
+
+    toast({
+      title: "Label Sent to Printer",
+      description: `Label for "${item.description || item.article_code}" sent to printer`,
+    });
+  };
+
   const getBackgroundColor = (color: string) => {
     switch (color) {
       case 'green':
@@ -1425,9 +1539,23 @@ const ProjectDetails = () => {
                                             Note: {item.notes}
                                           </div>}
                                       </div>
-                                      <span className={cn("text-white px-2 py-1 rounded-full text-xs font-bold ml-2 shadow-sm", order.status === 'delivered' ? 'bg-gradient-to-r from-green-500 to-emerald-500' : order.status === 'pending' ? 'bg-gradient-to-r from-orange-500 to-amber-500' : order.status === 'delayed' ? 'bg-gradient-to-r from-red-500 to-rose-500' : order.status === 'canceled' ? 'bg-gradient-to-r from-gray-500 to-slate-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500')}>
-                                        {item.delivered_quantity || 0}/{item.quantity}
-                                      </span>
+                                      <div className="flex items-center gap-1 ml-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            printItemLabel(item, order);
+                                          }}
+                                          title="Print label"
+                                        >
+                                          <Printer className="h-3 w-3" />
+                                        </Button>
+                                        <span className={cn("text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm", order.status === 'delivered' ? 'bg-gradient-to-r from-green-500 to-emerald-500' : order.status === 'pending' ? 'bg-gradient-to-r from-orange-500 to-amber-500' : order.status === 'delayed' ? 'bg-gradient-to-r from-red-500 to-rose-500' : order.status === 'canceled' ? 'bg-gradient-to-r from-gray-500 to-slate-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500')}>
+                                          {item.delivered_quantity || 0}/{item.quantity}
+                                        </span>
+                                      </div>
                                     </div>)}
                                 </div>
                               </div>}
