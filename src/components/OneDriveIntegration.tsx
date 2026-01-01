@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { oneDriveService, ProjectOneDriveConfig } from '@/services/oneDriveService';
-import { ExternalLink, Folder, Link2, Unlink, RefreshCw, HelpCircle } from 'lucide-react';
+import { ExternalLink, Folder, Link2, Unlink, RefreshCw, HelpCircle, Maximize2, Minimize2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -35,6 +35,7 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
   const [folderName, setFolderName] = useState('');
   const [saving, setSaving] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -58,13 +59,46 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
     }
   };
 
+  // Convert share URL to embed URL
+  const getEmbedUrl = (shareUrl: string): string => {
+    try {
+      const url = new URL(shareUrl);
+      
+      // For 1drv.ms short links, we need to use a different approach
+      // OneDrive embed works by adding embed parameter
+      if (url.hostname === '1drv.ms') {
+        // Short links can be embedded by changing the domain
+        return shareUrl.replace('1drv.ms', 'onedrive.live.com/embed');
+      }
+      
+      // For onedrive.live.com links
+      if (url.hostname.includes('onedrive.live.com')) {
+        // Add embed to the path if not already there
+        if (!url.pathname.includes('/embed')) {
+          return shareUrl.replace('onedrive.live.com', 'onedrive.live.com/embed');
+        }
+        return shareUrl;
+      }
+      
+      // For SharePoint/OneDrive Business links
+      if (url.hostname.includes('sharepoint.com')) {
+        // SharePoint embed format
+        const embedUrl = new URL(shareUrl);
+        embedUrl.searchParams.set('action', 'embedview');
+        return embedUrl.toString();
+      }
+      
+      // Default: try to use as-is with embed parameter
+      const embedUrl = new URL(shareUrl);
+      embedUrl.searchParams.set('embed', '1');
+      return embedUrl.toString();
+    } catch {
+      return shareUrl;
+    }
+  };
+
   const extractOneDriveInfo = (url: string): { folderId: string; driveId?: string } | null => {
     try {
-      // Handle various OneDrive URL formats
-      // Personal: https://onedrive.live.com/?id=FOLDERID
-      // Business: https://company-my.sharepoint.com/:f:/g/personal/user/ENCODEDID
-      // Direct: https://1drv.ms/f/s!FOLDERID
-      
       const urlObj = new URL(url);
       
       // Check for id parameter
@@ -73,14 +107,14 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
         return { folderId: idParam };
       }
       
-      // For SharePoint/OneDrive business URLs, extract from path
+      // For SharePoint/OneDrive business URLs
       const pathParts = urlObj.pathname.split('/');
       const lastPart = pathParts[pathParts.length - 1];
       if (lastPart && lastPart.length > 5) {
         return { folderId: lastPart };
       }
       
-      // For 1drv.ms short links, just use the URL as identifier
+      // For 1drv.ms short links
       if (urlObj.hostname === '1drv.ms') {
         return { folderId: urlObj.pathname.replace(/\//g, '_') };
       }
@@ -101,7 +135,6 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
       return;
     }
 
-    // Validate URL
     try {
       new URL(folderUrl);
     } catch {
@@ -199,48 +232,83 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
 
   return (
     <>
-      <Card>
-        <CardHeader>
+      <Card className={expanded ? 'fixed inset-4 z-50 overflow-hidden' : ''}>
+        <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 justify-between">
             <div className="flex items-center gap-2">
               <Folder className="h-5 w-5" />
-              OneDrive Integratie
+              OneDrive - {config?.folder_name || 'Niet gekoppeld'}
             </div>
-            <Button variant="ghost" size="sm" onClick={loadConfig}>
-              <RefreshCw className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {config && (
+                <>
+                  <Button variant="ghost" size="sm" onClick={() => setExpanded(!expanded)}>
+                    {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={handleOpenFolder} title="Open in nieuw tabblad">
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+              <Button variant="ghost" size="sm" onClick={loadConfig}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className={`space-y-4 ${expanded ? 'h-[calc(100%-4rem)] overflow-hidden' : ''}`}>
           {config ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium">Gekoppelde Map</h4>
-                  <p className="text-sm text-muted-foreground">{config.folder_name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Gekoppeld op {new Date(config.created_at).toLocaleDateString('nl-NL')}
-                  </p>
-                </div>
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-                  Verbonden
-                </Badge>
+            <div className={`space-y-4 ${expanded ? 'h-full flex flex-col' : ''}`}>
+              {/* Embedded OneDrive Folder */}
+              <div className={`border rounded-lg overflow-hidden bg-background ${expanded ? 'flex-1' : 'h-[400px]'}`}>
+                <iframe
+                  src={getEmbedUrl(config.folder_url)}
+                  className="w-full h-full border-0"
+                  title={`OneDrive - ${config.folder_name}`}
+                  allow="fullscreen"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                />
               </div>
               
-              <div className="flex gap-2 flex-wrap">
-                <Button onClick={handleOpenFolder} className="flex items-center gap-2">
-                  <ExternalLink className="h-4 w-4" />
-                  Map Openen
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={handleDisconnect}
-                  className="flex items-center gap-2 text-destructive hover:text-destructive"
-                >
-                  <Unlink className="h-4 w-4" />
-                  Loskoppelen
-                </Button>
-              </div>
+              {/* Controls */}
+              {!expanded && (
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                      Verbonden
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      Gekoppeld op {new Date(config.created_at).toLocaleDateString('nl-NL')}
+                    </span>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleDisconnect}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Unlink className="h-4 w-4 mr-1" />
+                    Loskoppelen
+                  </Button>
+                </div>
+              )}
+              
+              {expanded && (
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                    Verbonden
+                  </Badge>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleDisconnect}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Unlink className="h-4 w-4 mr-1" />
+                    Loskoppelen
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -248,7 +316,7 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
                 <h4 className="font-medium mb-2">OneDrive Map Koppelen</h4>
                 <p className="text-sm text-muted-foreground mb-4">
                   Koppel een OneDrive map aan dit project door de deellink te plakken. 
-                  Zo heb je snel toegang tot je projectbestanden.
+                  De inhoud van de map wordt hier getoond.
                 </p>
               </div>
               
@@ -274,11 +342,12 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
                       <li>Open OneDrive in je browser</li>
                       <li>Maak of selecteer een map voor dit project</li>
                       <li>Klik rechts op de map → "Delen"</li>
+                      <li>Zorg dat "Iedereen met de link" is geselecteerd</li>
                       <li>Klik op "Koppeling kopiëren"</li>
                       <li>Plak de link hier</li>
                     </ol>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Tip: Zorg ervoor dat de juiste mensen toegang hebben tot de gedeelde map.
+                      Tip: De map moet gedeeld zijn zodat de inhoud hier getoond kan worden.
                     </p>
                   </div>
                 </CollapsibleContent>
@@ -287,6 +356,14 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
           )}
         </CardContent>
       </Card>
+
+      {/* Backdrop for expanded mode */}
+      {expanded && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40" 
+          onClick={() => setExpanded(false)}
+        />
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
