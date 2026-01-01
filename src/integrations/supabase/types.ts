@@ -2545,8 +2545,8 @@ export type Database = {
       }
       project_onedrive_configs: {
         Row: {
-          access_token: string | null
           created_at: string
+          drive_id: string | null
           folder_id: string
           folder_name: string
           folder_url: string
@@ -2555,8 +2555,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          access_token?: string | null
           created_at?: string
+          drive_id?: string | null
           folder_id: string
           folder_name: string
           folder_url: string
@@ -2565,8 +2565,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          access_token?: string | null
           created_at?: string
+          drive_id?: string | null
           folder_id?: string
           folder_name?: string
           folder_url?: string
