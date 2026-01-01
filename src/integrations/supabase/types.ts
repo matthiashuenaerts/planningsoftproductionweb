@@ -2578,7 +2578,7 @@ export type Database = {
           {
             foreignKeyName: "fk_project_onedrive_configs_project_id"
             columns: ["project_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
