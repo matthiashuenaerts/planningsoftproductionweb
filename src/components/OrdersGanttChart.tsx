@@ -1076,9 +1076,21 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                               project.employeesOnHoliday?.has(emp.id)
                             );
 
-                            // Check if label would overflow to the right
-                            const barEndPosition = (position.left + position.width) / position.totalDays;
-                            const labelWouldOverflow = barEndPosition > 0.85; // If bar ends past 85% of timeline, show label on left
+                            // Decide where to place the outside label so it never creates extra horizontal scroll
+                            const dayWidthPx = position.totalDays > 0 ? containerWidth / position.totalDays : 0;
+                            const barStartPx = dayWidthPx * position.left;
+                            const barWidthPx = dayWidthPx * position.width;
+                            const barEndPx = barStartPx + barWidthPx;
+
+                            const rightSpacePx = Math.max(0, containerWidth - barEndPx);
+                            const leftSpacePx = Math.max(0, barStartPx);
+
+                            // If there isn't enough room on the right, place it on the left (when that helps)
+                            const placeOutsideLabelLeft = rightSpacePx < 160 && leftSpacePx > rightSpacePx;
+                            const outsideLabelMaxWidth = Math.max(
+                              0,
+                              (placeOutsideLabelLeft ? leftSpacePx : rightSpacePx) - 12
+                            );
 
                             return (
                               <div
@@ -1088,7 +1100,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                   left: `calc(100% / ${position.totalDays} * ${position.left})`,
                                   top: `${8 + idx * 32}px`,
                                   height: '28px',
-                                  flexDirection: labelWouldOverflow && !labelFitsInside ? 'row-reverse' : 'row',
+                                  flexDirection: placeOutsideLabelLeft && !labelFitsInside ? 'row-reverse' : 'row',
                                 }}
 
                               >
@@ -1137,15 +1149,12 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                    </div>
                                  </div>
 
-                                 {/* Label outside bar if doesn't fit inside */}
-                                 {!labelFitsInside && (
-                                   <div 
-                                     className="bg-muted px-2 py-1 rounded text-xs font-medium text-muted-foreground whitespace-nowrap shadow-sm"
-                                     style={{
-                                       transform: labelWouldOverflow ? 'translateX(-100%)' : 'none',
-                                       marginLeft: labelWouldOverflow ? '-8px' : '0',
-                                       marginRight: labelWouldOverflow ? '0' : '0',
-                                     }}
+                                 {/* Label outside bar if doesn't fit inside (clamped so it never creates horizontal overflow) */}
+                                 {!labelFitsInside && outsideLabelMaxWidth > 0 && (
+                                   <div
+                                     className="bg-muted px-2 py-1 rounded text-xs font-medium text-muted-foreground shadow-sm truncate"
+                                     style={{ maxWidth: `${outsideLabelMaxWidth}px` }}
+                                     title={projectLabel}
                                    >
                                      {projectLabel}
                                    </div>
