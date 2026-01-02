@@ -818,10 +818,9 @@ const TaskTimer = () => {
                         >
                           {taskDetails.title}
                         </p>
-                        {taskDetails.is_workstation_task && <p className="text-xs text-blue-600">Workstation Task</p>}
                       </div> : lastWorkedTask ? <div>
                         <p 
-                          className={`font-medium text-xs text-gray-500 ${!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id ? 'cursor-pointer' : ''}`}
+                          className={`font-medium text-xs text-gray-500 truncate ${!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id ? 'cursor-pointer' : ''}`}
                           onClick={(e) => {
                             if (!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id) {
                               e.stopPropagation();
@@ -832,7 +831,7 @@ const TaskTimer = () => {
                           {lastWorkedTask.project_name}
                         </p>
                         <p 
-                          className={`text-xs text-gray-400 ${!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id ? 'cursor-pointer' : ''}`}
+                          className={`text-xs text-gray-400 truncate ${!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id ? 'cursor-pointer' : ''}`}
                           onClick={(e) => {
                             if (!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id) {
                               e.stopPropagation();
@@ -842,7 +841,6 @@ const TaskTimer = () => {
                         >
                           {lastWorkedTask.title}
                         </p>
-                        
                       </div> : <div>
                         <p className="font-medium text-xs text-gray-500">No Previous Task</p>
                         <p className="text-xs text-gray-400">Start from tasks page</p>
