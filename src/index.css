@@ -176,3 +176,16 @@
 .animate-marquee:hover {
   animation-play-state: paused;
 }
+
+@layer utilities {
+  /* Hide scrollbars while keeping scroll behavior */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+

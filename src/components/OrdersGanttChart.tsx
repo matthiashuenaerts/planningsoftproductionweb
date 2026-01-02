@@ -892,7 +892,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         )}
       </div>
 
-      <div className="overflow-x-auto overflow-y-visible flex-1" ref={timelineRef}>
+      <div className="overflow-x-auto overflow-y-visible flex-1 scrollbar-hide" ref={timelineRef}>
         <div className="relative w-full">
           {/* Team rows */}
           <div className="relative">
