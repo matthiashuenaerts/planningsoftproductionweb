@@ -1100,10 +1100,24 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                   left: `calc(100% / ${position.totalDays} * ${position.left})`,
                                   top: `${8 + idx * 32}px`,
                                   height: '28px',
-                                  flexDirection: placeOutsideLabelLeft && !labelFitsInside ? 'row-reverse' : 'row',
                                 }}
 
                               >
+                                 {/* Label outside bar on the LEFT if needed */}
+                                 {!labelFitsInside && placeOutsideLabelLeft && outsideLabelMaxWidth > 0 && (
+                                   <div
+                                     className="absolute bg-muted px-2 py-1 rounded text-xs font-medium text-muted-foreground shadow-sm truncate"
+                                     style={{ 
+                                       maxWidth: `${outsideLabelMaxWidth}px`,
+                                       right: '100%',
+                                       marginRight: '4px',
+                                     }}
+                                     title={projectLabel}
+                                   >
+                                     {projectLabel}
+                                   </div>
+                                 )}
+
                                  {/* Project bar */}
                                  <div
                                    className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto cursor-pointer"
@@ -1149,8 +1163,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                    </div>
                                  </div>
 
-                                 {/* Label outside bar if doesn't fit inside (clamped so it never creates horizontal overflow) */}
-                                 {!labelFitsInside && outsideLabelMaxWidth > 0 && (
+                                 {/* Label outside bar on the RIGHT if needed */}
+                                 {!labelFitsInside && !placeOutsideLabelLeft && outsideLabelMaxWidth > 0 && (
                                    <div
                                      className="bg-muted px-2 py-1 rounded text-xs font-medium text-muted-foreground shadow-sm truncate"
                                      style={{ maxWidth: `${outsideLabelMaxWidth}px` }}
