@@ -795,7 +795,8 @@ const TaskTimer = () => {
                   </div>
                   
                   <div className="min-w-0 flex-1">
-                    {activeRegistration && taskDetails ? <p 
+                    {activeRegistration && taskDetails ? <div>
+                        <p 
                           className={`font-medium text-xs truncate ${!taskDetails.is_workstation_task && taskDetails.project_id ? 'cursor-pointer' : ''}`}
                           onClick={(e) => {
                             if (!taskDetails.is_workstation_task && taskDetails.project_id) {
@@ -804,9 +805,23 @@ const TaskTimer = () => {
                             }
                           }}
                         >
-                          {taskDetails.project_name} - {taskDetails.title}{taskDetails.is_workstation_task ? ' (Workstation)' : ''}{taskDetails.duration != null ? ` (${taskDetails.duration} min)` : ''}
-                        </p> : lastWorkedTask ? <p 
-                          className={`font-medium text-xs text-muted-foreground truncate ${!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id ? 'cursor-pointer' : ''}`}
+                          {taskDetails.project_name}
+                        </p>
+                        <p 
+                          className={`text-xs text-gray-600 truncate ${!taskDetails.is_workstation_task && taskDetails.project_id ? 'cursor-pointer' : ''}`}
+                          onClick={(e) => {
+                            if (!taskDetails.is_workstation_task && taskDetails.project_id) {
+                              e.stopPropagation();
+                              navigate(createLocalizedPath(`/projects/${taskDetails.project_id}`));
+                            }
+                          }}
+                        >
+                          {taskDetails.title}
+                        </p>
+                        {taskDetails.is_workstation_task && <p className="text-xs text-blue-600">Workstation Task</p>}
+                      </div> : lastWorkedTask ? <div>
+                        <p 
+                          className={`font-medium text-xs text-gray-500 ${!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id ? 'cursor-pointer' : ''}`}
                           onClick={(e) => {
                             if (!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id) {
                               e.stopPropagation();
@@ -814,8 +829,24 @@ const TaskTimer = () => {
                             }
                           }}
                         >
-                          {lastWorkedTask.project_name} - {lastWorkedTask.title}
-                        </p> : <p className="font-medium text-xs text-muted-foreground">No Previous Task</p>}
+                          {lastWorkedTask.project_name}
+                        </p>
+                        <p 
+                          className={`text-xs text-gray-400 ${!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id ? 'cursor-pointer' : ''}`}
+                          onClick={(e) => {
+                            if (!lastWorkedTask.is_workstation_task && lastWorkedTask.project_id) {
+                              e.stopPropagation();
+                              navigate(createLocalizedPath(`/projects/${lastWorkedTask.project_id}`));
+                            }
+                          }}
+                        >
+                          {lastWorkedTask.title}
+                        </p>
+                        
+                      </div> : <div>
+                        <p className="font-medium text-xs text-gray-500">No Previous Task</p>
+                        <p className="text-xs text-gray-400">Start from tasks page</p>
+                      </div>}
                   </div>
                 </div>
                 
