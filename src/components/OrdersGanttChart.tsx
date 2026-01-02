@@ -1076,6 +1076,10 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                               project.employeesOnHoliday?.has(emp.id)
                             );
 
+                            // Check if label would overflow to the right
+                            const barEndPosition = (position.left + position.width) / position.totalDays;
+                            const labelWouldOverflow = barEndPosition > 0.85; // If bar ends past 85% of timeline, show label on left
+
                             return (
                               <div
                                 key={project.id}
@@ -1084,6 +1088,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                   left: `calc(100% / ${position.totalDays} * ${position.left})`,
                                   top: `${8 + idx * 32}px`,
                                   height: '28px',
+                                  flexDirection: labelWouldOverflow && !labelFitsInside ? 'row-reverse' : 'row',
                                 }}
 
                               >
@@ -1132,9 +1137,16 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                    </div>
                                  </div>
 
-                                 {/* Label to the right of bar if doesn't fit inside */}
+                                 {/* Label outside bar if doesn't fit inside */}
                                  {!labelFitsInside && (
-                                   <div className="bg-muted px-2 py-1 rounded text-xs font-medium text-muted-foreground whitespace-nowrap shadow-sm">
+                                   <div 
+                                     className="bg-muted px-2 py-1 rounded text-xs font-medium text-muted-foreground whitespace-nowrap shadow-sm"
+                                     style={{
+                                       transform: labelWouldOverflow ? 'translateX(-100%)' : 'none',
+                                       marginLeft: labelWouldOverflow ? '-8px' : '0',
+                                       marginRight: labelWouldOverflow ? '0' : '0',
+                                     }}
+                                   >
                                      {projectLabel}
                                    </div>
                                  )}
