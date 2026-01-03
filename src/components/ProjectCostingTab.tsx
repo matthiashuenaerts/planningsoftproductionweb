@@ -68,6 +68,7 @@ interface AccessoryCost {
   supplier?: string;
   quantity: number;
   unitPrice: number;
+  hasDbPrice: boolean; // true if price came from database
   status: string;
 }
 
@@ -312,15 +313,19 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
           .select('id, article_name, article_code, supplier, quantity, status, unit_price')
           .eq('project_id', projectId);
 
-        const accessories: AccessoryCost[] = (accessoriesData || []).map(acc => ({
-          id: acc.id,
-          articleName: acc.article_name,
-          articleCode: acc.article_code || undefined,
-          supplier: acc.supplier || undefined,
-          quantity: acc.quantity,
-          unitPrice: (acc as any).unit_price || 0,
-          status: acc.status
-        }));
+        const accessories: AccessoryCost[] = (accessoriesData || []).map(acc => {
+          const dbPrice = (acc as any).unit_price || 0;
+          return {
+            id: acc.id,
+            articleName: acc.article_name,
+            articleCode: acc.article_code || undefined,
+            supplier: acc.supplier || undefined,
+            quantity: acc.quantity,
+            unitPrice: dbPrice,
+            hasDbPrice: dbPrice > 0,
+            status: acc.status
+          };
+        });
 
         const totalAccessoryCost = accessories.reduce((sum, acc) => sum + (acc.unitPrice * acc.quantity), 0);
 
@@ -400,7 +405,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
       // Update local state
       if (costingSummary) {
         const updatedAccessories = costingSummary.accessories.map(acc =>
-          acc.id === accessoryId ? { ...acc, unitPrice } : acc
+          acc.id === accessoryId ? { ...acc, unitPrice, hasDbPrice: unitPrice > 0 } : acc
         );
         const totalAccessoryCost = updatedAccessories.reduce(
           (sum, acc) => sum + (acc.unitPrice * acc.quantity), 0
@@ -996,18 +1001,24 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     </TableCell>
                     <TableCell className="text-right">{acc.quantity}</TableCell>
                     <TableCell className="text-right">
-                      <div className="relative w-24 ml-auto">
-                        <Euro className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={acc.unitPrice || ''}
-                          onChange={(e) => updateAccessoryPrice(acc.id, parseFloat(e.target.value) || 0)}
-                          className="h-8 pl-6 text-right text-sm"
-                          placeholder="0.00"
-                        />
-                      </div>
+                      {acc.hasDbPrice ? (
+                        <span className="font-medium text-green-600">
+                          {formatCurrency(acc.unitPrice)}
+                        </span>
+                      ) : (
+                        <div className="relative w-24 ml-auto">
+                          <Euro className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={acc.unitPrice || ''}
+                            onChange={(e) => updateAccessoryPrice(acc.id, parseFloat(e.target.value) || 0)}
+                            className="h-8 pl-6 text-right text-sm"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {formatCurrency(acc.unitPrice * acc.quantity)}
