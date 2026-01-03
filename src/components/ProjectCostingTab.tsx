@@ -1373,17 +1373,17 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
           <Table>
             <TableBody>
               <TableRow>
-                <TableCell className="font-medium">{t('costing_labor_cost')}</TableCell>
-                <TableCell className="text-right">{formatCurrency(costingSummary.totalLaborCost)}</TableCell>
+                <TableCell className="font-medium">{t('costing_labor_cost')} ({margins.labor}%)</TableCell>
+                <TableCell className="text-right">{formatCurrency(costingSummary.totalLaborCost * (1 + margins.labor / 100))}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="font-medium">{t('costing_order_materials')}</TableCell>
-                <TableCell className="text-right">{formatCurrency(costingSummary.totalOrderCost)}</TableCell>
+                <TableCell className="font-medium">{t('costing_order_materials')} ({margins.orderMaterials}%)</TableCell>
+                <TableCell className="text-right">{formatCurrency(costingSummary.totalOrderCost * (1 + margins.orderMaterials / 100))}</TableCell>
               </TableRow>
               {costingSummary.totalAccessoryCost > 0 && (
                 <TableRow>
-                  <TableCell className="font-medium">{t('accessories')}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(costingSummary.totalAccessoryCost)}</TableCell>
+                  <TableCell className="font-medium">{t('accessories')} ({margins.accessories}%)</TableCell>
+                  <TableCell className="text-right">{formatCurrency(costingSummary.totalAccessoryCost * (1 + margins.accessories / 100))}</TableCell>
                 </TableRow>
               )}
               {additionalCosts.materialCost > 0 && (
