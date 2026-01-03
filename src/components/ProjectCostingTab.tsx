@@ -985,10 +985,10 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                   </Collapsible>
                 ))}
                 <div className="flex justify-between p-3 bg-primary/10 rounded-lg font-bold">
-                  <span>{t('total')}</span>
+                  <span>{t('total')} (+{margins.labor}%)</span>
                   <div className="flex items-center gap-6">
                     <span>{formatTime(costingSummary.totalLaborMinutes)}</span>
-                    <span className="text-primary">{formatCurrency(costingSummary.totalLaborCost)}</span>
+                    <span className="text-primary">{formatCurrency(costingSummary.totalLaborCost * (1 + margins.labor / 100))}</span>
                   </div>
                 </div>
               </div>
