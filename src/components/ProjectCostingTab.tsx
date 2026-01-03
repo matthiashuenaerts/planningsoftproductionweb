@@ -51,6 +51,7 @@ interface TaskCostSummary {
 }
 
 interface OrderItemCost {
+  id: string;
   orderId: string;
   orderNumber?: string;
   supplier: string;
@@ -307,6 +308,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
           items.forEach(item => {
             const totalPrice = item.total_price || (item.quantity * (item.unit_price || 0));
             orderItems.push({
+              id: item.id,
               orderId: order.id,
               orderNumber: order.external_order_number || undefined,
               supplier: order.supplier,
@@ -479,10 +481,13 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
 
   const calculateTotalCost = () => {
     if (!costingSummary) return 0;
+    const laborWithMargin = costingSummary.totalLaborCost * (1 + margins.labor / 100);
+    const orderWithMargin = costingSummary.totalOrderCost * (1 + margins.orderMaterials / 100);
+    const accessoriesWithMargin = costingSummary.totalAccessoryCost * (1 + margins.accessories / 100);
     return (
-      costingSummary.totalLaborCost +
-      costingSummary.totalOrderCost +
-      costingSummary.totalAccessoryCost +
+      laborWithMargin +
+      orderWithMargin +
+      accessoriesWithMargin +
       additionalCosts.materialCost +
       additionalCosts.officePreparationCost +
       additionalCosts.transportInstallationCost +
@@ -516,6 +521,35 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
       }
     } catch (error) {
       console.error('Error updating accessory price:', error);
+    }
+  };
+
+  const updateOrderItemPrice = async (itemId: string, unitPrice: number) => {
+    try {
+      const { error } = await supabase
+        .from('order_items')
+        .update({ unit_price: unitPrice })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      if (costingSummary) {
+        const updatedOrderItems = costingSummary.orderItems.map(item =>
+          item.id === itemId ? { ...item, unitPrice, totalPrice: unitPrice * item.quantity } : item
+        );
+        const totalOrderCost = updatedOrderItems.reduce(
+          (sum, item) => sum + item.totalPrice, 0
+        );
+        setCostingSummary({
+          ...costingSummary,
+          orderItems: updatedOrderItems,
+          totalOrderCost,
+          totalProjectCost: costingSummary.totalLaborCost + totalOrderCost + costingSummary.totalAccessoryCost
+        });
+      }
+    } catch (error) {
+      console.error('Error updating order item price:', error);
     }
   };
 
@@ -1023,7 +1057,12 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                   <span>{t('total')}</span>
                   <div className="flex items-center gap-6">
                     <span>{formatTime(costingSummary.totalLaborMinutes)}</span>
-                    <span className="text-primary">{formatCurrency(costingSummary.totalLaborCost)}</span>
+                    <div className="flex flex-col items-end">
+                      <span className="text-primary">{formatCurrency(costingSummary.totalLaborCost)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        + {margins.labor}% = {formatCurrency(costingSummary.totalLaborCost * (1 + margins.labor / 100))}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1073,21 +1112,41 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {costingSummary.orderItems.map((item, idx) => (
-                  <TableRow key={idx}>
+                {costingSummary.orderItems.map((item) => (
+                  <TableRow key={item.id}>
                     <TableCell>
                       <Badge variant="outline">{item.supplier}</Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{item.articleCode || '-'}</TableCell>
                     <TableCell className="max-w-[200px] truncate">{item.description}</TableCell>
                     <TableCell className="text-right">{item.quantity}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="relative w-24 ml-auto">
+                        <Euro className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.unitPrice || ''}
+                          onChange={(e) => updateOrderItemPrice(item.id, parseFloat(e.target.value) || 0)}
+                          className="h-8 pl-6 text-right text-sm"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(item.totalPrice)}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/50 font-bold">
                   <TableCell colSpan={5}>{t('costing_total_materials')}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(costingSummary.totalOrderCost)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex flex-col items-end">
+                      <span>{formatCurrency(costingSummary.totalOrderCost)}</span>
+                      <span className="text-xs text-muted-foreground font-normal">
+                        + {margins.orderMaterials}% = {formatCurrency(costingSummary.totalOrderCost * (1 + margins.orderMaterials / 100))}
+                      </span>
+                    </div>
+                  </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -1185,7 +1244,14 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                 ))}
                 <TableRow className="bg-muted/50 font-bold">
                   <TableCell colSpan={5}>{t('costing_total_accessories')}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(costingSummary.totalAccessoryCost)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex flex-col items-end">
+                      <span>{formatCurrency(costingSummary.totalAccessoryCost)}</span>
+                      <span className="text-xs text-muted-foreground font-normal">
+                        + {margins.accessories}% = {formatCurrency(costingSummary.totalAccessoryCost * (1 + margins.accessories / 100))}
+                      </span>
+                    </div>
+                  </TableCell>
                   <TableCell></TableCell>
                 </TableRow>
               </TableBody>
