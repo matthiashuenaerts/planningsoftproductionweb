@@ -67,6 +67,7 @@ interface AccessoryCost {
   articleCode?: string;
   supplier?: string;
   quantity: number;
+  unitPrice: number;
   status: string;
 }
 
@@ -90,6 +91,7 @@ interface CostingSummary {
   
   // Accessories
   accessories: AccessoryCost[];
+  totalAccessoryCost: number;
   
   // Calculated totals
   totalProjectCost: number;
@@ -304,10 +306,10 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
           });
         });
 
-        // Fetch accessories
+        // Fetch accessories with unit_price
         const { data: accessoriesData } = await supabase
           .from('accessories')
-          .select('id, article_name, article_code, supplier, quantity, status')
+          .select('id, article_name, article_code, supplier, quantity, status, unit_price')
           .eq('project_id', projectId);
 
         const accessories: AccessoryCost[] = (accessoriesData || []).map(acc => ({
@@ -316,8 +318,11 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
           articleCode: acc.article_code || undefined,
           supplier: acc.supplier || undefined,
           quantity: acc.quantity,
+          unitPrice: (acc as any).unit_price || 0,
           status: acc.status
         }));
+
+        const totalAccessoryCost = accessories.reduce((sum, acc) => sum + (acc.unitPrice * acc.quantity), 0);
 
         setCostingSummary({
           totalLaborMinutes,
@@ -327,7 +332,8 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
           orderItems,
           totalOrderCost,
           accessories,
-          totalProjectCost: totalLaborCost + totalOrderCost
+          totalAccessoryCost,
+          totalProjectCost: totalLaborCost + totalOrderCost + totalAccessoryCost
         });
       } catch (error) {
         console.error('Error fetching costing data:', error);
@@ -374,11 +380,41 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
     return (
       costingSummary.totalLaborCost +
       costingSummary.totalOrderCost +
+      costingSummary.totalAccessoryCost +
       additionalCosts.materialCost +
       additionalCosts.officePreparationCost +
       additionalCosts.transportInstallationCost +
       additionalCosts.otherCost
     );
+  };
+
+  const updateAccessoryPrice = async (accessoryId: string, unitPrice: number) => {
+    try {
+      const { error } = await supabase
+        .from('accessories')
+        .update({ unit_price: unitPrice })
+        .eq('id', accessoryId);
+
+      if (error) throw error;
+
+      // Update local state
+      if (costingSummary) {
+        const updatedAccessories = costingSummary.accessories.map(acc =>
+          acc.id === accessoryId ? { ...acc, unitPrice } : acc
+        );
+        const totalAccessoryCost = updatedAccessories.reduce(
+          (sum, acc) => sum + (acc.unitPrice * acc.quantity), 0
+        );
+        setCostingSummary({
+          ...costingSummary,
+          accessories: updatedAccessories,
+          totalAccessoryCost,
+          totalProjectCost: costingSummary.totalLaborCost + costingSummary.totalOrderCost + totalAccessoryCost
+        });
+      }
+    } catch (error) {
+      console.error('Error updating accessory price:', error);
+    }
   };
 
   const calculateProfit = () => {
@@ -447,6 +483,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
     const costs = [
       [t('costing_labor_cost'), formatCurrency(costingSummary.totalLaborCost)],
       [t('costing_order_materials'), formatCurrency(costingSummary.totalOrderCost)],
+      [t('accessories'), formatCurrency(costingSummary.totalAccessoryCost)],
       [t('costing_additional_materials'), formatCurrency(additionalCosts.materialCost)],
       [t('costing_office_preparation'), formatCurrency(additionalCosts.officePreparationCost)],
       [t('costing_transport_installation'), formatCurrency(additionalCosts.transportInstallationCost)],
@@ -557,7 +594,48 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
       });
     }
 
-    // Footer
+    // Accessories Section
+    if (costingSummary.accessories.length > 0) {
+      yPos += 10;
+      if (yPos > 250) {
+        doc.addPage();
+        yPos = 20;
+      }
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(t('accessories'), margin, yPos);
+      yPos += 8;
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text(t('article_code'), margin, yPos);
+      doc.text(t('description'), margin + 35, yPos);
+      doc.text(t('quantity'), margin + 110, yPos);
+      doc.text(t('costing_unit_price'), margin + 130, yPos);
+      doc.text(t('total'), pageWidth - margin, yPos, { align: 'right' });
+      yPos += 6;
+
+      doc.setFont('helvetica', 'normal');
+      costingSummary.accessories.forEach(acc => {
+        if (yPos > 270) {
+          doc.addPage();
+          yPos = 20;
+        }
+        doc.text((acc.articleCode || '-').substring(0, 15), margin, yPos);
+        doc.text(acc.articleName.substring(0, 35), margin + 35, yPos);
+        doc.text(acc.quantity.toString(), margin + 110, yPos);
+        doc.text(formatCurrency(acc.unitPrice), margin + 130, yPos);
+        doc.text(formatCurrency(acc.unitPrice * acc.quantity), pageWidth - margin, yPos, { align: 'right' });
+        yPos += 5;
+      });
+
+      // Total row
+      yPos += 3;
+      doc.setFont('helvetica', 'bold');
+      doc.text(t('costing_total_accessories'), margin, yPos);
+      doc.text(formatCurrency(costingSummary.totalAccessoryCost), pageWidth - margin, yPos, { align: 'right' });
+    }
     const pageCount = doc.internal.pages.length - 1;
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
@@ -611,7 +689,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
@@ -630,7 +708,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
               <Users className="h-5 w-5 text-blue-500" />
               <div>
                 <p className="text-sm text-muted-foreground">{t('costing_labor_cost')}</p>
-                <p className="text-2xl font-bold">{formatCurrency(costingSummary.totalLaborCost)}</p>
+                <p className="text-xl font-bold">{formatCurrency(costingSummary.totalLaborCost)}</p>
               </div>
             </div>
           </CardContent>
@@ -642,7 +720,19 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
               <ShoppingCart className="h-5 w-5 text-orange-500" />
               <div>
                 <p className="text-sm text-muted-foreground">{t('costing_order_materials')}</p>
-                <p className="text-2xl font-bold">{formatCurrency(costingSummary.totalOrderCost)}</p>
+                <p className="text-xl font-bold">{formatCurrency(costingSummary.totalOrderCost)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-purple-500" />
+              <div>
+                <p className="text-sm text-muted-foreground">{t('accessories')}</p>
+                <p className="text-xl font-bold">{formatCurrency(costingSummary.totalAccessoryCost)}</p>
               </div>
             </div>
           </CardContent>
@@ -654,7 +744,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
               <TrendingUp className="h-5 w-5 text-primary" />
               <div>
                 <p className="text-sm text-muted-foreground">{t('costing_total_cost')}</p>
-                <p className="text-2xl font-bold text-primary">{formatCurrency(totalCost)}</p>
+                <p className="text-xl font-bold text-primary">{formatCurrency(totalCost)}</p>
               </div>
             </div>
           </CardContent>
@@ -878,6 +968,9 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
             <CardTitle className="flex items-center gap-2">
               <Wrench className="h-5 w-5" />
               {t('accessories')}
+              <Badge variant="secondary" className="ml-2">
+                {formatCurrency(costingSummary.totalAccessoryCost)}
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -888,6 +981,8 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                   <TableHead>{t('description')}</TableHead>
                   <TableHead>{t('supplier')}</TableHead>
                   <TableHead className="text-right">{t('quantity')}</TableHead>
+                  <TableHead className="text-right">{t('costing_unit_price')}</TableHead>
+                  <TableHead className="text-right">{t('total')}</TableHead>
                   <TableHead>{t('status')}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -895,11 +990,28 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                 {costingSummary.accessories.map((acc) => (
                   <TableRow key={acc.id}>
                     <TableCell className="text-muted-foreground">{acc.articleCode || '-'}</TableCell>
-                    <TableCell>{acc.articleName}</TableCell>
+                    <TableCell className="max-w-[200px] truncate">{acc.articleName}</TableCell>
                     <TableCell>
                       {acc.supplier && <Badge variant="outline">{acc.supplier}</Badge>}
                     </TableCell>
                     <TableCell className="text-right">{acc.quantity}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="relative w-24 ml-auto">
+                        <Euro className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={acc.unitPrice || ''}
+                          onChange={(e) => updateAccessoryPrice(acc.id, parseFloat(e.target.value) || 0)}
+                          className="h-8 pl-6 text-right text-sm"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(acc.unitPrice * acc.quantity)}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={
                         acc.status === 'delivered' ? 'default' :
@@ -912,6 +1024,11 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     </TableCell>
                   </TableRow>
                 ))}
+                <TableRow className="bg-muted/50 font-bold">
+                  <TableCell colSpan={5}>{t('costing_total_accessories')}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(costingSummary.totalAccessoryCost)}</TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </CardContent>
@@ -1038,6 +1155,12 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                 <TableCell className="font-medium">{t('costing_order_materials')}</TableCell>
                 <TableCell className="text-right">{formatCurrency(costingSummary.totalOrderCost)}</TableCell>
               </TableRow>
+              {costingSummary.totalAccessoryCost > 0 && (
+                <TableRow>
+                  <TableCell className="font-medium">{t('accessories')}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(costingSummary.totalAccessoryCost)}</TableCell>
+                </TableRow>
+              )}
               {additionalCosts.materialCost > 0 && (
                 <TableRow>
                   <TableCell className="font-medium">{t('costing_additional_materials')}</TableCell>
