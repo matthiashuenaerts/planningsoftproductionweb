@@ -2352,10 +2352,13 @@ export type Database = {
       }
       project_costing: {
         Row: {
+          accessories_margin_percentage: number | null
           created_at: string
           id: string
+          labor_margin_percentage: number | null
           material_cost: number | null
           office_preparation_cost: number | null
+          order_materials_margin_percentage: number | null
           other_cost: number | null
           project_id: string
           sales_price: number | null
@@ -2363,10 +2366,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accessories_margin_percentage?: number | null
           created_at?: string
           id?: string
+          labor_margin_percentage?: number | null
           material_cost?: number | null
           office_preparation_cost?: number | null
+          order_materials_margin_percentage?: number | null
           other_cost?: number | null
           project_id: string
           sales_price?: number | null
@@ -2374,10 +2380,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accessories_margin_percentage?: number | null
           created_at?: string
           id?: string
+          labor_margin_percentage?: number | null
           material_cost?: number | null
           office_preparation_cost?: number | null
+          order_materials_margin_percentage?: number | null
           other_cost?: number | null
           project_id?: string
           sales_price?: number | null
