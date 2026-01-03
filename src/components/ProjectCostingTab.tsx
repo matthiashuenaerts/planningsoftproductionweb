@@ -79,6 +79,12 @@ interface AdditionalCosts {
   otherCost: number;
 }
 
+interface MarginPercentages {
+  labor: number;
+  orderMaterials: number;
+  accessories: number;
+}
+
 interface CostingSummary {
   // Labor
   totalLaborMinutes: number;
@@ -122,6 +128,11 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
   });
   const [salesPrice, setSalesPrice] = useState<number>(0);
   const [costingId, setCostingId] = useState<string | null>(null);
+  const [margins, setMargins] = useState<MarginPercentages>({
+    labor: 35,
+    orderMaterials: 35,
+    accessories: 35
+  });
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { t } = useLanguage();
 
@@ -359,6 +370,11 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
             otherCost: Number(costingData.other_cost) || 0
           });
           setSalesPrice(Number(costingData.sales_price) || 0);
+          setMargins({
+            labor: Number(costingData.labor_margin_percentage) ?? 35,
+            orderMaterials: Number(costingData.order_materials_margin_percentage) ?? 35,
+            accessories: Number(costingData.accessories_margin_percentage) ?? 35
+          });
         }
       } catch (error) {
         console.error('Error fetching costing data:', error);
@@ -373,7 +389,8 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
   // Save costing parameters to database with debouncing
   const saveCostingData = useCallback(async (
     costs: AdditionalCosts,
-    price: number
+    price: number,
+    marginData: MarginPercentages
   ) => {
     try {
       const costingRecord = {
@@ -382,7 +399,10 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
         office_preparation_cost: costs.officePreparationCost,
         transport_installation_cost: costs.transportInstallationCost,
         other_cost: costs.otherCost,
-        sales_price: price
+        sales_price: price,
+        labor_margin_percentage: marginData.labor,
+        order_materials_margin_percentage: marginData.orderMaterials,
+        accessories_margin_percentage: marginData.accessories
       };
 
       if (costingId) {
@@ -408,7 +428,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
     }
   }, [projectId, costingId]);
 
-  // Debounced save when costs or sales price change
+  // Debounced save when costs, sales price, or margins change
   useEffect(() => {
     if (loading) return; // Don't save during initial load
     
@@ -417,7 +437,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
     }
     
     saveTimeoutRef.current = setTimeout(() => {
-      saveCostingData(additionalCosts, salesPrice);
+      saveCostingData(additionalCosts, salesPrice, margins);
     }, 500);
 
     return () => {
@@ -425,7 +445,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [additionalCosts, salesPrice, saveCostingData, loading]);
+  }, [additionalCosts, salesPrice, margins, saveCostingData, loading]);
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -836,28 +856,45 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
       {/* Labor Breakdown */}
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center flex-wrap gap-4">
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
               {t('costing_labor_breakdown')}
             </CardTitle>
-            <div className="flex gap-2">
-              <Button 
-                variant={viewMode === 'employee' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setViewMode('employee')}
-              >
-                <Users className="h-4 w-4 mr-1" />
-                {t('costing_by_employee')}
-              </Button>
-              <Button 
-                variant={viewMode === 'task' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setViewMode('task')}
-              >
-                <FileText className="h-4 w-4 mr-1" />
-                {t('costing_by_task')}
-              </Button>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Marge:</span>
+                <div className="relative w-20">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={margins.labor}
+                    onChange={(e) => setMargins(prev => ({ ...prev, labor: parseFloat(e.target.value) || 0 }))}
+                    className="h-8 pr-6 text-right text-sm"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  variant={viewMode === 'employee' ? 'default' : 'outline'} 
+                  size="sm"
+                  onClick={() => setViewMode('employee')}
+                >
+                  <Users className="h-4 w-4 mr-1" />
+                  {t('costing_by_employee')}
+                </Button>
+                <Button 
+                  variant={viewMode === 'task' ? 'default' : 'outline'} 
+                  size="sm"
+                  onClick={() => setViewMode('task')}
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  {t('costing_by_task')}
+                </Button>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -1000,10 +1037,27 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
       {/* Order Materials */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5" />
-            {t('costing_order_materials')}
-          </CardTitle>
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <CardTitle className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5" />
+              {t('costing_order_materials')}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Marge:</span>
+              <div className="relative w-20">
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={margins.orderMaterials}
+                  onChange={(e) => setMargins(prev => ({ ...prev, orderMaterials: parseFloat(e.target.value) || 0 }))}
+                  className="h-8 pr-6 text-right text-sm"
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+              </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {costingSummary.orderItems.length > 0 ? (
@@ -1047,13 +1101,30 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
       {costingSummary.accessories.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wrench className="h-5 w-5" />
-              {t('accessories')}
-              <Badge variant="secondary" className="ml-2">
-                {formatCurrency(costingSummary.totalAccessoryCost)}
-              </Badge>
-            </CardTitle>
+            <div className="flex justify-between items-center flex-wrap gap-4">
+              <CardTitle className="flex items-center gap-2">
+                <Wrench className="h-5 w-5" />
+                {t('accessories')}
+                <Badge variant="secondary" className="ml-2">
+                  {formatCurrency(costingSummary.totalAccessoryCost)}
+                </Badge>
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Marge:</span>
+                <div className="relative w-20">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={margins.accessories}
+                    onChange={(e) => setMargins(prev => ({ ...prev, accessories: parseFloat(e.target.value) || 0 }))}
+                    className="h-8 pr-6 text-right text-sm"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                </div>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
