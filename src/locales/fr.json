@@ -864,5 +864,6 @@
   "to_order": "À Commander",
   "ordered": "Commandé",
   "in_stock": "En Stock",
-  "delivered": "Livré"
+  "delivered": "Livré",
+  "costing_total_accessories": "Total Accessoires"
 }

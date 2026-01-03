@@ -864,5 +864,6 @@
   "to_order": "Te Bestellen",
   "ordered": "Besteld",
   "in_stock": "In Voorraad",
-  "delivered": "Geleverd"
+  "delivered": "Geleverd",
+  "costing_total_accessories": "Totaal Accessoires"
 }

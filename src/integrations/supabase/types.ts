@@ -28,6 +28,7 @@ export type Database = {
           status: string
           stock_location: string | null
           supplier: string | null
+          unit_price: number | null
           updated_at: string
         }
         Insert: {
@@ -43,6 +44,7 @@ export type Database = {
           status?: string
           stock_location?: string | null
           supplier?: string | null
+          unit_price?: number | null
           updated_at?: string
         }
         Update: {
@@ -58,6 +60,7 @@ export type Database = {
           status?: string
           stock_location?: string | null
           supplier?: string | null
+          unit_price?: number | null
           updated_at?: string
         }
         Relationships: [
