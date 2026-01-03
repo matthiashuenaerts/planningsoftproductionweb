@@ -1208,24 +1208,18 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     </TableCell>
                     <TableCell className="text-right">{acc.quantity}</TableCell>
                     <TableCell className="text-right">
-                      {acc.hasDbPrice ? (
-                        <span className="font-medium text-green-600">
-                          {formatCurrency(acc.unitPrice)}
-                        </span>
-                      ) : (
-                        <div className="relative w-24 ml-auto">
-                          <Euro className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={acc.unitPrice || ''}
-                            onChange={(e) => updateAccessoryPrice(acc.id, parseFloat(e.target.value) || 0)}
-                            className="h-8 pl-6 text-right text-sm"
-                            placeholder="0.00"
-                          />
-                        </div>
-                      )}
+                      <div className="relative w-24 ml-auto">
+                        <Euro className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={acc.unitPrice || ''}
+                          onChange={(e) => updateAccessoryPrice(acc.id, parseFloat(e.target.value) || 0)}
+                          className="h-8 pl-6 text-right text-sm"
+                          placeholder="0.00"
+                        />
+                      </div>
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {formatCurrency(acc.unitPrice * acc.quantity)}
