@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -121,6 +121,8 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
     otherCost: 0
   });
   const [salesPrice, setSalesPrice] = useState<number>(0);
+  const [costingId, setCostingId] = useState<string | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { t } = useLanguage();
 
   useEffect(() => {
@@ -340,6 +342,24 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
           totalAccessoryCost,
           totalProjectCost: totalLaborCost + totalOrderCost + totalAccessoryCost
         });
+
+        // Fetch project costing parameters
+        const { data: costingData } = await supabase
+          .from('project_costing')
+          .select('*')
+          .eq('project_id', projectId)
+          .single();
+
+        if (costingData) {
+          setCostingId(costingData.id);
+          setAdditionalCosts({
+            materialCost: Number(costingData.material_cost) || 0,
+            officePreparationCost: Number(costingData.office_preparation_cost) || 0,
+            transportInstallationCost: Number(costingData.transport_installation_cost) || 0,
+            otherCost: Number(costingData.other_cost) || 0
+          });
+          setSalesPrice(Number(costingData.sales_price) || 0);
+        }
       } catch (error) {
         console.error('Error fetching costing data:', error);
       } finally {
@@ -349,6 +369,63 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
 
     fetchCostingData();
   }, [projectId, t]);
+
+  // Save costing parameters to database with debouncing
+  const saveCostingData = useCallback(async (
+    costs: AdditionalCosts,
+    price: number
+  ) => {
+    try {
+      const costingRecord = {
+        project_id: projectId,
+        material_cost: costs.materialCost,
+        office_preparation_cost: costs.officePreparationCost,
+        transport_installation_cost: costs.transportInstallationCost,
+        other_cost: costs.otherCost,
+        sales_price: price
+      };
+
+      if (costingId) {
+        // Update existing record
+        await supabase
+          .from('project_costing')
+          .update(costingRecord)
+          .eq('id', costingId);
+      } else {
+        // Create new record
+        const { data } = await supabase
+          .from('project_costing')
+          .insert(costingRecord)
+          .select('id')
+          .single();
+        
+        if (data) {
+          setCostingId(data.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving costing data:', error);
+    }
+  }, [projectId, costingId]);
+
+  // Debounced save when costs or sales price change
+  useEffect(() => {
+    if (loading) return; // Don't save during initial load
+    
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    saveTimeoutRef.current = setTimeout(() => {
+      saveCostingData(additionalCosts, salesPrice);
+    }, 500);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [additionalCosts, salesPrice, saveCostingData, loading]);
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
