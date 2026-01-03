@@ -2350,6 +2350,50 @@ export type Database = {
           },
         ]
       }
+      project_costing: {
+        Row: {
+          created_at: string
+          id: string
+          material_cost: number | null
+          office_preparation_cost: number | null
+          other_cost: number | null
+          project_id: string
+          sales_price: number | null
+          transport_installation_cost: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          material_cost?: number | null
+          office_preparation_cost?: number | null
+          other_cost?: number | null
+          project_id: string
+          sales_price?: number | null
+          transport_installation_cost?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          material_cost?: number | null
+          office_preparation_cost?: number | null
+          other_cost?: number | null
+          project_id?: string
+          sales_price?: number | null
+          transport_installation_cost?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_costing_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_loading_overrides: {
         Row: {
           created_at: string
