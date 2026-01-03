@@ -562,64 +562,136 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
     return ((salesPrice - calculateTotalCost()) / salesPrice) * 100;
   };
 
-  const exportToPdf = () => {
+  // Draw branded header for PDF exports
+  const drawBrandedHeader = async (pdf: any, pageWidth: number, margin: number): Promise<number> => {
+    let yPos = margin;
+    const brandColor = { r: 45, g: 115, b: 135 }; // Teal color from logo
+    
+    // Load and add logo image
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      
+      await new Promise<void>((resolve, reject) => {
+        logoImg.onload = () => resolve();
+        logoImg.onerror = () => reject(new Error('Failed to load logo'));
+        logoImg.src = '/images/automattion-compass-logo.png';
+      });
+      
+      // Add logo to PDF (centered)
+      const logoWidth = 30;
+      const logoHeight = 30;
+      const logoX = (pageWidth - logoWidth) / 2;
+      pdf.addImage(logoImg, 'PNG', logoX, yPos, logoWidth, logoHeight);
+      yPos += logoHeight + 5;
+    } catch (error) {
+      console.warn('Could not load logo, using placeholder');
+      yPos += 35;
+    }
+    
+    // Company name
+    pdf.setFontSize(18);
+    pdf.setFont('helvetica', 'bolditalic');
+    pdf.setTextColor(brandColor.r, brandColor.g, brandColor.b);
+    pdf.text('AutoMattiOn', pageWidth / 2 - 2, yPos, { align: 'right' });
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(80, 180, 210);
+    pdf.text(' Compass', pageWidth / 2 - 2, yPos, { align: 'left' });
+    yPos += 6;
+    
+    // Slogan
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'italic');
+    pdf.setTextColor(80, 180, 210);
+    pdf.text('Guiding your production to perfection!', pageWidth / 2, yPos, { align: 'center' });
+    pdf.setTextColor(0, 0, 0);
+    yPos += 10;
+    
+    // Divider line
+    pdf.setDrawColor(brandColor.r, brandColor.g, brandColor.b);
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 8;
+    
+    return yPos;
+  };
+
+  const exportToPdf = async () => {
     if (!costingSummary || !projectInfo) return;
 
     const doc = new jsPDF();
-    let yPos = 20;
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 15;
     const contentWidth = pageWidth - 2 * margin;
+    const brandColor = { r: 45, g: 115, b: 135 };
+
+    // Draw branded header
+    let yPos = await drawBrandedHeader(doc, pageWidth, margin);
 
     // Title
-    doc.setFontSize(18);
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
     doc.text(t('costing_project_report'), pageWidth / 2, yPos, { align: 'center' });
-    yPos += 15;
+    yPos += 10;
 
-    // Project Info
-    doc.setFontSize(12);
+    // Project Info Box
+    doc.setFillColor(245, 245, 245);
+    doc.roundedRect(margin, yPos, contentWidth, 28, 3, 3, 'F');
+    yPos += 8;
+
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text(t('project'), margin, yPos);
+    doc.setTextColor(brandColor.r, brandColor.g, brandColor.b);
+    doc.text(t('project') + ':', margin + 5, yPos);
+    doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'normal');
     doc.text(projectInfo.name, margin + 30, yPos);
-    yPos += 7;
+    yPos += 6;
     
     doc.setFont('helvetica', 'bold');
-    doc.text(t('client_label'), margin, yPos);
+    doc.setTextColor(brandColor.r, brandColor.g, brandColor.b);
+    doc.text(t('client_label') + ':', margin + 5, yPos);
+    doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'normal');
     doc.text(projectInfo.client || '-', margin + 30, yPos);
-    yPos += 7;
-
-    if (projectInfo.startDate) {
-      doc.setFont('helvetica', 'bold');
-      doc.text(t('start_date'), margin, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(new Date(projectInfo.startDate).toLocaleDateString(), margin + 30, yPos);
-      yPos += 7;
-    }
 
     if (projectInfo.installationDate) {
       doc.setFont('helvetica', 'bold');
-      doc.text(t('installation_date'), margin, yPos);
+      doc.setTextColor(brandColor.r, brandColor.g, brandColor.b);
+      doc.text(t('installation_date') + ':', margin + contentWidth / 2, yPos);
+      doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'normal');
-      doc.text(new Date(projectInfo.installationDate).toLocaleDateString(), margin + 30, yPos);
-      yPos += 7;
+      doc.text(new Date(projectInfo.installationDate).toLocaleDateString(), margin + contentWidth / 2 + 35, yPos);
     }
+    yPos += 6;
 
-    yPos += 10;
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`${t('generated')}: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, margin + 5, yPos);
+    doc.setTextColor(0, 0, 0);
+    yPos += 12;
 
-    // Cost Summary Section
-    doc.setFontSize(14);
+    // Cost Summary Section Header
+    doc.setFillColor(brandColor.r, brandColor.g, brandColor.b);
+    doc.rect(margin, yPos, contentWidth, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text(t('costing_cost_summary'), margin, yPos);
-    yPos += 10;
+    doc.text(t('costing_cost_summary'), margin + 5, yPos + 5.5);
+    doc.setTextColor(0, 0, 0);
+    yPos += 14;
 
+    // Cost rows with margins
     doc.setFontSize(10);
+    const laborWithMargin = costingSummary.totalLaborCost * (1 + margins.labor / 100);
+    const orderWithMargin = costingSummary.totalOrderCost * (1 + margins.orderMaterials / 100);
+    const accessoriesWithMargin = costingSummary.totalAccessoryCost * (1 + margins.accessories / 100);
+
     const costs = [
-      [t('costing_labor_cost'), formatCurrency(costingSummary.totalLaborCost)],
-      [t('costing_order_materials'), formatCurrency(costingSummary.totalOrderCost)],
-      [t('accessories'), formatCurrency(costingSummary.totalAccessoryCost)],
+      [t('costing_labor_cost') + ` (+${margins.labor}%)`, formatCurrency(laborWithMargin)],
+      [t('costing_order_materials') + ` (+${margins.orderMaterials}%)`, formatCurrency(orderWithMargin)],
+      [t('accessories') + ` (+${margins.accessories}%)`, formatCurrency(accessoriesWithMargin)],
       [t('costing_additional_materials'), formatCurrency(additionalCosts.materialCost)],
       [t('costing_office_preparation'), formatCurrency(additionalCosts.officePreparationCost)],
       [t('costing_transport_installation'), formatCurrency(additionalCosts.transportInstallationCost)],
@@ -627,51 +699,66 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
     ];
 
     doc.setFont('helvetica', 'normal');
-    costs.forEach(([label, value]) => {
-      doc.text(label, margin, yPos);
-      doc.text(value, pageWidth - margin, yPos, { align: 'right' });
+    costs.forEach(([label, value], index) => {
+      if (index % 2 === 0) {
+        doc.setFillColor(250, 250, 250);
+        doc.rect(margin, yPos - 3.5, contentWidth, 6, 'F');
+      }
+      doc.text(label, margin + 3, yPos);
+      doc.text(value, pageWidth - margin - 3, yPos, { align: 'right' });
       yPos += 6;
     });
 
-    yPos += 3;
-    doc.setDrawColor(0);
+    yPos += 2;
+    doc.setDrawColor(brandColor.r, brandColor.g, brandColor.b);
+    doc.setLineWidth(0.5);
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 7;
 
+    // Total row
+    doc.setFillColor(brandColor.r, brandColor.g, brandColor.b);
+    doc.rect(margin, yPos - 4, contentWidth, 8, 'F');
+    doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
-    doc.text(t('costing_total_cost'), margin, yPos);
-    doc.text(formatCurrency(calculateTotalCost()), pageWidth - margin, yPos, { align: 'right' });
-    yPos += 10;
+    doc.text(t('costing_total_cost'), margin + 5, yPos);
+    doc.text(formatCurrency(calculateTotalCost()), pageWidth - margin - 5, yPos, { align: 'right' });
+    doc.setTextColor(0, 0, 0);
+    yPos += 12;
 
     if (salesPrice > 0) {
+      doc.setFont('helvetica', 'bold');
       doc.text(t('costing_sales_price'), margin, yPos);
       doc.text(formatCurrency(salesPrice), pageWidth - margin, yPos, { align: 'right' });
       yPos += 7;
 
       const profit = calculateProfit();
       const profitMargin = calculateProfitMargin();
-      doc.setTextColor(profit >= 0 ? 0 : 255, profit >= 0 ? 128 : 0, 0);
+      doc.setTextColor(profit >= 0 ? 0 : 200, profit >= 0 ? 128 : 0, 0);
       doc.text(t('costing_profit'), margin, yPos);
       doc.text(`${formatCurrency(profit)} (${profitMargin.toFixed(1)}%)`, pageWidth - margin, yPos, { align: 'right' });
-      doc.setTextColor(0);
+      doc.setTextColor(0, 0, 0);
     }
 
     yPos += 15;
 
-    // Labor Details
+    // Labor Details Section
     if (costingSummary.employeeCosts.length > 0) {
-      // Check if we need a new page
-      if (yPos > 250) {
+      if (yPos > 240) {
         doc.addPage();
         yPos = 20;
       }
 
-      doc.setFontSize(12);
+      doc.setFillColor(brandColor.r, brandColor.g, brandColor.b);
+      doc.rect(margin, yPos, contentWidth, 8, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text(t('costing_labor_breakdown'), margin, yPos);
-      yPos += 8;
+      doc.text(t('costing_labor_breakdown'), margin + 5, yPos + 5.5);
+      doc.setTextColor(0, 0, 0);
+      yPos += 12;
 
+      // Table headers
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
       doc.text(t('employee'), margin, yPos);
@@ -681,10 +768,14 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
       yPos += 6;
 
       doc.setFont('helvetica', 'normal');
-      costingSummary.employeeCosts.forEach(emp => {
+      costingSummary.employeeCosts.forEach((emp, index) => {
         if (yPos > 270) {
           doc.addPage();
           yPos = 20;
+        }
+        if (index % 2 === 0) {
+          doc.setFillColor(250, 250, 250);
+          doc.rect(margin, yPos - 3.5, contentWidth, 5, 'F');
         }
         doc.text(emp.employeeName.substring(0, 30), margin, yPos);
         doc.text(emp.taskCount.toString(), margin + 70, yPos);
