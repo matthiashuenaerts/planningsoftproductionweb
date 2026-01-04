@@ -328,8 +328,32 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
           .select('id, article_name, article_code, supplier, quantity, status, unit_price')
           .eq('project_id', projectId);
 
+        // Fetch all products to lookup prices by article_code
+        const { data: productsData } = await supabase
+          .from('products')
+          .select('article_code, price_per_unit');
+
+        // Create a map for quick product price lookup
+        const productPriceMap = new Map<string, number>();
+        (productsData || []).forEach(product => {
+          if (product.article_code && product.price_per_unit != null) {
+            productPriceMap.set(product.article_code.toLowerCase().trim(), product.price_per_unit);
+          }
+        });
+
         const accessories: AccessoryCost[] = (accessoriesData || []).map(acc => {
-          const dbPrice = (acc as any).unit_price || 0;
+          let dbPrice = (acc as any).unit_price || 0;
+          let hasDbPrice = dbPrice > 0;
+          
+          // If no price in accessories, try to find price from products table
+          if (dbPrice === 0 && acc.article_code) {
+            const productPrice = productPriceMap.get(acc.article_code.toLowerCase().trim());
+            if (productPrice != null && productPrice > 0) {
+              dbPrice = productPrice;
+              hasDbPrice = true;
+            }
+          }
+          
           return {
             id: acc.id,
             articleName: acc.article_name,
@@ -337,7 +361,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
             supplier: acc.supplier || undefined,
             quantity: acc.quantity,
             unitPrice: dbPrice,
-            hasDbPrice: dbPrice > 0,
+            hasDbPrice,
             status: acc.status
           };
         });
