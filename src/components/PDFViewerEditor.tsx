@@ -534,7 +534,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     
     // Signal that canvas is ready for line snap listeners
     setFabricCanvasReady(true);
-  }, [pdfDoc, currentPage, scale, drawingColor, strokeWidth, activeTool]);
+  }, [pdfDoc, currentPage, scale]);
 
   // Keep canvases (PDF + annotations overlay) in sync whenever page/zoom changes.
   // We always initialize Fabric so annotations are visible in Preview too; we only enable interaction in Edit mode.
@@ -547,6 +547,21 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       return () => window.cancelAnimationFrame(raf);
     }
   }, [isEditMode, pdfDoc, loading, currentPage, scale, initializeFabricCanvas]);
+
+  // Apply tool settings separately without reinitializing the canvas - prevents page jumping during text editing
+  useEffect(() => {
+    if (fabricCanvasRef.current && isEditMode) {
+      applyToolSettings(activeTool);
+      
+      // Update brush settings if drawing
+      if (fabricCanvasRef.current.freeDrawingBrush) {
+        fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
+        fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
+      }
+      
+      fabricCanvasRef.current.requestRenderAll();
+    }
+  }, [activeTool, drawingColor, strokeWidth, isEditMode]);
 
   // Smart Line Straightening: Extract points from a Fabric.js path
   const extractPathPoints = (pathData: any[]): { x: number; y: number }[] => {
