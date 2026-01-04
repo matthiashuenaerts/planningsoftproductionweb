@@ -1860,6 +1860,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             onClick={toggleEditMode}
             size="sm"
             variant={isEditMode ? "secondary" : "default"}
+            className={isEditMode ? "bg-blue-500 hover:bg-blue-600 text-white" : ""}
           >
             {isEditMode ? (
               <>
