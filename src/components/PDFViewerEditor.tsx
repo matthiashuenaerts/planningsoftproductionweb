@@ -1876,10 +1876,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           
           {isEditMode && (
             <>
-              <Button onClick={saveToPDF} size="sm" variant="default" disabled={saving}>
-                <Save className="h-4 w-4 mr-1" />
-                Save
-              </Button>
               <Button onClick={cancelEdits} size="sm" variant="outline">
                 <X className="h-4 w-4 mr-1" />
                 Cancel
