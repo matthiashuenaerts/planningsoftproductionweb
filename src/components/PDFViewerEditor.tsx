@@ -116,6 +116,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasUnsavedChanges = useRef(false);
   
+  // Flag to prevent saving state during undo/redo operations
+  const isRestoringHistoryRef = useRef(false);
+  
   // Smart line straightening (hold-to-straighten) state
   const [lineSnapEnabled, setLineSnapEnabled] = useState(true);
   const lineSnapEnabledRef = useRef(true); // Ref to access current value in callbacks
@@ -917,7 +920,16 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const saveCanvasState = () => {
     if (!fabricCanvasRef.current) return;
     
+    // Don't save state during undo/redo operations
+    if (isRestoringHistoryRef.current) return;
+    
     const state = JSON.stringify(fabricCanvasRef.current.toJSON());
+    
+    // Avoid duplicate states - don't save if identical to current state
+    if (canvasHistory.length > 0 && historyIndex >= 0 && canvasHistory[historyIndex] === state) {
+      return;
+    }
+    
     const newHistory = canvasHistory.slice(0, historyIndex + 1);
     newHistory.push(state);
     setCanvasHistory(newHistory);
@@ -1333,9 +1345,17 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     if (historyIndex > 0 && fabricCanvasRef.current) {
       const newIndex = historyIndex - 1;
       const state = canvasHistory[newIndex];
+      
+      // Set flag to prevent saveCanvasState from being called during loadFromJSON
+      isRestoringHistoryRef.current = true;
+      
       fabricCanvasRef.current.loadFromJSON(JSON.parse(state), () => {
         fabricCanvasRef.current?.renderAll();
         setHistoryIndex(newIndex);
+        
+        // Reset flag after restore is complete
+        isRestoringHistoryRef.current = false;
+        
         triggerAutoSave();
       });
     }
@@ -1346,9 +1366,17 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     if (historyIndex < canvasHistory.length - 1 && fabricCanvasRef.current) {
       const newIndex = historyIndex + 1;
       const state = canvasHistory[newIndex];
+      
+      // Set flag to prevent saveCanvasState from being called during loadFromJSON
+      isRestoringHistoryRef.current = true;
+      
       fabricCanvasRef.current.loadFromJSON(JSON.parse(state), () => {
         fabricCanvasRef.current?.renderAll();
         setHistoryIndex(newIndex);
+        
+        // Reset flag after restore is complete
+        isRestoringHistoryRef.current = false;
+        
         triggerAutoSave();
       });
     }
