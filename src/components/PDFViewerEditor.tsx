@@ -113,6 +113,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Annotations per page
   const pageAnnotationsRef = useRef<Map<number, AnnotationData[]>>(new Map());
   
+  // Track which page the current fabric canvas belongs to (prevents saving to wrong page)
+  const canvasPageRef = useRef<number>(1);
+  
   // Track previous scale for rescaling existing objects
   const previousScaleRef = useRef<number>(1.0);
   
@@ -543,9 +546,11 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     fabricCanvasRef.current = fabricCanvas;
     fabricInitKeyRef.current = initKey;
     previousScaleRef.current = scale;
+    canvasPageRef.current = currentPage; // Track which page this canvas belongs to
 
     // Load annotations for this page
     loadPageAnnotations(currentPage);
+    console.log(`Loaded annotations for page ${currentPage}, found ${pageAnnotationsRef.current.get(currentPage)?.length || 0} items`);
 
     // Save initial state
     saveCanvasState();
@@ -822,9 +827,11 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   };
 
   // Save current page annotations - normalize coordinates to scale 1.0
+  // Uses canvasPageRef to ensure annotations are saved to the correct page even during page transitions
   const saveCurrentPageAnnotations = () => {
     if (!fabricCanvasRef.current) return;
     
+    const pageToSave = canvasPageRef.current; // Use the page the canvas was initialized for
     const currentScale = previousScaleRef.current; // Use tracked scale for accurate normalization
     const objects = fabricCanvasRef.current.getObjects();
     
@@ -854,7 +861,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       };
     });
     
-    pageAnnotationsRef.current.set(currentPage, annotations);
+    pageAnnotationsRef.current.set(pageToSave, annotations);
+    console.log(`Saved ${annotations.length} annotations to page ${pageToSave}`);
   };
 
   // Load annotations for a specific page - scale coordinates from normalized (scale 1.0) to current scale
@@ -862,8 +870,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     if (!fabricCanvasRef.current) return;
     
     // Clear existing objects from canvas before loading page-specific annotations
+    const existingCount = fabricCanvasRef.current.getObjects().length;
     fabricCanvasRef.current.clear();
     fabricCanvasRef.current.backgroundColor = 'transparent';
+    console.log(`Cleared ${existingCount} objects from canvas before loading page ${pageNum}`);
     
     const annotations = pageAnnotationsRef.current.get(pageNum) || [];
     
@@ -991,7 +1001,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const saveCurrentPageAnnotationsToDb = async () => {
     try {
       saveCurrentPageAnnotations();
-      const annotations = pageAnnotationsRef.current.get(currentPage) || [];
+      const pageToSave = canvasPageRef.current; // Use the tracked canvas page
+      const annotations = pageAnnotationsRef.current.get(pageToSave) || [];
 
       const { error } = await supabase
         .from('pdf_annotations')
@@ -999,7 +1010,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           {
             project_id: projectId,
             file_name: fileName,
-            page_number: currentPage,
+            page_number: pageToSave,
             annotations: annotations as unknown as any,
           },
           {
