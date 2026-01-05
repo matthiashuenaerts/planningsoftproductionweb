@@ -58,7 +58,7 @@ const PDFEditorFullscreen: React.FC = () => {
       </div>
       
       {/* Full-screen PDF editor */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
         <PDFViewerEditor
           pdfUrl={pdfUrl}
           projectId={projectId}

@@ -2114,10 +2114,16 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       <div
         ref={canvasContainerRef}
         className="flex-1 min-h-0 overflow-auto bg-muted/50 p-4"
+        style={{ 
+          overflowX: 'auto', 
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-x pan-y'
+        }}
       >
-        <div className="flex justify-center">
+        <div className="inline-flex justify-center min-w-full">
           <div
-            className="relative shadow-lg bg-white overflow-hidden"
+            className="relative shadow-lg bg-white overflow-hidden flex-shrink-0"
             style={{ width: canvasSize.width, height: canvasSize.height }}
             aria-label="PDF canvas wrapper"
           >
