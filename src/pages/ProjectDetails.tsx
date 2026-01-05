@@ -1163,11 +1163,16 @@ const ProjectDetails = () => {
                 <Button variant={activeTab === 'onedrive' ? 'default' : 'outline'} onClick={() => setActiveTab('onedrive')} className="flex-shrink-0">
                   <Folder className="mr-2 h-4 w-4" /> {t('onedrive')}
                 </Button>
-                {currentEmployee?.role === 'admin' && (
-                  <Button variant={activeTab === 'costing' ? 'default' : 'outline'} onClick={() => setActiveTab('costing')} className="flex-shrink-0">
-                    <DollarSign className="mr-2 h-4 w-4" /> Costing
-                  </Button>
-                )}
+                  {['admin', 'manager', 'calculator'].includes(currentEmployee?.role) && (
+                    <Button
+                      variant={activeTab === 'costing' ? 'default' : 'outline'}
+                      onClick={() => setActiveTab('costing')}
+                      className="flex-shrink-0"
+                    >
+                      <DollarSign className="mr-2 h-4 w-4" /> Costing
+                    </Button>
+                  )}
+
               </div>
             </div>
           </div>
