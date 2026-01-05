@@ -28,7 +28,8 @@ import {
   Check,
   RotateCcw,
   ExternalLink,
-  Ruler
+  Ruler,
+  Hand
 } from 'lucide-react';
 import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Textbox, Path, PencilBrush, Line } from 'fabric';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
@@ -42,7 +43,7 @@ interface PDFViewerEditorProps {
   fullscreen?: boolean;
 }
 
-type ToolType = 'select' | 'draw' | 'text' | 'rectangle' | 'circle' | 'erase';
+type ToolType = 'select' | 'cursor' | 'draw' | 'text' | 'rectangle' | 'circle' | 'erase';
 
 interface AnnotationData {
   type: string;
@@ -139,6 +140,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const toolMouseDownHandlerRef = useRef<((e: any) => void) | null>(null);
 
   const [fabricCanvasReady, setFabricCanvasReady] = useState(false); // Track canvas readiness
+  
+  // Drag-to-scroll state for cursor mode
+  const isDraggingToScrollRef = useRef(false);
+  const dragStartPosRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
   
   // Keep ref in sync with state
   useEffect(() => {
@@ -1270,9 +1275,29 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       }
 
 
+      case 'cursor': {
+        // Cursor mode: disable canvas interactions, allow drag-to-scroll
+        canvas.selection = false;
+        canvas.defaultCursor = 'grab';
+        canvas.hoverCursor = 'grab';
+        // Disable all object selection
+        canvas.getObjects().forEach(obj => {
+          obj.selectable = false;
+          obj.evented = false;
+        });
+        break;
+      }
+
       case 'select':
       default:
         canvas.selection = true;
+        canvas.defaultCursor = 'default';
+        canvas.hoverCursor = 'move';
+        // Re-enable object selection
+        canvas.getObjects().forEach(obj => {
+          obj.selectable = true;
+          obj.evented = true;
+        });
         break;
     }
   };
@@ -1975,8 +2000,15 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       {/* Edit Tools (only in edit mode) */}
       {isEditMode && (
         <div className="flex flex-wrap items-center gap-3 p-3 border-b bg-muted/30">
-          {/* Tool buttons */}
           <div className="flex items-center gap-1 border-r pr-3">
+            <Button
+              onClick={() => handleToolChange('cursor')}
+              size="sm"
+              variant={activeTool === 'cursor' ? 'default' : 'ghost'}
+              title="Pan / Scroll"
+            >
+              <Hand className="h-4 w-4" />
+            </Button>
             <Button
               onClick={() => handleToolChange('select')}
               size="sm"
@@ -2148,7 +2180,70 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 touchAction:
                   isEditMode && (activeTool === 'draw' || activeTool === 'erase')
                     ? 'none'
+                    : activeTool === 'cursor'
+                    ? 'none'
                     : 'manipulation',
+                cursor: activeTool === 'cursor' ? 'grab' : undefined,
+              }}
+              onMouseDown={(e) => {
+                if (activeTool === 'cursor' && canvasContainerRef.current) {
+                  e.preventDefault();
+                  isDraggingToScrollRef.current = true;
+                  dragStartPosRef.current = {
+                    x: e.clientX,
+                    y: e.clientY,
+                    scrollLeft: canvasContainerRef.current.scrollLeft,
+                    scrollTop: canvasContainerRef.current.scrollTop,
+                  };
+                  (e.currentTarget as HTMLElement).style.cursor = 'grabbing';
+                }
+              }}
+              onMouseMove={(e) => {
+                if (activeTool === 'cursor' && isDraggingToScrollRef.current && dragStartPosRef.current && canvasContainerRef.current) {
+                  const dx = e.clientX - dragStartPosRef.current.x;
+                  const dy = e.clientY - dragStartPosRef.current.y;
+                  canvasContainerRef.current.scrollLeft = dragStartPosRef.current.scrollLeft - dx;
+                  canvasContainerRef.current.scrollTop = dragStartPosRef.current.scrollTop - dy;
+                }
+              }}
+              onMouseUp={(e) => {
+                if (activeTool === 'cursor') {
+                  isDraggingToScrollRef.current = false;
+                  dragStartPosRef.current = null;
+                  (e.currentTarget as HTMLElement).style.cursor = 'grab';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeTool === 'cursor') {
+                  isDraggingToScrollRef.current = false;
+                  dragStartPosRef.current = null;
+                  (e.currentTarget as HTMLElement).style.cursor = 'grab';
+                }
+              }}
+              onTouchStart={(e) => {
+                if (activeTool === 'cursor' && canvasContainerRef.current && e.touches.length === 1) {
+                  isDraggingToScrollRef.current = true;
+                  dragStartPosRef.current = {
+                    x: e.touches[0].clientX,
+                    y: e.touches[0].clientY,
+                    scrollLeft: canvasContainerRef.current.scrollLeft,
+                    scrollTop: canvasContainerRef.current.scrollTop,
+                  };
+                }
+              }}
+              onTouchMove={(e) => {
+                if (activeTool === 'cursor' && isDraggingToScrollRef.current && dragStartPosRef.current && canvasContainerRef.current && e.touches.length === 1) {
+                  const dx = e.touches[0].clientX - dragStartPosRef.current.x;
+                  const dy = e.touches[0].clientY - dragStartPosRef.current.y;
+                  canvasContainerRef.current.scrollLeft = dragStartPosRef.current.scrollLeft - dx;
+                  canvasContainerRef.current.scrollTop = dragStartPosRef.current.scrollTop - dy;
+                }
+              }}
+              onTouchEnd={() => {
+                if (activeTool === 'cursor') {
+                  isDraggingToScrollRef.current = false;
+                  dragStartPosRef.current = null;
+                }
               }}
             >
               <canvas
@@ -2156,8 +2251,15 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 className="block"
                 style={{
                   display: 'block',
-                  cursor: isEditMode && activeTool === 'draw' ? 'crosshair' : isEditMode && activeTool === 'text' ? 'text' : 'default',
-                  touchAction: isEditMode && (activeTool === 'draw' || activeTool === 'erase') ? 'none' : 'manipulation',
+                  cursor: activeTool === 'cursor' 
+                    ? 'grab' 
+                    : isEditMode && activeTool === 'draw' 
+                    ? 'crosshair' 
+                    : isEditMode && activeTool === 'text' 
+                    ? 'text' 
+                    : 'default',
+                  touchAction: isEditMode && (activeTool === 'draw' || activeTool === 'erase') ? 'none' : activeTool === 'cursor' ? 'none' : 'manipulation',
+                  pointerEvents: activeTool === 'cursor' ? 'none' : 'auto',
                 }}
                 aria-label="PDF annotation canvas"
               />
