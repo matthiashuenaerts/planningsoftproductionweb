@@ -145,6 +145,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const isDraggingToScrollRef = useRef(false);
   const dragStartPosRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
   
+  // Pinch-to-zoom state for cursor mode
+  const initialPinchDistanceRef = useRef<number | null>(null);
+  const initialPinchScaleRef = useRef<number>(1);
+  
+  // Pen drawing in cursor mode state
+  const isPenDrawingInCursorModeRef = useRef(false);
+  
   // Keep ref in sync with state
   useEffect(() => {
     lineSnapEnabledRef.current = lineSnapEnabled;
@@ -854,6 +861,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const loadPageAnnotations = (pageNum: number) => {
     if (!fabricCanvasRef.current) return;
     
+    // Clear existing objects from canvas before loading page-specific annotations
+    fabricCanvasRef.current.clear();
+    fabricCanvasRef.current.backgroundColor = 'transparent';
+    
     const annotations = pageAnnotationsRef.current.get(pageNum) || [];
     
     annotations.forEach(annotation => {
@@ -1277,14 +1288,27 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
       case 'cursor': {
         // Cursor mode: disable canvas interactions, allow drag-to-scroll
+        // BUT still allow pen/stylus drawing
         canvas.selection = false;
         canvas.defaultCursor = 'grab';
         canvas.hoverCursor = 'grab';
+        
         // Disable all object selection
         canvas.getObjects().forEach(obj => {
           obj.selectable = false;
           obj.evented = false;
         });
+        
+        // Enable drawing mode but we'll control it via pointer events
+        // The actual drawing will only happen when pen is detected
+        canvas.isDrawingMode = false; // Start with drawing off, enable on pen detection
+        
+        // Ensure brush is ready for pen input
+        if (!canvas.freeDrawingBrush) {
+          canvas.freeDrawingBrush = new PencilBrush(canvas);
+        }
+        canvas.freeDrawingBrush.color = drawingColor;
+        canvas.freeDrawingBrush.width = strokeWidth;
         break;
       }
 
@@ -1471,6 +1495,12 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     if (isEditMode) {
       saveCurrentPageAnnotations();
     }
+    
+    // Reset history when changing pages (history is per-page)
+    setCanvasHistory([]);
+    setHistoryIndex(-1);
+    canvasHistoryRef.current = [];
+    historyIndexRef.current = -1;
     
     setCurrentPage(newPage);
   };
@@ -2185,8 +2215,17 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                     : 'manipulation',
                 cursor: activeTool === 'cursor' ? 'grab' : undefined,
               }}
-              onMouseDown={(e) => {
-                if (activeTool === 'cursor' && canvasContainerRef.current) {
+              onPointerDown={(e) => {
+                // Detect pen/stylus in cursor mode - enable drawing
+                if (activeTool === 'cursor' && e.pointerType === 'pen' && fabricCanvasRef.current) {
+                  isPenDrawingInCursorModeRef.current = true;
+                  fabricCanvasRef.current.isDrawingMode = true;
+                  // Let the event pass through to Fabric for drawing
+                  return;
+                }
+                
+                // Mouse/touch in cursor mode - start drag to scroll
+                if (activeTool === 'cursor' && e.pointerType !== 'pen' && canvasContainerRef.current) {
                   e.preventDefault();
                   isDraggingToScrollRef.current = true;
                   dragStartPosRef.current = {
@@ -2198,22 +2237,33 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                   (e.currentTarget as HTMLElement).style.cursor = 'grabbing';
                 }
               }}
-              onMouseMove={(e) => {
-                if (activeTool === 'cursor' && isDraggingToScrollRef.current && dragStartPosRef.current && canvasContainerRef.current) {
+              onPointerMove={(e) => {
+                if (activeTool === 'cursor' && !isPenDrawingInCursorModeRef.current && isDraggingToScrollRef.current && dragStartPosRef.current && canvasContainerRef.current) {
                   const dx = e.clientX - dragStartPosRef.current.x;
                   const dy = e.clientY - dragStartPosRef.current.y;
                   canvasContainerRef.current.scrollLeft = dragStartPosRef.current.scrollLeft - dx;
                   canvasContainerRef.current.scrollTop = dragStartPosRef.current.scrollTop - dy;
                 }
               }}
-              onMouseUp={(e) => {
+              onPointerUp={(e) => {
+                // End pen drawing in cursor mode
+                if (activeTool === 'cursor' && isPenDrawingInCursorModeRef.current && fabricCanvasRef.current) {
+                  isPenDrawingInCursorModeRef.current = false;
+                  fabricCanvasRef.current.isDrawingMode = false;
+                }
+                
                 if (activeTool === 'cursor') {
                   isDraggingToScrollRef.current = false;
                   dragStartPosRef.current = null;
                   (e.currentTarget as HTMLElement).style.cursor = 'grab';
                 }
               }}
-              onMouseLeave={(e) => {
+              onPointerLeave={(e) => {
+                if (activeTool === 'cursor' && isPenDrawingInCursorModeRef.current && fabricCanvasRef.current) {
+                  isPenDrawingInCursorModeRef.current = false;
+                  fabricCanvasRef.current.isDrawingMode = false;
+                }
+                
                 if (activeTool === 'cursor') {
                   isDraggingToScrollRef.current = false;
                   dragStartPosRef.current = null;
@@ -2221,28 +2271,59 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 }
               }}
               onTouchStart={(e) => {
-                if (activeTool === 'cursor' && canvasContainerRef.current && e.touches.length === 1) {
-                  isDraggingToScrollRef.current = true;
-                  dragStartPosRef.current = {
-                    x: e.touches[0].clientX,
-                    y: e.touches[0].clientY,
-                    scrollLeft: canvasContainerRef.current.scrollLeft,
-                    scrollTop: canvasContainerRef.current.scrollTop,
-                  };
+                if (activeTool === 'cursor' && canvasContainerRef.current) {
+                  if (e.touches.length === 1) {
+                    // Single finger - drag to scroll
+                    isDraggingToScrollRef.current = true;
+                    dragStartPosRef.current = {
+                      x: e.touches[0].clientX,
+                      y: e.touches[0].clientY,
+                      scrollLeft: canvasContainerRef.current.scrollLeft,
+                      scrollTop: canvasContainerRef.current.scrollTop,
+                    };
+                    initialPinchDistanceRef.current = null;
+                  } else if (e.touches.length === 2) {
+                    // Two fingers - start pinch-to-zoom
+                    e.preventDefault();
+                    isDraggingToScrollRef.current = false;
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    initialPinchDistanceRef.current = Math.hypot(dx, dy);
+                    initialPinchScaleRef.current = scale;
+                  }
                 }
               }}
               onTouchMove={(e) => {
-                if (activeTool === 'cursor' && isDraggingToScrollRef.current && dragStartPosRef.current && canvasContainerRef.current && e.touches.length === 1) {
-                  const dx = e.touches[0].clientX - dragStartPosRef.current.x;
-                  const dy = e.touches[0].clientY - dragStartPosRef.current.y;
-                  canvasContainerRef.current.scrollLeft = dragStartPosRef.current.scrollLeft - dx;
-                  canvasContainerRef.current.scrollTop = dragStartPosRef.current.scrollTop - dy;
+                if (activeTool === 'cursor' && canvasContainerRef.current) {
+                  if (e.touches.length === 2 && initialPinchDistanceRef.current !== null) {
+                    // Pinch-to-zoom
+                    e.preventDefault();
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    const currentDistance = Math.hypot(dx, dy);
+                    const pinchRatio = currentDistance / initialPinchDistanceRef.current;
+                    const newScale = Math.min(3, Math.max(0.5, initialPinchScaleRef.current * pinchRatio));
+                    setScale(newScale);
+                  } else if (e.touches.length === 1 && isDraggingToScrollRef.current && dragStartPosRef.current) {
+                    // Single finger drag
+                    const dx = e.touches[0].clientX - dragStartPosRef.current.x;
+                    const dy = e.touches[0].clientY - dragStartPosRef.current.y;
+                    canvasContainerRef.current.scrollLeft = dragStartPosRef.current.scrollLeft - dx;
+                    canvasContainerRef.current.scrollTop = dragStartPosRef.current.scrollTop - dy;
+                  }
                 }
               }}
-              onTouchEnd={() => {
+              onTouchEnd={(e) => {
                 if (activeTool === 'cursor') {
-                  isDraggingToScrollRef.current = false;
-                  dragStartPosRef.current = null;
+                  // Reset pinch state when fewer than 2 fingers
+                  if (e.touches.length < 2) {
+                    initialPinchDistanceRef.current = null;
+                  }
+                  // Reset drag state when no fingers
+                  if (e.touches.length === 0) {
+                    isDraggingToScrollRef.current = false;
+                    dragStartPosRef.current = null;
+                  }
                 }
               }}
             >
@@ -2259,7 +2340,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                     ? 'text' 
                     : 'default',
                   touchAction: isEditMode && (activeTool === 'draw' || activeTool === 'erase') ? 'none' : activeTool === 'cursor' ? 'none' : 'manipulation',
-                  pointerEvents: activeTool === 'cursor' ? 'none' : 'auto',
+                  // In cursor mode, allow pen events through but block touch/mouse
+                  pointerEvents: activeTool === 'cursor' ? 'auto' : 'auto',
                 }}
                 aria-label="PDF annotation canvas"
               />
