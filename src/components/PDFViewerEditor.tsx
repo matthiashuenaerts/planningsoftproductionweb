@@ -2227,10 +2227,15 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 cursor: activeTool === 'cursor' ? 'grab' : undefined,
               }}
               onPointerDown={(e) => {
-                // Detect pen/stylus in cursor mode - enable drawing
+                // Detect pen/stylus in cursor mode - enable drawing with current brush settings
                 if (activeTool === 'cursor' && e.pointerType === 'pen' && fabricCanvasRef.current) {
                   isPenDrawingInCursorModeRef.current = true;
-                  fabricCanvasRef.current.isDrawingMode = true;
+                  const canvas = fabricCanvasRef.current;
+                  canvas.isDrawingMode = true;
+                  if (canvas.freeDrawingBrush) {
+                    canvas.freeDrawingBrush.color = drawingColor;
+                    canvas.freeDrawingBrush.width = strokeWidth;
+                  }
                   // Let the event pass through to Fabric for drawing
                   return;
                 }
