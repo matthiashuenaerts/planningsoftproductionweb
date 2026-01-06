@@ -9,12 +9,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Edit, Trash2, Upload, ExternalLink, FileText } from 'lucide-react';
+import { Plus, Edit, Trash2, Upload, ExternalLink, FileText, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import GroupProductDialog from './GroupProductDialog';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -48,6 +50,16 @@ interface Product {
   updated_at: string;
 }
 
+interface ProductGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  article_code: string | null;
+  image_path: string | null;
+  total_price?: number;
+  items_count?: number;
+}
+
 const ProductsSettings: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -59,6 +71,9 @@ const ProductsSettings: React.FC = () => {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
   const [csvImporting, setCsvImporting] = useState(false);
+  const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
+  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<ProductGroup | null>(null);
   const { toast } = useToast();
 
   const form = useForm<ProductFormData>({
@@ -80,6 +95,7 @@ const ProductsSettings: React.FC = () => {
   useEffect(() => {
     fetchProducts();
     fetchSuppliers();
+    fetchProductGroups();
   }, []);
 
   const fetchProducts = async () => {
@@ -100,6 +116,81 @@ const ProductsSettings: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchProductGroups = async () => {
+    try {
+      // First get all groups
+      const { data: groups, error: groupsError } = await supabase
+        .from('product_groups')
+        .select('*')
+        .order('name');
+
+      if (groupsError) throw groupsError;
+
+      // Then get items with product prices
+      const { data: items, error: itemsError } = await supabase
+        .from('product_group_items')
+        .select('group_id, quantity, product_id');
+
+      if (itemsError) throw itemsError;
+
+      // Get product prices
+      const productIds = [...new Set(items?.map(i => i.product_id) || [])];
+      let productPrices: Record<string, number> = {};
+      
+      if (productIds.length > 0) {
+        const { data: products } = await supabase
+          .from('products')
+          .select('id, price_per_unit')
+          .in('id', productIds);
+        
+        products?.forEach(p => {
+          productPrices[p.id] = p.price_per_unit || 0;
+        });
+      }
+
+      // Calculate totals for each group
+      const groupsWithTotals = (groups || []).map(group => {
+        const groupItems = items?.filter(i => i.group_id === group.id) || [];
+        const totalPrice = groupItems.reduce((sum, item) => {
+          return sum + (productPrices[item.product_id] || 0) * item.quantity;
+        }, 0);
+        return {
+          ...group,
+          total_price: totalPrice,
+          items_count: groupItems.length,
+        };
+      });
+
+      setProductGroups(groupsWithTotals);
+    } catch (error) {
+      console.error('Error fetching product groups:', error);
+    }
+  };
+
+  const handleDeleteGroup = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('product_groups')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Group product deleted successfully',
+      });
+      fetchProductGroups();
+    } catch (error) {
+      console.error('Error deleting group product:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete group product',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -628,87 +719,188 @@ const ProductsSettings: React.FC = () => {
         </div>
       </CardHeader>
       <CardContent>
-        <Table>
-           <TableHeader>
-             <TableRow>
-               <TableHead>Image</TableHead>
-               <TableHead>Name</TableHead>
-               <TableHead>Article Code</TableHead>
-               <TableHead>Supplier</TableHead>
-               <TableHead>Location</TableHead>
-               <TableHead>Price</TableHead>
-               <TableHead>Order Qty</TableHead>
-               <TableHead>Website</TableHead>
-               <TableHead>Actions</TableHead>
-             </TableRow>
-           </TableHeader>
-          <TableBody>
-            {products.map((product) => (
-              <TableRow key={product.id}>
-                <TableCell>
-                  {product.image_path ? (
-                    <img
-                      src={getImageUrl(product.image_path) || ''}
-                      alt={product.name}
-                      className="h-10 w-10 object-cover rounded"
-                    />
-                  ) : (
-                    <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
-                      <Upload className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell className="font-medium">{product.name}</TableCell>
-                <TableCell>
-                  {product.article_code && (
-                    <Badge variant="outline">{product.article_code}</Badge>
-                  )}
-                </TableCell>
-                 <TableCell>{product.supplier}</TableCell>
-                 <TableCell>{product.location}</TableCell>
-                 <TableCell>
-                   {product.price_per_unit != null ? `€${product.price_per_unit.toFixed(2)}` : '-'}
-                 </TableCell>
-                 <TableCell>{product.standard_order_quantity}</TableCell>
-                <TableCell>
-                  {product.website_link && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => window.open(product.website_link!, '_blank')}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEdit(product)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(product.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {products.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            No products found. Create your first product to get started.
-          </div>
-        )}
+        <Tabs defaultValue="products">
+          <TabsList className="mb-4">
+            <TabsTrigger value="products">Individual Products</TabsTrigger>
+            <TabsTrigger value="groups" className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Group Products
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="products">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Image</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Article Code</TableHead>
+                  <TableHead>Supplier</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead>Order Qty</TableHead>
+                  <TableHead>Website</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {products.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell>
+                      {product.image_path ? (
+                        <img
+                          src={getImageUrl(product.image_path) || ''}
+                          alt={product.name}
+                          className="h-10 w-10 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
+                          <Upload className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell>
+                      {product.article_code && (
+                        <Badge variant="outline">{product.article_code}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>{product.supplier}</TableCell>
+                    <TableCell>{product.location}</TableCell>
+                    <TableCell>
+                      {product.price_per_unit != null ? `€${product.price_per_unit.toFixed(2)}` : '-'}
+                    </TableCell>
+                    <TableCell>{product.standard_order_quantity}</TableCell>
+                    <TableCell>
+                      {product.website_link && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(product.website_link!, '_blank')}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(product)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(product.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {products.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No products found. Create your first product to get started.
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="groups">
+            <div className="mb-4">
+              <Button onClick={() => {
+                setEditingGroup(null);
+                setIsGroupDialogOpen(true);
+              }}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Group Product
+              </Button>
+            </div>
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Image</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Article Code</TableHead>
+                  <TableHead>Products</TableHead>
+                  <TableHead>Total Price</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {productGroups.map((group) => (
+                  <TableRow key={group.id}>
+                    <TableCell>
+                      {group.image_path ? (
+                        <img
+                          src={getImageUrl(group.image_path) || ''}
+                          alt={group.name}
+                          className="h-10 w-10 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">{group.name}</TableCell>
+                    <TableCell>
+                      {group.article_code && (
+                        <Badge variant="outline">{group.article_code}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge>{group.items_count || 0} products</Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      €{(group.total_price || 0).toFixed(2)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingGroup(group);
+                            setIsGroupDialogOpen(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteGroup(group.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {productGroups.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No group products found. Create your first group product to bundle multiple products together.
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
+
+      <GroupProductDialog
+        open={isGroupDialogOpen}
+        onOpenChange={setIsGroupDialogOpen}
+        editingGroup={editingGroup}
+        onSave={fetchProductGroups}
+      />
     </Card>
   );
 };
