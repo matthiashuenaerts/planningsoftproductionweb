@@ -268,6 +268,16 @@ const NewOrderModal = ({
       notes: `Selected from products database - ${product.name}`
     }]);
   };
+
+  const handleGroupSelect = (group: any, products: Array<{ product: any; quantity: number }>) => {
+    const newItems = products.map(({ product, quantity }) => ({
+      description: product.description || product.name,
+      quantity: quantity,
+      article_code: product.article_code || '',
+      notes: `From group: ${group.name} - ${product.name}`
+    }));
+    setOrderItems(prev => [...prev, ...newItems]);
+  };
   const updateOrderItem = (index: number, field: keyof OrderItem, value: string | number | null | undefined) => {
     setOrderItems(prev => prev.map((item, i) => i === index ? {
       ...item,
@@ -462,7 +472,11 @@ const NewOrderModal = ({
             <div className="flex justify-between items-center">
               <CardTitle>Order Items</CardTitle>
               <div className="flex gap-2">
-                <ProductSelector onProductSelect={handleProductSelect} buttonText="Add from Products" />
+                <ProductSelector 
+                  onProductSelect={handleProductSelect} 
+                  onGroupSelect={handleGroupSelect}
+                  buttonText="Add from Products" 
+                />
                 <Button type="button" onClick={addOrderItem} variant="outline" size="sm">
                   <Plus className="mr-2 h-4 w-4" />
                   Add Custom Item

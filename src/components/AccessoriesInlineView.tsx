@@ -460,6 +460,37 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
     setShowForm(true);
   };
 
+  const handleGroupSelect = async (group: any, products: Array<{ product: any; quantity: number }>) => {
+    try {
+      const accessoriesToCreate = products.map(({ product, quantity }) => ({
+        project_id: projectId,
+        article_name: product.name,
+        article_description: product.description || `From group: ${group.name}`,
+        article_code: product.article_code || '',
+        quantity: quantity,
+        stock_location: product.location || '',
+        supplier: product.supplier || '',
+        status: 'to_check' as const,
+        qr_code_text: product.qr_code || ''
+      }));
+
+      await accessoriesService.createMany(accessoriesToCreate);
+      
+      toast({
+        title: "Success",
+        description: `Added ${products.length} accessories from group "${group.name}"`
+      });
+      
+      loadAccessories();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to add accessories: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -467,7 +498,11 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
           <div className="flex items-center justify-between">
             <CardTitle>Accessories</CardTitle>
             <div className="flex gap-2">
-              <ProductSelector onProductSelect={handleProductSelect} buttonText="Select from Products" />
+              <ProductSelector 
+                onProductSelect={handleProductSelect} 
+                onGroupSelect={handleGroupSelect}
+                buttonText="Select from Products" 
+              />
               <Button
                 onClick={() => setShowForm(!showForm)}
                 size="sm"
