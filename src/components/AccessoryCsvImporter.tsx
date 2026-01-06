@@ -54,37 +54,110 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
           console.error('Error fetching products:', productsError);
         }
 
+        // Fetch all product groups with their items
+        const { data: groups, error: groupsError } = await supabase
+          .from('product_groups')
+          .select('*');
+
+        if (groupsError) {
+          console.error('Error fetching product groups:', groupsError);
+        }
+
+        const { data: groupItems, error: groupItemsError } = await supabase
+          .from('product_group_items')
+          .select('group_id, product_id, quantity');
+
+        if (groupItemsError) {
+          console.error('Error fetching group items:', groupItemsError);
+        }
+
+        // Build maps for quick lookup
         const productsByCode = new Map();
+        const productsById = new Map();
         if (products) {
           products.forEach(product => {
+            productsById.set(product.id, product);
             if (product.article_code) {
               productsByCode.set(product.article_code.toLowerCase(), product);
             }
           });
         }
 
-        const accessoriesToCreate = json.map(item => {
+        // Build group lookup by article_code and name
+        const groupsByCode = new Map();
+        const groupsByName = new Map();
+        if (groups) {
+          groups.forEach(group => {
+            if (group.article_code) {
+              groupsByCode.set(group.article_code.toLowerCase(), group);
+            }
+            groupsByName.set(group.name.toLowerCase(), group);
+          });
+        }
+
+        // Build group items map
+        const groupItemsMap = new Map<string, Array<{ product_id: string; quantity: number }>>();
+        if (groupItems) {
+          groupItems.forEach(item => {
+            if (!groupItemsMap.has(item.group_id)) {
+              groupItemsMap.set(item.group_id, []);
+            }
+            groupItemsMap.get(item.group_id)!.push({ product_id: item.product_id, quantity: item.quantity });
+          });
+        }
+
+        const accessoriesToCreate: Array<Omit<Accessory, 'id' | 'created_at' | 'updated_at'>> = [];
+
+        for (const item of json) {
           const importedQuantity = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
-          
-          // Check if article_code exists in products database
-          if (item.article_code && productsByCode.has(String(item.article_code).toLowerCase())) {
-            const product = productsByCode.get(String(item.article_code).toLowerCase());
+          const articleCode = item.article_code ? String(item.article_code).toLowerCase() : '';
+          const articleName = item.article_name ? String(item.article_name).toLowerCase() : '';
+
+          // First check if it's a group product (by article_code or name)
+          const matchedGroup = articleCode && groupsByCode.has(articleCode) 
+            ? groupsByCode.get(articleCode) 
+            : articleName && groupsByName.has(articleName) 
+              ? groupsByName.get(articleName) 
+              : null;
+
+          if (matchedGroup) {
+            // It's a group - add all products from the group
+            const items = groupItemsMap.get(matchedGroup.id) || [];
+            for (const groupItem of items) {
+              const product = productsById.get(groupItem.product_id);
+              if (product) {
+                accessoriesToCreate.push({
+                  project_id: projectId,
+                  article_name: product.name,
+                  article_description: product.description || `From group: ${matchedGroup.name}`,
+                  article_code: product.article_code,
+                  quantity: groupItem.quantity * importedQuantity, // Multiply by CSV quantity
+                  stock_location: product.location || item.stock_location,
+                  status: item.status || 'to_check',
+                  supplier: product.supplier,
+                  qr_code_text: product.qr_code,
+                });
+              }
+            }
+          } else if (articleCode && productsByCode.has(articleCode)) {
+            // Check if article_code exists in products database
+            const product = productsByCode.get(articleCode);
             
             // Use product data but keep imported quantity
-            return {
+            accessoriesToCreate.push({
               project_id: projectId,
               article_name: product.name,
               article_description: product.description,
               article_code: product.article_code,
-              quantity: importedQuantity, // Keep quantity from CSV
-              stock_location: item.stock_location, // Keep stock location from CSV if provided
+              quantity: importedQuantity,
+              stock_location: item.stock_location || product.location,
               status: item.status || 'to_check',
               supplier: product.supplier,
               qr_code_text: product.qr_code,
-            };
+            });
           } else {
-            // Use CSV data as before
-            return {
+            // Use CSV data as-is
+            accessoriesToCreate.push({
               project_id: projectId,
               article_name: item.article_name || '',
               article_description: item.article_description,
@@ -94,9 +167,9 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
               status: item.status || 'to_check',
               supplier: item.supplier,
               qr_code_text: item.qr_code_text,
-            };
+            });
           }
-        });
+        }
 
         for (const acc of accessoriesToCreate) {
           if (!acc.article_name) {
@@ -104,18 +177,27 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
           }
         }
 
-        const accessoriesToInsert = accessoriesToCreate as Omit<Accessory, 'id' | 'created_at' | 'updated_at'>[];
+        await accessoriesService.createMany(accessoriesToCreate);
 
-        await accessoriesService.createMany(accessoriesToInsert);
+        // Count matches
+        const groupMatchCount = json.filter(item => {
+          const code = item.article_code ? String(item.article_code).toLowerCase() : '';
+          const name = item.article_name ? String(item.article_name).toLowerCase() : '';
+          return (code && groupsByCode.has(code)) || (name && groupsByName.has(name));
+        }).length;
 
-        // Count how many were matched with products
-        const matchedCount = accessoriesToInsert.filter(acc => 
-          acc.article_code && productsByCode.has(String(acc.article_code).toLowerCase())
-        ).length;
+        const productMatchCount = json.filter(item => {
+          const code = item.article_code ? String(item.article_code).toLowerCase() : '';
+          return code && productsByCode.has(code) && !groupsByCode.has(code);
+        }).length;
 
-        const successMessage = matchedCount > 0 
-          ? `${accessoriesToCreate.length} accessories imported successfully. ${matchedCount} matched with products database.`
-          : `${accessoriesToCreate.length} accessories imported successfully.`;
+        let successMessage = `${accessoriesToCreate.length} accessories imported successfully.`;
+        if (groupMatchCount > 0 || productMatchCount > 0) {
+          const parts = [];
+          if (productMatchCount > 0) parts.push(`${productMatchCount} matched with products`);
+          if (groupMatchCount > 0) parts.push(`${groupMatchCount} expanded from group products`);
+          successMessage += ` ${parts.join(', ')}.`;
+        }
 
         toast({ title: 'Success', description: successMessage });
         onImportSuccess();
