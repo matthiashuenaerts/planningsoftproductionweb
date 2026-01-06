@@ -2183,6 +2183,75 @@ export type Database = {
         }
         Relationships: []
       }
+      product_group_items: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          product_id: string
+          quantity: number
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          product_id: string
+          quantity?: number
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_group_items_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "product_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_group_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_groups: {
+        Row: {
+          article_code: string | null
+          created_at: string
+          description: string | null
+          id: string
+          image_path: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          article_code?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_path?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          article_code?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_path?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       production_flow_lines: {
         Row: {
           color: string
