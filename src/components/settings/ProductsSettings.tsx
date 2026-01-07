@@ -526,7 +526,8 @@ const ProductsSettings: React.FC = () => {
     return data.publicUrl;
   };
 
-  if (loading) {
+  // Only show initial loading state when there are no products yet
+  if (loading && products.length === 0 && !searchTerm) {
     return <div>Loading products...</div>;
   }
 
