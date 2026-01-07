@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Package, ExternalLink, Layers } from 'lucide-react';
+import { Search, Package, ExternalLink, Layers, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -53,89 +53,76 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
-  const [filteredGroups, setFilteredGroups] = useState<ProductGroup[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchProducts();
-      if (showGroups) {
-        fetchProductGroups();
-      }
+  // Search products via API with debounce
+  const searchProducts = useCallback(async (term: string) => {
+    if (!term.trim()) {
+      setProducts([]);
+      return;
     }
-  }, [isOpen, showGroups]);
-
-  useEffect(() => {
-    if (searchTerm.trim()) {
-      const filtered = products.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (product.article_code && product.article_code.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (product.supplier && product.supplier.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-      setFilteredProducts(filtered);
-
-      const filteredG = productGroups.filter(group =>
-        group.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (group.article_code && group.article_code.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (group.description && group.description.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-      setFilteredGroups(filteredG);
-    } else {
-      setFilteredProducts(products);
-      setFilteredGroups(productGroups);
-    }
-  }, [searchTerm, products, productGroups]);
-
-  const fetchProducts = async () => {
+    
+    setIsSearching(true);
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .order('name');
+        .or(`name.ilike.%${term}%,article_code.ilike.%${term}%,supplier.ilike.%${term}%,description.ilike.%${term}%`)
+        .order('name')
+        .limit(100);
 
       if (error) throw error;
       setProducts(data || []);
-      setFilteredProducts(data || []);
     } catch (error) {
-      console.error('Error fetching products:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch products',
-        variant: 'destructive',
-      });
+      console.error('Error searching products:', error);
     } finally {
-      setLoading(false);
+      setIsSearching(false);
     }
-  };
+  }, []);
 
-  const fetchProductGroups = async () => {
+  // Search product groups via API
+  const searchProductGroups = useCallback(async (term: string) => {
+    if (!term.trim()) {
+      setProductGroups([]);
+      return;
+    }
+    
     try {
       const { data: groups, error: groupsError } = await supabase
         .from('product_groups')
         .select('*')
-        .order('name');
+        .or(`name.ilike.%${term}%,article_code.ilike.%${term}%,description.ilike.%${term}%`)
+        .order('name')
+        .limit(50);
 
       if (groupsError) throw groupsError;
 
-      const { data: items, error: itemsError } = await supabase
+      if (!groups || groups.length === 0) {
+        setProductGroups([]);
+        return;
+      }
+
+      // Fetch items for matching groups
+      const groupIds = groups.map(g => g.id);
+      const { data: items } = await supabase
         .from('product_group_items')
-        .select('group_id, quantity, product_id');
+        .select('group_id, quantity, product_id')
+        .in('group_id', groupIds);
 
-      if (itemsError) throw itemsError;
-
-      const { data: allProducts } = await supabase
+      // Fetch products for those items
+      const productIds = [...new Set((items || []).map(i => i.product_id))];
+      const { data: groupProducts } = await supabase
         .from('products')
-        .select('*');
+        .select('*')
+        .in('id', productIds);
 
-      const productMap = new Map((allProducts || []).map(p => [p.id, p]));
+      const productMap = new Map((groupProducts || []).map(p => [p.id, p]));
 
-      const groupsWithDetails = (groups || []).map(group => {
+      const groupsWithDetails = groups.map(group => {
         const groupItems = items?.filter(i => i.group_id === group.id) || [];
         const productsInGroup = groupItems.map(item => ({
           product: productMap.get(item.product_id) as Product,
@@ -155,11 +142,34 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
       });
 
       setProductGroups(groupsWithDetails);
-      setFilteredGroups(groupsWithDetails);
     } catch (error) {
-      console.error('Error fetching product groups:', error);
+      console.error('Error searching product groups:', error);
     }
-  };
+  }, []);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const timer = setTimeout(() => {
+      searchProducts(searchTerm);
+      if (showGroups) {
+        searchProductGroups(searchTerm);
+      }
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [searchTerm, isOpen, showGroups, searchProducts, searchProductGroups]);
+
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchTerm('');
+      setProducts([]);
+      setProductGroups([]);
+    }
+  }, [isOpen]);
+
 
   const handleProductSelect = (product: Product) => {
     onProductSelect(product);
@@ -205,20 +215,27 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
+            {isSearching && (
+              <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+            )}
           </div>
 
-          {loading ? (
-            <div className="text-center py-8">Loading products...</div>
+          {!searchTerm.trim() ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Start typing to search products...
+            </div>
+          ) : isSearching ? (
+            <div className="text-center py-8">Searching...</div>
           ) : showGroups ? (
             <Tabs defaultValue="products">
               <TabsList>
                 <TabsTrigger value="products">
                   <Package className="mr-2 h-4 w-4" />
-                  Individual Products ({filteredProducts.length})
+                  Individual Products ({products.length})
                 </TabsTrigger>
                 <TabsTrigger value="groups">
                   <Layers className="mr-2 h-4 w-4" />
-                  Group Products ({filteredGroups.length})
+                  Group Products ({productGroups.length})
                 </TabsTrigger>
               </TabsList>
 
@@ -236,7 +253,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredProducts.map((product) => (
+                    {products.map((product) => (
                       <TableRow key={product.id}>
                         <TableCell>
                           {product.image_path ? (
@@ -293,9 +310,9 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                     ))}
                   </TableBody>
                 </Table>
-                {filteredProducts.length === 0 && (
+                {products.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
-                    {searchTerm ? 'No products found matching your search.' : 'No products available.'}
+                    No products found matching your search.
                   </div>
                 )}
               </TabsContent>
@@ -313,7 +330,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredGroups.map((group) => (
+                    {productGroups.map((group) => (
                       <TableRow key={group.id}>
                         <TableCell>
                           {group.image_path ? (
@@ -365,9 +382,9 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                     ))}
                   </TableBody>
                 </Table>
-                {filteredGroups.length === 0 && (
+                {productGroups.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
-                    {searchTerm ? 'No group products found matching your search.' : 'No group products available.'}
+                    No group products found matching your search.
                   </div>
                 )}
               </TabsContent>
@@ -387,7 +404,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredProducts.map((product) => (
+                  {products.map((product) => (
                     <TableRow key={product.id}>
                       <TableCell>
                         {product.image_path ? (
@@ -444,9 +461,9 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                   ))}
                 </TableBody>
               </Table>
-              {filteredProducts.length === 0 && (
+              {products.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
-                  {searchTerm ? 'No products found matching your search.' : 'No products available.'}
+                  No products found matching your search.
                 </div>
               )}
             </>
