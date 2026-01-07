@@ -47,6 +47,10 @@ export const ProductImageDisplay: React.FC<ProductImageDisplayProps> = ({ articl
 
   const getImageUrl = (imagePath: string | null) => {
     if (!imagePath) return null;
+    // If it's already a full URL, return as-is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
     const { data } = supabase.storage
       .from('product-images')
       .getPublicUrl(imagePath);
