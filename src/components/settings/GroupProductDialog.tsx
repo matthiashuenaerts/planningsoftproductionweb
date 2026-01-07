@@ -4,9 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Package } from 'lucide-react';
+import { Plus, Trash2, Package, Search, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -53,11 +52,10 @@ const GroupProductDialog: React.FC<GroupProductDialogProps> = ({
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
 
   useEffect(() => {
     if (open) {
@@ -81,32 +79,62 @@ const GroupProductDialog: React.FC<GroupProductDialogProps> = ({
     setImageFile(null);
   };
 
-  const fetchProducts = async () => {
+  const searchProducts = async (searchTerm: string) => {
+    if (!searchTerm.trim()) {
+      setProducts([]);
+      return;
+    }
+    
+    setIsSearching(true);
     try {
       const { data, error } = await supabase
         .from('products')
         .select('id, name, article_code, price_per_unit, image_path')
-        .order('name');
+        .or(`name.ilike.%${searchTerm}%,article_code.ilike.%${searchTerm}%`)
+        .order('name')
+        .limit(50);
 
       if (error) throw error;
       setProducts(data || []);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Error searching products:', error);
+    } finally {
+      setIsSearching(false);
     }
   };
 
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchProducts(productSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [productSearch]);
+
   const fetchGroupItems = async (groupId: string) => {
     try {
+      // Fetch group items with product details using a join
       const { data, error } = await supabase
         .from('product_group_items')
-        .select('product_id, quantity')
+        .select(`
+          product_id, 
+          quantity,
+          products:product_id (
+            id,
+            name,
+            article_code,
+            price_per_unit,
+            image_path
+          )
+        `)
         .eq('group_id', groupId);
 
       if (error) throw error;
 
       const itemsWithProducts = (data || []).map(item => ({
-        ...item,
-        product: products.find(p => p.id === item.product_id),
+        product_id: item.product_id,
+        quantity: item.quantity,
+        product: item.products as unknown as Product,
       }));
 
       setGroupItems(itemsWithProducts);
@@ -332,25 +360,72 @@ const GroupProductDialog: React.FC<GroupProductDialogProps> = ({
           <div className="border-t pt-4">
             <Label className="text-base font-semibold">Products in Group</Label>
             
-            <div className="flex gap-2 mt-2">
-              <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Select a product to add" />
-                </SelectTrigger>
-                <SelectContent>
+            <div className="space-y-2 mt-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Search products by name or article code..."
+                  className="pl-9"
+                />
+                {isSearching && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+              
+              {productSearch.trim() && products.length > 0 && (
+                <div className="border rounded-md max-h-48 overflow-y-auto">
                   {products
                     .filter(p => !groupItems.find(item => item.product_id === p.id))
                     .map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.name} {product.article_code && `(${product.article_code})`}
-                        {product.price_per_unit != null && ` - €${product.price_per_unit.toFixed(2)}`}
-                      </SelectItem>
+                      <div
+                        key={product.id}
+                        className="flex items-center justify-between p-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        onClick={() => {
+                          setSelectedProductId(product.id);
+                          const foundProduct = products.find(p => p.id === product.id);
+                          setGroupItems([...groupItems, { product_id: product.id, quantity: 1, product: foundProduct }]);
+                          setProductSearch('');
+                          setProducts([]);
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          {product.image_path && (
+                            <img
+                              src={getImageUrl(product.image_path) || ''}
+                              alt={product.name}
+                              className="h-8 w-8 object-cover rounded"
+                            />
+                          )}
+                          <div>
+                            <div className="font-medium">{product.name}</div>
+                            {product.article_code && (
+                              <div className="text-xs text-muted-foreground">{product.article_code}</div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {product.price_per_unit != null && (
+                            <span className="text-sm text-muted-foreground">€{product.price_per_unit.toFixed(2)}</span>
+                          )}
+                          <Plus className="h-4 w-4 text-primary" />
+                        </div>
+                      </div>
                     ))}
-                </SelectContent>
-              </Select>
-              <Button onClick={addProduct} disabled={!selectedProductId}>
-                <Plus className="h-4 w-4" />
-              </Button>
+                  {products.filter(p => !groupItems.find(item => item.product_id === p.id)).length === 0 && (
+                    <div className="p-2 text-sm text-muted-foreground text-center">
+                      All matching products already added
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {productSearch.trim() && products.length === 0 && !isSearching && (
+                <div className="text-sm text-muted-foreground">
+                  No products found. Try a different search term.
+                </div>
+              )}
             </div>
 
             {groupItems.length > 0 && (
