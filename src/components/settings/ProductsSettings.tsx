@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Edit, Trash2, Upload, ExternalLink, FileText, Package } from 'lucide-react';
+import { Plus, Edit, Trash2, Upload, ExternalLink, FileText, Package, Search, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import GroupProductDialog from './GroupProductDialog';
@@ -60,6 +60,8 @@ interface ProductGroup {
   items_count?: number;
 }
 
+const PRODUCTS_PER_PAGE = 100;
+
 const ProductsSettings: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -74,6 +76,16 @@ const ProductsSettings: React.FC = () => {
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<ProductGroup | null>(null);
+  
+  // Pagination and search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  
   const { toast } = useToast();
 
   const form = useForm<ProductFormData>({
@@ -92,21 +104,79 @@ const ProductsSettings: React.FC = () => {
     },
   });
 
+  // Debounce search term
   useEffect(() => {
-    fetchProducts();
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Reset and fetch when search changes
+  useEffect(() => {
+    setProducts([]);
+    setPage(0);
+    setHasMore(true);
+    fetchProducts(0, debouncedSearchTerm, true);
+  }, [debouncedSearchTerm]);
+
+  useEffect(() => {
     fetchSuppliers();
     fetchProductGroups();
   }, []);
 
-  const fetchProducts = async () => {
+  // Infinite scroll observer
+  useEffect(() => {
+    if (loadMoreRef.current) {
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+            fetchProducts(page + 1, debouncedSearchTerm, false);
+          }
+        },
+        { threshold: 0.1 }
+      );
+      observerRef.current.observe(loadMoreRef.current);
+    }
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [hasMore, loadingMore, loading, page, debouncedSearchTerm]);
+
+  const fetchProducts = async (pageNum: number, search: string, isReset: boolean) => {
     try {
-      const { data, error } = await supabase
+      if (isReset) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+
+      let query = supabase
         .from('products')
         .select('*')
-        .order('name');
+        .order('name')
+        .range(pageNum * PRODUCTS_PER_PAGE, (pageNum + 1) * PRODUCTS_PER_PAGE - 1);
+
+      if (search.trim()) {
+        query = query.or(`name.ilike.%${search}%,article_code.ilike.%${search}%,supplier.ilike.%${search}%`);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
-      setProducts(data || []);
+
+      const newProducts = data || [];
+      
+      if (isReset) {
+        setProducts(newProducts);
+      } else {
+        setProducts(prev => [...prev, ...newProducts]);
+      }
+      
+      setPage(pageNum);
+      setHasMore(newProducts.length === PRODUCTS_PER_PAGE);
     } catch (error) {
       console.error('Error fetching products:', error);
       toast({
@@ -116,6 +186,7 @@ const ProductsSettings: React.FC = () => {
       });
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -282,7 +353,7 @@ const ProductsSettings: React.FC = () => {
       setEditingProduct(null);
       setImageFile(null);
       form.reset();
-      fetchProducts();
+      fetchProducts(0, debouncedSearchTerm, true);
     } catch (error) {
       console.error('Error saving product:', error);
       toast({
@@ -323,7 +394,7 @@ const ProductsSettings: React.FC = () => {
         title: 'Success',
         description: 'Product deleted successfully',
       });
-      fetchProducts();
+      fetchProducts(0, debouncedSearchTerm, true);
     } catch (error) {
       console.error('Error deleting product:', error);
       toast({
@@ -430,7 +501,7 @@ const ProductsSettings: React.FC = () => {
 
       setIsCsvDialogOpen(false);
       setCsvFile(null);
-      fetchProducts();
+      fetchProducts(0, debouncedSearchTerm, true);
     } catch (error) {
       console.error('Error importing CSV:', error);
       toast({
@@ -733,6 +804,17 @@ const ProductsSettings: React.FC = () => {
           </TabsList>
 
           <TabsContent value="products">
+            {/* Search bar */}
+            <div className="mb-4 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search products by name, article code, or supplier..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
             <Table>
               <TableHeader>
                 <TableRow>
@@ -808,9 +890,25 @@ const ProductsSettings: React.FC = () => {
                 ))}
               </TableBody>
             </Table>
-            {products.length === 0 && (
+            
+            {/* Infinite scroll loader */}
+            <div ref={loadMoreRef} className="py-4 flex justify-center">
+              {loadingMore && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading more products...
+                </div>
+              )}
+              {!hasMore && products.length > 0 && (
+                <div className="text-muted-foreground text-sm">
+                  All {products.length} products loaded
+                </div>
+              )}
+            </div>
+
+            {products.length === 0 && !loading && (
               <div className="text-center py-8 text-muted-foreground">
-                No products found. Create your first product to get started.
+                {searchTerm ? 'No products found matching your search.' : 'No products found. Create your first product to get started.'}
               </div>
             )}
           </TabsContent>
