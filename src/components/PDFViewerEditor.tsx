@@ -11,8 +11,6 @@ import {
   Download, 
   ZoomIn,
   ZoomOut,
-  ChevronLeft,
-  ChevronRight,
   Edit3,
   Eye,
   Type,
@@ -64,6 +62,12 @@ interface AnnotationData {
   angle?: number;
 }
 
+interface PageData {
+  pageNum: number;
+  width: number;
+  height: number;
+}
+
 const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({ 
   pdfUrl, 
   projectId, 
@@ -80,20 +84,23 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // PDF state
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [originalPdfBytes, setOriginalPdfBytes] = useState<Uint8Array | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
-  // Canvas state
+  // Page data for continuous scroll
+  const [pagesData, setPagesData] = useState<PageData[]>([]);
+  const [currentVisiblePage, setCurrentVisiblePage] = useState(1);
+  const [renderedPages, setRenderedPages] = useState<Set<number>>(new Set());
+  
+  // Canvas refs - one per page
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
-  const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
-  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
-  const fabricCanvasRef = useRef<FabricCanvas | null>(null);
-  const fabricInitKeyRef = useRef<string | null>(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 1000 });
+  const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const pdfCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
+  const overlayCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
+  const fabricCanvasRefs = useRef<Map<number, FabricCanvas>>(new Map());
   
   // Tool state
   const [activeTool, setActiveTool] = useState<ToolType>('select');
@@ -102,22 +109,14 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const [fontSize, setFontSize] = useState(18);
   const [fontFamily, setFontFamily] = useState('Arial');
   
-  // History state
-  const [canvasHistory, setCanvasHistory] = useState<string[]>([]);
+  // History state (per page)
+  const canvasHistoryRef = useRef<Map<number, string[]>>(new Map());
+  const historyIndexRef = useRef<Map<number, number>>(new Map());
   const [historyIndex, setHistoryIndex] = useState(-1);
-
-  // Keep latest history state in refs so rapid changes don’t collapse into 1 undo step
-  const canvasHistoryRef = useRef<string[]>([]);
-  const historyIndexRef = useRef<number>(-1);
+  const [canvasHistoryLength, setCanvasHistoryLength] = useState(0);
   
   // Annotations per page
   const pageAnnotationsRef = useRef<Map<number, AnnotationData[]>>(new Map());
-  
-  // Track which page the current fabric canvas belongs to (prevents saving to wrong page)
-  const canvasPageRef = useRef<number>(1);
-  
-  // Track previous scale for rescaling existing objects
-  const previousScaleRef = useRef<number>(1.0);
   
   // Auto-save state
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -127,51 +126,32 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Flag to prevent saving state during undo/redo operations
   const isRestoringHistoryRef = useRef(false);
   
-  // Smart line straightening (hold-to-straighten) state
+  // Smart line straightening state
   const [lineSnapEnabled, setLineSnapEnabled] = useState(true);
-  const lineSnapEnabledRef = useRef(true); // Ref to access current value in callbacks
-
-  // Fabric only emits `path:created` when the pointer is released.
-  // To support "draw a somewhat straight line and HOLD at the end", we detect whether
-  // the pointer stopped moving for LINE_SNAP_HOLD_DURATION right before mouse:up.
+  const lineSnapEnabledRef = useRef(true);
   const isStrokeInProgressRef = useRef(false);
   const lastSignificantMoveAtRef = useRef<number>(0);
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
   const shouldStraightenNextPathRef = useRef(false);
-
-  // Track tool-specific mouse handlers so we don't accidentally remove global listeners
-  const toolMouseDownHandlerRef = useRef<((e: any) => void) | null>(null);
-
-  const [fabricCanvasReady, setFabricCanvasReady] = useState(false); // Track canvas readiness
+  
+  // Pen drawing in cursor mode state
+  const isPenDrawingInCursorModeRef = useRef(false);
+  const activePenPageRef = useRef<number | null>(null);
   
   // Drag-to-scroll state for cursor mode
   const isDraggingToScrollRef = useRef(false);
   const dragStartPosRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
   
-  // Pinch-to-zoom state for cursor mode
+  // Pinch-to-zoom state
   const initialPinchDistanceRef = useRef<number | null>(null);
   const initialPinchScaleRef = useRef<number>(1);
   
-  // Pen drawing in cursor mode state
-  const isPenDrawingInCursorModeRef = useRef(false);
+  const LINE_SNAP_HOLD_DURATION = 200;
+  const LINE_STRAIGHTNESS_THRESHOLD = 0.25;
   
-  // Keep ref in sync with state
   useEffect(() => {
     lineSnapEnabledRef.current = lineSnapEnabled;
   }, [lineSnapEnabled]);
-
-  // Keep history refs in sync with state (and fix stale closures in event handlers)
-  useEffect(() => {
-    canvasHistoryRef.current = canvasHistory;
-  }, [canvasHistory]);
-
-  useEffect(() => {
-    historyIndexRef.current = historyIndex;
-  }, [historyIndex]);
-  
-  // Line snap configuration - increased tolerances for easier detection
-  const LINE_SNAP_HOLD_DURATION = 200; // ms to hold before snapping (reduced for faster detection)
-  const LINE_STRAIGHTNESS_THRESHOLD = 0.25; // max allowed deviation ratio (increased for easier detection)
 
   // Load PDF.js
   useEffect(() => {
@@ -180,7 +160,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         setLoading(true);
         
         if (window.pdfjsLib) {
-          // Ensure worker is configured even when PDF.js is already present
           (window.pdfjsLib as any).GlobalWorkerOptions.workerSrc =
             (window.pdfjsLib as any).GlobalWorkerOptions.workerSrc ||
             'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -213,11 +192,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     loadPdfJs();
     
     return () => {
-      // Cleanup
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.dispose();
-        fabricCanvasRef.current = null;
-      }
+      // Cleanup all fabric canvases
+      fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
+      fabricCanvasRefs.current.clear();
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current);
       }
@@ -228,9 +205,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     try {
       console.log('Loading PDF from URL:', pdfUrl);
       
-      // Fetch PDF bytes
       const response = await fetch(pdfUrl);
-      
       if (!response.ok) {
         throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
       }
@@ -238,45 +213,36 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       const arrayBuffer = await response.arrayBuffer();
       const pdfBytes = new Uint8Array(arrayBuffer);
       
-      console.log('PDF bytes loaded, size:', pdfBytes.length);
-      
-      // Validate PDF header
       if (pdfBytes.length < 5) {
         throw new Error('PDF file is too small or empty');
       }
       
-      // Check for PDF magic number (%PDF-)
       const header = String.fromCharCode(pdfBytes[0], pdfBytes[1], pdfBytes[2], pdfBytes[3], pdfBytes[4]);
-      console.log('PDF header:', header);
-      
       if (!header.startsWith('%PDF-')) {
-        console.error('Invalid PDF header. First 20 bytes:', 
-          Array.from(pdfBytes.slice(0, 20)).map(b => String.fromCharCode(b)).join(''));
         throw new Error('Invalid PDF file - missing PDF header');
       }
       
       setOriginalPdfBytes(pdfBytes);
 
-      // Load with PDF.js
-      console.log('Loading PDF with PDF.js...');
       const loadingTask = (window.pdfjsLib as any).getDocument({ data: pdfBytes.slice() });
       const pdf = await loadingTask.promise;
       
-      console.log('PDF.js loaded successfully. Pages:', pdf.numPages);
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
       
-      // Get first page dimensions
-      const page = await pdf.getPage(1);
-      const viewport = page.getViewport({ scale: 1.0 });
-      console.log('First page viewport:', viewport.width, 'x', viewport.height);
-      setCanvasSize({ width: viewport.width, height: viewport.height });
+      // Get all page dimensions
+      const pages: PageData[] = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 1.0 });
+        pages.push({ pageNum: i, width: viewport.width, height: viewport.height });
+      }
+      setPagesData(pages);
       
       // Load saved annotations
       await loadAnnotationsFromDatabase();
       
       setLoading(false);
-      console.log('PDF loading complete');
     } catch (error) {
       console.error('Error loading PDF:', error);
       toast({
@@ -288,7 +254,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
   };
 
-  // Load annotations from database
   const loadAnnotationsFromDatabase = async () => {
     try {
       const { data, error } = await supabase
@@ -307,168 +272,57 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           const annotations = row.annotations as unknown as AnnotationData[];
           pageAnnotationsRef.current.set(row.page_number, annotations);
         });
-        console.log('Loaded annotations for', data.length, 'pages');
       }
     } catch (error) {
       console.error('Error loading annotations:', error);
     }
   };
 
-  // Render PDF page (preview mode or as background in edit mode)
-  const renderPDFPage = useCallback(async (pageNum: number, targetCanvas?: HTMLCanvasElement) => {
-    console.log('renderPDFPage called, pageNum:', pageNum, 'pdfDoc:', !!pdfDoc);
-
-    if (!pdfDoc) {
-      console.error('Cannot render: pdfDoc is null');
-      return null;
-    }
-
+  // Render a specific PDF page
+  const renderPDFPage = useCallback(async (pageNum: number) => {
+    if (!pdfDoc) return;
+    
+    const pdfCanvas = pdfCanvasRefs.current.get(pageNum);
+    if (!pdfCanvas) return;
+    
     try {
-      console.log('Getting page', pageNum);
       const page = await pdfDoc.getPage(pageNum);
       const viewport = page.getViewport({ scale });
+      const context = pdfCanvas.getContext('2d');
+      if (!context) return;
 
-      console.log('Page viewport:', viewport.width, 'x', viewport.height);
+      pdfCanvas.width = viewport.width;
+      pdfCanvas.height = viewport.height;
 
-      const canvas = targetCanvas || document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      if (!context) {
-        console.error('Cannot get 2D context');
-        return null;
-      }
-
-      // Keep wrapper + overlay in sync with the actual rendered viewport
-      setCanvasSize({ width: viewport.width, height: viewport.height });
-
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-
-      console.log('Rendering page to canvas...');
       await page.render({
         canvasContext: context,
         viewport: viewport,
       }).promise;
-
-      console.log('Page rendered successfully');
-      return { canvas, viewport };
+      
+      setRenderedPages(prev => new Set([...prev, pageNum]));
     } catch (error) {
-      console.error('Error rendering PDF page:', error);
-      return null;
+      console.error(`Error rendering page ${pageNum}:`, error);
     }
   }, [pdfDoc, scale]);
 
-  // Initialize/update Fabric canvas for edit mode (overlay on top of a real PDF.js canvas)
-  const initializeFabricCanvas = useCallback(async () => {
-    console.log(
-      'initializeFabricCanvas called, overlayCanvasRef:',
-      !!overlayCanvasRef.current,
-      'pdfCanvasRef:',
-      !!pdfCanvasRef.current,
-      'pdfDoc:',
-      !!pdfDoc,
-    );
+  // Initialize Fabric canvas for a page
+  const initializeFabricCanvas = useCallback((pageNum: number) => {
+    const overlayCanvas = overlayCanvasRefs.current.get(pageNum);
+    const pageData = pagesData.find(p => p.pageNum === pageNum);
+    if (!overlayCanvas || !pageData) return;
 
-    if (!overlayCanvasRef.current || !pdfCanvasRef.current || !pdfDoc) {
-      console.error('Cannot initialize Fabric: missing refs');
-      return;
+    // Dispose existing if any
+    const existing = fabricCanvasRefs.current.get(pageNum);
+    if (existing) {
+      existing.dispose();
     }
 
-    // Render PDF page into the underlying PDF canvas
-    const result = await renderPDFPage(currentPage, pdfCanvasRef.current);
-    if (!result) {
-      console.error('Failed to render PDF page');
-      return;
-    }
+    const viewport = { width: pageData.width * scale, height: pageData.height * scale };
+    
+    overlayCanvas.width = viewport.width;
+    overlayCanvas.height = viewport.height;
 
-    const { viewport } = result;
-
-    const pageKey = `${currentPage}`;
-    const initKey = `${currentPage}-${scale}-${viewport.width}-${viewport.height}`;
-    const previousKey = fabricInitKeyRef.current;
-    const previousPageKey = previousKey ? previousKey.split('-')[0] : null;
-
-    // If we're already initialized for this page/zoom, don't recreate the canvas
-    if (fabricCanvasRef.current && fabricInitKeyRef.current === initKey) {
-      applyToolSettings(isEditMode ? activeTool : 'select');
-      if (!isEditMode) {
-        fabricCanvasRef.current.discardActiveObject();
-        fabricCanvasRef.current.selection = false;
-      }
-      fabricCanvasRef.current.calcOffset();
-      fabricCanvasRef.current.requestRenderAll();
-      return;
-    }
-
-    // Check if only scale changed (same page) - rescale existing objects instead of recreating
-    if (fabricCanvasRef.current && previousPageKey === pageKey && previousScaleRef.current !== scale) {
-      const scaleRatio = scale / previousScaleRef.current;
-      const canvas = fabricCanvasRef.current;
-      
-      // Rescale all existing objects
-      canvas.getObjects().forEach(obj => {
-        // Scale position
-        obj.set({
-          left: (obj.left || 0) * scaleRatio,
-          top: (obj.top || 0) * scaleRatio,
-        });
-        
-        // For paths, scale via scaleX/scaleY (preserves path shape)
-        if (obj.type === 'path') {
-          obj.set({
-            scaleX: (obj.scaleX || 1) * scaleRatio,
-            scaleY: (obj.scaleY || 1) * scaleRatio,
-            strokeWidth: (obj.strokeWidth || 1) * scaleRatio
-          });
-        } else {
-          // For shapes like rect, circle, textbox - scale their actual dimensions
-          obj.set({
-            scaleX: (obj.scaleX || 1) * scaleRatio,
-            scaleY: (obj.scaleY || 1) * scaleRatio,
-          });
-          
-          // Update stroke width for shapes
-          if (obj.strokeWidth) {
-            obj.set({ strokeWidth: obj.strokeWidth * scaleRatio });
-          }
-        }
-        
-        obj.setCoords();
-      });
-
-      // Resize the canvas (let Fabric handle retina scaling; do NOT manually set canvas.width/height)
-      canvas.setDimensions({ width: viewport.width, height: viewport.height });
-
-      previousScaleRef.current = scale;
-      fabricInitKeyRef.current = initKey;
-
-      // Offsets can be wrong immediately after resize; recalc + re-apply tool on next frame
-      requestAnimationFrame(() => {
-        canvas.calcOffset();
-        applyToolSettings(isEditMode ? activeTool : 'select');
-        if (!isEditMode) {
-          canvas.discardActiveObject();
-          canvas.selection = false;
-        }
-        canvas.requestRenderAll();
-      });
-
-      return;
-    }
-
-    // Dispose existing fabric canvas (page changed or first init)
-    if (fabricCanvasRef.current) {
-      saveCurrentPageAnnotations();
-      fabricCanvasRef.current.dispose();
-      fabricCanvasRef.current = null;
-      fabricInitKeyRef.current = null;
-      setFabricCanvasReady(false); // Reset ready flag
-    }
-
-    // Create overlay Fabric canvas with same size as PDF
-    overlayCanvasRef.current.width = viewport.width;
-    overlayCanvasRef.current.height = viewport.height;
-
-    const fabricCanvas = new FabricCanvas(overlayCanvasRef.current, {
+    const fabricCanvas = new FabricCanvas(overlayCanvas, {
       width: viewport.width,
       height: viewport.height,
       backgroundColor: 'transparent',
@@ -476,7 +330,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       selection: true,
     });
 
-    // Ensure the Fabric wrapper container is properly positioned and always sits above the PDF canvas
     const fabricWrapper = fabricCanvas.wrapperEl;
     if (fabricWrapper) {
       fabricWrapper.style.position = 'absolute';
@@ -486,358 +339,164 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       fabricWrapper.style.height = `${viewport.height}px`;
       fabricWrapper.style.zIndex = '20';
       fabricWrapper.style.pointerEvents = 'auto';
-
-      // Interaction styles are applied dynamically in applyToolSettings
-      (fabricWrapper.style as any).touchAction = 'manipulation';
-      (fabricWrapper.style as any).webkitUserSelect = 'auto';
-      fabricWrapper.style.userSelect = 'auto';
     }
 
-    // Ensure the canvases capture input reliably
-    const setInputCaptureStyles = (el?: HTMLCanvasElement | null) => {
-      if (!el) return;
-      el.style.pointerEvents = 'auto';
-      (el.style as any).touchAction = 'manipulation';
-      (el.style as any).webkitUserSelect = 'auto';
-      el.style.userSelect = 'auto';
-    };
-
-    setInputCaptureStyles(overlayCanvasRef.current);
-    setInputCaptureStyles((fabricCanvas as any).upperCanvasEl as HTMLCanvasElement | undefined);
-    setInputCaptureStyles((fabricCanvas as any).lowerCanvasEl as HTMLCanvasElement | undefined);
-
-    // Keep Fabric internal canvases in sync and make sure offsets are correct
-    fabricCanvas.setDimensions({ width: viewport.width, height: viewport.height });
-    fabricCanvas.calcOffset();
-
-    // Configure brush (safe)
-    if (fabricCanvas.freeDrawingBrush) {
-      fabricCanvas.freeDrawingBrush.color = drawingColor;
-      fabricCanvas.freeDrawingBrush.width = strokeWidth;
+    // Configure brush
+    if (!fabricCanvas.freeDrawingBrush) {
+      fabricCanvas.freeDrawingBrush = new PencilBrush(fabricCanvas);
     }
+    fabricCanvas.freeDrawingBrush.color = drawingColor;
+    fabricCanvas.freeDrawingBrush.width = strokeWidth;
 
     // Add event listeners
-    fabricCanvas.on('path:created', (e: any) => {
-      // Debug: helps verify drawing is actually producing paths
-      console.log('Fabric path:created', {
-        stroke: e?.path?.stroke,
-        strokeWidth: e?.path?.strokeWidth,
-        pointerType: e?.e?.pointerType,
-      });
-      saveCanvasState();
-
-      // Save immediately after each stroke (so user doesn't need to switch tools)
-      void saveCurrentPageAnnotationsToDb();
-
-      // Also keep the normal debounce autosave for other changes
+    fabricCanvas.on('path:created', () => {
+      saveCanvasState(pageNum);
+      saveCurrentPageAnnotationsToDb(pageNum);
       triggerAutoSave();
     });
 
     fabricCanvas.on('object:modified', () => {
-      saveCanvasState();
+      saveCanvasState(pageNum);
       triggerAutoSave();
     });
 
     fabricCanvas.on('object:removed', () => {
-      saveCanvasState();
+      saveCanvasState(pageNum);
       triggerAutoSave();
     });
 
-    fabricCanvasRef.current = fabricCanvas;
-    fabricInitKeyRef.current = initKey;
-    previousScaleRef.current = scale;
-    canvasPageRef.current = currentPage; // Track which page this canvas belongs to
-
+    fabricCanvasRefs.current.set(pageNum, fabricCanvas);
+    
     // Load annotations for this page
-    loadPageAnnotations(currentPage);
-    console.log(`Loaded annotations for page ${currentPage}, found ${pageAnnotationsRef.current.get(currentPage)?.length || 0} items`);
-
-    // Save initial state
-    saveCanvasState();
-
-    // Apply tool settings only when editing; keep preview overlay non-interactive
-    applyToolSettings(isEditMode ? activeTool : 'select');
+    loadPageAnnotations(pageNum, fabricCanvas);
+    
+    // Apply tool settings
+    applyToolSettings(isEditMode ? activeTool : 'select', fabricCanvas);
     if (!isEditMode) {
       fabricCanvas.selection = false;
       fabricCanvas.discardActiveObject();
     }
+    
     fabricCanvas.requestRenderAll();
+  }, [pagesData, scale, drawingColor, strokeWidth, isEditMode, activeTool]);
 
-    console.log('Fabric canvas initialization complete');
-    
-    // Signal that canvas is ready for line snap listeners
-    setFabricCanvasReady(true);
-  }, [pdfDoc, currentPage, scale]);
-
-  // Keep canvases (PDF + annotations overlay) in sync whenever page/zoom changes.
-  // We always initialize Fabric so annotations are visible in Preview too; we only enable interaction in Edit mode.
+  // Intersection Observer for lazy loading pages
   useEffect(() => {
-    console.log('Canvas sync effect - isEditMode:', isEditMode, 'pdfDoc:', !!pdfDoc, 'loading:', loading);
-    if (pdfDoc && !loading) {
-      const raf = window.requestAnimationFrame(() => {
-        initializeFabricCanvas();
-      });
-      return () => window.cancelAnimationFrame(raf);
-    }
-  }, [isEditMode, pdfDoc, loading, currentPage, scale, initializeFabricCanvas]);
+    if (!pdfDoc || pagesData.length === 0) return;
 
-  // Apply tool settings separately without reinitializing the canvas - prevents page jumping during text editing
-  useEffect(() => {
-    if (fabricCanvasRef.current && isEditMode) {
-      applyToolSettings(activeTool);
-      
-      // Update brush settings if drawing
-      if (fabricCanvasRef.current.freeDrawingBrush) {
-        fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
-        fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
-      }
-      
-      fabricCanvasRef.current.requestRenderAll();
-    }
-  }, [activeTool, drawingColor, strokeWidth, isEditMode]);
-
-  // Smart Line Straightening: Extract points from a Fabric.js path
-  const extractPathPoints = (pathData: any[]): { x: number; y: number }[] => {
-    const points: { x: number; y: number }[] = [];
-    if (!Array.isArray(pathData)) return points;
-    
-    for (const segment of pathData) {
-      if (!Array.isArray(segment)) continue;
-      const [command, ...coords] = segment;
-      
-      // Handle different path commands
-      if (command === 'M' || command === 'L') {
-        // MoveTo or LineTo: coords are [x, y]
-        if (coords.length >= 2) {
-          points.push({ x: coords[0], y: coords[1] });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          const pageNum = parseInt(entry.target.getAttribute('data-page') || '1');
+          if (entry.isIntersecting) {
+            // Render the page if not already rendered
+            if (!renderedPages.has(pageNum)) {
+              renderPDFPage(pageNum);
+            }
+            // Initialize fabric canvas if needed
+            if (!fabricCanvasRefs.current.has(pageNum)) {
+              initializeFabricCanvas(pageNum);
+            }
+          }
+        });
+        
+        // Update current visible page
+        const visibleEntries = entries.filter(e => e.isIntersecting);
+        if (visibleEntries.length > 0) {
+          const mostVisible = visibleEntries.reduce((a, b) => 
+            a.intersectionRatio > b.intersectionRatio ? a : b
+          );
+          const pageNum = parseInt(mostVisible.target.getAttribute('data-page') || '1');
+          setCurrentVisiblePage(pageNum);
         }
-      } else if (command === 'Q') {
-        // Quadratic curve: coords are [cpX, cpY, x, y] - use endpoint
-        if (coords.length >= 4) {
-          points.push({ x: coords[2], y: coords[3] });
-        }
-      } else if (command === 'C') {
-        // Cubic curve: coords are [cp1X, cp1Y, cp2X, cp2Y, x, y] - use endpoint
-        if (coords.length >= 6) {
-          points.push({ x: coords[4], y: coords[5] });
-        }
-      }
-    }
-    return points;
-  };
-
-  // Calculate the maximum perpendicular distance from points to the ideal line
-  const calculateStraightnessScore = (points: { x: number; y: number }[]): number => {
-    if (points.length < 2) return 0;
-    
-    const start = points[0];
-    const end = points[points.length - 1];
-    
-    // Calculate line length
-    const lineLength = Math.sqrt(
-      Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)
+      },
+      { root: canvasContainerRef.current, rootMargin: '100px', threshold: 0.1 }
     );
-    
-    if (lineLength < 10) return 1; // Very short strokes don't qualify
-    
-    // Calculate max perpendicular distance from the ideal line
-    let maxDistance = 0;
-    
-    for (const point of points) {
-      // Perpendicular distance from point to line (start -> end)
-      const distance = Math.abs(
-        (end.y - start.y) * point.x - 
-        (end.x - start.x) * point.y + 
-        end.x * start.y - 
-        end.y * start.x
-      ) / lineLength;
-      
-      maxDistance = Math.max(maxDistance, distance);
-    }
-    
-    // Return the ratio of max deviation to line length
-    return maxDistance / lineLength;
-  };
 
-  // Replace a freehand path with a straight line
-  const replaceWithStraightLine = (path: Path) => {
-    if (!fabricCanvasRef.current) return;
-    
-    const pathData = path.path;
-    if (!pathData) return;
-    
-    const points = extractPathPoints(pathData);
-    if (points.length < 2) return;
-    
-    const canvas = fabricCanvasRef.current;
-    const start = points[0];
-    const end = points[points.length - 1];
-    
-    // Get path properties
-    const pathLeft = path.left || 0;
-    const pathTop = path.top || 0;
-    
-    // Calculate absolute positions (path points are relative to path origin)
-    const startX = pathLeft + start.x;
-    const startY = pathTop + start.y;
-    const endX = pathLeft + end.x;
-    const endY = pathTop + end.y;
-    
-    // Create a straight line with same styling
-    const straightLine = new Line([startX, startY, endX, endY], {
-      stroke: path.stroke as string,
-      strokeWidth: path.strokeWidth,
-      strokeLineCap: 'round',
-      strokeLineJoin: 'round',
-      fill: 'transparent',
-      selectable: true,
-      evented: true,
+    pageRefs.current.forEach((ref) => {
+      observer.observe(ref);
     });
-    
-    // Animate the transition (brief visual feedback)
-    path.set({ opacity: 0.5 });
-    canvas.add(straightLine);
-    canvas.remove(path);
-    canvas.requestRenderAll();
-    
-    // Flash effect for feedback
-    straightLine.set({ opacity: 0 });
-    canvas.requestRenderAll();
-    
-    // Fade in the straight line
-    let opacity = 0;
-    const fadeIn = setInterval(() => {
-      opacity += 0.2;
-      straightLine.set({ opacity: Math.min(1, opacity) });
-      canvas.requestRenderAll();
-      if (opacity >= 1) {
-        clearInterval(fadeIn);
-        saveCanvasState();
-        triggerAutoSave();
-      }
-    }, 30);
-  };
 
-  // Analyze and potentially straighten a drawn path
-  const analyzeAndStraightenPath = (path: Path) => {
-    if (!lineSnapEnabledRef.current) return;
-    
-    const pathData = path.path;
-    if (!pathData) return;
-    
-    const points = extractPathPoints(pathData);
-    if (points.length < 3) return; // Need at least 3 points to analyze
-    
-    const straightnessScore = calculateStraightnessScore(points);
-    
-    console.log('Line straightness score:', straightnessScore, '(threshold:', LINE_STRAIGHTNESS_THRESHOLD, ')');
-    
-    if (straightnessScore <= LINE_STRAIGHTNESS_THRESHOLD) {
-      replaceWithStraightLine(path);
-    }
-  };
+    return () => observer.disconnect();
+  }, [pdfDoc, pagesData, scale, renderedPages, renderPDFPage, initializeFabricCanvas]);
 
-  // Hold-to-straighten is handled via Fabric mouse events (see the effect below).
-
-  // Set up hold-to-straighten listeners on the Fabric canvas
+  // Re-render pages when scale changes
   useEffect(() => {
-    if (!fabricCanvasReady || !fabricCanvasRef.current || !isEditMode) return;
+    if (!pdfDoc) return;
+    setRenderedPages(new Set());
+    // Dispose all fabric canvases
+    fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
+    fabricCanvasRefs.current.clear();
+  }, [scale, pdfDoc]);
 
-    const canvas = fabricCanvasRef.current;
-    const MOVE_EPS = 2; // px of movement that counts as "still"
+  const saveCanvasState = (pageNum: number) => {
+    const canvas = fabricCanvasRefs.current.get(pageNum);
+    if (!canvas || isRestoringHistoryRef.current) return;
 
-    const onMouseDown = (e: any) => {
-      if (!lineSnapEnabledRef.current) return;
-      if (activeTool !== 'draw') return;
+    const state = JSON.stringify(canvas.toJSON());
+    const history = canvasHistoryRef.current.get(pageNum) || [];
+    const index = historyIndexRef.current.get(pageNum) ?? -1;
 
-      isStrokeInProgressRef.current = true;
-      shouldStraightenNextPathRef.current = false;
+    if (history.length > 0 && index >= 0 && history[index] === state) {
+      return;
+    }
 
-      const p = canvas.getPointer(e.e);
-      lastPointerRef.current = { x: p.x, y: p.y };
-      lastSignificantMoveAtRef.current = Date.now();
-    };
+    const newHistory = history.slice(0, index + 1);
+    newHistory.push(state);
 
-    const onMouseMove = (e: any) => {
-      if (!isStrokeInProgressRef.current) return;
-      if (activeTool !== 'draw') return;
+    canvasHistoryRef.current.set(pageNum, newHistory);
+    historyIndexRef.current.set(pageNum, newHistory.length - 1);
 
-      const p = canvas.getPointer(e.e);
-      const prev = lastPointerRef.current;
-      if (!prev) {
-        lastPointerRef.current = { x: p.x, y: p.y };
-        return;
-      }
-
-      const dist = Math.hypot(p.x - prev.x, p.y - prev.y);
-      if (dist >= MOVE_EPS) {
-        lastPointerRef.current = { x: p.x, y: p.y };
-        lastSignificantMoveAtRef.current = Date.now();
-      }
-    };
-
-    const onMouseUp = () => {
-      if (!isStrokeInProgressRef.current) return;
-
-      isStrokeInProgressRef.current = false;
-      lastPointerRef.current = null;
-
-      const heldForMs = Date.now() - lastSignificantMoveAtRef.current;
-      shouldStraightenNextPathRef.current = heldForMs >= LINE_SNAP_HOLD_DURATION;
-    };
-
-    const onPathCreated = (e: any) => {
-      if (!lineSnapEnabledRef.current) return;
-      if (activeTool !== 'draw') return;
-      if (!e?.path) return;
-
-      if (shouldStraightenNextPathRef.current) {
-        shouldStraightenNextPathRef.current = false;
-        analyzeAndStraightenPath(e.path as Path);
-      }
-    };
-
-    canvas.on('mouse:down', onMouseDown);
-    canvas.on('mouse:move', onMouseMove);
-    canvas.on('mouse:up', onMouseUp);
-    canvas.on('path:created', onPathCreated);
-
-    return () => {
-      canvas.off('mouse:down', onMouseDown);
-      canvas.off('mouse:move', onMouseMove);
-      canvas.off('mouse:up', onMouseUp);
-      canvas.off('path:created', onPathCreated);
-    };
-  }, [isEditMode, fabricCanvasReady, activeTool]);
-
-  // Helper function to normalize path data (divide by scale)
-  const normalizePathData = (pathData: any, currentScale: number): any => {
-    if (!Array.isArray(pathData)) return pathData;
-    
-    return pathData.map((segment: any) => {
-      if (!Array.isArray(segment)) return segment;
-      
-      // First element is the command (M, L, C, Q, etc.), rest are coordinates
-      const [command, ...coords] = segment;
-      const normalizedCoords = coords.map((coord: any) => 
-        typeof coord === 'number' ? coord / currentScale : coord
-      );
-      return [command, ...normalizedCoords];
-    });
+    if (pageNum === currentVisiblePage) {
+      setHistoryIndex(newHistory.length - 1);
+      setCanvasHistoryLength(newHistory.length);
+    }
   };
 
-  // Save current page annotations - normalize coordinates to scale 1.0
-  // Uses canvasPageRef to ensure annotations are saved to the correct page even during page transitions
-  const saveCurrentPageAnnotations = () => {
-    if (!fabricCanvasRef.current) return;
+  const triggerAutoSave = () => {
+    hasUnsavedChanges.current = true;
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      performAutoSave();
+    }, 3000);
+  };
+
+  const saveCurrentPageAnnotationsToDb = async (pageNum: number) => {
+    try {
+      saveCurrentPageAnnotations(pageNum);
+      const annotations = pageAnnotationsRef.current.get(pageNum) || [];
+
+      const { error } = await supabase
+        .from('pdf_annotations')
+        .upsert(
+          {
+            project_id: projectId,
+            file_name: fileName,
+            page_number: pageNum,
+            annotations: annotations as unknown as any,
+          },
+          {
+            onConflict: 'project_id,file_name,page_number',
+          },
+        );
+
+      if (error) throw error;
+      setLastSaved(new Date());
+    } catch (error) {
+      console.error('Immediate annotation save failed:', error);
+    }
+  };
+
+  const saveCurrentPageAnnotations = (pageNum: number) => {
+    const canvas = fabricCanvasRefs.current.get(pageNum);
+    if (!canvas) return;
     
-    const pageToSave = canvasPageRef.current; // Use the page the canvas was initialized for
-    const currentScale = previousScaleRef.current; // Use tracked scale for accurate normalization
-    const objects = fabricCanvasRef.current.getObjects();
+    const objects = canvas.getObjects();
+    const currentScale = scale;
     
-    // Normalize all coordinates by dividing by current scale so they're stored relative to scale 1.0
     const annotations: AnnotationData[] = objects.map(obj => {
-      // Get the actual object dimensions accounting for any transforms
       const objScaleX = obj.scaleX || 1;
       const objScaleY = obj.scaleY || 1;
       
@@ -855,31 +514,36 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         fontFamily: obj.type === 'textbox' ? (obj as Textbox).fontFamily : undefined,
         radius: obj.type === 'circle' ? (((obj as FabricCircle).radius || 0) * objScaleX) / currentScale : undefined,
         path: obj.type === 'path' ? normalizePathData((obj as Path).path, currentScale) : undefined,
-        scaleX: 1, // Bake in transforms, reset to 1
+        scaleX: 1,
         scaleY: 1,
         angle: obj.angle
       };
     });
     
-    pageAnnotationsRef.current.set(pageToSave, annotations);
-    console.log(`Saved ${annotations.length} annotations to page ${pageToSave}`);
+    pageAnnotationsRef.current.set(pageNum, annotations);
   };
 
-  // Load annotations for a specific page - scale coordinates from normalized (scale 1.0) to current scale
-  const loadPageAnnotations = (pageNum: number) => {
-    if (!fabricCanvasRef.current) return;
+  const normalizePathData = (pathData: any, currentScale: number): any => {
+    if (!Array.isArray(pathData)) return pathData;
     
-    // Clear existing objects from canvas before loading page-specific annotations
-    const existingCount = fabricCanvasRef.current.getObjects().length;
-    fabricCanvasRef.current.clear();
-    fabricCanvasRef.current.backgroundColor = 'transparent';
-    console.log(`Cleared ${existingCount} objects from canvas before loading page ${pageNum}`);
+    return pathData.map((segment: any) => {
+      if (!Array.isArray(segment)) return segment;
+      const [command, ...coords] = segment;
+      const normalizedCoords = coords.map((coord: any) => 
+        typeof coord === 'number' ? coord / currentScale : coord
+      );
+      return [command, ...normalizedCoords];
+    });
+  };
+
+  const loadPageAnnotations = (pageNum: number, canvas: FabricCanvas) => {
+    canvas.clear();
+    canvas.backgroundColor = 'transparent';
     
     const annotations = pageAnnotationsRef.current.get(pageNum) || [];
     
     annotations.forEach(annotation => {
       let obj;
-      // Scale all coordinates from normalized (scale 1.0) to current scale
       const commonProps = {
         left: (annotation.left || 0) * scale,
         top: (annotation.top || 0) * scale,
@@ -919,7 +583,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           break;
         case 'path':
           if (annotation.path) {
-            // For paths, we need to scale the path data itself
             const scaledPath = scalePathData(annotation.path, scale);
             obj = new Path(scaledPath, {
               ...commonProps,
@@ -932,21 +595,24 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       }
       
       if (obj) {
-        fabricCanvasRef.current?.add(obj);
+        canvas.add(obj);
       }
     });
     
-    fabricCanvasRef.current.renderAll();
+    canvas.renderAll();
+    
+    // Initialize history for this page
+    if (!canvasHistoryRef.current.has(pageNum)) {
+      canvasHistoryRef.current.set(pageNum, [JSON.stringify(canvas.toJSON())]);
+      historyIndexRef.current.set(pageNum, 0);
+    }
   };
-  
-  // Helper function to scale path data
+
   const scalePathData = (pathData: any, targetScale: number): any => {
     if (!Array.isArray(pathData)) return pathData;
     
     return pathData.map((segment: any) => {
       if (!Array.isArray(segment)) return segment;
-      
-      // First element is the command (M, L, C, Q, etc.), rest are coordinates
       const [command, ...coords] = segment;
       const scaledCoords = coords.map((coord: any) => 
         typeof coord === 'number' ? coord * targetScale : coord
@@ -955,82 +621,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     });
   };
 
-  // Save canvas state for undo/redo (one step per annotation action)
-  const saveCanvasState = () => {
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) return;
-
-    // Don't save state during undo/redo operations
-    if (isRestoringHistoryRef.current) return;
-
-    const state = JSON.stringify(canvas.toJSON());
-    const history = canvasHistoryRef.current;
-    const index = historyIndexRef.current;
-
-    // Avoid duplicate states - don't save if identical to current state
-    if (history.length > 0 && index >= 0 && history[index] === state) {
-      return;
-    }
-
-    const newHistory = history.slice(0, index + 1);
-    newHistory.push(state);
-
-    // Update refs immediately so rapid successive changes don't overwrite each other
-    canvasHistoryRef.current = newHistory;
-    historyIndexRef.current = newHistory.length - 1;
-
-    setCanvasHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  };
-
-  // Auto-save trigger
-  const triggerAutoSave = () => {
-    hasUnsavedChanges.current = true;
-
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
-    }
-
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      if (hasUnsavedChanges.current) {
-        await performAutoSave();
-      }
-    }, 3000);
-  };
-
-  const saveCurrentPageAnnotationsToDb = async () => {
-    try {
-      saveCurrentPageAnnotations();
-      const pageToSave = canvasPageRef.current; // Use the tracked canvas page
-      const annotations = pageAnnotationsRef.current.get(pageToSave) || [];
-
-      const { error } = await supabase
-        .from('pdf_annotations')
-        .upsert(
-          {
-            project_id: projectId,
-            file_name: fileName,
-            page_number: pageToSave,
-            annotations: annotations as unknown as any,
-          },
-          {
-            onConflict: 'project_id,file_name,page_number',
-          },
-        );
-
-      if (error) throw error;
-      setLastSaved(new Date());
-    } catch (error) {
-      console.error('Immediate annotation save failed:', error);
-    }
-  };
-
-  // Perform auto-save
   const performAutoSave = async () => {
     try {
-      saveCurrentPageAnnotations();
+      // Save all pages with fabric canvases
+      fabricCanvasRefs.current.forEach((_, pageNum) => {
+        saveCurrentPageAnnotations(pageNum);
+      });
 
-      // Save to database
       for (const [pageNum, annotations] of pageAnnotationsRef.current.entries()) {
         const { error } = await supabase
           .from('pdf_annotations')
@@ -1055,465 +652,182 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
   };
 
-  const focusTextboxEditing = (textbox: Textbox) => {
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) return;
+  const applyToolSettings = (tool: ToolType, canvas?: FabricCanvas) => {
+    const canvases = canvas ? [canvas] : Array.from(fabricCanvasRefs.current.values());
+    
+    canvases.forEach(c => {
+      c.isDrawingMode = false;
+      c.selection = true;
+      c.defaultCursor = 'default';
 
-    // Make wrapper focusable (helps keyboard events in some browsers)
-    if (canvas.wrapperEl && !canvas.wrapperEl.hasAttribute('tabindex')) {
-      canvas.wrapperEl.setAttribute('tabindex', '0');
-      canvas.wrapperEl.style.outline = 'none';
-    }
+      switch (tool) {
+        case 'draw':
+          c.isDrawingMode = true;
+          c.selection = false;
+          c.defaultCursor = 'crosshair';
+          if (!c.freeDrawingBrush) {
+            c.freeDrawingBrush = new PencilBrush(c);
+          }
+          c.freeDrawingBrush.color = drawingColor;
+          c.freeDrawingBrush.width = strokeWidth;
+          break;
 
-    canvas.isDrawingMode = false;
-    canvas.setActiveObject(textbox);
-    canvas.requestRenderAll();
+        case 'erase':
+          c.selection = false;
+          c.defaultCursor = 'crosshair';
+          break;
 
-    const tryFocus = () => {
-      // Enter editing first so Fabric creates the hidden textarea
-      textbox.enterEditing();
-      textbox.selectAll();
+        case 'text':
+          c.selection = true;
+          c.defaultCursor = 'text';
+          break;
 
-      const ta =
-        ((textbox as any).hiddenTextarea as HTMLTextAreaElement | undefined) ??
-        ((canvas as any).hiddenTextarea as HTMLTextAreaElement | undefined);
+        case 'rectangle':
+        case 'circle':
+          c.selection = false;
+          c.defaultCursor = 'crosshair';
+          break;
 
-      // If we're inside a modal (Radix Dialog), focusing an element outside the dialog
-      // is blocked by the focus trap. Keep the hidden textarea inside the canvas wrapper.
-      if (ta && canvas.wrapperEl && ta.parentElement !== canvas.wrapperEl) {
-        canvas.wrapperEl.appendChild(ta);
+        case 'cursor':
+          c.selection = false;
+          c.defaultCursor = 'grab';
+          c.hoverCursor = 'grab';
+          c.isDrawingMode = false;
+          c.getObjects().forEach(obj => {
+            obj.selectable = false;
+            obj.evented = false;
+          });
+          if (!c.freeDrawingBrush) {
+            c.freeDrawingBrush = new PencilBrush(c);
+          }
+          c.freeDrawingBrush.color = drawingColor;
+          c.freeDrawingBrush.width = strokeWidth;
+          break;
+
+        case 'select':
+        default:
+          c.selection = true;
+          c.defaultCursor = 'default';
+          c.hoverCursor = 'move';
+          c.getObjects().forEach(obj => {
+            obj.selectable = true;
+            obj.evented = true;
+          });
+          break;
       }
-
-      if (ta) {
-        ta.focus();
-        ta.select();
-      } else if (canvas.wrapperEl) {
-        canvas.wrapperEl.focus();
-      }
-    };
-
-    // First attempt must be synchronous (keeps it within the user gesture)
-    tryFocus();
-
-    // Some browsers (Safari/iOS) need a next-frame retry
-    requestAnimationFrame(() => {
-      if (!(textbox as any).isEditing) {
-        tryFocus();
-      }
+      
+      c.requestRenderAll();
     });
   };
 
-  // Apply tool settings
-  const applyToolSettings = (tool: ToolType) => {
-    if (!fabricCanvasRef.current) return;
-
-    const canvas = fabricCanvasRef.current;
-
-    // Keep wrapper/canvases in the correct interaction mode.
-    // (Draw/erase need touchAction=none; text needs selection/focus.)
-    const isDrawLike = isEditMode && (tool === 'draw' || tool === 'erase');
-    const wrapper = canvas.wrapperEl;
-    const upper = (canvas as any).upperCanvasEl as HTMLCanvasElement | undefined;
-    const lower = (canvas as any).lowerCanvasEl as HTMLCanvasElement | undefined;
-
-    const applyInteraction = (el?: HTMLElement | null) => {
-      if (!el) return;
-      (el.style as any).touchAction = isDrawLike ? 'none' : 'manipulation';
-      (el.style as any).webkitUserSelect = isDrawLike ? 'none' : 'auto';
-      el.style.userSelect = isDrawLike ? 'none' : 'auto';
-    };
-
-    applyInteraction(wrapper);
-    applyInteraction(upper);
-    applyInteraction(lower);
-
-    // Make sure pointer math is up-to-date right before switching modes
-    canvas.calcOffset();
-
-    // Reset modes
-    canvas.isDrawingMode = false;
-    canvas.selection = true;
-    canvas.defaultCursor = 'default';
-
-    // Remove previous tool-specific click handler (do NOT remove global listeners)
-    if (toolMouseDownHandlerRef.current) {
-      canvas.off('mouse:down', toolMouseDownHandlerRef.current);
-      toolMouseDownHandlerRef.current = null;
+  // Update all fabric canvases when tool changes
+  useEffect(() => {
+    if (isEditMode) {
+      applyToolSettings(activeTool);
     }
+  }, [activeTool, drawingColor, strokeWidth, isEditMode]);
 
-    switch (tool) {
-      case 'draw': {
-        canvas.isDrawingMode = true;
-        canvas.selection = false;
-        canvas.defaultCursor = 'crosshair';
-        (canvas as any).freeDrawingCursor = 'crosshair';
-
-        // Ensure a PencilBrush exists (required for reliable mouse + pen drawing in Fabric v6)
-        if (!canvas.freeDrawingBrush) {
-          canvas.freeDrawingBrush = new PencilBrush(canvas);
-        }
-
-        canvas.freeDrawingBrush.color = drawingColor;
-        canvas.freeDrawingBrush.width = strokeWidth;
-        // Optional smoothing; keep mild so cursor drawing feels natural
-        (canvas.freeDrawingBrush as any).decimate = 0;
-
-        break;
-      }
-
-      case 'erase': {
-        canvas.selection = false;
-        canvas.defaultCursor = 'crosshair';
-
-        const handler = (e: any) => {
-          if (e.target) {
-            canvas.remove(e.target);
-            saveCanvasState();
-            triggerAutoSave();
-          }
-        };
-
-        canvas.on('mouse:down', handler);
-        toolMouseDownHandlerRef.current = handler;
-        break;
-      }
-
-
-      case 'text': {
-        canvas.selection = true;
-        canvas.defaultCursor = 'text';
-
-        const handler = (e: any) => {
-          // If clicked on existing textbox, let user edit it
-          if (e.target && e.target.type === 'textbox') {
-            focusTextboxEditing(e.target as Textbox);
-            return;
-          }
-
-          const pointer = canvas.getPointer(e.e);
-          const textbox = new Textbox('Type here...', {
-            left: pointer.x,
-            top: pointer.y,
-            width: 220,
-            fontSize,
-            fontFamily,
-            fill: drawingColor,
-            borderColor: '#0066ff',
-            cornerColor: '#0066ff',
-            cornerSize: 8,
-            transparentCorners: false,
-            editable: true,
-          });
-
-          textbox.on('changed', () => triggerAutoSave());
-          textbox.on('editing:exited', () => {
-            triggerAutoSave();
-            // Remove empty textboxes when user exits without typing
-            if (!textbox.text || textbox.text.trim() === '' || textbox.text === 'Type here...') {
-              canvas.remove(textbox);
-              saveCanvasState();
-            }
-          });
-
-          canvas.add(textbox);
-          focusTextboxEditing(textbox);
-
-          saveCanvasState();
-          triggerAutoSave();
-        };
-
-        canvas.on('mouse:down', handler);
-        toolMouseDownHandlerRef.current = handler;
-        break;
-      }
-
-
-      case 'rectangle': {
-        canvas.selection = false;
-        canvas.defaultCursor = 'crosshair';
-
-        const handler = (e: any) => {
-          const pointer = canvas.getPointer(e.e);
-          const rect = new Rect({
-            left: pointer.x,
-            top: pointer.y,
-            width: 160,
-            height: 100,
-            fill: 'transparent',
-            stroke: drawingColor,
-            strokeWidth,
-            borderColor: '#0066ff',
-            cornerColor: '#0066ff',
-            cornerSize: 8,
-            transparentCorners: false,
-          });
-
-          canvas.add(rect);
-          canvas.setActiveObject(rect);
-          saveCanvasState();
-          triggerAutoSave();
-
-          setActiveTool('select');
-          setTimeout(() => applyToolSettings('select'), 0);
-        };
-
-        canvas.on('mouse:down', handler);
-        toolMouseDownHandlerRef.current = handler;
-        break;
-      }
-
-
-      case 'circle': {
-        canvas.selection = false;
-        canvas.defaultCursor = 'crosshair';
-
-        const handler = (e: any) => {
-          const pointer = canvas.getPointer(e.e);
-          const circle = new FabricCircle({
-            left: pointer.x,
-            top: pointer.y,
-            radius: 60,
-            fill: 'transparent',
-            stroke: drawingColor,
-            strokeWidth,
-            borderColor: '#0066ff',
-            cornerColor: '#0066ff',
-            cornerSize: 8,
-            transparentCorners: false,
-          });
-
-          canvas.add(circle);
-          canvas.setActiveObject(circle);
-          saveCanvasState();
-          triggerAutoSave();
-
-          setActiveTool('select');
-          setTimeout(() => applyToolSettings('select'), 0);
-        };
-
-        canvas.on('mouse:down', handler);
-        toolMouseDownHandlerRef.current = handler;
-        break;
-      }
-
-
-      case 'cursor': {
-        // Cursor mode: disable canvas interactions, allow drag-to-scroll
-        // BUT still allow pen/stylus drawing
-        canvas.selection = false;
-        canvas.defaultCursor = 'grab';
-        canvas.hoverCursor = 'grab';
-        
-        // Disable all object selection
-        canvas.getObjects().forEach(obj => {
-          obj.selectable = false;
-          obj.evented = false;
-        });
-        
-        // Enable drawing mode but we'll control it via pointer events
-        // The actual drawing will only happen when pen is detected
-        canvas.isDrawingMode = false; // Start with drawing off, enable on pen detection
-        
-        // Ensure brush is ready for pen input
-        if (!canvas.freeDrawingBrush) {
-          canvas.freeDrawingBrush = new PencilBrush(canvas);
-        }
-        canvas.freeDrawingBrush.color = drawingColor;
-        canvas.freeDrawingBrush.width = strokeWidth;
-        break;
-      }
-
-      case 'select':
-      default:
-        canvas.selection = true;
-        canvas.defaultCursor = 'default';
-        canvas.hoverCursor = 'move';
-        // Re-enable object selection
-        canvas.getObjects().forEach(obj => {
-          obj.selectable = true;
-          obj.evented = true;
-        });
-        break;
-    }
-  };
-
-  // Handle tool change
   const handleToolChange = (tool: ToolType) => {
     setActiveTool(tool);
-    applyToolSettings(tool);
   };
 
-  // Add textbox
-  const addTextbox = () => {
-    if (!fabricCanvasRef.current) return;
-
-    const canvas = fabricCanvasRef.current;
-    const textbox = new Textbox('Type here...', {
-      left: 100,
-      top: 100,
-      width: 200,
-      fontSize: fontSize,
-      fontFamily: fontFamily,
-      fill: drawingColor,
-      borderColor: '#0066ff',
-      cornerColor: '#0066ff',
-      cornerSize: 8,
-      transparentCorners: false,
-      editable: true,
-    });
-
-    textbox.on('changed', () => triggerAutoSave());
-    textbox.on('editing:exited', () => {
-      triggerAutoSave();
-      if (!textbox.text || textbox.text.trim() === '' || textbox.text === 'Type here...') {
-        fabricCanvasRef.current?.remove(textbox);
-      }
-    });
-
-    canvas.add(textbox);
-    focusTextboxEditing(textbox);
-
-    saveCanvasState();
-  };
-
-  // Add rectangle
-  const addRectangle = () => {
-    if (!fabricCanvasRef.current) return;
-    
-    const rect = new Rect({
-      left: 100,
-      top: 100,
-      width: 120,
-      height: 80,
-      fill: 'transparent',
-      stroke: drawingColor,
-      strokeWidth: strokeWidth,
-      borderColor: '#0066ff',
-      cornerColor: '#0066ff',
-      cornerSize: 8,
-      transparentCorners: false
-    });
-    
-    fabricCanvasRef.current.add(rect);
-    fabricCanvasRef.current.setActiveObject(rect);
-    saveCanvasState();
-  };
-
-  // Add circle
-  const addCircle = () => {
-    if (!fabricCanvasRef.current) return;
-    
-    const circle = new FabricCircle({
-      left: 100,
-      top: 100,
-      radius: 50,
-      fill: 'transparent',
-      stroke: drawingColor,
-      strokeWidth: strokeWidth,
-      borderColor: '#0066ff',
-      cornerColor: '#0066ff',
-      cornerSize: 8,
-      transparentCorners: false
-    });
-    
-    fabricCanvasRef.current.add(circle);
-    fabricCanvasRef.current.setActiveObject(circle);
-    saveCanvasState();
-  };
-
-  // Undo
   const undo = () => {
-    const canvas = fabricCanvasRef.current;
-    const idx = historyIndexRef.current;
-    const history = canvasHistoryRef.current;
+    const canvas = fabricCanvasRefs.current.get(currentVisiblePage);
+    const history = canvasHistoryRef.current.get(currentVisiblePage) || [];
+    const idx = historyIndexRef.current.get(currentVisiblePage) ?? -1;
 
     if (!canvas || idx <= 0) return;
 
     const newIndex = idx - 1;
     const state = history[newIndex];
 
-    // Set flag to prevent saveCanvasState from being called during loadFromJSON
     isRestoringHistoryRef.current = true;
 
     canvas.loadFromJSON(JSON.parse(state), () => {
       canvas.renderAll();
-
-      historyIndexRef.current = newIndex;
+      historyIndexRef.current.set(currentVisiblePage, newIndex);
       setHistoryIndex(newIndex);
-
-      // Reset flag after restore is complete
       isRestoringHistoryRef.current = false;
-
       triggerAutoSave();
     });
   };
 
-  // Redo
   const redo = () => {
-    const canvas = fabricCanvasRef.current;
-    const idx = historyIndexRef.current;
-    const history = canvasHistoryRef.current;
+    const canvas = fabricCanvasRefs.current.get(currentVisiblePage);
+    const history = canvasHistoryRef.current.get(currentVisiblePage) || [];
+    const idx = historyIndexRef.current.get(currentVisiblePage) ?? -1;
 
     if (!canvas || idx >= history.length - 1) return;
 
     const newIndex = idx + 1;
     const state = history[newIndex];
 
-    // Set flag to prevent saveCanvasState from being called during loadFromJSON
     isRestoringHistoryRef.current = true;
 
     canvas.loadFromJSON(JSON.parse(state), () => {
       canvas.renderAll();
-
-      historyIndexRef.current = newIndex;
+      historyIndexRef.current.set(currentVisiblePage, newIndex);
       setHistoryIndex(newIndex);
-
-      // Reset flag after restore is complete
       isRestoringHistoryRef.current = false;
-
       triggerAutoSave();
     });
   };
 
-  // Clear annotations
   const clearAnnotations = () => {
-    if (!fabricCanvasRef.current) return;
+    const canvas = fabricCanvasRefs.current.get(currentVisiblePage);
+    if (!canvas) return;
     
-    const objects = fabricCanvasRef.current.getObjects();
-    objects.forEach(obj => fabricCanvasRef.current?.remove(obj));
-    fabricCanvasRef.current.renderAll();
-    saveCanvasState();
+    canvas.getObjects().forEach(obj => canvas.remove(obj));
+    canvas.renderAll();
+    saveCanvasState(currentVisiblePage);
     triggerAutoSave();
   };
 
-  // Delete selected object
   const deleteSelected = () => {
-    if (!fabricCanvasRef.current) return;
+    const canvas = fabricCanvasRefs.current.get(currentVisiblePage);
+    if (!canvas) return;
     
-    const activeObject = fabricCanvasRef.current.getActiveObject();
+    const activeObject = canvas.getActiveObject();
     if (activeObject) {
-      fabricCanvasRef.current.remove(activeObject);
-      fabricCanvasRef.current.renderAll();
-      saveCanvasState();
+      canvas.remove(activeObject);
+      canvas.renderAll();
+      saveCanvasState(currentVisiblePage);
       triggerAutoSave();
     }
   };
 
-  // Change page
-  const changePage = async (newPage: number) => {
-    if (newPage < 1 || newPage > totalPages) return;
-    
+  const toggleEditMode = useCallback(() => {
     if (isEditMode) {
-      saveCurrentPageAnnotations();
+      // Leaving edit mode
+      fabricCanvasRefs.current.forEach((canvas, pageNum) => {
+        saveCurrentPageAnnotations(pageNum);
+        canvas.isDrawingMode = false;
+        canvas.discardActiveObject();
+        canvas.selection = false;
+        canvas.requestRenderAll();
+      });
+      performAutoSave();
+      setActiveTool('select');
+      setIsEditMode(false);
+    } else {
+      // Entering edit mode
+      setActiveTool('draw');
+      setIsEditMode(true);
     }
-    
-    // Reset history when changing pages (history is per-page)
-    setCanvasHistory([]);
-    setHistoryIndex(-1);
-    canvasHistoryRef.current = [];
-    historyIndexRef.current = -1;
-    
-    setCurrentPage(newPage);
+  }, [isEditMode]);
+
+  const cancelEdits = () => {
+    fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
+    fabricCanvasRefs.current.clear();
+    pageAnnotationsRef.current.clear();
+    loadAnnotationsFromDatabase().then(() => {
+      setIsEditMode(false);
+      setRenderedPages(new Set());
+      toast({
+        title: "Changes discarded",
+        description: "Your edits have been cancelled",
+      });
+    });
   };
 
   // Helper: hex to RGB
@@ -1526,26 +840,11 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     } : { r: 0, g: 0, b: 0 };
   };
 
-  // Save annotations to PDF file
   const saveToPDF = async () => {
-    console.log('saveToPDF called, originalPdfBytes:', originalPdfBytes?.length);
-    
     if (!originalPdfBytes || originalPdfBytes.length < 5) {
       toast({
         title: "Error",
-        description: "PDF not loaded properly - no data available",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // Validate PDF header
-    const header = String.fromCharCode(originalPdfBytes[0], originalPdfBytes[1], originalPdfBytes[2], originalPdfBytes[3], originalPdfBytes[4]);
-    if (!header.startsWith('%PDF-')) {
-      console.error('Invalid PDF bytes in save. Header:', header);
-      toast({
-        title: "Error",
-        description: "PDF data is corrupted - please reload the document",
+        description: "PDF not loaded properly",
         variant: "destructive"
       });
       return;
@@ -1553,25 +852,22 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
     setSaving(true);
     try {
-      // Save current annotations first
-      if (isEditMode) {
-        saveCurrentPageAnnotations();
-      }
+      // Save all current annotations
+      fabricCanvasRefs.current.forEach((_, pageNum) => {
+        saveCurrentPageAnnotations(pageNum);
+      });
       
-      console.log('Loading PDF for modification...');
-      // Create new PDF from original - use a copy of the bytes
-      const pdfBytesArray = originalPdfBytes.slice();
-      const newPdfDoc = await PDFDocument.load(pdfBytesArray);
+      const newPdfDoc = await PDFDocument.load(originalPdfBytes.slice());
       const font = await newPdfDoc.embedFont(StandardFonts.Helvetica);
       
-      // Apply annotations to each page
       for (const [pageNum, annotations] of pageAnnotationsRef.current.entries()) {
         const page = newPdfDoc.getPage(pageNum - 1);
         const { width, height } = page.getSize();
+        const pageData = pagesData.find(p => p.pageNum === pageNum);
+        if (!pageData) continue;
         
-        // Calculate scale factors
-        const scaleX = width / (canvasSize.width * scale);
-        const scaleY = height / (canvasSize.height * scale);
+        const scaleX = width / pageData.width;
+        const scaleY = height / pageData.height;
 
         for (const annotation of annotations) {
           const x = (annotation.left || 0) * scaleX;
@@ -1616,14 +912,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               });
               break;
             case 'path':
-              // Draw path (freehand drawings) as lines
               if (annotation.path && Array.isArray(annotation.path)) {
                 const pathColor = hexToRgb(annotation.stroke || '#000000');
-                const pathScaleX = (annotation.scaleX || 1) * scaleX;
-                const pathScaleY = (annotation.scaleY || 1) * scaleY;
-                const pathStrokeWidth = (annotation.strokeWidth || 2) * Math.min(pathScaleX, pathScaleY);
+                const pathStrokeWidth = (annotation.strokeWidth || 2) * Math.min(scaleX, scaleY);
                 
-                // Build SVG path string for pdf-lib
                 let svgPathStr = '';
                 for (const cmd of annotation.path) {
                   if (cmd[0] === 'M') {
@@ -1655,10 +947,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         }
       }
 
-      // Save modified PDF
       const pdfBytes = await newPdfDoc.save();
       
-      // Upload back to Supabase
       const filePath = `${projectId}/${fileName}`;
       const { error } = await supabase
         .storage
@@ -1669,12 +959,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
       if (error) throw error;
       
-      // Update original bytes
       setOriginalPdfBytes(new Uint8Array(pdfBytes));
       
-      // Reload PDF to show embedded annotations
-      await loadPDF();
-
       toast({
         title: "Success",
         description: "Annotations saved to PDF successfully",
@@ -1694,24 +980,23 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
   };
 
-  // Download annotated PDF
   const downloadPDF = async () => {
     if (!originalPdfBytes) return;
     
     try {
       setSaving(true);
       
-      // Create annotated PDF
       const newPdfDoc = await PDFDocument.load(originalPdfBytes);
       const font = await newPdfDoc.embedFont(StandardFonts.Helvetica);
       
-      // Apply annotations
       for (const [pageNum, annotations] of pageAnnotationsRef.current.entries()) {
         const page = newPdfDoc.getPage(pageNum - 1);
         const { width, height } = page.getSize();
+        const pageData = pagesData.find(p => p.pageNum === pageNum);
+        if (!pageData) continue;
         
-        const scaleX = width / (canvasSize.width * scale);
-        const scaleY = height / (canvasSize.height * scale);
+        const scaleX = width / pageData.width;
+        const scaleY = height / pageData.height;
 
         for (const annotation of annotations) {
           const x = (annotation.left || 0) * scaleX;
@@ -1756,12 +1041,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               });
               break;
             case 'path':
-              // Draw path (freehand drawings) as lines
               if (annotation.path && Array.isArray(annotation.path)) {
                 const dlPathColor = hexToRgb(annotation.stroke || '#000000');
-                const dlPathScaleX = (annotation.scaleX || 1) * scaleX;
-                const dlPathScaleY = (annotation.scaleY || 1) * scaleY;
-                const dlPathStrokeWidth = (annotation.strokeWidth || 2) * Math.min(dlPathScaleX, dlPathScaleY);
+                const dlPathStrokeWidth = (annotation.strokeWidth || 2) * Math.min(scaleX, scaleY);
                 
                 let dlSvgPathStr = '';
                 for (const cmd of annotation.path) {
@@ -1821,95 +1103,87 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
   };
 
-  // Toggle edit mode
-  const toggleEditMode = useCallback(() => {
-    if (isEditMode) {
-      // Leaving edit mode: persist to DB, keep overlay visible in Preview
-      saveCurrentPageAnnotations();
-      performAutoSave();
-
-      // Disable interactions (overlay stays visible)
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.isDrawingMode = false;
-        fabricCanvasRef.current.discardActiveObject();
-        fabricCanvasRef.current.selection = false;
-        fabricCanvasRef.current.requestRenderAll();
-      }
-
-      setActiveTool('select');
-      setIsEditMode(false);
-    } else {
-      // Entering edit mode: default to pencil so users can start annotating immediately
-      setActiveTool('draw');
-      setIsEditMode(true);
-    }
-  }, [isEditMode, saveCurrentPageAnnotations, performAutoSave]);
-
-  // Cancel edits
-  const cancelEdits = () => {
-    // Dispose Fabric canvas immediately
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.dispose();
-      fabricCanvasRef.current = null;
-    }
-
-    // Reload from database
-    pageAnnotationsRef.current.clear();
-    loadAnnotationsFromDatabase().then(() => {
-      setIsEditMode(false);
-      toast({
-        title: "Changes discarded",
-        description: "Your edits have been cancelled",
-      });
+  const openInNewTab = () => {
+    const params = new URLSearchParams({
+      url: pdfUrl,
+      projectId: projectId,
+      fileName: fileName,
+      returnUrl: window.location.pathname + window.location.search
     });
+    window.open(`/pdf-editor?${params.toString()}`, '_blank');
   };
 
-  // Update brush settings when color/width changes
-  useEffect(() => {
-    if (fabricCanvasRef.current?.freeDrawingBrush && activeTool === 'draw') {
-      fabricCanvasRef.current.freeDrawingBrush.color = drawingColor;
-      fabricCanvasRef.current.freeDrawingBrush.width = strokeWidth;
+  // Handle pointer events for pen detection in cursor mode
+  const handlePointerDown = (e: React.PointerEvent, pageNum: number) => {
+    // Pen/stylus in cursor mode - enable drawing
+    if (activeTool === 'cursor' && e.pointerType === 'pen') {
+      const canvas = fabricCanvasRefs.current.get(pageNum);
+      if (canvas) {
+        isPenDrawingInCursorModeRef.current = true;
+        activePenPageRef.current = pageNum;
+        canvas.isDrawingMode = true;
+        if (canvas.freeDrawingBrush) {
+          canvas.freeDrawingBrush.color = drawingColor;
+          canvas.freeDrawingBrush.width = strokeWidth;
+        }
+      }
+      return;
     }
-  }, [drawingColor, strokeWidth, activeTool]);
+    
+    // Mouse/touch in cursor mode - start drag to scroll
+    if (activeTool === 'cursor' && e.pointerType !== 'pen' && canvasContainerRef.current) {
+      e.preventDefault();
+      isDraggingToScrollRef.current = true;
+      dragStartPosRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        scrollLeft: canvasContainerRef.current.scrollLeft,
+        scrollTop: canvasContainerRef.current.scrollTop,
+      };
+    }
+  };
 
-  // When the scroll container moves (or viewport resizes), Fabric's pointer offset becomes stale.
-  // If offset is wrong, paths can be drawn "off-canvas" and appear invisible.
-  useEffect(() => {
-    if (!isEditMode) return;
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (activeTool === 'cursor' && !isPenDrawingInCursorModeRef.current && isDraggingToScrollRef.current && dragStartPosRef.current && canvasContainerRef.current) {
+      const dx = e.clientX - dragStartPosRef.current.x;
+      const dy = e.clientY - dragStartPosRef.current.y;
+      canvasContainerRef.current.scrollLeft = dragStartPosRef.current.scrollLeft - dx;
+      canvasContainerRef.current.scrollTop = dragStartPosRef.current.scrollTop - dy;
+    }
+  };
 
-    const scrollEl = canvasContainerRef.current;
-    const syncOffset = () => {
-      if (!fabricCanvasRef.current) return;
-      fabricCanvasRef.current.calcOffset();
-    };
+  const handlePointerUp = (e: React.PointerEvent) => {
+    // End pen drawing in cursor mode
+    if (activeTool === 'cursor' && isPenDrawingInCursorModeRef.current && activePenPageRef.current !== null) {
+      const canvas = fabricCanvasRefs.current.get(activePenPageRef.current);
+      if (canvas) {
+        canvas.isDrawingMode = false;
+      }
+      isPenDrawingInCursorModeRef.current = false;
+      activePenPageRef.current = null;
+    }
+    
+    if (activeTool === 'cursor') {
+      isDraggingToScrollRef.current = false;
+      dragStartPosRef.current = null;
+    }
+  };
 
-    syncOffset();
-
-    scrollEl?.addEventListener('scroll', syncOffset, { passive: true });
-    window.addEventListener('resize', syncOffset);
-
-    return () => {
-      scrollEl?.removeEventListener('scroll', syncOffset);
-      window.removeEventListener('resize', syncOffset);
-    };
-  }, [isEditMode]);
-
-  // Re-sync Fabric offsets after zoom/page size changes (prevents cursor mismatch)
-  useEffect(() => {
-    if (!isEditMode || !fabricCanvasRef.current) return;
-    const raf = requestAnimationFrame(() => {
-      fabricCanvasRef.current?.calcOffset();
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [isEditMode, scale, canvasSize.width, canvasSize.height]);
-
-  // Ensure the active tool is always applied after Fabric finishes initializing
-  useEffect(() => {
-    if (!isEditMode || !fabricCanvasRef.current) return;
-    applyToolSettings(activeTool);
-    fabricCanvasRef.current.calcOffset();
-    fabricCanvasRef.current.requestRenderAll();
-  }, [isEditMode, activeTool, drawingColor, strokeWidth, fontFamily, fontSize]);
+  const handlePointerLeave = (e: React.PointerEvent) => {
+    if (activeTool === 'cursor' && isPenDrawingInCursorModeRef.current && activePenPageRef.current !== null) {
+      const canvas = fabricCanvasRefs.current.get(activePenPageRef.current);
+      if (canvas) {
+        canvas.isDrawingMode = false;
+      }
+      isPenDrawingInCursorModeRef.current = false;
+      activePenPageRef.current = null;
+    }
+    
+    if (activeTool === 'cursor') {
+      isDraggingToScrollRef.current = false;
+      dragStartPosRef.current = null;
+    }
+  };
 
   if (loading) {
     return (
@@ -1922,80 +1196,53 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     );
   }
 
-  // Open PDF in new tab for full-screen editing
-  const openInNewTab = () => {
-    const params = new URLSearchParams({
-      url: pdfUrl,
-      projectId: projectId,
-      fileName: fileName,
-      returnUrl: window.location.pathname + window.location.search
-    });
-    window.open(`/pdf-editor?${params.toString()}`, '_blank');
-  };
+  const currentHistory = canvasHistoryRef.current.get(currentVisiblePage) || [];
+  const currentHistoryIndex = historyIndexRef.current.get(currentVisiblePage) ?? -1;
 
   return (
     <div className={`flex flex-col bg-background ${fullscreen ? 'h-full' : 'min-h-[70vh] h-[80vh]'}`} ref={containerRef}>
       {/* Header Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 p-3 border-b bg-card">
-        {/* Left: Navigation */}
+        {/* Left: Page indicator and zoom */}
         <div className="flex items-center gap-2">
-          <Button
-            onClick={() => changePage(currentPage - 1)}
-            disabled={currentPage <= 1}
-            size="sm"
-            variant="outline"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium px-2">
-            {currentPage} / {totalPages}
+          <span className="text-sm text-muted-foreground">
+            Page {currentVisiblePage} of {totalPages}
           </span>
-          <Button
-            onClick={() => changePage(currentPage + 1)}
-            disabled={currentPage >= totalPages}
-            size="sm"
-            variant="outline"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          
+          <div className="flex items-center gap-1 ml-4">
+            <Button
+              onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
+              size="sm"
+              variant="outline"
+              disabled={scale <= 0.5}
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <span className="text-sm w-16 text-center">{Math.round(scale * 100)}%</span>
+            <Button
+              onClick={() => setScale(s => Math.min(3, s + 0.25))}
+              size="sm"
+              variant="outline"
+              disabled={scale >= 3}
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
-        {/* Center: Zoom */}
+        {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          <Button
-            onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
-            size="sm"
-            variant="outline"
-            disabled={scale <= 0.5}
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium min-w-[60px] text-center">
-            {Math.round(scale * 100)}%
-          </span>
-          <Button
-            onClick={() => setScale(s => Math.min(3, s + 0.25))}
-            size="sm"
-            variant="outline"
-            disabled={scale >= 3}
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Right: Mode & Actions */}
-        <div className="flex items-center gap-2">
-          {saving && (
-            <span className="text-sm text-muted-foreground flex items-center gap-1">
-              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
-              Saving...
+          {lastSaved && (
+            <span className="text-xs text-muted-foreground">
+              Saved {lastSaved.toLocaleTimeString()}
             </span>
           )}
-          {lastSaved && !saving && (
-            <span className="text-sm text-green-600 flex items-center gap-1">
-              <Check className="h-3 w-3" />
-              Saved
-            </span>
+          
+          {isEditMode && (
+            <Button onClick={saveToPDF} size="sm" variant="default" disabled={saving}>
+              <Save className="h-4 w-4 mr-1" />
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
           )}
           
           <Button
@@ -2018,12 +1265,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           </Button>
           
           {isEditMode && (
-            <>
-              <Button onClick={cancelEdits} size="sm" variant="outline">
-                <X className="h-4 w-4 mr-1" />
-                Cancel
-              </Button>
-            </>
+            <Button onClick={cancelEdits} size="sm" variant="outline">
+              <X className="h-4 w-4 mr-1" />
+              Cancel
+            </Button>
           )}
           
           <Button onClick={downloadPDF} size="sm" variant="outline">
@@ -2038,7 +1283,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         </div>
       </div>
 
-      {/* Edit Tools (only in edit mode) */}
+      {/* Edit Tools */}
       {isEditMode && (
         <div className="flex flex-wrap items-center gap-3 p-3 border-b bg-muted/30">
           <div className="flex items-center gap-1 border-r pr-3">
@@ -2046,7 +1291,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               onClick={() => handleToolChange('cursor')}
               size="sm"
               variant={activeTool === 'cursor' ? 'default' : 'ghost'}
-              title="Pan / Scroll"
+              title="Pan / Scroll (pen still draws)"
             >
               <Hand className="h-4 w-4" />
             </Button>
@@ -2127,7 +1372,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             <span className="text-sm w-6">{strokeWidth}</span>
           </div>
 
-          {/* Font settings (for text) */}
+          {/* Font settings */}
           <div className="flex items-center gap-2 border-r pr-3">
             <label className="text-sm text-muted-foreground">Font:</label>
             <Select value={fontFamily} onValueChange={setFontFamily}>
@@ -2153,10 +1398,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
           {/* Actions */}
           <div className="flex items-center gap-1 border-r pr-3">
-            <Button onClick={undo} size="sm" variant="ghost" disabled={historyIndex <= 0} title="Undo">
+            <Button onClick={undo} size="sm" variant="ghost" disabled={currentHistoryIndex <= 0} title="Undo">
               <Undo className="h-4 w-4" />
             </Button>
-            <Button onClick={redo} size="sm" variant="ghost" disabled={historyIndex >= canvasHistory.length - 1} title="Redo">
+            <Button onClick={redo} size="sm" variant="ghost" disabled={currentHistoryIndex >= currentHistory.length - 1} title="Redo">
               <Redo className="h-4 w-4" />
             </Button>
             <Button onClick={deleteSelected} size="sm" variant="ghost" title="Delete Selected">
@@ -2173,7 +1418,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               onClick={() => setLineSnapEnabled(!lineSnapEnabled)}
               size="sm"
               variant={lineSnapEnabled ? 'default' : 'ghost'}
-              title={lineSnapEnabled ? 'Line snap enabled (hold after drawing to straighten)' : 'Line snap disabled'}
+              title={lineSnapEnabled ? 'Line snap enabled' : 'Line snap disabled'}
               className={lineSnapEnabled ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
             >
               <Ruler className="h-4 w-4 mr-1" />
@@ -2183,7 +1428,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         </div>
       )}
 
-      {/* Canvas Container */}
+      {/* Scrollable PDF Container - All pages in continuous scroll */}
       <div
         ref={canvasContainerRef}
         className="flex-1 min-h-0 overflow-auto bg-muted/50 p-4"
@@ -2191,178 +1436,81 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           overflowX: 'auto', 
           overflowY: 'auto',
           WebkitOverflowScrolling: 'touch',
-          touchAction: 'pan-x pan-y'
         }}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerLeave}
       >
-        <div className="inline-flex justify-center min-w-full">
-          <div
-            className="relative shadow-lg bg-white overflow-hidden flex-shrink-0"
-            style={{ width: canvasSize.width, height: canvasSize.height }}
-            aria-label="PDF canvas wrapper"
-          >
-            {/* PDF rendered by PDF.js */}
-            <canvas
-              ref={pdfCanvasRef}
-              className="absolute top-0 left-0 block"
-              style={{ display: 'block' }}
-              aria-label="PDF preview canvas"
-            />
-
-            {/* Fabric overlay for annotations */}
+        <div className="flex flex-col items-center gap-4 min-w-full">
+          {pagesData.map((pageData) => (
             <div
-              className="absolute top-0 left-0"
-              style={{
-                width: canvasSize.width,
-                height: canvasSize.height,
-                pointerEvents: isEditMode ? 'auto' : 'none',
-                opacity: 1,
-                zIndex: 10,
-                // Important for iPad/Apple Pencil: prevent scroll/zoom gestures from swallowing draw events
-                touchAction:
-                  isEditMode && (activeTool === 'draw' || activeTool === 'erase')
+              key={pageData.pageNum}
+              ref={(el) => {
+                if (el) pageRefs.current.set(pageData.pageNum, el);
+              }}
+              data-page={pageData.pageNum}
+              className="relative shadow-lg bg-white overflow-hidden flex-shrink-0"
+              style={{ 
+                width: pageData.width * scale, 
+                height: pageData.height * scale 
+              }}
+              onPointerDown={(e) => handlePointerDown(e, pageData.pageNum)}
+            >
+              {/* PDF canvas */}
+              <canvas
+                ref={(el) => {
+                  if (el) pdfCanvasRefs.current.set(pageData.pageNum, el);
+                }}
+                className="absolute top-0 left-0 block"
+                style={{ display: 'block' }}
+              />
+
+              {/* Fabric overlay for annotations */}
+              <div
+                className="absolute top-0 left-0"
+                style={{
+                  width: pageData.width * scale,
+                  height: pageData.height * scale,
+                  pointerEvents: isEditMode ? 'auto' : 'none',
+                  zIndex: 10,
+                  touchAction: isEditMode && (activeTool === 'draw' || activeTool === 'erase')
                     ? 'none'
                     : activeTool === 'cursor'
                     ? 'none'
                     : 'manipulation',
-                cursor: activeTool === 'cursor' ? 'grab' : undefined,
-              }}
-              onPointerDown={(e) => {
-                // Detect pen/stylus in cursor mode - enable drawing with current brush settings
-                if (activeTool === 'cursor' && e.pointerType === 'pen' && fabricCanvasRef.current) {
-                  isPenDrawingInCursorModeRef.current = true;
-                  const canvas = fabricCanvasRef.current;
-                  canvas.isDrawingMode = true;
-                  if (canvas.freeDrawingBrush) {
-                    canvas.freeDrawingBrush.color = drawingColor;
-                    canvas.freeDrawingBrush.width = strokeWidth;
-                  }
-                  // Let the event pass through to Fabric for drawing
-                  return;
-                }
-                
-                // Mouse/touch in cursor mode - start drag to scroll
-                if (activeTool === 'cursor' && e.pointerType !== 'pen' && canvasContainerRef.current) {
-                  e.preventDefault();
-                  isDraggingToScrollRef.current = true;
-                  dragStartPosRef.current = {
-                    x: e.clientX,
-                    y: e.clientY,
-                    scrollLeft: canvasContainerRef.current.scrollLeft,
-                    scrollTop: canvasContainerRef.current.scrollTop,
-                  };
-                  (e.currentTarget as HTMLElement).style.cursor = 'grabbing';
-                }
-              }}
-              onPointerMove={(e) => {
-                if (activeTool === 'cursor' && !isPenDrawingInCursorModeRef.current && isDraggingToScrollRef.current && dragStartPosRef.current && canvasContainerRef.current) {
-                  const dx = e.clientX - dragStartPosRef.current.x;
-                  const dy = e.clientY - dragStartPosRef.current.y;
-                  canvasContainerRef.current.scrollLeft = dragStartPosRef.current.scrollLeft - dx;
-                  canvasContainerRef.current.scrollTop = dragStartPosRef.current.scrollTop - dy;
-                }
-              }}
-              onPointerUp={(e) => {
-                // End pen drawing in cursor mode
-                if (activeTool === 'cursor' && isPenDrawingInCursorModeRef.current && fabricCanvasRef.current) {
-                  isPenDrawingInCursorModeRef.current = false;
-                  fabricCanvasRef.current.isDrawingMode = false;
-                }
-                
-                if (activeTool === 'cursor') {
-                  isDraggingToScrollRef.current = false;
-                  dragStartPosRef.current = null;
-                  (e.currentTarget as HTMLElement).style.cursor = 'grab';
-                }
-              }}
-              onPointerLeave={(e) => {
-                if (activeTool === 'cursor' && isPenDrawingInCursorModeRef.current && fabricCanvasRef.current) {
-                  isPenDrawingInCursorModeRef.current = false;
-                  fabricCanvasRef.current.isDrawingMode = false;
-                }
-                
-                if (activeTool === 'cursor') {
-                  isDraggingToScrollRef.current = false;
-                  dragStartPosRef.current = null;
-                  (e.currentTarget as HTMLElement).style.cursor = 'grab';
-                }
-              }}
-              onTouchStart={(e) => {
-                if (activeTool === 'cursor' && canvasContainerRef.current) {
-                  if (e.touches.length === 1) {
-                    // Single finger - drag to scroll
-                    isDraggingToScrollRef.current = true;
-                    dragStartPosRef.current = {
-                      x: e.touches[0].clientX,
-                      y: e.touches[0].clientY,
-                      scrollLeft: canvasContainerRef.current.scrollLeft,
-                      scrollTop: canvasContainerRef.current.scrollTop,
-                    };
-                    initialPinchDistanceRef.current = null;
-                  } else if (e.touches.length === 2) {
-                    // Two fingers - start pinch-to-zoom
-                    e.preventDefault();
-                    isDraggingToScrollRef.current = false;
-                    const dx = e.touches[0].clientX - e.touches[1].clientX;
-                    const dy = e.touches[0].clientY - e.touches[1].clientY;
-                    initialPinchDistanceRef.current = Math.hypot(dx, dy);
-                    initialPinchScaleRef.current = scale;
-                  }
-                }
-              }}
-              onTouchMove={(e) => {
-                if (activeTool === 'cursor' && canvasContainerRef.current) {
-                  if (e.touches.length === 2 && initialPinchDistanceRef.current !== null) {
-                    // Pinch-to-zoom
-                    e.preventDefault();
-                    const dx = e.touches[0].clientX - e.touches[1].clientX;
-                    const dy = e.touches[0].clientY - e.touches[1].clientY;
-                    const currentDistance = Math.hypot(dx, dy);
-                    const pinchRatio = currentDistance / initialPinchDistanceRef.current;
-                    const newScale = Math.min(3, Math.max(0.5, initialPinchScaleRef.current * pinchRatio));
-                    setScale(newScale);
-                  } else if (e.touches.length === 1 && isDraggingToScrollRef.current && dragStartPosRef.current) {
-                    // Single finger drag
-                    const dx = e.touches[0].clientX - dragStartPosRef.current.x;
-                    const dy = e.touches[0].clientY - dragStartPosRef.current.y;
-                    canvasContainerRef.current.scrollLeft = dragStartPosRef.current.scrollLeft - dx;
-                    canvasContainerRef.current.scrollTop = dragStartPosRef.current.scrollTop - dy;
-                  }
-                }
-              }}
-              onTouchEnd={(e) => {
-                if (activeTool === 'cursor') {
-                  // Reset pinch state when fewer than 2 fingers
-                  if (e.touches.length < 2) {
-                    initialPinchDistanceRef.current = null;
-                  }
-                  // Reset drag state when no fingers
-                  if (e.touches.length === 0) {
-                    isDraggingToScrollRef.current = false;
-                    dragStartPosRef.current = null;
-                  }
-                }
-              }}
-            >
-              <canvas
-                ref={overlayCanvasRef}
-                className="block"
-                style={{
-                  display: 'block',
-                  cursor: activeTool === 'cursor' 
-                    ? 'grab' 
-                    : isEditMode && activeTool === 'draw' 
-                    ? 'crosshair' 
-                    : isEditMode && activeTool === 'text' 
-                    ? 'text' 
-                    : 'default',
-                  touchAction: isEditMode && (activeTool === 'draw' || activeTool === 'erase') ? 'none' : activeTool === 'cursor' ? 'none' : 'manipulation',
-                  // In cursor mode, allow pen events through but block touch/mouse
-                  pointerEvents: activeTool === 'cursor' ? 'auto' : 'auto',
+                  cursor: activeTool === 'cursor' ? 'grab' : undefined,
                 }}
-                aria-label="PDF annotation canvas"
-              />
+              >
+                <canvas
+                  ref={(el) => {
+                    if (el) overlayCanvasRefs.current.set(pageData.pageNum, el);
+                  }}
+                  className="block"
+                  style={{
+                    display: 'block',
+                    cursor: activeTool === 'cursor' 
+                      ? 'grab' 
+                      : isEditMode && activeTool === 'draw' 
+                      ? 'crosshair' 
+                      : isEditMode && activeTool === 'text' 
+                      ? 'text' 
+                      : 'default',
+                    touchAction: isEditMode && (activeTool === 'draw' || activeTool === 'erase') 
+                      ? 'none' 
+                      : activeTool === 'cursor' 
+                      ? 'none' 
+                      : 'manipulation',
+                    pointerEvents: 'auto',
+                  }}
+                />
+              </div>
+              
+              {/* Page number indicator */}
+              <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                {pageData.pageNum}
+              </div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>
