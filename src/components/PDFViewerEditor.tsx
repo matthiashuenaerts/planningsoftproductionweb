@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { usePDFTouchHandler } from '@/hooks/usePDFTouchHandler';
 import { 
   Save, 
   Download, 
@@ -23,13 +23,12 @@ import {
   Move,
   Trash2,
   X,
-  Check,
   RotateCcw,
   ExternalLink,
   Ruler,
   Hand
 } from 'lucide-react';
-import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Textbox, Path, PencilBrush, Line } from 'fabric';
+import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Textbox, Path, PencilBrush } from 'fabric';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 interface PDFViewerEditorProps {
@@ -129,29 +128,63 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Smart line straightening state
   const [lineSnapEnabled, setLineSnapEnabled] = useState(true);
   const lineSnapEnabledRef = useRef(true);
-  const isStrokeInProgressRef = useRef(false);
-  const lastSignificantMoveAtRef = useRef<number>(0);
-  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
-  const shouldStraightenNextPathRef = useRef(false);
   
-  // Pen drawing in cursor mode state
-  const isPenDrawingInCursorModeRef = useRef(false);
-  const activePenPageRef = useRef<number | null>(null);
-  
-  // Drag-to-scroll state for cursor mode
-  const isDraggingToScrollRef = useRef(false);
-  const dragStartPosRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
-  
-  // Pinch-to-zoom state
-  const initialPinchDistanceRef = useRef<number | null>(null);
-  const initialPinchScaleRef = useRef<number>(1);
-  
-  const LINE_SNAP_HOLD_DURATION = 200;
-  const LINE_STRAIGHTNESS_THRESHOLD = 0.25;
+  // Pen drawing state for cursor mode
+  const penDrawingPageRef = useRef<number | null>(null);
   
   useEffect(() => {
     lineSnapEnabledRef.current = lineSnapEnabled;
   }, [lineSnapEnabled]);
+
+  // Get page number at a specific point
+  const getPageAtPoint = useCallback((clientX: number, clientY: number): number | null => {
+    for (const [pageNum, pageDiv] of pageRefs.current.entries()) {
+      const rect = pageDiv.getBoundingClientRect();
+      if (clientX >= rect.left && clientX <= rect.right && 
+          clientY >= rect.top && clientY <= rect.bottom) {
+        return pageNum;
+      }
+    }
+    return null;
+  }, []);
+
+  // Handle pen draw start (from touch handler)
+  const handlePenDrawStart = useCallback((pageNum: number) => {
+    const canvas = fabricCanvasRefs.current.get(pageNum);
+    if (canvas && isEditMode) {
+      penDrawingPageRef.current = pageNum;
+      canvas.isDrawingMode = true;
+      if (canvas.freeDrawingBrush) {
+        canvas.freeDrawingBrush.color = drawingColor;
+        canvas.freeDrawingBrush.width = strokeWidth;
+      }
+    }
+  }, [isEditMode, drawingColor, strokeWidth]);
+
+  // Handle pen draw end (from touch handler)
+  const handlePenDrawEnd = useCallback(() => {
+    if (penDrawingPageRef.current !== null) {
+      const canvas = fabricCanvasRefs.current.get(penDrawingPageRef.current);
+      if (canvas && activeTool !== 'draw') {
+        canvas.isDrawingMode = false;
+      }
+      penDrawingPageRef.current = null;
+    }
+  }, [activeTool]);
+
+  // Initialize touch handler
+  usePDFTouchHandler({
+    containerRef: canvasContainerRef,
+    scale,
+    setScale,
+    minScale: 0.5,
+    maxScale: 3,
+    activeTool,
+    isEditMode,
+    onPenDrawStart: handlePenDrawStart,
+    onPenDrawEnd: handlePenDrawEnd,
+    getPageAtPoint,
+  });
 
   // Load PDF.js
   useEffect(() => {
@@ -192,7 +225,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     loadPdfJs();
     
     return () => {
-      // Cleanup all fabric canvases
       fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
       fabricCanvasRefs.current.clear();
       if (autoSaveTimeoutRef.current) {
@@ -230,7 +262,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
       
-      // Get all page dimensions
       const pages: PageData[] = [];
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
@@ -239,7 +270,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       }
       setPagesData(pages);
       
-      // Load saved annotations
       await loadAnnotationsFromDatabase();
       
       setLoading(false);
@@ -311,7 +341,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     const pageData = pagesData.find(p => p.pageNum === pageNum);
     if (!overlayCanvas || !pageData) return;
 
-    // Dispose existing if any
     const existing = fabricCanvasRefs.current.get(pageNum);
     if (existing) {
       existing.dispose();
@@ -328,6 +357,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       backgroundColor: 'transparent',
       preserveObjectStacking: true,
       selection: true,
+      allowTouchScrolling: false, // We handle touch ourselves
     });
 
     const fabricWrapper = fabricCanvas.wrapperEl;
@@ -341,14 +371,12 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       fabricWrapper.style.pointerEvents = 'auto';
     }
 
-    // Configure brush
     if (!fabricCanvas.freeDrawingBrush) {
       fabricCanvas.freeDrawingBrush = new PencilBrush(fabricCanvas);
     }
     fabricCanvas.freeDrawingBrush.color = drawingColor;
     fabricCanvas.freeDrawingBrush.width = strokeWidth;
 
-    // Add event listeners
     fabricCanvas.on('path:created', () => {
       saveCanvasState(pageNum);
       saveCurrentPageAnnotationsToDb(pageNum);
@@ -367,10 +395,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
     fabricCanvasRefs.current.set(pageNum, fabricCanvas);
     
-    // Load annotations for this page
     loadPageAnnotations(pageNum, fabricCanvas);
     
-    // Apply tool settings
     applyToolSettings(isEditMode ? activeTool : 'select', fabricCanvas);
     if (!isEditMode) {
       fabricCanvas.selection = false;
@@ -389,18 +415,15 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         entries.forEach(entry => {
           const pageNum = parseInt(entry.target.getAttribute('data-page') || '1');
           if (entry.isIntersecting) {
-            // Render the page if not already rendered
             if (!renderedPages.has(pageNum)) {
               renderPDFPage(pageNum);
             }
-            // Initialize fabric canvas if needed
             if (!fabricCanvasRefs.current.has(pageNum)) {
               initializeFabricCanvas(pageNum);
             }
           }
         });
         
-        // Update current visible page
         const visibleEntries = entries.filter(e => e.isIntersecting);
         if (visibleEntries.length > 0) {
           const mostVisible = visibleEntries.reduce((a, b) => 
@@ -424,7 +447,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   useEffect(() => {
     if (!pdfDoc) return;
     setRenderedPages(new Set());
-    // Dispose all fabric canvases
     fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
     fabricCanvasRefs.current.clear();
   }, [scale, pdfDoc]);
@@ -601,7 +623,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     
     canvas.renderAll();
     
-    // Initialize history for this page
     if (!canvasHistoryRef.current.has(pageNum)) {
       canvasHistoryRef.current.set(pageNum, [JSON.stringify(canvas.toJSON())]);
       historyIndexRef.current.set(pageNum, 0);
@@ -623,7 +644,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
   const performAutoSave = async () => {
     try {
-      // Save all pages with fabric canvases
       fabricCanvasRefs.current.forEach((_, pageNum) => {
         saveCurrentPageAnnotations(pageNum);
       });
@@ -697,6 +717,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             obj.selectable = false;
             obj.evented = false;
           });
+          // Keep brush ready for pen input
           if (!c.freeDrawingBrush) {
             c.freeDrawingBrush = new PencilBrush(c);
           }
@@ -720,7 +741,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     });
   };
 
-  // Update all fabric canvases when tool changes
   useEffect(() => {
     if (isEditMode) {
       applyToolSettings(activeTool);
@@ -798,7 +818,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
   const toggleEditMode = useCallback(() => {
     if (isEditMode) {
-      // Leaving edit mode
       fabricCanvasRefs.current.forEach((canvas, pageNum) => {
         saveCurrentPageAnnotations(pageNum);
         canvas.isDrawingMode = false;
@@ -810,7 +829,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       setActiveTool('select');
       setIsEditMode(false);
     } else {
-      // Entering edit mode
       setActiveTool('draw');
       setIsEditMode(true);
     }
@@ -830,7 +848,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     });
   };
 
-  // Helper: hex to RGB
   const hexToRgb = (hex: string) => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? {
@@ -852,7 +869,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
     setSaving(true);
     try {
-      // Save all current annotations
       fabricCanvasRefs.current.forEach((_, pageNum) => {
         saveCurrentPageAnnotations(pageNum);
       });
@@ -1113,78 +1129,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     window.open(`/pdf-editor?${params.toString()}`, '_blank');
   };
 
-  // Handle pointer events for pen detection in cursor mode
-  const handlePointerDown = (e: React.PointerEvent, pageNum: number) => {
-    // Pen/stylus in cursor mode - enable drawing
-    if (activeTool === 'cursor' && e.pointerType === 'pen') {
-      const canvas = fabricCanvasRefs.current.get(pageNum);
-      if (canvas) {
-        isPenDrawingInCursorModeRef.current = true;
-        activePenPageRef.current = pageNum;
-        canvas.isDrawingMode = true;
-        if (canvas.freeDrawingBrush) {
-          canvas.freeDrawingBrush.color = drawingColor;
-          canvas.freeDrawingBrush.width = strokeWidth;
-        }
-      }
-      return;
-    }
-    
-    // Mouse/touch in cursor mode - start drag to scroll
-    if (activeTool === 'cursor' && e.pointerType !== 'pen' && canvasContainerRef.current) {
-      e.preventDefault();
-      isDraggingToScrollRef.current = true;
-      dragStartPosRef.current = {
-        x: e.clientX,
-        y: e.clientY,
-        scrollLeft: canvasContainerRef.current.scrollLeft,
-        scrollTop: canvasContainerRef.current.scrollTop,
-      };
-    }
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (activeTool === 'cursor' && !isPenDrawingInCursorModeRef.current && isDraggingToScrollRef.current && dragStartPosRef.current && canvasContainerRef.current) {
-      const dx = e.clientX - dragStartPosRef.current.x;
-      const dy = e.clientY - dragStartPosRef.current.y;
-      canvasContainerRef.current.scrollLeft = dragStartPosRef.current.scrollLeft - dx;
-      canvasContainerRef.current.scrollTop = dragStartPosRef.current.scrollTop - dy;
-    }
-  };
-
-  const handlePointerUp = (e: React.PointerEvent) => {
-    // End pen drawing in cursor mode
-    if (activeTool === 'cursor' && isPenDrawingInCursorModeRef.current && activePenPageRef.current !== null) {
-      const canvas = fabricCanvasRefs.current.get(activePenPageRef.current);
-      if (canvas) {
-        canvas.isDrawingMode = false;
-      }
-      isPenDrawingInCursorModeRef.current = false;
-      activePenPageRef.current = null;
-    }
-    
-    if (activeTool === 'cursor') {
-      isDraggingToScrollRef.current = false;
-      dragStartPosRef.current = null;
-    }
-  };
-
-  const handlePointerLeave = (e: React.PointerEvent) => {
-    if (activeTool === 'cursor' && isPenDrawingInCursorModeRef.current && activePenPageRef.current !== null) {
-      const canvas = fabricCanvasRefs.current.get(activePenPageRef.current);
-      if (canvas) {
-        canvas.isDrawingMode = false;
-      }
-      isPenDrawingInCursorModeRef.current = false;
-      activePenPageRef.current = null;
-    }
-    
-    if (activeTool === 'cursor') {
-      isDraggingToScrollRef.current = false;
-      dragStartPosRef.current = null;
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -1199,11 +1143,18 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const currentHistory = canvasHistoryRef.current.get(currentVisiblePage) || [];
   const currentHistoryIndex = historyIndexRef.current.get(currentVisiblePage) ?? -1;
 
+  // Determine touch-action based on mode and tool
+  const getContainerTouchAction = () => {
+    if (!isEditMode) return 'pan-x pan-y';
+    if (activeTool === 'cursor') return 'none'; // We handle everything
+    if (activeTool === 'draw' || activeTool === 'erase') return 'none';
+    return 'pan-x pan-y';
+  };
+
   return (
     <div className={`flex flex-col bg-background ${fullscreen ? 'h-full' : 'min-h-[70vh] h-[80vh]'}`} ref={containerRef}>
       {/* Header Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 p-3 border-b bg-card">
-        {/* Left: Page indicator and zoom */}
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">
             Page {currentVisiblePage} of {totalPages}
@@ -1230,7 +1181,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           </div>
         </div>
 
-        {/* Right: Actions */}
         <div className="flex items-center gap-2">
           {lastSaved && (
             <span className="text-xs text-muted-foreground">
@@ -1346,7 +1296,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             </Button>
           </div>
 
-          {/* Color picker */}
           <div className="flex items-center gap-2 border-r pr-3">
             <label className="text-sm text-muted-foreground">Color:</label>
             <Input
@@ -1357,7 +1306,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             />
           </div>
 
-          {/* Stroke width */}
           <div className="flex items-center gap-2 border-r pr-3">
             <label className="text-sm text-muted-foreground">Size:</label>
             <div className="w-24">
@@ -1372,7 +1320,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             <span className="text-sm w-6">{strokeWidth}</span>
           </div>
 
-          {/* Font settings */}
           <div className="flex items-center gap-2 border-r pr-3">
             <label className="text-sm text-muted-foreground">Font:</label>
             <Select value={fontFamily} onValueChange={setFontFamily}>
@@ -1396,7 +1343,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             />
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-1 border-r pr-3">
             <Button onClick={undo} size="sm" variant="ghost" disabled={currentHistoryIndex <= 0} title="Undo">
               <Undo className="h-4 w-4" />
@@ -1412,7 +1358,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             </Button>
           </div>
           
-          {/* Smart line snap toggle */}
           <div className="flex items-center gap-2">
             <Button
               onClick={() => setLineSnapEnabled(!lineSnapEnabled)}
@@ -1428,7 +1373,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         </div>
       )}
 
-      {/* Scrollable PDF Container - All pages in continuous scroll */}
+      {/* Scrollable PDF Container */}
       <div
         ref={canvasContainerRef}
         className="flex-1 min-h-0 overflow-auto bg-muted/50 p-4"
@@ -1436,10 +1381,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           overflowX: 'auto', 
           overflowY: 'auto',
           WebkitOverflowScrolling: 'touch',
+          touchAction: getContainerTouchAction(),
+          cursor: activeTool === 'cursor' ? 'grab' : undefined,
         }}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerLeave}
       >
         <div className="flex flex-col items-center gap-4 min-w-full">
           {pagesData.map((pageData) => (
@@ -1452,9 +1396,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               className="relative shadow-lg bg-white overflow-hidden flex-shrink-0"
               style={{ 
                 width: pageData.width * scale, 
-                height: pageData.height * scale 
+                height: pageData.height * scale,
+                touchAction: 'none', // Let our handler manage touches on pages
               }}
-              onPointerDown={(e) => handlePointerDown(e, pageData.pageNum)}
             >
               {/* PDF canvas */}
               <canvas
@@ -1473,12 +1417,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                   height: pageData.height * scale,
                   pointerEvents: isEditMode ? 'auto' : 'none',
                   zIndex: 10,
-                  touchAction: isEditMode && (activeTool === 'draw' || activeTool === 'erase')
-                    ? 'none'
-                    : activeTool === 'cursor'
-                    ? 'none'
-                    : 'manipulation',
-                  cursor: activeTool === 'cursor' ? 'grab' : undefined,
+                  touchAction: 'none',
                 }}
               >
                 <canvas
@@ -1495,18 +1434,14 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                       : isEditMode && activeTool === 'text' 
                       ? 'text' 
                       : 'default',
-                    touchAction: isEditMode && (activeTool === 'draw' || activeTool === 'erase') 
-                      ? 'none' 
-                      : activeTool === 'cursor' 
-                      ? 'none' 
-                      : 'manipulation',
+                    touchAction: 'none',
                     pointerEvents: 'auto',
                   }}
                 />
               </div>
               
               {/* Page number indicator */}
-              <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+              <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded pointer-events-none">
                 {pageData.pageNum}
               </div>
             </div>
