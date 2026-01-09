@@ -406,6 +406,35 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     fabricCanvas.requestRenderAll();
   }, [pagesData, scale, drawingColor, strokeWidth, isEditMode, activeTool]);
 
+  // Track rendered pages with a ref to avoid re-creating observer
+  const renderedPagesRef = useRef<Set<number>>(new Set());
+  
+  // Sync state to ref
+  useEffect(() => {
+    renderedPagesRef.current = renderedPages;
+  }, [renderedPages]);
+
+  // Render first page immediately when PDF is loaded
+  useEffect(() => {
+    if (!pdfDoc || pagesData.length === 0) return;
+    
+    // Immediately render the first page(s) visible
+    const renderInitialPages = async () => {
+      // Give refs time to be set
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Render first page immediately
+      if (pagesData.length > 0 && !renderedPagesRef.current.has(1)) {
+        await renderPDFPage(1);
+        if (!fabricCanvasRefs.current.has(1)) {
+          initializeFabricCanvas(1);
+        }
+      }
+    };
+    
+    renderInitialPages();
+  }, [pdfDoc, pagesData, renderPDFPage, initializeFabricCanvas]);
+
   // Intersection Observer for lazy loading pages
   useEffect(() => {
     if (!pdfDoc || pagesData.length === 0) return;
@@ -415,7 +444,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         entries.forEach(entry => {
           const pageNum = parseInt(entry.target.getAttribute('data-page') || '1');
           if (entry.isIntersecting) {
-            if (!renderedPages.has(pageNum)) {
+            if (!renderedPagesRef.current.has(pageNum)) {
               renderPDFPage(pageNum);
             }
             if (!fabricCanvasRefs.current.has(pageNum)) {
@@ -433,15 +462,21 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           setCurrentVisiblePage(pageNum);
         }
       },
-      { root: canvasContainerRef.current, rootMargin: '100px', threshold: 0.1 }
+      { root: canvasContainerRef.current, rootMargin: '200px', threshold: 0.01 }
     );
 
-    pageRefs.current.forEach((ref) => {
-      observer.observe(ref);
-    });
+    // Wait a tick for refs to be populated
+    const timeoutId = setTimeout(() => {
+      pageRefs.current.forEach((ref) => {
+        observer.observe(ref);
+      });
+    }, 100);
 
-    return () => observer.disconnect();
-  }, [pdfDoc, pagesData, scale, renderedPages, renderPDFPage, initializeFabricCanvas]);
+    return () => {
+      clearTimeout(timeoutId);
+      observer.disconnect();
+    };
+  }, [pdfDoc, pagesData, scale, renderPDFPage, initializeFabricCanvas]);
 
   // Re-render pages when scale changes
   useEffect(() => {
@@ -1405,8 +1440,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 ref={(el) => {
                   if (el) pdfCanvasRefs.current.set(pageData.pageNum, el);
                 }}
+                width={pageData.width * scale}
+                height={pageData.height * scale}
                 className="absolute top-0 left-0 block"
-                style={{ display: 'block' }}
+                style={{ display: 'block', width: pageData.width * scale, height: pageData.height * scale }}
               />
 
               {/* Fabric overlay for annotations */}
