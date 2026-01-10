@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { csvImportConfigService } from './csvImportConfigService';
 
 export interface PartsList {
   id: string;
@@ -69,29 +70,8 @@ export class PartsListService {
     const lines = csvContent.split('\n');
     const headers = lines[0].split(';').map(h => h.trim());
     
-    // Expected headers mapping
-    const headerMap = {
-      'Materiaal': 'materiaal',
-      'Dikte': 'dikte',
-      'Nerf': 'nerf',
-      'Lengte': 'lengte',
-      'Breedte': 'breedte',
-      'Aantal': 'aantal',
-      'CNC pos': 'cnc_pos',
-      'CNC  pos': 'cnc_pos', // Handle extra space variation
-      'Wand Naam': 'wand_naam',
-      'Afplak Boven': 'afplak_boven',
-      'Afplak Onder': 'afplak_onder',
-      'Afplak Links': 'afplak_links',
-      'Afplak Rechts': 'afplak_rechts',
-      'Commentaar': 'commentaar',
-      'Commentaar 2': 'commentaar_2',
-      'CNCPRG1': 'cncprg1',
-      'CNCPRG2': 'cncprg2',
-      'ABD': 'abd',
-      'Afbeelding': 'afbeelding',
-      'Doorlopende nerf': 'doorlopende_nerf'
-    };
+    // Get header mapping from configuration (dynamic)
+    const headerMap = await csvImportConfigService.getHeaderMap();
 
     // Parse parts from CSV
     const parts = [];
@@ -106,7 +86,7 @@ export class PartsListService {
       };
 
       headers.forEach((header, index) => {
-        const fieldName = headerMap[header as keyof typeof headerMap];
+        const fieldName = headerMap[header];
         if (fieldName && values[index]) {
           const value = values[index].trim();
           if (fieldName === 'aantal') {

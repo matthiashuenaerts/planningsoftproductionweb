@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,8 +8,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { partsListService } from '@/services/partsListService';
-import { Upload, FileText, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { csvImportConfigService, CsvImportConfig } from '@/services/csvImportConfigService';
+import { Upload, FileText, Loader2, CheckCircle, AlertCircle, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface PartsListImporterProps {
   projectId: string;
@@ -24,8 +27,24 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
   const [isImporting, setIsImporting] = useState(false);
   const [previewData, setPreviewData] = useState<string[][]>([]);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [columnMappings, setColumnMappings] = useState<CsvImportConfig[]>([]);
+  const [showMappings, setShowMappings] = useState(false);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
+  const isAdmin = currentEmployee?.role === 'admin';
+
+  useEffect(() => {
+    loadMappings();
+  }, []);
+
+  const loadMappings = async () => {
+    try {
+      const configs = await csvImportConfigService.getConfigs();
+      setColumnMappings(configs);
+    } catch (error) {
+      console.error('Error loading CSV mappings:', error);
+    }
+  };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -57,20 +76,21 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
       
       setPreviewData(rows);
       
-      // Basic validation
+      // Basic validation using dynamic config
       const errors: string[] = [];
       if (rows.length < 2) {
         errors.push('CSV must contain at least a header row and one data row');
       }
       
-      const expectedHeaders = ['Materiaal', 'Dikte', 'Nerf', 'Lengte', 'Breedte', 'Aantal'];
+      // Get required headers from config
+      const requiredHeaders = columnMappings.filter(c => c.is_required).map(c => c.csv_header);
       const headers = rows[0] || [];
-      const missingHeaders = expectedHeaders.filter(header => 
-        !headers.some(h => h.toLowerCase().includes(header.toLowerCase()))
+      const missingHeaders = requiredHeaders.filter(header => 
+        !headers.some(h => h.toLowerCase() === header.toLowerCase())
       );
       
       if (missingHeaders.length > 0) {
-        errors.push(`Missing recommended headers: ${missingHeaders.join(', ')}`);
+        errors.push(`Missing required headers: ${missingHeaders.join(', ')}`);
       }
       
       setValidationErrors(errors);
@@ -130,21 +150,27 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
     }
   };
 
-  const expectedHeaders = [
-    'Materiaal', 'Dikte', 'Nerf', 'Lengte', 'Breedte', 'Aantal', 
-    'CNC pos', 'Wand Naam', 'Afplak Boven', 'Afplak Onder', 
-    'Afplak Links', 'Afplak Rechts', 'Commentaar', 'Commentaar 2',
-    'CNCPRG1', 'CNCPRG2', 'ABD', 'Afbeelding', 'Doorlopende nerf'
-  ];
+  // Get headers from dynamic config
+  const expectedHeaders = columnMappings.map(c => c.csv_header);
 
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
             Import Parts List from CSV (Project-wide)
           </CardTitle>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.href = '/settings?tab=csv-import'}
+            >
+              <Settings className="h-4 w-4 mr-1" />
+              Configure Mappings
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -241,26 +267,84 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
         </Card>
       )}
 
-      {/* Expected Format Guide */}
+      {/* Expected Format Guide - Admin sees full mapping details */}
       <Card>
         <CardHeader>
-          <CardTitle>Expected CSV Format</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Expected CSV Format</span>
+            {isAdmin && columnMappings.length > 0 && (
+              <Collapsible open={showMappings} onOpenChange={setShowMappings}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    {showMappings ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    <span className="ml-1">{showMappings ? 'Hide' : 'Show'} Mappings</span>
+                  </Button>
+                </CollapsibleTrigger>
+              </Collapsible>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
+          <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Your CSV should include these headers (semicolon-separated):
             </p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-1 text-xs">
-              {expectedHeaders.map(header => (
-                <Badge key={header} variant="outline" className="text-xs">
-                  {header}
-                </Badge>
-              ))}
+              {expectedHeaders.map(header => {
+                const mapping = columnMappings.find(m => m.csv_header === header);
+                return (
+                  <Badge 
+                    key={header} 
+                    variant={mapping?.is_required ? 'default' : 'outline'} 
+                    className="text-xs"
+                  >
+                    {header}
+                    {mapping?.is_required && ' *'}
+                  </Badge>
+                );
+              })}
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Required fields: Materiaal, Aantal. Other fields are optional but recommended.
+            <p className="text-xs text-muted-foreground">
+              * Required fields. Other fields are optional but recommended.
             </p>
+
+            {/* Admin-only: Detailed mapping table */}
+            {isAdmin && (
+              <Collapsible open={showMappings} onOpenChange={setShowMappings}>
+                <CollapsibleContent>
+                  <div className="mt-4 rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>CSV Header</TableHead>
+                          <TableHead>Database Column</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead className="text-center">Required</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {columnMappings.map((mapping) => (
+                          <TableRow key={mapping.id}>
+                            <TableCell className="font-medium">{mapping.csv_header}</TableCell>
+                            <TableCell className="font-mono text-xs">{mapping.db_column}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {mapping.description || '-'}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {mapping.is_required ? (
+                                <Badge variant="default" className="text-xs">Required</Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs">Optional</Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
           </div>
         </CardContent>
       </Card>
