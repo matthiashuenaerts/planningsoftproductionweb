@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,6 +32,7 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
   const [showMappings, setShowMappings] = useState(false);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
+  const navigate = useNavigate();
   const isAdmin = currentEmployee?.role === 'admin';
 
   useEffect(() => {
@@ -165,7 +167,7 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.location.href = '/settings?tab=csv-import'}
+              onClick={() => navigate('/settings?tab=csv-import')}
             >
               <Settings className="h-4 w-4 mr-1" />
               Configure Mappings
