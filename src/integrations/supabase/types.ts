@@ -911,6 +911,42 @@ export type Database = {
           },
         ]
       }
+      csv_import_configs: {
+        Row: {
+          config_name: string
+          created_at: string | null
+          csv_header: string
+          db_column: string
+          description: string | null
+          display_order: number | null
+          id: string
+          is_required: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          config_name?: string
+          created_at?: string | null
+          csv_header: string
+          db_column: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_required?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          config_name?: string
+          created_at?: string | null
+          csv_header?: string
+          db_column?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_required?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       daily_team_assignments: {
         Row: {
           created_at: string
@@ -4200,6 +4236,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_employee_on_holiday: {
         Args: { check_date: string; emp_id: string }
         Returns: boolean

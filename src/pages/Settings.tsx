@@ -16,6 +16,7 @@ import { HelpManagement } from '@/components/help/HelpManagement';
 import MailSettings from '@/components/settings/MailSettings';
 import StockLocationsSettings from '@/components/settings/StockLocationsSettings';
 import InstallationTeamsSettings from '@/components/settings/InstallationTeamsSettings';
+import { CsvImportConfigSettings } from '@/components/CsvImportConfigSettings';
 
 import MaterialSettings from '@/components/settings/MaterialSettings';
 import SupabaseConnectionSettings from '@/components/settings/SupabaseConnectionSettings';
@@ -104,6 +105,7 @@ const Settings: React.FC = () => {
               <TabsTrigger value="supabase">Supabase Connection</TabsTrigger>
               <TabsTrigger value="mail">Mail</TabsTrigger>
               <TabsTrigger value="help">Help Management</TabsTrigger>
+              <TabsTrigger value="csv-import">CSV Import</TabsTrigger>
             </TabsList>
             
             <TabsContent value="workstations">
@@ -161,6 +163,10 @@ const Settings: React.FC = () => {
 
             <TabsContent value="help">
               <HelpManagement />
+            </TabsContent>
+
+            <TabsContent value="csv-import">
+              <CsvImportConfigSettings />
             </TabsContent>
           </Tabs>
         </div>
