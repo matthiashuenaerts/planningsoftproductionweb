@@ -11,11 +11,12 @@ export interface CsvImportConfig {
 }
 
 class CsvImportConfigService {
-  private cachedConfigs: CsvImportConfig[] | null = null;
+  private cachedConfigs: Map<string, CsvImportConfig[]> = new Map();
 
   async getConfigs(configName: string = 'parts_list'): Promise<CsvImportConfig[]> {
-    if (this.cachedConfigs) {
-      return this.cachedConfigs;
+    // Check cache for this specific config type
+    if (this.cachedConfigs.has(configName)) {
+      return this.cachedConfigs.get(configName)!;
     }
 
     const { data, error } = await supabase
@@ -26,8 +27,9 @@ class CsvImportConfigService {
 
     if (error) throw error;
     
-    this.cachedConfigs = data || [];
-    return this.cachedConfigs;
+    const configs = data || [];
+    this.cachedConfigs.set(configName, configs);
+    return configs;
   }
 
   async getHeaderMap(configName: string = 'parts_list'): Promise<Record<string, string>> {
@@ -46,8 +48,12 @@ class CsvImportConfigService {
     return configs.filter(c => c.is_required).map(c => c.csv_header);
   }
 
-  clearCache() {
-    this.cachedConfigs = null;
+  clearCache(configName?: string) {
+    if (configName) {
+      this.cachedConfigs.delete(configName);
+    } else {
+      this.cachedConfigs.clear();
+    }
   }
 }
 
