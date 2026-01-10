@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Settings, Plus, Trash2, Save, ArrowUpDown, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface CsvImportConfig {
   id: string;
@@ -22,7 +23,7 @@ interface CsvImportConfig {
 }
 
 // Available database columns for the parts table
-const DB_COLUMNS = [
+const PARTS_DB_COLUMNS = [
   { value: 'materiaal', label: 'Materiaal (Material)' },
   { value: 'dikte', label: 'Dikte (Thickness)' },
   { value: 'nerf', label: 'Nerf (Grain)' },
@@ -44,7 +45,27 @@ const DB_COLUMNS = [
   { value: 'doorlopende_nerf', label: 'Doorlopende Nerf (Continuous Grain)' },
 ];
 
-export const CsvImportConfigSettings: React.FC = () => {
+// Available database columns for the accessories table
+const ACCESSORIES_DB_COLUMNS = [
+  { value: 'article_name', label: 'Article Name' },
+  { value: 'article_description', label: 'Article Description' },
+  { value: 'article_code', label: 'Article Code' },
+  { value: 'quantity', label: 'Quantity' },
+  { value: 'stock_location', label: 'Stock Location' },
+  { value: 'status', label: 'Status' },
+  { value: 'supplier', label: 'Supplier' },
+  { value: 'qr_code_text', label: 'QR Code Text' },
+  { value: 'unit_price', label: 'Unit Price' },
+];
+
+interface ConfigSectionProps {
+  configName: string;
+  dbColumns: { value: string; label: string }[];
+  title: string;
+  description: string;
+}
+
+const ConfigSection: React.FC<ConfigSectionProps> = ({ configName, dbColumns, title, description }) => {
   const [configs, setConfigs] = useState<CsvImportConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -55,14 +76,14 @@ export const CsvImportConfigSettings: React.FC = () => {
 
   useEffect(() => {
     loadConfigs();
-  }, []);
+  }, [configName]);
 
   const loadConfigs = async () => {
     try {
       const { data, error } = await supabase
         .from('csv_import_configs')
         .select('*')
-        .eq('config_name', 'parts_list')
+        .eq('config_name', configName)
         .order('display_order', { ascending: true });
 
       if (error) throw error;
@@ -132,7 +153,7 @@ export const CsvImportConfigSettings: React.FC = () => {
     try {
       const maxOrder = Math.max(...configs.map(c => c.display_order), 0);
       const { error } = await supabase.from('csv_import_configs').insert({
-        config_name: 'parts_list',
+        config_name: configName,
         csv_header: newConfig.csv_header,
         db_column: newConfig.db_column,
         description: newConfig.description || null,
@@ -175,10 +196,13 @@ export const CsvImportConfigSettings: React.FC = () => {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
-          <Settings className="h-5 w-5" />
-          CSV Import Column Mappings
-        </CardTitle>
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            {title}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">{description}</p>
+        </div>
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogTrigger asChild>
             <Button size="sm">
@@ -209,7 +233,7 @@ export const CsvImportConfigSettings: React.FC = () => {
                     <SelectValue placeholder="Select database column" />
                   </SelectTrigger>
                   <SelectContent>
-                    {DB_COLUMNS.map((col) => (
+                    {dbColumns.map((col) => (
                       <SelectItem key={col.value} value={col.value}>
                         {col.label}
                       </SelectItem>
@@ -233,10 +257,6 @@ export const CsvImportConfigSettings: React.FC = () => {
         </Dialog>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground mb-4">
-          Configure how CSV column headers map to database fields. The CSV importer will use these mappings to correctly import parts data.
-        </p>
-        
         <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
@@ -273,7 +293,7 @@ export const CsvImportConfigSettings: React.FC = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {DB_COLUMNS.map((col) => (
+                        {dbColumns.map((col) => (
                           <SelectItem key={col.value} value={col.value}>
                             {col.label}
                           </SelectItem>
@@ -324,5 +344,36 @@ export const CsvImportConfigSettings: React.FC = () => {
         </div>
       </CardContent>
     </Card>
+  );
+};
+
+export const CsvImportConfigSettings: React.FC = () => {
+  return (
+    <div className="space-y-6">
+      <Tabs defaultValue="parts_list" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="parts_list">Parts List Import</TabsTrigger>
+          <TabsTrigger value="accessories">Accessories Import</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="parts_list">
+          <ConfigSection
+            configName="parts_list"
+            dbColumns={PARTS_DB_COLUMNS}
+            title="Parts List CSV Column Mappings"
+            description="Configure how CSV column headers map to database fields for parts list imports."
+          />
+        </TabsContent>
+        
+        <TabsContent value="accessories">
+          <ConfigSection
+            configName="accessories"
+            dbColumns={ACCESSORIES_DB_COLUMNS}
+            title="Accessories CSV Column Mappings"
+            description="Configure how CSV column headers map to database fields for accessories imports."
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 };
