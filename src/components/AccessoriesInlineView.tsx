@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, ExternalLink, Edit, ShoppingCart, QrCode, Upload, Pencil } from 'lucide-react';
+import { Plus, Trash2, ExternalLink, Edit, ShoppingCart, QrCode, Upload, Pencil, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { accessoriesService, Accessory } from '@/services/accessoriesService';
 import { orderService } from '@/services/orderService';
@@ -90,6 +90,9 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
 
   const statuses: Accessory['status'][] = ['to_check', 'in_stock', 'delivered', 'to_order', 'ordered'];
 
+  const [showProcessingArticles, setShowProcessingArticles] = useState(false);
+  const [processingArticleCodes, setProcessingArticleCodes] = useState<Set<string>>(new Set());
+
   const [formData, setFormData] = useState<{
     article_name: string;
     article_description: string;
@@ -114,7 +117,24 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
     loadAccessories();
     loadOrders();
     loadSuppliers();
+    loadProcessingArticleCodes();
   }, [projectId]);
+
+  const loadProcessingArticleCodes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('article_code')
+        .eq('is_processing_article', true)
+        .not('article_code', 'is', null);
+
+      if (error) throw error;
+      const codes = new Set((data || []).map(p => p.article_code).filter(Boolean) as string[]);
+      setProcessingArticleCodes(codes);
+    } catch (error) {
+      console.error('Failed to load processing article codes:', error);
+    }
+  };
 
   const loadAccessories = async () => {
     try {
@@ -298,9 +318,14 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     const isChecked = checked === true;
     if (isChecked) {
-      const selectableAccessories = accessories.filter(acc => 
-        acc.status === 'to_order' && !acc.order_id
-      );
+      // Only select from visible (filtered) accessories
+      const selectableAccessories = accessories.filter(acc => {
+        // Skip processing articles if they're hidden
+        if (!showProcessingArticles && acc.article_code && processingArticleCodes.has(acc.article_code)) {
+          return false;
+        }
+        return acc.status === 'to_order' && !acc.order_id;
+      });
       setSelectedAccessories(selectableAccessories.map(acc => acc.id));
     } else {
       setSelectedAccessories([]);
@@ -425,6 +450,20 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
     }
   };
 
+  // Filter accessories to optionally hide processing articles
+  const filteredAccessories = accessories.filter(acc => {
+    if (showProcessingArticles) return true;
+    // Hide if article_code matches a processing article
+    if (acc.article_code && processingArticleCodes.has(acc.article_code)) {
+      return false;
+    }
+    return true;
+  });
+
+  const processingArticleCount = accessories.filter(acc => 
+    acc.article_code && processingArticleCodes.has(acc.article_code)
+  ).length;
+
   const getPrefilledOrderData = () => {
     const selectedItems = accessories.filter(acc => selectedAccessories.includes(acc.id));
     
@@ -536,6 +575,20 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                 <QrCode className="mr-2 h-4 w-4" />
                 QR Codes
               </Button>
+              {processingArticleCount > 0 && (
+                <Button
+                  onClick={() => setShowProcessingArticles(!showProcessingArticles)}
+                  size="sm"
+                  variant={showProcessingArticles ? "default" : "outline"}
+                >
+                  {showProcessingArticles ? (
+                    <EyeOff className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Eye className="mr-2 h-4 w-4" />
+                  )}
+                  Processing ({processingArticleCount})
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -785,7 +838,7 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                 <TableRow>
                   <TableHead className="w-12">
                     <Checkbox
-                      checked={selectedAccessories.length > 0 && selectedAccessories.length === accessories.filter(acc => acc.status === 'to_order' && !acc.order_id).length}
+                      checked={selectedAccessories.length > 0 && selectedAccessories.length === filteredAccessories.filter(acc => acc.status === 'to_order' && !acc.order_id).length}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
@@ -801,7 +854,7 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {accessories.map((accessory) => (
+                {filteredAccessories.map((accessory) => (
                   <TableRow key={accessory.id} className={getRowClassName(accessory.status)}>
                     <TableCell>
                       <Checkbox
@@ -972,9 +1025,12 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
             </Table>
           </div>
 
-          {accessories.length === 0 && !loading && (
+          {filteredAccessories.length === 0 && !loading && (
             <div className="text-center py-8 text-muted-foreground">
-              No accessories found. Add one using the form above or import from CSV.
+              {accessories.length === 0 
+                ? 'No accessories found. Add one using the form above or import from CSV.'
+                : `No accessories to display. ${processingArticleCount} processing article(s) hidden.`
+              }
             </div>
           )}
         </CardContent>
