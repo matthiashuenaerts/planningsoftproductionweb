@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -29,6 +30,7 @@ const productSchema = z.object({
   qr_code: z.string().optional(),
   location: z.string().optional(),
   price_per_unit: z.number().min(0, 'Price must be 0 or greater').optional(),
+  is_processing_article: z.boolean().optional(),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -46,6 +48,7 @@ interface Product {
   qr_code: string | null;
   location: string | null;
   price_per_unit: number | null;
+  is_processing_article: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -101,6 +104,7 @@ const ProductsSettings: React.FC = () => {
       qr_code: '',
       location: '',
       price_per_unit: 0,
+      is_processing_article: false,
     },
   });
 
@@ -323,6 +327,7 @@ const ProductsSettings: React.FC = () => {
         qr_code: data.qr_code || null,
         location: data.location || null,
         price_per_unit: data.price_per_unit || null,
+        is_processing_article: data.is_processing_article || false,
         image_path: imagePath,
       };
 
@@ -377,6 +382,7 @@ const ProductsSettings: React.FC = () => {
       qr_code: product.qr_code || '',
       location: product.location || '',
       price_per_unit: product.price_per_unit || 0,
+      is_processing_article: product.is_processing_article || false,
     });
     setIsDialogOpen(true);
   };
@@ -751,6 +757,27 @@ const ProductsSettings: React.FC = () => {
                            <Input {...field} placeholder="Storage location..." />
                          </FormControl>
                          <FormMessage />
+                       </FormItem>
+                     )}
+                   />
+
+                   <FormField
+                     control={form.control}
+                     name="is_processing_article"
+                     render={({ field }) => (
+                       <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                         <FormControl>
+                           <Checkbox
+                             checked={field.value}
+                             onCheckedChange={field.onChange}
+                           />
+                         </FormControl>
+                         <div className="space-y-1 leading-none">
+                           <FormLabel>Processing Article</FormLabel>
+                           <p className="text-sm text-muted-foreground">
+                             Mark this product as a processing article
+                           </p>
+                         </div>
                        </FormItem>
                      )}
                    />
