@@ -2338,6 +2338,7 @@ export type Database = {
           description: string | null
           id: string
           image_path: string | null
+          is_processing_article: boolean
           location: string | null
           name: string
           price_per_unit: number | null
@@ -2355,6 +2356,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_path?: string | null
+          is_processing_article?: boolean
           location?: string | null
           name: string
           price_per_unit?: number | null
@@ -2372,6 +2374,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_path?: string | null
+          is_processing_article?: boolean
           location?: string | null
           name?: string
           price_per_unit?: number | null
