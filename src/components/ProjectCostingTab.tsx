@@ -71,6 +71,7 @@ interface AccessoryCost {
   unitPrice: number;
   hasDbPrice: boolean; // true if price came from database
   status: string;
+  orderId?: string;
 }
 
 interface AdditionalCosts {
@@ -325,7 +326,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
         // Fetch accessories with unit_price
         const { data: accessoriesData } = await supabase
           .from('accessories')
-          .select('id, article_name, article_code, supplier, quantity, status, unit_price')
+          .select('id, article_name, article_code, supplier, quantity, status, unit_price, order_id')
           .eq('project_id', projectId);
 
         // Fetch all products to lookup prices by article_code
@@ -362,7 +363,8 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
             quantity: acc.quantity,
             unitPrice: dbPrice,
             hasDbPrice,
-            status: acc.status
+            status: acc.status,
+            orderId: (acc as any).order_id || undefined
           };
         });
 
@@ -1315,7 +1317,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
               </TableHeader>
               <TableBody>
                 {costingSummary.accessories.map((acc) => (
-                  <TableRow key={acc.id}>
+                  <TableRow key={acc.id} className={acc.orderId ? "bg-destructive/20" : ""}>
                     <TableCell className="text-muted-foreground">{acc.articleCode || '-'}</TableCell>
                     <TableCell className="max-w-[200px] truncate">{acc.articleName}</TableCell>
                     <TableCell>
