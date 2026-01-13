@@ -342,18 +342,41 @@ export const timeRegistrationService = {
     }
     
     // Now mark the task as completed (only for regular tasks, not workstation tasks)
-    const { data: taskExists } = await supabase
+    const { data: taskData } = await supabase
       .from('tasks')
-      .select('id')
+      .select('id, estimated_duration')
       .eq('id', taskId)
       .maybeSingle();
     
-    if (taskExists) {
+    if (taskData) {
+      // Get ALL time registrations for this task to calculate total actual duration
+      const { data: allRegistrations, error: allRegError } = await supabase
+        .from('time_registrations')
+        .select('duration_minutes')
+        .eq('task_id', taskId);
+      
+      if (allRegError) throw allRegError;
+      
+      // Sum up all duration_minutes from all time registrations
+      const totalActualMinutes = (allRegistrations || []).reduce((sum, reg) => {
+        return sum + (reg.duration_minutes || 0);
+      }, 0);
+      
       const updateData: any = {
         status: 'COMPLETED',
         completed_at: new Date().toISOString(),
-        assignee_id: null
+        assignee_id: null,
+        actual_duration_minutes: totalActualMinutes
       };
+      
+      // Calculate efficiency percentage if we have estimated_duration
+      // Positive = faster than expected, Negative = slower than expected
+      if (taskData.estimated_duration && taskData.estimated_duration > 0) {
+        const efficiencyPercentage = Math.round(
+          ((taskData.estimated_duration - totalActualMinutes) / taskData.estimated_duration) * 100
+        );
+        updateData.efficiency_percentage = efficiencyPercentage;
+      }
       
       // Set completed_by if we have an employee
       if (completedBy) {

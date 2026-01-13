@@ -430,28 +430,30 @@ const TaskList: React.FC<TaskListProps> = ({
                   )}
 
                   {/* Efficiency data for completed tasks */}
-                  {showEfficiencyData && task.status === 'COMPLETED' && task.actual_duration_minutes !== undefined && task.efficiency_percentage !== undefined && (
+                  {showEfficiencyData && task.status === 'COMPLETED' && task.actual_duration_minutes !== undefined && (
                     <div className="mt-2 space-y-1">
                       <div className="flex items-center gap-2 text-sm">
                         <Clock className="h-4 w-4 text-gray-500" />
                         <span className="text-gray-600">
-                          Planned: {formatDuration(task.actual_duration_minutes)}
-                          {task.total_duration && ` / Total: ${formatDuration(task.total_duration)}`}
+                          {task.estimated_duration ? `Estimated: ${formatDuration(task.estimated_duration)} / ` : ''}
+                          Actual: {formatDuration(task.actual_duration_minutes)}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        {task.efficiency_percentage >= 0 ? (
-                          <TrendingUp className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <TrendingDown className="h-4 w-4 text-red-600" />
-                        )}
-                        <span className={`font-medium ${task.efficiency_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {task.efficiency_percentage >= 0 ? '+' : ''}{task.efficiency_percentage}% efficiency
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          ({task.efficiency_percentage >= 0 ? 'faster' : 'slower'} than planned)
-                        </span>
-                      </div>
+                      {task.efficiency_percentage !== undefined && (
+                        <div className="flex items-center gap-2 text-sm">
+                          {task.efficiency_percentage >= 0 ? (
+                            <TrendingUp className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4 text-red-600" />
+                          )}
+                          <span className={`font-medium ${task.efficiency_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {task.efficiency_percentage >= 0 ? '+' : ''}{task.efficiency_percentage}% efficiency
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            ({task.efficiency_percentage >= 0 ? 'faster' : 'slower'} than expected)
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
