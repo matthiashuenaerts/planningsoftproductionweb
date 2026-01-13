@@ -152,7 +152,7 @@ const ProjectDetails = () => {
     // Process only tasks that need calculation
     for (const task of tasksNeedingCalculation) {
       const actualMinutes = timeRegsByTask.get(task.id) || 0;
-      const estimatedMinutes = (task as any).estimated_duration || task.duration || 0;
+      const estimatedMinutes = task.estimated_duration || 0;
       console.log(`Task ${task.id}: Estimated ${estimatedMinutes}min, Actual ${actualMinutes}min`);
       if (estimatedMinutes > 0 && actualMinutes > 0) {
         const efficiency = (estimatedMinutes - actualMinutes) / estimatedMinutes * 100;
@@ -180,8 +180,8 @@ const ProjectDetails = () => {
 
     // Include already calculated tasks in project efficiency calculation
     completedTasks.forEach(task => {
-      if (task.actual_duration_minutes && task.duration && !tasksNeedingCalculation.includes(task)) {
-        totalPlannedMinutes += task.duration;
+      if (task.actual_duration_minutes && task.estimated_duration && !tasksNeedingCalculation.includes(task)) {
+        totalPlannedMinutes += task.estimated_duration;
         totalActualMinutes += task.actual_duration_minutes;
       }
     });
