@@ -157,6 +157,14 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
         }
 
         const accessoriesToCreate: Array<Omit<Accessory, 'id' | 'created_at' | 'updated_at'>> = [];
+        
+        // Map to aggregate quantities for identical article codes that match database products
+        const productAggregator = new Map<string, {
+          product: any;
+          quantity: number;
+          stockLocation?: string;
+          status?: string;
+        }>();
 
         for (const item of mappedJson) {
           const importedQuantity = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
@@ -176,37 +184,44 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
             for (const groupItem of items) {
               const product = productsById.get(groupItem.product_id);
               if (product) {
-                accessoriesToCreate.push({
-                  project_id: projectId,
-                  article_name: product.name,
-                  article_description: product.description || `From group: ${matchedGroup.name}`,
-                  article_code: product.article_code,
-                  quantity: groupItem.quantity * importedQuantity, // Multiply by CSV quantity
-                  stock_location: product.location || item.stock_location,
-                  status: item.status || 'to_check',
-                  supplier: product.supplier,
-                  qr_code_text: product.qr_code,
-                });
+                const productKey = product.article_code?.toLowerCase() || product.id;
+                const existing = productAggregator.get(productKey);
+                const newQuantity = groupItem.quantity * importedQuantity;
+                
+                if (existing) {
+                  existing.quantity += newQuantity;
+                } else {
+                  productAggregator.set(productKey, {
+                    product: {
+                      ...product,
+                      description: product.description || `From group: ${matchedGroup.name}`,
+                    },
+                    quantity: newQuantity,
+                    stockLocation: product.location || item.stock_location,
+                    status: item.status || 'to_check',
+                  });
+                }
               }
             }
           } else if (articleCode && productsByCode.has(articleCode)) {
-            // Check if article_code exists in products database
+            // Check if article_code exists in products database - aggregate quantities
             const product = productsByCode.get(articleCode);
+            const existing = productAggregator.get(articleCode);
             
-            // Use product data but keep imported quantity
-            accessoriesToCreate.push({
-              project_id: projectId,
-              article_name: product.name,
-              article_description: product.description,
-              article_code: product.article_code,
-              quantity: importedQuantity,
-              stock_location: item.stock_location || product.location,
-              status: item.status || 'to_check',
-              supplier: product.supplier,
-              qr_code_text: product.qr_code,
-            });
+            if (existing) {
+              // Add to existing quantity
+              existing.quantity += importedQuantity;
+            } else {
+              // First occurrence - add to aggregator
+              productAggregator.set(articleCode, {
+                product,
+                quantity: importedQuantity,
+                stockLocation: item.stock_location || product.location,
+                status: item.status || 'to_check',
+              });
+            }
           } else {
-            // Use CSV data as-is
+            // Use CSV data as-is (no aggregation for non-database items)
             accessoriesToCreate.push({
               project_id: projectId,
               article_name: item.article_name || '',
@@ -219,6 +234,21 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
               qr_code_text: item.qr_code_text,
             });
           }
+        }
+        
+        // Convert aggregated product entries to accessories
+        for (const [, entry] of productAggregator) {
+          accessoriesToCreate.push({
+            project_id: projectId,
+            article_name: entry.product.name,
+            article_description: entry.product.description,
+            article_code: entry.product.article_code,
+            quantity: entry.quantity,
+            stock_location: entry.stockLocation,
+            status: (entry.status || 'to_check') as 'to_check' | 'to_order' | 'ordered' | 'in_stock' | 'delivered',
+            supplier: entry.product.supplier,
+            qr_code_text: entry.product.qr_code,
+          });
         }
 
         for (const acc of accessoriesToCreate) {
