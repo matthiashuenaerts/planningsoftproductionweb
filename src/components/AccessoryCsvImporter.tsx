@@ -96,13 +96,34 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
         });
 
         // Fetch all products first to check against article codes
-        const { data: products, error: productsError } = await supabase
-          .from('products')
-          .select('*');
-
-        if (productsError) {
-          console.error('Error fetching products:', productsError);
+        // Use pagination to ensure we get all products (Supabase has a default limit of 1000)
+        let allProducts: any[] = [];
+        let from = 0;
+        const batchSize = 1000;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const { data: batch, error: productsError } = await supabase
+            .from('products')
+            .select('*')
+            .range(from, from + batchSize - 1);
+          
+          if (productsError) {
+            console.error('Error fetching products:', productsError);
+            break;
+          }
+          
+          if (batch && batch.length > 0) {
+            allProducts = allProducts.concat(batch);
+            from += batchSize;
+            hasMore = batch.length === batchSize;
+          } else {
+            hasMore = false;
+          }
         }
+        
+        const products = allProducts;
+        console.log(`Fetched ${products.length} products from database`);
 
         // Fetch all product groups with their items
         const { data: groups, error: groupsError } = await supabase
