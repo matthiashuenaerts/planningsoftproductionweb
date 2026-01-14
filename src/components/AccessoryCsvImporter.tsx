@@ -156,6 +156,9 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
           });
         }
 
+        console.log('Group items map built:', groupItemsMap.size, 'groups');
+        console.log('Products by ID:', productsById.size, 'products');
+
         const accessoriesToCreate: Array<Omit<Accessory, 'id' | 'created_at' | 'updated_at'>> = [];
         
         // Map to aggregate quantities for identical article codes that match database products
@@ -181,12 +184,16 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
           if (matchedGroup) {
             // It's a group - add all products from the group
             const items = groupItemsMap.get(matchedGroup.id) || [];
+            console.log(`Group "${matchedGroup.name}" (id: ${matchedGroup.id}) has ${items.length} items to split`);
+            
+            // Process ALL items in the group
             for (const groupItem of items) {
               const product = productsById.get(groupItem.product_id);
+              const newQuantity = groupItem.quantity * importedQuantity;
+              
               if (product) {
                 const productKey = product.article_code?.toLowerCase() || product.id;
                 const existing = productAggregator.get(productKey);
-                const newQuantity = groupItem.quantity * importedQuantity;
                 
                 if (existing) {
                   existing.quantity += newQuantity;
@@ -201,6 +208,21 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
                     status: item.status || 'to_check',
                   });
                 }
+                console.log(`  - Added product "${product.name}" (code: ${product.article_code}) qty: ${newQuantity}`);
+              } else {
+                // Product not found in database - still create accessory entry with available info
+                console.warn(`  - Product ID ${groupItem.product_id} not found in products table, creating placeholder`);
+                accessoriesToCreate.push({
+                  project_id: projectId,
+                  article_name: `Unknown product (${groupItem.product_id.substring(0, 8)}...)`,
+                  article_description: `From group: ${matchedGroup.name}`,
+                  article_code: undefined,
+                  quantity: newQuantity,
+                  stock_location: item.stock_location,
+                  status: item.status || 'to_check',
+                  supplier: undefined,
+                  qr_code_text: undefined,
+                });
               }
             }
           } else if (articleCode && productsByCode.has(articleCode)) {
@@ -237,7 +259,9 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
         }
         
         // Convert aggregated product entries to accessories
-        for (const [, entry] of productAggregator) {
+        console.log(`Converting ${productAggregator.size} aggregated products to accessories`);
+        for (const [key, entry] of productAggregator) {
+          console.log(`  - ${entry.product.name} (${key}): qty ${entry.quantity}`);
           accessoriesToCreate.push({
             project_id: projectId,
             article_name: entry.product.name,
