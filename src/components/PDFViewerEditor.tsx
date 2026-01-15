@@ -205,14 +205,28 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     if (penDrawingPageRef.current !== null) {
       const pageNum = penDrawingPageRef.current;
       const canvas = fabricCanvasRefs.current.get(pageNum);
+      
+      // Only disable drawing mode if we're not in draw tool mode
+      // Delay slightly to let Fabric finalize the path
       if (canvas && activeTool !== 'draw') {
-        canvas.isDrawingMode = false;
+        setTimeout(() => {
+          if (penDrawingPageRef.current === null) {
+            canvas.isDrawingMode = false;
+          }
+        }, 100);
       }
+      
       // Restore pointer events based on edit mode
       const overlayEl = overlayCanvasRefs.current.get(pageNum)?.parentElement;
       if (overlayEl && !isEditMode) {
-        overlayEl.style.pointerEvents = 'none';
+        // Delay pointer events restoration to allow path finalization
+        setTimeout(() => {
+          if (penDrawingPageRef.current === null && !isEditMode) {
+            overlayEl.style.pointerEvents = 'none';
+          }
+        }, 150);
       }
+      
       penDrawingPageRef.current = null;
     }
   }, [activeTool, isEditMode]);
