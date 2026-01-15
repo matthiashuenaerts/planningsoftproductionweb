@@ -477,42 +477,78 @@ export const timeRegistrationService = {
   },
 
   async getAllRegistrations(): Promise<any[]> {
-    const { data, error } = await supabase
-      .from('time_registrations')
-      .select(`
-        *,
-        employees (name),
-        tasks (
-          title, 
-          phases (name, projects (id, name)), 
-          standard_tasks (hourly_cost)
-        ),
-        workstation_tasks (task_name, workstations (id, name))
-      `)
-      .order('start_time', { ascending: false });
+    // Use pagination to fetch all registrations (Supabase has a default limit of 1000)
+    let allRegistrations: any[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data: batch, error } = await supabase
+        .from('time_registrations')
+        .select(`
+          *,
+          employees (name),
+          tasks (
+            title, 
+            phases (name, projects (id, name)), 
+            standard_tasks (hourly_cost)
+          ),
+          workstation_tasks (task_name, workstations (id, name))
+        `)
+        .order('start_time', { ascending: false })
+        .range(from, from + batchSize - 1);
+      
+      if (error) throw error;
+      
+      if (batch && batch.length > 0) {
+        allRegistrations = allRegistrations.concat(batch);
+        from += batchSize;
+        hasMore = batch.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
     
-    if (error) throw error;
-    return data || [];
+    return allRegistrations;
   },
 
   async getRegistrationsByEmployee(employeeId: string): Promise<any[]> {
-    const { data, error } = await supabase
-      .from('time_registrations')
-      .select(`
-        *,
-        employees (name),
-        tasks (
-          title, 
-          phases (name, projects (id, name)),
-          standard_tasks (hourly_cost)
-        ),
-        workstation_tasks (task_name, workstations (id, name))
-      `)
-      .eq('employee_id', employeeId)
-      .order('start_time', { ascending: false });
+    // Use pagination to fetch all registrations (Supabase has a default limit of 1000)
+    let allRegistrations: any[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data: batch, error } = await supabase
+        .from('time_registrations')
+        .select(`
+          *,
+          employees (name),
+          tasks (
+            title, 
+            phases (name, projects (id, name)),
+            standard_tasks (hourly_cost)
+          ),
+          workstation_tasks (task_name, workstations (id, name))
+        `)
+        .eq('employee_id', employeeId)
+        .order('start_time', { ascending: false })
+        .range(from, from + batchSize - 1);
+      
+      if (error) throw error;
+      
+      if (batch && batch.length > 0) {
+        allRegistrations = allRegistrations.concat(batch);
+        from += batchSize;
+        hasMore = batch.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
     
-    if (error) throw error;
-    return data || [];
+    return allRegistrations;
   },
 
   async deleteRegistrationsOlderThan(cutoffDate: Date): Promise<number> {
