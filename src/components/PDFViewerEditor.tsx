@@ -108,6 +108,14 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const [fontSize, setFontSize] = useState(18);
   const [fontFamily, setFontFamily] = useState('Arial');
   
+  // Refs to hold current values for use in event handlers (avoid closure issues)
+  const activeToolRef = useRef<ToolType>('select');
+  const isEditModeRef = useRef(false);
+  const drawingColorRef = useRef('#ff0000');
+  const strokeWidthRef = useRef(3);
+  const fontSizeRef = useRef(18);
+  const fontFamilyRef = useRef('Arial');
+  
   // History state (per page)
   const canvasHistoryRef = useRef<Map<number, string[]>>(new Map());
   const historyIndexRef = useRef<Map<number, number>>(new Map());
@@ -135,6 +143,31 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   useEffect(() => {
     lineSnapEnabledRef.current = lineSnapEnabled;
   }, [lineSnapEnabled]);
+  
+  // Keep refs in sync with state for use in event handlers
+  useEffect(() => {
+    activeToolRef.current = activeTool;
+  }, [activeTool]);
+  
+  useEffect(() => {
+    isEditModeRef.current = isEditMode;
+  }, [isEditMode]);
+  
+  useEffect(() => {
+    drawingColorRef.current = drawingColor;
+  }, [drawingColor]);
+  
+  useEffect(() => {
+    strokeWidthRef.current = strokeWidth;
+  }, [strokeWidth]);
+  
+  useEffect(() => {
+    fontSizeRef.current = fontSize;
+  }, [fontSize]);
+  
+  useEffect(() => {
+    fontFamilyRef.current = fontFamily;
+  }, [fontFamily]);
 
   // Get page number at a specific point
   const getPageAtPoint = useCallback((clientX: number, clientY: number): number | null => {
@@ -416,8 +449,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     if (!fabricCanvas.freeDrawingBrush) {
       fabricCanvas.freeDrawingBrush = new PencilBrush(fabricCanvas);
     }
-    fabricCanvas.freeDrawingBrush.color = drawingColor;
-    fabricCanvas.freeDrawingBrush.width = strokeWidth;
+    fabricCanvas.freeDrawingBrush.color = drawingColorRef.current;
+    fabricCanvas.freeDrawingBrush.width = strokeWidthRef.current;
 
     fabricCanvas.on('path:created', () => {
       saveCanvasState(pageNum);
@@ -435,26 +468,35 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       triggerAutoSave();
     });
 
-    // Handle eraser tool - click on objects to delete them
+    // Handle all tool interactions - use refs to get current values
     fabricCanvas.on('mouse:down', (options) => {
-      if (activeTool === 'erase' && isEditMode && options.target) {
+      const currentTool = activeToolRef.current;
+      const currentEditMode = isEditModeRef.current;
+      const currentColor = drawingColorRef.current;
+      const currentStrokeWidth = strokeWidthRef.current;
+      const currentFontSize = fontSizeRef.current;
+      const currentFontFamily = fontFamilyRef.current;
+      
+      // Handle eraser tool - click on objects to delete them
+      if (currentTool === 'erase' && currentEditMode && options.target) {
         fabricCanvas.remove(options.target);
         fabricCanvas.requestRenderAll();
         saveCanvasState(pageNum);
         saveCurrentPageAnnotationsToDb(pageNum);
         triggerAutoSave();
+        return;
       }
       
       // Handle text tool - add text on click
-      if (activeTool === 'text' && isEditMode && !options.target) {
+      if (currentTool === 'text' && currentEditMode && !options.target) {
         const pointer = fabricCanvas.getPointer(options.e);
         const text = new Textbox('Text', {
           left: pointer.x,
           top: pointer.y,
           width: 200 * scale,
-          fontSize: fontSize * scale,
-          fontFamily: fontFamily,
-          fill: drawingColor,
+          fontSize: currentFontSize * scale,
+          fontFamily: currentFontFamily,
+          fill: currentColor,
           editable: true,
         });
         fabricCanvas.add(text);
@@ -462,10 +504,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         text.enterEditing();
         fabricCanvas.requestRenderAll();
         saveCanvasState(pageNum);
+        saveCurrentPageAnnotationsToDb(pageNum);
+        triggerAutoSave();
+        return;
       }
       
       // Handle rectangle tool
-      if (activeTool === 'rectangle' && isEditMode && !options.target) {
+      if (currentTool === 'rectangle' && currentEditMode && !options.target) {
         const pointer = fabricCanvas.getPointer(options.e);
         const rect = new Rect({
           left: pointer.x,
@@ -473,30 +518,36 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           width: 100 * scale,
           height: 60 * scale,
           fill: 'transparent',
-          stroke: drawingColor,
-          strokeWidth: strokeWidth,
+          stroke: currentColor,
+          strokeWidth: currentStrokeWidth,
         });
         fabricCanvas.add(rect);
         fabricCanvas.setActiveObject(rect);
         fabricCanvas.requestRenderAll();
         saveCanvasState(pageNum);
+        saveCurrentPageAnnotationsToDb(pageNum);
+        triggerAutoSave();
+        return;
       }
       
       // Handle circle tool
-      if (activeTool === 'circle' && isEditMode && !options.target) {
+      if (currentTool === 'circle' && currentEditMode && !options.target) {
         const pointer = fabricCanvas.getPointer(options.e);
         const circle = new FabricCircle({
           left: pointer.x,
           top: pointer.y,
           radius: 40 * scale,
           fill: 'transparent',
-          stroke: drawingColor,
-          strokeWidth: strokeWidth,
+          stroke: currentColor,
+          strokeWidth: currentStrokeWidth,
         });
         fabricCanvas.add(circle);
         fabricCanvas.setActiveObject(circle);
         fabricCanvas.requestRenderAll();
         saveCanvasState(pageNum);
+        saveCurrentPageAnnotationsToDb(pageNum);
+        triggerAutoSave();
+        return;
       }
     });
 
@@ -504,14 +555,14 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     
     loadPageAnnotations(pageNum, fabricCanvas);
     
-    applyToolSettings(isEditMode ? activeTool : 'select', fabricCanvas);
-    if (!isEditMode) {
+    applyToolSettings(isEditModeRef.current ? activeToolRef.current : 'select', fabricCanvas);
+    if (!isEditModeRef.current) {
       fabricCanvas.selection = false;
       fabricCanvas.discardActiveObject();
     }
     
     fabricCanvas.requestRenderAll();
-  }, [pagesData, scale, drawingColor, strokeWidth, fontSize, fontFamily, isEditMode, activeTool]);
+  }, [pagesData, scale]);
 
   // Track rendered pages with a ref to avoid re-creating observer
   const renderedPagesRef = useRef<Set<number>>(new Set());
