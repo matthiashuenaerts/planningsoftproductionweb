@@ -225,6 +225,16 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     loadPdfJs();
     
     return () => {
+      // Cancel all active render tasks
+      renderTasksRef.current.forEach((task) => {
+        try {
+          task.cancel();
+        } catch (e) {
+          // Ignore cancel errors
+        }
+      });
+      renderTasksRef.current.clear();
+      
       fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
       fabricCanvasRefs.current.clear();
       if (autoSaveTimeoutRef.current) {
@@ -265,8 +275,14 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       const pages: PageData[] = [];
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 1.0 });
-        pages.push({ pageNum: i, width: viewport.width, height: viewport.height });
+        // Get viewport with rotation normalized - this ensures rotated pages display correctly
+        // PDF.js applies rotation automatically when getting viewport
+        const viewport = page.getViewport({ scale: 1.0, rotation: 0 });
+        pages.push({ 
+          pageNum: i, 
+          width: viewport.width, 
+          height: viewport.height 
+        });
       }
       setPagesData(pages);
       
@@ -308,6 +324,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
   };
 
+  // Track active render tasks to prevent conflicts
+  const renderTasksRef = useRef<Map<number, any>>(new Map());
+
   // Render a specific PDF page
   const renderPDFPage = useCallback(async (pageNum: number) => {
     if (!pdfDoc) return;
@@ -315,22 +334,46 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     const pdfCanvas = pdfCanvasRefs.current.get(pageNum);
     if (!pdfCanvas) return;
     
+    // Cancel any existing render task for this page
+    const existingTask = renderTasksRef.current.get(pageNum);
+    if (existingTask) {
+      try {
+        existingTask.cancel();
+      } catch (e) {
+        // Ignore cancel errors
+      }
+      renderTasksRef.current.delete(pageNum);
+    }
+    
     try {
       const page = await pdfDoc.getPage(pageNum);
-      const viewport = page.getViewport({ scale });
+      // Use rotation: 0 to let PDF.js handle the page's native rotation
+      const viewport = page.getViewport({ scale, rotation: 0 });
       const context = pdfCanvas.getContext('2d');
       if (!context) return;
 
       pdfCanvas.width = viewport.width;
       pdfCanvas.height = viewport.height;
 
-      await page.render({
+      const renderTask = page.render({
         canvasContext: context,
         viewport: viewport,
-      }).promise;
+      });
+      
+      // Store the render task so we can cancel it if needed
+      renderTasksRef.current.set(pageNum, renderTask);
+      
+      await renderTask.promise;
+      
+      // Clean up after successful render
+      renderTasksRef.current.delete(pageNum);
       
       setRenderedPages(prev => new Set([...prev, pageNum]));
-    } catch (error) {
+    } catch (error: any) {
+      // Ignore cancellation errors
+      if (error?.name === 'RenderingCancelledException') {
+        return;
+      }
       console.error(`Error rendering page ${pageNum}:`, error);
     }
   }, [pdfDoc, scale]);
@@ -393,6 +436,71 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       triggerAutoSave();
     });
 
+    // Handle eraser tool - click on objects to delete them
+    fabricCanvas.on('mouse:down', (options) => {
+      if (activeTool === 'erase' && isEditMode && options.target) {
+        fabricCanvas.remove(options.target);
+        fabricCanvas.requestRenderAll();
+        saveCanvasState(pageNum);
+        saveCurrentPageAnnotationsToDb(pageNum);
+        triggerAutoSave();
+      }
+      
+      // Handle text tool - add text on click
+      if (activeTool === 'text' && isEditMode && !options.target) {
+        const pointer = fabricCanvas.getPointer(options.e);
+        const text = new Textbox('Text', {
+          left: pointer.x,
+          top: pointer.y,
+          width: 200 * scale,
+          fontSize: fontSize * scale,
+          fontFamily: fontFamily,
+          fill: drawingColor,
+          editable: true,
+        });
+        fabricCanvas.add(text);
+        fabricCanvas.setActiveObject(text);
+        text.enterEditing();
+        fabricCanvas.requestRenderAll();
+        saveCanvasState(pageNum);
+      }
+      
+      // Handle rectangle tool
+      if (activeTool === 'rectangle' && isEditMode && !options.target) {
+        const pointer = fabricCanvas.getPointer(options.e);
+        const rect = new Rect({
+          left: pointer.x,
+          top: pointer.y,
+          width: 100 * scale,
+          height: 60 * scale,
+          fill: 'transparent',
+          stroke: drawingColor,
+          strokeWidth: strokeWidth,
+        });
+        fabricCanvas.add(rect);
+        fabricCanvas.setActiveObject(rect);
+        fabricCanvas.requestRenderAll();
+        saveCanvasState(pageNum);
+      }
+      
+      // Handle circle tool
+      if (activeTool === 'circle' && isEditMode && !options.target) {
+        const pointer = fabricCanvas.getPointer(options.e);
+        const circle = new FabricCircle({
+          left: pointer.x,
+          top: pointer.y,
+          radius: 40 * scale,
+          fill: 'transparent',
+          stroke: drawingColor,
+          strokeWidth: strokeWidth,
+        });
+        fabricCanvas.add(circle);
+        fabricCanvas.setActiveObject(circle);
+        fabricCanvas.requestRenderAll();
+        saveCanvasState(pageNum);
+      }
+    });
+
     fabricCanvasRefs.current.set(pageNum, fabricCanvas);
     
     loadPageAnnotations(pageNum, fabricCanvas);
@@ -404,7 +512,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
     
     fabricCanvas.requestRenderAll();
-  }, [pagesData, scale, drawingColor, strokeWidth, isEditMode, activeTool]);
+  }, [pagesData, scale, drawingColor, strokeWidth, fontSize, fontFamily, isEditMode, activeTool]);
 
   // Track rendered pages with a ref to avoid re-creating observer
   const renderedPagesRef = useRef<Set<number>>(new Set());
@@ -481,6 +589,17 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Re-render pages when scale changes
   useEffect(() => {
     if (!pdfDoc) return;
+    
+    // Cancel all active render tasks before clearing
+    renderTasksRef.current.forEach((task, pageNum) => {
+      try {
+        task.cancel();
+      } catch (e) {
+        // Ignore cancel errors
+      }
+    });
+    renderTasksRef.current.clear();
+    
     setRenderedPages(new Set());
     fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
     fabricCanvasRefs.current.clear();
@@ -730,17 +849,34 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         case 'erase':
           c.selection = false;
           c.defaultCursor = 'crosshair';
+          c.hoverCursor = 'pointer';
+          // Allow objects to be clicked for erasing
+          c.getObjects().forEach(obj => {
+            obj.selectable = false;
+            obj.evented = true; // Must be true to receive click events
+          });
           break;
 
         case 'text':
-          c.selection = true;
+          c.selection = false;
           c.defaultCursor = 'text';
+          c.hoverCursor = 'text';
+          // Allow clicking on existing text to edit, but don't select
+          c.getObjects().forEach(obj => {
+            obj.selectable = obj.type === 'textbox';
+            obj.evented = obj.type === 'textbox';
+          });
           break;
 
         case 'rectangle':
         case 'circle':
           c.selection = false;
           c.defaultCursor = 'crosshair';
+          c.hoverCursor = 'crosshair';
+          c.getObjects().forEach(obj => {
+            obj.selectable = false;
+            obj.evented = false;
+          });
           break;
 
         case 'cursor':
