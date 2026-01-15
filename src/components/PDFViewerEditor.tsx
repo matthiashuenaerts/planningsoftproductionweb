@@ -181,29 +181,41 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     return null;
   }, []);
 
-  // Handle pen draw start (from touch handler)
+  // Handle pen draw start (from touch handler) - always allow Apple Pencil drawing
   const handlePenDrawStart = useCallback((pageNum: number) => {
     const canvas = fabricCanvasRefs.current.get(pageNum);
-    if (canvas && isEditMode) {
+    if (canvas) {
+      // Always allow pen drawing, even in view/pan mode
       penDrawingPageRef.current = pageNum;
       canvas.isDrawingMode = true;
       if (canvas.freeDrawingBrush) {
         canvas.freeDrawingBrush.color = drawingColor;
         canvas.freeDrawingBrush.width = strokeWidth;
       }
+      // Temporarily enable pointer events for drawing
+      const overlayEl = overlayCanvasRefs.current.get(pageNum)?.parentElement;
+      if (overlayEl) {
+        overlayEl.style.pointerEvents = 'auto';
+      }
     }
-  }, [isEditMode, drawingColor, strokeWidth]);
+  }, [drawingColor, strokeWidth]);
 
   // Handle pen draw end (from touch handler)
   const handlePenDrawEnd = useCallback(() => {
     if (penDrawingPageRef.current !== null) {
-      const canvas = fabricCanvasRefs.current.get(penDrawingPageRef.current);
+      const pageNum = penDrawingPageRef.current;
+      const canvas = fabricCanvasRefs.current.get(pageNum);
       if (canvas && activeTool !== 'draw') {
         canvas.isDrawingMode = false;
       }
+      // Restore pointer events based on edit mode
+      const overlayEl = overlayCanvasRefs.current.get(pageNum)?.parentElement;
+      if (overlayEl && !isEditMode) {
+        overlayEl.style.pointerEvents = 'none';
+      }
       penDrawingPageRef.current = null;
     }
-  }, [activeTool]);
+  }, [activeTool, isEditMode]);
 
   // Initialize touch handler
   usePDFTouchHandler({
@@ -1606,7 +1618,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           cursor: activeTool === 'cursor' ? 'grab' : undefined,
         }}
       >
-        <div className="flex flex-col items-center gap-4 min-w-full">
+        <div 
+          className="flex flex-col items-center gap-4" 
+          style={{ 
+            minWidth: 'fit-content',
+            padding: '0 max(16px, calc((100% - ' + (pagesData[0]?.width || 600) * scale + 'px) / 2))',
+          }}
+        >
           {pagesData.map((pageData) => (
             <div
               key={pageData.pageNum}

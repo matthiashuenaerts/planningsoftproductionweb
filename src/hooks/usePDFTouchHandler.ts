@@ -127,22 +127,20 @@ export function usePDFTouchHandler(config: TouchHandlerConfig) {
 
     stopMomentum();
 
-    // Pen/stylus detection - always draws regardless of tool (when in edit mode)
+    // Pen/stylus detection - always allows drawing (even in pan/view mode)
     if (e.pointerType === 'pen') {
-      if (isEditMode) {
-        stateRef.current.isPenDrawing = true;
-        
-        // Find which page the pen is on
-        if (getPageAtPoint) {
-          const pageNum = getPageAtPoint(e.clientX, e.clientY);
-          if (pageNum !== null) {
-            onPenDrawStart?.(pageNum);
-          }
+      stateRef.current.isPenDrawing = true;
+      
+      // Find which page the pen is on
+      if (getPageAtPoint) {
+        const pageNum = getPageAtPoint(e.clientX, e.clientY);
+        if (pageNum !== null) {
+          onPenDrawStart?.(pageNum);
         }
-        
-        // Don't prevent default - let Fabric handle the pen drawing
-        return;
       }
+      
+      // Don't prevent default - let Fabric handle the pen drawing
+      return;
     }
 
     // Two-finger pinch detection
