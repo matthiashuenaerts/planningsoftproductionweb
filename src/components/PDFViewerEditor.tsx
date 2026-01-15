@@ -275,9 +275,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       const pages: PageData[] = [];
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
-        // Get viewport with rotation normalized - this ensures rotated pages display correctly
-        // PDF.js applies rotation automatically when getting viewport
-        const viewport = page.getViewport({ scale: 1.0, rotation: 0 });
+        // Get viewport without forcing rotation - let PDF.js use the page's native rotation
+        const viewport = page.getViewport({ scale: 1.0 });
         pages.push({ 
           pageNum: i, 
           width: viewport.width, 
@@ -347,8 +346,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     
     try {
       const page = await pdfDoc.getPage(pageNum);
-      // Use rotation: 0 to let PDF.js handle the page's native rotation
-      const viewport = page.getViewport({ scale, rotation: 0 });
+      // Don't force rotation - let PDF.js use the page's native rotation from the PDF
+      const viewport = page.getViewport({ scale });
       const context = pdfCanvas.getContext('2d');
       if (!context) return;
 
