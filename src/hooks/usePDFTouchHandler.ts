@@ -121,27 +121,26 @@ export function usePDFTouchHandler(config: TouchHandlerConfig) {
     const container = containerRef.current;
     if (!container) return;
 
-    // Track all active touches
+    // Pen/stylus detection - let it pass through to Fabric completely
+    // Don't track it or interfere with it at all
+    if (e.pointerType === 'pen') {
+      // Find which page the pen is on and notify
+      if (getPageAtPoint) {
+        const pageNum = getPageAtPoint(e.clientX, e.clientY);
+        if (pageNum !== null) {
+          stateRef.current.isPenDrawing = true;
+          onPenDrawStart?.(pageNum);
+        }
+      }
+      // Let the event propagate to Fabric - don't preventDefault, don't stopPropagation
+      return;
+    }
+
+    // Track all active touches (non-pen only)
     activeTouchesRef.current.set(e.pointerId, e);
     const touches = Array.from(activeTouchesRef.current.values());
 
     stopMomentum();
-
-    // Pen/stylus detection - always allows drawing (even in pan/view mode)
-    if (e.pointerType === 'pen') {
-      stateRef.current.isPenDrawing = true;
-      
-      // Find which page the pen is on
-      if (getPageAtPoint) {
-        const pageNum = getPageAtPoint(e.clientX, e.clientY);
-        if (pageNum !== null) {
-          onPenDrawStart?.(pageNum);
-        }
-      }
-      
-      // Don't prevent default - let Fabric handle the pen drawing
-      return;
-    }
 
     // Two-finger pinch detection
     if (touches.length === 2) {
@@ -190,18 +189,19 @@ export function usePDFTouchHandler(config: TouchHandlerConfig) {
     const container = containerRef.current;
     if (!container) return;
 
-    // Update tracked touch
+    const state = stateRef.current;
+
+    // Pen drawing - let Fabric handle it completely, don't interfere
+    if (e.pointerType === 'pen' && state.isPenDrawing) {
+      return;
+    }
+
+    // Update tracked touch (non-pen only)
     if (activeTouchesRef.current.has(e.pointerId)) {
       activeTouchesRef.current.set(e.pointerId, e);
     }
 
-    const state = stateRef.current;
     const touches = Array.from(activeTouchesRef.current.values());
-
-    // Pen drawing - let Fabric handle it
-    if (state.isPenDrawing && e.pointerType === 'pen') {
-      return;
-    }
 
     // Pinch-to-zoom
     if (state.isPinching && touches.length === 2) {
@@ -267,17 +267,20 @@ export function usePDFTouchHandler(config: TouchHandlerConfig) {
   const handlePointerUp = useCallback((e: PointerEvent) => {
     const container = containerRef.current;
     
-    // Remove from active touches
-    activeTouchesRef.current.delete(e.pointerId);
-    
     const state = stateRef.current;
 
-    // End pen drawing
-    if (state.isPenDrawing && e.pointerType === 'pen') {
-      state.isPenDrawing = false;
-      onPenDrawEnd?.();
+    // End pen drawing - let Fabric finalize the path first, then notify
+    if (e.pointerType === 'pen' && state.isPenDrawing) {
+      // Use setTimeout to let Fabric process the pointer up event first
+      setTimeout(() => {
+        state.isPenDrawing = false;
+        onPenDrawEnd?.();
+      }, 50);
       return;
     }
+    
+    // Remove from active touches (non-pen only)
+    activeTouchesRef.current.delete(e.pointerId);
 
     // End pinching when one finger lifts
     if (state.isPinching) {
@@ -323,8 +326,8 @@ export function usePDFTouchHandler(config: TouchHandlerConfig) {
     const container = containerRef.current;
     if (!container) return;
 
-    // Use capture phase to intercept before Fabric
-    const options = { passive: false, capture: true };
+    // Use capture phase for pan/pinch, but let pen events through
+    const options = { passive: false, capture: false };
     
     container.addEventListener('pointerdown', handlePointerDown, options);
     container.addEventListener('pointermove', handlePointerMove, options);
