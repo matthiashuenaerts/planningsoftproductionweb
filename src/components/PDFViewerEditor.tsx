@@ -77,7 +77,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 }) => {
   const { toast } = useToast();
   
-  // Mode state
+  // Mode state - default to pan/view mode
   const [isEditMode, setIsEditMode] = useState(false);
   
   // PDF state
@@ -101,15 +101,15 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const overlayCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
   const fabricCanvasRefs = useRef<Map<number, FabricCanvas>>(new Map());
   
-  // Tool state
-  const [activeTool, setActiveTool] = useState<ToolType>('select');
+  // Tool state - default to cursor (pan) mode
+  const [activeTool, setActiveTool] = useState<ToolType>('cursor');
   const [drawingColor, setDrawingColor] = useState('#ff0000');
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [fontSize, setFontSize] = useState(18);
   const [fontFamily, setFontFamily] = useState('Arial');
   
   // Refs to hold current values for use in event handlers (avoid closure issues)
-  const activeToolRef = useRef<ToolType>('select');
+  const activeToolRef = useRef<ToolType>('cursor');
   const isEditModeRef = useRef(false);
   const drawingColorRef = useRef('#ff0000');
   const strokeWidthRef = useRef(3);
@@ -181,24 +181,44 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     return null;
   }, []);
 
-  // Handle pen draw start (from touch handler) - always allow Apple Pencil drawing
+  // Handle pen draw start (from touch handler) - always allow Apple Pencil drawing/erasing
   const handlePenDrawStart = useCallback((pageNum: number) => {
     const canvas = fabricCanvasRefs.current.get(pageNum);
     if (canvas) {
-      // Always allow pen drawing, even in view/pan mode
       penDrawingPageRef.current = pageNum;
-      canvas.isDrawingMode = true;
-      if (canvas.freeDrawingBrush) {
-        canvas.freeDrawingBrush.color = drawingColor;
-        canvas.freeDrawingBrush.width = strokeWidth;
+      
+      // Check if we're in erase mode - enable eraser behavior for pen
+      const currentTool = activeToolRef.current;
+      if (currentTool === 'erase') {
+        // Enable eraser mode for pen - disable drawing, enable object events
+        canvas.isDrawingMode = false;
+        canvas.selection = false;
+        canvas.hoverCursor = 'not-allowed';
+        canvas.defaultCursor = 'not-allowed';
+        
+        // Make all objects respond to mouse events for swipe delete
+        canvas.getObjects().forEach(obj => {
+          obj.selectable = false;
+          obj.evented = true;
+          obj.hoverCursor = 'not-allowed';
+        });
+        canvas.requestRenderAll();
+      } else {
+        // Normal drawing mode
+        canvas.isDrawingMode = true;
+        if (canvas.freeDrawingBrush) {
+          canvas.freeDrawingBrush.color = drawingColorRef.current;
+          canvas.freeDrawingBrush.width = strokeWidthRef.current;
+        }
       }
-      // Temporarily enable pointer events for drawing
+      
+      // Temporarily enable pointer events for drawing/erasing
       const overlayEl = overlayCanvasRefs.current.get(pageNum)?.parentElement;
       if (overlayEl) {
         overlayEl.style.pointerEvents = 'auto';
       }
     }
-  }, [drawingColor, strokeWidth]);
+  }, []);
 
   // Handle pen draw end (from touch handler)
   const handlePenDrawEnd = useCallback(() => {
@@ -208,9 +228,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       
       // Only disable drawing mode if we're not in draw tool mode
       // Delay slightly to let Fabric finalize the path
-      if (canvas && activeTool !== 'draw') {
+      if (canvas && activeToolRef.current !== 'draw') {
         setTimeout(() => {
-          if (penDrawingPageRef.current === null) {
+          if (penDrawingPageRef.current === null && activeToolRef.current !== 'draw') {
             canvas.isDrawingMode = false;
           }
         }, 100);
@@ -218,10 +238,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       
       // Restore pointer events based on edit mode
       const overlayEl = overlayCanvasRefs.current.get(pageNum)?.parentElement;
-      if (overlayEl && !isEditMode) {
+      if (overlayEl && !isEditModeRef.current) {
         // Delay pointer events restoration to allow path finalization
         setTimeout(() => {
-          if (penDrawingPageRef.current === null && !isEditMode) {
+          if (penDrawingPageRef.current === null && !isEditModeRef.current) {
             overlayEl.style.pointerEvents = 'none';
           }
         }, 150);
@@ -229,7 +249,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       
       penDrawingPageRef.current = null;
     }
-  }, [activeTool, isEditMode]);
+  }, []);
 
   // Initialize touch handler
   usePDFTouchHandler({
@@ -576,6 +596,44 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         return;
       }
     });
+    
+    // Track which objects have been erased to prevent duplicate removes
+    const erasedObjectsSet = new Set<any>();
+    let hasErasedThisStroke = false;
+    
+    // Handle eraser swipe - delete objects on mouse move while pressed
+    fabricCanvas.on('mouse:move', (options) => {
+      const currentTool = activeToolRef.current;
+      const currentEditMode = isEditModeRef.current;
+      const isPenDrawingActive = penDrawingPageRef.current !== null;
+      
+      // Eraser swipe: when pen is active in erase mode, or mouse is down in erase mode
+      if (currentTool === 'erase' && (currentEditMode || isPenDrawingActive) && options.target) {
+        // Check if pen/mouse button is pressed
+        const event = options.e;
+        const isPenOrMouseDown = 
+          (event instanceof PointerEvent && event.pressure > 0) ||
+          (event instanceof MouseEvent && (event.buttons & 1) === 1);
+          
+        if (isPenOrMouseDown && !erasedObjectsSet.has(options.target)) {
+          erasedObjectsSet.add(options.target);
+          hasErasedThisStroke = true;
+          fabricCanvas.remove(options.target);
+          fabricCanvas.requestRenderAll();
+        }
+      }
+    });
+    
+    // Save state after eraser stroke ends
+    fabricCanvas.on('mouse:up', () => {
+      if (hasErasedThisStroke) {
+        saveCanvasState(pageNum);
+        saveCurrentPageAnnotationsToDb(pageNum);
+        triggerAutoSave();
+        hasErasedThisStroke = false;
+      }
+      erasedObjectsSet.clear();
+    });
 
     fabricCanvasRefs.current.set(pageNum, fabricCanvas);
     
@@ -662,9 +720,14 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     };
   }, [pdfDoc, pagesData, scale, renderPDFPage, initializeFabricCanvas]);
 
-  // Re-render pages when scale changes
+  // Re-render pages when scale changes - save annotations first
   useEffect(() => {
     if (!pdfDoc) return;
+    
+    // Save all current annotations before re-rendering at new scale
+    fabricCanvasRefs.current.forEach((canvas, pageNum) => {
+      saveCurrentPageAnnotations(pageNum);
+    });
     
     // Cancel all active render tasks before clearing
     renderTasksRef.current.forEach((task, pageNum) => {
@@ -680,6 +743,25 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
     fabricCanvasRefs.current.clear();
   }, [scale, pdfDoc]);
+
+  // Recalculate Fabric canvas offsets on scroll (fixes drawing coordinates when scrolled)
+  useEffect(() => {
+    const container = canvasContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      // Recalculate offset for all Fabric canvases
+      fabricCanvasRefs.current.forEach(canvas => {
+        canvas.calcOffset();
+      });
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   const saveCanvasState = (pageNum: number) => {
     const canvas = fabricCanvasRefs.current.get(pageNum);
@@ -923,13 +1005,15 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           break;
 
         case 'erase':
+          c.isDrawingMode = false;
           c.selection = false;
-          c.defaultCursor = 'crosshair';
-          c.hoverCursor = 'pointer';
-          // Allow objects to be clicked for erasing
+          c.defaultCursor = 'not-allowed';
+          c.hoverCursor = 'not-allowed';
+          // Allow objects to be hovered/clicked for erasing - critical for swipe delete
           c.getObjects().forEach(obj => {
             obj.selectable = false;
-            obj.evented = true; // Must be true to receive click events
+            obj.evented = true; // Must be true to receive mouse events
+            obj.hoverCursor = 'not-allowed';
           });
           break;
 
@@ -1073,10 +1157,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         canvas.requestRenderAll();
       });
       performAutoSave();
-      setActiveTool('select');
+      setActiveTool('cursor');
       setIsEditMode(false);
     } else {
-      setActiveTool('draw');
+      setActiveTool('cursor'); // Default to pan/cursor mode when entering edit mode
       setIsEditMode(true);
     }
   }, [isEditMode]);
