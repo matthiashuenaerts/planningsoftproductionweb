@@ -834,6 +834,31 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       const objScaleX = obj.scaleX || 1;
       const objScaleY = obj.scaleY || 1;
       
+      // For paths, we need to store the path data as-is (not scaled) 
+      // because path coordinates are relative to the object's position
+      // We only normalize left, top, and strokeWidth
+      if (obj.type === 'path') {
+        const pathObj = obj as Path;
+        // For paths: normalize position and strokeWidth by current scale
+        // Path coordinates are relative to the path's own coordinate system
+        // The scaleX/scaleY on the object represents how the path is scaled
+        // We need to normalize this back to base scale (1.0)
+        return {
+          type: 'path',
+          left: (obj.left || 0) / currentScale,
+          top: (obj.top || 0) / currentScale,
+          fill: obj.fill as string,
+          stroke: obj.stroke as string,
+          strokeWidth: obj.strokeWidth ? obj.strokeWidth / currentScale : undefined,
+          // Store path data as-is - it's in the path's local coordinate system
+          path: JSON.parse(JSON.stringify(pathObj.path)),
+          // Normalize the object's scale factors: divide by current scale to get base
+          scaleX: objScaleX / currentScale,
+          scaleY: objScaleY / currentScale,
+          angle: obj.angle
+        };
+      }
+      
       return {
         type: obj.type || 'unknown',
         left: (obj.left || 0) / currentScale,
@@ -847,7 +872,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         fontSize: obj.type === 'textbox' ? ((obj as Textbox).fontSize || 18) / currentScale : undefined,
         fontFamily: obj.type === 'textbox' ? (obj as Textbox).fontFamily : undefined,
         radius: obj.type === 'circle' ? (((obj as FabricCircle).radius || 0) * objScaleX) / currentScale : undefined,
-        path: obj.type === 'path' ? normalizePathData((obj as Path).path, currentScale) : undefined,
         scaleX: 1,
         scaleY: 1,
         angle: obj.angle
@@ -855,19 +879,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     });
     
     pageAnnotationsRef.current.set(pageNum, annotations);
-  };
-
-  const normalizePathData = (pathData: any, currentScale: number): any => {
-    if (!Array.isArray(pathData)) return pathData;
-    
-    return pathData.map((segment: any) => {
-      if (!Array.isArray(segment)) return segment;
-      const [command, ...coords] = segment;
-      const normalizedCoords = coords.map((coord: any) => 
-        typeof coord === 'number' ? coord / currentScale : coord
-      );
-      return [command, ...normalizedCoords];
-    });
   };
 
   const loadPageAnnotations = (pageNum: number, canvas: FabricCanvas) => {
@@ -878,51 +889,62 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     
     annotations.forEach(annotation => {
       let obj;
-      const commonProps = {
-        left: (annotation.left || 0) * scale,
-        top: (annotation.top || 0) * scale,
-        scaleX: annotation.scaleX || 1,
-        scaleY: annotation.scaleY || 1,
-        angle: annotation.angle || 0
-      };
       
       switch (annotation.type) {
         case 'rect':
           obj = new Rect({
-            ...commonProps,
+            left: (annotation.left || 0) * scale,
+            top: (annotation.top || 0) * scale,
             width: (annotation.width || 0) * scale,
             height: (annotation.height || 0) * scale,
             fill: annotation.fill || 'transparent',
             stroke: annotation.stroke,
-            strokeWidth: (annotation.strokeWidth || 1) * scale
+            strokeWidth: (annotation.strokeWidth || 1) * scale,
+            scaleX: 1,
+            scaleY: 1,
+            angle: annotation.angle || 0
           });
           break;
         case 'circle':
           obj = new FabricCircle({
-            ...commonProps,
+            left: (annotation.left || 0) * scale,
+            top: (annotation.top || 0) * scale,
             radius: (annotation.radius || 0) * scale,
             fill: annotation.fill || 'transparent',
             stroke: annotation.stroke,
-            strokeWidth: (annotation.strokeWidth || 1) * scale
+            strokeWidth: (annotation.strokeWidth || 1) * scale,
+            scaleX: 1,
+            scaleY: 1,
+            angle: annotation.angle || 0
           });
           break;
         case 'textbox':
           obj = new Textbox(annotation.text || '', {
-            ...commonProps,
+            left: (annotation.left || 0) * scale,
+            top: (annotation.top || 0) * scale,
             width: (annotation.width || 200) * scale,
             fontSize: (annotation.fontSize || 18) * scale,
             fontFamily: annotation.fontFamily || 'Arial',
-            fill: annotation.fill || '#000000'
+            fill: annotation.fill || '#000000',
+            scaleX: 1,
+            scaleY: 1,
+            angle: annotation.angle || 0
           });
           break;
         case 'path':
           if (annotation.path) {
-            const scaledPath = scalePathData(annotation.path, scale);
-            obj = new Path(scaledPath, {
-              ...commonProps,
+            // For paths: scale position and strokeWidth
+            // Apply stored base scaleX/scaleY multiplied by current view scale
+            obj = new Path(annotation.path, {
+              left: (annotation.left || 0) * scale,
+              top: (annotation.top || 0) * scale,
               stroke: annotation.stroke,
               strokeWidth: (annotation.strokeWidth || 1) * scale,
-              fill: 'transparent'
+              fill: 'transparent',
+              // Restore scale: base scale * current view scale
+              scaleX: (annotation.scaleX || 1) * scale,
+              scaleY: (annotation.scaleY || 1) * scale,
+              angle: annotation.angle || 0
             });
           }
           break;
@@ -939,19 +961,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       canvasHistoryRef.current.set(pageNum, [JSON.stringify(canvas.toJSON())]);
       historyIndexRef.current.set(pageNum, 0);
     }
-  };
-
-  const scalePathData = (pathData: any, targetScale: number): any => {
-    if (!Array.isArray(pathData)) return pathData;
-    
-    return pathData.map((segment: any) => {
-      if (!Array.isArray(segment)) return segment;
-      const [command, ...coords] = segment;
-      const scaledCoords = coords.map((coord: any) => 
-        typeof coord === 'number' ? coord * targetScale : coord
-      );
-      return [command, ...scaledCoords];
-    });
   };
 
   const performAutoSave = async () => {
