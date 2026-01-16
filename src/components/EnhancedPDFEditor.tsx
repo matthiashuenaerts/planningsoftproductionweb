@@ -122,12 +122,26 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     }
   }, [pdfDoc, canvasSize, loading]);
 
-  // Re-render when page or scale changes
+  // Track previous scale to detect scale changes
+  const prevScaleRef = useRef(scale);
+  
+  // Handle scale changes - save annotations before re-render, then reload with new scale
   useEffect(() => {
-    if (pdfDoc && !loading && initialized && fabricCanvasRef.current) {
-      console.log('Rendering page due to change:', currentPage, 'scale:', scale);
-      renderPage(currentPage);
+    if (!pdfDoc || loading || !initialized || !fabricCanvasRef.current) return;
+    
+    const prevScale = prevScaleRef.current;
+    
+    // If scale changed, save current annotations first (they're normalized so will reload correctly)
+    if (prevScale !== scale) {
+      console.log('Scale changed from', prevScale, 'to', scale, '- saving and reloading annotations');
+      // Save with previous scale (normalize to base)
+      // Note: savePageAnnotations uses current `scale` state, which is already updated
+      // But we need to save BEFORE the scale changes visually
+      // Actually, since we normalize on save, we just need to reload with new scale
     }
+    
+    prevScaleRef.current = scale;
+    renderPage(currentPage);
   }, [currentPage, scale, initialized]);
 
   // Force re-render when fabricCanvas is created
@@ -286,16 +300,21 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       const font = await newPdfDoc.embedFont(StandardFonts.Helvetica);
 
       // Apply annotations to each page
+      // Annotations are stored in normalized coordinates (base scale = 1)
+      // so we scale from base canvas size to PDF size
       for (const [pageNum, annotations] of pageAnnotations.entries()) {
         const page = newPdfDoc.getPage(pageNum - 1);
         const { width, height } = page.getSize();
         
-        const scaleX = width / (fabricCanvasRef.current?.width || 800);
-        const scaleY = height / (fabricCanvasRef.current?.height || 600);
+        // Use base canvas size (not scaled) since annotations are normalized
+        const baseWidth = canvasSize.width;
+        const baseHeight = canvasSize.height;
+        const scaleX = width / baseWidth;
+        const scaleY = height / baseHeight;
 
         for (const annotation of annotations) {
-          const x = annotation.left * scaleX;
-          const y = height - (annotation.top * scaleY);
+          const x = (annotation.left || 0) * scaleX;
+          const y = height - ((annotation.top || 0) * scaleY);
 
           switch (annotation.type) {
             case 'textbox':
@@ -312,8 +331,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
               }
               break;
             case 'rect':
-              const rectWidth = annotation.width * scaleX;
-              const rectHeight = annotation.height * scaleY;
+              const rectWidth = (annotation.width || 0) * scaleX;
+              const rectHeight = (annotation.height || 0) * scaleY;
               const rectColorArray = hexToRgb(annotation.stroke || '#000000');
               page.drawRectangle({
                 x,
@@ -321,18 +340,18 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
                 width: rectWidth,
                 height: rectHeight,
                 borderColor: rgb(rectColorArray.r / 255, rectColorArray.g / 255, rectColorArray.b / 255),
-                borderWidth: annotation.strokeWidth || 1,
+                borderWidth: (annotation.strokeWidth || 1) * scaleX,
               });
               break;
             case 'circle':
-              const radius = annotation.radius * scaleX;
+              const radius = (annotation.radius || 0) * scaleX;
               const circleColorArray = hexToRgb(annotation.stroke || '#000000');
               page.drawCircle({
                 x: x + radius,
                 y: y - radius,
                 size: radius,
                 borderColor: rgb(circleColorArray.r / 255, circleColorArray.g / 255, circleColorArray.b / 255),
-                borderWidth: annotation.strokeWidth || 1,
+                borderWidth: (annotation.strokeWidth || 1) * scaleX,
               });
               break;
           }
@@ -479,79 +498,135 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
     }
   };
 
+  // Helper to normalize path data to base scale (scale=1)
+  const normalizePathData = (pathData: any, currentScale: number): any => {
+    if (!Array.isArray(pathData)) return pathData;
+    
+    return pathData.map((segment: any) => {
+      if (!Array.isArray(segment)) return segment;
+      const [command, ...coords] = segment;
+      const normalizedCoords = coords.map((coord: any) => 
+        typeof coord === 'number' ? coord / currentScale : coord
+      );
+      return [command, ...normalizedCoords];
+    });
+  };
+
+  // Helper to scale path data from base scale to current scale
+  const scalePathData = (pathData: any, targetScale: number): any => {
+    if (!Array.isArray(pathData)) return pathData;
+    
+    return pathData.map((segment: any) => {
+      if (!Array.isArray(segment)) return segment;
+      const [command, ...coords] = segment;
+      const scaledCoords = coords.map((coord: any) => 
+        typeof coord === 'number' ? coord * targetScale : coord
+      );
+      return [command, ...scaledCoords];
+    });
+  };
+
   const savePageAnnotations = (pageNum: number) => {
     if (!fabricCanvasRef.current) return;
 
+    const currentScale = scale;
     const objects = fabricCanvasRef.current.getObjects();
-    const annotations = objects.map(obj => ({
-      type: obj.type,
-      left: obj.left,
-      top: obj.top,
-      width: obj.width,
-      height: obj.height,
-      fill: obj.fill,
-      stroke: obj.stroke,
-      strokeWidth: obj.strokeWidth,
-      text: obj.type === 'textbox' ? (obj as any).text : undefined,
-      fontSize: obj.type === 'textbox' ? (obj as any).fontSize : undefined,
-      path: obj.type === 'path' ? (obj as any).path : undefined,
-      radius: obj.type === 'circle' ? (obj as any).radius : undefined
-    }));
+    
+    // Normalize all coordinates to base scale (scale=1) for storage
+    const annotations = objects.map(obj => {
+      const objScaleX = obj.scaleX || 1;
+      const objScaleY = obj.scaleY || 1;
+      
+      return {
+        type: obj.type,
+        // Normalize positions by dividing by current scale
+        left: (obj.left || 0) / currentScale,
+        top: (obj.top || 0) / currentScale,
+        // For width/height, also account for object's internal scale
+        width: obj.width ? (obj.width * objScaleX) / currentScale : undefined,
+        height: obj.height ? (obj.height * objScaleY) / currentScale : undefined,
+        fill: obj.fill,
+        stroke: obj.stroke,
+        strokeWidth: obj.strokeWidth ? obj.strokeWidth / currentScale : undefined,
+        text: obj.type === 'textbox' ? (obj as any).text : undefined,
+        fontSize: obj.type === 'textbox' ? ((obj as any).fontSize || 18) / currentScale : undefined,
+        fontFamily: obj.type === 'textbox' ? (obj as any).fontFamily : undefined,
+        // Normalize path coordinates
+        path: obj.type === 'path' ? normalizePathData((obj as any).path, currentScale) : undefined,
+        radius: obj.type === 'circle' ? (((obj as any).radius || 0) * objScaleX) / currentScale : undefined,
+        // Store normalized scale (always 1 since we bake in the scaling)
+        scaleX: 1,
+        scaleY: 1,
+        angle: obj.angle || 0
+      };
+    });
 
     setPageAnnotations(prev => new Map(prev).set(pageNum, annotations));
-    console.log('Saved annotations for page', pageNum, ':', annotations.length, 'objects');
+    console.log('Saved normalized annotations for page', pageNum, ':', annotations.length, 'objects');
   };
 
   const loadPageAnnotations = (pageNum: number) => {
     if (!fabricCanvasRef.current) return;
 
+    const currentScale = scale;
+    
     // Clear current objects (except background)
     const objects = fabricCanvasRef.current.getObjects();
     objects.forEach(obj => fabricCanvasRef.current?.remove(obj));
 
-    // Load annotations for this page
+    // Load annotations for this page and scale them to current view scale
     const annotations = pageAnnotations.get(pageNum) || [];
-    console.log('Loading annotations for page', pageNum, ':', annotations.length, 'objects');
+    console.log('Loading annotations for page', pageNum, 'at scale', currentScale, ':', annotations.length, 'objects');
     
     annotations.forEach(annotation => {
       let obj;
+      
+      // Common properties scaled from base (scale=1) to current scale
+      const commonProps = {
+        left: (annotation.left || 0) * currentScale,
+        top: (annotation.top || 0) * currentScale,
+        scaleX: annotation.scaleX || 1,
+        scaleY: annotation.scaleY || 1,
+        angle: annotation.angle || 0
+      };
+      
       switch (annotation.type) {
         case 'rect':
           obj = new Rect({
-            left: annotation.left,
-            top: annotation.top,
-            width: annotation.width,
-            height: annotation.height,
-            fill: annotation.fill,
+            ...commonProps,
+            width: (annotation.width || 0) * currentScale,
+            height: (annotation.height || 0) * currentScale,
+            fill: annotation.fill || 'transparent',
             stroke: annotation.stroke,
-            strokeWidth: annotation.strokeWidth
+            strokeWidth: (annotation.strokeWidth || 1) * currentScale
           });
           break;
         case 'circle':
           obj = new FabricCircle({
-            left: annotation.left,
-            top: annotation.top,
-            radius: annotation.radius,
-            fill: annotation.fill,
+            ...commonProps,
+            radius: (annotation.radius || 0) * currentScale,
+            fill: annotation.fill || 'transparent',
             stroke: annotation.stroke,
-            strokeWidth: annotation.strokeWidth
+            strokeWidth: (annotation.strokeWidth || 1) * currentScale
           });
           break;
         case 'textbox':
-          obj = new Textbox(annotation.text, {
-            left: annotation.left,
-            top: annotation.top,
-            fontSize: annotation.fontSize,
-            fill: annotation.fill
+          obj = new Textbox(annotation.text || '', {
+            ...commonProps,
+            width: (annotation.width || 200) * currentScale,
+            fontSize: (annotation.fontSize || 18) * currentScale,
+            fontFamily: annotation.fontFamily || 'Arial',
+            fill: annotation.fill || '#000000'
           });
           break;
         case 'path':
           if (annotation.path) {
-            obj = new Path(annotation.path, {
-              left: annotation.left,
-              top: annotation.top,
+            // Scale the path data from base scale to current scale
+            const scaledPath = scalePathData(annotation.path, currentScale);
+            obj = new Path(scaledPath, {
+              ...commonProps,
               stroke: annotation.stroke,
-              strokeWidth: annotation.strokeWidth,
+              strokeWidth: (annotation.strokeWidth || 1) * currentScale,
               fill: 'transparent'
             });
           }
@@ -825,19 +900,22 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       const font = await newPdfDoc.embedFont(StandardFonts.Helvetica);
 
       // Apply annotations to each page
+      // Annotations are stored in normalized coordinates (base scale = 1)
       for (const [pageNum, annotations] of pageAnnotations.entries()) {
         const page = newPdfDoc.getPage(pageNum - 1); // PDF-lib uses 0-based indexing
         const { width, height } = page.getSize();
         
-        // Scale factor to convert canvas coordinates to PDF coordinates
-        const scaleX = width / (fabricCanvasRef.current?.width || 800);
-        const scaleY = height / (fabricCanvasRef.current?.height || 600);
+        // Use base canvas size since annotations are normalized to scale=1
+        const baseWidth = canvasSize.width;
+        const baseHeight = canvasSize.height;
+        const scaleX = width / baseWidth;
+        const scaleY = height / baseHeight;
 
         console.log('Processing page', pageNum, 'with', annotations.length, 'annotations');
 
         for (const annotation of annotations) {
-          const x = annotation.left * scaleX;
-          const y = height - (annotation.top * scaleY); // PDF coordinates are bottom-up
+          const x = (annotation.left || 0) * scaleX;
+          const y = height - ((annotation.top || 0) * scaleY); // PDF coordinates are bottom-up
 
           switch (annotation.type) {
             case 'textbox':
@@ -854,8 +932,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
               }
               break;
             case 'rect':
-              const rectWidth = annotation.width * scaleX;
-              const rectHeight = annotation.height * scaleY;
+              const rectWidth = (annotation.width || 0) * scaleX;
+              const rectHeight = (annotation.height || 0) * scaleY;
               const rectColorArray = hexToRgb(annotation.stroke || '#000000');
               page.drawRectangle({
                 x,
@@ -863,18 +941,18 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
                 width: rectWidth,
                 height: rectHeight,
                 borderColor: rgb(rectColorArray.r / 255, rectColorArray.g / 255, rectColorArray.b / 255),
-                borderWidth: annotation.strokeWidth || 1,
+                borderWidth: (annotation.strokeWidth || 1) * scaleX,
               });
               break;
             case 'circle':
-              const radius = annotation.radius * scaleX;
+              const radius = (annotation.radius || 0) * scaleX;
               const circleColorArray = hexToRgb(annotation.stroke || '#000000');
               page.drawCircle({
                 x: x + radius,
                 y: y - radius,
                 size: radius,
                 borderColor: rgb(circleColorArray.r / 255, circleColorArray.g / 255, circleColorArray.b / 255),
-                borderWidth: annotation.strokeWidth || 1,
+                borderWidth: (annotation.strokeWidth || 1) * scaleX,
               });
               break;
           }
@@ -933,6 +1011,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
 
   const changeScale = (newScale: number) => {
     if (newScale >= 0.5 && newScale <= 3) {
+      // Save current annotations before scale change (they will be normalized)
+      savePageAnnotations(currentPage);
       setScale(newScale);
     }
   };
@@ -948,16 +1028,20 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       const font = await newPdfDoc.embedFont(StandardFonts.Helvetica);
 
       // Apply annotations to each page
+      // Annotations are stored in normalized coordinates (base scale = 1)
       for (const [pageNum, annotations] of pageAnnotations.entries()) {
         const page = newPdfDoc.getPage(pageNum - 1);
         const { width, height } = page.getSize();
         
-        const scaleX = width / (fabricCanvasRef.current?.width || 800);
-        const scaleY = height / (fabricCanvasRef.current?.height || 600);
+        // Use base canvas size since annotations are normalized
+        const baseWidth = canvasSize.width;
+        const baseHeight = canvasSize.height;
+        const scaleX = width / baseWidth;
+        const scaleY = height / baseHeight;
 
         for (const annotation of annotations) {
-          const x = annotation.left * scaleX;
-          const y = height - (annotation.top * scaleY);
+          const x = (annotation.left || 0) * scaleX;
+          const y = height - ((annotation.top || 0) * scaleY);
 
           switch (annotation.type) {
             case 'textbox':
@@ -974,8 +1058,8 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
               }
               break;
             case 'rect':
-              const rectWidth = annotation.width * scaleX;
-              const rectHeight = annotation.height * scaleY;
+              const rectWidth = (annotation.width || 0) * scaleX;
+              const rectHeight = (annotation.height || 0) * scaleY;
               const rectColorArray = hexToRgb(annotation.stroke || '#000000');
               page.drawRectangle({
                 x,
@@ -983,18 +1067,18 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
                 width: rectWidth,
                 height: rectHeight,
                 borderColor: rgb(rectColorArray.r / 255, rectColorArray.g / 255, rectColorArray.b / 255),
-                borderWidth: annotation.strokeWidth || 1,
+                borderWidth: (annotation.strokeWidth || 1) * scaleX,
               });
               break;
             case 'circle':
-              const radius = annotation.radius * scaleX;
+              const radius = (annotation.radius || 0) * scaleX;
               const circleColorArray = hexToRgb(annotation.stroke || '#000000');
               page.drawCircle({
                 x: x + radius,
                 y: y - radius,
                 size: radius,
                 borderColor: rgb(circleColorArray.r / 255, circleColorArray.g / 255, circleColorArray.b / 255),
-                borderWidth: annotation.strokeWidth || 1,
+                borderWidth: (annotation.strokeWidth || 1) * scaleX,
               });
               break;
           }
