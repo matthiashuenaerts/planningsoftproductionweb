@@ -823,6 +823,23 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
   };
 
+  // Helper to normalize path data to base scale (1.0)
+  const normalizePathData = (pathData: any[], objScaleX: number, objScaleY: number): any[] => {
+    return pathData.map(segment => {
+      const cmd = segment[0];
+      const coords = segment.slice(1);
+      // Scale numeric coordinates
+      const scaledCoords = coords.map((val: any, idx: number) => {
+        if (typeof val === 'number') {
+          // Even indices are X coords, odd are Y coords
+          return idx % 2 === 0 ? val * objScaleX : val * objScaleY;
+        }
+        return val;
+      });
+      return [cmd, ...scaledCoords];
+    });
+  };
+
   const saveCurrentPageAnnotations = (pageNum: number) => {
     const canvas = fabricCanvasRefs.current.get(pageNum);
     if (!canvas) return;
@@ -834,15 +851,19 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       const objScaleX = obj.scaleX || 1;
       const objScaleY = obj.scaleY || 1;
       
-      // For paths, we need to store the path data as-is (not scaled) 
-      // because path coordinates are relative to the object's position
-      // We only normalize left, top, and strokeWidth
+      // For paths: normalize everything to base scale (1.0)
+      // Path coordinates in Fabric are in local space, but we need to account for
+      // both the object's scaleX/scaleY AND the current view scale
       if (obj.type === 'path') {
         const pathObj = obj as Path;
-        // For paths: normalize position and strokeWidth by current scale
-        // Path coordinates are relative to the path's own coordinate system
-        // The scaleX/scaleY on the object represents how the path is scaled
-        // We need to normalize this back to base scale (1.0)
+        const rawPath = JSON.parse(JSON.stringify(pathObj.path));
+        
+        // The path data is in local coordinates. When the path is drawn at scale X,
+        // the coordinates are at that scale. We need to:
+        // 1. Apply object's scaleX/scaleY to get actual screen coords
+        // 2. Divide by currentScale to normalize to base scale (1.0)
+        const normalizedPath = normalizePathData(rawPath, objScaleX / currentScale, objScaleY / currentScale);
+        
         return {
           type: 'path',
           left: (obj.left || 0) / currentScale,
@@ -850,11 +871,11 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           fill: obj.fill as string,
           stroke: obj.stroke as string,
           strokeWidth: obj.strokeWidth ? obj.strokeWidth / currentScale : undefined,
-          // Store path data as-is - it's in the path's local coordinate system
-          path: JSON.parse(JSON.stringify(pathObj.path)),
-          // Normalize the object's scale factors: divide by current scale to get base
-          scaleX: objScaleX / currentScale,
-          scaleY: objScaleY / currentScale,
+          // Store normalized path data (at base scale 1.0)
+          path: normalizedPath,
+          // Always store scaleX/scaleY as 1 since we've baked the scaling into path data
+          scaleX: 1,
+          scaleY: 1,
           angle: obj.angle
         };
       }
@@ -879,6 +900,23 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     });
     
     pageAnnotationsRef.current.set(pageNum, annotations);
+  };
+
+  // Helper to scale path data from base scale (1.0) to current view scale
+  const scalePathData = (pathData: any[], scaleX: number, scaleY: number): any[] => {
+    return pathData.map(segment => {
+      const cmd = segment[0];
+      const coords = segment.slice(1);
+      // Scale numeric coordinates
+      const scaledCoords = coords.map((val: any, idx: number) => {
+        if (typeof val === 'number') {
+          // Even indices are X coords, odd are Y coords
+          return idx % 2 === 0 ? val * scaleX : val * scaleY;
+        }
+        return val;
+      });
+      return [cmd, ...scaledCoords];
+    });
   };
 
   const loadPageAnnotations = (pageNum: number, canvas: FabricCanvas) => {
@@ -933,17 +971,18 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           break;
         case 'path':
           if (annotation.path) {
-            // For paths: scale position and strokeWidth
-            // Apply stored base scaleX/scaleY multiplied by current view scale
-            obj = new Path(annotation.path, {
+            // Scale path data from base scale (1.0) to current view scale
+            const scaledPath = scalePathData(annotation.path, scale, scale);
+            
+            obj = new Path(scaledPath, {
               left: (annotation.left || 0) * scale,
               top: (annotation.top || 0) * scale,
               stroke: annotation.stroke,
               strokeWidth: (annotation.strokeWidth || 1) * scale,
               fill: 'transparent',
-              // Restore scale: base scale * current view scale
-              scaleX: (annotation.scaleX || 1) * scale,
-              scaleY: (annotation.scaleY || 1) * scale,
+              // scaleX/scaleY are always 1 since scaling is baked into path data
+              scaleX: 1,
+              scaleY: 1,
               angle: annotation.angle || 0
             });
           }
