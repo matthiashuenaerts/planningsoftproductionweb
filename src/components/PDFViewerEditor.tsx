@@ -405,7 +405,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Track active render tasks to prevent conflicts
   const renderTasksRef = useRef<Map<number, any>>(new Map());
 
-  // Render a specific PDF page
+  // Render a specific PDF page with high quality settings
   const renderPDFPage = useCallback(async (pageNum: number) => {
     if (!pdfDoc) return;
     
@@ -425,13 +425,28 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     
     try {
       const page = await pdfDoc.getPage(pageNum);
+      
+      // Use device pixel ratio for sharper rendering on retina displays
+      const devicePixelRatio = window.devicePixelRatio || 1;
+      const renderScale = scale * devicePixelRatio;
+      
       // Don't force rotation - let PDF.js use the page's native rotation from the PDF
-      const viewport = page.getViewport({ scale });
+      const viewport = page.getViewport({ scale: renderScale });
+      const displayViewport = page.getViewport({ scale });
       const context = pdfCanvas.getContext('2d');
       if (!context) return;
 
+      // Set canvas dimensions for high DPI rendering
       pdfCanvas.width = viewport.width;
       pdfCanvas.height = viewport.height;
+      
+      // Scale canvas back down with CSS for sharp display
+      pdfCanvas.style.width = `${displayViewport.width}px`;
+      pdfCanvas.style.height = `${displayViewport.height}px`;
+      
+      // Enable high-quality image smoothing
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
 
       const renderTask = page.render({
         canvasContext: context,
@@ -492,11 +507,16 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       fabricWrapper.style.pointerEvents = 'auto';
     }
 
+    // Initialize drawing brush with smooth settings
     if (!fabricCanvas.freeDrawingBrush) {
       fabricCanvas.freeDrawingBrush = new PencilBrush(fabricCanvas);
     }
     fabricCanvas.freeDrawingBrush.color = drawingColorRef.current;
     fabricCanvas.freeDrawingBrush.width = strokeWidthRef.current;
+    // Smooth drawing with curve simplification
+    (fabricCanvas.freeDrawingBrush as any).decimate = 2; // Reduce jitter
+    (fabricCanvas.freeDrawingBrush as any).strokeLineCap = 'round';
+    (fabricCanvas.freeDrawingBrush as any).strokeLineJoin = 'round';
 
     fabricCanvas.on('path:created', () => {
       saveCanvasState(pageNum);
