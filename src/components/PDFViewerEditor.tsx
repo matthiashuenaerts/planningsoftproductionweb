@@ -42,25 +42,28 @@ interface PDFViewerEditorProps {
 
 type ToolType = 'select' | 'cursor' | 'draw' | 'text' | 'rectangle' | 'circle' | 'erase';
 
+// All annotation positions are stored as PERCENTAGES (0-1) of page dimensions
+// This makes them completely scale-independent
 interface AnnotationData {
   type: string;
-  left: number;
-  top: number;
-  width?: number;
-  height?: number;
+  // Position as percentage of page width/height (0-1 range)
+  leftPct: number;
+  topPct: number;
+  // Dimensions as percentage of page width/height
+  widthPct?: number;
+  heightPct?: number;
   fill?: string;
   stroke?: string;
-  strokeWidth?: number;
+  // Stroke width as percentage of page width
+  strokeWidthPct?: number;
   text?: string;
-  fontSize?: number;
+  // Font size as percentage of page height
+  fontSizePct?: number;
   fontFamily?: string;
-  radius?: number;
+  // Radius as percentage of page width
+  radiusPct?: number;
+  // Path data - stored in normalized local coordinates (relative to path bounding box at scale 1)
   path?: any;
-  // For paths we must preserve Fabric's internal offset/origin to avoid drifting on zoom
-  pathOffsetX?: number;
-  pathOffsetY?: number;
-  originX?: string;
-  originY?: string;
   scaleX?: number;
   scaleY?: number;
   angle?: number;
@@ -90,7 +93,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const [originalPdfBytes, setOriginalPdfBytes] = useState<Uint8Array | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.0);
-  const prevScaleRef = useRef(1.0);
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -773,13 +776,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   useEffect(() => {
     if (!pdfDoc) return;
 
-    // IMPORTANT:
-    // At this point `scale` is the NEW scale, but existing Fabric objects are still
-    // positioned in the OLD scale. So we must normalize using the previous scale.
-    const prevScale = prevScaleRef.current || 1;
-
+    // Save annotations before changing scale
+    // Since we now store as percentages, this works at any scale
     fabricCanvasRefs.current.forEach((_, pageNum) => {
-      saveCurrentPageAnnotations(pageNum, prevScale);
+      saveCurrentPageAnnotations(pageNum);
     });
 
     // Cancel all active render tasks before clearing
@@ -794,10 +794,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
     setRenderedPages(new Set());
     fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
-    fabricCanvasRefs.current.clear();
-
-    // Update previous scale ref for the next zoom change
-    prevScaleRef.current = scale;
   }, [scale, pdfDoc]);
 
   // Recalculate Fabric canvas offsets on scroll (fixes drawing coordinates when scrolled)
@@ -879,83 +875,117 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
   };
 
-  // Helper to normalize path data to base scale (1.0)
-  // Path coordinates in Fabric are relative to the path's origin (left, top)
-  // We don't need to scale the path data itself - only the position and dimensions
-  const saveCurrentPageAnnotations = (pageNum: number, scaleForNormalization?: number) => {
+  // Save annotations as percentages of page dimensions (scale-independent)
+  const saveCurrentPageAnnotations = (pageNum: number) => {
     const canvas = fabricCanvasRefs.current.get(pageNum);
-    if (!canvas) return;
+    const pageData = pagesData.find(p => p.pageNum === pageNum);
+    if (!canvas || !pageData) return;
     
     const objects = canvas.getObjects();
-    const currentScale = scaleForNormalization ?? scale;
+    
+    // Current canvas size (page dimensions * current scale)
+    const canvasWidth = pageData.width * scale;
+    const canvasHeight = pageData.height * scale;
     
     const annotations: AnnotationData[] = objects.map(obj => {
       const objScaleX = obj.scaleX || 1;
       const objScaleY = obj.scaleY || 1;
       
-      // For paths: the key insight is that path data is in LOCAL coordinates
-      // The path's left/top determine where it's positioned on the canvas
-      // Path coordinates themselves are relative to (0,0) of the path bounding box
       if (obj.type === 'path') {
         const pathObj = obj as Path;
-        // Clone the path data without modification
+        // Clone the path data - it's in local coordinates relative to path's top-left
         const rawPath = JSON.parse(JSON.stringify(pathObj.path));
-
+        
+        // Get the bounding rect to understand the path's dimensions
         const bounds = pathObj.getBoundingRect();
-        const pathOffset = (pathObj as any).pathOffset as { x: number; y: number } | undefined;
 
         return {
           type: 'path',
-          // Normalize position to base scale
-          left: (obj.left || 0) / currentScale,
-          top: (obj.top || 0) / currentScale,
-          // Store the bounding dimensions normalized (optional but useful for debugging)
-          width: bounds.width / currentScale,
-          height: bounds.height / currentScale,
+          // Store position as percentage of page
+          leftPct: (obj.left || 0) / canvasWidth,
+          topPct: (obj.top || 0) / canvasHeight,
+          // Store dimensions as percentage
+          widthPct: bounds.width / canvasWidth,
+          heightPct: bounds.height / canvasHeight,
           fill: obj.fill as string,
           stroke: obj.stroke as string,
-          strokeWidth: obj.strokeWidth ? obj.strokeWidth / currentScale : undefined,
-          // Store path data in its original coordinate space
+          // Store stroke width as percentage of page width
+          strokeWidthPct: obj.strokeWidth ? obj.strokeWidth / canvasWidth : undefined,
+          // Path data stays in its original local coordinate system
+          // We normalize it relative to the path's own bounding box
           path: rawPath,
-          // CRITICAL: preserve Fabric path origin/offset so it doesn't shift when recreated
-          originX: (pathObj as any).originX,
-          originY: (pathObj as any).originY,
-          pathOffsetX: pathOffset ? pathOffset.x / currentScale : undefined,
-          pathOffsetY: pathOffset ? pathOffset.y / currentScale : undefined,
-          // Store the actual scale factors so we can restore properly
-          scaleX: objScaleX / currentScale,
-          scaleY: objScaleY / currentScale,
+          // Store the scale factors normalized
+          scaleX: objScaleX,
+          scaleY: objScaleY,
           angle: obj.angle,
         };
       }
       
+      if (obj.type === 'circle') {
+        const circleObj = obj as FabricCircle;
+        return {
+          type: 'circle',
+          leftPct: (obj.left || 0) / canvasWidth,
+          topPct: (obj.top || 0) / canvasHeight,
+          radiusPct: ((circleObj.radius || 0) * objScaleX) / canvasWidth,
+          fill: obj.fill as string,
+          stroke: obj.stroke as string,
+          strokeWidthPct: obj.strokeWidth ? obj.strokeWidth / canvasWidth : undefined,
+          scaleX: 1,
+          scaleY: 1,
+          angle: obj.angle,
+        };
+      }
+      
+      if (obj.type === 'textbox') {
+        const textObj = obj as Textbox;
+        return {
+          type: 'textbox',
+          leftPct: (obj.left || 0) / canvasWidth,
+          topPct: (obj.top || 0) / canvasHeight,
+          widthPct: ((textObj.width || 0) * objScaleX) / canvasWidth,
+          heightPct: ((textObj.height || 0) * objScaleY) / canvasHeight,
+          fill: obj.fill as string,
+          text: textObj.text,
+          fontSizePct: ((textObj.fontSize || 18) * objScaleY) / canvasHeight,
+          fontFamily: textObj.fontFamily,
+          scaleX: 1,
+          scaleY: 1,
+          angle: obj.angle,
+        };
+      }
+      
+      // Default: rect and others
       return {
         type: obj.type || 'unknown',
-        left: (obj.left || 0) / currentScale,
-        top: (obj.top || 0) / currentScale,
-        width: (obj as any).width ? ((obj as any).width * objScaleX) / currentScale : undefined,
-        height: (obj as any).height ? ((obj as any).height * objScaleY) / currentScale : undefined,
+        leftPct: (obj.left || 0) / canvasWidth,
+        topPct: (obj.top || 0) / canvasHeight,
+        widthPct: (obj as any).width ? (((obj as any).width * objScaleX) / canvasWidth) : undefined,
+        heightPct: (obj as any).height ? (((obj as any).height * objScaleY) / canvasHeight) : undefined,
         fill: obj.fill as string,
         stroke: obj.stroke as string,
-        strokeWidth: obj.strokeWidth ? obj.strokeWidth / currentScale : undefined,
-        text: obj.type === 'textbox' ? (obj as Textbox).text : undefined,
-        fontSize: obj.type === 'textbox' ? ((obj as Textbox).fontSize || 18) / currentScale : undefined,
-        fontFamily: obj.type === 'textbox' ? (obj as Textbox).fontFamily : undefined,
-        radius: obj.type === 'circle' ? (((obj as FabricCircle).radius || 0) * objScaleX) / currentScale : undefined,
+        strokeWidthPct: obj.strokeWidth ? obj.strokeWidth / canvasWidth : undefined,
         scaleX: 1,
         scaleY: 1,
-        angle: obj.angle
+        angle: obj.angle,
       };
     });
     
     pageAnnotationsRef.current.set(pageNum, annotations);
   };
 
+  // Load annotations from percentage-based storage to current canvas size
   const loadPageAnnotations = (pageNum: number, canvas: FabricCanvas) => {
     canvas.clear();
     canvas.backgroundColor = 'transparent';
     
     const annotations = pageAnnotationsRef.current.get(pageNum) || [];
+    const pageData = pagesData.find(p => p.pageNum === pageNum);
+    if (!pageData) return;
+    
+    // Current canvas size
+    const canvasWidth = pageData.width * scale;
+    const canvasHeight = pageData.height * scale;
     
     annotations.forEach(annotation => {
       let obj;
@@ -963,13 +993,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       switch (annotation.type) {
         case 'rect':
           obj = new Rect({
-            left: (annotation.left || 0) * scale,
-            top: (annotation.top || 0) * scale,
-            width: (annotation.width || 0) * scale,
-            height: (annotation.height || 0) * scale,
+            left: (annotation.leftPct || 0) * canvasWidth,
+            top: (annotation.topPct || 0) * canvasHeight,
+            width: (annotation.widthPct || 0) * canvasWidth,
+            height: (annotation.heightPct || 0) * canvasHeight,
             fill: annotation.fill || 'transparent',
             stroke: annotation.stroke,
-            strokeWidth: (annotation.strokeWidth || 1) * scale,
+            strokeWidth: (annotation.strokeWidthPct || 0.002) * canvasWidth,
             scaleX: 1,
             scaleY: 1,
             angle: annotation.angle || 0
@@ -977,23 +1007,23 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           break;
         case 'circle':
           obj = new FabricCircle({
-            left: (annotation.left || 0) * scale,
-            top: (annotation.top || 0) * scale,
-            radius: (annotation.radius || 0) * scale,
+            left: (annotation.leftPct || 0) * canvasWidth,
+            top: (annotation.topPct || 0) * canvasHeight,
+            radius: (annotation.radiusPct || 0) * canvasWidth,
             fill: annotation.fill || 'transparent',
             stroke: annotation.stroke,
-            strokeWidth: (annotation.strokeWidth || 1) * scale,
+            strokeWidth: (annotation.strokeWidthPct || 0.002) * canvasWidth,
             scaleX: 1,
             scaleY: 1,
             angle: annotation.angle || 0
           });
           break;
         case 'textbox':
-          obj = new Textbox(annotation.text || '', {
-            left: (annotation.left || 0) * scale,
-            top: (annotation.top || 0) * scale,
-            width: (annotation.width || 200) * scale,
-            fontSize: (annotation.fontSize || 18) * scale,
+          obj = new Textbox(annotation.text || 'Text', {
+            left: (annotation.leftPct || 0) * canvasWidth,
+            top: (annotation.topPct || 0) * canvasHeight,
+            width: (annotation.widthPct || 0.3) * canvasWidth,
+            fontSize: (annotation.fontSizePct || 0.03) * canvasHeight,
             fontFamily: annotation.fontFamily || 'Arial',
             fill: annotation.fill || '#000000',
             scaleX: 1,
@@ -1003,24 +1033,25 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           break;
         case 'path':
           if (annotation.path) {
-            // For paths: recreate and restore Fabric's internal origin/offset to avoid drift
+            // Create path with proper scaling
+            // The path data is in local coordinates, we need to scale the entire path
             const path = new Path(annotation.path, {
-              left: (annotation.left || 0) * scale,
-              top: (annotation.top || 0) * scale,
               stroke: annotation.stroke,
-              strokeWidth: (annotation.strokeWidth || 1) * scale,
               fill: 'transparent',
-              scaleX: (annotation.scaleX || 1) * scale,
-              scaleY: (annotation.scaleY || 1) * scale,
+              strokeWidth: (annotation.strokeWidthPct || 0.005) * canvasWidth,
               angle: annotation.angle || 0,
-              originX: (annotation.originX as any) || 'left',
-              originY: (annotation.originY as any) || 'top',
             });
-
-            if (typeof annotation.pathOffsetX === 'number' && typeof annotation.pathOffsetY === 'number') {
-              (path as any).pathOffset = new Point(annotation.pathOffsetX * scale, annotation.pathOffsetY * scale);
-            }
-
+            
+            // Now position and scale the path
+            // The path was saved when canvas was at some size, now we restore it at current size
+            path.set({
+              left: (annotation.leftPct || 0) * canvasWidth,
+              top: (annotation.topPct || 0) * canvasHeight,
+              scaleX: annotation.scaleX || 1,
+              scaleY: annotation.scaleY || 1,
+            });
+            
+            path.setCoords();
             obj = path;
           }
           break;
@@ -1295,20 +1326,16 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       for (const [pageNum, annotations] of pageAnnotationsRef.current.entries()) {
         const page = newPdfDoc.getPage(pageNum - 1);
         const { width, height } = page.getSize();
-        const pageData = pagesData.find(p => p.pageNum === pageNum);
-        if (!pageData) continue;
-        
-        const scaleX = width / pageData.width;
-        const scaleY = height / pageData.height;
 
         for (const annotation of annotations) {
-          const x = (annotation.left || 0) * scaleX;
-          const y = height - ((annotation.top || 0) * scaleY);
+          // Convert percentage-based positions to PDF coordinates
+          const x = (annotation.leftPct || 0) * width;
+          const y = height - ((annotation.topPct || 0) * height);
 
           switch (annotation.type) {
             case 'textbox':
               if (annotation.text) {
-                const textFontSize = ((annotation.fontSize || 18) * (annotation.scaleY || 1)) * scaleX;
+                const textFontSize = (annotation.fontSizePct || 0.03) * height;
                 const colorArray = hexToRgb(annotation.fill || '#000000');
                 page.drawText(annotation.text, {
                   x,
@@ -1320,8 +1347,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               }
               break;
             case 'rect':
-              const rectWidth = (annotation.width || 0) * (annotation.scaleX || 1) * scaleX;
-              const rectHeight = (annotation.height || 0) * (annotation.scaleY || 1) * scaleY;
+              const rectWidth = (annotation.widthPct || 0) * width;
+              const rectHeight = (annotation.heightPct || 0) * height;
               const rectColorArray = hexToRgb(annotation.stroke || '#000000');
               page.drawRectangle({
                 x,
@@ -1329,40 +1356,45 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 width: rectWidth,
                 height: rectHeight,
                 borderColor: rgb(rectColorArray.r / 255, rectColorArray.g / 255, rectColorArray.b / 255),
-                borderWidth: annotation.strokeWidth || 1,
+                borderWidth: (annotation.strokeWidthPct || 0.002) * width,
               });
               break;
             case 'circle':
-              const radius = (annotation.radius || 0) * (annotation.scaleX || 1) * scaleX;
+              const radius = (annotation.radiusPct || 0) * width;
               const circleColorArray = hexToRgb(annotation.stroke || '#000000');
               page.drawCircle({
                 x: x + radius,
                 y: y - radius,
                 size: radius,
                 borderColor: rgb(circleColorArray.r / 255, circleColorArray.g / 255, circleColorArray.b / 255),
-                borderWidth: annotation.strokeWidth || 1,
+                borderWidth: (annotation.strokeWidthPct || 0.002) * width,
               });
               break;
             case 'path':
               if (annotation.path && Array.isArray(annotation.path)) {
                 const pathColor = hexToRgb(annotation.stroke || '#000000');
-                const pathStrokeWidth = (annotation.strokeWidth || 2) * Math.min(scaleX, scaleY);
+                const pathStrokeWidth = (annotation.strokeWidthPct || 0.005) * width;
+                
+                // Path coordinates are stored in the path's local coordinate system
+                // We need to transform them to PDF coordinates
+                const pathLeft = (annotation.leftPct || 0) * width;
+                const pathTop = (annotation.topPct || 0) * height;
                 
                 let svgPathStr = '';
                 for (const cmd of annotation.path) {
                   if (cmd[0] === 'M') {
-                    const px = (annotation.left + cmd[1] * (annotation.scaleX || 1)) * scaleX;
-                    const py = height - ((annotation.top + cmd[2] * (annotation.scaleY || 1)) * scaleY);
+                    const px = pathLeft + cmd[1] * (annotation.scaleX || 1);
+                    const py = height - (pathTop + cmd[2] * (annotation.scaleY || 1));
                     svgPathStr += `M ${px} ${py} `;
                   } else if (cmd[0] === 'Q') {
-                    const cpx = (annotation.left + cmd[1] * (annotation.scaleX || 1)) * scaleX;
-                    const cpy = height - ((annotation.top + cmd[2] * (annotation.scaleY || 1)) * scaleY);
-                    const endx = (annotation.left + cmd[3] * (annotation.scaleX || 1)) * scaleX;
-                    const endy = height - ((annotation.top + cmd[4] * (annotation.scaleY || 1)) * scaleY);
+                    const cpx = pathLeft + cmd[1] * (annotation.scaleX || 1);
+                    const cpy = height - (pathTop + cmd[2] * (annotation.scaleY || 1));
+                    const endx = pathLeft + cmd[3] * (annotation.scaleX || 1);
+                    const endy = height - (pathTop + cmd[4] * (annotation.scaleY || 1));
                     svgPathStr += `Q ${cpx} ${cpy} ${endx} ${endy} `;
                   } else if (cmd[0] === 'L') {
-                    const lx = (annotation.left + cmd[1] * (annotation.scaleX || 1)) * scaleX;
-                    const ly = height - ((annotation.top + cmd[2] * (annotation.scaleY || 1)) * scaleY);
+                    const lx = pathLeft + cmd[1] * (annotation.scaleX || 1);
+                    const ly = height - (pathTop + cmd[2] * (annotation.scaleY || 1));
                     svgPathStr += `L ${lx} ${ly} `;
                   }
                 }
@@ -1424,20 +1456,16 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       for (const [pageNum, annotations] of pageAnnotationsRef.current.entries()) {
         const page = newPdfDoc.getPage(pageNum - 1);
         const { width, height } = page.getSize();
-        const pageData = pagesData.find(p => p.pageNum === pageNum);
-        if (!pageData) continue;
-        
-        const scaleX = width / pageData.width;
-        const scaleY = height / pageData.height;
 
         for (const annotation of annotations) {
-          const x = (annotation.left || 0) * scaleX;
-          const y = height - ((annotation.top || 0) * scaleY);
+          // Convert percentage-based positions to PDF coordinates
+          const x = (annotation.leftPct || 0) * width;
+          const y = height - ((annotation.topPct || 0) * height);
 
           switch (annotation.type) {
             case 'textbox':
               if (annotation.text) {
-                const textFontSize = ((annotation.fontSize || 18) * (annotation.scaleY || 1)) * scaleX;
+                const textFontSize = (annotation.fontSizePct || 0.03) * height;
                 const colorArray = hexToRgb(annotation.fill || '#000000');
                 page.drawText(annotation.text, {
                   x,
@@ -1449,8 +1477,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               }
               break;
             case 'rect':
-              const rectWidth = (annotation.width || 0) * (annotation.scaleX || 1) * scaleX;
-              const rectHeight = (annotation.height || 0) * (annotation.scaleY || 1) * scaleY;
+              const rectWidth = (annotation.widthPct || 0) * width;
+              const rectHeight = (annotation.heightPct || 0) * height;
               const rectColorArray = hexToRgb(annotation.stroke || '#000000');
               page.drawRectangle({
                 x,
@@ -1458,40 +1486,43 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 width: rectWidth,
                 height: rectHeight,
                 borderColor: rgb(rectColorArray.r / 255, rectColorArray.g / 255, rectColorArray.b / 255),
-                borderWidth: annotation.strokeWidth || 1,
+                borderWidth: (annotation.strokeWidthPct || 0.002) * width,
               });
               break;
             case 'circle':
-              const dlRadius = (annotation.radius || 0) * (annotation.scaleX || 1) * scaleX;
+              const dlRadius = (annotation.radiusPct || 0) * width;
               const dlCircleColorArray = hexToRgb(annotation.stroke || '#000000');
               page.drawCircle({
                 x: x + dlRadius,
                 y: y - dlRadius,
                 size: dlRadius,
                 borderColor: rgb(dlCircleColorArray.r / 255, dlCircleColorArray.g / 255, dlCircleColorArray.b / 255),
-                borderWidth: annotation.strokeWidth || 1,
+                borderWidth: (annotation.strokeWidthPct || 0.002) * width,
               });
               break;
             case 'path':
               if (annotation.path && Array.isArray(annotation.path)) {
                 const dlPathColor = hexToRgb(annotation.stroke || '#000000');
-                const dlPathStrokeWidth = (annotation.strokeWidth || 2) * Math.min(scaleX, scaleY);
+                const dlPathStrokeWidth = (annotation.strokeWidthPct || 0.005) * width;
+                
+                const pathLeft = (annotation.leftPct || 0) * width;
+                const pathTop = (annotation.topPct || 0) * height;
                 
                 let dlSvgPathStr = '';
                 for (const cmd of annotation.path) {
                   if (cmd[0] === 'M') {
-                    const px = (annotation.left + cmd[1] * (annotation.scaleX || 1)) * scaleX;
-                    const py = height - ((annotation.top + cmd[2] * (annotation.scaleY || 1)) * scaleY);
+                    const px = pathLeft + cmd[1] * (annotation.scaleX || 1);
+                    const py = height - (pathTop + cmd[2] * (annotation.scaleY || 1));
                     dlSvgPathStr += `M ${px} ${py} `;
                   } else if (cmd[0] === 'Q') {
-                    const cpx = (annotation.left + cmd[1] * (annotation.scaleX || 1)) * scaleX;
-                    const cpy = height - ((annotation.top + cmd[2] * (annotation.scaleY || 1)) * scaleY);
-                    const endx = (annotation.left + cmd[3] * (annotation.scaleX || 1)) * scaleX;
-                    const endy = height - ((annotation.top + cmd[4] * (annotation.scaleY || 1)) * scaleY);
+                    const cpx = pathLeft + cmd[1] * (annotation.scaleX || 1);
+                    const cpy = height - (pathTop + cmd[2] * (annotation.scaleY || 1));
+                    const endx = pathLeft + cmd[3] * (annotation.scaleX || 1);
+                    const endy = height - (pathTop + cmd[4] * (annotation.scaleY || 1));
                     dlSvgPathStr += `Q ${cpx} ${cpy} ${endx} ${endy} `;
                   } else if (cmd[0] === 'L') {
-                    const lx = (annotation.left + cmd[1] * (annotation.scaleX || 1)) * scaleX;
-                    const ly = height - ((annotation.top + cmd[2] * (annotation.scaleY || 1)) * scaleY);
+                    const lx = pathLeft + cmd[1] * (annotation.scaleX || 1);
+                    const ly = height - (pathTop + cmd[2] * (annotation.scaleY || 1));
                     dlSvgPathStr += `L ${lx} ${ly} `;
                   }
                 }
