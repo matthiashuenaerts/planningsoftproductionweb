@@ -792,8 +792,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     });
     renderTasksRef.current.clear();
 
-    setRenderedPages(new Set());
+    // Dispose all fabric canvases
     fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
+    // CRITICAL: Clear the map so canvases get reinitialized after scale change
+    fabricCanvasRefs.current.clear();
+    
+    // Clear rendered pages to trigger re-render
+    setRenderedPages(new Set());
   }, [scale, pdfDoc]);
 
   // Recalculate Fabric canvas offsets on scroll (fixes drawing coordinates when scrolled)
