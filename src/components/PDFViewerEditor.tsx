@@ -898,30 +898,49 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       
       if (obj.type === 'path') {
         const pathObj = obj as Path;
-        // Clone the path data - it's in local coordinates relative to path's top-left
+        // Clone and NORMALIZE the path data
+        // Path coordinates are in local space, we need to normalize them to percentages
         const rawPath = JSON.parse(JSON.stringify(pathObj.path));
         
-        // Get the bounding rect to understand the path's dimensions
-        const bounds = pathObj.getBoundingRect();
+        // Normalize path coordinates: divide by canvas size to get percentages
+        // Path commands: M, L, Q, C, etc. have coordinates at specific indices
+        const normalizedPath = rawPath.map((cmd: any[]) => {
+          const cmdType = cmd[0];
+          const newCmd = [cmdType];
+          
+          // Normalize coordinate pairs based on command type
+          for (let i = 1; i < cmd.length; i++) {
+            if (typeof cmd[i] === 'number') {
+              // Even indices (1, 3, 5...) are X coordinates, odd indices (2, 4, 6...) are Y coordinates
+              // In path array: index 1, 3, 5... are X; index 2, 4, 6... are Y
+              if ((i % 2) === 1) {
+                // X coordinate - normalize by canvas width, accounting for object scale
+                newCmd.push((cmd[i] * objScaleX) / canvasWidth);
+              } else {
+                // Y coordinate - normalize by canvas height, accounting for object scale
+                newCmd.push((cmd[i] * objScaleY) / canvasHeight);
+              }
+            } else {
+              newCmd.push(cmd[i]);
+            }
+          }
+          return newCmd;
+        });
 
         return {
           type: 'path',
           // Store position as percentage of page
           leftPct: (obj.left || 0) / canvasWidth,
           topPct: (obj.top || 0) / canvasHeight,
-          // Store dimensions as percentage
-          widthPct: bounds.width / canvasWidth,
-          heightPct: bounds.height / canvasHeight,
           fill: obj.fill as string,
           stroke: obj.stroke as string,
           // Store stroke width as percentage of page width
           strokeWidthPct: obj.strokeWidth ? obj.strokeWidth / canvasWidth : undefined,
-          // Path data stays in its original local coordinate system
-          // We normalize it relative to the path's own bounding box
-          path: rawPath,
-          // Store the scale factors normalized
-          scaleX: objScaleX,
-          scaleY: objScaleY,
+          // Path data is now normalized to percentages
+          path: normalizedPath,
+          // Scale factors are baked into the path, so store as 1
+          scaleX: 1,
+          scaleY: 1,
           angle: obj.angle,
         };
       }
@@ -1038,22 +1057,42 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           break;
         case 'path':
           if (annotation.path) {
-            // Create path with proper scaling
-            // The path data is in local coordinates, we need to scale the entire path
-            const path = new Path(annotation.path, {
+            // Denormalize path coordinates from percentages back to canvas pixels
+            const denormalizedPath = annotation.path.map((cmd: any[]) => {
+              const cmdType = cmd[0];
+              const newCmd = [cmdType];
+              
+              for (let i = 1; i < cmd.length; i++) {
+                if (typeof cmd[i] === 'number') {
+                  // Even indices (1, 3, 5...) are X coordinates, odd indices (2, 4, 6...) are Y coordinates
+                  if ((i % 2) === 1) {
+                    // X coordinate - multiply by canvas width
+                    newCmd.push(cmd[i] * canvasWidth);
+                  } else {
+                    // Y coordinate - multiply by canvas height
+                    newCmd.push(cmd[i] * canvasHeight);
+                  }
+                } else {
+                  newCmd.push(cmd[i]);
+                }
+              }
+              return newCmd;
+            });
+            
+            // Create path with denormalized coordinates
+            const path = new Path(denormalizedPath, {
               stroke: annotation.stroke,
               fill: 'transparent',
               strokeWidth: (annotation.strokeWidthPct || 0.005) * canvasWidth,
               angle: annotation.angle || 0,
             });
             
-            // Now position and scale the path
-            // The path was saved when canvas was at some size, now we restore it at current size
+            // Position the path
             path.set({
               left: (annotation.leftPct || 0) * canvasWidth,
               top: (annotation.topPct || 0) * canvasHeight,
-              scaleX: annotation.scaleX || 1,
-              scaleY: annotation.scaleY || 1,
+              scaleX: 1,
+              scaleY: 1,
             });
             
             path.setCoords();
@@ -1380,26 +1419,26 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 const pathColor = hexToRgb(annotation.stroke || '#000000');
                 const pathStrokeWidth = (annotation.strokeWidthPct || 0.005) * width;
                 
-                // Path coordinates are stored in the path's local coordinate system
-                // We need to transform them to PDF coordinates
+                // Path position (top-left corner of path bounding box)
                 const pathLeft = (annotation.leftPct || 0) * width;
                 const pathTop = (annotation.topPct || 0) * height;
                 
                 let svgPathStr = '';
                 for (const cmd of annotation.path) {
                   if (cmd[0] === 'M') {
-                    const px = pathLeft + cmd[1] * (annotation.scaleX || 1);
-                    const py = height - (pathTop + cmd[2] * (annotation.scaleY || 1));
+                    // Path coordinates are stored as percentages - multiply by page dimensions
+                    const px = pathLeft + cmd[1] * width;
+                    const py = height - (pathTop + cmd[2] * height);
                     svgPathStr += `M ${px} ${py} `;
                   } else if (cmd[0] === 'Q') {
-                    const cpx = pathLeft + cmd[1] * (annotation.scaleX || 1);
-                    const cpy = height - (pathTop + cmd[2] * (annotation.scaleY || 1));
-                    const endx = pathLeft + cmd[3] * (annotation.scaleX || 1);
-                    const endy = height - (pathTop + cmd[4] * (annotation.scaleY || 1));
+                    const cpx = pathLeft + cmd[1] * width;
+                    const cpy = height - (pathTop + cmd[2] * height);
+                    const endx = pathLeft + cmd[3] * width;
+                    const endy = height - (pathTop + cmd[4] * height);
                     svgPathStr += `Q ${cpx} ${cpy} ${endx} ${endy} `;
                   } else if (cmd[0] === 'L') {
-                    const lx = pathLeft + cmd[1] * (annotation.scaleX || 1);
-                    const ly = height - (pathTop + cmd[2] * (annotation.scaleY || 1));
+                    const lx = pathLeft + cmd[1] * width;
+                    const ly = height - (pathTop + cmd[2] * height);
                     svgPathStr += `L ${lx} ${ly} `;
                   }
                 }
@@ -1510,24 +1549,26 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 const dlPathColor = hexToRgb(annotation.stroke || '#000000');
                 const dlPathStrokeWidth = (annotation.strokeWidthPct || 0.005) * width;
                 
+                // Path position (top-left corner of path bounding box)
                 const pathLeft = (annotation.leftPct || 0) * width;
                 const pathTop = (annotation.topPct || 0) * height;
                 
                 let dlSvgPathStr = '';
                 for (const cmd of annotation.path) {
                   if (cmd[0] === 'M') {
-                    const px = pathLeft + cmd[1] * (annotation.scaleX || 1);
-                    const py = height - (pathTop + cmd[2] * (annotation.scaleY || 1));
+                    // Path coordinates are stored as percentages - multiply by page dimensions
+                    const px = pathLeft + cmd[1] * width;
+                    const py = height - (pathTop + cmd[2] * height);
                     dlSvgPathStr += `M ${px} ${py} `;
                   } else if (cmd[0] === 'Q') {
-                    const cpx = pathLeft + cmd[1] * (annotation.scaleX || 1);
-                    const cpy = height - (pathTop + cmd[2] * (annotation.scaleY || 1));
-                    const endx = pathLeft + cmd[3] * (annotation.scaleX || 1);
-                    const endy = height - (pathTop + cmd[4] * (annotation.scaleY || 1));
+                    const cpx = pathLeft + cmd[1] * width;
+                    const cpy = height - (pathTop + cmd[2] * height);
+                    const endx = pathLeft + cmd[3] * width;
+                    const endy = height - (pathTop + cmd[4] * height);
                     dlSvgPathStr += `Q ${cpx} ${cpy} ${endx} ${endy} `;
                   } else if (cmd[0] === 'L') {
-                    const lx = pathLeft + cmd[1] * (annotation.scaleX || 1);
-                    const ly = height - (pathTop + cmd[2] * (annotation.scaleY || 1));
+                    const lx = pathLeft + cmd[1] * width;
+                    const ly = height - (pathTop + cmd[2] * height);
                     dlSvgPathStr += `L ${lx} ${ly} `;
                   }
                 }
