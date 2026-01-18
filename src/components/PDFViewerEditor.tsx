@@ -90,6 +90,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const [originalPdfBytes, setOriginalPdfBytes] = useState<Uint8Array | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.0);
+  const prevScaleRef = useRef(1.0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -771,14 +772,18 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Re-render pages when scale changes - save annotations first
   useEffect(() => {
     if (!pdfDoc) return;
-    
-    // Save all current annotations before re-rendering at new scale
-    fabricCanvasRefs.current.forEach((canvas, pageNum) => {
-      saveCurrentPageAnnotations(pageNum);
+
+    // IMPORTANT:
+    // At this point `scale` is the NEW scale, but existing Fabric objects are still
+    // positioned in the OLD scale. So we must normalize using the previous scale.
+    const prevScale = prevScaleRef.current || 1;
+
+    fabricCanvasRefs.current.forEach((_, pageNum) => {
+      saveCurrentPageAnnotations(pageNum, prevScale);
     });
-    
+
     // Cancel all active render tasks before clearing
-    renderTasksRef.current.forEach((task, pageNum) => {
+    renderTasksRef.current.forEach((task) => {
       try {
         task.cancel();
       } catch (e) {
@@ -786,10 +791,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       }
     });
     renderTasksRef.current.clear();
-    
+
     setRenderedPages(new Set());
     fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
     fabricCanvasRefs.current.clear();
+
+    // Update previous scale ref for the next zoom change
+    prevScaleRef.current = scale;
   }, [scale, pdfDoc]);
 
   // Recalculate Fabric canvas offsets on scroll (fixes drawing coordinates when scrolled)
@@ -874,12 +882,12 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Helper to normalize path data to base scale (1.0)
   // Path coordinates in Fabric are relative to the path's origin (left, top)
   // We don't need to scale the path data itself - only the position and dimensions
-  const saveCurrentPageAnnotations = (pageNum: number) => {
+  const saveCurrentPageAnnotations = (pageNum: number, scaleForNormalization?: number) => {
     const canvas = fabricCanvasRefs.current.get(pageNum);
     if (!canvas) return;
     
     const objects = canvas.getObjects();
-    const currentScale = scale;
+    const currentScale = scaleForNormalization ?? scale;
     
     const annotations: AnnotationData[] = objects.map(obj => {
       const objScaleX = obj.scaleX || 1;
