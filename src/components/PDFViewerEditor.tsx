@@ -322,11 +322,23 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     };
   }, [pdfUrl]);
 
-  const loadPDF = async () => {
+  const loadPDF = async (retryCount = 0) => {
+    const maxRetries = 3;
+    const retryDelay = 1000;
+    
     try {
-      console.log('Loading PDF from URL:', pdfUrl);
+      console.log('Loading PDF from URL:', pdfUrl, retryCount > 0 ? `(retry ${retryCount})` : '');
       
-      const response = await fetch(pdfUrl);
+      // Add cache-busting and timeout for reliability
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+      
+      const response = await fetch(pdfUrl, {
+        signal: controller.signal,
+        cache: 'no-cache', // Avoid stale cache issues
+      });
+      clearTimeout(timeoutId);
+      
       if (!response.ok) {
         throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
       }
@@ -367,8 +379,16 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       await loadAnnotationsFromDatabase();
       
       setLoading(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading PDF:', error);
+      
+      // Retry on network errors
+      if (retryCount < maxRetries && (error.name === 'AbortError' || error.message?.includes('fetch'))) {
+        console.log(`Retrying PDF load in ${retryDelay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay * (retryCount + 1)));
+        return loadPDF(retryCount + 1);
+      }
+      
       toast({
         title: "Error",
         description: `Failed to load PDF: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -844,22 +864,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   };
 
   // Helper to normalize path data to base scale (1.0)
-  const normalizePathData = (pathData: any[], objScaleX: number, objScaleY: number): any[] => {
-    return pathData.map(segment => {
-      const cmd = segment[0];
-      const coords = segment.slice(1);
-      // Scale numeric coordinates
-      const scaledCoords = coords.map((val: any, idx: number) => {
-        if (typeof val === 'number') {
-          // Even indices are X coords, odd are Y coords
-          return idx % 2 === 0 ? val * objScaleX : val * objScaleY;
-        }
-        return val;
-      });
-      return [cmd, ...scaledCoords];
-    });
-  };
-
+  // Path coordinates in Fabric are relative to the path's origin (left, top)
+  // We don't need to scale the path data itself - only the position and dimensions
   const saveCurrentPageAnnotations = (pageNum: number) => {
     const canvas = fabricCanvasRefs.current.get(pageNum);
     if (!canvas) return;
@@ -871,31 +877,33 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       const objScaleX = obj.scaleX || 1;
       const objScaleY = obj.scaleY || 1;
       
-      // For paths: normalize everything to base scale (1.0)
-      // Path coordinates in Fabric are in local space, but we need to account for
-      // both the object's scaleX/scaleY AND the current view scale
+      // For paths: the key insight is that path data is in LOCAL coordinates
+      // The path's left/top determine where it's positioned on the canvas
+      // Path coordinates themselves are relative to (0,0) of the path bounding box
       if (obj.type === 'path') {
         const pathObj = obj as Path;
+        // Clone the path data without modification - it's already in local coords
         const rawPath = JSON.parse(JSON.stringify(pathObj.path));
         
-        // The path data is in local coordinates. When the path is drawn at scale X,
-        // the coordinates are at that scale. We need to:
-        // 1. Apply object's scaleX/scaleY to get actual screen coords
-        // 2. Divide by currentScale to normalize to base scale (1.0)
-        const normalizedPath = normalizePathData(rawPath, objScaleX / currentScale, objScaleY / currentScale);
+        // Get the path's bounding box dimensions at current scale
+        const bounds = pathObj.getBoundingRect();
         
         return {
           type: 'path',
+          // Normalize position to base scale
           left: (obj.left || 0) / currentScale,
           top: (obj.top || 0) / currentScale,
+          // Store the bounding dimensions normalized
+          width: bounds.width / currentScale,
+          height: bounds.height / currentScale,
           fill: obj.fill as string,
           stroke: obj.stroke as string,
           strokeWidth: obj.strokeWidth ? obj.strokeWidth / currentScale : undefined,
-          // Store normalized path data (at base scale 1.0)
-          path: normalizedPath,
-          // Always store scaleX/scaleY as 1 since we've baked the scaling into path data
-          scaleX: 1,
-          scaleY: 1,
+          // Store path data as-is - it's in local coordinates
+          path: rawPath,
+          // Store the actual scale factors so we can restore properly
+          scaleX: objScaleX / currentScale,
+          scaleY: objScaleY / currentScale,
           angle: obj.angle
         };
       }
@@ -920,23 +928,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     });
     
     pageAnnotationsRef.current.set(pageNum, annotations);
-  };
-
-  // Helper to scale path data from base scale (1.0) to current view scale
-  const scalePathData = (pathData: any[], scaleX: number, scaleY: number): any[] => {
-    return pathData.map(segment => {
-      const cmd = segment[0];
-      const coords = segment.slice(1);
-      // Scale numeric coordinates
-      const scaledCoords = coords.map((val: any, idx: number) => {
-        if (typeof val === 'number') {
-          // Even indices are X coords, odd are Y coords
-          return idx % 2 === 0 ? val * scaleX : val * scaleY;
-        }
-        return val;
-      });
-      return [cmd, ...scaledCoords];
-    });
   };
 
   const loadPageAnnotations = (pageNum: number, canvas: FabricCanvas) => {
@@ -991,18 +982,17 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           break;
         case 'path':
           if (annotation.path) {
-            // Scale path data from base scale (1.0) to current view scale
-            const scaledPath = scalePathData(annotation.path, scale, scale);
-            
-            obj = new Path(scaledPath, {
+            // For paths: create with stored path data and apply scaling via scaleX/scaleY
+            // This preserves the path shape while positioning correctly
+            obj = new Path(annotation.path, {
               left: (annotation.left || 0) * scale,
               top: (annotation.top || 0) * scale,
               stroke: annotation.stroke,
               strokeWidth: (annotation.strokeWidth || 1) * scale,
               fill: 'transparent',
-              // scaleX/scaleY are always 1 since scaling is baked into path data
-              scaleX: 1,
-              scaleY: 1,
+              // Apply the stored scale factors multiplied by current view scale
+              scaleX: (annotation.scaleX || 1) * scale,
+              scaleY: (annotation.scaleY || 1) * scale,
               angle: annotation.angle || 0
             });
           }
