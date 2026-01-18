@@ -28,7 +28,7 @@ import {
   Ruler,
   Hand
 } from 'lucide-react';
-import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Textbox, Path, PencilBrush } from 'fabric';
+import { Canvas as FabricCanvas, Rect, Circle as FabricCircle, Textbox, Path, PencilBrush, Point } from 'fabric';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 interface PDFViewerEditorProps {
@@ -56,6 +56,11 @@ interface AnnotationData {
   fontFamily?: string;
   radius?: number;
   path?: any;
+  // For paths we must preserve Fabric's internal offset/origin to avoid drifting on zoom
+  pathOffsetX?: number;
+  pathOffsetY?: number;
+  originX?: string;
+  originY?: string;
   scaleX?: number;
   scaleY?: number;
   angle?: number;
@@ -678,6 +683,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     fabricCanvasRefs.current.set(pageNum, fabricCanvas);
     
     loadPageAnnotations(pageNum, fabricCanvas);
+
+    // Ensure Fabric's internal offsets are correct (critical after zoom/scroll)
+    fabricCanvas.calcOffset();
     
     applyToolSettings(isEditModeRef.current ? activeToolRef.current : 'select', fabricCanvas);
     if (!isEditModeRef.current) {
@@ -882,29 +890,34 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       // Path coordinates themselves are relative to (0,0) of the path bounding box
       if (obj.type === 'path') {
         const pathObj = obj as Path;
-        // Clone the path data without modification - it's already in local coords
+        // Clone the path data without modification
         const rawPath = JSON.parse(JSON.stringify(pathObj.path));
-        
-        // Get the path's bounding box dimensions at current scale
+
         const bounds = pathObj.getBoundingRect();
-        
+        const pathOffset = (pathObj as any).pathOffset as { x: number; y: number } | undefined;
+
         return {
           type: 'path',
           // Normalize position to base scale
           left: (obj.left || 0) / currentScale,
           top: (obj.top || 0) / currentScale,
-          // Store the bounding dimensions normalized
+          // Store the bounding dimensions normalized (optional but useful for debugging)
           width: bounds.width / currentScale,
           height: bounds.height / currentScale,
           fill: obj.fill as string,
           stroke: obj.stroke as string,
           strokeWidth: obj.strokeWidth ? obj.strokeWidth / currentScale : undefined,
-          // Store path data as-is - it's in local coordinates
+          // Store path data in its original coordinate space
           path: rawPath,
+          // CRITICAL: preserve Fabric path origin/offset so it doesn't shift when recreated
+          originX: (pathObj as any).originX,
+          originY: (pathObj as any).originY,
+          pathOffsetX: pathOffset ? pathOffset.x / currentScale : undefined,
+          pathOffsetY: pathOffset ? pathOffset.y / currentScale : undefined,
           // Store the actual scale factors so we can restore properly
           scaleX: objScaleX / currentScale,
           scaleY: objScaleY / currentScale,
-          angle: obj.angle
+          angle: obj.angle,
         };
       }
       
@@ -982,19 +995,25 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           break;
         case 'path':
           if (annotation.path) {
-            // For paths: create with stored path data and apply scaling via scaleX/scaleY
-            // This preserves the path shape while positioning correctly
-            obj = new Path(annotation.path, {
+            // For paths: recreate and restore Fabric's internal origin/offset to avoid drift
+            const path = new Path(annotation.path, {
               left: (annotation.left || 0) * scale,
               top: (annotation.top || 0) * scale,
               stroke: annotation.stroke,
               strokeWidth: (annotation.strokeWidth || 1) * scale,
               fill: 'transparent',
-              // Apply the stored scale factors multiplied by current view scale
               scaleX: (annotation.scaleX || 1) * scale,
               scaleY: (annotation.scaleY || 1) * scale,
-              angle: annotation.angle || 0
+              angle: annotation.angle || 0,
+              originX: (annotation.originX as any) || 'left',
+              originY: (annotation.originY as any) || 'top',
             });
+
+            if (typeof annotation.pathOffsetX === 'number' && typeof annotation.pathOffsetY === 'number') {
+              (path as any).pathOffset = new Point(annotation.pathOffsetX * scale, annotation.pathOffsetY * scale);
+            }
+
+            obj = path;
           }
           break;
       }
