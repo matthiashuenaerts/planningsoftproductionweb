@@ -209,7 +209,7 @@ export function usePDFTouchHandler(config: TouchHandlerConfig) {
 
     const touches = Array.from(activeTouchesRef.current.values());
 
-    // Pinch-to-zoom with smooth animation
+    // Pinch-to-zoom - apply scale directly for smoother performance
     if (state.isPinching && touches.length === 2) {
       e.preventDefault();
       
@@ -220,49 +220,28 @@ export function usePDFTouchHandler(config: TouchHandlerConfig) {
       const scaleRatio = currentDistance / state.pinchStartDistance;
       let newScale = state.pinchStartScale * scaleRatio;
       
-      // Clamp scale
+      // Clamp scale with smooth bounds
       newScale = Math.max(minScale, Math.min(maxScale, newScale));
       
       // Calculate zoom center for better UX
       const center = getCenter(p1, p2);
       const containerRect = container.getBoundingClientRect();
       
-      // Get scroll position relative to center
-      const relativeX = (center.x - containerRect.left + container.scrollLeft) / scale;
-      const relativeY = (center.y - containerRect.top + container.scrollTop) / scale;
+      // Get scroll position relative to center BEFORE scale change
+      const relativeX = (center.x - containerRect.left + container.scrollLeft) / state.pinchStartScale;
+      const relativeY = (center.y - containerRect.top + container.scrollTop) / state.pinchStartScale;
       
-      // Smooth scale transition using requestAnimationFrame
-      targetScaleRef.current = newScale;
+      // Apply scale directly - no animation, just the final value
+      // This prevents multiple re-renders during the pinch gesture
+      setScale(newScale);
       
-      if (!zoomAnimationRef.current) {
-        const animateZoom = () => {
-          const currentScale = scale;
-          const target = targetScaleRef.current;
-          const diff = target - currentScale;
-          
-          // Smooth interpolation factor (higher = faster)
-          const smoothFactor = 0.3;
-          const newAnimatedScale = currentScale + diff * smoothFactor;
-          
-          // Apply scale if difference is significant
-          if (Math.abs(diff) > 0.001) {
-            setScale(newAnimatedScale);
-            
-            // Adjust scroll to keep zoom centered
-            const newScrollX = relativeX * newAnimatedScale - (center.x - containerRect.left);
-            const newScrollY = relativeY * newAnimatedScale - (center.y - containerRect.top);
-            container.scrollLeft = newScrollX;
-            container.scrollTop = newScrollY;
-            
-            zoomAnimationRef.current = requestAnimationFrame(animateZoom);
-          } else {
-            setScale(target);
-            zoomAnimationRef.current = null;
-          }
-        };
-        
-        zoomAnimationRef.current = requestAnimationFrame(animateZoom);
-      }
+      // Adjust scroll to keep zoom centered around pinch point
+      requestAnimationFrame(() => {
+        const newScrollX = relativeX * newScale - (center.x - containerRect.left);
+        const newScrollY = relativeY * newScale - (center.y - containerRect.top);
+        container.scrollLeft = Math.max(0, newScrollX);
+        container.scrollTop = Math.max(0, newScrollY);
+      });
       
       return;
     }

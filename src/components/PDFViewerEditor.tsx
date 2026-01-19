@@ -808,33 +808,59 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     };
   }, [pdfDoc, pagesData, scale, renderPDFPage, initializeFabricCanvas]);
 
-  // Re-render pages when scale changes - save annotations first
+  // Track the previous scale for debounced re-render
+  const scaleChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCommittedScaleRef = useRef<number>(scale);
+  
+  // Re-render pages when scale changes - debounced to prevent flickering during pinch-to-zoom
   useEffect(() => {
     if (!pdfDoc) return;
-
-    // Save annotations before changing scale
-    // Since we now store as percentages, this works at any scale
-    fabricCanvasRefs.current.forEach((_, pageNum) => {
-      saveCurrentPageAnnotations(pageNum);
-    });
-
-    // Cancel all active render tasks before clearing
-    renderTasksRef.current.forEach((task) => {
-      try {
-        task.cancel();
-      } catch (e) {
-        // Ignore cancel errors
-      }
-    });
-    renderTasksRef.current.clear();
-
-    // Dispose all fabric canvases
-    fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
-    // CRITICAL: Clear the map so canvases get reinitialized after scale change
-    fabricCanvasRefs.current.clear();
     
-    // Clear rendered pages to trigger re-render
-    setRenderedPages(new Set());
+    // Clear any pending scale change timeout
+    if (scaleChangeTimeoutRef.current) {
+      clearTimeout(scaleChangeTimeoutRef.current);
+    }
+    
+    // If scale hasn't actually changed (within tolerance), skip
+    if (Math.abs(scale - lastCommittedScaleRef.current) < 0.001) {
+      return;
+    }
+    
+    // Debounce the actual re-render to prevent flickering during continuous pinch
+    scaleChangeTimeoutRef.current = setTimeout(() => {
+      // Save annotations before changing scale
+      // Since we now store as percentages, this works at any scale
+      fabricCanvasRefs.current.forEach((_, pageNum) => {
+        saveCurrentPageAnnotations(pageNum);
+      });
+
+      // Cancel all active render tasks before clearing
+      renderTasksRef.current.forEach((task) => {
+        try {
+          task.cancel();
+        } catch (e) {
+          // Ignore cancel errors
+        }
+      });
+      renderTasksRef.current.clear();
+
+      // Dispose all fabric canvases
+      fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
+      // CRITICAL: Clear the map so canvases get reinitialized after scale change
+      fabricCanvasRefs.current.clear();
+      
+      // Update committed scale
+      lastCommittedScaleRef.current = scale;
+      
+      // Clear rendered pages to trigger re-render
+      setRenderedPages(new Set());
+    }, 150); // 150ms debounce for smooth pinch-to-zoom
+    
+    return () => {
+      if (scaleChangeTimeoutRef.current) {
+        clearTimeout(scaleChangeTimeoutRef.current);
+      }
+    };
   }, [scale, pdfDoc]);
 
   // Recalculate Fabric canvas offsets on scroll (fixes drawing coordinates when scrolled)
@@ -937,10 +963,16 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       if (obj.type === 'path') {
         const pathObj = obj as Path;
         // Clone and NORMALIZE the path data
-        // Path coordinates are in local space, we need to normalize them to percentages
+        // Path coordinates are in ABSOLUTE canvas space after accounting for left/top/pathOffset
         const rawPath = JSON.parse(JSON.stringify(pathObj.path));
         
-        // Normalize path coordinates: divide by canvas size to get percentages
+        // Get the path's absolute position offset (left + pathOffset)
+        const pathLeft = obj.left || 0;
+        const pathTop = obj.top || 0;
+        // Fabric stores path points relative to pathOffset, which is usually the path's top-left corner
+        // So the absolute position of a path point is: left + pathPoint.x (already in local coords)
+        
+        // Normalize path coordinates: convert to ABSOLUTE positions first, then to percentages
         // Path commands: M, L, Q, C, etc. have coordinates at specific indices
         const normalizedPath = rawPath.map((cmd: any[]) => {
           const cmdType = cmd[0];
@@ -952,11 +984,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               // Even indices (1, 3, 5...) are X coordinates, odd indices (2, 4, 6...) are Y coordinates
               // In path array: index 1, 3, 5... are X; index 2, 4, 6... are Y
               if ((i % 2) === 1) {
-                // X coordinate - normalize by canvas width, accounting for object scale
-                newCmd.push((cmd[i] * objScaleX) / canvasWidth);
+                // X coordinate - convert to absolute position, apply scale, then normalize
+                const absX = pathLeft + (cmd[i] * objScaleX);
+                newCmd.push(absX / canvasWidth);
               } else {
-                // Y coordinate - normalize by canvas height, accounting for object scale
-                newCmd.push((cmd[i] * objScaleY) / canvasHeight);
+                // Y coordinate - convert to absolute position, apply scale, then normalize
+                const absY = pathTop + (cmd[i] * objScaleY);
+                newCmd.push(absY / canvasHeight);
               }
             } else {
               newCmd.push(cmd[i]);
@@ -967,14 +1001,14 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
         return {
           type: 'path',
-          // Store position as percentage of page
-          leftPct: (obj.left || 0) / canvasWidth,
-          topPct: (obj.top || 0) / canvasHeight,
+          // Position is baked into the path coordinates now, so store 0
+          leftPct: 0,
+          topPct: 0,
           fill: obj.fill as string,
           stroke: obj.stroke as string,
           // Store stroke width as percentage of page width
           strokeWidthPct: obj.strokeWidth ? obj.strokeWidth / canvasWidth : undefined,
-          // Path data is now normalized to percentages
+          // Path data now contains ABSOLUTE positions as percentages
           path: normalizedPath,
           // Scale factors are baked into the path, so store as 1
           scaleX: 1,
@@ -1119,21 +1153,19 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             });
             
             // Create path with denormalized coordinates
+            // IMPORTANT: The Path constructor auto-calculates bounding box and sets pathOffset
+            // We must NOT override left/top after creation as it breaks positioning
             const path = new Path(denormalizedPath, {
               stroke: annotation.stroke,
               fill: 'transparent',
               strokeWidth: (annotation.strokeWidthPct || 0.005) * canvasWidth,
               angle: annotation.angle || 0,
-            });
-            
-            // Position the path
-            path.set({
-              left: (annotation.leftPct || 0) * canvasWidth,
-              top: (annotation.topPct || 0) * canvasHeight,
               scaleX: 1,
               scaleY: 1,
             });
             
+            // The path is now positioned correctly based on its denormalized coordinates
+            // DO NOT set left/top - the path already has correct absolute positions from its path data
             path.setCoords();
             obj = path;
           }
