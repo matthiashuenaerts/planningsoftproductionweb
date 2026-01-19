@@ -888,9 +888,11 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     
     const objects = canvas.getObjects();
     
-    // Current canvas size (page dimensions * current scale)
-    const canvasWidth = pageData.width * scale;
-    const canvasHeight = pageData.height * scale;
+    // CRITICAL: Use actual canvas dimensions, not computed from scale
+    // During scale changes, the scale state may have updated but the canvas still has old dimensions
+    // Using canvas.getWidth/getHeight ensures we normalize against the ACTUAL current size
+    const canvasWidth = canvas.getWidth();
+    const canvasHeight = canvas.getHeight();
     
     const annotations: AnnotationData[] = objects.map(obj => {
       const objScaleX = obj.scaleX || 1;
@@ -1007,9 +1009,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     const pageData = pagesData.find(p => p.pageNum === pageNum);
     if (!pageData) return;
     
-    // Current canvas size
-    const canvasWidth = pageData.width * scale;
-    const canvasHeight = pageData.height * scale;
+    // Use actual canvas dimensions for consistent coordinate mapping
+    // This ensures annotations are placed correctly regardless of when this is called
+    const canvasWidth = canvas.getWidth();
+    const canvasHeight = canvas.getHeight();
     
     annotations.forEach(annotation => {
       let obj;
