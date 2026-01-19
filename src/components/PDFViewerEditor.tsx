@@ -433,13 +433,28 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
   // Track active render tasks to prevent conflicts
   const renderTasksRef = useRef<Map<number, any>>(new Map());
+  
+  // Track pages that are pending render (ref not ready yet)
+  const pendingRenderRef = useRef<Set<number>>(new Set());
 
   // Render a specific PDF page with high quality settings
-  const renderPDFPage = useCallback(async (pageNum: number) => {
+  const renderPDFPage = useCallback(async (pageNum: number, retryCount = 0) => {
     if (!pdfDoc) return;
     
     const pdfCanvas = pdfCanvasRefs.current.get(pageNum);
-    if (!pdfCanvas) return;
+    if (!pdfCanvas) {
+      // Canvas ref not ready yet - mark as pending and retry
+      if (retryCount < 5) {
+        pendingRenderRef.current.add(pageNum);
+        setTimeout(() => {
+          renderPDFPage(pageNum, retryCount + 1);
+        }, 100 * (retryCount + 1)); // Exponential backoff: 100ms, 200ms, 300ms, etc.
+      }
+      return;
+    }
+    
+    // Remove from pending if it was there
+    pendingRenderRef.current.delete(pageNum);
     
     // Cancel any existing render task for this page
     const existingTask = renderTasksRef.current.get(pageNum);
@@ -712,18 +727,27 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   useEffect(() => {
     if (!pdfDoc || pagesData.length === 0) return;
     
-    // Immediately render the first page(s) visible
+    // Immediately render the first page(s) visible with retry logic
     const renderInitialPages = async () => {
-      // Give refs time to be set
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
-      // Render first page immediately
-      if (pagesData.length > 0 && !renderedPagesRef.current.has(1)) {
-        await renderPDFPage(1);
-        if (!fabricCanvasRefs.current.has(1)) {
-          initializeFabricCanvas(1);
+      // Start rendering immediately - the renderPDFPage function has its own retry logic
+      // if the canvas ref isn't ready yet
+      for (let pageNum = 1; pageNum <= Math.min(2, pagesData.length); pageNum++) {
+        if (!renderedPagesRef.current.has(pageNum)) {
+          renderPDFPage(pageNum);
         }
       }
+      
+      // Also check after a delay to handle race conditions
+      setTimeout(() => {
+        for (let pageNum = 1; pageNum <= Math.min(2, pagesData.length); pageNum++) {
+          if (!renderedPagesRef.current.has(pageNum)) {
+            renderPDFPage(pageNum);
+          }
+          if (!fabricCanvasRefs.current.has(pageNum)) {
+            initializeFabricCanvas(pageNum);
+          }
+        }
+      }, 200);
     };
     
     renderInitialPages();
@@ -738,11 +762,17 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         entries.forEach(entry => {
           const pageNum = parseInt(entry.target.getAttribute('data-page') || '1');
           if (entry.isIntersecting) {
+            // Use the retry-enabled renderPDFPage - it will handle ref availability
             if (!renderedPagesRef.current.has(pageNum)) {
               renderPDFPage(pageNum);
             }
             if (!fabricCanvasRefs.current.has(pageNum)) {
-              initializeFabricCanvas(pageNum);
+              // Slight delay for Fabric init to ensure PDF canvas is ready
+              setTimeout(() => {
+                if (!fabricCanvasRefs.current.has(pageNum)) {
+                  initializeFabricCanvas(pageNum);
+                }
+              }, 50);
             }
           }
         });
@@ -759,15 +789,21 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       { root: canvasContainerRef.current, rootMargin: '200px', threshold: 0.01 }
     );
 
-    // Wait a tick for refs to be populated
-    const timeoutId = setTimeout(() => {
+    // Use multiple timings to catch refs at different stages of React rendering
+    const attemptObserve = () => {
       pageRefs.current.forEach((ref) => {
         observer.observe(ref);
       });
-    }, 100);
+    };
+    
+    // Try immediately, then after short delays
+    attemptObserve();
+    const timeoutId1 = setTimeout(attemptObserve, 50);
+    const timeoutId2 = setTimeout(attemptObserve, 150);
 
     return () => {
-      clearTimeout(timeoutId);
+      clearTimeout(timeoutId1);
+      clearTimeout(timeoutId2);
       observer.disconnect();
     };
   }, [pdfDoc, pagesData, scale, renderPDFPage, initializeFabricCanvas]);
