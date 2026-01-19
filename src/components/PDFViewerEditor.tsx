@@ -62,8 +62,11 @@ interface AnnotationData {
   fontFamily?: string;
   // Radius as percentage of page width
   radiusPct?: number;
-  // Path data - stored in normalized local coordinates (relative to path bounding box at scale 1)
+  // Path data - stored in normalized coordinates (percentages of page size)
   path?: any;
+  // Fabric Path internal offset (persisted to prevent drift at non-integer zoom levels)
+  pathOffsetXPct?: number;
+  pathOffsetYPct?: number;
   scaleX?: number;
   scaleY?: number;
   angle?: number;
@@ -470,23 +473,30 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     try {
       const page = await pdfDoc.getPage(pageNum);
       
+      const pageData = pagesData.find(p => p.pageNum === pageNum);
+      if (!pageData) return;
+
+      // Use integer CSS pixel sizes so the PDF canvas and Fabric overlay share the exact same
+      // coordinate space, even at arbitrary (non-0.25-step) zoom values.
+      const displayWidth = Math.max(1, Math.round(pageData.width * scale));
+      const displayHeight = Math.max(1, Math.round(pageData.height * scale));
+
       // Use device pixel ratio for sharper rendering on retina displays
       const devicePixelRatio = window.devicePixelRatio || 1;
       const renderScale = scale * devicePixelRatio;
-      
+
       // Don't force rotation - let PDF.js use the page's native rotation from the PDF
       const viewport = page.getViewport({ scale: renderScale });
-      const displayViewport = page.getViewport({ scale });
       const context = pdfCanvas.getContext('2d');
       if (!context) return;
 
-      // Set canvas dimensions for high DPI rendering
-      pdfCanvas.width = viewport.width;
-      pdfCanvas.height = viewport.height;
-      
-      // Scale canvas back down with CSS for sharp display
-      pdfCanvas.style.width = `${displayViewport.width}px`;
-      pdfCanvas.style.height = `${displayViewport.height}px`;
+      // Set canvas dimensions for high DPI rendering (integer backing store)
+      pdfCanvas.width = Math.max(1, Math.round(viewport.width));
+      pdfCanvas.height = Math.max(1, Math.round(viewport.height));
+
+      // Scale canvas down with CSS to match the overlay EXACTLY
+      pdfCanvas.style.width = `${displayWidth}px`;
+      pdfCanvas.style.height = `${displayHeight}px`;
       
       // Enable high-quality image smoothing
       context.imageSmoothingEnabled = true;
@@ -513,7 +523,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       }
       console.error(`Error rendering page ${pageNum}:`, error);
     }
-  }, [pdfDoc, scale]);
+  }, [pdfDoc, scale, pagesData]);
 
   // Initialize Fabric canvas for a page
   const initializeFabricCanvas = useCallback((pageNum: number) => {
@@ -526,10 +536,17 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       existing.dispose();
     }
 
-    const viewport = { width: pageData.width * scale, height: pageData.height * scale };
-    
+    // Use integer CSS pixel sizes to avoid sub-pixel mismatch with the PDF canvas
+    const viewport = {
+      width: Math.max(1, Math.round(pageData.width * scale)),
+      height: Math.max(1, Math.round(pageData.height * scale)),
+    };
+
+    // IMPORTANT: canvas.width/height are integer backing-store sizes; passing floats will be coerced
     overlayCanvas.width = viewport.width;
     overlayCanvas.height = viewport.height;
+    overlayCanvas.style.width = `${viewport.width}px`;
+    overlayCanvas.style.height = `${viewport.height}px`;
 
     const fabricCanvas = new FabricCanvas(overlayCanvas, {
       width: viewport.width,
@@ -965,6 +982,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           return newCmd;
         });
 
+        const pathOffset = (pathObj as any).pathOffset as Point | undefined;
+        const pathOffsetX = typeof pathOffset?.x === 'number' ? pathOffset.x * objScaleX : undefined;
+        const pathOffsetY = typeof pathOffset?.y === 'number' ? pathOffset.y * objScaleY : undefined;
+
         return {
           type: 'path',
           // Store position as percentage of page
@@ -976,6 +997,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           strokeWidthPct: obj.strokeWidth ? obj.strokeWidth / canvasWidth : undefined,
           // Path data is now normalized to percentages
           path: normalizedPath,
+          // Persist pathOffset to prevent drift at arbitrary zoom levels
+          pathOffsetXPct: pathOffsetX != null ? pathOffsetX / canvasWidth : undefined,
+          pathOffsetYPct: pathOffsetY != null ? pathOffsetY / canvasHeight : undefined,
           // Scale factors are baked into the path, so store as 1
           scaleX: 1,
           scaleY: 1,
@@ -1133,7 +1157,15 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               scaleX: 1,
               scaleY: 1,
             });
-            
+
+            // Restore Fabric's internal offset if available (prevents drift at non-integer zoom)
+            if (typeof annotation.pathOffsetXPct === 'number' && typeof annotation.pathOffsetYPct === 'number') {
+              (path as any).pathOffset = new Point(
+                annotation.pathOffsetXPct * canvasWidth,
+                annotation.pathOffsetYPct * canvasHeight,
+              );
+            }
+
             path.setCoords();
             obj = path;
           }
@@ -1683,6 +1715,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     return 'pan-x pan-y';
   };
 
+  const firstPageWidthPx = Math.max(1, Math.round((pagesData[0]?.width || 600) * scale));
+
   return (
     <div className={`flex flex-col bg-background ${fullscreen ? 'h-full' : 'min-h-[70vh] h-[80vh]'}`} ref={containerRef}>
       {/* Header Toolbar */}
@@ -1921,71 +1955,78 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           className="flex flex-col items-center gap-4" 
           style={{ 
             minWidth: 'fit-content',
-            padding: '0 max(16px, calc((100% - ' + (pagesData[0]?.width || 600) * scale + 'px) / 2))',
+            padding: `0 max(16px, calc((100% - ${firstPageWidthPx}px) / 2))`,
           }}
         >
-          {pagesData.map((pageData) => (
-            <div
-              key={pageData.pageNum}
-              ref={(el) => {
-                if (el) pageRefs.current.set(pageData.pageNum, el);
-              }}
-              data-page={pageData.pageNum}
-              className="relative shadow-lg bg-white overflow-hidden flex-shrink-0"
-              style={{ 
-                width: pageData.width * scale, 
-                height: pageData.height * scale,
-                touchAction: 'none', // Let our handler manage touches on pages
-              }}
-            >
-              {/* PDF canvas */}
-              <canvas
-                ref={(el) => {
-                  if (el) pdfCanvasRefs.current.set(pageData.pageNum, el);
-                }}
-                width={pageData.width * scale}
-                height={pageData.height * scale}
-                className="absolute top-0 left-0 block"
-                style={{ display: 'block', width: pageData.width * scale, height: pageData.height * scale }}
-              />
+          {pagesData.map((pageData) => {
+            const pageWidth = Math.max(1, Math.round(pageData.width * scale));
+            const pageHeight = Math.max(1, Math.round(pageData.height * scale));
 
-              {/* Fabric overlay for annotations */}
+            return (
               <div
-                className="absolute top-0 left-0"
-                style={{
-                  width: pageData.width * scale,
-                  height: pageData.height * scale,
-                  pointerEvents: isEditMode ? 'auto' : 'none',
-                  zIndex: 10,
-                  touchAction: 'none',
+                key={pageData.pageNum}
+                ref={(el) => {
+                  if (el) pageRefs.current.set(pageData.pageNum, el);
+                }}
+                data-page={pageData.pageNum}
+                className="relative shadow-lg bg-white overflow-hidden flex-shrink-0"
+                style={{ 
+                  width: pageWidth,
+                  height: pageHeight,
+                  touchAction: 'none', // Let our handler manage touches on pages
                 }}
               >
+                {/* PDF canvas */}
                 <canvas
                   ref={(el) => {
-                    if (el) overlayCanvasRefs.current.set(pageData.pageNum, el);
+                    if (el) pdfCanvasRefs.current.set(pageData.pageNum, el);
                   }}
-                  className="block"
-                  style={{
-                    display: 'block',
-                    cursor: activeTool === 'cursor' 
-                      ? 'grab' 
-                      : isEditMode && activeTool === 'draw' 
-                      ? 'crosshair' 
-                      : isEditMode && activeTool === 'text' 
-                      ? 'text' 
-                      : 'default',
-                    touchAction: 'none',
-                    pointerEvents: 'auto',
-                  }}
+                  width={pageWidth}
+                  height={pageHeight}
+                  className="absolute top-0 left-0 block"
+                  style={{ display: 'block', width: pageWidth, height: pageHeight }}
                 />
+
+                {/* Fabric overlay for annotations */}
+                <div
+                  className="absolute top-0 left-0"
+                  style={{
+                    width: pageWidth,
+                    height: pageHeight,
+                    pointerEvents: isEditMode ? 'auto' : 'none',
+                    zIndex: 10,
+                    touchAction: 'none',
+                  }}
+                >
+                  <canvas
+                    ref={(el) => {
+                      if (el) overlayCanvasRefs.current.set(pageData.pageNum, el);
+                    }}
+                    className="block"
+                    style={{
+                      display: 'block',
+                      width: pageWidth,
+                      height: pageHeight,
+                      cursor: activeTool === 'cursor' 
+                        ? 'grab' 
+                        : isEditMode && activeTool === 'draw' 
+                        ? 'crosshair' 
+                        : isEditMode && activeTool === 'text' 
+                        ? 'text' 
+                        : 'default',
+                      touchAction: 'none',
+                      pointerEvents: 'auto',
+                    }}
+                  />
+                </div>
+                
+                {/* Page number indicator */}
+                <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded pointer-events-none">
+                  {pageData.pageNum}
+                </div>
               </div>
-              
-              {/* Page number indicator */}
-              <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded pointer-events-none">
-                {pageData.pageNum}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
