@@ -142,6 +142,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasUnsavedChanges = useRef(false);
   
+  // Debounce scale changes to prevent race conditions when zooming fast
+  const scaleChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingScaleRef = useRef<number | null>(null);
+  
   // Flag to prevent saving state during undo/redo operations
   const isRestoringHistoryRef = useRef(false);
   
@@ -825,33 +829,55 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     };
   }, [pdfDoc, pagesData, scale, renderPDFPage, initializeFabricCanvas]);
 
-  // Re-render pages when scale changes - save annotations first
+  // Re-render pages when scale changes - debounced to handle fast zooming
   useEffect(() => {
     if (!pdfDoc) return;
 
-    // Save annotations before changing scale
-    // Since we now store as percentages, this works at any scale
-    fabricCanvasRefs.current.forEach((_, pageNum) => {
-      saveCurrentPageAnnotations(pageNum);
-    });
-
-    // Cancel all active render tasks before clearing
-    renderTasksRef.current.forEach((task) => {
-      try {
-        task.cancel();
-      } catch (e) {
-        // Ignore cancel errors
-      }
-    });
-    renderTasksRef.current.clear();
-
-    // Dispose all fabric canvases
-    fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
-    // CRITICAL: Clear the map so canvases get reinitialized after scale change
-    fabricCanvasRefs.current.clear();
+    // Clear any pending scale change
+    if (scaleChangeTimeoutRef.current) {
+      clearTimeout(scaleChangeTimeoutRef.current);
+    }
     
-    // Clear rendered pages to trigger re-render
-    setRenderedPages(new Set());
+    // Store the pending scale
+    pendingScaleRef.current = scale;
+    
+    // Debounce the actual re-render to prevent race conditions when zooming fast
+    scaleChangeTimeoutRef.current = setTimeout(() => {
+      // Only proceed if this is still the latest scale value
+      if (pendingScaleRef.current !== scale) return;
+      
+      // Save annotations before changing scale
+      // Since we now store as percentages, this works at any scale
+      fabricCanvasRefs.current.forEach((_, pageNum) => {
+        saveCurrentPageAnnotations(pageNum);
+      });
+
+      // Cancel all active render tasks before clearing
+      renderTasksRef.current.forEach((task) => {
+        try {
+          task.cancel();
+        } catch (e) {
+          // Ignore cancel errors
+        }
+      });
+      renderTasksRef.current.clear();
+
+      // Dispose all fabric canvases
+      fabricCanvasRefs.current.forEach(canvas => canvas.dispose());
+      // CRITICAL: Clear the map so canvases get reinitialized after scale change
+      fabricCanvasRefs.current.clear();
+      
+      // Clear rendered pages to trigger re-render
+      setRenderedPages(new Set());
+      
+      pendingScaleRef.current = null;
+    }, 150); // 150ms debounce - fast enough to feel responsive, slow enough to batch rapid changes
+
+    return () => {
+      if (scaleChangeTimeoutRef.current) {
+        clearTimeout(scaleChangeTimeoutRef.current);
+      }
+    };
   }, [scale, pdfDoc]);
 
   // Recalculate Fabric canvas offsets on scroll (fixes drawing coordinates when scrolled)
