@@ -11,6 +11,8 @@ interface TouchHandlerConfig {
   onPenDrawStart?: (pageNum: number) => void;
   onPenDrawEnd?: () => void;
   getPageAtPoint?: (x: number, y: number) => number | null;
+  onZoomStart?: () => void;
+  onZoomEnd?: () => void;
 }
 
 interface TouchState {
@@ -44,6 +46,8 @@ export function usePDFTouchHandler(config: TouchHandlerConfig) {
     onPenDrawStart,
     onPenDrawEnd,
     getPageAtPoint,
+    onZoomStart,
+    onZoomEnd,
   } = config;
 
   const stateRef = useRef<TouchState>({
@@ -69,6 +73,8 @@ export function usePDFTouchHandler(config: TouchHandlerConfig) {
   const zoomAnimationRef = useRef<number | null>(null);
   const targetScaleRef = useRef<number>(scale);
   const activeTouchesRef = useRef<Map<number, PointerEvent>>(new Map());
+  const zoomEndTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isZoomingRef = useRef(false);
 
   // Calculate distance between two touch points
   const getDistance = useCallback((p1: { x: number; y: number }, p2: { x: number; y: number }) => {
@@ -164,6 +170,17 @@ export function usePDFTouchHandler(config: TouchHandlerConfig) {
       const center = getCenter(p1, p2);
       state.pinchCenterX = center.x;
       state.pinchCenterY = center.y;
+      
+      // Notify zoom start
+      if (!isZoomingRef.current) {
+        isZoomingRef.current = true;
+        onZoomStart?.();
+      }
+      // Clear any pending zoom end
+      if (zoomEndTimeoutRef.current) {
+        clearTimeout(zoomEndTimeoutRef.current);
+        zoomEndTimeoutRef.current = null;
+      }
       
       return;
     }
@@ -315,6 +332,18 @@ export function usePDFTouchHandler(config: TouchHandlerConfig) {
     if (state.isPinching) {
       if (activeTouchesRef.current.size < 2) {
         state.isPinching = false;
+        
+        // Schedule zoom end callback after a short delay to allow for gesture completion
+        if (zoomEndTimeoutRef.current) {
+          clearTimeout(zoomEndTimeoutRef.current);
+        }
+        zoomEndTimeoutRef.current = setTimeout(() => {
+          if (isZoomingRef.current) {
+            isZoomingRef.current = false;
+            onZoomEnd?.();
+          }
+          zoomEndTimeoutRef.current = null;
+        }, 200); // 200ms after last finger lifts
       }
       return;
     }
@@ -382,6 +411,9 @@ export function usePDFTouchHandler(config: TouchHandlerConfig) {
       container.removeEventListener('pointerleave', handlePointerCancel, options);
       container.removeEventListener('touchmove', preventTouchDefault);
       stopMomentum();
+      if (zoomEndTimeoutRef.current) {
+        clearTimeout(zoomEndTimeoutRef.current);
+      }
     };
   }, [containerRef, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, stopMomentum]);
 
