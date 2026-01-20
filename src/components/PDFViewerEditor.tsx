@@ -97,12 +97,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1.0);
   
-  // Visual scale for smooth CSS transforms during zoom (updates immediately)
-  // Render scale for actual canvas re-rendering (updates after zoom settles)
-  const [visualScale, setVisualScale] = useState(1.0);
-  const [renderScale, setRenderScale] = useState(1.0);
-  const isZoomingRef = useRef(false);
-  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -273,23 +267,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
   }, []);
 
-  // Handle zoom start - apply visual transform immediately
-  const handleZoomStart = useCallback(() => {
-    isZoomingRef.current = true;
-  }, []);
-
-  // Handle zoom end - trigger actual re-render
-  const handleZoomEnd = useCallback(() => {
-    isZoomingRef.current = false;
-    // Update render scale to trigger actual canvas re-render
-    setRenderScale(scale);
-  }, [scale]);
-
-  // Keep visual scale in sync with scale during zoom
-  useEffect(() => {
-    setVisualScale(scale);
-  }, [scale]);
-
   // Initialize touch handler
   usePDFTouchHandler({
     containerRef: canvasContainerRef,
@@ -302,8 +279,6 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     onPenDrawStart: handlePenDrawStart,
     onPenDrawEnd: handlePenDrawEnd,
     getPageAtPoint,
-    onZoomStart: handleZoomStart,
-    onZoomEnd: handleZoomEnd,
   });
 
   // Load PDF.js
@@ -507,16 +482,15 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
       // Use integer CSS pixel sizes so the PDF canvas and Fabric overlay share the exact same
       // coordinate space, even at arbitrary (non-0.25-step) zoom values.
-      // Use renderScale (not scale) to match the canvas dimensions we're actually rendering at
-      const displayWidth = Math.max(1, Math.round(pageData.width * renderScale));
-      const displayHeight = Math.max(1, Math.round(pageData.height * renderScale));
+      const displayWidth = Math.max(1, Math.round(pageData.width * scale));
+      const displayHeight = Math.max(1, Math.round(pageData.height * scale));
 
       // Use device pixel ratio for sharper rendering on retina displays
       const devicePixelRatio = window.devicePixelRatio || 1;
-      const pdfRenderScale = renderScale * devicePixelRatio;
+      const renderScale = scale * devicePixelRatio;
 
       // Don't force rotation - let PDF.js use the page's native rotation from the PDF
-      const viewport = page.getViewport({ scale: pdfRenderScale });
+      const viewport = page.getViewport({ scale: renderScale });
       const context = pdfCanvas.getContext('2d');
       if (!context) return;
 
@@ -553,7 +527,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       }
       console.error(`Error rendering page ${pageNum}:`, error);
     }
-  }, [pdfDoc, renderScale, pagesData]);
+  }, [pdfDoc, scale, pagesData]);
 
   // Initialize Fabric canvas for a page
   const initializeFabricCanvas = useCallback((pageNum: number) => {
@@ -567,10 +541,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
 
     // Use integer CSS pixel sizes to avoid sub-pixel mismatch with the PDF canvas
-    // Use renderScale (not scale) to match actual canvas resolution
     const viewport = {
-      width: Math.max(1, Math.round(pageData.width * renderScale)),
-      height: Math.max(1, Math.round(pageData.height * renderScale)),
+      width: Math.max(1, Math.round(pageData.width * scale)),
+      height: Math.max(1, Math.round(pageData.height * scale)),
     };
 
     // IMPORTANT: canvas.width/height are integer backing-store sizes; passing floats will be coerced
@@ -761,7 +734,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
     
     fabricCanvas.requestRenderAll();
-  }, [pagesData, renderScale]);
+  }, [pagesData, scale]);
 
   // Track rendered pages with a ref to avoid re-creating observer
   const renderedPagesRef = useRef<Set<number>>(new Set());
@@ -856,12 +829,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     };
   }, [pdfDoc, pagesData, scale, renderPDFPage, initializeFabricCanvas]);
 
-  // Re-render pages when renderScale changes (not during active zoom for smoothness)
+  // Re-render pages when scale changes - debounced to handle fast zooming
   useEffect(() => {
     if (!pdfDoc) return;
-    
-    // Skip if we're actively zooming - CSS transforms handle visual during zoom
-    if (isZoomingRef.current) return;
 
     // Clear any pending scale change
     if (scaleChangeTimeoutRef.current) {
@@ -869,15 +839,15 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
     
     // Store the pending scale
-    pendingScaleRef.current = renderScale;
+    pendingScaleRef.current = scale;
     
-    // Debounce the actual re-render to allow zoom to fully settle
+    // Debounce the actual re-render to prevent race conditions when zooming fast
     scaleChangeTimeoutRef.current = setTimeout(() => {
-      // Only proceed if this is still the latest render scale value
-      if (pendingScaleRef.current !== renderScale) return;
+      // Only proceed if this is still the latest scale value
+      if (pendingScaleRef.current !== scale) return;
       
       // Save annotations before changing scale
-      // Using base page dimensions for normalization ensures stability
+      // Since we now store as percentages, this works at any scale
       fabricCanvasRefs.current.forEach((_, pageNum) => {
         saveCurrentPageAnnotations(pageNum);
       });
@@ -900,33 +870,15 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       // Clear rendered pages to trigger re-render
       setRenderedPages(new Set());
       
-      // Sync visual scale with render scale
-      setVisualScale(renderScale);
-      
       pendingScaleRef.current = null;
-    }, 200); // 200ms debounce - allow zoom to fully settle
+    }, 150); // 150ms debounce - fast enough to feel responsive, slow enough to batch rapid changes
 
     return () => {
       if (scaleChangeTimeoutRef.current) {
         clearTimeout(scaleChangeTimeoutRef.current);
       }
     };
-  }, [renderScale, pdfDoc]);
-
-  // Update renderScale when scale changes (but not during active zoom)
-  useEffect(() => {
-    // During active zoom, don't update renderScale - let onZoomEnd handle it
-    if (isZoomingRef.current) return;
-    
-    // When not actively zooming (e.g., button zoom), update renderScale after debounce
-    const timeoutId = setTimeout(() => {
-      if (!isZoomingRef.current) {
-        setRenderScale(scale);
-      }
-    }, 200);
-    
-    return () => clearTimeout(timeoutId);
-  }, [scale]);
+  }, [scale, pdfDoc]);
 
   // Recalculate Fabric canvas offsets on scroll (fixes drawing coordinates when scrolled)
   useEffect(() => {
@@ -1007,8 +959,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
   };
 
-  // Save annotations as percentages of BASE page dimensions (scale=1.0)
-  // This ensures stability regardless of current zoom level
+  // Save annotations as percentages of page dimensions (scale-independent)
   const saveCurrentPageAnnotations = (pageNum: number) => {
     const canvas = fabricCanvasRefs.current.get(pageNum);
     const pageData = pagesData.find(p => p.pageNum === pageNum);
@@ -1016,18 +967,11 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     
     const objects = canvas.getObjects();
     
-    // CRITICAL: Use BASE page dimensions (scale=1.0) for normalization
-    // This makes percentages independent of current zoom level
-    const baseWidth = pageData.width;
-    const baseHeight = pageData.height;
-    
-    // Get the ACTUAL current canvas dimensions to calculate effective scale
+    // CRITICAL: Use actual canvas dimensions, not computed from scale
+    // During scale changes, the scale state may have updated but the canvas still has old dimensions
+    // Using canvas.getWidth/getHeight ensures we normalize against the ACTUAL current size
     const canvasWidth = canvas.getWidth();
     const canvasHeight = canvas.getHeight();
-    
-    // Calculate the effective scale of the current canvas relative to base
-    const effectiveScaleX = canvasWidth / baseWidth;
-    const effectiveScaleY = canvasHeight / baseHeight;
     
     const annotations: AnnotationData[] = objects.map(obj => {
       const objScaleX = obj.scaleX || 1;
@@ -1036,10 +980,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       if (obj.type === 'path') {
         const pathObj = obj as Path;
         // Clone and NORMALIZE the path data
-        // Path coordinates are in local space, we need to normalize them to percentages of BASE dimensions
+        // Path coordinates are in local space, we need to normalize them to percentages
         const rawPath = JSON.parse(JSON.stringify(pathObj.path));
         
-        // Normalize path coordinates: divide by base size to get percentages
+        // Normalize path coordinates: divide by canvas size to get percentages
         // Path commands: M, L, Q, C, etc. have coordinates at specific indices
         const normalizedPath = rawPath.map((cmd: any[]) => {
           const cmdType = cmd[0];
@@ -1051,11 +995,11 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               // Even indices (1, 3, 5...) are X coordinates, odd indices (2, 4, 6...) are Y coordinates
               // In path array: index 1, 3, 5... are X; index 2, 4, 6... are Y
               if ((i % 2) === 1) {
-                // X coordinate - normalize to base width, accounting for effective scale and object scale
-                newCmd.push((cmd[i] * objScaleX * effectiveScaleX) / canvasWidth);
+                // X coordinate - normalize by canvas width, accounting for object scale
+                newCmd.push((cmd[i] * objScaleX) / canvasWidth);
               } else {
-                // Y coordinate - normalize to base height, accounting for effective scale and object scale
-                newCmd.push((cmd[i] * objScaleY * effectiveScaleY) / canvasHeight);
+                // Y coordinate - normalize by canvas height, accounting for object scale
+                newCmd.push((cmd[i] * objScaleY) / canvasHeight);
               }
             } else {
               newCmd.push(cmd[i]);
@@ -1070,18 +1014,18 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
         return {
           type: 'path',
-          // Store position as percentage of BASE page dimensions
-          leftPct: ((obj.left || 0) / canvasWidth) * effectiveScaleX,
-          topPct: ((obj.top || 0) / canvasHeight) * effectiveScaleY,
+          // Store position as percentage of page
+          leftPct: (obj.left || 0) / canvasWidth,
+          topPct: (obj.top || 0) / canvasHeight,
           fill: obj.fill as string,
           stroke: obj.stroke as string,
-          // Store stroke width as percentage of BASE page width
-          strokeWidthPct: obj.strokeWidth ? (obj.strokeWidth / canvasWidth) * effectiveScaleX : undefined,
-          // Path data is now normalized to percentages of BASE dimensions
+          // Store stroke width as percentage of page width
+          strokeWidthPct: obj.strokeWidth ? obj.strokeWidth / canvasWidth : undefined,
+          // Path data is now normalized to percentages
           path: normalizedPath,
-          // Persist pathOffset normalized to BASE dimensions
-          pathOffsetXPct: pathOffsetX != null ? (pathOffsetX / canvasWidth) * effectiveScaleX : undefined,
-          pathOffsetYPct: pathOffsetY != null ? (pathOffsetY / canvasHeight) * effectiveScaleY : undefined,
+          // Persist pathOffset to prevent drift at arbitrary zoom levels
+          pathOffsetXPct: pathOffsetX != null ? pathOffsetX / canvasWidth : undefined,
+          pathOffsetYPct: pathOffsetY != null ? pathOffsetY / canvasHeight : undefined,
           // Scale factors are baked into the path, so store as 1
           scaleX: 1,
           scaleY: 1,
@@ -1093,12 +1037,12 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         const circleObj = obj as FabricCircle;
         return {
           type: 'circle',
-          leftPct: ((obj.left || 0) / canvasWidth) * effectiveScaleX,
-          topPct: ((obj.top || 0) / canvasHeight) * effectiveScaleY,
-          radiusPct: (((circleObj.radius || 0) * objScaleX) / canvasWidth) * effectiveScaleX,
+          leftPct: (obj.left || 0) / canvasWidth,
+          topPct: (obj.top || 0) / canvasHeight,
+          radiusPct: ((circleObj.radius || 0) * objScaleX) / canvasWidth,
           fill: obj.fill as string,
           stroke: obj.stroke as string,
-          strokeWidthPct: obj.strokeWidth ? (obj.strokeWidth / canvasWidth) * effectiveScaleX : undefined,
+          strokeWidthPct: obj.strokeWidth ? obj.strokeWidth / canvasWidth : undefined,
           scaleX: 1,
           scaleY: 1,
           angle: obj.angle,
@@ -1109,13 +1053,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         const textObj = obj as Textbox;
         return {
           type: 'textbox',
-          leftPct: ((obj.left || 0) / canvasWidth) * effectiveScaleX,
-          topPct: ((obj.top || 0) / canvasHeight) * effectiveScaleY,
-          widthPct: (((textObj.width || 0) * objScaleX) / canvasWidth) * effectiveScaleX,
-          heightPct: (((textObj.height || 0) * objScaleY) / canvasHeight) * effectiveScaleY,
+          leftPct: (obj.left || 0) / canvasWidth,
+          topPct: (obj.top || 0) / canvasHeight,
+          widthPct: ((textObj.width || 0) * objScaleX) / canvasWidth,
+          heightPct: ((textObj.height || 0) * objScaleY) / canvasHeight,
           fill: obj.fill as string,
           text: textObj.text,
-          fontSizePct: (((textObj.fontSize || 18) * objScaleY) / canvasHeight) * effectiveScaleY,
+          fontSizePct: ((textObj.fontSize || 18) * objScaleY) / canvasHeight,
           fontFamily: textObj.fontFamily,
           scaleX: 1,
           scaleY: 1,
@@ -1126,13 +1070,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       // Default: rect and others
       return {
         type: obj.type || 'unknown',
-        leftPct: ((obj.left || 0) / canvasWidth) * effectiveScaleX,
-        topPct: ((obj.top || 0) / canvasHeight) * effectiveScaleY,
-        widthPct: (obj as any).width ? ((((obj as any).width * objScaleX) / canvasWidth) * effectiveScaleX) : undefined,
-        heightPct: (obj as any).height ? ((((obj as any).height * objScaleY) / canvasHeight) * effectiveScaleY) : undefined,
+        leftPct: (obj.left || 0) / canvasWidth,
+        topPct: (obj.top || 0) / canvasHeight,
+        widthPct: (obj as any).width ? (((obj as any).width * objScaleX) / canvasWidth) : undefined,
+        heightPct: (obj as any).height ? (((obj as any).height * objScaleY) / canvasHeight) : undefined,
         fill: obj.fill as string,
         stroke: obj.stroke as string,
-        strokeWidthPct: obj.strokeWidth ? (obj.strokeWidth / canvasWidth) * effectiveScaleX : undefined,
+        strokeWidthPct: obj.strokeWidth ? obj.strokeWidth / canvasWidth : undefined,
         scaleX: 1,
         scaleY: 1,
         angle: obj.angle,
@@ -2041,16 +1985,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           }}
         >
           {pagesData.map((pageData) => {
-            // Rendered dimensions (at renderScale) - actual canvas resolution
-            const renderedWidth = Math.max(1, Math.round(pageData.width * renderScale));
-            const renderedHeight = Math.max(1, Math.round(pageData.height * renderScale));
-            
-            // Visual dimensions (at visualScale) - CSS display size
-            const displayWidth = Math.max(1, Math.round(pageData.width * visualScale));
-            const displayHeight = Math.max(1, Math.round(pageData.height * visualScale));
-            
-            // CSS transform ratio for smooth zoom during active gesture
-            const transformRatio = visualScale / renderScale;
+            const pageWidth = Math.max(1, Math.round(pageData.width * scale));
+            const pageHeight = Math.max(1, Math.round(pageData.height * scale));
 
             return (
               <div
@@ -2061,64 +1997,53 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 data-page={pageData.pageNum}
                 className="relative shadow-lg bg-white overflow-hidden flex-shrink-0"
                 style={{ 
-                  width: displayWidth,
-                  height: displayHeight,
+                  width: pageWidth,
+                  height: pageHeight,
                   touchAction: 'none', // Let our handler manage touches on pages
                 }}
               >
-                {/* Inner container for CSS transform-based zoom */}
+                {/* PDF canvas */}
+                <canvas
+                  ref={(el) => {
+                    if (el) pdfCanvasRefs.current.set(pageData.pageNum, el);
+                  }}
+                  width={pageWidth}
+                  height={pageHeight}
+                  className="absolute top-0 left-0 block"
+                  style={{ display: 'block', width: pageWidth, height: pageHeight }}
+                />
+
+                {/* Fabric overlay for annotations */}
                 <div
+                  className="absolute top-0 left-0"
                   style={{
-                    width: renderedWidth,
-                    height: renderedHeight,
-                    transform: `scale(${transformRatio})`,
-                    transformOrigin: 'top left',
-                    willChange: isZoomingRef.current ? 'transform' : 'auto',
+                    width: pageWidth,
+                    height: pageHeight,
+                    pointerEvents: isEditMode ? 'auto' : 'none',
+                    zIndex: 10,
+                    touchAction: 'none',
                   }}
                 >
-                  {/* PDF canvas */}
                   <canvas
                     ref={(el) => {
-                      if (el) pdfCanvasRefs.current.set(pageData.pageNum, el);
+                      if (el) overlayCanvasRefs.current.set(pageData.pageNum, el);
                     }}
-                    width={renderedWidth}
-                    height={renderedHeight}
-                    className="absolute top-0 left-0 block"
-                    style={{ display: 'block', width: renderedWidth, height: renderedHeight }}
-                  />
-
-                  {/* Fabric overlay for annotations */}
-                  <div
-                    className="absolute top-0 left-0"
+                    className="block"
                     style={{
-                      width: renderedWidth,
-                      height: renderedHeight,
-                      pointerEvents: isEditMode ? 'auto' : 'none',
-                      zIndex: 10,
+                      display: 'block',
+                      width: pageWidth,
+                      height: pageHeight,
+                      cursor: activeTool === 'cursor' 
+                        ? 'grab' 
+                        : isEditMode && activeTool === 'draw' 
+                        ? 'crosshair' 
+                        : isEditMode && activeTool === 'text' 
+                        ? 'text' 
+                        : 'default',
                       touchAction: 'none',
+                      pointerEvents: 'auto',
                     }}
-                  >
-                    <canvas
-                      ref={(el) => {
-                        if (el) overlayCanvasRefs.current.set(pageData.pageNum, el);
-                      }}
-                      className="block"
-                      style={{
-                        display: 'block',
-                        width: renderedWidth,
-                        height: renderedHeight,
-                        cursor: activeTool === 'cursor' 
-                          ? 'grab' 
-                          : isEditMode && activeTool === 'draw' 
-                          ? 'crosshair' 
-                          : isEditMode && activeTool === 'text' 
-                          ? 'text' 
-                          : 'default',
-                        touchAction: 'none',
-                        pointerEvents: 'auto',
-                      }}
-                    />
-                  </div>
+                  />
                 </div>
                 
                 {/* Page number indicator */}
