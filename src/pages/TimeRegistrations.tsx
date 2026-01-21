@@ -25,6 +25,7 @@ import { ManualTimeRegistrationDialog } from '@/components/ManualTimeRegistratio
 import { EditTimeRegistrationDialog } from '@/components/EditTimeRegistrationDialog';
 import { workingHoursService, WorkingHours } from '@/services/workingHoursService';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { standardTasksService, StandardTask } from '@/services/standardTasksService';
 
 const TimeRegistrations = () => {
   const { currentEmployee } = useAuth();
@@ -71,6 +72,11 @@ const TimeRegistrations = () => {
     queryFn: () => workingHoursService.getWorkingHours(),
   });
 
+  const { data: allStandardTasks = [] } = useQuery<StandardTask[]>({
+    queryKey: ['allStandardTasks'],
+    queryFn: () => standardTasksService.getAll(),
+  });
+
   const isFilterActive = React.useMemo(() => (
     (canViewAllRegistrations && selectedEmployee !== 'all') ||
     dateFilter.startDate !== '' ||
@@ -112,10 +118,11 @@ const TimeRegistrations = () => {
       );
     }
 
-    // Task filter
+    // Task filter (by standard task)
     if (taskFilter !== 'all') {
       filtered = filtered.filter((reg: any) => 
-        reg.task_id === taskFilter || reg.workstation_task_id === taskFilter
+        reg.tasks?.standard_task_id === taskFilter || 
+        reg.workstation_tasks?.standard_task_id === taskFilter
       );
     }
 
@@ -168,22 +175,11 @@ const TimeRegistrations = () => {
     return Array.from(projects.values());
   };
 
-  const getUniqueTasks = (registrations: any[]) => {
-    const tasks = new Map<string, { id: string; name: string }>();
-    registrations.forEach((reg: any) => {
-      if (reg.task_id && reg.tasks?.title) {
-        tasks.set(reg.task_id, {
-          id: reg.task_id,
-          name: reg.tasks.title,
-        });
-      } else if (reg.workstation_task_id && reg.workstation_tasks?.task_name) {
-        tasks.set(reg.workstation_task_id, {
-          id: reg.workstation_task_id,
-          name: reg.workstation_tasks.task_name,
-        });
-      }
-    });
-    return Array.from(tasks.values());
+  const getUniqueStandardTasks = () => {
+    return allStandardTasks.map(task => ({
+      id: task.id,
+      name: task.task_name,
+    }));
   };
 
   const { totalFilteredMinutes, totalCost } = filteredRegistrations.reduce(
@@ -938,7 +934,7 @@ const TimeRegistrations = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t("all_tasks")}</SelectItem>
-                      {getUniqueTasks(myRegistrations).map((task: any) => (
+                      {getUniqueStandardTasks().map((task: any) => (
                         <SelectItem key={task.id} value={task.id}>
                           {task.name}
                         </SelectItem>
@@ -1210,7 +1206,7 @@ const TimeRegistrations = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t("all_tasks")}</SelectItem>
-                      {getUniqueTasks(allRegistrations).map((task: any) => (
+                      {getUniqueStandardTasks().map((task: any) => (
                         <SelectItem key={task.id} value={task.id}>
                           {task.name}
                         </SelectItem>
