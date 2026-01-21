@@ -104,6 +104,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   const [pagesData, setPagesData] = useState<PageData[]>([]);
   const [currentVisiblePage, setCurrentVisiblePage] = useState(1);
   const [renderedPages, setRenderedPages] = useState<Set<number>>(new Set());
+
+  // Keep the latest visible page available inside debounced callbacks (e.g. scale changes)
+  const currentVisiblePageRef = useRef(1);
   
   // Canvas refs - one per page
   const containerRef = useRef<HTMLDivElement>(null);
@@ -746,6 +749,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     renderedPagesRef.current = renderedPages;
   }, [renderedPages]);
 
+  useEffect(() => {
+    currentVisiblePageRef.current = currentVisiblePage;
+  }, [currentVisiblePage]);
+
   // Render first page immediately when PDF is loaded
   useEffect(() => {
     if (!pdfDoc || pagesData.length === 0) return;
@@ -875,6 +882,30 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       
       // Clear rendered pages to trigger re-render
       setRenderedPages(new Set());
+
+      // Force-render the currently visible page (and neighbors).
+      // Reason: after we clear renderedPages/canvases, the IntersectionObserver may not re-fire
+      // for elements that are already intersecting, leaving the page blank until the user scrolls.
+      const visible = currentVisiblePageRef.current;
+      const maxPage = pagesData.length || totalPages || 1;
+      const pagesToRender = [visible - 1, visible, visible + 1].filter(
+        (p) => p >= 1 && p <= maxPage
+      );
+
+      pagesToRender.forEach((pageNum) => {
+        renderPDFPage(pageNum);
+      });
+
+      // Initialize Fabric overlays with a small retry to survive ref timing during fast zoom
+      const initOverlays = () => {
+        pagesToRender.forEach((pageNum) => {
+          if (!fabricCanvasRefs.current.has(pageNum)) {
+            initializeFabricCanvas(pageNum);
+          }
+        });
+      };
+      setTimeout(initOverlays, 60);
+      setTimeout(initOverlays, 220);
       
       pendingScaleRef.current = null;
       
@@ -889,7 +920,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         clearTimeout(scaleChangeTimeoutRef.current);
       }
     };
-  }, [scale, pdfDoc]);
+  }, [scale, pdfDoc, pagesData, totalPages, renderPDFPage, initializeFabricCanvas]);
 
   // Recalculate Fabric canvas offsets on scroll (fixes drawing coordinates when scrolled)
   useEffect(() => {
