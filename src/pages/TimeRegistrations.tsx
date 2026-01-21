@@ -118,11 +118,10 @@ const TimeRegistrations = () => {
       );
     }
 
-    // Task filter (by standard task)
+    // Task filter (by standard task - only applies to project tasks, not workstation tasks)
     if (taskFilter !== 'all') {
       filtered = filtered.filter((reg: any) => 
-        reg.tasks?.standard_task_id === taskFilter || 
-        reg.workstation_tasks?.standard_task_id === taskFilter
+        reg.tasks?.standard_task_id === taskFilter
       );
     }
 
