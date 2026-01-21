@@ -145,6 +145,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   // Debounce scale changes to prevent race conditions when zooming fast
   const scaleChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingScaleRef = useRef<number | null>(null);
+  // Track if we're actively zooming to prevent annotation saves during zoom
+  const isZoomingRef = useRef(false);
   
   // Flag to prevent saving state during undo/redo operations
   const isRestoringHistoryRef = useRef(false);
@@ -833,6 +835,9 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   useEffect(() => {
     if (!pdfDoc) return;
 
+    // Mark that we're zooming - prevents annotation saves during zoom
+    isZoomingRef.current = true;
+
     // Clear any pending scale change
     if (scaleChangeTimeoutRef.current) {
       clearTimeout(scaleChangeTimeoutRef.current);
@@ -842,6 +847,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     pendingScaleRef.current = scale;
     
     // Debounce the actual re-render to prevent race conditions when zooming fast
+    // Use 250ms to give more time for rapid zoom gestures to settle
     scaleChangeTimeoutRef.current = setTimeout(() => {
       // Only proceed if this is still the latest scale value
       if (pendingScaleRef.current !== scale) return;
@@ -871,7 +877,12 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       setRenderedPages(new Set());
       
       pendingScaleRef.current = null;
-    }, 150); // 150ms debounce - fast enough to feel responsive, slow enough to batch rapid changes
+      
+      // Mark zooming as complete after a short delay to let render complete
+      setTimeout(() => {
+        isZoomingRef.current = false;
+      }, 100);
+    }, 250); // 250ms debounce - enough time for rapid zoom gestures to settle
 
     return () => {
       if (scaleChangeTimeoutRef.current) {
@@ -959,8 +970,14 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     }
   };
 
+  // Helper to round percentage values to 6 decimal places to prevent floating-point drift
+  const roundPct = (value: number): number => Math.round(value * 1000000) / 1000000;
+
   // Save annotations as percentages of page dimensions (scale-independent)
   const saveCurrentPageAnnotations = (pageNum: number) => {
+    // Don't save during active zooming to prevent misaligned annotations
+    if (isZoomingRef.current) return;
+    
     const canvas = fabricCanvasRefs.current.get(pageNum);
     const pageData = pagesData.find(p => p.pageNum === pageNum);
     if (!canvas || !pageData) return;
@@ -996,10 +1013,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
               // In path array: index 1, 3, 5... are X; index 2, 4, 6... are Y
               if ((i % 2) === 1) {
                 // X coordinate - normalize by canvas width, accounting for object scale
-                newCmd.push((cmd[i] * objScaleX) / canvasWidth);
+                newCmd.push(roundPct((cmd[i] * objScaleX) / canvasWidth));
               } else {
                 // Y coordinate - normalize by canvas height, accounting for object scale
-                newCmd.push((cmd[i] * objScaleY) / canvasHeight);
+                newCmd.push(roundPct((cmd[i] * objScaleY) / canvasHeight));
               }
             } else {
               newCmd.push(cmd[i]);
@@ -1014,18 +1031,18 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
         return {
           type: 'path',
-          // Store position as percentage of page
-          leftPct: (obj.left || 0) / canvasWidth,
-          topPct: (obj.top || 0) / canvasHeight,
+          // Store position as percentage of page (rounded to prevent drift)
+          leftPct: roundPct((obj.left || 0) / canvasWidth),
+          topPct: roundPct((obj.top || 0) / canvasHeight),
           fill: obj.fill as string,
           stroke: obj.stroke as string,
           // Store stroke width as percentage of page width
-          strokeWidthPct: obj.strokeWidth ? obj.strokeWidth / canvasWidth : undefined,
+          strokeWidthPct: obj.strokeWidth ? roundPct(obj.strokeWidth / canvasWidth) : undefined,
           // Path data is now normalized to percentages
           path: normalizedPath,
           // Persist pathOffset to prevent drift at arbitrary zoom levels
-          pathOffsetXPct: pathOffsetX != null ? pathOffsetX / canvasWidth : undefined,
-          pathOffsetYPct: pathOffsetY != null ? pathOffsetY / canvasHeight : undefined,
+          pathOffsetXPct: pathOffsetX != null ? roundPct(pathOffsetX / canvasWidth) : undefined,
+          pathOffsetYPct: pathOffsetY != null ? roundPct(pathOffsetY / canvasHeight) : undefined,
           // Scale factors are baked into the path, so store as 1
           scaleX: 1,
           scaleY: 1,
@@ -1037,12 +1054,12 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         const circleObj = obj as FabricCircle;
         return {
           type: 'circle',
-          leftPct: (obj.left || 0) / canvasWidth,
-          topPct: (obj.top || 0) / canvasHeight,
-          radiusPct: ((circleObj.radius || 0) * objScaleX) / canvasWidth,
+          leftPct: roundPct((obj.left || 0) / canvasWidth),
+          topPct: roundPct((obj.top || 0) / canvasHeight),
+          radiusPct: roundPct(((circleObj.radius || 0) * objScaleX) / canvasWidth),
           fill: obj.fill as string,
           stroke: obj.stroke as string,
-          strokeWidthPct: obj.strokeWidth ? obj.strokeWidth / canvasWidth : undefined,
+          strokeWidthPct: obj.strokeWidth ? roundPct(obj.strokeWidth / canvasWidth) : undefined,
           scaleX: 1,
           scaleY: 1,
           angle: obj.angle,
@@ -1053,13 +1070,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
         const textObj = obj as Textbox;
         return {
           type: 'textbox',
-          leftPct: (obj.left || 0) / canvasWidth,
-          topPct: (obj.top || 0) / canvasHeight,
-          widthPct: ((textObj.width || 0) * objScaleX) / canvasWidth,
-          heightPct: ((textObj.height || 0) * objScaleY) / canvasHeight,
+          leftPct: roundPct((obj.left || 0) / canvasWidth),
+          topPct: roundPct((obj.top || 0) / canvasHeight),
+          widthPct: roundPct(((textObj.width || 0) * objScaleX) / canvasWidth),
+          heightPct: roundPct(((textObj.height || 0) * objScaleY) / canvasHeight),
           fill: obj.fill as string,
           text: textObj.text,
-          fontSizePct: ((textObj.fontSize || 18) * objScaleY) / canvasHeight,
+          fontSizePct: roundPct(((textObj.fontSize || 18) * objScaleY) / canvasHeight),
           fontFamily: textObj.fontFamily,
           scaleX: 1,
           scaleY: 1,
@@ -1070,13 +1087,13 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       // Default: rect and others
       return {
         type: obj.type || 'unknown',
-        leftPct: (obj.left || 0) / canvasWidth,
-        topPct: (obj.top || 0) / canvasHeight,
-        widthPct: (obj as any).width ? (((obj as any).width * objScaleX) / canvasWidth) : undefined,
-        heightPct: (obj as any).height ? (((obj as any).height * objScaleY) / canvasHeight) : undefined,
+        leftPct: roundPct((obj.left || 0) / canvasWidth),
+        topPct: roundPct((obj.top || 0) / canvasHeight),
+        widthPct: (obj as any).width ? roundPct(((obj as any).width * objScaleX) / canvasWidth) : undefined,
+        heightPct: (obj as any).height ? roundPct(((obj as any).height * objScaleY) / canvasHeight) : undefined,
         fill: obj.fill as string,
         stroke: obj.stroke as string,
-        strokeWidthPct: obj.strokeWidth ? obj.strokeWidth / canvasWidth : undefined,
+        strokeWidthPct: obj.strokeWidth ? roundPct(obj.strokeWidth / canvasWidth) : undefined,
         scaleX: 1,
         scaleY: 1,
         angle: obj.angle,
@@ -1103,16 +1120,19 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     annotations.forEach(annotation => {
       let obj;
       
+      // Helper to convert percentage to pixel with rounding for consistent positioning
+      const pctToPx = (pct: number, dimension: number) => Math.round(pct * dimension * 100) / 100;
+      
       switch (annotation.type) {
         case 'rect':
           obj = new Rect({
-            left: (annotation.leftPct || 0) * canvasWidth,
-            top: (annotation.topPct || 0) * canvasHeight,
-            width: (annotation.widthPct || 0) * canvasWidth,
-            height: (annotation.heightPct || 0) * canvasHeight,
+            left: pctToPx(annotation.leftPct || 0, canvasWidth),
+            top: pctToPx(annotation.topPct || 0, canvasHeight),
+            width: pctToPx(annotation.widthPct || 0, canvasWidth),
+            height: pctToPx(annotation.heightPct || 0, canvasHeight),
             fill: annotation.fill || 'transparent',
             stroke: annotation.stroke,
-            strokeWidth: (annotation.strokeWidthPct || 0.002) * canvasWidth,
+            strokeWidth: pctToPx(annotation.strokeWidthPct || 0.002, canvasWidth),
             scaleX: 1,
             scaleY: 1,
             angle: annotation.angle || 0
@@ -1120,12 +1140,12 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           break;
         case 'circle':
           obj = new FabricCircle({
-            left: (annotation.leftPct || 0) * canvasWidth,
-            top: (annotation.topPct || 0) * canvasHeight,
-            radius: (annotation.radiusPct || 0) * canvasWidth,
+            left: pctToPx(annotation.leftPct || 0, canvasWidth),
+            top: pctToPx(annotation.topPct || 0, canvasHeight),
+            radius: pctToPx(annotation.radiusPct || 0, canvasWidth),
             fill: annotation.fill || 'transparent',
             stroke: annotation.stroke,
-            strokeWidth: (annotation.strokeWidthPct || 0.002) * canvasWidth,
+            strokeWidth: pctToPx(annotation.strokeWidthPct || 0.002, canvasWidth),
             scaleX: 1,
             scaleY: 1,
             angle: annotation.angle || 0
@@ -1133,10 +1153,10 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
           break;
         case 'textbox':
           obj = new Textbox(annotation.text || 'Text', {
-            left: (annotation.leftPct || 0) * canvasWidth,
-            top: (annotation.topPct || 0) * canvasHeight,
-            width: (annotation.widthPct || 0.3) * canvasWidth,
-            fontSize: (annotation.fontSizePct || 0.03) * canvasHeight,
+            left: pctToPx(annotation.leftPct || 0, canvasWidth),
+            top: pctToPx(annotation.topPct || 0, canvasHeight),
+            width: pctToPx(annotation.widthPct || 0.3, canvasWidth),
+            fontSize: pctToPx(annotation.fontSizePct || 0.03, canvasHeight),
             fontFamily: annotation.fontFamily || 'Arial',
             fill: annotation.fill || '#000000',
             scaleX: 1,
@@ -1155,11 +1175,11 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 if (typeof cmd[i] === 'number') {
                   // Even indices (1, 3, 5...) are X coordinates, odd indices (2, 4, 6...) are Y coordinates
                   if ((i % 2) === 1) {
-                    // X coordinate - multiply by canvas width
-                    newCmd.push(cmd[i] * canvasWidth);
+                    // X coordinate - multiply by canvas width with rounding
+                    newCmd.push(pctToPx(cmd[i], canvasWidth));
                   } else {
-                    // Y coordinate - multiply by canvas height
-                    newCmd.push(cmd[i] * canvasHeight);
+                    // Y coordinate - multiply by canvas height with rounding
+                    newCmd.push(pctToPx(cmd[i], canvasHeight));
                   }
                 } else {
                   newCmd.push(cmd[i]);
@@ -1172,14 +1192,14 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             const path = new Path(denormalizedPath, {
               stroke: annotation.stroke,
               fill: 'transparent',
-              strokeWidth: (annotation.strokeWidthPct || 0.005) * canvasWidth,
+              strokeWidth: pctToPx(annotation.strokeWidthPct || 0.005, canvasWidth),
               angle: annotation.angle || 0,
             });
             
-            // Position the path
+            // Position the path with rounded coordinates
             path.set({
-              left: (annotation.leftPct || 0) * canvasWidth,
-              top: (annotation.topPct || 0) * canvasHeight,
+              left: pctToPx(annotation.leftPct || 0, canvasWidth),
+              top: pctToPx(annotation.topPct || 0, canvasHeight),
               scaleX: 1,
               scaleY: 1,
             });
@@ -1187,8 +1207,8 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             // Restore Fabric's internal offset if available (prevents drift at non-integer zoom)
             if (typeof annotation.pathOffsetXPct === 'number' && typeof annotation.pathOffsetYPct === 'number') {
               (path as any).pathOffset = new Point(
-                annotation.pathOffsetXPct * canvasWidth,
-                annotation.pathOffsetYPct * canvasHeight,
+                pctToPx(annotation.pathOffsetXPct, canvasWidth),
+                pctToPx(annotation.pathOffsetYPct, canvasHeight),
               );
             }
 
