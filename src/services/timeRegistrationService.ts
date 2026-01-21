@@ -490,11 +490,12 @@ export const timeRegistrationService = {
           *,
           employees (name),
           tasks (
-            title, 
+            title,
+            standard_task_id,
             phases (name, projects (id, name)), 
             standard_tasks (hourly_cost)
           ),
-          workstation_tasks (task_name, workstations (id, name))
+          workstation_tasks (task_name, standard_task_id, workstations (id, name))
         `)
         .order('start_time', { ascending: false })
         .range(from, from + batchSize - 1);
@@ -527,11 +528,12 @@ export const timeRegistrationService = {
           *,
           employees (name),
           tasks (
-            title, 
+            title,
+            standard_task_id,
             phases (name, projects (id, name)),
             standard_tasks (hourly_cost)
           ),
-          workstation_tasks (task_name, workstations (id, name))
+          workstation_tasks (task_name, standard_task_id, workstations (id, name))
         `)
         .eq('employee_id', employeeId)
         .order('start_time', { ascending: false })
