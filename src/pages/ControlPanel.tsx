@@ -33,6 +33,7 @@ const ControlPanel: React.FC = () => {
   const [workstationBufferTimes, setWorkstationBufferTimes] = useState<Record<string, number>>({});
   const [activeEmployees, setActiveEmployees] = useState<any[]>([]);
   const [rushOrdersCount, setRushOrdersCount] = useState(0);
+  const [selectedProductionLine, setSelectedProductionLine] = useState<number | null>(null);
   const [truckLoadingData, setTruckLoadingData] = useState<{
     todayLoadings: LoadingAssignment[];
     upcomingLoadings: LoadingAssignment[];
@@ -47,6 +48,22 @@ const ControlPanel: React.FC = () => {
     queryKey: ['workstations'],
     queryFn: workstationService.getAll
   });
+
+  // Get unique production lines and check if there are multiple
+  const productionLines = [...new Set(workstations.map(ws => ws.production_line))].sort((a, b) => a - b);
+  const hasMultipleLines = productionLines.length > 1;
+
+  // Set initial production line when workstations load
+  useEffect(() => {
+    if (workstations.length > 0 && selectedProductionLine === null) {
+      setSelectedProductionLine(productionLines[0] || 1);
+    }
+  }, [workstations, productionLines, selectedProductionLine]);
+
+  // Filter and sort workstations by sort_order, then by selected production line
+  const sortedWorkstations = workstations
+    .filter(ws => !hasMultipleLines || ws.production_line === selectedProductionLine)
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   useEffect(() => {
     loadStatuses();
@@ -354,11 +371,31 @@ const ControlPanel: React.FC = () => {
         {/* Main Content Grid */}
         <div className="grid grid-cols-[1fr_300px] gap-4">
           {/* Production Flow */}
-          <Card className="bg-slate-800/50 border-slate-700 p-6">
-            <h2 className="text-xl font-bold text-white mb-4">Production Flow</h2>
-          
+        <Card className="bg-slate-800/50 border-slate-700 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-white">Production Flow</h2>
+              
+              {/* Production Line Tabs - only show when multiple lines exist */}
+              {hasMultipleLines && (
+                <div className="flex gap-2">
+                  {productionLines.map(line => (
+                    <Button
+                      key={line}
+                      variant={selectedProductionLine === line ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedProductionLine(line)}
+                      className={selectedProductionLine === line 
+                        ? "bg-primary text-primary-foreground" 
+                        : "text-white border-slate-600 bg-transparent hover:bg-slate-700"}
+                    >
+                      Lijn {line}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
           <div className="flex items-center justify-center gap-4 flex-wrap">
-            {workstations.map((workstation, index) => {
+            {sortedWorkstations.map((workstation, index) => {
               const status = getWorkstationStatus(workstation.id);
               const statusColor = getStatusColor(status);
               const statusText = getStatusText(status);
