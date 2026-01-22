@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { id, name, email, password, role, logistics, workstation } = await req.json();
+    const { id, name, email, password, role, logistics, workstation, preferred_language } = await req.json();
 
     if (!id) {
       return new Response(
@@ -55,6 +55,7 @@ serve(async (req) => {
     if (role !== undefined) employeeUpdateData.role = role;
     if (logistics !== undefined) employeeUpdateData.logistics = logistics;
     if (workstation !== undefined) employeeUpdateData.workstation = workstation;
+    if (preferred_language !== undefined) employeeUpdateData.preferred_language = preferred_language;
 
     // If employee has auth_user_id, update the auth user as well
     if (currentEmployee.auth_user_id) {

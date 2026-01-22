@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { name, email, password, role, logistics, workstation } = await req.json();
+    const { name, email, password, role, logistics, workstation, preferred_language } = await req.json();
 
     if (!name || !password) {
       return new Response(
@@ -69,7 +69,8 @@ serve(async (req) => {
         role: role || 'worker',
         logistics: logistics || false,
         workstation: workstation || null,
-        auth_user_id: authUser.user.id
+        auth_user_id: authUser.user.id,
+        preferred_language: preferred_language || 'nl'
       }])
       .select()
       .single();
