@@ -3,6 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface CheckboxCardProps {
   id: string;
@@ -11,6 +12,7 @@ interface CheckboxCardProps {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   disabled?: boolean;
+  currentWorkstations?: string[];
 }
 
 export const CheckboxCard: React.FC<CheckboxCardProps> = ({
@@ -19,9 +21,9 @@ export const CheckboxCard: React.FC<CheckboxCardProps> = ({
   description,
   checked,
   onCheckedChange,
-  disabled = false
+  disabled = false,
+  currentWorkstations = []
 }) => {
-  // Simple standalone checkbox component - not using useFormField hook
   return (
     <Card className={`border ${checked ? 'border-primary' : 'border-border'}`}>
       <CardHeader className="p-4 pb-2">
@@ -41,6 +43,15 @@ export const CheckboxCard: React.FC<CheckboxCardProps> = ({
           </div>
         </div>
         <CardDescription className="text-xs line-clamp-2">{description}</CardDescription>
+        {currentWorkstations.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {currentWorkstations.map((ws, index) => (
+              <Badge key={index} variant="secondary" className="text-xs">
+                {ws}
+              </Badge>
+            ))}
+          </div>
+        )}
       </CardHeader>
     </Card>
   );
