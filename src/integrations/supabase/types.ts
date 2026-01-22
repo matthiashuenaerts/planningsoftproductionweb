@@ -4043,7 +4043,7 @@ export type Database = {
           {
             foreignKeyName: "workstation_positions_workstation_id_fkey"
             columns: ["workstation_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "workstations"
             referencedColumns: ["id"]
           },
