@@ -79,6 +79,26 @@ export const TaskWorkstationsManager: React.FC<TaskWorkstationsManagerProps> = (
           
         if (error) throw error;
         
+        // Also link all employees who can do this task to this workstation
+        const { data: employeeLinks, error: empError } = await supabase
+          .from('employee_standard_task_links')
+          .select('employee_id')
+          .eq('standard_task_id', taskId);
+        
+        if (empError) throw empError;
+        
+        if (employeeLinks && employeeLinks.length > 0) {
+          // Insert employee-workstation links (ignore duplicates)
+          for (const empLink of employeeLinks) {
+            await supabase
+              .from('employee_workstation_links')
+              .upsert({
+                employee_id: empLink.employee_id,
+                workstation_id: workstationId
+              }, { onConflict: 'employee_id,workstation_id', ignoreDuplicates: true });
+          }
+        }
+        
         setTaskLinks(prev => ({ ...prev, [taskId]: true }));
       } else {
         // Unlink standard task from workstation
@@ -89,6 +109,44 @@ export const TaskWorkstationsManager: React.FC<TaskWorkstationsManagerProps> = (
           .eq('workstation_id', workstationId);
           
         if (error) throw error;
+        
+        // Check if any other tasks for this workstation are still linked to those employees
+        // If not, remove the employee-workstation link
+        const { data: employeeLinks, error: empError } = await supabase
+          .from('employee_standard_task_links')
+          .select('employee_id')
+          .eq('standard_task_id', taskId);
+        
+        if (!empError && employeeLinks) {
+          for (const empLink of employeeLinks) {
+            // Check if this employee has other tasks linked to this workstation
+            const { data: otherTasks } = await supabase
+              .from('employee_standard_task_links')
+              .select(`
+                standard_task_id,
+                standard_tasks!inner(
+                  standard_task_workstation_links!inner(workstation_id)
+                )
+              `)
+              .eq('employee_id', empLink.employee_id)
+              .neq('standard_task_id', taskId);
+            
+            const hasOtherTasksForWorkstation = otherTasks?.some((t: any) => 
+              t.standard_tasks?.standard_task_workstation_links?.some(
+                (link: any) => link.workstation_id === workstationId
+              )
+            );
+            
+            if (!hasOtherTasksForWorkstation) {
+              // Remove employee from this workstation
+              await supabase
+                .from('employee_workstation_links')
+                .delete()
+                .eq('employee_id', empLink.employee_id)
+                .eq('workstation_id', workstationId);
+            }
+          }
+        }
         
         setTaskLinks(prev => ({ ...prev, [taskId]: false }));
       }
