@@ -8,7 +8,12 @@ import { Package, Clock, Check, Calendar, ArrowUpRight, LayoutGrid, ListIcon, Us
 import TaskList from '@/components/TaskList';
 import { Workstation } from '@/services/workstationService';
 
-// Helper function to validate and convert task status
+// Helper to normalize workstation data from Supabase
+const normalizeWorkstation = (ws: any): Workstation => ({
+  ...ws,
+  sort_order: ws.sort_order ?? 0,
+  production_line: ws.production_line ?? 1
+});
 const validateTaskStatus = (status: string): "TODO" | "IN_PROGRESS" | "COMPLETED" => {
   if (status === "TODO" || status === "IN_PROGRESS" || status === "COMPLETED") {
     return status;
@@ -166,7 +171,7 @@ const WorkstationDashboard = () => {
           }
           
           if (workstationData) {
-            workstations.push(workstationData as Workstation);
+            workstations.push(normalizeWorkstation(workstationData));
           }
         }
       } else {
@@ -181,7 +186,7 @@ const WorkstationDashboard = () => {
           if (workstationError && workstationError.code !== 'PGRST116') {
             console.error('Error fetching workstation by name:', workstationError);
           } else if (workstationData) {
-            workstations.push(workstationData as Workstation);
+            workstations.push(normalizeWorkstation(workstationData));
           } else {
             // Try to find workstation case-insensitively
             const { data: allWorkstations, error: listError } = await supabase
@@ -196,7 +201,7 @@ const WorkstationDashboard = () => {
               );
               
               if (matchingWorkstation) {
-                workstations.push(matchingWorkstation as Workstation);
+                workstations.push(normalizeWorkstation(matchingWorkstation));
               }
             }
           }
@@ -218,7 +223,7 @@ const WorkstationDashboard = () => {
           // Check if this workstation is already in our list
           const exists = workstations.some(ws => ws.id === matchByName.id);
           if (!exists) {
-            workstations.push(matchByName as Workstation);
+            workstations.push(normalizeWorkstation(matchByName));
           }
         }
       }
