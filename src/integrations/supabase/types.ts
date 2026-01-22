@@ -4151,6 +4151,8 @@ export type Database = {
           id: string
           image_path: string | null
           name: string
+          production_line: number | null
+          sort_order: number | null
           updated_at: string
         }
         Insert: {
@@ -4162,6 +4164,8 @@ export type Database = {
           id?: string
           image_path?: string | null
           name: string
+          production_line?: number | null
+          sort_order?: number | null
           updated_at?: string
         }
         Update: {
@@ -4173,6 +4177,8 @@ export type Database = {
           id?: string
           image_path?: string | null
           name?: string
+          production_line?: number | null
+          sort_order?: number | null
           updated_at?: string
         }
         Relationships: []

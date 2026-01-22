@@ -8,9 +8,18 @@ export interface Workstation {
   image_path: string | null;
   icon_path: string | null;
   active_workers: number;
+  sort_order: number;
+  production_line: number;
   created_at: string;
   updated_at: string;
 }
+
+// Helper to normalize workstation data with new fields
+const normalizeWorkstation = (ws: any): Workstation => ({
+  ...ws,
+  sort_order: ws.sort_order ?? 0,
+  production_line: ws.production_line ?? 1
+});
 
 export const workstationService = {
   async getAll(): Promise<Workstation[]> {
@@ -23,7 +32,7 @@ export const workstationService = {
       throw new Error(`Failed to fetch workstations: ${error.message}`);
     }
     
-    return data || [];
+    return (data || []).map(normalizeWorkstation);
   },
 
   async getById(id: string): Promise<Workstation | null> {
@@ -37,7 +46,7 @@ export const workstationService = {
       throw new Error(`Failed to fetch workstation: ${error.message}`);
     }
     
-    return data;
+    return data ? normalizeWorkstation(data) : null;
   },
 
   async getByName(name: string): Promise<Workstation | null> {
@@ -52,7 +61,7 @@ export const workstationService = {
       return null;
     }
     
-    return data;
+    return data ? normalizeWorkstation(data) : null;
   },
 
   async create(workstation: { name: string; description?: string }): Promise<Workstation> {
@@ -66,13 +75,13 @@ export const workstationService = {
       throw new Error(`Failed to create workstation: ${error.message}`);
     }
     
-    return data;
+    return normalizeWorkstation(data);
   },
 
-  async update(id: string, updates: Partial<Pick<Workstation, 'name' | 'description' | 'image_path' | 'icon_path'>>): Promise<Workstation> {
+  async update(id: string, updates: Partial<Pick<Workstation, 'name' | 'description' | 'image_path' | 'icon_path' | 'sort_order' | 'production_line'>>): Promise<Workstation> {
     const { data, error } = await supabase
       .from('workstations')
-      .update(updates)
+      .update(updates as any)
       .eq('id', id)
       .select()
       .single();
@@ -81,7 +90,7 @@ export const workstationService = {
       throw new Error(`Failed to update workstation: ${error.message}`);
     }
     
-    return data;
+    return normalizeWorkstation(data);
   },
 
   async delete(id: string): Promise<void> {
@@ -247,7 +256,7 @@ export const workstationService = {
       throw new Error(`Failed to update active workers: ${error.message}`);
     }
     
-    return data;
+    return normalizeWorkstation(data);
   },
 
   async getEmployeesForWorkstation(workstationId: string): Promise<Array<{ id: string; name: string; email: string | null }>> {

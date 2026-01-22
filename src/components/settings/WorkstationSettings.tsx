@@ -64,7 +64,9 @@ const WorkstationSettings: React.FC = () => {
       name: '',
       description: '',
       x_position: 50,
-      y_position: 50
+      y_position: 50,
+      sort_order: 0,
+      production_line: 1
     }
   });
 
@@ -110,7 +112,9 @@ const WorkstationSettings: React.FC = () => {
       name: workstation.name,
       description: workstation.description || '',
       x_position: pos?.x ?? 50,
-      y_position: pos?.y ?? 50
+      y_position: pos?.y ?? 50,
+      sort_order: workstation.sort_order ?? 0,
+      production_line: workstation.production_line ?? 1
     });
     setShowEditDialog(true);
   };
@@ -139,13 +143,15 @@ const WorkstationSettings: React.FC = () => {
     }
   };
 
-  const handleUpdate = async (data: { name: string; description: string; x_position: number; y_position: number }) => {
+  const handleUpdate = async (data: { name: string; description: string; x_position: number; y_position: number; sort_order: number; production_line: number }) => {
     if (!selectedWorkstation) return;
     
     try {
       await workstationService.update(selectedWorkstation.id, {
         name: data.name,
-        description: data.description || null
+        description: data.description || null,
+        sort_order: data.sort_order,
+        production_line: data.production_line
       });
       
       // Update or insert position
@@ -336,6 +342,8 @@ const WorkstationSettings: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-16">Order</TableHead>
+                  <TableHead className="w-16">Line</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead className="hidden md:table-cell">Description</TableHead>
                   <TableHead>Actions</TableHead>
@@ -344,13 +352,17 @@ const WorkstationSettings: React.FC = () => {
               <TableBody>
                 {workstations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                       No workstations found. Create your first one!
                     </TableCell>
                   </TableRow>
                 ) : (
-                  workstations.map((workstation) => (
+                  workstations
+                    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+                    .map((workstation) => (
                     <TableRow key={workstation.id}>
+                      <TableCell className="text-center font-medium">{workstation.sort_order ?? 0}</TableCell>
+                      <TableCell className="text-center">{workstation.production_line ?? 1}</TableCell>
                       <TableCell>{workstation.name}</TableCell>
                       <TableCell className="hidden md:table-cell">{workstation.description}</TableCell>
                       <TableCell>
@@ -613,6 +625,50 @@ const WorkstationSettings: React.FC = () => {
                   </FormItem>
                 )}
               />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="sort_order"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Order</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Order in production flow
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="production_line"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Production Line</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="1"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Production line number
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
