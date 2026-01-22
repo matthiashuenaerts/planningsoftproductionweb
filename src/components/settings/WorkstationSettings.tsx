@@ -46,6 +46,7 @@ const WorkstationSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showTaskMapping, setShowTaskMapping] = useState(false);
   const [showTasksManager, setShowTasksManager] = useState(false);
@@ -55,12 +56,15 @@ const WorkstationSettings: React.FC = () => {
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadIconFile, setUploadIconFile] = useState<File | null>(null);
+  const [workstationPositions, setWorkstationPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const { toast } = useToast();
 
   const form = useForm({
     defaultValues: {
       name: '',
-      description: ''
+      description: '',
+      x_position: 50,
+      y_position: 50
     }
   });
 
@@ -69,6 +73,19 @@ const WorkstationSettings: React.FC = () => {
       setLoading(true);
       const data = await workstationService.getAll();
       setWorkstations(data);
+      
+      // Load positions
+      const { data: positions, error: posError } = await supabase
+        .from('workstation_positions')
+        .select('*');
+      
+      if (!posError && positions) {
+        const posMap = new Map<string, { x: number; y: number }>();
+        positions.forEach((p: any) => {
+          posMap.set(p.workstation_id, { x: Number(p.x_position), y: Number(p.y_position) });
+        });
+        setWorkstationPositions(posMap);
+      }
     } catch (error: any) {
       console.error('Error loading workstations:', error);
       toast({
@@ -88,10 +105,14 @@ const WorkstationSettings: React.FC = () => {
   const handleOpenEdit = (workstation: Workstation) => {
     setSelectedWorkstation(workstation);
     setIsEditing(true);
+    const pos = workstationPositions.get(workstation.id);
     form.reset({
       name: workstation.name,
-      description: workstation.description || ''
+      description: workstation.description || '',
+      x_position: pos?.x ?? 50,
+      y_position: pos?.y ?? 50
     });
+    setShowEditDialog(true);
   };
 
   const handleCreate = async (data: { name: string; description: string }) => {
@@ -118,7 +139,7 @@ const WorkstationSettings: React.FC = () => {
     }
   };
 
-  const handleUpdate = async (data: { name: string; description: string }) => {
+  const handleUpdate = async (data: { name: string; description: string; x_position: number; y_position: number }) => {
     if (!selectedWorkstation) return;
     
     try {
@@ -127,12 +148,24 @@ const WorkstationSettings: React.FC = () => {
         description: data.description || null
       });
       
+      // Update or insert position
+      const { error: posError } = await supabase
+        .from('workstation_positions')
+        .upsert({
+          workstation_id: selectedWorkstation.id,
+          x_position: data.x_position,
+          y_position: data.y_position
+        }, { onConflict: 'workstation_id' });
+      
+      if (posError) throw posError;
+      
       toast({
         title: "Success",
         description: "Workstation updated successfully"
       });
       
       setIsEditing(false);
+      setShowEditDialog(false);
       setSelectedWorkstation(null);
       form.reset();
       loadWorkstations();
@@ -362,17 +395,13 @@ const WorkstationSettings: React.FC = () => {
                           >
                             Upload icon
                           </Button>
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button
-                                variant="ghost" 
-                                size="icon"
-                                onClick={() => handleOpenEdit(workstation)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </DialogTrigger>
-                          </Dialog>
+                          <Button
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleOpenEdit(workstation)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost" 
                             size="icon"
@@ -539,6 +568,110 @@ const WorkstationSettings: React.FC = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Edit Workstation Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={(open) => {
+        setShowEditDialog(open);
+        if (!open) {
+          setIsEditing(false);
+          setSelectedWorkstation(null);
+          form.reset();
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Workstation</DialogTitle>
+            <DialogDescription>
+              Update workstation details and floor plan position
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter workstation name" {...field} required />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Enter workstation description" {...field} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="x_position"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>X Position (%)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          max="100" 
+                          step="0.1"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Horizontal position on floor plan (0-100%)
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="y_position"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Y Position (%)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          max="100" 
+                          step="0.1"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Vertical position on floor plan (0-100%)
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">Update</Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
