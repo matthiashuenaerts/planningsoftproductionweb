@@ -151,6 +151,68 @@ export const workstationService = {
     }
   },
 
+  async unlinkTaskFromWorkstation(taskId: string, workstationId?: string): Promise<void> {
+    let query = supabase
+      .from('task_workstation_links')
+      .delete()
+      .eq('task_id', taskId);
+    
+    if (workstationId) {
+      query = query.eq('workstation_id', workstationId);
+    }
+    
+    const { error } = await query;
+    
+    if (error) {
+      throw new Error(`Failed to unlink task from workstation: ${error.message}`);
+    }
+  },
+
+  async reassignTaskWorkstation(taskId: string, newWorkstationId: string): Promise<void> {
+    // Delete all existing workstation links for this task
+    const { error: deleteError } = await supabase
+      .from('task_workstation_links')
+      .delete()
+      .eq('task_id', taskId);
+    
+    if (deleteError) {
+      throw new Error(`Failed to remove existing workstation link: ${deleteError.message}`);
+    }
+
+    // Insert the new workstation link
+    const { error: insertError } = await supabase
+      .from('task_workstation_links')
+      .insert({ task_id: taskId, workstation_id: newWorkstationId });
+    
+    if (insertError) {
+      throw new Error(`Failed to assign task to new workstation: ${insertError.message}`);
+    }
+  },
+
+  async getWorkstationsForTask(taskId: string): Promise<Workstation[]> {
+    const { data, error } = await supabase
+      .from('task_workstation_links')
+      .select(`
+        workstations (
+          id,
+          name,
+          description,
+          image_path,
+          icon_path,
+          active_workers,
+          created_at,
+          updated_at
+        )
+      `)
+      .eq('task_id', taskId);
+    
+    if (error) {
+      throw new Error(`Failed to fetch workstations for task: ${error.message}`);
+    }
+    
+    return data?.map(item => item.workstations).filter(Boolean) as Workstation[] || [];
+  },
+
   async linkEmployeeToWorkstation(employeeId: string, workstationId: string): Promise<void> {
     const { error } = await supabase
       .from('employee_workstation_links')
