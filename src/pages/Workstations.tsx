@@ -32,6 +32,8 @@ interface WorkstationWithIcon {
   description: string | null;
   icon: React.ReactNode;
   icon_path: string | null;
+  sort_order: number;
+  production_line: number;
 }
 const Workstations: React.FC = () => {
   const [selectedWorkstation, setSelectedWorkstation] = useState<string | null>(null);
@@ -45,6 +47,7 @@ const Workstations: React.FC = () => {
   const [newErrorMessage, setNewErrorMessage] = useState('');
   const [newErrorType, setNewErrorType] = useState('general');
   const [newErrorNotes, setNewErrorNotes] = useState('');
+  const [selectedProductionLine, setSelectedProductionLine] = useState<number | null>(null);
   const {
     toast
   } = useToast();
@@ -299,70 +302,108 @@ const Workstations: React.FC = () => {
                     <ArrowLeft className="mr-2 h-4 w-4" /> {t('back_to_workstations')}
                   </Button>
                   <WorkstationView workstationId={selectedWorkstation} onBack={() => setSelectedWorkstation(null)} />
-                </div> : <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <h1 className="text-2xl font-bold">{t('workstations_title')}</h1>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => navigate('/nl/floorplan')}
-                      className="flex items-center gap-2"
-                    >
-                      <Map className="h-4 w-4" />
-                      Floorplan
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {workstations.map(workstation => <Card key={workstation.id} className="hover:shadow-md transition-shadow cursor-pointer relative">
-                        <div className="absolute top-2 right-2 z-10">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={e => e.stopPropagation()}>
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                             <DropdownMenuContent align="end">
-                               <DropdownMenuItem onClick={e => {
-                        e.stopPropagation();
-                        handleShowWorkstationTasks(workstation.id);
-                      }}>
-                                 <CheckCircle className="mr-2 h-4 w-4" />
-                                 {t('workstation_tasks')}
-                               </DropdownMenuItem>
-                               <DropdownMenuItem onClick={e => {
-                        e.stopPropagation();
-                        setShowQRScanner(workstation.id);
-                      }}>
-                                 <QrCode className="mr-2 h-4 w-4" />
-                                 Scan QR-code
-                               </DropdownMenuItem>
-                               <DropdownMenuItem onClick={e => {
-                        e.stopPropagation();
-                        setShowErrorDialog(workstation.id);
-                      }}>
-                                 <AlertTriangle className="mr-2 h-4 w-4" />
-                                 Foutmelding Toevoegen
-                               </DropdownMenuItem>
-                             </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <CardContent className="p-6 flex flex-col items-center text-center" onClick={() => setSelectedWorkstation(workstation.id)}>
-                          <div className="bg-primary/10 p-4 rounded-full mb-4">
-                            {workstation.icon_path ? (
-                              <img 
-                                src={workstation.icon_path} 
-                                alt={workstation.name} 
-                                className="h-8 w-8 object-contain"
-                              />
-                            ) : (
-                              workstation.icon
-                            )}
+                </div> : (() => {
+                  // Get unique production lines and check if we need tabs
+                  const productionLines = [...new Set(workstations.map(ws => ws.production_line))].sort((a, b) => a - b);
+                  const hasMultipleLines = productionLines.length > 1;
+                  
+                  // Set default selected line if not set
+                  const activeProductionLine = selectedProductionLine ?? productionLines[0] ?? 1;
+                  
+                  // Filter workstations by production line if multiple lines exist
+                  const filteredWorkstations = hasMultipleLines 
+                    ? workstations.filter(ws => ws.production_line === activeProductionLine)
+                    : workstations;
+                  
+                  return (
+                  <div>
+                    <div className="flex items-center justify-between mb-6">
+                      <h1 className="text-2xl font-bold">{t('workstations_title')}</h1>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => navigate('/nl/floorplan')}
+                        className="flex items-center gap-2"
+                      >
+                        <Map className="h-4 w-4" />
+                        Floorplan
+                      </Button>
+                    </div>
+                    
+                    {/* Production Line Tabs - only show if more than 1 production line */}
+                    {hasMultipleLines && (
+                      <div className="flex gap-2 mb-6 border-b">
+                        {productionLines.map(line => (
+                          <Button
+                            key={line}
+                            variant={activeProductionLine === line ? "default" : "ghost"}
+                            className="rounded-b-none"
+                            onClick={() => setSelectedProductionLine(line)}
+                          >
+                            Productielijn {line}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {filteredWorkstations.map((workstation, index) => <Card key={workstation.id} className="hover:shadow-md transition-shadow cursor-pointer relative">
+                          <div className="absolute top-2 left-2 z-10">
+                            <Badge variant="secondary" className="text-xs font-mono">
+                              {String(workstation.sort_order).padStart(2, '0')}
+                            </Badge>
                           </div>
-                          <h3 className="text-lg font-medium mb-1">{workstation.name}</h3>
-                          {workstation.description && <p className="text-sm text-muted-foreground">{workstation.description}</p>}
-                        </CardContent>
-                      </Card>)}
+                          <div className="absolute top-2 right-2 z-10">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={e => e.stopPropagation()}>
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                               <DropdownMenuContent align="end">
+                                 <DropdownMenuItem onClick={e => {
+                          e.stopPropagation();
+                          handleShowWorkstationTasks(workstation.id);
+                        }}>
+                                   <CheckCircle className="mr-2 h-4 w-4" />
+                                   {t('workstation_tasks')}
+                                 </DropdownMenuItem>
+                                 <DropdownMenuItem onClick={e => {
+                          e.stopPropagation();
+                          setShowQRScanner(workstation.id);
+                        }}>
+                                   <QrCode className="mr-2 h-4 w-4" />
+                                   Scan QR-code
+                                 </DropdownMenuItem>
+                                 <DropdownMenuItem onClick={e => {
+                          e.stopPropagation();
+                          setShowErrorDialog(workstation.id);
+                        }}>
+                                   <AlertTriangle className="mr-2 h-4 w-4" />
+                                   Foutmelding Toevoegen
+                                 </DropdownMenuItem>
+                               </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                          <CardContent className="p-6 flex flex-col items-center text-center" onClick={() => setSelectedWorkstation(workstation.id)}>
+                            <div className="bg-primary/10 p-4 rounded-full mb-4">
+                              {workstation.icon_path ? (
+                                <img 
+                                  src={workstation.icon_path} 
+                                  alt={workstation.name} 
+                                  className="h-8 w-8 object-contain"
+                                />
+                              ) : (
+                                workstation.icon
+                              )}
+                            </div>
+                            <h3 className="text-lg font-medium mb-1">{workstation.name}</h3>
+                            {workstation.description && <p className="text-sm text-muted-foreground">{workstation.description}</p>}
+                          </CardContent>
+                        </Card>)}
+                    </div>
                   </div>
-                </div>}
+                  );
+                })()}
             </div>
           </div>
         </ScrollArea>
