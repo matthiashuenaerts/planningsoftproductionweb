@@ -69,7 +69,8 @@ const EmployeeSettings: React.FC = () => {
     email: '',
     password: '',
     role: 'worker',
-    logistics: false
+    logistics: false,
+    preferred_language: 'nl'
   });
   const { toast } = useToast();
 
@@ -113,7 +114,8 @@ const EmployeeSettings: React.FC = () => {
         email: employee.email || '',
         password: '',
         role: employee.role,
-        logistics: employee.logistics || false
+        logistics: employee.logistics || false,
+        preferred_language: (employee as any).preferred_language || 'nl'
       });
     } else {
       setEditingEmployee(null);
@@ -122,7 +124,8 @@ const EmployeeSettings: React.FC = () => {
         email: '',
         password: '',
         role: 'worker',
-        logistics: false
+        logistics: false,
+        preferred_language: 'nl'
       });
     }
     setIsAddOrEditOpen(true);
@@ -253,6 +256,23 @@ const EmployeeSettings: React.FC = () => {
                       <SelectItem value="teamleader">Team Leader</SelectItem>
                       <SelectItem value="worker">Worker</SelectItem>
                       <SelectItem value="workstation">Workstation</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="preferred_language">Startup Language</Label>
+                  <Select 
+                    value={employeeData.preferred_language} 
+                    onValueChange={(value) => setEmployeeData(prev => ({ ...prev, preferred_language: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nl">Nederlands</SelectItem>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="fr">Français</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

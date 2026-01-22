@@ -104,13 +104,16 @@ const Login: React.FC = () => {
         description: `Welcome, ${employee.name}!`
       });
 
-      // Navigate to the originally requested page or home
+      // Navigate to the employee's preferred language path
+      const preferredLanguage = (employee as any).preferred_language || 'nl';
       const redirectPath = sessionStorage.getItem('redirectAfterLogin');
       if (redirectPath) {
         sessionStorage.removeItem('redirectAfterLogin');
-        navigate(redirectPath);
+        // Replace the language prefix in the stored path with the preferred language
+        const pathWithoutLang = redirectPath.replace(/^\/(nl|en|fr)/, '');
+        navigate(`/${preferredLanguage}${pathWithoutLang || ''}`);
       } else {
-        navigate('/');
+        navigate(`/${preferredLanguage}`);
       }
     } catch (error: any) {
       console.error('Login error:', error);

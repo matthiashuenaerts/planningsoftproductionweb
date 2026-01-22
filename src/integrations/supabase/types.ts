@@ -1142,6 +1142,7 @@ export type Database = {
           logistics: boolean | null
           name: string
           password: string
+          preferred_language: string | null
           role: string
           workstation: string | null
         }
@@ -1153,6 +1154,7 @@ export type Database = {
           logistics?: boolean | null
           name: string
           password: string
+          preferred_language?: string | null
           role: string
           workstation?: string | null
         }
@@ -1164,6 +1166,7 @@ export type Database = {
           logistics?: boolean | null
           name?: string
           password?: string
+          preferred_language?: string | null
           role?: string
           workstation?: string | null
         }
