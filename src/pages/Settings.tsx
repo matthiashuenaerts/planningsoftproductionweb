@@ -17,6 +17,7 @@ import MailSettings from '@/components/settings/MailSettings';
 import StockLocationsSettings from '@/components/settings/StockLocationsSettings';
 import InstallationTeamsSettings from '@/components/settings/InstallationTeamsSettings';
 import { CsvImportConfigSettings } from '@/components/CsvImportConfigSettings';
+import ProductionRoutingSettings from '@/components/settings/ProductionRoutingSettings';
 
 import MaterialSettings from '@/components/settings/MaterialSettings';
 import SupabaseConnectionSettings from '@/components/settings/SupabaseConnectionSettings';
@@ -92,7 +93,7 @@ const Settings: React.FC = () => {
             <TabsList className="mb-4 overflow-x-auto w-full justify-start">
               <TabsTrigger value="workstations">Workstations</TabsTrigger>
               <TabsTrigger value="employees">Employees</TabsTrigger>
-              
+              <TabsTrigger value="production-routing">Production Routing</TabsTrigger>
               <TabsTrigger value="standard-tasks">Standard Tasks</TabsTrigger>
               <TabsTrigger value="calculation-relationships">Calculation Relationships</TabsTrigger>
               <TabsTrigger value="holiday-planner">Holiday Planner</TabsTrigger>
@@ -116,6 +117,10 @@ const Settings: React.FC = () => {
               <EmployeeSettings />
             </TabsContent>
 
+
+            <TabsContent value="production-routing">
+              <ProductionRoutingSettings />
+            </TabsContent>
 
             <TabsContent value="standard-tasks">
               <StandardTasksSettings />

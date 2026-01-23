@@ -30,12 +30,21 @@ import { Switch } from '@/components/ui/switch';
 import { projectService, phaseService, taskService, Task } from '@/services/dataService';
 import { workstationService } from '@/services/workstationService';
 import { standardTasksService, StandardTask } from '@/services/standardTasksService';
+import { productionRouteService, ProductionRoute } from '@/services/productionRouteService';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from './ui/scroll-area';
 import { Checkbox } from './ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from './ui/label';
 
 // Add the missing interface
 interface NewProjectModalProps {
@@ -88,11 +97,14 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [allTasks, setAllTasks] = useState<TaskItem[]>([]); // Store all tasks for filtering
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskWorkstation, setNewTaskWorkstation] = useState('');
   const [workstations, setWorkstations] = useState<{id: string, name: string}[]>([]);
   const [projectCode, setProjectCode] = useState('');
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [routes, setRoutes] = useState<ProductionRoute[]>([]);
+  const [selectedRouteId, setSelectedRouteId] = useState<string>('');
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -168,15 +180,19 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
     }
   }, [open, form.watch('is_after_sales')]);
 
-  // Fetch all workstations and standard tasks when component mounts
+  // Fetch all workstations, standard tasks, and routes when component mounts
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         
-        // Get all workstations
-        const workstationData = await workstationService.getAll();
+        // Get all workstations and routes in parallel
+        const [workstationData, routesData] = await Promise.all([
+          workstationService.getAll(),
+          productionRouteService.getAll()
+        ]);
         setWorkstations(workstationData.map(w => ({ id: w.id, name: w.name })));
+        setRoutes(routesData);
         
         // Get all standard tasks with their linked workstations
         const standardTasks = await standardTasksService.getAll();
@@ -208,7 +224,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
           }
         }
         
+        setAllTasks(taskItems);
         setTasks(taskItems);
+        setSelectedRouteId(''); // Reset route selection
       } catch (error) {
         console.error('Error fetching data:', error);
         toast({
@@ -225,6 +243,37 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       fetchData();
     }
   }, [open, toast]);
+
+  // Handle route selection change
+  const handleRouteChange = async (routeId: string) => {
+    setSelectedRouteId(routeId);
+    
+    if (!routeId || routeId === 'all') {
+      // Show all tasks when "All Tasks" is selected
+      setTasks(allTasks.map(t => ({ ...t, selected: true })));
+      return;
+    }
+    
+    try {
+      // Get the tasks for this route
+      const routeTasks = await productionRouteService.getRouteTasks(routeId);
+      const routeTaskIds = routeTasks.map(t => t.standard_task_id);
+      
+      // Filter to only show tasks that are in the route, and select them
+      const filteredTasks = allTasks
+        .filter(t => t.standard_task_id && routeTaskIds.includes(t.standard_task_id))
+        .map(t => ({ ...t, selected: true }));
+      
+      setTasks(filteredTasks);
+    } catch (error) {
+      console.error('Error loading route tasks:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load route tasks",
+        variant: "destructive"
+      });
+    }
+  };
   
   // Calculate task durations whenever project_value changes or when tasks are loaded/modified
   useEffect(() => {
@@ -670,8 +719,25 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
               </div>
 
               <div className="border rounded-md p-4">
-                <h3 className="font-medium mb-2">Project Tasks</h3>
-                
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-medium">Project Tasks</h3>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="route-select" className="text-sm whitespace-nowrap">Production Route:</Label>
+                    <Select value={selectedRouteId} onValueChange={handleRouteChange}>
+                      <SelectTrigger id="route-select" className="w-[200px]">
+                        <SelectValue placeholder="All Tasks" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Tasks</SelectItem>
+                        {routes.map(route => (
+                          <SelectItem key={route.id} value={route.id}>
+                            {route.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 {loading ? (
                   <div className="flex justify-center p-4">
                     <Loader2 className="h-8 w-8 animate-spin" />

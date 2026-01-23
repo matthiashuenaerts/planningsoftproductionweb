@@ -2333,6 +2333,66 @@ export type Database = {
         }
         Relationships: []
       }
+      production_route_tasks: {
+        Row: {
+          created_at: string
+          id: string
+          route_id: string
+          standard_task_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          route_id: string
+          standard_task_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          route_id?: string
+          standard_task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_route_tasks_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "production_routes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_route_tasks_standard_task_id_fkey"
+            columns: ["standard_task_id"]
+            isOneToOne: false
+            referencedRelation: "standard_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_routes: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           article_code: string | null

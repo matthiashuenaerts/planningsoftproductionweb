@@ -865,5 +865,23 @@
   "ordered": "Commandé",
   "in_stock": "En Stock",
   "delivered": "Livré",
-  "costing_total_accessories": "Total Accessoires"
+  "costing_total_accessories": "Total Accessoires",
+  
+  "production_routing": "Routage de Production",
+  "add_route": "Ajouter Route",
+  "edit_route": "Modifier Route",
+  "delete_route": "Supprimer Route",
+  "route_name": "Nom de la Route",
+  "enter_route_name": "Entrez le nom de la route",
+  "enter_route_description": "Entrez la description de la route",
+  "select_tasks": "Sélectionner les Tâches",
+  "tasks_selected": "tâches sélectionnées",
+  "no_routes_found": "Aucune route de production trouvée",
+  "route_name_required": "Le nom de la route est requis",
+  "route_created": "Route créée avec succès",
+  "route_updated": "Route mise à jour avec succès",
+  "route_deleted": "Route supprimée avec succès",
+  "delete_route_confirmation": "Êtes-vous sûr de vouloir supprimer la route \"{{name}}\"? Cette action ne peut pas être annulée.",
+  "failed_to_save_route": "Échec de l'enregistrement de la route",
+  "failed_to_delete_route": "Échec de la suppression de la route"
 }

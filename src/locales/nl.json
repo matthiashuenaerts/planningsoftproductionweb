@@ -865,5 +865,23 @@
   "ordered": "Besteld",
   "in_stock": "In Voorraad",
   "delivered": "Geleverd",
-  "costing_total_accessories": "Totaal Accessoires"
+  "costing_total_accessories": "Totaal Accessoires",
+  
+  "production_routing": "Productie Routing",
+  "add_route": "Route Toevoegen",
+  "edit_route": "Route Bewerken",
+  "delete_route": "Route Verwijderen",
+  "route_name": "Route Naam",
+  "enter_route_name": "Voer route naam in",
+  "enter_route_description": "Voer route beschrijving in",
+  "select_tasks": "Selecteer Taken",
+  "tasks_selected": "taken geselecteerd",
+  "no_routes_found": "Geen productie routes gevonden",
+  "route_name_required": "Route naam is verplicht",
+  "route_created": "Route succesvol aangemaakt",
+  "route_updated": "Route succesvol bijgewerkt",
+  "route_deleted": "Route succesvol verwijderd",
+  "delete_route_confirmation": "Weet u zeker dat u de route \"{{name}}\" wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
+  "failed_to_save_route": "Opslaan route mislukt",
+  "failed_to_delete_route": "Verwijderen route mislukt"
 }
