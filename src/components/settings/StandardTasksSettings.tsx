@@ -5,19 +5,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, X, Plus, Trash2, CheckSquare } from 'lucide-react';
+import { Save, X, Plus, Trash2, CheckSquare, Edit, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { checklistService, ChecklistItem } from '@/services/checklistService';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface LimitPhase {
   id: string;
   standard_task_id: string;
   standard_task_number: string;
   standard_task_name: string;
+}
+
+interface TaskFormData {
+  task_number: string;
+  task_name: string;
+  time_coefficient: number;
+  day_counter: number;
+  hourly_cost: number;
+  color: string;
 }
 
 const StandardTasksSettings: React.FC = () => {
@@ -31,6 +42,24 @@ const StandardTasksSettings: React.FC = () => {
   const [newChecklistItem, setNewChecklistItem] = useState('');
   const [newItemRequired, setNewItemRequired] = useState(true);
   const { toast } = useToast();
+
+  // Add/Edit task dialog state
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<StandardTask | null>(null);
+  const [taskFormData, setTaskFormData] = useState<TaskFormData>({
+    task_number: '',
+    task_name: '',
+    time_coefficient: 0,
+    day_counter: 0,
+    hourly_cost: 0,
+    color: ''
+  });
+  const [savingTask, setSavingTask] = useState(false);
+
+  // Delete confirmation state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<StandardTask | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Predefined color options
   const colorOptions = [
@@ -49,55 +78,55 @@ const StandardTasksSettings: React.FC = () => {
   ];
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        console.log('Fetching standard tasks...');
-        const tasks = await standardTasksService.getAll();
-        console.log('Standard tasks loaded:', tasks);
-        setStandardTasks(tasks);
-        
-        // Fetch all standard tasks for limit phase selection
-        const allTasks = await standardTasksService.getAllStandardTasksForLimitPhases();
-        console.log('All standard tasks for limit phases:', allTasks);
-        setAllStandardTasks(allTasks);
-        
-        // Fetch limit phases and checklists for each standard task
-        const limitPhasesData: Record<string, LimitPhase[]> = {};
-        const checklistsData: Record<string, ChecklistItem[]> = {};
-        
-        for (const task of tasks) {
-          try {
-            // Fetch limit phases
-            const taskLimitPhases = await standardTasksService.getLimitPhases(task.id);
-            console.log(`Limit phases for task ${task.task_number}:`, taskLimitPhases);
-            limitPhasesData[task.id] = taskLimitPhases;
-            
-            // Fetch checklist items
-            const taskChecklistItems = await checklistService.getChecklistItems(task.id);
-            console.log(`Checklist items for task ${task.task_number}:`, taskChecklistItems);
-            checklistsData[task.id] = taskChecklistItems;
-          } catch (error) {
-            console.error(`Error fetching data for task ${task.id}:`, error);
-            limitPhasesData[task.id] = [];
-            checklistsData[task.id] = [];
-          }
-        }
-        setLimitPhases(limitPhasesData);
-        setChecklists(checklistsData);
-      } catch (error) {
-        console.error('Error loading standard tasks:', error);
-        toast({
-          title: 'Error loading standard tasks',
-          description: `Failed to load standard tasks: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          variant: 'destructive'
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
-  }, [toast]);
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      console.log('Fetching standard tasks...');
+      const tasks = await standardTasksService.getAll();
+      console.log('Standard tasks loaded:', tasks);
+      setStandardTasks(tasks);
+      
+      // Fetch all standard tasks for limit phase selection
+      const allTasks = await standardTasksService.getAllStandardTasksForLimitPhases();
+      console.log('All standard tasks for limit phases:', allTasks);
+      setAllStandardTasks(allTasks);
+      
+      // Fetch limit phases and checklists for each standard task
+      const limitPhasesData: Record<string, LimitPhase[]> = {};
+      const checklistsData: Record<string, ChecklistItem[]> = {};
+      
+      for (const task of tasks) {
+        try {
+          // Fetch limit phases
+          const taskLimitPhases = await standardTasksService.getLimitPhases(task.id);
+          console.log(`Limit phases for task ${task.task_number}:`, taskLimitPhases);
+          limitPhasesData[task.id] = taskLimitPhases;
+          
+          // Fetch checklist items
+          const taskChecklistItems = await checklistService.getChecklistItems(task.id);
+          console.log(`Checklist items for task ${task.task_number}:`, taskChecklistItems);
+          checklistsData[task.id] = taskChecklistItems;
+        } catch (error) {
+          console.error(`Error fetching data for task ${task.id}:`, error);
+          limitPhasesData[task.id] = [];
+          checklistsData[task.id] = [];
+        }
+      }
+      setLimitPhases(limitPhasesData);
+      setChecklists(checklistsData);
+    } catch (error) {
+      console.error('Error loading standard tasks:', error);
+      toast({
+        title: 'Error loading standard tasks',
+        description: `Failed to load standard tasks: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getTaskNameParts = (taskName: string): string[] => {
     return standardTasksService.getTaskNameParts(taskName);
@@ -402,346 +431,621 @@ const StandardTasksSettings: React.FC = () => {
     }
   };
 
+  // Add/Edit task functions
+  const openAddTaskDialog = () => {
+    setEditingTask(null);
+    setTaskFormData({
+      task_number: '',
+      task_name: '',
+      time_coefficient: 0,
+      day_counter: 0,
+      hourly_cost: 0,
+      color: ''
+    });
+    setTaskDialogOpen(true);
+  };
+
+  const openEditTaskDialog = (task: StandardTask) => {
+    setEditingTask(task);
+    setTaskFormData({
+      task_number: task.task_number,
+      task_name: task.task_name,
+      time_coefficient: task.time_coefficient,
+      day_counter: task.day_counter,
+      hourly_cost: task.hourly_cost || 0,
+      color: task.color || ''
+    });
+    setTaskDialogOpen(true);
+  };
+
+  const handleSaveTask = async () => {
+    if (!taskFormData.task_number.trim() || !taskFormData.task_name.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Task number and name are required',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setSavingTask(true);
+    try {
+      if (editingTask) {
+        // Update existing task
+        await standardTasksService.update(editingTask.id, {
+          task_number: taskFormData.task_number.trim(),
+          task_name: taskFormData.task_name.trim(),
+          time_coefficient: taskFormData.time_coefficient,
+          day_counter: taskFormData.day_counter,
+          hourly_cost: taskFormData.hourly_cost,
+          color: taskFormData.color || undefined
+        });
+        toast({
+          title: 'Success',
+          description: 'Standard task updated successfully'
+        });
+      } else {
+        // Create new task
+        await standardTasksService.create({
+          task_number: taskFormData.task_number.trim(),
+          task_name: taskFormData.task_name.trim(),
+          time_coefficient: taskFormData.time_coefficient,
+          day_counter: taskFormData.day_counter,
+          hourly_cost: taskFormData.hourly_cost,
+          color: taskFormData.color || undefined
+        });
+        toast({
+          title: 'Success',
+          description: 'Standard task created successfully'
+        });
+      }
+      setTaskDialogOpen(false);
+      await fetchData();
+    } catch (error) {
+      console.error('Error saving task:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to save task: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: 'destructive'
+      });
+    } finally {
+      setSavingTask(false);
+    }
+  };
+
+  const openDeleteDialog = (task: StandardTask) => {
+    setTaskToDelete(task);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteTask = async () => {
+    if (!taskToDelete) return;
+
+    setDeleting(true);
+    try {
+      await standardTasksService.delete(taskToDelete.id);
+      toast({
+        title: 'Success',
+        description: 'Standard task deleted successfully'
+      });
+      setDeleteDialogOpen(false);
+      setTaskToDelete(null);
+      await fetchData();
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to delete task: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: 'destructive'
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-medium">Standard Tasks</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium text-foreground">Standard Tasks</h2>
+        <Button onClick={openAddTaskDialog}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Task
+        </Button>
+      </div>
       
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-20">Task #</TableHead>
-                <TableHead>Task Name</TableHead>
-                <TableHead>Details</TableHead>
-                <TableHead className="w-32">Time Coefficient</TableHead>
-                <TableHead className="w-20">Actions</TableHead>
-                <TableHead className="w-32">Day Counter</TableHead>
-                <TableHead className="w-20">Actions</TableHead>
-                <TableHead className="w-32">Hourly Cost (€)</TableHead>
-                <TableHead className="w-20">Actions</TableHead>
-                <TableHead className="w-32">Color</TableHead>
-                <TableHead className="w-20">Actions</TableHead>
-                <TableHead className="w-96">Limit Phases (Standard Tasks)</TableHead>
-                <TableHead className="w-40">Checklist Items</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {standardTasks.map((task) => {
-                const taskParts = getTaskNameParts(task.task_name);
-                const taskLimitPhases = limitPhases[task.id] || [];
-                
-                return (
-                  <TableRow key={task.id}>
-                    <TableCell className="font-medium">{task.task_number}</TableCell>
-                    <TableCell>{task.task_name}</TableCell>
-                    <TableCell>
-                      {taskParts.length > 1 ? (
-                        <div className="text-xs text-muted-foreground">
-                          {taskParts.map((part, index) => (
-                            <span key={index} className="mr-1">
-                              {index > 0 && <span className="mx-1">→</span>}
-                              {part}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
-                      <Input 
-                        type="number" 
-                        step="0.1"
-                        min="0"
-                        value={task.time_coefficient} 
-                        onChange={(e) => handleCoefficientChange(task.id, e.target.value)}
-                        className="w-full"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => saveTimeCoefficient(task)} 
-                        disabled={saving[task.id]}
-                        className="w-full"
-                      >
-                        {saving[task.id] ? (
-                          <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
-                        ) : (
-                          <Save className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <Input 
-                        type="number" 
-                        min="0"
-                        value={task.day_counter} 
-                        onChange={(e) => handleDayCounterChange(task.id, e.target.value)}
-                        className="w-full"
-                        placeholder="Days"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => saveDayCounter(task)} 
-                        disabled={saving[`${task.id}_day`]}
-                        className="w-full"
-                      >
-                        {saving[`${task.id}_day`] ? (
-                          <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
-                        ) : (
-                          <Save className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={task.hourly_cost || 0}
-                        onChange={(e) => handleHourlyCostChange(task.id, e.target.value)}
-                        className="w-full"
-                        placeholder="e.g. 50.00"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => saveHourlyCost(task)}
-                        disabled={saving[`${task.id}_hourly_cost`]}
-                        className="w-full"
-                      >
-                        {saving[`${task.id}_hourly_cost`] ? (
-                          <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
-                        ) : (
-                          <Save className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {colorOptions.map((color) => (
-                          <button
-                            key={color}
-                            className={`w-6 h-6 rounded border-2 hover:scale-110 transition-transform ${
-                              task.color === color ? 'border-gray-900 shadow-md' : 'border-gray-300'
-                            }`}
-                            style={{ backgroundColor: color }}
-                            onClick={() => handleColorChange(task.id, color)}
-                            title={`Set color to ${color}`}
-                          />
-                        ))}
-                        {/* No color option */}
-                        <button
-                          className={`w-6 h-6 rounded border-2 bg-white hover:scale-110 transition-transform ${
-                            !task.color || task.color === '' ? 'border-gray-900 shadow-md' : 'border-gray-300'
-                          }`}
-                          onClick={() => handleColorChange(task.id, '')}
-                          title="No color"
+          <ScrollArea className="h-[70vh]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-20 sticky top-0 bg-background">Task #</TableHead>
+                  <TableHead className="sticky top-0 bg-background">Task Name</TableHead>
+                  <TableHead className="w-32 sticky top-0 bg-background">Time Coefficient</TableHead>
+                  <TableHead className="w-20 sticky top-0 bg-background">Actions</TableHead>
+                  <TableHead className="w-32 sticky top-0 bg-background">Day Counter</TableHead>
+                  <TableHead className="w-20 sticky top-0 bg-background">Actions</TableHead>
+                  <TableHead className="w-32 sticky top-0 bg-background">Hourly Cost (€)</TableHead>
+                  <TableHead className="w-20 sticky top-0 bg-background">Actions</TableHead>
+                  <TableHead className="w-32 sticky top-0 bg-background">Color</TableHead>
+                  <TableHead className="w-20 sticky top-0 bg-background">Actions</TableHead>
+                  <TableHead className="w-64 sticky top-0 bg-background">Limit Phases</TableHead>
+                  <TableHead className="w-40 sticky top-0 bg-background">Checklist</TableHead>
+                  <TableHead className="w-24 sticky top-0 bg-background">Edit/Delete</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {standardTasks.map((task) => {
+                  const taskLimitPhases = limitPhases[task.id] || [];
+                  
+                  return (
+                    <TableRow key={task.id}>
+                      <TableCell className="font-medium text-foreground">{task.task_number}</TableCell>
+                      <TableCell className="text-foreground">{task.task_name}</TableCell>
+                      <TableCell>
+                        <Input 
+                          type="number" 
+                          step="0.1"
+                          min="0"
+                          value={task.time_coefficient} 
+                          onChange={(e) => handleCoefficientChange(task.id, e.target.value)}
+                          className="w-full bg-background text-foreground"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => saveTimeCoefficient(task)} 
+                          disabled={saving[task.id]}
+                          className="w-full"
                         >
-                          <X className="h-3 w-3 text-gray-400 mx-auto" />
-                        </button>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => saveColor(task)} 
-                        disabled={saving[`${task.id}_color`]}
-                        className="w-full"
-                      >
-                        {saving[`${task.id}_color`] ? (
-                          <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
-                        ) : (
-                          <Save className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-3">
-                        {/* Current limit phases */}
-                        <div className="flex flex-wrap gap-1">
-                          {taskLimitPhases.map((limitPhase) => (
-                            <Badge key={limitPhase.id} variant="secondary" className="flex items-center gap-1">
-                              {limitPhase.standard_task_number} - {limitPhase.standard_task_name}
-                              <button
-                                onClick={() => removeLimitPhase(task.id, limitPhase.id)}
-                                className="ml-1 hover:text-red-500"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                        
-                        {/* Available standard tasks to select as limit phases */}
-                        <div className="space-y-2 max-h-32 overflow-y-auto border rounded p-2">
-                          <div className="text-xs font-medium text-gray-600">Available Standard Tasks:</div>
-                          {allStandardTasks
-                            .filter(standardTask => standardTask.id !== task.id) // Don't allow self-reference
-                            .map((standardTask) => {
-                              const isSelected = taskLimitPhases.some(lp => lp.standard_task_id === standardTask.id);
-                              return (
-                                <div key={standardTask.id} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={`${task.id}-${standardTask.id}`}
-                                    checked={isSelected}
-                                    onCheckedChange={(checked) => 
-                                      handleLimitPhaseToggle(task.id, standardTask.id, checked as boolean)
-                                    }
-                                  />
-                                  <label 
-                                    htmlFor={`${task.id}-${standardTask.id}`}
-                                    className="text-xs cursor-pointer flex-1"
-                                  >
-                                    {standardTask.task_number} - {standardTask.task_name}
-                                  </label>
-                                </div>
-                              );
-                            })}
-                          {allStandardTasks.length === 0 && (
-                            <div className="text-xs text-gray-500">No standard tasks available</div>
+                          {saving[task.id] ? (
+                            <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
+                          ) : (
+                            <Save className="h-4 w-4" />
                           )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">
-                            {(checklists[task.id] || []).length} items
-                          </span>
-                          <Dialog
-                            open={checklistDialogOpen === task.id}
-                            onOpenChange={(open) => setChecklistDialogOpen(open ? task.id : null)}
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <Input 
+                          type="number" 
+                          min="0"
+                          value={task.day_counter} 
+                          onChange={(e) => handleDayCounterChange(task.id, e.target.value)}
+                          className="w-full bg-background text-foreground"
+                          placeholder="Days"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => saveDayCounter(task)} 
+                          disabled={saving[`${task.id}_day`]}
+                          className="w-full"
+                        >
+                          {saving[`${task.id}_day`] ? (
+                            <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={task.hourly_cost || 0}
+                          onChange={(e) => handleHourlyCostChange(task.id, e.target.value)}
+                          className="w-full bg-background text-foreground"
+                          placeholder="e.g. 50.00"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => saveHourlyCost(task)}
+                          disabled={saving[`${task.id}_hourly_cost`]}
+                          className="w-full"
+                        >
+                          {saving[`${task.id}_hourly_cost`] ? (
+                            <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {colorOptions.map((color) => (
+                            <button
+                              key={color}
+                              className={`w-6 h-6 rounded border-2 hover:scale-110 transition-transform ${
+                                task.color === color ? 'border-foreground shadow-md' : 'border-muted'
+                              }`}
+                              style={{ backgroundColor: color }}
+                              onClick={() => handleColorChange(task.id, color)}
+                              title={`Set color to ${color}`}
+                            />
+                          ))}
+                          {/* No color option */}
+                          <button
+                            className={`w-6 h-6 rounded border-2 bg-background hover:scale-110 transition-transform ${
+                              !task.color || task.color === '' ? 'border-foreground shadow-md' : 'border-muted'
+                            }`}
+                            onClick={() => handleColorChange(task.id, '')}
+                            title="No color"
                           >
+                            <X className="h-3 w-3 text-muted-foreground mx-auto" />
+                          </button>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => saveColor(task)} 
+                          disabled={saving[`${task.id}_color`]}
+                          className="w-full"
+                        >
+                          {saving[`${task.id}_color`] ? (
+                            <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full"></div>
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-2">
+                          {/* Current limit phases */}
+                          <div className="flex flex-wrap gap-1">
+                            {taskLimitPhases.map((limitPhase) => (
+                              <Badge key={limitPhase.id} variant="secondary" className="flex items-center gap-1 text-xs">
+                                {limitPhase.standard_task_number}
+                                <button
+                                  onClick={() => removeLimitPhase(task.id, limitPhase.id)}
+                                  className="ml-1 hover:text-destructive"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                          
+                          {/* Available standard tasks to select as limit phases */}
+                          <Dialog>
                             <DialogTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => loadChecklistItems(task.id)}
-                              >
-                                <CheckSquare className="h-4 w-4 mr-1" />
+                              <Button variant="outline" size="sm" className="w-full">
+                                <Plus className="h-3 w-3 mr-1" />
                                 Manage
                               </Button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-2xl">
+                            <DialogContent className="max-w-lg">
                               <DialogHeader>
-                                <DialogTitle>
-                                  Checklist for {task.task_number} - {task.task_name}
-                                </DialogTitle>
+                                <DialogTitle className="text-foreground">Limit Phases for {task.task_number}</DialogTitle>
+                                <DialogDescription className="text-muted-foreground">
+                                  Select which tasks must be completed before this task can start.
+                                </DialogDescription>
                               </DialogHeader>
-                              
-                              <div className="space-y-4">
-                                {/* Add new item */}
-                                <div className="border rounded-lg p-4 space-y-3">
-                                  <h4 className="font-medium">Add New Checklist Item</h4>
-                                  <div className="space-y-2">
-                                    <Input
-                                      placeholder="Enter checklist item..."
-                                      value={newChecklistItem}
-                                      onChange={(e) => setNewChecklistItem(e.target.value)}
-                                    />
-                                    <div className="flex items-center space-x-2">
-                                      <Switch
-                                        id="required"
-                                        checked={newItemRequired}
-                                        onCheckedChange={setNewItemRequired}
-                                      />
-                                      <Label htmlFor="required">Required item</Label>
-                                    </div>
-                                    <Button
-                                      onClick={() => addChecklistItem(task.id)}
-                                      disabled={!newChecklistItem.trim()}
-                                      size="sm"
-                                    >
-                                      <Plus className="h-4 w-4 mr-1" />
-                                      Add Item
-                                    </Button>
-                                  </div>
-                                </div>
-
-                                {/* Existing items */}
+                              <ScrollArea className="h-[400px] pr-4">
                                 <div className="space-y-2">
-                                  <h4 className="font-medium">Existing Items</h4>
-                                  {(checklists[task.id] || []).length === 0 ? (
-                                    <p className="text-muted-foreground text-sm">
-                                      No checklist items configured for this task.
-                                    </p>
-                                  ) : (
-                                    <div className="space-y-2">
-                                      {(checklists[task.id] || []).map((item) => (
-                                        <div
-                                          key={item.id}
-                                          className="flex items-center justify-between p-3 border rounded-lg"
-                                        >
-                                          <div className="flex-1">
-                                            <p className="text-sm">{item.item_text}</p>
-                                            <div className="flex items-center space-x-2 mt-1">
-                                              <Switch
-                                                checked={item.is_required}
-                                                onCheckedChange={() => toggleItemRequired(task.id, item)}
-                                              />
-                                              <Label className="text-xs text-muted-foreground">
-                                                {item.is_required ? 'Required' : 'Optional'}
-                                              </Label>
-                                            </div>
-                                          </div>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => deleteChecklistItem(task.id, item.id)}
+                                  {allStandardTasks
+                                    .filter(standardTask => standardTask.id !== task.id)
+                                    .map((standardTask) => {
+                                      const isSelected = taskLimitPhases.some(lp => lp.standard_task_id === standardTask.id);
+                                      return (
+                                        <div key={standardTask.id} className="flex items-center space-x-2 p-2 rounded hover:bg-muted">
+                                          <Checkbox
+                                            id={`${task.id}-${standardTask.id}`}
+                                            checked={isSelected}
+                                            onCheckedChange={(checked) => 
+                                              handleLimitPhaseToggle(task.id, standardTask.id, checked as boolean)
+                                            }
+                                          />
+                                          <label 
+                                            htmlFor={`${task.id}-${standardTask.id}`}
+                                            className="text-sm cursor-pointer flex-1 text-foreground"
                                           >
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
+                                            {standardTask.task_number} - {standardTask.task_name}
+                                          </label>
                                         </div>
-                                      ))}
-                                    </div>
-                                  )}
+                                      );
+                                    })}
                                 </div>
-                              </div>
+                              </ScrollArea>
                             </DialogContent>
                           </Dialog>
                         </div>
-                        
-                        {/* Preview of checklist items */}
-                        <div className="space-y-1">
-                          {(checklists[task.id] || []).slice(0, 3).map((item) => (
-                            <div key={item.id} className="text-xs text-muted-foreground">
-                              • {item.item_text.substring(0, 30)}
-                              {item.item_text.length > 30 ? '...' : ''}
-                              {item.is_required && <span className="text-red-500 ml-1">*</span>}
-                            </div>
-                          ))}
-                          {(checklists[task.id] || []).length > 3 && (
-                            <div className="text-xs text-muted-foreground">
-                              ... and {(checklists[task.id] || []).length - 3} more
-                            </div>
-                          )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-foreground">
+                              {(checklists[task.id] || []).length} items
+                            </span>
+                            <Dialog
+                              open={checklistDialogOpen === task.id}
+                              onOpenChange={(open) => setChecklistDialogOpen(open ? task.id : null)}
+                            >
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => loadChecklistItems(task.id)}
+                                >
+                                  <CheckSquare className="h-4 w-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                  <DialogTitle className="text-foreground">
+                                    Checklist for {task.task_number} - {task.task_name}
+                                  </DialogTitle>
+                                </DialogHeader>
+                                
+                                <div className="space-y-4">
+                                  {/* Add new item */}
+                                  <div className="border rounded-lg p-4 space-y-3">
+                                    <h4 className="font-medium text-foreground">Add New Checklist Item</h4>
+                                    <div className="space-y-2">
+                                      <Input
+                                        placeholder="Enter checklist item..."
+                                        value={newChecklistItem}
+                                        onChange={(e) => setNewChecklistItem(e.target.value)}
+                                        className="bg-background text-foreground"
+                                      />
+                                      <div className="flex items-center space-x-2">
+                                        <Switch
+                                          id="required"
+                                          checked={newItemRequired}
+                                          onCheckedChange={setNewItemRequired}
+                                        />
+                                        <Label htmlFor="required" className="text-foreground">Required item</Label>
+                                      </div>
+                                      <Button
+                                        onClick={() => addChecklistItem(task.id)}
+                                        disabled={!newChecklistItem.trim()}
+                                        size="sm"
+                                      >
+                                        <Plus className="h-4 w-4 mr-1" />
+                                        Add Item
+                                      </Button>
+                                    </div>
+                                  </div>
+
+                                  {/* Existing items */}
+                                  <div className="space-y-2">
+                                    <h4 className="font-medium text-foreground">Existing Items</h4>
+                                    {(checklists[task.id] || []).length === 0 ? (
+                                      <p className="text-muted-foreground text-sm">
+                                        No checklist items configured for this task.
+                                      </p>
+                                    ) : (
+                                      <div className="space-y-2">
+                                        {(checklists[task.id] || []).map((item) => (
+                                          <div
+                                            key={item.id}
+                                            className="flex items-center justify-between p-3 border rounded-lg"
+                                          >
+                                            <div className="flex-1">
+                                              <p className="text-sm text-foreground">{item.item_text}</p>
+                                              <div className="flex items-center space-x-2 mt-1">
+                                                <Switch
+                                                  checked={item.is_required}
+                                                  onCheckedChange={() => toggleItemRequired(task.id, item)}
+                                                />
+                                                <Label className="text-xs text-muted-foreground">
+                                                  {item.is_required ? 'Required' : 'Optional'}
+                                                </Label>
+                                              </div>
+                                            </div>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => deleteChecklistItem(task.id, item.id)}
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditTaskDialog(task)}
+                            title="Edit task"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openDeleteDialog(task)}
+                            className="text-destructive hover:text-destructive"
+                            title="Delete task"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </ScrollArea>
         </CardContent>
       </Card>
+
+      {/* Add/Edit Task Dialog */}
+      <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">
+              {editingTask ? 'Edit Standard Task' : 'Add Standard Task'}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {editingTask ? 'Update the task details below.' : 'Fill in the details for the new standard task.'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="task_number" className="text-foreground">Task Number *</Label>
+              <Input
+                id="task_number"
+                value={taskFormData.task_number}
+                onChange={(e) => setTaskFormData(prev => ({ ...prev, task_number: e.target.value }))}
+                placeholder="e.g. 01, 02, 03..."
+                className="bg-background text-foreground"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="task_name" className="text-foreground">Task Name *</Label>
+              <Input
+                id="task_name"
+                value={taskFormData.task_name}
+                onChange={(e) => setTaskFormData(prev => ({ ...prev, task_name: e.target.value }))}
+                placeholder="Enter task name"
+                className="bg-background text-foreground"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="time_coefficient" className="text-foreground">Time Coefficient</Label>
+                <Input
+                  id="time_coefficient"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={taskFormData.time_coefficient}
+                  onChange={(e) => setTaskFormData(prev => ({ ...prev, time_coefficient: parseFloat(e.target.value) || 0 }))}
+                  className="bg-background text-foreground"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="day_counter" className="text-foreground">Day Counter</Label>
+                <Input
+                  id="day_counter"
+                  type="number"
+                  min="0"
+                  value={taskFormData.day_counter}
+                  onChange={(e) => setTaskFormData(prev => ({ ...prev, day_counter: parseInt(e.target.value) || 0 }))}
+                  className="bg-background text-foreground"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="hourly_cost" className="text-foreground">Hourly Cost (€)</Label>
+              <Input
+                id="hourly_cost"
+                type="number"
+                step="0.01"
+                min="0"
+                value={taskFormData.hourly_cost}
+                onChange={(e) => setTaskFormData(prev => ({ ...prev, hourly_cost: parseFloat(e.target.value) || 0 }))}
+                className="bg-background text-foreground"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-foreground">Color</Label>
+              <div className="flex flex-wrap gap-2">
+                {colorOptions.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`w-8 h-8 rounded border-2 hover:scale-110 transition-transform ${
+                      taskFormData.color === color ? 'border-foreground shadow-md' : 'border-muted'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setTaskFormData(prev => ({ ...prev, color }))}
+                  />
+                ))}
+                <button
+                  type="button"
+                  className={`w-8 h-8 rounded border-2 bg-background hover:scale-110 transition-transform ${
+                    !taskFormData.color ? 'border-foreground shadow-md' : 'border-muted'
+                  }`}
+                  onClick={() => setTaskFormData(prev => ({ ...prev, color: '' }))}
+                >
+                  <X className="h-4 w-4 text-muted-foreground mx-auto" />
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTaskDialogOpen(false)} disabled={savingTask}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveTask} disabled={savingTask}>
+              {savingTask ? (
+                <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full mr-2"></div>
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              {editingTask ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-foreground">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Delete Standard Task
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              Are you sure you want to delete task "{taskToDelete?.task_number} - {taskToDelete?.task_name}"? 
+              This action cannot be undone and may affect existing projects that use this task.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTask}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (
+                <div className="animate-spin h-4 w-4 border-2 border-b-transparent rounded-full mr-2"></div>
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
