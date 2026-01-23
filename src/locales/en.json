@@ -384,5 +384,23 @@
   "ordered": "Ordered",
   "in_stock": "In Stock",
   "delivered": "Delivered",
-  "costing_total_accessories": "Total Accessories"
+  "costing_total_accessories": "Total Accessories",
+  
+  "production_routing": "Production Routing",
+  "add_route": "Add Route",
+  "edit_route": "Edit Route",
+  "delete_route": "Delete Route",
+  "route_name": "Route Name",
+  "enter_route_name": "Enter route name",
+  "enter_route_description": "Enter route description",
+  "select_tasks": "Select Tasks",
+  "tasks_selected": "tasks selected",
+  "no_routes_found": "No production routes found",
+  "route_name_required": "Route name is required",
+  "route_created": "Route created successfully",
+  "route_updated": "Route updated successfully",
+  "route_deleted": "Route deleted successfully",
+  "delete_route_confirmation": "Are you sure you want to delete the route \"{{name}}\"? This action cannot be undone.",
+  "failed_to_save_route": "Failed to save route",
+  "failed_to_delete_route": "Failed to delete route"
 }
