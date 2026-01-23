@@ -367,5 +367,53 @@ export const standardTasksService = {
     }
     
     return data?.map(item => item.standard_tasks).filter(Boolean) as StandardTask[] || [];
+  },
+
+  async create(task: { task_number: string; task_name: string; time_coefficient?: number; day_counter?: number; color?: string; hourly_cost?: number }): Promise<StandardTask> {
+    const { data, error } = await supabase
+      .from('standard_tasks')
+      .insert({
+        task_number: task.task_number,
+        task_name: task.task_name,
+        time_coefficient: task.time_coefficient || 0,
+        day_counter: task.day_counter || 0,
+        color: task.color || null,
+        hourly_cost: task.hourly_cost || 0
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating standard task:', error);
+      throw error;
+    }
+    return data as StandardTask;
+  },
+
+  async update(id: string, updates: Partial<{ task_number: string; task_name: string; time_coefficient: number; day_counter: number; color: string; hourly_cost: number }>): Promise<StandardTask> {
+    const { data, error } = await supabase
+      .from('standard_tasks')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating standard task:', error);
+      throw error;
+    }
+    return data as StandardTask;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('standard_tasks')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting standard task:', error);
+      throw error;
+    }
   }
 };
