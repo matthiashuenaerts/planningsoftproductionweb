@@ -8,6 +8,9 @@ import { projectChatService } from '@/services/projectChatService';
 import { rushOrderService } from '@/services/rushOrderService';
 import { partsListService } from '@/services/partsListService';
 
+const BRAND_COLOR = { r: 45, g: 115, b: 135 };
+const ACCENT_COLOR = { r: 80, g: 180, b: 210 };
+
 interface ComprehensiveExportData {
   project: Project;
   phases: any[];
@@ -26,6 +29,57 @@ interface ComprehensiveExportData {
   workstations: any[];
   documents: any[];
 }
+
+const drawBrandedHeader = async (pdf: jsPDF, pageWidth: number, margin: number): Promise<number> => {
+  let yPos = margin;
+  
+  // Try to add logo
+  try {
+    const logoImg = new Image();
+    logoImg.crossOrigin = 'anonymous';
+    
+    await new Promise<void>((resolve, reject) => {
+      logoImg.onload = () => resolve();
+      logoImg.onerror = () => reject(new Error('Failed to load logo'));
+      logoImg.src = '/images/automattion-compass-logo.png';
+    });
+    
+    const logoWidth = 30;
+    const logoHeight = 30;
+    const logoX = (pageWidth - logoWidth) / 2;
+    pdf.addImage(logoImg, 'PNG', logoX, yPos, logoWidth, logoHeight);
+    yPos += logoHeight + 5;
+  } catch (error) {
+    console.warn('Could not load logo, using placeholder');
+    yPos += 35;
+  }
+  
+  // Company name
+  pdf.setFontSize(18);
+  pdf.setFont('helvetica', 'bolditalic');
+  pdf.setTextColor(BRAND_COLOR.r, BRAND_COLOR.g, BRAND_COLOR.b);
+  pdf.text('AutoMattiOn', pageWidth / 2 - 2, yPos, { align: 'right' });
+  pdf.setFont('helvetica', 'bold');
+  pdf.setTextColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+  pdf.text(' Compass', pageWidth / 2 - 2, yPos, { align: 'left' });
+  yPos += 6;
+  
+  // Slogan
+  pdf.setFontSize(10);
+  pdf.setFont('helvetica', 'italic');
+  pdf.setTextColor(ACCENT_COLOR.r, ACCENT_COLOR.g, ACCENT_COLOR.b);
+  pdf.text('Guiding your production to perfection!', pageWidth / 2, yPos, { align: 'center' });
+  pdf.setTextColor(0, 0, 0);
+  yPos += 10;
+  
+  // Divider line
+  pdf.setDrawColor(BRAND_COLOR.r, BRAND_COLOR.g, BRAND_COLOR.b);
+  pdf.setLineWidth(0.5);
+  pdf.line(margin, yPos, pageWidth - margin, yPos);
+  yPos += 8;
+  
+  return yPos;
+};
 
 export const exportProjectToPDF = async (project: Project): Promise<void> => {
   const pdfBlob = await generateProjectPDFBlob(project);
@@ -53,21 +107,30 @@ export const generateProjectPDFBlob = async (project: Project): Promise<Blob> =>
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 20;
     const contentWidth = pageWidth - 2 * margin;
-    let currentY = margin;
+    
+    // Draw branded header on title page
+    let currentY = await drawBrandedHeader(pdf, pageWidth, margin);
 
-    // Title page
-    pdf.setFontSize(24);
+    // Title
+    pdf.setFontSize(20);
     pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(0, 0, 0);
     pdf.text('Project Export Report', pageWidth / 2, currentY, { align: 'center' });
     
-    currentY += 15;
-    pdf.setFontSize(18);
+    currentY += 12;
+    pdf.setFontSize(16);
     pdf.text(exportData.project.name, pageWidth / 2, currentY, { align: 'center' });
     
-    currentY += 10;
-    pdf.setFontSize(12);
+    currentY += 8;
+    pdf.setFontSize(11);
     pdf.setFont('helvetica', 'normal');
+    pdf.text(`Client: ${exportData.project.client}`, pageWidth / 2, currentY, { align: 'center' });
+    
+    currentY += 8;
+    pdf.setFontSize(10);
+    pdf.setTextColor(100, 100, 100);
     pdf.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, currentY, { align: 'center' });
+    pdf.setTextColor(0, 0, 0);
 
     // Project Overview
     pdf.addPage();
@@ -324,10 +387,19 @@ const checkPageBreak = (pdf: jsPDF, currentY: number, neededSpace: number, pageH
 };
 
 const addSection = (pdf: jsPDF, title: string, currentY: number, margin: number, contentWidth: number): number => {
-  pdf.setFontSize(16);
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  
+  // Draw colored section header bar
+  pdf.setFillColor(BRAND_COLOR.r, BRAND_COLOR.g, BRAND_COLOR.b);
+  pdf.rect(margin, currentY - 2, contentWidth, 10, 'F');
+  
+  pdf.setFontSize(12);
   pdf.setFont('helvetica', 'bold');
-  pdf.text(title, margin, currentY);
-  return currentY + 10;
+  pdf.setTextColor(255, 255, 255);
+  pdf.text(title, margin + 5, currentY + 5);
+  pdf.setTextColor(0, 0, 0);
+  
+  return currentY + 14;
 };
 
 const addProjectOverview = (pdf: jsPDF, data: ComprehensiveExportData, currentY: number, margin: number, contentWidth: number): number => {
@@ -494,26 +566,48 @@ const addPartsListsData = (pdf: jsPDF, data: ComprehensiveExportData, currentY: 
 };
 
 const addProjectMessagesData = (pdf: jsPDF, messages: any[], currentY: number, margin: number, contentWidth: number): number => {
-  pdf.setFontSize(10);
-  pdf.setFont('helvetica', 'normal');
+  const pageWidth = pdf.internal.pageSize.getWidth();
   
-  // Show only recent messages to avoid overwhelming the PDF
-  const recentMessages = messages.slice(0, 20);
+  // Show recent messages
+  const recentMessages = messages.slice(0, 30);
   
-  recentMessages.forEach(message => {
-    currentY = checkPageBreak(pdf, currentY, 15, pdf.internal.pageSize.getHeight(), margin);
+  recentMessages.forEach((message, index) => {
+    currentY = checkPageBreak(pdf, currentY, 18, pdf.internal.pageSize.getHeight(), margin);
+    
+    // Alternating background for readability
+    if (index % 2 === 0) {
+      pdf.setFillColor(248, 248, 248);
+      pdf.rect(margin, currentY - 4, contentWidth, 14, 'F');
+    }
+    
+    // Employee name with brand color
+    pdf.setFontSize(10);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(`${message.employee?.name || 'Unknown'} - ${new Date(message.created_at).toLocaleDateString()}`, margin, currentY);
+    pdf.setTextColor(BRAND_COLOR.r, BRAND_COLOR.g, BRAND_COLOR.b);
+    const senderName = message.employee_name || message.employee?.name || 'Unknown';
+    pdf.text(senderName, margin + 2, currentY);
+    
+    // Date in gray
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(120, 120, 120);
+    const dateStr = new Date(message.created_at).toLocaleString();
+    pdf.text(dateStr, pageWidth - margin - 2, currentY, { align: 'right' });
     currentY += 5;
     
-    pdf.setFont('helvetica', 'normal');
-    const messageText = message.message.length > 100 ? message.message.substring(0, 100) + '...' : message.message;
-    pdf.text(messageText, margin + 5, currentY);
-    currentY += 8;
+    // Message content
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(9);
+    const messageText = message.message.length > 120 ? message.message.substring(0, 120) + '...' : message.message;
+    pdf.text(messageText, margin + 4, currentY);
+    currentY += 9;
   });
   
-  if (messages.length > 20) {
-    pdf.text(`... and ${messages.length - 20} more messages`, margin, currentY);
+  if (messages.length > 30) {
+    pdf.setFontSize(9);
+    pdf.setTextColor(100, 100, 100);
+    pdf.text(`... and ${messages.length - 30} more messages`, margin, currentY);
+    pdf.setTextColor(0, 0, 0);
     currentY += 8;
   }
   
