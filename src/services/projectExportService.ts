@@ -50,6 +50,7 @@ export const exportProjectDataAsZip = async (project: Project): Promise<void> =>
     
     // Generate comprehensive PDF and add it to ZIP
     const { generateProjectPDFBlob } = await import('./projectPdfExportService');
+    const { generateCostingPDFBlob } = await import('./projectCostingPdfService');
     
     // Generate ZIP file
     const zip = new JSZip();
@@ -61,6 +62,16 @@ export const exportProjectDataAsZip = async (project: Project): Promise<void> =>
       zip.file(pdfFileName, pdfBlob);
     } catch (error) {
       console.error('Failed to generate PDF for ZIP:', error);
+      // Continue with export even if PDF generation fails
+    }
+    
+    // Add costing PDF to ZIP
+    try {
+      const costingPdfBlob = await generateCostingPDFBlob(project.id);
+      const costingPdfFileName = `${project.name.replace(/[^a-zA-Z0-9]/g, '_')}_Costing_Report.pdf`;
+      zip.file(costingPdfFileName, costingPdfBlob);
+    } catch (error) {
+      console.error('Failed to generate Costing PDF for ZIP:', error);
       // Continue with export even if PDF generation fails
     }
     
