@@ -18,6 +18,7 @@ import { Plus, Edit, Trash2, Upload, ExternalLink, FileText, Package, Search, Lo
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import GroupProductDialog from './GroupProductDialog';
+import { CsvDuplicateDialog, DuplicateProduct } from './CsvDuplicateDialog';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -79,6 +80,12 @@ const ProductsSettings: React.FC = () => {
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<ProductGroup | null>(null);
+  
+  // CSV duplicate handling state
+  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
+  const [duplicateProducts, setDuplicateProducts] = useState<DuplicateProduct[]>([]);
+  const [newProductsToInsert, setNewProductsToInsert] = useState<any[]>([]);
+  const [duplicateProductsData, setDuplicateProductsData] = useState<any[]>([]);
   
   // Pagination and search state
   const [searchTerm, setSearchTerm] = useState('');
@@ -411,103 +418,152 @@ const ProductsSettings: React.FC = () => {
     }
   };
 
+  const parseCSV = (text: string): any[] => {
+    const lines = text.split('\n').filter(line => line.trim());
+    
+    if (lines.length < 2) {
+      return [];
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const productsToInsert: any[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim());
+      if (values.length !== headers.length) continue;
+
+      const product: any = {};
+      headers.forEach((header, index) => {
+        const value = values[index];
+        switch (header) {
+          case 'name':
+            product.name = value;
+            break;
+          case 'description':
+            product.description = value || null;
+            break;
+          case 'article_code':
+          case 'article code':
+            product.article_code = value || null;
+            break;
+          case 'supplier':
+            product.supplier = value || null;
+            break;
+          case 'standard_order_quantity':
+          case 'standard order quantity':
+          case 'quantity':
+            product.standard_order_quantity = parseInt(value) || 1;
+            break;
+          case 'website_link':
+          case 'website link':
+          case 'website':
+            product.website_link = value || null;
+            break;
+          case 'barcode':
+            product.barcode = value || null;
+            break;
+          case 'qr_code':
+          case 'qr code':
+            product.qr_code = value || null;
+            break;
+          case 'location':
+            product.location = value || null;
+            break;
+          case 'price_per_unit':
+          case 'price per unit':
+          case 'price':
+            product.price_per_unit = parseFloat(value) || null;
+            break;
+        }
+      });
+
+      if (product.name) {
+        productsToInsert.push(product);
+      }
+    }
+
+    return productsToInsert;
+  };
+
   const handleCsvImport = async () => {
     if (!csvFile) return;
 
     try {
       setCsvImporting(true);
       const text = await csvFile.text();
-      const lines = text.split('\n').filter(line => line.trim());
+      const parsedProducts = parseCSV(text);
       
-      if (lines.length < 2) {
-        toast({
-          title: 'Error',
-          description: 'CSV file must have at least a header and one data row',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-      const productsToInsert = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
-        if (values.length !== headers.length) continue;
-
-        const product: any = {};
-        headers.forEach((header, index) => {
-          const value = values[index];
-          switch (header) {
-            case 'name':
-              product.name = value;
-              break;
-            case 'description':
-              product.description = value || null;
-              break;
-            case 'article_code':
-            case 'article code':
-              product.article_code = value || null;
-              break;
-            case 'supplier':
-              product.supplier = value || null;
-              break;
-            case 'standard_order_quantity':
-            case 'standard order quantity':
-            case 'quantity':
-              product.standard_order_quantity = parseInt(value) || 1;
-              break;
-            case 'website_link':
-            case 'website link':
-            case 'website':
-              product.website_link = value || null;
-              break;
-            case 'barcode':
-              product.barcode = value || null;
-              break;
-            case 'qr_code':
-            case 'qr code':
-              product.qr_code = value || null;
-              break;
-            case 'location':
-              product.location = value || null;
-              break;
-            case 'price_per_unit':
-            case 'price per unit':
-            case 'price':
-              product.price_per_unit = parseFloat(value) || null;
-              break;
-          }
-        });
-
-        if (product.name) {
-          productsToInsert.push(product);
-        }
-      }
-
-      if (productsToInsert.length === 0) {
+      if (parsedProducts.length === 0) {
         toast({
           title: 'Error',
           description: 'No valid products found in CSV file',
           variant: 'destructive',
         });
+        setCsvImporting(false);
         return;
       }
 
-      const { error } = await supabase
+      // Get article codes from parsed products (only those with article codes)
+      const csvArticleCodes = parsedProducts
+        .filter(p => p.article_code)
+        .map(p => p.article_code);
+
+      if (csvArticleCodes.length === 0) {
+        // No article codes to check, insert all products
+        await insertNewProducts(parsedProducts);
+        return;
+      }
+
+      // Check for existing products with same article codes
+      const { data: existingProducts, error: fetchError } = await supabase
         .from('products')
-        .insert(productsToInsert);
+        .select('id, name, article_code, price_per_unit')
+        .in('article_code', csvArticleCodes);
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
 
-      toast({
-        title: 'Success',
-        description: `${productsToInsert.length} products imported successfully`,
-      });
+      if (existingProducts && existingProducts.length > 0) {
+        // Create a map of existing article codes
+        const existingMap = new Map(
+          existingProducts.map(p => [p.article_code, p])
+        );
 
-      setIsCsvDialogOpen(false);
-      setCsvFile(null);
-      fetchProducts(0, debouncedSearchTerm, true);
+        // Separate new products from duplicates
+        const newProducts: any[] = [];
+        const duplicates: DuplicateProduct[] = [];
+        const duplicateData: any[] = [];
+
+        parsedProducts.forEach(product => {
+          const existing = existingMap.get(product.article_code);
+          if (existing) {
+            duplicates.push({
+              name: product.name,
+              article_code: product.article_code,
+              existingPrice: existing.price_per_unit,
+              newPrice: product.price_per_unit,
+            });
+            duplicateData.push({
+              ...product,
+              existingId: existing.id,
+            });
+          } else {
+            newProducts.push(product);
+          }
+        });
+
+        // Store data for later use
+        setNewProductsToInsert(newProducts);
+        setDuplicateProducts(duplicates);
+        setDuplicateProductsData(duplicateData);
+        
+        // Show duplicate dialog
+        setIsCsvDialogOpen(false);
+        setIsDuplicateDialogOpen(true);
+        setCsvImporting(false);
+      } else {
+        // No duplicates, insert all products
+        await insertNewProducts(parsedProducts);
+      }
     } catch (error) {
       console.error('Error importing CSV:', error);
       toast({
@@ -515,8 +571,98 @@ const ProductsSettings: React.FC = () => {
         description: 'Failed to import CSV file',
         variant: 'destructive',
       });
+      setCsvImporting(false);
+    }
+  };
+
+  const insertNewProducts = async (products: any[]) => {
+    try {
+      if (products.length > 0) {
+        const { error } = await supabase
+          .from('products')
+          .insert(products);
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: 'Success',
+        description: `${products.length} products imported successfully`,
+      });
+
+      setIsCsvDialogOpen(false);
+      setCsvFile(null);
+      fetchProducts(0, debouncedSearchTerm, true);
+    } catch (error) {
+      console.error('Error inserting products:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to import products',
+        variant: 'destructive',
+      });
     } finally {
       setCsvImporting(false);
+    }
+  };
+
+  const handleIgnoreDuplicates = async () => {
+    setIsDuplicateDialogOpen(false);
+    setCsvImporting(true);
+    
+    await insertNewProducts(newProductsToInsert);
+    
+    // Reset state
+    setDuplicateProducts([]);
+    setDuplicateProductsData([]);
+    setNewProductsToInsert([]);
+    setCsvFile(null);
+  };
+
+  const handleUpdatePrices = async () => {
+    setIsDuplicateDialogOpen(false);
+    setCsvImporting(true);
+
+    try {
+      // Update prices for duplicate products
+      for (const dup of duplicateProductsData) {
+        if (dup.existingId && dup.price_per_unit !== null) {
+          await supabase
+            .from('products')
+            .update({ price_per_unit: dup.price_per_unit })
+            .eq('id', dup.existingId);
+        }
+      }
+
+      // Insert new products
+      if (newProductsToInsert.length > 0) {
+        const { error } = await supabase
+          .from('products')
+          .insert(newProductsToInsert);
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: 'Success',
+        description: `${newProductsToInsert.length} new products imported, ${duplicateProductsData.length} prices updated`,
+      });
+
+      setIsCsvDialogOpen(false);
+      setCsvFile(null);
+      fetchProducts(0, debouncedSearchTerm, true);
+    } catch (error) {
+      console.error('Error updating prices:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update prices',
+        variant: 'destructive',
+      });
+    } finally {
+      setCsvImporting(false);
+      // Reset state
+      setDuplicateProducts([]);
+      setDuplicateProductsData([]);
+      setNewProductsToInsert([]);
     }
   };
 
@@ -1030,6 +1176,14 @@ const ProductsSettings: React.FC = () => {
         onOpenChange={setIsGroupDialogOpen}
         editingGroup={editingGroup}
         onSave={fetchProductGroups}
+      />
+
+      <CsvDuplicateDialog
+        open={isDuplicateDialogOpen}
+        onOpenChange={setIsDuplicateDialogOpen}
+        duplicates={duplicateProducts}
+        onIgnore={handleIgnoreDuplicates}
+        onUpdatePrices={handleUpdatePrices}
       />
     </Card>
   );
