@@ -2128,7 +2128,7 @@ const Planning = () => {
             </div>
 
             {activeView === 'gantt' ? (
-              <WorkstationGanttChart ref={ganttChartRef} selectedDate={selectedDate} />
+              <WorkstationGanttChart ref={ganttChartRef} selectedDate={selectedDate} onDateChange={setSelectedDate} />
             ) : activeView === 'workstation' ? (
               <WorkstationScheduleView selectedDate={selectedDate} />
             ) : (
