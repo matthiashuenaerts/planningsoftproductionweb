@@ -2803,16 +2803,33 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       </CardHeader>
       <CardContent>
         <div ref={scrollRef} className="overflow-auto border rounded-lg" style={{ maxHeight: 600 }}>
-          {/* header */}
+          {/* header with fixed total width to ensure proper alignment */}
           <div
             className="sticky top-0 z-10 flex border-b bg-muted"
-            style={{ marginLeft: workstationLabelWidth, height: headerHeight }}
+            style={{ 
+              height: headerHeight,
+              minWidth: workstationLabelWidth + (scale.totalUnits * scale.unitWidth)
+            }}
           >
-            {timeline.map((t, i) => (
-              <div key={i} style={{ width: scale.unitWidth }} className="flex flex-col justify-center items-center border-r text-xs">
-                {scale.format(t)}
-              </div>
-            ))}
+            {/* Sticky label cell for header */}
+            <div 
+              className="sticky left-0 z-20 bg-muted border-r flex items-center justify-center font-medium"
+              style={{ width: workstationLabelWidth, minWidth: workstationLabelWidth }}
+            >
+              {format(selectedDate, 'EEEE d MMMM', { locale: nl })}
+            </div>
+            {/* Timeline columns */}
+            <div className="flex">
+              {timeline.map((t, i) => (
+                <div 
+                  key={i} 
+                  style={{ width: scale.unitWidth, minWidth: scale.unitWidth }} 
+                  className="flex flex-col justify-center items-center border-r text-xs"
+                >
+                  {scale.format(t)}
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* rows */}
@@ -2822,12 +2839,21 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             
             const workerCount = ws.active_workers || 1;
             const totalHeight = rowHeight * workerCount;
+            const timelineWidth = scale.totalUnits * scale.unitWidth;
             
             return (
-              <div key={ws.id} className="relative border-b" style={{ height: totalHeight }}>
+              <div 
+                key={ws.id} 
+                className="relative border-b flex" 
+                style={{ 
+                  height: totalHeight,
+                  minWidth: workstationLabelWidth + timelineWidth
+                }}
+              >
+                {/* Sticky workstation label */}
                 <div
-                  className="absolute left-0 top-0 bottom-0 flex flex-col border-r bg-muted"
-                  style={{ width: workstationLabelWidth }}
+                  className="sticky left-0 z-10 flex flex-col border-r bg-muted"
+                  style={{ width: workstationLabelWidth, minWidth: workstationLabelWidth }}
                 >
                   <div className="px-3 py-2 border-b flex items-center justify-between">
                     <span className="font-medium">{ws.name}</span>
@@ -2857,7 +2883,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                   {/* Show worker lane labels with employee names */}
                   {Array.from({ length: workerCount }).map((_, workerIndex) => {
                     const assignment = getAssignedEmployee(selectedDate, ws.id, workerIndex);
-                    const laneTop = workerIndex * rowHeight;
                     
                     return (
                       <div
@@ -2879,104 +2904,110 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                   })}
                 </div>
                 
-                {/* Render each worker lane */}
-                {Array.from({ length: workerCount }).map((_, workerIndex) => {
-                  const tasks = workerMap.get(workerIndex) || [];
-                  const laneTop = workerIndex * rowHeight;
-                  
-                  return (
-                    <div
-                      key={workerIndex}
-                      className="absolute"
-                      style={{
-                        left: workstationLabelWidth,
-                        right: 0,
-                        top: laneTop,
-                        height: rowHeight,
-                        borderTop: workerIndex > 0 ? '1px dashed hsl(var(--border) / 0.3)' : undefined
-                      }}
-                    >
-                      {timeline.map((_, i) => (
-                        <div key={i} className="absolute top-0 bottom-0 border-r border-border/40" style={{ left: i * scale.unitWidth }} />
-                      ))}
-                      <TooltipProvider>
-                        {tasks.map(({ task, start, end, isVisible }) => {
-                          if (!isVisible) return null;
+                {/* Timeline area with fixed width */}
+                <div className="relative" style={{ width: timelineWidth, minWidth: timelineWidth }}>
+                  {/* Render each worker lane */}
+                  {Array.from({ length: workerCount }).map((_, workerIndex) => {
+                    const tasks = workerMap.get(workerIndex) || [];
+                    const laneTop = workerIndex * rowHeight;
+                    
+                    return (
+                      <div
+                        key={workerIndex}
+                        className="absolute left-0 right-0"
+                        style={{
+                          top: laneTop,
+                          height: rowHeight,
+                          borderTop: workerIndex > 0 ? '1px dashed hsl(var(--border) / 0.3)' : undefined
+                        }}
+                      >
+                        {/* Grid lines aligned with timeline columns */}
+                        {timeline.map((_, i) => (
+                          <div 
+                            key={i} 
+                            className="absolute top-0 bottom-0 border-r border-border/40" 
+                            style={{ left: i * scale.unitWidth, width: 0 }} 
+                          />
+                        ))}
+                        <TooltipProvider>
+                          {tasks.map(({ task, start, end, isVisible }) => {
+                            if (!isVisible) return null;
 
-                          const project = task.phases?.projects;
-                          const { bg, text, border } = getTaskColor(task);
-                          const left = (differenceInMinutes(start, timelineStart) / scale.unitInMinutes) * scale.unitWidth;
-                          const width = (differenceInMinutes(end, start) / scale.unitInMinutes) * scale.unitWidth;
-                          
-                          // Get assigned employee for this date
-                          const assignment = getAssignedEmployee(start, ws.id, workerIndex);
-                          
-                          // Critical path styling (thicker border)
-                          const isCritical = showCriticalPath && task.priority === 'high';
-                          
-                          return (
-                            <Tooltip key={`${task.id}-${start.toISOString()}-${workerIndex}`}>
-                              <TooltipTrigger asChild>
-                                <div
-                                  className="absolute rounded-md px-2 py-1 text-xs font-medium overflow-hidden"
-                                  style={{
-                                    left,
-                                    width,
-                                    top: 8,
-                                    height: rowHeight - 16,
-                                    background: bg,
-                                    color: text,
-                                    border: isCritical ? `3px solid ${border}` : `1px solid ${border}`,
-                                    boxShadow: isCritical ? '0 0 8px rgba(255,0,0,0.3)' : 'none',
-                                  }}
-                                >
-                                  <div className="truncate font-semibold">
-                                    {project?.name || 'Project'} – {task.title}
-                                  </div>
-                                  <div className="text-[9px] opacity-75 truncate">
-                                    {task.priority === 'high' && '🔴 '}
-                                    {task.priority === 'medium' && '🟡 '}
-                                    {task.priority === 'low' && '🟢 '}
-                                    {task.status === 'HOLD' && '🟠 HOLD '}
-                                  </div>
-                                  {assignment && (
-                                    <div className="text-[10px] opacity-80 truncate mt-0.5">
-                                      👤 {assignment.employeeName}
+                            const project = task.phases?.projects;
+                            const { bg, text, border } = getTaskColor(task);
+                            const left = (differenceInMinutes(start, timelineStart) / scale.unitInMinutes) * scale.unitWidth;
+                            const width = (differenceInMinutes(end, start) / scale.unitInMinutes) * scale.unitWidth;
+                            
+                            // Get assigned employee for this date
+                            const assignment = getAssignedEmployee(start, ws.id, workerIndex);
+                            
+                            // Critical path styling (thicker border)
+                            const isCritical = showCriticalPath && task.priority === 'high';
+                            
+                            return (
+                              <Tooltip key={`${task.id}-${start.toISOString()}-${workerIndex}`}>
+                                <TooltipTrigger asChild>
+                                  <div
+                                    className="absolute rounded-md px-2 py-1 text-xs font-medium overflow-hidden"
+                                    style={{
+                                      left,
+                                      width: Math.max(width, 2), // Minimum width for visibility
+                                      top: 8,
+                                      height: rowHeight - 16,
+                                      background: bg,
+                                      color: text,
+                                      border: isCritical ? `3px solid ${border}` : `1px solid ${border}`,
+                                      boxShadow: isCritical ? '0 0 8px rgba(255,0,0,0.3)' : 'none',
+                                    }}
+                                  >
+                                    <div className="truncate font-semibold">
+                                      {project?.name || 'Project'} – {task.title}
                                     </div>
-                                  )}
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-xs">
-                                <div className="text-xs space-y-1">
-                                  <div className="font-bold text-sm mb-1">{project?.name || 'Project'}</div>
-                                  <div><b>Taak:</b> {task.title}</div>
-                                  <div><b>Start:</b> {format(start, 'dd MMM HH:mm')}</div>
-                                  <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
-                                  <div><b>Duur:</b> {task.duration} min</div>
-                                  <div><b>Status:</b> {task.status} {task.status === 'HOLD' && '🟠'}</div>
-                                  <div><b>Prioriteit:</b> {task.priority} {task.priority === 'high' && '🔴'}</div>
-                                  {assignment && (
-                                    <div><b>Werknemer:</b> {assignment.employeeName}</div>
-                                  )}
-                                  {project && (
-                                    <>
-                                      <div className="border-t pt-1 mt-1">
-                                        <div><b>Klant:</b> {project.client}</div>
-                                        <div><b>Project start:</b> {format(new Date(project.start_date), 'dd MMM yyyy')}</div>
-                                        <div><b>Installatie:</b> {format(new Date(project.installation_date), 'dd MMM yyyy')}</div>
-                                        <div><b>Status:</b> {project.status}</div>
+                                    <div className="text-[9px] opacity-75 truncate">
+                                      {task.priority === 'high' && '🔴 '}
+                                      {task.priority === 'medium' && '🟡 '}
+                                      {task.priority === 'low' && '🟢 '}
+                                      {task.status === 'HOLD' && '🟠 HOLD '}
+                                    </div>
+                                    {assignment && (
+                                      <div className="text-[10px] opacity-80 truncate mt-0.5">
+                                        👤 {assignment.employeeName}
                                       </div>
-                                    </>
-                                  )}
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
-                          );
-                        })}
-                      </TooltipProvider>
-                    </div>
-                  );
-                })}
+                                    )}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <div className="text-xs space-y-1">
+                                    <div className="font-bold text-sm mb-1">{project?.name || 'Project'}</div>
+                                    <div><b>Taak:</b> {task.title}</div>
+                                    <div><b>Start:</b> {format(start, 'dd MMM HH:mm')}</div>
+                                    <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
+                                    <div><b>Duur:</b> {task.duration} min</div>
+                                    <div><b>Status:</b> {task.status} {task.status === 'HOLD' && '🟠'}</div>
+                                    <div><b>Prioriteit:</b> {task.priority} {task.priority === 'high' && '🔴'}</div>
+                                    {assignment && (
+                                      <div><b>Werknemer:</b> {assignment.employeeName}</div>
+                                    )}
+                                    {project && (
+                                      <>
+                                        <div className="border-t pt-1 mt-1">
+                                          <div><b>Klant:</b> {project.client}</div>
+                                          <div><b>Project start:</b> {format(new Date(project.start_date), 'dd MMM yyyy')}</div>
+                                          <div><b>Installatie:</b> {format(new Date(project.installation_date), 'dd MMM yyyy')}</div>
+                                          <div><b>Status:</b> {project.status}</div>
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          })}
+                        </TooltipProvider>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
