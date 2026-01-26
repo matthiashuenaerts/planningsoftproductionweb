@@ -1247,6 +1247,67 @@ export type Database = {
           },
         ]
       }
+      gantt_schedules: {
+        Row: {
+          created_at: string
+          employee_id: string | null
+          end_time: string
+          id: string
+          scheduled_date: string
+          start_time: string
+          task_id: string
+          updated_at: string
+          worker_index: number
+          workstation_id: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id?: string | null
+          end_time: string
+          id?: string
+          scheduled_date: string
+          start_time: string
+          task_id: string
+          updated_at?: string
+          worker_index?: number
+          workstation_id: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string | null
+          end_time?: string
+          id?: string
+          scheduled_date?: string
+          start_time?: string
+          task_id?: string
+          updated_at?: string
+          worker_index?: number
+          workstation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gantt_schedules_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gantt_schedules_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gantt_schedules_workstation_id_fkey"
+            columns: ["workstation_id"]
+            isOneToOne: false
+            referencedRelation: "workstations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       help_articles: {
         Row: {
           category_id: string

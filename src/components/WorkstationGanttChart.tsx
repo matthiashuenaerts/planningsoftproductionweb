@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useMemo, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
 import {
   format,
   addMinutes,
@@ -8,17 +8,21 @@ import {
   setHours,
   setMinutes,
   addDays,
+  subDays,
   getDay,
   isBefore,
+  parseISO,
 } from 'date-fns';
+import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { workstationService, Workstation } from '@/services/workstationService';
 import { workingHoursService, WorkingHours } from '@/services/workingHoursService';
 import { holidayService, Holiday } from '@/services/holidayService';
+import { ganttScheduleService, GanttScheduleInsert } from '@/services/ganttScheduleService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus, ChevronDown, ChevronRight, User, Wand2 } from 'lucide-react';
+import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus, ChevronDown, ChevronRight, ChevronLeft, User, Wand2, Calendar, Save } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
@@ -68,6 +72,7 @@ interface LimitPhase {
 
 interface WorkstationGanttChartProps {
   selectedDate: Date;
+  onDateChange?: (date: Date) => void;
 }
 
 interface DailyEmployeeAssignment {
@@ -85,7 +90,7 @@ export interface WorkstationGanttChartRef {
   getWorkstations: () => Workstation[];
 }
 
-const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGanttChartProps>(({ selectedDate }, ref) => {
+const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGanttChartProps>(({ selectedDate, onDateChange }, ref) => {
   const [workstations, setWorkstations] = useState<Workstation[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [workingHours, setWorkingHours] = useState<WorkingHours[]>([]);
@@ -93,9 +98,11 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [limitPhases, setLimitPhases] = useState<LimitPhase[]>([]);
   const [standardTasks, setStandardTasks] = useState<Array<{ id: string; task_name: string; task_number: string }>>([]);
   const [loading, setLoading] = useState(true);
+  const [savingSchedule, setSavingSchedule] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [dailyAssignments, setDailyAssignments] = useState<DailyEmployeeAssignment[]>([]);
+  const [savedSchedules, setSavedSchedules] = useState<any[]>([]);
   const [employeeStandardTaskLinks, setEmployeeStandardTaskLinks] = useState<Map<string, Array<{ id: string; name: string; standardTasks: string[] }>>>(new Map());
   const [workstationEmployeeLinks, setWorkstationEmployeeLinks] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
   const [showCriticalPath, setShowCriticalPath] = useState(false);
@@ -108,16 +115,22 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [reschedulingProjectId, setReschedulingProjectId] = useState<string | null>(null);
   const [capacityIssue, setCapacityIssue] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const realtimeChannelRef = useRef<any>(null);
 
   const rowHeight = 60;
   const headerHeight = 80;
   const workstationLabelWidth = 250;
 
+  // Day-based scale - always show a single day with hour granularity
   const scale = useMemo(() => {
-    // Extended timeline: 90 days at day level, much more at hour/minute level
-    if (zoom >= 2) return { unitInMinutes: 15, unitWidth: 8 * zoom, totalUnits: (24 * 60 * 14) / 15, format: (d: Date) => format(d, 'HH:mm') };
-    if (zoom >= 1) return { unitInMinutes: 60, unitWidth: 40 * zoom, totalUnits: 24 * 14, format: (d: Date) => format(d, 'HH:mm') };
-    return { unitInMinutes: 1440, unitWidth: 120 * zoom, totalUnits: 90, format: (d: Date) => format(d, 'dd MMM') };
+    // Day-based view: show 24 hours for the selected day
+    const unitWidth = 60 * zoom; // 60 pixels per hour base
+    return {
+      unitInMinutes: 60,
+      unitWidth,
+      totalUnits: 24,
+      format: (d: Date) => format(d, 'HH:mm')
+    };
   }, [zoom]);
 
   // fetch all once
@@ -205,6 +218,97 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       setLoading(false);
     })();
   }, [selectedDate]);
+
+  // Load saved schedules from database for the selected date
+  const loadSavedSchedules = useCallback(async () => {
+    try {
+      const schedules = await ganttScheduleService.getSchedulesWithDetailsForDate(selectedDate);
+      setSavedSchedules(schedules);
+      
+      if (schedules.length > 0) {
+        // Build daily assignments from saved schedules
+        const assignments: DailyEmployeeAssignment[] = [];
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        
+        schedules.forEach((schedule: any) => {
+          if (schedule.employee_id && schedule.employees) {
+            assignments.push({
+              date: dateStr,
+              workstationId: schedule.workstation_id,
+              workerIndex: schedule.worker_index,
+              employeeId: schedule.employee_id,
+              employeeName: schedule.employees.name,
+            });
+          }
+        });
+        
+        // Remove duplicates
+        const uniqueAssignments = assignments.filter((a, index, self) =>
+          index === self.findIndex(t => 
+            t.date === a.date && 
+            t.workstationId === a.workstationId && 
+            t.workerIndex === a.workerIndex &&
+            t.employeeId === a.employeeId
+          )
+        );
+        
+        setDailyAssignments(uniqueAssignments);
+        setScheduleGenerated(true);
+      }
+    } catch (error) {
+      console.error('Error loading saved schedules:', error);
+    }
+  }, [selectedDate]);
+
+  // Load schedules when date changes
+  useEffect(() => {
+    loadSavedSchedules();
+  }, [loadSavedSchedules]);
+
+  // Real-time subscription for schedule updates
+  useEffect(() => {
+    // Cleanup previous subscription
+    if (realtimeChannelRef.current) {
+      ganttScheduleService.unsubscribeFromSchedules(realtimeChannelRef.current);
+    }
+    
+    // Subscribe to real-time updates for the selected date
+    realtimeChannelRef.current = ganttScheduleService.subscribeToSchedules(
+      selectedDate,
+      (payload) => {
+        console.log('Real-time schedule update:', payload);
+        loadSavedSchedules();
+      }
+    );
+    
+    return () => {
+      if (realtimeChannelRef.current) {
+        ganttScheduleService.unsubscribeFromSchedules(realtimeChannelRef.current);
+      }
+    };
+  }, [selectedDate, loadSavedSchedules]);
+
+  // Day navigation handlers
+  const handlePreviousDay = useCallback(() => {
+    const newDate = subDays(selectedDate, 1);
+    if (onDateChange) {
+      onDateChange(newDate);
+    }
+  }, [selectedDate, onDateChange]);
+
+  const handleNextDay = useCallback(() => {
+    const newDate = addDays(selectedDate, 1);
+    if (onDateChange) {
+      onDateChange(newDate);
+    }
+  }, [selectedDate, onDateChange]);
+
+  const handleToday = useCallback(() => {
+    const today = startOfDay(new Date());
+    if (onDateChange) {
+      onDateChange(today);
+    }
+  }, [onDateChange]);
 
   // precomputed lookup structures
   const workingHoursMap = useMemo(() => {
@@ -933,6 +1037,47 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       } else {
         console.log('✅ All projects scheduled to complete before their installation dates');
         toast.success(`Planning: ${scheduledTasks.size} taken, gemiddeld ${avgPerEmployee} min/werknemer - Alle deadlines gehaald!`);
+      }
+      
+      // ===== PHASE 7: Save schedules to database =====
+      console.log('💾 PHASE 7: Saving schedules to database...');
+      try {
+        // Group schedules by date
+        const schedulesByDate = new Map<string, GanttScheduleInsert[]>();
+        
+        taskAssignments.forEach(({ employeeId, workstationId, start, end }, taskId) => {
+          const dateStr = format(start, 'yyyy-MM-dd');
+          
+          if (!schedulesByDate.has(dateStr)) {
+            schedulesByDate.set(dateStr, []);
+          }
+          
+          // Find worker index for this employee at this workstation
+          const assignment = newAssignments.find(
+            a => a.date === dateStr && a.workstationId === workstationId && a.employeeId === employeeId
+          );
+          
+          schedulesByDate.get(dateStr)!.push({
+            task_id: taskId,
+            workstation_id: workstationId,
+            employee_id: employeeId,
+            scheduled_date: dateStr,
+            start_time: start.toISOString(),
+            end_time: end.toISOString(),
+            worker_index: assignment?.workerIndex || 0,
+          });
+        });
+        
+        // Save all schedules
+        for (const [dateStr, dateSchedules] of schedulesByDate) {
+          await ganttScheduleService.saveSchedulesForDate(parseISO(dateStr), dateSchedules);
+        }
+        
+        console.log(`✅ Saved ${taskAssignments.size} schedules to database`);
+        toast.success('Planning opgeslagen in database');
+      } catch (saveError) {
+        console.error('Error saving schedules:', saveError);
+        toast.error('Fout bij opslaan van planning');
       }
       
     } catch (error) {
@@ -2047,6 +2192,49 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       all.set(ws.id, workerMap);
     });
 
+    // If we have saved schedules from the database, use those
+    if (savedSchedules.length > 0) {
+      const isTaskVisible = (task: any) => {
+        if (!searchTerm) return true;
+        return task?.phases?.projects?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      };
+      
+      savedSchedules.forEach((schedule: any) => {
+        if (!schedule.tasks || !schedule.workstation_id) return;
+        
+        const workerMap = all.get(schedule.workstation_id);
+        if (!workerMap) return;
+        
+        const workerIndex = schedule.worker_index || 0;
+        const workerTasks = workerMap.get(workerIndex) || [];
+        
+        const task: Task = {
+          id: schedule.tasks.id,
+          title: schedule.tasks.title,
+          description: schedule.tasks.description,
+          duration: schedule.tasks.duration,
+          status: schedule.tasks.status,
+          due_date: schedule.tasks.due_date,
+          phase_id: schedule.tasks.phase_id,
+          standard_task_id: schedule.tasks.standard_task_id,
+          priority: schedule.tasks.priority,
+          phases: schedule.tasks.phases,
+          workstations: [],
+        };
+        
+        workerTasks.push({
+          task,
+          start: parseISO(schedule.start_time),
+          end: parseISO(schedule.end_time),
+          isVisible: isTaskVisible(task),
+        });
+        
+        workerMap.set(workerIndex, workerTasks);
+      });
+      
+      return all;
+    }
+
     // Return empty schedule if not generated yet
     if (!scheduleGenerated) {
       return all;
@@ -2404,7 +2592,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     }
 
     return all;
-  }, [tasks, workstations, selectedDate, workingHoursMap, holidaySet, limitTaskMap, searchTerm, dailyAssignments, workstationEmployeeLinks, employeeStandardTaskLinks, scheduleGenerated]);
+  }, [tasks, workstations, selectedDate, workingHoursMap, holidaySet, limitTaskMap, searchTerm, dailyAssignments, workstationEmployeeLinks, employeeStandardTaskLinks, scheduleGenerated, savedSchedules]);
 
   // Auto-assign on mount and when dependencies change
   // Auto-assign disabled to avoid auto-filling the chart; use the 'Genereer Planning' button instead
@@ -2485,79 +2673,133 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     />
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-center gap-4 flex-wrap">
-          <CardTitle>Workstation Gantt Chart (Slim Gepland)</CardTitle>
-          <div className="flex gap-2 items-center flex-wrap">
-            <Button onClick={handleAutoAssign} variant="outline" size="sm">
-              🎯 Slim Auto-toewijzen
-            </Button>
-            <Button 
-              onClick={handleGeneratePlanning} 
-              variant="default"
-              size="sm"
-              disabled={generatingPlanning}
-              className="bg-gradient-to-r from-primary to-primary/80"
-            >
-              {generatingPlanning ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Genereren...
-                </>
-              ) : (
-                <>
-                  <Wand2 className="w-4 h-4 mr-2" />
-                  Genereer Planning
-                </>
-              )}
-            </Button>
-            <Button 
-              onClick={() => setShowCriticalPath(!showCriticalPath)} 
-              variant={showCriticalPath ? "default" : "outline"} 
-              size="sm"
-            >
-              {showCriticalPath ? '✓' : ''} Kritiek pad
-            </Button>
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Zoek project..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8 w-64"
-              />
+        <div className="flex flex-col gap-4">
+          {/* Title and Day Navigation Row */}
+          <div className="flex justify-between items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-4">
+              <CardTitle>Workstation Gantt Chart</CardTitle>
+              
+              {/* Day Navigation */}
+              <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
+                <Button 
+                  onClick={handlePreviousDay} 
+                  variant="ghost" 
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                
+                <div className="flex items-center gap-2 px-3 py-1 min-w-[180px] justify-center">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-semibold">
+                    {format(selectedDate, 'EEEE d MMMM yyyy', { locale: nl })}
+                  </span>
+                </div>
+                
+                <Button 
+                  onClick={handleNextDay} 
+                  variant="ghost" 
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                
+                <Button 
+                  onClick={handleToday} 
+                  variant="outline" 
+                  size="sm"
+                  className="ml-2"
+                >
+                  Vandaag
+                </Button>
+              </div>
             </div>
-            <Button onClick={() => setZoom((z) => Math.max(0.25, z / 1.5))} variant="outline" size="sm">
-              <ZoomOut className="w-4 h-4" />
-            </Button>
-            <Button onClick={() => setZoom((z) => Math.min(6, z * 1.5))} variant="outline" size="sm">
-              <ZoomIn className="w-4 h-4" />
-            </Button>
+            
+            {/* Action Buttons */}
+            <div className="flex gap-2 items-center flex-wrap">
+              <Button onClick={handleAutoAssign} variant="outline" size="sm">
+                🎯 Slim Auto-toewijzen
+              </Button>
+              <Button 
+                onClick={handleGeneratePlanning} 
+                variant="default"
+                size="sm"
+                disabled={generatingPlanning}
+                className="bg-gradient-to-r from-primary to-primary/80"
+              >
+                {generatingPlanning ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Genereren...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-4 h-4 mr-2" />
+                    Genereer Planning
+                  </>
+                )}
+              </Button>
+              <Button 
+                onClick={() => setShowCriticalPath(!showCriticalPath)} 
+                variant={showCriticalPath ? "default" : "outline"} 
+                size="sm"
+              >
+                {showCriticalPath ? '✓' : ''} Kritiek pad
+              </Button>
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Zoek project..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 w-64"
+                />
+              </div>
+              <Button onClick={() => setZoom((z) => Math.max(0.25, z / 1.5))} variant="outline" size="sm">
+                <ZoomOut className="w-4 h-4" />
+              </Button>
+              <Button onClick={() => setZoom((z) => Math.min(6, z * 1.5))} variant="outline" size="sm">
+                <ZoomIn className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
+          
+          {/* Status Indicators */}
+          <div className="flex gap-4 text-xs text-muted-foreground flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-destructive"></div>
+              <span>🔴 Hoge prioriteit / Urgent</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-primary"></div>
+              <span>🟢 Actief project</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-warning"></div>
+              <span>🟠 Geblokkeerd (HOLD)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-muted-foreground/30"></div>
+              <span>⚪ Toekomstig project</span>
+            </div>
+            
+            {savedSchedules.length > 0 && (
+              <div className="flex items-center gap-1.5 ml-4 text-primary">
+                <Save className="w-3 h-3" />
+                <span>{savedSchedules.length} taken geladen uit database</span>
+              </div>
+            )}
+          </div>
+          
+          {dailyAssignments.length > 0 && (
+            <div className="p-2 bg-accent border border-border rounded text-xs">
+              ✅ <strong>{new Set(dailyAssignments.map(a => a.employeeId)).size}</strong> werknemers toegewezen voor{' '}
+              <strong>{format(selectedDate, 'd MMMM', { locale: nl })}</strong> met optimale werkverdeling
+            </div>
+          )}
         </div>
-        <div className="flex gap-4 text-xs text-muted-foreground mt-2 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded" style={{ background: 'hsl(220, 80%, 40%)' }}></div>
-            <span>🔴 Hoge prioriteit / Urgent</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded" style={{ background: 'hsl(220, 65%, 45%)' }}></div>
-            <span>🟢 Actief project</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded" style={{ background: 'hsl(220, 45%, 55%)' }}></div>
-            <span>🟠 Geblokkeerd (HOLD)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded" style={{ background: 'hsl(220, 30%, 60%)' }}></div>
-            <span>⚪ Toekomstig project</span>
-          </div>
-        </div>
-        {dailyAssignments.length > 0 && (
-          <div className="mt-2 p-2 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded text-xs">
-            ✅ <strong>{new Set(dailyAssignments.map(a => a.employeeId)).size}</strong> werknemers toegewezen over{' '}
-            <strong>{new Set(dailyAssignments.map(a => a.date)).size}</strong> dagen met optimale werkverdeling
-          </div>
-        )}
       </CardHeader>
       <CardContent>
         <div ref={scrollRef} className="overflow-auto border rounded-lg" style={{ maxHeight: 600 }}>
@@ -2753,13 +2995,13 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
               </Card>
               <Card>
                 <CardContent className="pt-4">
-                  <div className="text-2xl font-bold text-green-600">{uniqueEmployees.length}</div>
+                  <div className="text-2xl font-bold text-primary">{uniqueEmployees.length}</div>
                   <div className="text-xs text-muted-foreground">Toegewezen werknemers</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-4">
-                  <div className="text-2xl font-bold text-blue-600">
+                  <div className="text-2xl font-bold text-primary">
                     {new Set(dailyAssignments.map(a => a.date)).size}
                   </div>
                   <div className="text-xs text-muted-foreground">Dagen gepland</div>
