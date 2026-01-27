@@ -63,6 +63,7 @@ const QUANTITY_PATTERNS = [
 
 // Article code patterns - more comprehensive
 const ARTICLE_CODE_PATTERNS = [
+  /\b([A-Z0-9]{2,}\/[^\s]{2,})\b/gi, // Codes with slashes: LB4F/EBL9KA500x734
   /\b([A-Z]{2,5}[\-\.\s]?\d{4,10}[A-Z0-9]*)\b/gi, // XX-12345678
   /\b(\d{5,13})\b/g, // EAN or numeric codes (5-13 digits)
   /art[\.:]?\s*(?:nr|code|nummer)?[:\s]*([A-Z0-9\-\.]+)/gi,
@@ -175,7 +176,7 @@ function detectColumns(rows: TableRow[]): Map<string, number> {
     'article_code': /^(art|article|code|artikelcode|artikel|artnr|art\.nr|item|sku|ean|product\s*code)/i,
     'description': /^(description|omschrijving|desc|naam|name|product|artikel\s*naam|item\s*description)/i,
     'quantity': /^(qty|quantity|aantal|hoeveelheid|stuks|pcs|aant|besteld)/i,
-    'price': /^(price|prijs|unit\s*price|eenheid|bedrag|€|eur|amount)/i,
+    'price': /^(price|prijs|unit\s*price|eenheid|bedrag|€|eur|amount|e\.?\s*prijs|e\.?\s*price|e\.?prijs\s*eur)/i,
   };
   
   // Look for header row in first 10 rows
@@ -205,6 +206,74 @@ function detectColumns(rows: TableRow[]): Map<string, number> {
   }
   
   return columnHeaders;
+}
+
+function parseQuantityValue(value?: string): number | undefined {
+  if (!value) return undefined;
+  // Support formats like "20,00" or "20.00" or "20"
+  const cleaned = value
+    .replace(/\s/g, '')
+    .replace(/,/g, '.')
+    .replace(/[^0-9.]/g, '');
+  const n = Number.parseFloat(cleaned);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return Math.round(n);
+}
+
+function parsePriceValue(value?: string): number | undefined {
+  if (!value) return undefined;
+  const cleaned = value
+    .replace(/\s/g, '')
+    .replace(/€/g, '')
+    .replace(/EUR/gi, '')
+    .replace(/,/g, '.')
+    .replace(/[^0-9.]/g, '');
+  const n = Number.parseFloat(cleaned);
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return n;
+}
+
+function extractHeuristicTableData(rows: TableRow[]): Record<string, string>[] {
+  const result: Record<string, string>[] = [];
+
+  for (const row of rows) {
+    const line = row.items.map(i => i.str).join(' ').replace(/\s+/g, ' ').trim();
+    if (!line) continue;
+
+    // Skip likely headers/footers
+    if (/^(artikel|omschrijving|aantal|qty|quantity|price|prijs|datum|date)\b/i.test(line)) continue;
+    if (/^totaal/i.test(line)) continue;
+
+    const articleCode = extractArticleCodeFromLine(line);
+    const qty = extractQuantityFromLine(line);
+    const price = extractPriceFromLine(line);
+
+    // Require at least a code OR a quantity to consider it an item row
+    if (!articleCode && !qty) continue;
+
+    let description = line;
+    if (articleCode) {
+      description = description.replace(new RegExp(articleCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '');
+    }
+    if (price !== undefined) {
+      description = description.replace(/€\s*\d+(?:[\.,]\d{1,2})?/g, '');
+      description = description.replace(/\d+(?:[\.,]\d{1,2})?\s*€/g, '');
+    }
+    if (qty !== undefined) {
+      description = description.replace(/\b\d{1,4}(?:[\.,]\d+)?\b/g, '');
+    }
+    description = description.replace(/\s+/g, ' ').trim();
+    if (!description && articleCode) description = articleCode;
+
+    result.push({
+      description,
+      article_code: articleCode || '',
+      quantity: qty !== undefined ? String(qty) : '1',
+      price: price !== undefined ? String(price) : '',
+    });
+  }
+
+  return result;
 }
 
 // Extract table rows with column assignment
@@ -620,6 +689,10 @@ export async function parsePDFForOrder(
       if (columnPositions.size >= 2) {
         const pageData = extractTableData(rows, columnPositions);
         tableData.push(...pageData);
+        } else {
+          // Fallback: attempt to parse item rows even when headers/columns aren't detected reliably
+          const heuristic = extractHeuristicTableData(rows);
+          tableData.push(...heuristic);
       }
     }
   } catch (e) {
@@ -678,12 +751,32 @@ export async function parsePDFForOrder(
   let items: ParsedOrderItem[] = [];
   
   if (tableData.length > 0) {
-    items = tableData.map(row => ({
-      description: row['description'] || '',
-      quantity: parseInt(row['quantity']) || 1,
-      article_code: row['article_code'] || '',
-      unit_price: row['price'] ? parseFloat(row['price'].replace(',', '.').replace(/[^0-9.]/g, '')) : undefined,
-    })).filter(item => item.description || item.article_code);
+    items = tableData
+      .map(row => {
+        let description = row['description'] || '';
+        let article_code = row['article_code'] || '';
+        const quantity = parseQuantityValue(row['quantity']) || 1;
+        const unit_price = parsePriceValue(row['price']);
+
+        // Some suppliers put the full line in "Artikel" (incl. description). Ensure we always have a description.
+        if (!description && article_code) {
+          description = article_code;
+        }
+
+        // Try to extract a clean article code from description if needed
+        if ((!article_code || article_code.length > 30) && description) {
+          const extracted = extractArticleCodeFromLine(description);
+          if (extracted) article_code = extracted;
+        }
+
+        return {
+          description,
+          quantity,
+          article_code,
+          unit_price,
+        };
+      })
+      .filter(item => item.description || item.article_code);
   }
   
   // If no table items, try text-based matching
