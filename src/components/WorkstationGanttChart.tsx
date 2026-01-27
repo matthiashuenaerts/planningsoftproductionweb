@@ -196,19 +196,44 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       
       setEmployeeStandardTaskLinks(employeeTaskMap);
       
-      const { data } = await supabase
-        .from('tasks')
-        .select(`
-          id, title, description, duration, status, due_date, phase_id, standard_task_id, priority,
-          phases ( 
-            name, 
-            projects ( id, name, start_date, installation_date, status, client ) 
-          ),
-          task_workstation_links ( workstations ( id, name ) )
-        `)
-        .in('status', ['TODO', 'HOLD'])
-        .order('due_date');
-      const t = (data || []).map((d: any) => ({
+      // Fetch ALL TODO and HOLD tasks using pagination (Supabase limits to 1000 per request)
+      const BATCH_SIZE = 1000;
+      let allTasks: any[] = [];
+      let offset = 0;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('tasks')
+          .select(`
+            id, title, description, duration, status, due_date, phase_id, standard_task_id, priority,
+            phases ( 
+              name, 
+              projects ( id, name, start_date, installation_date, status, client ) 
+            ),
+            task_workstation_links ( workstations ( id, name ) )
+          `)
+          .in('status', ['TODO', 'HOLD'])
+          .order('due_date')
+          .range(offset, offset + BATCH_SIZE - 1);
+        
+        if (error) {
+          console.error('Error fetching tasks batch:', error);
+          break;
+        }
+        
+        if (data && data.length > 0) {
+          allTasks = [...allTasks, ...data];
+          offset += BATCH_SIZE;
+          hasMore = data.length === BATCH_SIZE;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      console.log(`Loaded ${allTasks.length} TODO/HOLD tasks from database`);
+      
+      const t = allTasks.map((d: any) => ({
         ...d,
         workstations: d.task_workstation_links?.map((x: any) => x.workstations).filter(Boolean) || [],
       }));
