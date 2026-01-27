@@ -306,6 +306,9 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
         });
       }
 
+      // After analysis, take the user to the editable form (pre-filled)
+      setActiveTab('manual');
+
     } catch (error: any) {
       console.error('Error parsing PDF:', error);
       toast({
@@ -708,6 +711,11 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
                           <p><strong>Order Date:</strong> {parsedData.orderDate || 'Not detected'}</p>
                           <p><strong>Delivery Date:</strong> {parsedData.expectedDelivery || 'Not detected'}</p>
                           <p><strong>Items Found:</strong> {parsedData.items.length}</p>
+                          <div className="pt-3">
+                            <Button type="button" size="sm" onClick={() => setActiveTab('manual')}>
+                              Review & edit in form
+                            </Button>
+                          </div>
                         </div>
                       )}
                       <Button variant="outline" size="sm" onClick={clearPdf}>
