@@ -3,6 +3,7 @@
 
 export interface ParsedOrderData {
   supplier?: string;
+  matchedSupplierId?: string;
   orderDate?: string;
   expectedDelivery?: string;
   orderNumber?: string;
@@ -33,12 +34,24 @@ interface MaterialMatch {
   category: string;
 }
 
-// Common date patterns in various formats
-const DATE_PATTERNS = [
-  /(\d{2})[\/\-\.](\d{2})[\/\-\.](\d{4})/g, // DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
-  /(\d{4})[\/\-\.](\d{2})[\/\-\.](\d{2})/g, // YYYY/MM/DD, YYYY-MM-DD, YYYY.MM.DD
-  /(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december)[a-z]*\s+(\d{4})/gi,
-];
+interface SupplierMatch {
+  id: string;
+  name: string;
+}
+
+interface TextItem {
+  str: string;
+  transform: number[];
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface TableRow {
+  y: number;
+  items: TextItem[];
+}
 
 // Common quantity patterns
 const QUANTITY_PATTERNS = [
@@ -46,25 +59,25 @@ const QUANTITY_PATTERNS = [
   /qty[:\s]*(\d+)/gi,
   /quantity[:\s]*(\d+)/gi,
   /aantal[:\s]*(\d+)/gi,
-  /^(\d+)\s+(?=[A-Z])/gm, // Number at start of line followed by text
 ];
 
-// Article code patterns
+// Article code patterns - more comprehensive
 const ARTICLE_CODE_PATTERNS = [
-  /\b([A-Z]{2,4}[\-\s]?\d{4,8})\b/g, // XX-1234567
-  /\b(\d{6,13})\b/g, // EAN or numeric codes
-  /art[\.:]?\s*(?:nr|code|nummer)?[:\s]*([A-Z0-9\-]+)/gi,
-  /article[:\s]*([A-Z0-9\-]+)/gi,
-  /code[:\s]*([A-Z0-9\-]+)/gi,
+  /\b([A-Z]{2,5}[\-\.\s]?\d{4,10}[A-Z0-9]*)\b/gi, // XX-12345678
+  /\b(\d{5,13})\b/g, // EAN or numeric codes (5-13 digits)
+  /art[\.:]?\s*(?:nr|code|nummer)?[:\s]*([A-Z0-9\-\.]+)/gi,
+  /article[:\s]*([A-Z0-9\-\.]+)/gi,
+  /code[:\s]*([A-Z0-9\-\.]+)/gi,
+  /\b([A-Z0-9]{3,}\-[A-Z0-9\-]+)\b/g, // Code with dashes
 ];
 
 // Price patterns
 const PRICE_PATTERNS = [
-  /€\s*(\d+[,\.]\d{2})/g,
-  /EUR\s*(\d+[,\.]\d{2})/gi,
-  /(\d+[,\.]\d{2})\s*€/g,
-  /prijs[:\s]*€?\s*(\d+[,\.]\d{2})/gi,
-  /price[:\s]*€?\s*(\d+[,\.]\d{2})/gi,
+  /€\s*(\d+(?:[,\.]\d{1,2})?)/g,
+  /EUR\s*(\d+(?:[,\.]\d{1,2})?)/gi,
+  /(\d+(?:[,\.]\d{1,2})?)\s*€/g,
+  /prijs[:\s]*€?\s*(\d+(?:[,\.]\d{1,2})?)/gi,
+  /price[:\s]*€?\s*(\d+(?:[,\.]\d{1,2})?)/gi,
 ];
 
 export async function extractTextFromPDF(file: File): Promise<string> {
@@ -92,24 +105,165 @@ export async function extractTextFromPDF(file: File): Promise<string> {
   return fullText;
 }
 
-function parseDate(text: string): string | undefined {
-  // Look for date labels first
-  const dateLabels = [
-    /(?:order\s*date|besteldatum|datum)[:\s]*([^\n]+)/gi,
-    /(?:delivery\s*date|leverdatum|leveringsdatum)[:\s]*([^\n]+)/gi,
-    /(?:expected|verwacht)[:\s]*([^\n]+)/gi,
-  ];
+// Extract text items with position information for table parsing
+async function extractTextWithPositions(file: File): Promise<TextItem[][]> {
+  const arrayBuffer = await file.arrayBuffer();
+  const uint8Array = new Uint8Array(arrayBuffer);
+  
+  const pdfjsLib = await import('pdfjs-dist');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  
+  const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
+  const allPages: TextItem[][] = [];
+  
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const textContent = await page.getTextContent();
+    
+    const items: TextItem[] = textContent.items.map((item: any) => ({
+      str: item.str,
+      transform: item.transform,
+      x: item.transform[4],
+      y: item.transform[5],
+      width: item.width,
+      height: item.height || 10
+    }));
+    
+    allPages.push(items);
+  }
+  
+  return allPages;
+}
 
-  for (const pattern of dateLabels) {
-    const match = pattern.exec(text);
-    if (match) {
-      const dateStr = match[1].trim();
-      const parsed = extractDateFromString(dateStr);
-      if (parsed) return parsed;
+// Group text items into rows based on Y-coordinate
+function groupIntoRows(items: TextItem[], yTolerance: number = 5): TableRow[] {
+  if (items.length === 0) return [];
+  
+  // Sort by Y (descending - PDF coordinates start from bottom)
+  const sorted = [...items].sort((a, b) => b.y - a.y);
+  
+  const rows: TableRow[] = [];
+  let currentRow: TableRow = { y: sorted[0].y, items: [] };
+  
+  for (const item of sorted) {
+    if (Math.abs(item.y - currentRow.y) <= yTolerance) {
+      currentRow.items.push(item);
+    } else {
+      if (currentRow.items.length > 0) {
+        // Sort items within row by X coordinate
+        currentRow.items.sort((a, b) => a.x - b.x);
+        rows.push(currentRow);
+      }
+      currentRow = { y: item.y, items: [item] };
     }
   }
+  
+  if (currentRow.items.length > 0) {
+    currentRow.items.sort((a, b) => a.x - b.x);
+    rows.push(currentRow);
+  }
+  
+  return rows;
+}
 
-  return undefined;
+// Detect column positions from header row
+function detectColumns(rows: TableRow[]): Map<string, number> {
+  const columnHeaders = new Map<string, number>();
+  
+  // Common header keywords and their variations
+  const headerPatterns: Record<string, RegExp> = {
+    'article_code': /^(art|article|code|artikelcode|artikel|artnr|art\.nr|item|sku|ean|product\s*code)/i,
+    'description': /^(description|omschrijving|desc|naam|name|product|artikel\s*naam|item\s*description)/i,
+    'quantity': /^(qty|quantity|aantal|hoeveelheid|stuks|pcs|aant|besteld)/i,
+    'price': /^(price|prijs|unit\s*price|eenheid|bedrag|€|eur|amount)/i,
+  };
+  
+  // Look for header row in first 10 rows
+  for (let i = 0; i < Math.min(10, rows.length); i++) {
+    const row = rows[i];
+    const rowText = row.items.map(item => item.str.toLowerCase().trim()).join(' ');
+    
+    // Check if this row contains multiple header keywords
+    let headerCount = 0;
+    for (const pattern of Object.values(headerPatterns)) {
+      if (pattern.test(rowText)) headerCount++;
+    }
+    
+    if (headerCount >= 2) {
+      // This is likely a header row
+      for (const item of row.items) {
+        const text = item.str.toLowerCase().trim();
+        for (const [columnName, pattern] of Object.entries(headerPatterns)) {
+          if (pattern.test(text)) {
+            columnHeaders.set(columnName, item.x);
+            break;
+          }
+        }
+      }
+      break;
+    }
+  }
+  
+  return columnHeaders;
+}
+
+// Extract table rows with column assignment
+function extractTableData(rows: TableRow[], columnPositions: Map<string, number>): Record<string, string>[] {
+  const result: Record<string, string>[] = [];
+  const columns = Array.from(columnPositions.entries()).sort((a, b) => a[1] - b[1]);
+  
+  if (columns.length === 0) return result;
+  
+  // Find the header row index
+  let headerIndex = -1;
+  for (let i = 0; i < Math.min(10, rows.length); i++) {
+    const rowText = rows[i].items.map(item => item.str.toLowerCase().trim()).join(' ');
+    if (/artikel|product|beschrijving|quantity|qty|hoeveelheid/i.test(rowText)) {
+      headerIndex = i;
+      break;
+    }
+  }
+  
+  // Process rows after header
+  const dataRows = headerIndex >= 0 ? rows.slice(headerIndex + 1) : rows.slice(3);
+  
+  for (const row of dataRows) {
+    // Skip rows with very few characters (likely empty or separator rows)
+    const totalText = row.items.map(i => i.str).join('').trim();
+    if (totalText.length < 3) continue;
+    
+    const record: Record<string, string> = {};
+    
+    for (const item of row.items) {
+      // Find which column this item belongs to
+      let bestColumn = '';
+      let minDistance = Infinity;
+      
+      for (const [colName, colX] of columns) {
+        const distance = Math.abs(item.x - colX);
+        if (distance < minDistance && distance < 100) { // 100px tolerance
+          minDistance = distance;
+          bestColumn = colName;
+        }
+      }
+      
+      if (bestColumn) {
+        record[bestColumn] = (record[bestColumn] || '') + ' ' + item.str;
+      }
+    }
+    
+    // Clean up values
+    for (const key of Object.keys(record)) {
+      record[key] = record[key].trim();
+    }
+    
+    // Only add if we have some meaningful data
+    if (record['description'] || record['article_code']) {
+      result.push(record);
+    }
+  }
+  
+  return result;
 }
 
 function extractDateFromString(str: string): string | undefined {
@@ -134,17 +288,89 @@ function extractDateFromString(str: string): string | undefined {
   return undefined;
 }
 
+// Match extracted supplier text against database suppliers
+function matchSupplier(extractedText: string, suppliers: SupplierMatch[]): SupplierMatch | undefined {
+  if (!extractedText || suppliers.length === 0) return undefined;
+  
+  const normalizedText = extractedText.toLowerCase().trim();
+  
+  // First, try exact match
+  const exactMatch = suppliers.find(s => 
+    s.name.toLowerCase().trim() === normalizedText
+  );
+  if (exactMatch) return exactMatch;
+  
+  // Try partial match - supplier name contained in text or vice versa
+  let bestMatch: SupplierMatch | undefined;
+  let bestScore = 0;
+  
+  for (const supplier of suppliers) {
+    const supplierName = supplier.name.toLowerCase().trim();
+    
+    // Check if supplier name is in the extracted text
+    if (normalizedText.includes(supplierName)) {
+      const score = supplierName.length;
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = supplier;
+      }
+    }
+    
+    // Check if extracted text is in supplier name
+    if (supplierName.includes(normalizedText)) {
+      const score = normalizedText.length;
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = supplier;
+      }
+    }
+    
+    // Check word overlap
+    const textWords = normalizedText.split(/\s+/).filter(w => w.length > 2);
+    const supplierWords = supplierName.split(/\s+/).filter(w => w.length > 2);
+    
+    const matchingWords = textWords.filter(tw => 
+      supplierWords.some(sw => sw.includes(tw) || tw.includes(sw))
+    );
+    
+    if (matchingWords.length > 0) {
+      const score = matchingWords.join('').length;
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = supplier;
+      }
+    }
+  }
+  
+  return bestMatch;
+}
+
 function extractSupplier(text: string): string | undefined {
   const supplierPatterns = [
     /(?:supplier|leverancier|vendor)[:\s]*([^\n]+)/gi,
-    /(?:from|van)[:\s]*([^\n]+)/gi,
-    /(?:company|bedrijf)[:\s]*([^\n]+)/gi,
+    /(?:from|van|afzender)[:\s]*([^\n]+)/gi,
+    /(?:company|bedrijf|firma)[:\s]*([^\n]+)/gi,
+    /(?:verkoper|seller)[:\s]*([^\n]+)/gi,
   ];
 
   for (const pattern of supplierPatterns) {
+    pattern.lastIndex = 0;
     const match = pattern.exec(text);
     if (match) {
       return match[1].trim().substring(0, 100);
+    }
+  }
+
+  // Try to find company name in first few lines (often contains sender info)
+  const lines = text.split('\n').slice(0, 10);
+  for (const line of lines) {
+    // Look for patterns like "Company Name" or "Company Name B.V." or "Company Name BV"
+    const companyMatch = line.match(/^([A-Z][A-Za-z\s&]+(?:B\.?V\.?|N\.?V\.?|BV|NV|GmbH|Inc|Ltd|LLC)?)\s*$/);
+    if (companyMatch) {
+      const name = companyMatch[1].trim();
+      if (name.length > 3 && name.length < 60) {
+        return name;
+      }
     }
   }
 
@@ -153,12 +379,14 @@ function extractSupplier(text: string): string | undefined {
 
 function extractOrderNumber(text: string): string | undefined {
   const patterns = [
-    /(?:order\s*(?:no|nr|number|nummer)|bestelnummer)[:\s#]*([A-Z0-9\-]+)/gi,
+    /(?:order\s*(?:no|nr|number|nummer)|bestelnummer|bestellnummer)[:\s#]*([A-Z0-9\-]+)/gi,
     /(?:po|p\.o\.)[:\s#]*([A-Z0-9\-]+)/gi,
-    /(?:reference|referentie)[:\s#]*([A-Z0-9\-]+)/gi,
+    /(?:reference|referentie|ref)[:\s#]*([A-Z0-9\-]+)/gi,
+    /(?:document\s*(?:no|nr|nummer))[:\s#]*([A-Z0-9\-]+)/gi,
   ];
 
   for (const pattern of patterns) {
+    pattern.lastIndex = 0;
     const match = pattern.exec(text);
     if (match) {
       return match[1].trim();
@@ -166,103 +394,6 @@ function extractOrderNumber(text: string): string | undefined {
   }
 
   return undefined;
-}
-
-function findMatchingProducts(
-  text: string,
-  products: ProductMatch[],
-  materials: MaterialMatch[]
-): ParsedOrderItem[] {
-  const items: ParsedOrderItem[] = [];
-  const lines = text.split('\n').filter(line => line.trim());
-  
-  // Create lookup maps for faster matching
-  const productByCode = new Map<string, ProductMatch>();
-  const productByName = new Map<string, ProductMatch>();
-  
-  for (const product of products) {
-    if (product.article_code) {
-      productByCode.set(product.article_code.toLowerCase(), product);
-    }
-    productByName.set(product.name.toLowerCase(), product);
-  }
-
-  const materialBySku = new Map<string, MaterialMatch>();
-  const materialByName = new Map<string, MaterialMatch>();
-  
-  for (const material of materials) {
-    if (material.sku) {
-      materialBySku.set(material.sku.toLowerCase(), material);
-    }
-    materialByName.set(material.name.toLowerCase(), material);
-  }
-
-  // Process each line looking for items
-  for (const line of lines) {
-    const lineLower = line.toLowerCase();
-    
-    // Try to find product by article code
-    for (const pattern of ARTICLE_CODE_PATTERNS) {
-      pattern.lastIndex = 0;
-      let match;
-      while ((match = pattern.exec(line)) !== null) {
-        const code = match[1];
-        const product = productByCode.get(code.toLowerCase());
-        if (product) {
-          const quantity = extractQuantityFromLine(line);
-          const price = extractPriceFromLine(line);
-          items.push({
-            description: product.name,
-            quantity: quantity || 1,
-            article_code: product.article_code,
-            unit_price: price,
-          });
-        }
-      }
-    }
-
-    // Try to find product by name (partial matching)
-    for (const [name, product] of productByName) {
-      if (lineLower.includes(name) && name.length > 3) {
-        const alreadyFound = items.some(i => i.article_code === product.article_code);
-        if (!alreadyFound) {
-          const quantity = extractQuantityFromLine(line);
-          const price = extractPriceFromLine(line);
-          items.push({
-            description: product.name,
-            quantity: quantity || 1,
-            article_code: product.article_code,
-            unit_price: price,
-          });
-        }
-      }
-    }
-
-    // Try to find material by SKU
-    for (const [sku, material] of materialBySku) {
-      if (lineLower.includes(sku)) {
-        const alreadyFound = items.some(i => i.article_code === material.sku);
-        if (!alreadyFound) {
-          const quantity = extractQuantityFromLine(line);
-          const price = extractPriceFromLine(line);
-          items.push({
-            description: `${material.name} (${material.category})`,
-            quantity: quantity || 1,
-            article_code: material.sku,
-            unit_price: price,
-          });
-        }
-      }
-    }
-  }
-
-  // If no matches found, try to extract generic items from table-like structures
-  if (items.length === 0) {
-    const tableItems = extractTableItems(text);
-    items.push(...tableItems);
-  }
-
-  return items;
 }
 
 function extractQuantityFromLine(line: string): number | undefined {
@@ -274,10 +405,10 @@ function extractQuantityFromLine(line: string): number | undefined {
     }
   }
   
-  // Try to find standalone numbers that look like quantities
-  const numbers = line.match(/\b(\d{1,4})\b/g);
-  if (numbers && numbers.length > 0) {
-    const qty = parseInt(numbers[0], 10);
+  // Try to find standalone numbers that look like quantities (1-4 digits, at start or with context)
+  const qtyMatch = line.match(/^\s*(\d{1,4})\s+/);
+  if (qtyMatch) {
+    const qty = parseInt(qtyMatch[1], 10);
     if (qty > 0 && qty < 10000) {
       return qty;
     }
@@ -297,6 +428,125 @@ function extractPriceFromLine(line: string): number | undefined {
   return undefined;
 }
 
+function extractArticleCodeFromLine(line: string): string {
+  for (const pattern of ARTICLE_CODE_PATTERNS) {
+    pattern.lastIndex = 0;
+    const match = pattern.exec(line);
+    if (match) {
+      return match[1];
+    }
+  }
+  return '';
+}
+
+function findMatchingProducts(
+  text: string,
+  products: ProductMatch[],
+  materials: MaterialMatch[]
+): ParsedOrderItem[] {
+  const items: ParsedOrderItem[] = [];
+  const lines = text.split('\n').filter(line => line.trim());
+  const foundCodes = new Set<string>();
+  
+  // Create lookup maps for faster matching
+  const productByCode = new Map<string, ProductMatch>();
+  const productByName = new Map<string, ProductMatch>();
+  
+  for (const product of products) {
+    if (product.article_code) {
+      productByCode.set(product.article_code.toLowerCase(), product);
+    }
+    if (product.name) {
+      productByName.set(product.name.toLowerCase(), product);
+    }
+  }
+
+  const materialBySku = new Map<string, MaterialMatch>();
+  const materialByName = new Map<string, MaterialMatch>();
+  
+  for (const material of materials) {
+    if (material.sku) {
+      materialBySku.set(material.sku.toLowerCase(), material);
+    }
+    materialByName.set(material.name.toLowerCase(), material);
+  }
+
+  // Process each line looking for items
+  for (const line of lines) {
+    const lineLower = line.toLowerCase();
+    
+    // Skip header-like lines
+    if (/^(item|artikel|description|omschrijving|qty|quantity|price|prijs|totaal|total|subtotal)/i.test(line.trim())) {
+      continue;
+    }
+    
+    // Try to find product by article code first
+    for (const pattern of ARTICLE_CODE_PATTERNS) {
+      pattern.lastIndex = 0;
+      let match;
+      while ((match = pattern.exec(line)) !== null) {
+        const code = match[1];
+        const codeLower = code.toLowerCase();
+        
+        if (foundCodes.has(codeLower)) continue;
+        
+        const product = productByCode.get(codeLower);
+        if (product) {
+          const quantity = extractQuantityFromLine(line) || 1;
+          const price = extractPriceFromLine(line);
+          items.push({
+            description: product.name,
+            quantity: quantity,
+            article_code: product.article_code,
+            unit_price: price,
+          });
+          foundCodes.add(codeLower);
+        }
+        
+        // Check materials
+        const material = materialBySku.get(codeLower);
+        if (material && !foundCodes.has(codeLower)) {
+          const quantity = extractQuantityFromLine(line) || 1;
+          const price = extractPriceFromLine(line);
+          items.push({
+            description: `${material.name} (${material.category})`,
+            quantity: quantity,
+            article_code: material.sku,
+            unit_price: price,
+          });
+          foundCodes.add(codeLower);
+        }
+      }
+    }
+
+    // Try to find product by name (partial matching for names > 5 chars)
+    for (const [name, product] of productByName) {
+      if (name.length > 5 && lineLower.includes(name)) {
+        const codeKey = (product.article_code || name).toLowerCase();
+        if (!foundCodes.has(codeKey)) {
+          const quantity = extractQuantityFromLine(line) || 1;
+          const price = extractPriceFromLine(line);
+          items.push({
+            description: product.name,
+            quantity: quantity,
+            article_code: product.article_code,
+            unit_price: price,
+          });
+          foundCodes.add(codeKey);
+        }
+      }
+    }
+  }
+
+  // If no matches found, try to extract generic items from table-like structures
+  if (items.length === 0) {
+    const tableItems = extractTableItems(text);
+    items.push(...tableItems);
+  }
+
+  return items;
+}
+
 function extractTableItems(text: string): ParsedOrderItem[] {
   const items: ParsedOrderItem[] = [];
   const lines = text.split('\n').filter(line => line.trim());
@@ -304,36 +554,37 @@ function extractTableItems(text: string): ParsedOrderItem[] {
   // Look for lines that appear to be table rows with item data
   for (const line of lines) {
     // Skip header-like lines
-    if (/^(item|artikel|description|omschrijving|qty|quantity|price)/i.test(line)) {
+    if (/^(item|artikel|description|omschrijving|qty|quantity|price|prijs|total)/i.test(line.trim())) {
+      continue;
+    }
+    
+    // Skip very short lines or lines that are just numbers
+    if (line.trim().length < 5 || /^\d+$/.test(line.trim())) {
       continue;
     }
     
     // Look for lines with numeric data that suggest they're order items
     const hasQuantity = /\b\d{1,4}\s*(st|stuk|pcs|x)?\b/i.test(line);
-    const hasCode = /\b[A-Z0-9\-]{5,}\b/.test(line);
+    const hasCode = /\b[A-Z0-9\-\.]{5,}\b/.test(line);
     
     if (hasQuantity || hasCode) {
       const quantity = extractQuantityFromLine(line) || 1;
       const price = extractPriceFromLine(line);
+      const articleCode = extractArticleCodeFromLine(line);
       
-      // Extract article code
-      let articleCode = '';
-      for (const pattern of ARTICLE_CODE_PATTERNS) {
-        pattern.lastIndex = 0;
-        const match = pattern.exec(line);
-        if (match) {
-          articleCode = match[1];
-          break;
-        }
-      }
-      
-      // Use the line as description (cleaned up)
-      const description = line
+      // Clean description: remove prices, quantities, and article codes
+      let description = line
         .replace(/\d+[,\.]\d{2}\s*€?/g, '') // Remove prices
         .replace(/€\s*\d+/g, '')
         .replace(/\b\d{1,4}\s*(st|stuk|pcs|x)?\b/gi, '') // Remove quantities
-        .trim()
-        .substring(0, 200);
+        .trim();
+      
+      // Remove the article code from description if found
+      if (articleCode) {
+        description = description.replace(new RegExp(articleCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
+      }
+      
+      description = description.replace(/\s+/g, ' ').trim().substring(0, 200);
       
       if (description.length > 3) {
         items.push({
@@ -346,24 +597,54 @@ function extractTableItems(text: string): ParsedOrderItem[] {
     }
   }
   
-  return items.slice(0, 50); // Limit to 50 items
+  return items.slice(0, 100); // Limit to 100 items
 }
 
+// Main parse function with enhanced features
 export async function parsePDFForOrder(
   file: File,
   products: ProductMatch[],
-  materials: MaterialMatch[]
+  materials: MaterialMatch[],
+  suppliers?: SupplierMatch[]
 ): Promise<ParsedOrderData> {
+  // Extract text with positions for table parsing
+  let tableData: Record<string, string>[] = [];
+  
+  try {
+    const textWithPositions = await extractTextWithPositions(file);
+    
+    for (const pageItems of textWithPositions) {
+      const rows = groupIntoRows(pageItems);
+      const columnPositions = detectColumns(rows);
+      
+      if (columnPositions.size >= 2) {
+        const pageData = extractTableData(rows, columnPositions);
+        tableData.push(...pageData);
+      }
+    }
+  } catch (e) {
+    console.log('Table extraction failed, falling back to text extraction:', e);
+  }
+  
+  // Also extract plain text for metadata and fallback matching
   const text = await extractTextFromPDF(file);
   
   console.log('Extracted PDF text:', text.substring(0, 1000));
+  console.log('Table data extracted:', tableData.length, 'rows');
   
-  const supplier = extractSupplier(text);
+  const extractedSupplier = extractSupplier(text);
   const orderNumber = extractOrderNumber(text);
   
+  // Match supplier against database
+  let matchedSupplier: SupplierMatch | undefined;
+  if (extractedSupplier && suppliers && suppliers.length > 0) {
+    matchedSupplier = matchSupplier(extractedSupplier, suppliers);
+    console.log('Matched supplier:', matchedSupplier?.name || 'none', 'from extracted:', extractedSupplier);
+  }
+  
   // Extract dates
-  const orderDateMatch = text.match(/(?:order\s*date|besteldatum|datum)[:\s]*([^\n]+)/gi);
-  const deliveryDateMatch = text.match(/(?:delivery|levering|lever)[^\n]*[:\s]*([^\n]+)/gi);
+  const orderDateMatch = text.match(/(?:order\s*date|besteldatum|datum|date)[:\s]*([^\n]+)/gi);
+  const deliveryDateMatch = text.match(/(?:delivery|levering|lever|expected)[^\n]*[:\s]*([^\n]+)/gi);
   
   let orderDate: string | undefined;
   let expectedDelivery: string | undefined;
@@ -393,11 +674,26 @@ export async function parsePDFForOrder(
     }
   }
   
-  // Find matching items
-  const items = findMatchingProducts(text, products, materials);
+  // Build items from table data first
+  let items: ParsedOrderItem[] = [];
+  
+  if (tableData.length > 0) {
+    items = tableData.map(row => ({
+      description: row['description'] || '',
+      quantity: parseInt(row['quantity']) || 1,
+      article_code: row['article_code'] || '',
+      unit_price: row['price'] ? parseFloat(row['price'].replace(',', '.').replace(/[^0-9.]/g, '')) : undefined,
+    })).filter(item => item.description || item.article_code);
+  }
+  
+  // If no table items, try text-based matching
+  if (items.length === 0) {
+    items = findMatchingProducts(text, products, materials);
+  }
   
   return {
-    supplier,
+    supplier: matchedSupplier?.name || extractedSupplier,
+    matchedSupplierId: matchedSupplier?.id,
     orderDate,
     expectedDelivery,
     orderNumber,

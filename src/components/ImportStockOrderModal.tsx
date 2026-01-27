@@ -46,12 +46,18 @@ interface Material {
   supplier: string | null;
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+}
+
 const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, onImportSuccess }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [formData, setFormData] = useState({
-    supplier: '',
+    supplierId: '',
+    supplierName: '',
     orderDate: new Date().toISOString().split('T')[0],
     expectedDelivery: '',
     notes: ''
@@ -63,6 +69,7 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
   // Database items
   const [products, setProducts] = useState<Product[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
   // Search states
@@ -74,11 +81,21 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedOrderData | null>(null);
 
-  // Fetch products and materials on mount
+  // Fetch products, materials, and suppliers on mount
   useEffect(() => {
     const fetchData = async () => {
       setLoadingData(true);
       try {
+        // Fetch suppliers
+        const { data: suppliersData, error: suppliersError } = await supabase
+          .from('suppliers')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name');
+        
+        if (suppliersError) throw suppliersError;
+        setSuppliers(suppliersData || []);
+
         // Fetch products with pagination
         const BATCH_SIZE = 1000;
         let allProducts: Product[] = [];
@@ -156,9 +173,16 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
       source: 'product'
     };
     
-    // Update supplier if not set
-    if (!formData.supplier && product.supplier) {
-      setFormData(prev => ({ ...prev, supplier: product.supplier! }));
+    // Update supplier if not set - try to match with database suppliers
+    if (!formData.supplierId && product.supplier) {
+      const matchedSupplier = suppliers.find(s => 
+        s.name.toLowerCase() === product.supplier?.toLowerCase()
+      );
+      if (matchedSupplier) {
+        setFormData(prev => ({ ...prev, supplierId: matchedSupplier.id, supplierName: matchedSupplier.name }));
+      } else {
+        setFormData(prev => ({ ...prev, supplierName: product.supplier! }));
+      }
     }
     
     setOrderItems(prev => [...prev.filter(item => item.description || item.article_code), newItem]);
@@ -175,9 +199,16 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
       source: 'material'
     };
     
-    // Update supplier if not set
-    if (!formData.supplier && material.supplier) {
-      setFormData(prev => ({ ...prev, supplier: material.supplier! }));
+    // Update supplier if not set - try to match with database suppliers
+    if (!formData.supplierId && material.supplier) {
+      const matchedSupplier = suppliers.find(s => 
+        s.name.toLowerCase() === material.supplier?.toLowerCase()
+      );
+      if (matchedSupplier) {
+        setFormData(prev => ({ ...prev, supplierId: matchedSupplier.id, supplierName: matchedSupplier.name }));
+      } else {
+        setFormData(prev => ({ ...prev, supplierName: material.supplier! }));
+      }
     }
     
     setOrderItems(prev => [...prev.filter(item => item.description || item.article_code), newItem]);
@@ -201,7 +232,7 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
     setPdfLoading(true);
 
     try {
-      // Parse the PDF
+      // Parse the PDF with suppliers for matching
       const productMatches = products.map(p => ({
         id: p.id,
         name: p.name,
@@ -217,12 +248,26 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
         category: m.category,
       }));
 
-      const parsed = await parsePDFForOrder(file, productMatches, materialMatches);
+      const supplierMatches = suppliers.map(s => ({
+        id: s.id,
+        name: s.name,
+      }));
+
+      const parsed = await parsePDFForOrder(file, productMatches, materialMatches, supplierMatches);
       setParsedData(parsed);
 
-      // Auto-fill form data
-      if (parsed.supplier && !formData.supplier) {
-        setFormData(prev => ({ ...prev, supplier: parsed.supplier! }));
+      // Auto-fill form data with matched supplier
+      if (!formData.supplierId) {
+        if (parsed.matchedSupplierId) {
+          const matchedSupplier = suppliers.find(s => s.id === parsed.matchedSupplierId);
+          setFormData(prev => ({ 
+            ...prev, 
+            supplierId: parsed.matchedSupplierId!, 
+            supplierName: matchedSupplier?.name || parsed.supplier || ''
+          }));
+        } else if (parsed.supplier) {
+          setFormData(prev => ({ ...prev, supplierName: parsed.supplier! }));
+        }
       }
       if (parsed.orderDate) {
         setFormData(prev => ({ ...prev, orderDate: parsed.orderDate! }));
@@ -281,10 +326,15 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.supplier.trim()) {
+    // Get supplier name from selected supplier or manual entry
+    const supplierName = formData.supplierId 
+      ? suppliers.find(s => s.id === formData.supplierId)?.name || formData.supplierName
+      : formData.supplierName;
+    
+    if (!supplierName.trim()) {
       toast({
         title: "Error",
-        description: "Please fill in the supplier name",
+        description: "Please select or enter a supplier",
         variant: "destructive"
       });
       return;
@@ -316,7 +366,7 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
       // Create the stock order with the provided supplier and no project_id
       const newOrder = await orderService.create({
         project_id: null, // No project linking
-        supplier: formData.supplier,
+        supplier: supplierName,
         order_date: formData.orderDate,
         expected_delivery: formData.expectedDelivery,
         status: 'pending',
@@ -391,13 +441,41 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="supplier">Supplier *</Label>
-                    <Input
-                      id="supplier"
-                      value={formData.supplier}
-                      onChange={(e) => setFormData(prev => ({ ...prev, supplier: e.target.value }))}
-                      placeholder="Enter supplier name"
-                      required
-                    />
+                    <Select
+                      value={formData.supplierId}
+                      onValueChange={(value) => {
+                        if (value === '__manual__') {
+                          setFormData(prev => ({ ...prev, supplierId: '', supplierName: '' }));
+                        } else {
+                          const supplier = suppliers.find(s => s.id === value);
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            supplierId: value, 
+                            supplierName: supplier?.name || '' 
+                          }));
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a supplier..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__manual__">-- Enter manually --</SelectItem>
+                        {suppliers.map(supplier => (
+                          <SelectItem key={supplier.id} value={supplier.id}>
+                            {supplier.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!formData.supplierId && (
+                      <Input
+                        className="mt-2"
+                        value={formData.supplierName}
+                        onChange={(e) => setFormData(prev => ({ ...prev, supplierName: e.target.value }))}
+                        placeholder="Enter supplier name manually"
+                      />
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="orderDate">Order Date</Label>
