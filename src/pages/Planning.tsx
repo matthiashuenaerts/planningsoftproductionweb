@@ -54,8 +54,8 @@ import StandardTaskAssignment from '@/components/StandardTaskAssignment';
 import { supabase } from '@/integrations/supabase/client';
 import DraggableScheduleItem from '@/components/DraggableScheduleItem';
 import WorkstationScheduleView from '@/components/WorkstationScheduleView';
-import WorkstationGanttChart from '@/components/WorkstationGanttChart';
-import ProductionCompletionTimeline from '@/components/planning/ProductionCompletionTimeline';
+import WorkstationGanttChart, { ProjectCompletionInfo } from '@/components/WorkstationGanttChart';
+import ProductionCompletionTimeline, { ProjectCompletionData } from '@/components/planning/ProductionCompletionTimeline';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface WorkerTask {
@@ -116,6 +116,9 @@ const Planning = () => {
   const [activeView, setActiveView] = useState<'worker' | 'workstation' | 'gantt'>('worker');
   const [holidays, setHolidays] = useState<any[]>([]);
   const [showSchedulingMethodDialog, setShowSchedulingMethodDialog] = useState(false);
+  const [projectCompletions, setProjectCompletions] = useState<ProjectCompletionData[]>([]);
+  const [lastProductionStepName, setLastProductionStepName] = useState<string | null>(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
   const ganttChartRef = useRef<any>(null);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
@@ -2130,16 +2133,28 @@ const Planning = () => {
 
             {/* Production Completion Timeline - Show in Gantt view */}
             {activeView === 'gantt' && (
-              <div className="mb-6">
+              <div className="mb-4">
                 <ProductionCompletionTimeline 
-                  selectedDate={selectedDate}
-                  onDateChange={setSelectedDate}
+                  projectCompletions={projectCompletions}
+                  loading={timelineLoading}
+                  lastProductionStepName={lastProductionStepName || undefined}
                 />
               </div>
             )}
 
             {activeView === 'gantt' ? (
-              <WorkstationGanttChart ref={ganttChartRef} selectedDate={selectedDate} onDateChange={setSelectedDate} />
+              <WorkstationGanttChart 
+                ref={ganttChartRef} 
+                selectedDate={selectedDate} 
+                onDateChange={setSelectedDate}
+                onPlanningGenerated={(completions, lastStepName, isGenerating) => {
+                  setTimelineLoading(isGenerating);
+                  if (!isGenerating) {
+                    setProjectCompletions(completions);
+                    setLastProductionStepName(lastStepName);
+                  }
+                }}
+              />
             ) : activeView === 'workstation' ? (
               <WorkstationScheduleView selectedDate={selectedDate} />
             ) : (
