@@ -20,6 +20,7 @@ import { workingHoursService, WorkingHours } from '@/services/workingHoursServic
 import { holidayService, Holiday } from '@/services/holidayService';
 import { ganttScheduleService, GanttScheduleInsert } from '@/services/ganttScheduleService';
 import { capacityCheckService } from '@/services/capacityCheckService';
+import { standardTasksService } from '@/services/standardTasksService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -968,12 +969,34 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       
       // ===== PHASE 6: Check project deadlines =====
       console.log('🔍 PHASE 6: Checking project deadlines...');
+      
+      // Get the last production step and build task order map
+      const lastProductionStep = await standardTasksService.getLastProductionStep();
+      const taskOrderMap = new Map<string, number>();
+      standardTasks.forEach((st, index) => {
+        taskOrderMap.set(st.id, index);
+      });
+      
+      const lastProductionStepOrder = lastProductionStep 
+        ? (taskOrderMap.get(lastProductionStep.id) ?? Infinity)
+        : Infinity;
+      
+      // Helper to check if a task is at or before the last production step
+      const isProductionTask = (task: typeof scheduleTasks[0]): boolean => {
+        if (!lastProductionStep || !task.standard_task_id) return true; // Include if no filter
+        const taskOrder = taskOrderMap.get(task.standard_task_id) ?? Infinity;
+        return taskOrder <= lastProductionStepOrder;
+      };
+      
       const projectCompletionDates = new Map<string, { lastEndDate: Date; project: any; tasks: typeof scheduleTasks }>();
       
-      // Group tasks by project and find the latest end date for each project
+      // Group tasks by project and find the latest end date for production tasks only
       taskAssignments.forEach(({ start, end }, taskId) => {
         const task = scheduleTasks.find(t => t.id === taskId);
         if (!task?.project) return;
+        
+        // Only consider tasks up to and including the last production step
+        if (!isProductionTask(task)) return;
         
         const existing = projectCompletionDates.get(task.project.id);
         if (!existing || end > existing.lastEndDate) {
@@ -987,10 +1010,10 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         }
       });
       
-      // Also check for unassigned tasks by project
+      // Also check for unassigned production tasks by project
       const projectsWithUnassignedTasks = new Set<string>();
       unassignedTasks.forEach(task => {
-        if (task.project?.id) {
+        if (task.project?.id && isProductionTask(task)) {
           projectsWithUnassignedTasks.add(task.project.id);
         }
       });
@@ -1015,17 +1038,17 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             canReschedule: !projectsWithUnassignedTasks.has(projectId)
           });
           
-          // If project has unassigned tasks, it's a capacity issue
+          // If project has unassigned production tasks, it's a capacity issue
           if (projectsWithUnassignedTasks.has(projectId)) {
             hasCapacityIssue = true;
           }
         }
       });
       
-      // Check for completely unscheduled projects (all tasks unassigned)
+      // Check for completely unscheduled projects (all production tasks unassigned)
       const unscheduledProjects = new Map<string, { project: any; tasks: typeof scheduleTasks }>();
       unassignedTasks.forEach(task => {
-        if (!task.project) return;
+        if (!task.project || !isProductionTask(task)) return;
         const existing = unscheduledProjects.get(task.project.id);
         if (existing) {
           existing.tasks.push(task);
@@ -1450,11 +1473,26 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       
       setDailyAssignments(newAssignments);
       
-      // Recheck deadlines
+      // Recheck deadlines - only consider production tasks
+      const lastProductionStep = await standardTasksService.getLastProductionStep();
+      const taskOrderMap = new Map<string, number>();
+      standardTasks.forEach((st, index) => {
+        taskOrderMap.set(st.id, index);
+      });
+      const lastProductionStepOrder = lastProductionStep 
+        ? (taskOrderMap.get(lastProductionStep.id) ?? Infinity)
+        : Infinity;
+      
+      const isProductionTask = (task: typeof scheduleTasks[0]): boolean => {
+        if (!lastProductionStep || !task.standard_task_id) return true;
+        const taskOrder = taskOrderMap.get(task.standard_task_id) ?? Infinity;
+        return taskOrder <= lastProductionStepOrder;
+      };
+      
       const projectCompletionDates = new Map<string, { lastEndDate: Date; project: any }>();
       taskAssignments.forEach(({ end }, taskId) => {
         const task = scheduleTasks.find(t => t.id === taskId);
-        if (!task?.project) return;
+        if (!task?.project || !isProductionTask(task)) return;
         
         const existing = projectCompletionDates.get(task.project.id);
         if (!existing || end > existing.lastEndDate) {
@@ -1797,11 +1835,26 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         }
       }
       
-      // Update warnings
+      // Update warnings - only consider production tasks
+      const lastProductionStep = await standardTasksService.getLastProductionStep();
+      const taskOrderMap = new Map<string, number>();
+      standardTasks.forEach((st, index) => {
+        taskOrderMap.set(st.id, index);
+      });
+      const lastProductionStepOrder = lastProductionStep 
+        ? (taskOrderMap.get(lastProductionStep.id) ?? Infinity)
+        : Infinity;
+      
+      const isProductionTask = (task: typeof scheduleTasks[0]): boolean => {
+        if (!lastProductionStep || !task.standard_task_id) return true;
+        const taskOrder = taskOrderMap.get(task.standard_task_id) ?? Infinity;
+        return taskOrder <= lastProductionStepOrder;
+      };
+      
       const projectCompletionDates = new Map<string, { lastEndDate: Date; project: any }>();
       taskAssignments.forEach(({ start, end }, taskId) => {
         const task = scheduleTasks.find(t => t.id === taskId);
-        if (!task?.project) return;
+        if (!task?.project || !isProductionTask(task)) return;
         
         const existing = projectCompletionDates.get(task.project.id);
         if (!existing || end > existing.lastEndDate) {
