@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, X, Plus, Trash2, CheckSquare, Edit, AlertTriangle } from 'lucide-react';
+import { Save, X, Plus, Trash2, CheckSquare, Edit, AlertTriangle, Flag } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface LimitPhase {
   id: string;
@@ -569,6 +570,7 @@ const StandardTasksSettings: React.FC = () => {
                 <TableRow>
                   <TableHead className="w-20 sticky top-0 bg-background">Task #</TableHead>
                   <TableHead className="sticky top-0 bg-background">Task Name</TableHead>
+                  <TableHead className="w-24 sticky top-0 bg-background">Last Step</TableHead>
                   <TableHead className="w-32 sticky top-0 bg-background">Time Coefficient</TableHead>
                   <TableHead className="w-20 sticky top-0 bg-background">Actions</TableHead>
                   <TableHead className="w-32 sticky top-0 bg-background">Day Counter</TableHead>
@@ -590,6 +592,53 @@ const StandardTasksSettings: React.FC = () => {
                     <TableRow key={task.id}>
                       <TableCell className="font-medium text-foreground">{task.task_number}</TableCell>
                       <TableCell className="text-foreground">{task.task_name}</TableCell>
+                      <TableCell>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center justify-center">
+                                <Checkbox
+                                  id={`last-step-${task.id}`}
+                                  checked={task.is_last_production_step || false}
+                                  onCheckedChange={async (checked) => {
+                                    try {
+                                      if (checked) {
+                                        await standardTasksService.setLastProductionStep(task.id);
+                                      } else {
+                                        await standardTasksService.clearLastProductionStep(task.id);
+                                      }
+                                      await fetchData();
+                                      toast({
+                                        title: 'Success',
+                                        description: checked 
+                                          ? `"${task.task_number}" set as last production step`
+                                          : 'Last production step cleared',
+                                      });
+                                    } catch (error) {
+                                      console.error('Error updating last production step:', error);
+                                      toast({
+                                        title: 'Error',
+                                        description: 'Failed to update last production step',
+                                        variant: 'destructive'
+                                      });
+                                    }
+                                  }}
+                                  className={task.is_last_production_step ? 'border-primary' : ''}
+                                />
+                                {task.is_last_production_step && (
+                                  <Flag className="h-4 w-4 ml-1 text-primary" />
+                                )}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">
+                                Mark this as the last production step. This defines the production completion date 
+                                and is used for capacity calculations. Only one task can be marked.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
                       <TableCell>
                         <Input 
                           type="number" 

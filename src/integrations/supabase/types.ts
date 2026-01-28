@@ -3497,6 +3497,7 @@ export type Database = {
           day_counter: number
           hourly_cost: number
           id: string
+          is_last_production_step: boolean | null
           task_name: string
           task_number: string
           time_coefficient: number
@@ -3508,6 +3509,7 @@ export type Database = {
           day_counter?: number
           hourly_cost?: number
           id?: string
+          is_last_production_step?: boolean | null
           task_name: string
           task_number: string
           time_coefficient?: number
@@ -3519,6 +3521,7 @@ export type Database = {
           day_counter?: number
           hourly_cost?: number
           id?: string
+          is_last_production_step?: boolean | null
           task_name?: string
           task_number?: string
           time_coefficient?: number

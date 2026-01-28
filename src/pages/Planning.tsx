@@ -55,6 +55,7 @@ import { supabase } from '@/integrations/supabase/client';
 import DraggableScheduleItem from '@/components/DraggableScheduleItem';
 import WorkstationScheduleView from '@/components/WorkstationScheduleView';
 import WorkstationGanttChart from '@/components/WorkstationGanttChart';
+import ProductionCompletionTimeline from '@/components/planning/ProductionCompletionTimeline';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface WorkerTask {
@@ -2126,6 +2127,16 @@ const Planning = () => {
                 </Button>
               </div>
             </div>
+
+            {/* Production Completion Timeline - Show in Gantt view */}
+            {activeView === 'gantt' && (
+              <div className="mb-6">
+                <ProductionCompletionTimeline 
+                  selectedDate={selectedDate}
+                  onDateChange={setSelectedDate}
+                />
+              </div>
+            )}
 
             {activeView === 'gantt' ? (
               <WorkstationGanttChart ref={ganttChartRef} selectedDate={selectedDate} onDateChange={setSelectedDate} />
