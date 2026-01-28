@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { AlertTriangle, Calendar, CheckCircle2, ChevronLeft, ChevronRight, Clock, Flag, ZoomIn, ZoomOut } from 'lucide-react';
-import { format, addDays, startOfDay, differenceInDays, isWeekend, isSameDay } from 'date-fns';
+import { AlertTriangle, Calendar, CheckCircle2, ChevronLeft, ChevronRight, Flag, ZoomIn, ZoomOut } from 'lucide-react';
+import { format, addDays, startOfDay, differenceInDays, isWeekend, isSameDay, isValid } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { StandardTask, standardTasksService } from '@/services/standardTasksService';
 
@@ -24,6 +24,16 @@ interface ProductionCompletionTimelineProps {
   onDateChange?: (date: Date) => void;
   scheduleData?: any[];
 }
+
+// Helper to safely format dates
+const safeFormat = (date: Date | undefined | null, formatStr: string): string => {
+  if (!date || !isValid(date)) return 'N/A';
+  try {
+    return format(date, formatStr);
+  } catch {
+    return 'N/A';
+  }
+};
 
 const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> = ({
   selectedDate,
@@ -118,32 +128,39 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
 
       // Build project completion info
       const today = new Date();
-      const completions: ProjectCompletionInfo[] = (projects || []).map(project => {
-        const installationDate = new Date(project.installation_date);
-        const lastStepEnd = completionMap.get(project.id);
-        const daysRemaining = differenceInDays(installationDate, today);
+      const completions: ProjectCompletionInfo[] = (projects || [])
+        .filter(project => {
+          // Filter out projects with invalid installation dates
+          if (!project.installation_date) return false;
+          const date = new Date(project.installation_date);
+          return isValid(date);
+        })
+        .map(project => {
+          const installationDate = new Date(project.installation_date);
+          const lastStepEnd = completionMap.get(project.id);
+          const daysRemaining = differenceInDays(installationDate, today);
 
-        let status: ProjectCompletionInfo['status'] = 'pending';
-        if (lastStepEnd) {
-          if (lastStepEnd > installationDate) {
-            status = 'overdue';
-          } else if (differenceInDays(installationDate, lastStepEnd) <= 2) {
-            status = 'at_risk';
-          } else {
-            status = 'on_track';
+          let status: ProjectCompletionInfo['status'] = 'pending';
+          if (lastStepEnd && isValid(lastStepEnd)) {
+            if (lastStepEnd > installationDate) {
+              status = 'overdue';
+            } else if (differenceInDays(installationDate, lastStepEnd) <= 2) {
+              status = 'at_risk';
+            } else {
+              status = 'on_track';
+            }
           }
-        }
 
-        return {
-          projectId: project.id,
-          projectName: project.name,
-          client: project.client,
-          installationDate,
-          lastProductionStepEnd: lastStepEnd,
-          status,
-          daysRemaining
-        };
-      });
+          return {
+            projectId: project.id,
+            projectName: project.name,
+            client: project.client,
+            installationDate,
+            lastProductionStepEnd: lastStepEnd && isValid(lastStepEnd) ? lastStepEnd : undefined,
+            status,
+            daysRemaining
+          };
+        });
 
       setProjectCompletions(completions.filter(p => p.daysRemaining >= -7)); // Show projects from past week
     } catch (error) {
@@ -197,9 +214,9 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
             <AlertTriangle className="h-5 w-5 mr-2" />
             Last Production Step Not Configured
           </CardTitle>
-          <CardDescription className="text-amber-700">
+          <p className="text-sm text-amber-700">
             Please configure a "Last Production Step" in Settings → Standard Tasks to enable production timeline tracking and capacity calculations.
-          </CardDescription>
+          </p>
         </CardHeader>
       </Card>
     );
@@ -214,12 +231,12 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
               <Flag className="h-5 w-5 mr-2 text-primary" />
               Production Completion Timeline
             </CardTitle>
-            <CardDescription className="flex items-center mt-1">
+            <div className="flex items-center mt-1 text-sm text-muted-foreground">
               <span>Milestone: </span>
               <Badge variant="outline" className="ml-2">
                 {lastProductionStep.task_number} - {lastProductionStep.task_name}
               </Badge>
-            </CardDescription>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -327,7 +344,7 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
                                 <TooltipContent>
                                   <div className="text-sm">
                                     <div className="font-medium">{project.projectName}</div>
-                                    <div>Production Complete: {format(project.lastProductionStepEnd!, 'dd/MM/yyyy HH:mm')}</div>
+                                    <div>Production Complete: {safeFormat(project.lastProductionStepEnd, 'dd/MM/yyyy HH:mm')}</div>
                                   </div>
                                 </TooltipContent>
                               </Tooltip>
@@ -368,13 +385,13 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
                                   <div className="text-sm space-y-1">
                                     <div className="font-bold">{project.projectName}</div>
                                     <div>Client: {project.client}</div>
-                                    <div>Installation: {format(project.installationDate, 'dd/MM/yyyy')}</div>
+                                    <div>Installation: {safeFormat(project.installationDate, 'dd/MM/yyyy')}</div>
                                     <div className="flex items-center gap-2">
                                       Status: {getStatusBadge(project.status)}
                                     </div>
                                     {project.lastProductionStepEnd && (
                                       <div>
-                                        Production Complete: {format(project.lastProductionStepEnd, 'dd/MM/yyyy HH:mm')}
+                                        Production Complete: {safeFormat(project.lastProductionStepEnd, 'dd/MM/yyyy HH:mm')}
                                       </div>
                                     )}
                                   </div>
