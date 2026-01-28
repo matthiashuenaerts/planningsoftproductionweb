@@ -9,6 +9,7 @@ export interface StandardTask {
   day_counter: number;
   color?: string;
   hourly_cost: number;
+  is_last_production_step?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -413,6 +414,59 @@ export const standardTasksService = {
     
     if (error) {
       console.error('Error deleting standard task:', error);
+      throw error;
+    }
+  },
+
+  async getLastProductionStep(): Promise<StandardTask | null> {
+    const { data, error } = await supabase
+      .from('standard_tasks')
+      .select('*')
+      .eq('is_last_production_step', true)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error fetching last production step:', error);
+      throw error;
+    }
+    return data as StandardTask | null;
+  },
+
+  async setLastProductionStep(taskId: string): Promise<StandardTask> {
+    // First, clear any existing last production step
+    const { error: clearError } = await supabase
+      .from('standard_tasks')
+      .update({ is_last_production_step: false })
+      .eq('is_last_production_step', true);
+    
+    if (clearError) {
+      console.error('Error clearing last production step:', clearError);
+      throw clearError;
+    }
+    
+    // Then set the new one
+    const { data, error } = await supabase
+      .from('standard_tasks')
+      .update({ is_last_production_step: true })
+      .eq('id', taskId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error setting last production step:', error);
+      throw error;
+    }
+    return data as StandardTask;
+  },
+
+  async clearLastProductionStep(taskId: string): Promise<void> {
+    const { error } = await supabase
+      .from('standard_tasks')
+      .update({ is_last_production_step: false })
+      .eq('id', taskId);
+    
+    if (error) {
+      console.error('Error clearing last production step:', error);
       throw error;
     }
   }

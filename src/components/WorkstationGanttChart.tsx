@@ -19,6 +19,7 @@ import { workstationService, Workstation } from '@/services/workstationService';
 import { workingHoursService, WorkingHours } from '@/services/workingHoursService';
 import { holidayService, Holiday } from '@/services/holidayService';
 import { ganttScheduleService, GanttScheduleInsert } from '@/services/ganttScheduleService';
+import { capacityCheckService } from '@/services/capacityCheckService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -535,6 +536,14 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     try {
       setGeneratingPlanning(true);
       console.log('🚀 Starting NEW optimal sequential scheduler...');
+      
+      // Validate last production step is configured
+      const validation = await capacityCheckService.validateLastProductionStepExists();
+      if (!validation.valid) {
+        toast.error(validation.message);
+        setGeneratingPlanning(false);
+        return;
+      }
       
       const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
       const today = format(new Date(), 'yyyy-MM-dd');
