@@ -634,38 +634,23 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       // Workstation schedule for capacity tracking
       const wsSchedule = new Map<string, Map<string, Array<{ start: Date; end: Date; empId: string }>>>();
       
-      // Build limit task dependency map: standard_task_id -> array of required standard_task_ids
-      const limitTaskDeps = new Map<string, string[]>();
-      limitPhases.forEach(lp => {
-        if (!limitTaskDeps.has(lp.standard_task_id)) {
-          limitTaskDeps.set(lp.standard_task_id, []);
-        }
-        limitTaskDeps.get(lp.standard_task_id)!.push(lp.limit_standard_task_id);
-      });
-      
-      console.log('📋 Limit task dependencies:', Object.fromEntries(limitTaskDeps));
-      
-      // Helper: Get task priority score - INSTALLATION DATE is PRIMARY factor
+      // Helper: Get task priority score
       const getScore = (task: typeof scheduleTasks[0]): number => {
         if (!task.project) return -2000;
         if (task.project.start_date > today) return -1000;
         
         let score = 0;
-        
-        // PRIMARY FACTOR: Days until installation - most urgent projects get highest score
-        // Score range: 0-1000 based on installation urgency
         const daysToInstall = differenceInMinutes(new Date(task.project.installation_date), new Date()) / (24 * 60);
-        // Projects due within 30 days get maximum urgency boost
-        // Formula: 1000 - (days * 10), capped between 0-1000
-        score += Math.max(0, Math.min(1000, 1000 - (daysToInstall * 10)));
+        score += Math.max(0, 100 - daysToInstall) * 0.4;
         
-        // SECONDARY: Project status (much smaller influence)
-        if (task.project.status === 'in_progress') score += 20;
-        else if (task.project.status === 'planned') score += 10;
+        if (task.project.status === 'in_progress') score += 12.5;
+        else if (task.project.status === 'planned') score += 7.5;
         
-        // TERTIARY: Task priority
-        if (task.priority === 'high') score += 5;
-        else if (task.priority === 'medium') score += 2;
+        if (task.priority === 'high') score += 6;
+        else if (task.priority === 'medium') score += 3;
+        
+        const daysToDue = differenceInMinutes(new Date(task.due_date), new Date()) / (24 * 60);
+        score += Math.max(0, 50 - daysToDue) * 0.15;
         
         return score;
       };
@@ -832,92 +817,28 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         taskAssignments.set(task.id, { employeeId: empId, employeeName: empName, workstationId: wsId, start, end });
       };
       
-      // Helper: Get minimum start time based on limit task dependencies
-      const getMinStartForTask = (task: typeof scheduleTasks[0]): Date => {
-        if (!task.standard_task_id || !task.project) return timelineStart;
-        
-        const requiredStdTaskIds = limitTaskDeps.get(task.standard_task_id);
-        if (!requiredStdTaskIds || requiredStdTaskIds.length === 0) return timelineStart;
-        
-        let latestEnd = timelineStart;
-        
-        // Find all limit tasks in the SAME project that must complete first
-        for (const reqStdTaskId of requiredStdTaskIds) {
-          // Find tasks in the same project with this standard_task_id
-          const limitTask = scheduleTasks.find(t => 
-            t.standard_task_id === reqStdTaskId && 
-            t.project?.id === task.project?.id
-          );
-          
-          if (limitTask) {
-            const endTime = taskEndTimes.get(limitTask.id);
-            if (endTime && endTime > latestEnd) {
-              latestEnd = endTime;
-            } else if (!endTime && !scheduledTasks.has(limitTask.id)) {
-              // Limit task exists but not scheduled yet - return far future to delay this task
-              return addDays(timelineStart, 9999);
-            }
-          }
-          // If limit task doesn't exist in project (excluded), we can proceed
-        }
-        
-        return latestEnd;
-      };
-      
-      // Helper: Check if all limit tasks are scheduled for a task
-      const areLimitTasksScheduled = (task: typeof scheduleTasks[0]): boolean => {
-        if (!task.standard_task_id || !task.project) return true;
-        
-        const requiredStdTaskIds = limitTaskDeps.get(task.standard_task_id);
-        if (!requiredStdTaskIds || requiredStdTaskIds.length === 0) return true;
-        
-        for (const reqStdTaskId of requiredStdTaskIds) {
-          // Find the limit task in the SAME project
-          const limitTask = scheduleTasks.find(t => 
-            t.standard_task_id === reqStdTaskId && 
-            t.project?.id === task.project?.id
-          );
-          
-          // If limit task exists in this project and is not scheduled, we can't proceed
-          if (limitTask && !scheduledTasks.has(limitTask.id)) {
-            return false;
-          }
-          // If limit task doesn't exist (was excluded from project), we can proceed
-        }
-        
-        return true;
-      };
-      
-      // Helper: Try to assign a task (with limit task checking)
+      // Helper: Try to assign a task
       const tryAssign = (task: typeof scheduleTasks[0]): boolean => {
         if (!task.standard_task_id) return false;
-        
-        // Check if all limit tasks are scheduled first
-        if (!areLimitTasksScheduled(task)) {
-          return false;
-        }
         
         const eligible = employees.filter(e => e.standardTasks.includes(task.standard_task_id!));
         if (eligible.length === 0) return false;
         
-        // Use the task's workstations directly
+        // Use the task's workstations directly - ignore employee_workstation_links
         const taskWsIds = task.workstations?.map(w => w.id) || [];
         if (taskWsIds.length === 0) return false;
         
-        // Get minimum start time based on limit task dependencies
-        const minStart = getMinStartForTask(task);
-        
-        // Score employees: least loaded
+        // Score employees: least loaded only (no workstation matching)
         const scored = eligible.map(emp => {
           const slots = employeeSchedule.get(emp.id) || [];
           const workload = slots.reduce((sum, s) => sum + differenceInMinutes(s.end, s.start), 0);
           return { emp, score: (100000 - workload) };
         }).sort((a, b) => b.score - a.score);
         
-        // Try to assign using task's workstations with proper minStart
+        // Try to assign using task's workstations directly
         for (const { emp } of scored) {
           for (const wsId of taskWsIds) {
-            const slot = findSlot(emp.id, task.duration, wsId, minStart);
+            const slot = findSlot(emp.id, task.duration, wsId, timelineStart);
             if (slot) {
               scheduleTask(task, emp.id, emp.name, wsId, slot.start, slot.end, slot.dateStr);
               return true;
@@ -937,7 +858,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         return true;
       });
       
-      // Sort by priority (installation date is primary factor)
+      // Sort by priority
       const sortedTasks = [...validTasks].sort((a, b) => {
         const scoreA = getScore(a);
         const scoreB = getScore(b);
@@ -945,86 +866,61 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
       });
       
-      // Group tasks by project for better dependency handling
-      const tasksByProject = new Map<string, typeof scheduleTasks>();
-      sortedTasks.forEach(task => {
-        if (!task.project?.id) return;
-        if (!tasksByProject.has(task.project.id)) {
-          tasksByProject.set(task.project.id, []);
-        }
-        tasksByProject.get(task.project.id)!.push(task);
-      });
-      
-      console.log(`📋 Tasks grouped into ${tasksByProject.size} projects, ${sortedTasks.length} total valid tasks`);
-      console.log(`📅 Scheduling with limit task dependency enforcement...`);
-      
+      const todoTasks = sortedTasks.filter(t => t.status === 'TODO');
+      const holdTasks = sortedTasks.filter(t => t.status === 'HOLD');
       const unassignedTasks: typeof scheduleTasks = [];
       
-      // PHASE 1: Schedule tasks respecting limit dependencies
-      // We iterate multiple times to handle chains of dependencies
-      console.log('📅 PHASE 1: Scheduling with dependency resolution...');
+      console.log(`📋 Tasks: ${todoTasks.length} TODO, ${holdTasks.length} HOLD, ${employees.length} employees`);
       
-      let maxIterations = sortedTasks.length * 2;
-      let iteration = 0;
-      let tasksToSchedule = [...sortedTasks];
-      let pendingTasks: typeof scheduleTasks = [];
-      
-      while (tasksToSchedule.length > 0 && iteration < maxIterations) {
-        iteration++;
-        pendingTasks = [];
-        let scheduledThisRound = 0;
-        
-        for (const task of tasksToSchedule) {
-          if (scheduledTasks.has(task.id)) continue;
-          
-          // Check if limit tasks are satisfied
-          if (!areLimitTasksScheduled(task)) {
-            // Limit tasks not yet scheduled, defer this task
-            pendingTasks.push(task);
-            continue;
-          }
-          
-          // Try to assign
-          if (tryAssign(task)) {
-            scheduledThisRound++;
-          } else {
-            // Could not assign (no eligible employee/workstation slot)
-            pendingTasks.push(task);
-          }
-        }
-        
-        console.log(`  Iteration ${iteration}: scheduled ${scheduledThisRound}, pending ${pendingTasks.length}`);
-        
-        // If no progress was made this round, break
-        if (scheduledThisRound === 0) break;
-        
-        tasksToSchedule = pendingTasks;
-      }
-      
-      // Add remaining pending tasks to unassigned
-      pendingTasks.forEach(task => {
-        if (!scheduledTasks.has(task.id)) {
+      // PHASE 1: Schedule TODO tasks
+      console.log('📅 PHASE 1: Scheduling TODO tasks...');
+      for (const task of todoTasks) {
+        if (!tryAssign(task)) {
           unassignedTasks.push(task);
         }
-      });
+      }
+      console.log(`✅ PHASE 1: ${scheduledTasks.size} scheduled`);
       
-      console.log(`✅ PHASE 1: ${scheduledTasks.size} scheduled, ${unassignedTasks.length} unassigned`);
+      // PHASE 2: Schedule HOLD tasks
+      console.log('📅 PHASE 2: Scheduling HOLD tasks...');
+      let remaining = new Set(holdTasks.map(t => t.id));
+      let iter = 0;
+      while (remaining.size > 0 && iter < holdTasks.length * 3) {
+        iter++;
+        let progress = false;
+        for (const task of holdTasks) {
+          if (!remaining.has(task.id)) continue;
+          if (scheduledTasks.has(task.id)) {
+            remaining.delete(task.id);
+            continue;
+          }
+          if (tryAssign(task)) {
+            remaining.delete(task.id);
+            progress = true;
+          }
+        }
+        if (!progress) break;
+      }
+      for (const taskId of remaining) {
+        const task = holdTasks.find(t => t.id === taskId);
+        if (task) unassignedTasks.push(task);
+      }
+      console.log(`✅ PHASE 2: ${scheduledTasks.size} scheduled`);
       
-      // PHASE 2: Final attempt - try to schedule remaining with relaxed constraints
-      console.log('📅 PHASE 2: Final scheduling attempt...');
-      const stillPending = [...unassignedTasks];
+      // PHASE 3: Gap-filling
+      console.log('📅 PHASE 3: Gap-filling...');
+      const stillUnassigned = [...unassignedTasks];
       unassignedTasks.length = 0;
-      
-      for (const task of stillPending) {
+      for (const task of stillUnassigned) {
         if (scheduledTasks.has(task.id)) continue;
         if (!tryAssign(task)) {
           unassignedTasks.push(task);
         }
       }
-      console.log(`✅ PHASE 2: ${scheduledTasks.size} total scheduled, ${unassignedTasks.length} unassigned`);
+      console.log(`✅ PHASE 3: ${scheduledTasks.size} scheduled`);
       
-      // PHASE 3: Validation
-      console.log('🔍 PHASE 3: Validation...');
+      // PHASE 4: Validation
+      console.log('🔍 PHASE 4: Validation...');
       let errors = 0;
       employeeSchedule.forEach((slots, empId) => {
         const sorted = [...slots].sort((a, b) => a.start.getTime() - b.start.getTime());
@@ -1037,8 +933,8 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       });
       console.log(errors === 0 ? '✅ Validation passed!' : `⚠️ ${errors} errors`);
       
-      // PHASE 4: Build UI assignments
-      console.log('🎨 PHASE 4: Building UI...');
+      // PHASE 5: Build UI assignments
+      console.log('🎨 PHASE 5: Building UI...');
       const newAssignments: DailyEmployeeAssignment[] = [];
       const empWsDays = new Map<string, Set<string>>();
       
@@ -1085,8 +981,8 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       setDailyAssignments(newAssignments);
       setScheduleGenerated(true);
       
-      // ===== PHASE 5: Check project deadlines =====
-      console.log('🔍 PHASE 5: Checking project deadlines...');
+      // ===== PHASE 6: Check project deadlines =====
+      console.log('🔍 PHASE 6: Checking project deadlines...');
       
       // Get the last production step and build task order map
       const lastProductionStep = await standardTasksService.getLastProductionStep();
@@ -1214,8 +1110,8 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         toast.success(`Planning: ${scheduledTasks.size} taken, gemiddeld ${avgPerEmployee} min/werknemer - Alle deadlines gehaald!`);
       }
       
-      // ===== PHASE 6: Save schedules to database =====
-      console.log('💾 PHASE 6: Saving schedules to database...');
+      // ===== PHASE 7: Save schedules to database =====
+      console.log('💾 PHASE 7: Saving schedules to database...');
       try {
         // Group schedules by date
         const schedulesByDate = new Map<string, GanttScheduleInsert[]>();
@@ -1255,8 +1151,8 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         toast.error('Fout bij opslaan van planning');
       }
       
-      // ===== PHASE 7: Build project completion data for timeline =====
-      console.log('📊 PHASE 7: Building project completion timeline data...');
+      // ===== PHASE 8: Build project completion data for timeline =====
+      console.log('📊 PHASE 8: Building project completion timeline data...');
       const completionData: ProjectCompletionInfo[] = [];
       const todayDate = new Date();
       
@@ -1394,16 +1290,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       employees.forEach(e => employeeSchedule.set(e.id, []));
       const wsSchedule = new Map<string, Map<string, Array<{ start: Date; end: Date; empId: string }>>>();
       
-      // Build limit task dependency map
-      const limitTaskDeps = new Map<string, string[]>();
-      limitPhases.forEach(lp => {
-        if (!limitTaskDeps.has(lp.standard_task_id)) {
-          limitTaskDeps.set(lp.standard_task_id, []);
-        }
-        limitTaskDeps.get(lp.standard_task_id)!.push(lp.limit_standard_task_id);
-      });
-      
-      // Enhanced priority scoring that strongly prioritizes urgent projects AND installation date
+      // Enhanced priority scoring that strongly prioritizes urgent projects
       const getScore = (task: typeof scheduleTasks[0]): number => {
         if (!task.project) return -2000;
         if (task.project.start_date > today) return -1000;
@@ -1569,70 +1456,13 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         taskAssignments.set(task.id, { employeeId: empId, employeeName: empName, workstationId: wsId, start, end });
       };
       
-      // Helper: Get minimum start time based on limit task dependencies
-      const getMinStartForTask = (task: typeof scheduleTasks[0]): Date => {
-        if (!task.standard_task_id || !task.project) return timelineStart;
-        
-        const requiredStdTaskIds = limitTaskDeps.get(task.standard_task_id);
-        if (!requiredStdTaskIds || requiredStdTaskIds.length === 0) return timelineStart;
-        
-        let latestEnd = timelineStart;
-        
-        for (const reqStdTaskId of requiredStdTaskIds) {
-          const limitTask = scheduleTasks.find(t => 
-            t.standard_task_id === reqStdTaskId && 
-            t.project?.id === task.project?.id
-          );
-          
-          if (limitTask) {
-            const endTime = taskEndTimes.get(limitTask.id);
-            if (endTime && endTime > latestEnd) {
-              latestEnd = endTime;
-            } else if (!endTime && !scheduledTasks.has(limitTask.id)) {
-              return addDays(timelineStart, 9999);
-            }
-          }
-        }
-        
-        return latestEnd;
-      };
-      
-      // Helper: Check if all limit tasks are scheduled for a task
-      const areLimitTasksScheduled = (task: typeof scheduleTasks[0]): boolean => {
-        if (!task.standard_task_id || !task.project) return true;
-        
-        const requiredStdTaskIds = limitTaskDeps.get(task.standard_task_id);
-        if (!requiredStdTaskIds || requiredStdTaskIds.length === 0) return true;
-        
-        for (const reqStdTaskId of requiredStdTaskIds) {
-          const limitTask = scheduleTasks.find(t => 
-            t.standard_task_id === reqStdTaskId && 
-            t.project?.id === task.project?.id
-          );
-          
-          if (limitTask && !scheduledTasks.has(limitTask.id)) {
-            return false;
-          }
-        }
-        
-        return true;
-      };
-      
       const tryAssign = (task: typeof scheduleTasks[0]): boolean => {
         if (!task.standard_task_id) return false;
-        
-        // Check if all limit tasks are scheduled first
-        if (!areLimitTasksScheduled(task)) {
-          return false;
-        }
         
         const eligible = employees.filter(e => e.standardTasks.includes(task.standard_task_id!));
         if (eligible.length === 0) return false;
         
         const taskWsIds = task.workstations?.map(w => w.id) || [];
-        
-        // Get minimum start time based on limit task dependencies
-        const minStart = getMinStartForTask(task);
         
         const scored = eligible.map(emp => {
           const slots = employeeSchedule.get(emp.id) || [];
@@ -1646,7 +1476,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
           const wsToTry = compatWs.length > 0 ? compatWs : emp.workstations;
           
           for (const wsId of wsToTry) {
-            const slot = findSlot(emp.id, task.duration, wsId, minStart);
+            const slot = findSlot(emp.id, task.duration, wsId, timelineStart);
             if (slot) {
               scheduleTask(task, emp.id, emp.name, wsId, slot.start, slot.end, slot.dateStr);
               return true;
@@ -1671,42 +1501,13 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
       });
       
-      // Schedule tasks respecting limit dependencies - iterate multiple times
+      // Schedule all tasks
       const unassignedTasks: typeof scheduleTasks = [];
-      let maxIterations = sortedTasks.length * 2;
-      let iteration = 0;
-      let tasksToSchedule = [...sortedTasks];
-      let pendingTasks: typeof scheduleTasks = [];
-      
-      while (tasksToSchedule.length > 0 && iteration < maxIterations) {
-        iteration++;
-        pendingTasks = [];
-        let scheduledThisRound = 0;
-        
-        for (const task of tasksToSchedule) {
-          if (scheduledTasks.has(task.id)) continue;
-          
-          if (!areLimitTasksScheduled(task)) {
-            pendingTasks.push(task);
-            continue;
-          }
-          
-          if (tryAssign(task)) {
-            scheduledThisRound++;
-          } else {
-            pendingTasks.push(task);
-          }
-        }
-        
-        if (scheduledThisRound === 0) break;
-        tasksToSchedule = pendingTasks;
-      }
-      
-      pendingTasks.forEach(task => {
-        if (!scheduledTasks.has(task.id)) {
+      for (const task of sortedTasks) {
+        if (!tryAssign(task)) {
           unassignedTasks.push(task);
         }
-      });
+      }
       
       // Build UI assignments
       const newAssignments: DailyEmployeeAssignment[] = [];
