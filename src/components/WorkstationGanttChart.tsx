@@ -72,9 +72,20 @@ interface LimitPhase {
   limit_standard_task_id: string;
 }
 
+export interface ProjectCompletionInfo {
+  projectId: string;
+  projectName: string;
+  client: string;
+  installationDate: Date;
+  lastProductionStepEnd: Date | null;
+  status: 'on_track' | 'at_risk' | 'overdue' | 'pending';
+  daysRemaining: number;
+}
+
 interface WorkstationGanttChartProps {
   selectedDate: Date;
   onDateChange?: (date: Date) => void;
+  onPlanningGenerated?: (completions: ProjectCompletionInfo[], lastStepName: string | null, isGenerating: boolean) => void;
 }
 
 interface DailyEmployeeAssignment {
@@ -92,7 +103,7 @@ export interface WorkstationGanttChartRef {
   getWorkstations: () => Workstation[];
 }
 
-const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGanttChartProps>(({ selectedDate, onDateChange }, ref) => {
+const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGanttChartProps>(({ selectedDate, onDateChange, onPlanningGenerated }, ref) => {
   const [workstations, setWorkstations] = useState<Workstation[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [workingHours, setWorkingHours] = useState<WorkingHours[]>([]);
@@ -536,6 +547,8 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const handleGeneratePlanning = async () => {
     try {
       setGeneratingPlanning(true);
+      // Notify parent that planning generation started
+      onPlanningGenerated?.([], null, true);
       console.log('🚀 Starting NEW optimal sequential scheduler...');
       
       // Validate last production step is configured
@@ -543,6 +556,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       if (!validation.valid) {
         toast.error(validation.message);
         setGeneratingPlanning(false);
+        onPlanningGenerated?.([], null, false);
         return;
       }
       
@@ -1137,9 +1151,60 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         toast.error('Fout bij opslaan van planning');
       }
       
+      // ===== PHASE 8: Build project completion data for timeline =====
+      console.log('📊 PHASE 8: Building project completion timeline data...');
+      const completionData: ProjectCompletionInfo[] = [];
+      const todayDate = new Date();
+      
+      projectCompletionDates.forEach(({ lastEndDate, project }, projectId) => {
+        const installationDate = new Date(project.installation_date);
+        const daysRemaining = Math.ceil(differenceInMinutes(installationDate, todayDate) / (24 * 60));
+        
+        let status: ProjectCompletionInfo['status'] = 'on_track';
+        if (lastEndDate > installationDate) {
+          status = 'overdue';
+        } else if (differenceInMinutes(installationDate, lastEndDate) < 2 * 24 * 60) { // Less than 2 days buffer
+          status = 'at_risk';
+        }
+        
+        completionData.push({
+          projectId,
+          projectName: project.name,
+          client: project.client || 'Onbekende klant',
+          installationDate,
+          lastProductionStepEnd: lastEndDate,
+          status,
+          daysRemaining
+        });
+      });
+      
+      // Add projects without scheduled production tasks as pending
+      unscheduledProjects.forEach(({ project }, projectId) => {
+        if (completionData.some(c => c.projectId === projectId)) return;
+        const installationDate = new Date(project.installation_date);
+        const daysRemaining = Math.ceil(differenceInMinutes(installationDate, todayDate) / (24 * 60));
+        completionData.push({
+          projectId,
+          projectName: project.name,
+          client: project.client || 'Onbekende klant',
+          installationDate,
+          lastProductionStepEnd: null,
+          status: 'pending',
+          daysRemaining
+        });
+      });
+      
+      // Sort by installation date
+      completionData.sort((a, b) => a.installationDate.getTime() - b.installationDate.getTime());
+      
+      // Notify parent with completion data
+      const lastStepName = lastProductionStep ? `${lastProductionStep.task_number} - ${lastProductionStep.task_name}` : null;
+      onPlanningGenerated?.(completionData, lastStepName, false);
+      
     } catch (error) {
       console.error('Generate planning error:', error);
       toast.error('Fout bij het genereren van planning');
+      onPlanningGenerated?.([], null, false);
     } finally {
       setGeneratingPlanning(false);
     }
