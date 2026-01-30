@@ -892,58 +892,53 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         new Date(a.project.installation_date).getTime() - new Date(b.project.installation_date).getTime()
       );
       
-      // Sort tasks within each project by task_number order
-      sortedProjects.forEach(({ tasks }) => {
-        tasks.sort((a, b) => {
-          const orderA = taskOrderMap.get(a.standard_task_id!) ?? Infinity;
-          const orderB = taskOrderMap.get(b.standard_task_id!) ?? Infinity;
-          return orderA - orderB;
-        });
-      });
-      
       console.log(`📋 ${sortedProjects.length} projects, ${validTasks.length} tasks, ${employees.length} employees`);
       console.log(`📋 Projects by urgency: ${sortedProjects.slice(0, 5).map(p => p.project.name).join(', ')}...`);
       
-      // ===== HELPER: Check if all limit tasks are scheduled for a task =====
-      const canScheduleWithLimits = (task: typeof scheduleTasks[0]): { canSchedule: boolean; minStartTime: Date } => {
-        if (!task.standard_task_id || !task.project) {
-          return { canSchedule: true, minStartTime: timelineStart };
-        }
+      // ===== HELPER: Get minimum start time from limit phases for HOLD tasks =====
+      const getMinStartFromLimitPhases = (
+        task: typeof scheduleTasks[0],
+        projectId: string,
+        allProjectTasks: typeof scheduleTasks
+      ): Date | null => {
+        if (!task.standard_task_id) return timelineStart;
         
         const limitStdIds = limitTaskMap.get(task.standard_task_id);
         if (!limitStdIds || limitStdIds.length === 0) {
-          return { canSchedule: true, minStartTime: timelineStart };
+          return timelineStart;
         }
         
         let maxEndTime = timelineStart;
         
         for (const limitStdId of limitStdIds) {
-          // Find the limit task in the same project
-          const limitTask = validTasks.find(
-            t => t.standard_task_id === limitStdId && t.project?.id === task.project?.id
+          // Find the corresponding task in THIS project
+          const limitTask = allProjectTasks.find(
+            t => t.standard_task_id === limitStdId && t.project?.id === projectId
           );
           
-          // If no such task exists in the project, it doesn't block scheduling
+          // If limit task doesn't exist in project, it doesn't block
           if (!limitTask) continue;
           
-          // Check if the limit task is scheduled
+          // Get scheduled end time
           const endTime = taskEndTimes.get(limitTask.id);
+          
           if (!endTime) {
-            // Limit task exists but not yet scheduled - cannot schedule this task
-            return { canSchedule: false, minStartTime: new Date(0) };
+            // Limit task exists but not yet scheduled
+            // This HOLD task cannot be scheduled in this pass
+            return null;
           }
           
-          // Update max end time
+          // Track the latest end time
           if (endTime > maxEndTime) {
             maxEndTime = endTime;
           }
         }
         
-        return { canSchedule: true, minStartTime: maxEndTime };
+        return maxEndTime;
       };
       
-      // ===== MODIFIED tryAssign to respect minimum start time =====
-      const tryAssignWithMinStart = (task: typeof scheduleTasks[0], minStart: Date): boolean => {
+      // ===== HELPER: Try to assign a task with minimum start time =====
+      const tryAssignEarliestSlot = (task: typeof scheduleTasks[0], minStart: Date): boolean => {
         if (!task.standard_task_id) return false;
         
         const eligible = employees.filter(e => e.standardTasks.includes(task.standard_task_id!));
@@ -952,13 +947,14 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         const taskWsIds = task.workstations?.map(w => w.id) || [];
         if (taskWsIds.length === 0) return false;
         
-        // Score employees: least loaded
+        // Score employees by workload (least loaded first)
         const scored = eligible.map(emp => {
           const slots = employeeSchedule.get(emp.id) || [];
           const workload = slots.reduce((sum, s) => sum + differenceInMinutes(s.end, s.start), 0);
-          return { emp, score: (100000 - workload) };
-        }).sort((a, b) => b.score - a.score);
+          return { emp, workload };
+        }).sort((a, b) => a.workload - b.workload);
         
+        // Try each employee, find slot AFTER minStart
         for (const { emp } of scored) {
           for (const wsId of taskWsIds) {
             const slot = findSlot(emp.id, task.duration, wsId, minStart);
@@ -968,36 +964,59 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             }
           }
         }
+        
         return false;
       };
       
       const unassignedTasks: typeof scheduleTasks = [];
       
-      // ===== PHASE 1: Schedule by project urgency with strict limit task enforcement =====
-      console.log('📅 PHASE 1: Scheduling by project urgency with limit enforcement...');
+      // ===== PHASE 1: Schedule by project urgency with status separation =====
+      // Process each project fully before moving to the next
+      // Within each project: TODO tasks first (as early as possible), then HOLD tasks (after limit phases)
+      console.log('📅 PHASE 1: Scheduling TODO tasks first, then HOLD tasks per project...');
       
       for (const { project, tasks: projectTasks } of sortedProjects) {
         console.log(`  📁 Project: ${project.name} (install: ${project.installation_date})`);
         
-        for (const task of projectTasks) {
+        // Separate by status
+        const todoTasks = projectTasks
+          .filter(t => t.status === 'TODO')
+          .sort((a, b) => (taskOrderMap.get(a.standard_task_id!) ?? Infinity) - (taskOrderMap.get(b.standard_task_id!) ?? Infinity));
+        
+        const holdTasks = projectTasks
+          .filter(t => t.status === 'HOLD')
+          .sort((a, b) => (taskOrderMap.get(a.standard_task_id!) ?? Infinity) - (taskOrderMap.get(b.standard_task_id!) ?? Infinity));
+        
+        console.log(`    📋 TODO: ${todoTasks.length}, HOLD: ${holdTasks.length}`);
+        
+        // STEP A: Schedule all TODO tasks first (as early as possible)
+        for (const task of todoTasks) {
           if (scheduledTasks.has(task.id)) continue;
           
-          const { canSchedule, minStartTime } = canScheduleWithLimits(task);
+          if (!tryAssignEarliestSlot(task, timelineStart)) {
+            unassignedTasks.push(task);
+          }
+        }
+        
+        // STEP B: Schedule HOLD tasks after their limit phases
+        for (const task of holdTasks) {
+          if (scheduledTasks.has(task.id)) continue;
           
-          if (!canSchedule) {
-            // Add to pending for retry later
+          const minStart = getMinStartFromLimitPhases(task, project.id, projectTasks);
+          if (minStart === null) {
+            // Limit tasks not yet scheduled - add to pending
             unassignedTasks.push(task);
             continue;
           }
           
-          if (!tryAssignWithMinStart(task, minStartTime)) {
+          if (!tryAssignEarliestSlot(task, minStart)) {
             unassignedTasks.push(task);
           }
         }
       }
       console.log(`✅ PHASE 1: ${scheduledTasks.size} scheduled, ${unassignedTasks.length} pending`);
       
-      // ===== PHASE 2: Iterative retry for tasks with dependencies now met =====
+      // ===== PHASE 2: Iterative retry for pending tasks (mostly HOLD tasks waiting for limit phases) =====
       console.log('📅 PHASE 2: Resolving remaining dependencies...');
       let iterations = 0;
       const maxIterations = 100;
@@ -1006,15 +1025,14 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         iterations++;
         let madeProgress = false;
         
-        // Sort unassigned by project urgency again
+        // Sort by project urgency, then task number
         unassignedTasks.sort((a, b) => {
           const dateA = a.project ? new Date(a.project.installation_date).getTime() : Infinity;
           const dateB = b.project ? new Date(b.project.installation_date).getTime() : Infinity;
           if (dateA !== dateB) return dateA - dateB;
           
-          const orderA = taskOrderMap.get(a.standard_task_id!) ?? Infinity;
-          const orderB = taskOrderMap.get(b.standard_task_id!) ?? Infinity;
-          return orderA - orderB;
+          return (taskOrderMap.get(a.standard_task_id!) ?? Infinity) - 
+                 (taskOrderMap.get(b.standard_task_id!) ?? Infinity);
         });
         
         const stillPending: typeof scheduleTasks = [];
@@ -1022,17 +1040,30 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         for (const task of unassignedTasks) {
           if (scheduledTasks.has(task.id)) continue;
           
-          const { canSchedule, minStartTime } = canScheduleWithLimits(task);
+          // Get all tasks for this project for limit phase checking
+          const projectTasks = task.project 
+            ? projectsMap.get(task.project.id)?.tasks || []
+            : [];
           
-          if (!canSchedule) {
-            stillPending.push(task);
-            continue;
-          }
-          
-          if (tryAssignWithMinStart(task, minStartTime)) {
-            madeProgress = true;
+          if (task.status === 'HOLD') {
+            // For HOLD tasks, check limit phases
+            const minStart = getMinStartFromLimitPhases(task, task.project?.id || '', projectTasks);
+            if (minStart === null) {
+              stillPending.push(task);
+              continue;
+            }
+            if (tryAssignEarliestSlot(task, minStart)) {
+              madeProgress = true;
+            } else {
+              stillPending.push(task);
+            }
           } else {
-            stillPending.push(task);
+            // TODO task - schedule as early as possible
+            if (tryAssignEarliestSlot(task, timelineStart)) {
+              madeProgress = true;
+            } else {
+              stillPending.push(task);
+            }
           }
         }
         
@@ -1043,13 +1074,13 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       }
       console.log(`✅ PHASE 2: ${scheduledTasks.size} scheduled after ${iterations} iterations`);
       
-      // ===== PHASE 3: Gap-filling for remaining tasks =====
+      // ===== PHASE 3: Gap-filling for remaining tasks (last resort) =====
       console.log('📅 PHASE 3: Gap-filling...');
       const stillUnassigned = [...unassignedTasks];
       unassignedTasks.length = 0;
       for (const task of stillUnassigned) {
         if (scheduledTasks.has(task.id)) continue;
-        // Try without limit enforcement as a last resort
+        // Try without strict limit enforcement as a last resort
         if (!tryAssign(task)) {
           unassignedTasks.push(task);
         }
