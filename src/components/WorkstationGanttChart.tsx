@@ -552,6 +552,22 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       onPlanningGenerated?.([], null, true);
       console.log('🚀 Starting NEW optimal sequential scheduler...');
       
+      // Step 0: Clear all existing schedules from the database
+      console.log('🗑️ Clearing all existing gantt_schedules...');
+      const { error: deleteError } = await supabase
+        .from('gantt_schedules')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+      
+      if (deleteError) {
+        console.error('Error clearing gantt_schedules:', deleteError);
+        toast.error('Failed to clear existing schedules');
+        setGeneratingPlanning(false);
+        onPlanningGenerated?.([], null, false);
+        return;
+      }
+      console.log('✅ All existing schedules cleared');
+      
       // Validate last production step is configured
       const validation = await capacityCheckService.validateLastProductionStepExists();
       if (!validation.valid) {
