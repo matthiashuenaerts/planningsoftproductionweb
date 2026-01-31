@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, X, Plus, Trash2, CheckSquare, Edit, AlertTriangle, Flag } from 'lucide-react';
+import { Save, X, Plus, Trash2, CheckSquare, Edit, AlertTriangle, Flag, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -30,6 +30,7 @@ interface TaskFormData {
   day_counter: number;
   hourly_cost: number;
   color: string;
+  multi_user_task: boolean;
 }
 
 const StandardTasksSettings: React.FC = () => {
@@ -53,7 +54,8 @@ const StandardTasksSettings: React.FC = () => {
     time_coefficient: 0,
     day_counter: 0,
     hourly_cost: 0,
-    color: ''
+    color: '',
+    multi_user_task: false
   });
   const [savingTask, setSavingTask] = useState(false);
 
@@ -441,7 +443,8 @@ const StandardTasksSettings: React.FC = () => {
       time_coefficient: 0,
       day_counter: 0,
       hourly_cost: 0,
-      color: ''
+      color: '',
+      multi_user_task: false
     });
     setTaskDialogOpen(true);
   };
@@ -454,7 +457,8 @@ const StandardTasksSettings: React.FC = () => {
       time_coefficient: task.time_coefficient,
       day_counter: task.day_counter,
       hourly_cost: task.hourly_cost || 0,
-      color: task.color || ''
+      color: task.color || '',
+      multi_user_task: task.multi_user_task || false
     });
     setTaskDialogOpen(true);
   };
@@ -479,7 +483,8 @@ const StandardTasksSettings: React.FC = () => {
           time_coefficient: taskFormData.time_coefficient,
           day_counter: taskFormData.day_counter,
           hourly_cost: taskFormData.hourly_cost,
-          color: taskFormData.color || undefined
+          color: taskFormData.color || undefined,
+          multi_user_task: taskFormData.multi_user_task
         });
         toast({
           title: 'Success',
@@ -493,7 +498,8 @@ const StandardTasksSettings: React.FC = () => {
           time_coefficient: taskFormData.time_coefficient,
           day_counter: taskFormData.day_counter,
           hourly_cost: taskFormData.hourly_cost,
-          color: taskFormData.color || undefined
+          color: taskFormData.color || undefined,
+          multi_user_task: taskFormData.multi_user_task
         });
         toast({
           title: 'Success',
@@ -571,6 +577,7 @@ const StandardTasksSettings: React.FC = () => {
                   <TableHead className="w-20 sticky top-0 bg-background">Task #</TableHead>
                   <TableHead className="sticky top-0 bg-background">Task Name</TableHead>
                   <TableHead className="w-24 sticky top-0 bg-background">Last Step</TableHead>
+                  <TableHead className="w-24 sticky top-0 bg-background">Multi-User</TableHead>
                   <TableHead className="w-32 sticky top-0 bg-background">Time Coefficient</TableHead>
                   <TableHead className="w-20 sticky top-0 bg-background">Actions</TableHead>
                   <TableHead className="w-32 sticky top-0 bg-background">Day Counter</TableHead>
@@ -640,6 +647,47 @@ const StandardTasksSettings: React.FC = () => {
                         </TooltipProvider>
                       </TableCell>
                       <TableCell>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center justify-center">
+                                <Checkbox
+                                  id={`multi-user-${task.id}`}
+                                  checked={task.multi_user_task || false}
+                                  onCheckedChange={async (checked) => {
+                                    try {
+                                      await standardTasksService.update(task.id, { multi_user_task: checked as boolean });
+                                      await fetchData();
+                                      toast({
+                                        title: 'Success',
+                                        description: checked 
+                                          ? `"${task.task_number}" enabled for multi-user assignment`
+                                          : 'Multi-user assignment disabled',
+                                      });
+                                    } catch (error) {
+                                      console.error('Error updating multi_user_task:', error);
+                                      toast({
+                                        title: 'Error',
+                                        description: 'Failed to update multi-user setting',
+                                        variant: 'destructive'
+                                      });
+                                    }
+                                  }}
+                                  className={task.multi_user_task ? 'border-primary' : ''}
+                                />
+                                {task.multi_user_task && (
+                                  <Users className="h-4 w-4 ml-1 text-primary" />
+                                )}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">
+                                Enable multi-user task: this task can be assigned to multiple employees 
+                                simultaneously to complete faster (e.g., 2 employees = half the time).
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         <Input 
                           type="number" 
                           step="0.1"
@@ -1045,6 +1093,20 @@ const StandardTasksSettings: React.FC = () => {
                 >
                   <X className="h-4 w-4 text-muted-foreground mx-auto" />
                 </button>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3 p-3 rounded-lg border">
+              <Switch
+                id="multi_user_task"
+                checked={taskFormData.multi_user_task}
+                onCheckedChange={(checked) => setTaskFormData(prev => ({ ...prev, multi_user_task: checked }))}
+              />
+              <div className="space-y-0.5">
+                <Label htmlFor="multi_user_task" className="text-foreground font-medium">Multi-User Task</Label>
+                <p className="text-xs text-muted-foreground">
+                  Allow multiple employees to work on this task simultaneously (2 employees = half the time)
+                </p>
               </div>
             </div>
           </div>

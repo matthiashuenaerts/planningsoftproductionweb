@@ -39,6 +39,8 @@ interface ProjectDeadlineWarning {
   estimatedCompletionDate: Date;
   daysOverdue: number;
   canReschedule: boolean;
+  cause?: string;
+  solution?: string;
 }
 
 interface Project {
@@ -110,7 +112,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [workingHours, setWorkingHours] = useState<WorkingHours[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [limitPhases, setLimitPhases] = useState<LimitPhase[]>([]);
-  const [standardTasks, setStandardTasks] = useState<Array<{ id: string; task_name: string; task_number: string }>>([]);
+  const [standardTasks, setStandardTasks] = useState<Array<{ id: string; task_name: string; task_number: string; multi_user_task?: boolean }>>([]);
   const [loading, setLoading] = useState(true);
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -160,10 +162,10 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       setWorkingHours(wh || []);
       setHolidays(hd || []);
       
-      // Fetch standard tasks
+      // Fetch standard tasks with multi_user_task flag
       const { data: standardTasksData, error: standardTasksError } = await supabase
         .from('standard_tasks')
-        .select('id, task_name, task_number')
+        .select('id, task_name, task_number, multi_user_task')
         .order('task_number');
       
       if (standardTasksError) {
@@ -953,8 +955,15 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         return maxEndTime;
       };
       
+      // ===== Helper: Check if a task is a multi-user task =====
+      const isMultiUserTask = (standardTaskId: string): boolean => {
+        const stdTask = standardTasks.find(st => st.id === standardTaskId);
+        return stdTask?.multi_user_task || false;
+      };
+      
       // ===== HELPER: Try to assign a task with minimum start time =====
-      const tryAssignEarliestSlot = (task: typeof scheduleTasks[0], minStart: Date): boolean => {
+      // Enhanced to support multi-user tasks that can be split across multiple employees
+      const tryAssignEarliestSlot = (task: typeof scheduleTasks[0], minStart: Date, useMultiUser: boolean = false): boolean => {
         if (!task.standard_task_id) return false;
         
         const eligible = employees.filter(e => e.standardTasks.includes(task.standard_task_id!));
@@ -963,6 +972,75 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         const taskWsIds = task.workstations?.map(w => w.id) || [];
         if (taskWsIds.length === 0) return false;
         
+        // Check if this is a multi-user task and we should try multi-user assignment
+        const canUseMultiUser = useMultiUser && isMultiUserTask(task.standard_task_id) && eligible.length >= 2;
+        
+        if (canUseMultiUser) {
+          // Multi-user mode: Try to split the task across 2 employees (each does half)
+          // Both employees work in parallel on the same task, reducing total duration
+          const splitDuration = Math.ceil(task.duration / 2); // Each employee does half
+          
+          // Score employees by workload (least loaded first)
+          const scored = eligible.map(emp => {
+            const slots = employeeSchedule.get(emp.id) || [];
+            const workload = slots.reduce((sum, s) => sum + differenceInMinutes(s.end, s.start), 0);
+            return { emp, workload };
+          }).sort((a, b) => a.workload - b.workload);
+          
+          // Find two employees who can work at the same time
+          for (let i = 0; i < scored.length; i++) {
+            for (let j = i + 1; j < scored.length; j++) {
+              const emp1 = scored[i].emp;
+              const emp2 = scored[j].emp;
+              
+              for (const wsId of taskWsIds) {
+                const slot1 = findSlot(emp1.id, splitDuration, wsId, minStart);
+                if (!slot1) continue;
+                
+                // Find a slot for emp2 that overlaps with emp1's slot
+                const slot2 = findSlot(emp2.id, splitDuration, wsId, slot1.start);
+                if (!slot2) continue;
+                
+                // Check if both slots start at similar times (within 30 min for parallel work)
+                const timeDiff = Math.abs(differenceInMinutes(slot1.start, slot2.start));
+                if (timeDiff <= 30) {
+                  // Great - both can work in parallel
+                  // Use the earlier end time as completion (they work together)
+                  const effectiveEnd = slot1.end < slot2.end ? slot1.end : slot2.end;
+                  
+                  // Schedule both employees for the task
+                  employeeSchedule.get(emp1.id)!.push({ start: slot1.start, end: effectiveEnd, taskId: task.id, workstationId: wsId });
+                  employeeSchedule.get(emp2.id)!.push({ start: slot2.start, end: effectiveEnd, taskId: task.id, workstationId: wsId });
+                  
+                  // Add to workstation schedule
+                  if (!wsSchedule.has(slot1.dateStr)) wsSchedule.set(slot1.dateStr, new Map());
+                  if (!wsSchedule.get(slot1.dateStr)!.has(wsId)) wsSchedule.get(slot1.dateStr)!.set(wsId, []);
+                  wsSchedule.get(slot1.dateStr)!.get(wsId)!.push({ start: slot1.start, end: effectiveEnd, empId: emp1.id });
+                  wsSchedule.get(slot1.dateStr)!.get(wsId)!.push({ start: slot2.start, end: effectiveEnd, empId: emp2.id });
+                  
+                  // Track completion
+                  taskEndTimes.set(task.id, effectiveEnd);
+                  scheduledTasks.add(task.id);
+                  taskAssignments.set(task.id, { 
+                    employeeId: emp1.id, 
+                    employeeName: `${emp1.name} + ${emp2.name}`, 
+                    workstationId: wsId, 
+                    start: slot1.start, 
+                    end: effectiveEnd 
+                  });
+                  
+                  console.log(`✅ Multi-user task "${task.title}" assigned to ${emp1.name} + ${emp2.name} (duration reduced from ${task.duration} to ${splitDuration} min)`);
+                  return true;
+                }
+              }
+            }
+          }
+          
+          // Fall back to single-user if multi-user failed
+          console.log(`⚠️ Multi-user assignment failed for "${task.title}", trying single-user`);
+        }
+        
+        // Standard single-user assignment
         // Score employees by workload (least loaded first)
         const scored = eligible.map(emp => {
           const slots = employeeSchedule.get(emp.id) || [];
@@ -1204,12 +1282,61 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       const warnings: ProjectDeadlineWarning[] = [];
       let hasCapacityIssue = false;
       
+      // Analyze multi-user capable tasks for each project
+      const multiUserTasksMap = new Map<string, number>();
+      standardTasks.forEach(st => {
+        if (st.multi_user_task) multiUserTasksMap.set(st.id, 1);
+      });
+      
       projectCompletionDates.forEach(({ lastEndDate, project }, projectId) => {
         const installationDate = new Date(project.installation_date);
         
         // Check if project will be completed after installation date
         if (lastEndDate > installationDate) {
           const daysOverdue = Math.ceil(differenceInMinutes(lastEndDate, installationDate) / (24 * 60));
+          
+          // Analyze cause and solution
+          let cause = '';
+          let solution = '';
+          
+          // Check for unassigned tasks
+          const hasUnassigned = projectsWithUnassignedTasks.has(projectId);
+          
+          // Count eligible employees for this project's tasks
+          const projectTaskList = projectsMap.get(projectId)?.tasks || [];
+          const eligibleEmployeesForProject = new Set<string>();
+          projectTaskList.forEach(task => {
+            if (task.standard_task_id) {
+              employees.forEach(emp => {
+                if (emp.standardTasks.includes(task.standard_task_id!)) {
+                  eligibleEmployeesForProject.add(emp.id);
+                }
+              });
+            }
+          });
+          
+          // Check for multi-user tasks that could help
+          const hasMultiUserTasks = projectTaskList.some(t => 
+            t.standard_task_id && multiUserTasksMap.has(t.standard_task_id)
+          );
+          
+          if (hasUnassigned) {
+            cause = 'Er zijn taken die niet ingepland konden worden door gebrek aan beschikbare werknemers met de juiste vaardigheden.';
+            solution = 'Wijs meer werknemers toe aan de standaard taken van dit project, of stel de installatiedatum uit.';
+          } else if (eligibleEmployeesForProject.size < 3) {
+            cause = `Beperkte werknemerscapaciteit: slechts ${eligibleEmployeesForProject.size} werknemer(s) kunnen aan dit project werken.`;
+            solution = 'Voeg meer werknemers toe met de benodigde vaardigheden, of markeer taken als "Multi-User Task" in instellingen.';
+          } else if (daysOverdue <= 3 && hasMultiUserTasks) {
+            cause = 'Dit project heeft multi-user taken die mogelijk parallelle toewijzing ondersteunen.';
+            solution = 'Probeer opnieuw te plannen - het systeem zal proberen multi-user taken te gebruiken om de doorlooptijd te verkorten.';
+          } else {
+            cause = `De totale geschatte werktijd overschrijdt de beschikbare capaciteit voor de installatiedatum.`;
+            if (hasMultiUserTasks) {
+              solution = 'Activeer meer "Multi-User Tasks" in instellingen om parallelle bewerking mogelijk te maken.';
+            } else {
+              solution = 'Markeer lange taken als "Multi-User Task" in Instellingen > Standaard Taken, of voeg meer werknemers toe.';
+            }
+          }
           
           warnings.push({
             projectId,
@@ -1218,11 +1345,13 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             installationDate,
             estimatedCompletionDate: lastEndDate,
             daysOverdue,
-            canReschedule: !projectsWithUnassignedTasks.has(projectId)
+            canReschedule: !hasUnassigned,
+            cause,
+            solution
           });
           
           // If project has unassigned production tasks, it's a capacity issue
-          if (projectsWithUnassignedTasks.has(projectId)) {
+          if (hasUnassigned) {
             hasCapacityIssue = true;
           }
         }
@@ -1252,6 +1381,28 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
           const estimatedCompletion = addDays(new Date(), estimatedDays + 30); // Add buffer
           
           if (isBefore(installationDate, estimatedCompletion)) {
+            // Analyze missing employees
+            const missingEmployeeStandardTasks = new Set<string>();
+            tasks.forEach(task => {
+              if (task.standard_task_id) {
+                const hasEligible = employees.some(emp => 
+                  emp.standardTasks.includes(task.standard_task_id!)
+                );
+                if (!hasEligible) {
+                  const stdTask = standardTasks.find(st => st.id === task.standard_task_id);
+                  if (stdTask) missingEmployeeStandardTasks.add(stdTask.task_number);
+                }
+              }
+            });
+            
+            const cause = missingEmployeeStandardTasks.size > 0
+              ? `Geen werknemers toegewezen aan taken: ${Array.from(missingEmployeeStandardTasks).slice(0, 3).join(', ')}${missingEmployeeStandardTasks.size > 3 ? '...' : ''}`
+              : 'Alle werknemers zijn volledig bezet met andere projecten.';
+            
+            const solution = missingEmployeeStandardTasks.size > 0
+              ? 'Ga naar Instellingen > Werknemers en wijs de benodigde standaard taken toe aan werknemers.'
+              : 'Verhoog het aantal actieve werknemers of verplaats de installatiedatum.';
+            
             warnings.push({
               projectId,
               projectName: project.name,
@@ -1259,7 +1410,9 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
               installationDate,
               estimatedCompletionDate: estimatedCompletion,
               daysOverdue: Math.ceil(differenceInMinutes(estimatedCompletion, installationDate) / (24 * 60)),
-              canReschedule: false
+              canReschedule: false,
+              cause,
+              solution
             });
             hasCapacityIssue = true;
           }
