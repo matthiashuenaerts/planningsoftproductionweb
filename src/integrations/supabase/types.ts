@@ -3551,6 +3551,7 @@ export type Database = {
           hourly_cost: number
           id: string
           is_last_production_step: boolean | null
+          multi_user_task: boolean | null
           task_name: string
           task_number: string
           time_coefficient: number
@@ -3563,6 +3564,7 @@ export type Database = {
           hourly_cost?: number
           id?: string
           is_last_production_step?: boolean | null
+          multi_user_task?: boolean | null
           task_name: string
           task_number: string
           time_coefficient?: number
@@ -3575,6 +3577,7 @@ export type Database = {
           hourly_cost?: number
           id?: string
           is_last_production_step?: boolean | null
+          multi_user_task?: boolean | null
           task_name?: string
           task_number?: string
           time_coefficient?: number
