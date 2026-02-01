@@ -647,13 +647,17 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       const taskAssignments = new Map<string, { employeeId: string; employeeName: string; workstationId: string; start: Date; end: Date }>();
       
       // Employee schedule: ONE task at a time
-      const employeeSchedule = new Map<string, Array<{ start: Date; end: Date; taskId: string; workstationId: string }>>();
+      const employeeSchedule = new Map<string, Array<{ start: Date; end: Date; taskId: string; workstationId: string; projectId?: string }>>();
       employees.forEach(e => employeeSchedule.set(e.id, []));
       
       // Workstation schedule for capacity tracking
       const wsSchedule = new Map<string, Map<string, Array<{ start: Date; end: Date; empId: string }>>>();
       
-      // Helper: Get task priority score
+      // ===== NEW: Project continuity tracking =====
+      // Track the last scheduled task end time for each project to ensure compact scheduling
+      const projectLastEndTime = new Map<string, { endTime: Date; employeeId: string; workstationId: string }>();
+      
+      // Helper: Get task priority score (still useful for tie-breaking)
       const getScore = (task: typeof scheduleTasks[0]): number => {
         if (!task.project) return -2000;
         if (task.project.start_date > today) return -1000;
@@ -822,18 +826,29 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         end: Date,
         dateStr: string
       ) => {
-        // Add to employee schedule
-        employeeSchedule.get(empId)!.push({ start, end, taskId: task.id, workstationId: wsId });
+        const projectId = task.project?.id;
+        
+        // Add to employee schedule with project tracking
+        employeeSchedule.get(empId)!.push({ start, end, taskId: task.id, workstationId: wsId, projectId });
         
         // Add to workstation schedule
         if (!wsSchedule.has(dateStr)) wsSchedule.set(dateStr, new Map());
         if (!wsSchedule.get(dateStr)!.has(wsId)) wsSchedule.get(dateStr)!.set(wsId, []);
         wsSchedule.get(dateStr)!.get(wsId)!.push({ start, end, empId });
         
-        // Track
+        // Track task completion
         taskEndTimes.set(task.id, end);
         scheduledTasks.add(task.id);
         taskAssignments.set(task.id, { employeeId: empId, employeeName: empName, workstationId: wsId, start, end });
+        
+        // ===== NEW: Update project continuity tracking =====
+        // This ensures the next task in this project starts as soon as possible after this one
+        if (projectId) {
+          const existing = projectLastEndTime.get(projectId);
+          if (!existing || end > existing.endTime) {
+            projectLastEndTime.set(projectId, { endTime: end, employeeId: empId, workstationId: wsId });
+          }
+        }
       };
       
       // Helper: Try to assign a task
@@ -962,7 +977,8 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       };
       
       // ===== HELPER: Try to assign a task with minimum start time =====
-      // Enhanced to support multi-user tasks that can be split across multiple employees
+      // Enhanced for COMPACT SCHEDULING: Prioritizes project continuity and task tightness
+      // When a task is for a project, it will try to start as soon as the previous project task ends
       const tryAssignEarliestSlot = (task: typeof scheduleTasks[0], minStart: Date, useMultiUser: boolean = false): boolean => {
         if (!task.standard_task_id) return false;
         
@@ -972,20 +988,45 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         const taskWsIds = task.workstations?.map(w => w.id) || [];
         if (taskWsIds.length === 0) return false;
         
+        const projectId = task.project?.id;
+        
+        // ===== COMPACT SCHEDULING: Calculate effective minimum start =====
+        // The task should start either from minStart OR from when the last project task ended
+        // This creates a "stair-step" pattern where tasks follow each other tightly
+        let effectiveMinStart = minStart;
+        if (projectId) {
+          const projectContinuity = projectLastEndTime.get(projectId);
+          if (projectContinuity && projectContinuity.endTime > effectiveMinStart) {
+            effectiveMinStart = projectContinuity.endTime;
+          }
+        }
+        
         // Check if this is a multi-user task and we should try multi-user assignment
         const canUseMultiUser = useMultiUser && isMultiUserTask(task.standard_task_id) && eligible.length >= 2;
         
         if (canUseMultiUser) {
           // Multi-user mode: Try to split the task across 2 employees (each does half)
-          // Both employees work in parallel on the same task, reducing total duration
-          const splitDuration = Math.ceil(task.duration / 2); // Each employee does half
+          const splitDuration = Math.ceil(task.duration / 2);
           
-          // Score employees by workload (least loaded first)
+          // Score employees - prioritize continuity (same project worker first)
           const scored = eligible.map(emp => {
             const slots = employeeSchedule.get(emp.id) || [];
             const workload = slots.reduce((sum, s) => sum + differenceInMinutes(s.end, s.start), 0);
-            return { emp, workload };
-          }).sort((a, b) => a.workload - b.workload);
+            
+            // Boost score for employees who just worked on this project (continuity bonus)
+            let continuityBonus = 0;
+            if (projectId) {
+              const lastProjectSlot = slots.filter(s => s.projectId === projectId).pop();
+              if (lastProjectSlot) {
+                // Higher bonus if they just finished a task from this project
+                const minutesSinceProjectWork = differenceInMinutes(effectiveMinStart, lastProjectSlot.end);
+                if (minutesSinceProjectWork <= 60) continuityBonus = 100000; // Very high priority
+                else if (minutesSinceProjectWork <= 480) continuityBonus = 50000; // Same day bonus
+              }
+            }
+            
+            return { emp, score: continuityBonus + (100000 - workload) };
+          }).sort((a, b) => b.score - a.score);
           
           // Find two employees who can work at the same time
           for (let i = 0; i < scored.length; i++) {
@@ -994,31 +1035,24 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
               const emp2 = scored[j].emp;
               
               for (const wsId of taskWsIds) {
-                const slot1 = findSlot(emp1.id, splitDuration, wsId, minStart);
+                const slot1 = findSlot(emp1.id, splitDuration, wsId, effectiveMinStart);
                 if (!slot1) continue;
                 
-                // Find a slot for emp2 that overlaps with emp1's slot
                 const slot2 = findSlot(emp2.id, splitDuration, wsId, slot1.start);
                 if (!slot2) continue;
                 
-                // Check if both slots start at similar times (within 30 min for parallel work)
                 const timeDiff = Math.abs(differenceInMinutes(slot1.start, slot2.start));
                 if (timeDiff <= 30) {
-                  // Great - both can work in parallel
-                  // Use the earlier end time as completion (they work together)
                   const effectiveEnd = slot1.end < slot2.end ? slot1.end : slot2.end;
                   
-                  // Schedule both employees for the task
-                  employeeSchedule.get(emp1.id)!.push({ start: slot1.start, end: effectiveEnd, taskId: task.id, workstationId: wsId });
-                  employeeSchedule.get(emp2.id)!.push({ start: slot2.start, end: effectiveEnd, taskId: task.id, workstationId: wsId });
+                  employeeSchedule.get(emp1.id)!.push({ start: slot1.start, end: effectiveEnd, taskId: task.id, workstationId: wsId, projectId });
+                  employeeSchedule.get(emp2.id)!.push({ start: slot2.start, end: effectiveEnd, taskId: task.id, workstationId: wsId, projectId });
                   
-                  // Add to workstation schedule
                   if (!wsSchedule.has(slot1.dateStr)) wsSchedule.set(slot1.dateStr, new Map());
                   if (!wsSchedule.get(slot1.dateStr)!.has(wsId)) wsSchedule.get(slot1.dateStr)!.set(wsId, []);
                   wsSchedule.get(slot1.dateStr)!.get(wsId)!.push({ start: slot1.start, end: effectiveEnd, empId: emp1.id });
                   wsSchedule.get(slot1.dateStr)!.get(wsId)!.push({ start: slot2.start, end: effectiveEnd, empId: emp2.id });
                   
-                  // Track completion
                   taskEndTimes.set(task.id, effectiveEnd);
                   scheduledTasks.add(task.id);
                   taskAssignments.set(task.id, { 
@@ -1029,6 +1063,14 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                     end: effectiveEnd 
                   });
                   
+                  // Update project continuity
+                  if (projectId) {
+                    const existing = projectLastEndTime.get(projectId);
+                    if (!existing || effectiveEnd > existing.endTime) {
+                      projectLastEndTime.set(projectId, { endTime: effectiveEnd, employeeId: emp1.id, workstationId: wsId });
+                    }
+                  }
+                  
                   console.log(`✅ Multi-user task "${task.title}" assigned to ${emp1.name} + ${emp2.name} (duration reduced from ${task.duration} to ${splitDuration} min)`);
                   return true;
                 }
@@ -1036,22 +1078,32 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             }
           }
           
-          // Fall back to single-user if multi-user failed
           console.log(`⚠️ Multi-user assignment failed for "${task.title}", trying single-user`);
         }
         
-        // Standard single-user assignment
-        // Score employees by workload (least loaded first)
+        // ===== COMPACT SCHEDULING: Score employees with continuity priority =====
         const scored = eligible.map(emp => {
           const slots = employeeSchedule.get(emp.id) || [];
           const workload = slots.reduce((sum, s) => sum + differenceInMinutes(s.end, s.start), 0);
-          return { emp, workload };
-        }).sort((a, b) => a.workload - b.workload);
+          
+          // Boost score for employees who just worked on this project
+          let continuityBonus = 0;
+          if (projectId) {
+            const lastProjectSlot = slots.filter(s => s.projectId === projectId).pop();
+            if (lastProjectSlot) {
+              const minutesSinceProjectWork = differenceInMinutes(effectiveMinStart, lastProjectSlot.end);
+              if (minutesSinceProjectWork <= 60) continuityBonus = 100000;
+              else if (minutesSinceProjectWork <= 480) continuityBonus = 50000;
+            }
+          }
+          
+          return { emp, score: continuityBonus + (100000 - workload) };
+        }).sort((a, b) => b.score - a.score);
         
-        // Try each employee, find slot AFTER minStart
+        // Try each employee, find slot AFTER effectiveMinStart (ensures compact scheduling)
         for (const { emp } of scored) {
           for (const wsId of taskWsIds) {
-            const slot = findSlot(emp.id, task.duration, wsId, minStart);
+            const slot = findSlot(emp.id, task.duration, wsId, effectiveMinStart);
             if (slot) {
               scheduleTask(task, emp.id, emp.name, wsId, slot.start, slot.end, slot.dateStr);
               return true;
@@ -1180,6 +1232,132 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         }
       }
       console.log(`✅ PHASE 3: ${scheduledTasks.size} scheduled`);
+      
+      // ===== PHASE 3.5: OPTIMIZATION - Rescue overdue projects =====
+      console.log('🔧 PHASE 3.5: Multi-pass optimization for overdue projects...');
+      
+      // Calculate project completion vs installation date
+      const analyzeProjectDeadlines = (): { overdue: Array<{ projectId: string; project: any; daysOverdue: number; completionDate: Date }>, early: Array<{ projectId: string; project: any; daysEarly: number; completionDate: Date }> } => {
+        const overdue: Array<{ projectId: string; project: any; daysOverdue: number; completionDate: Date }> = [];
+        const early: Array<{ projectId: string; project: any; daysEarly: number; completionDate: Date }> = [];
+        
+        // Group scheduled tasks by project
+        const projectEndTimes = new Map<string, { endTime: Date; project: any }>();
+        taskAssignments.forEach(({ end }, taskId) => {
+          const task = scheduleTasks.find(t => t.id === taskId);
+          if (!task?.project || !isProductionTask(task)) return;
+          
+          const existing = projectEndTimes.get(task.project.id);
+          if (!existing || end > existing.endTime) {
+            projectEndTimes.set(task.project.id, { endTime: end, project: task.project });
+          }
+        });
+        
+        projectEndTimes.forEach(({ endTime, project }, projectId) => {
+          const installDate = new Date(project.installation_date);
+          const diffDays = differenceInMinutes(installDate, endTime) / (24 * 60);
+          
+          if (diffDays < 0) {
+            overdue.push({ projectId, project, daysOverdue: Math.abs(diffDays), completionDate: endTime });
+          } else if (diffDays > 2) { // More than 2 days early = has slack
+            early.push({ projectId, project, daysEarly: diffDays, completionDate: endTime });
+          }
+        });
+        
+        overdue.sort((a, b) => b.daysOverdue - a.daysOverdue);
+        early.sort((a, b) => b.daysEarly - a.daysEarly);
+        
+        return { overdue, early };
+      };
+      
+      let { overdue, early } = analyzeProjectDeadlines();
+      console.log(`  📊 Initial: ${overdue.length} overdue, ${early.length} with slack time`);
+      
+      // Optimization loop - try to rescue overdue projects
+      let optimizationPasses = 0;
+      const maxOptimizationPasses = 5;
+      
+      while (overdue.length > 0 && optimizationPasses < maxOptimizationPasses) {
+        optimizationPasses++;
+        console.log(`  🔄 Optimization pass ${optimizationPasses}...`);
+        
+        let improved = false;
+        
+        for (const overdueProject of overdue) {
+          // Get tasks for this project that could be multi-user
+          const projectTaskIds = Array.from(taskAssignments.entries())
+            .filter(([taskId]) => {
+              const task = scheduleTasks.find(t => t.id === taskId);
+              return task?.project?.id === overdueProject.projectId;
+            })
+            .map(([taskId]) => taskId);
+          
+          // Find multi-user capable tasks that aren't already split
+          for (const taskId of projectTaskIds) {
+            const task = scheduleTasks.find(t => t.id === taskId);
+            if (!task?.standard_task_id) continue;
+            
+            // Check if task is multi-user capable
+            if (!isMultiUserTask(task.standard_task_id)) continue;
+            
+            const currentAssignment = taskAssignments.get(taskId);
+            if (!currentAssignment) continue;
+            
+            // Skip if already multi-user (name contains " + ")
+            if (currentAssignment.employeeName.includes(' + ')) continue;
+            
+            // Try to reschedule this task with multi-user
+            // First, remove current assignment
+            const empSlots = employeeSchedule.get(currentAssignment.employeeId);
+            if (empSlots) {
+              const slotIndex = empSlots.findIndex(s => s.taskId === taskId);
+              if (slotIndex >= 0) empSlots.splice(slotIndex, 1);
+            }
+            
+            // Remove from workstation schedule
+            const dateStr = format(currentAssignment.start, 'yyyy-MM-dd');
+            const wsSlots = wsSchedule.get(dateStr)?.get(currentAssignment.workstationId);
+            if (wsSlots) {
+              const wsIndex = wsSlots.findIndex(s => s.start.getTime() === currentAssignment.start.getTime() && s.empId === currentAssignment.employeeId);
+              if (wsIndex >= 0) wsSlots.splice(wsIndex, 1);
+            }
+            
+            // Remove from tracking
+            scheduledTasks.delete(taskId);
+            taskEndTimes.delete(taskId);
+            taskAssignments.delete(taskId);
+            
+            // Try to reschedule with multi-user
+            const minStart = task.status === 'HOLD' 
+              ? getMinStartFromLimitPhases(task, overdueProject.projectId, projectsMap.get(overdueProject.projectId)?.tasks || [])
+              : timelineStart;
+            
+            if (minStart !== null && tryAssignEarliestSlot(task, minStart, true)) {
+              console.log(`    ✅ Optimized task "${task.title}" with multi-user assignment`);
+              improved = true;
+              break; // Re-analyze after each improvement
+            } else {
+              // Failed to reschedule with multi-user, put it back
+              const slot = findSlot(currentAssignment.employeeId, task.duration, currentAssignment.workstationId, currentAssignment.start);
+              if (slot) {
+                scheduleTask(task, currentAssignment.employeeId, currentAssignment.employeeName, currentAssignment.workstationId, slot.start, slot.end, slot.dateStr);
+              }
+            }
+          }
+          
+          if (improved) break;
+        }
+        
+        if (!improved) break;
+        
+        // Re-analyze
+        const analysis = analyzeProjectDeadlines();
+        overdue = analysis.overdue;
+        early = analysis.early;
+      }
+      
+      console.log(`✅ PHASE 3.5: Optimization complete after ${optimizationPasses} passes`);
+      console.log(`  📊 Final: ${overdue.length} overdue, ${early.length} with slack time`);
       
       // PHASE 4: Validation
       console.log('🔍 PHASE 4: Validation...');
