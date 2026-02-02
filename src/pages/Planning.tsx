@@ -56,6 +56,7 @@ import DraggableScheduleItem from '@/components/DraggableScheduleItem';
 import WorkstationScheduleView from '@/components/WorkstationScheduleView';
 import WorkstationGanttChart, { ProjectCompletionInfo } from '@/components/WorkstationGanttChart';
 import ProductionCompletionTimeline, { ProjectCompletionData } from '@/components/planning/ProductionCompletionTimeline';
+import { projectCompletionService } from '@/services/projectCompletionService';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface WorkerTask {
@@ -180,6 +181,32 @@ const Planning = () => {
       }
     };
     loadHolidays();
+  }, []);
+
+  // Load production completion timeline from database on mount
+  useEffect(() => {
+    const loadCompletionData = async () => {
+      try {
+        setTimelineLoading(true);
+        const { data, lastProductionStepName: stepName } = await projectCompletionService.getCompletionData();
+        setProjectCompletions(data);
+        setLastProductionStepName(stepName);
+      } catch (error) {
+        console.error('Error loading completion data:', error);
+      } finally {
+        setTimelineLoading(false);
+      }
+    };
+    loadCompletionData();
+    
+    // Subscribe to real-time updates
+    const channel = projectCompletionService.subscribeToCompletionData(() => {
+      loadCompletionData();
+    });
+    
+    return () => {
+      projectCompletionService.unsubscribeFromCompletionData(channel);
+    };
   }, []);
 
   // Check if a date is a production team holiday
