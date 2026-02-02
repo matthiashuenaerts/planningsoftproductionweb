@@ -13,8 +13,6 @@ interface ProjectDeadlineWarning {
   estimatedCompletionDate: Date;
   daysOverdue: number;
   canReschedule: boolean;
-  cause?: string;
-  solution?: string;
 }
 
 interface ProjectDeadlineWarningDialogProps {
@@ -106,26 +104,7 @@ export const ProjectDeadlineWarningDialog: React.FC<ProjectDeadlineWarningDialog
                     </span>
                   </div>
                 </div>
-                
-                {/* Cause and solution */}
-                {(warning.cause || warning.solution) && (
-                  <div className="mt-3 space-y-2 pt-3 border-t border-destructive/10">
-                    {warning.cause && (
-                      <div className="text-sm">
-                        <span className="font-medium text-amber-700 dark:text-amber-400">⚠️ Oorzaak: </span>
-                        <span className="text-muted-foreground">{warning.cause}</span>
-                      </div>
-                    )}
-                    {warning.solution && (
-                      <div className="text-sm">
-                        <span className="font-medium text-green-700 dark:text-green-400">💡 Oplossing: </span>
-                        <span className="text-muted-foreground">{warning.solution}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {!warning.canReschedule && !warning.cause && (
+                {!warning.canReschedule && (
                   <p className="mt-2 text-xs text-destructive">
                     ⚠️ Dit project kan niet worden versneld - geen extra capaciteit beschikbaar
                   </p>

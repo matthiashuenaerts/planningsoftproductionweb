@@ -10,7 +10,6 @@ export interface StandardTask {
   color?: string;
   hourly_cost: number;
   is_last_production_step?: boolean;
-  multi_user_task?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -371,7 +370,7 @@ export const standardTasksService = {
     return data?.map(item => item.standard_tasks).filter(Boolean) as StandardTask[] || [];
   },
 
-  async create(task: { task_number: string; task_name: string; time_coefficient?: number; day_counter?: number; color?: string; hourly_cost?: number; multi_user_task?: boolean }): Promise<StandardTask> {
+  async create(task: { task_number: string; task_name: string; time_coefficient?: number; day_counter?: number; color?: string; hourly_cost?: number }): Promise<StandardTask> {
     const { data, error } = await supabase
       .from('standard_tasks')
       .insert({
@@ -380,8 +379,7 @@ export const standardTasksService = {
         time_coefficient: task.time_coefficient || 0,
         day_counter: task.day_counter || 0,
         color: task.color || null,
-        hourly_cost: task.hourly_cost || 0,
-        multi_user_task: task.multi_user_task || false
+        hourly_cost: task.hourly_cost || 0
       })
       .select()
       .single();
@@ -393,7 +391,7 @@ export const standardTasksService = {
     return data as StandardTask;
   },
 
-  async update(id: string, updates: Partial<{ task_number: string; task_name: string; time_coefficient: number; day_counter: number; color: string; hourly_cost: number; multi_user_task: boolean }>): Promise<StandardTask> {
+  async update(id: string, updates: Partial<{ task_number: string; task_name: string; time_coefficient: number; day_counter: number; color: string; hourly_cost: number }>): Promise<StandardTask> {
     const { data, error } = await supabase
       .from('standard_tasks')
       .update(updates)

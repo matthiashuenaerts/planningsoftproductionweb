@@ -2872,59 +2872,6 @@ export type Database = {
           },
         ]
       }
-      project_production_completion: {
-        Row: {
-          client: string | null
-          created_at: string
-          days_remaining: number
-          generated_at: string
-          id: string
-          installation_date: string
-          last_production_step_end: string | null
-          last_production_step_name: string | null
-          project_id: string
-          project_name: string
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          client?: string | null
-          created_at?: string
-          days_remaining: number
-          generated_at?: string
-          id?: string
-          installation_date: string
-          last_production_step_end?: string | null
-          last_production_step_name?: string | null
-          project_id: string
-          project_name: string
-          status: string
-          updated_at?: string
-        }
-        Update: {
-          client?: string | null
-          created_at?: string
-          days_remaining?: number
-          generated_at?: string
-          id?: string
-          installation_date?: string
-          last_production_step_end?: string | null
-          last_production_step_name?: string | null
-          project_id?: string
-          project_name?: string
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_production_completion_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       project_sync_logs: {
         Row: {
           created_at: string | null
@@ -3551,7 +3498,6 @@ export type Database = {
           hourly_cost: number
           id: string
           is_last_production_step: boolean | null
-          multi_user_task: boolean | null
           task_name: string
           task_number: string
           time_coefficient: number
@@ -3564,7 +3510,6 @@ export type Database = {
           hourly_cost?: number
           id?: string
           is_last_production_step?: boolean | null
-          multi_user_task?: boolean | null
           task_name: string
           task_number: string
           time_coefficient?: number
@@ -3577,7 +3522,6 @@ export type Database = {
           hourly_cost?: number
           id?: string
           is_last_production_step?: boolean | null
-          multi_user_task?: boolean | null
           task_name?: string
           task_number?: string
           time_coefficient?: number
