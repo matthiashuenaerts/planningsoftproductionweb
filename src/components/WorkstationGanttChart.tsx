@@ -25,7 +25,7 @@ import { projectCompletionService } from '@/services/projectCompletionService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus, ChevronDown, ChevronRight, ChevronLeft, User, Wand2, Calendar, Save } from 'lucide-react';
+import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus, ChevronDown, ChevronRight, ChevronLeft, User, Wand2, Calendar, Save, Sparkles } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
@@ -124,6 +124,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
   const [generatingPlanning, setGeneratingPlanning] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
   const [scheduleGenerated, setScheduleGenerated] = useState(false);
   const [deadlineWarnings, setDeadlineWarnings] = useState<ProjectDeadlineWarning[]>([]);
   const [showDeadlineWarning, setShowDeadlineWarning] = useState(false);
@@ -1717,6 +1718,827 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       onPlanningGenerated?.([], null, false);
     } finally {
       setGeneratingPlanning(false);
+    }
+  };
+
+  // ========================================================================================
+  // COMPREHENSIVE OPTIMIZATION - Multi-pass algorithm for perfect scheduling
+  // ========================================================================================
+  const handleOptimizePlanning = async () => {
+    try {
+      setOptimizing(true);
+      onPlanningGenerated?.([], null, true);
+      console.log('🎯 Starting COMPREHENSIVE OPTIMIZATION...');
+      
+      const startTime = Date.now();
+      const maxOptimizationTime = 5 * 60 * 1000; // 5 minutes max
+      
+      // Validate last production step is configured
+      const validation = await capacityCheckService.validateLastProductionStepExists();
+      if (!validation.valid) {
+        toast.error(validation.message);
+        setOptimizing(false);
+        onPlanningGenerated?.([], null, false);
+        return;
+      }
+      
+      const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const daysToSchedule = 120;
+      
+      // Build employee data
+      const employees: Array<{
+        id: string;
+        name: string;
+        standardTasks: string[];
+        workstations: string[];
+      }> = [];
+      
+      employeeStandardTaskLinks.forEach((empList) => {
+        empList.forEach(emp => {
+          if (employees.some(e => e.id === emp.id)) return;
+          
+          const linkedWorkstations: string[] = [];
+          workstations.forEach(ws => {
+            const links = workstationEmployeeLinks.get(ws.id) || [];
+            if (links.some(e => e.id === emp.id)) {
+              linkedWorkstations.push(ws.id);
+            }
+          });
+          
+          employees.push({
+            id: emp.id,
+            name: emp.name,
+            standardTasks: [...emp.standardTasks],
+            workstations: linkedWorkstations
+          });
+        });
+      });
+      
+      // Build workstation capacity
+      const wsCapacity = new Map<string, number>();
+      workstations.forEach(ws => wsCapacity.set(ws.id, ws.active_workers || 1));
+      
+      // Build working hours config
+      const whConfig = new Map<number, { start_time: string; end_time: string; breaks?: Array<{ start_time: string; end_time: string }> }>();
+      workingHours
+        .filter(w => w.team === 'production' && w.is_active)
+        .forEach(w => {
+          whConfig.set(w.day_of_week, {
+            start_time: w.start_time,
+            end_time: w.end_time,
+            breaks: w.breaks
+          });
+        });
+      
+      // Prepare tasks with project info
+      const scheduleTasks = tasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        duration: t.duration,
+        status: t.status,
+        due_date: t.due_date,
+        standard_task_id: t.standard_task_id,
+        priority: t.priority,
+        project: t.phases?.projects,
+        workstations: t.workstations
+      }));
+      
+      // Get last production step for filtering
+      const lastProductionStep = await standardTasksService.getLastProductionStep();
+      const taskOrderMap = new Map<string, number>();
+      standardTasks.forEach((st, index) => {
+        taskOrderMap.set(st.id, index);
+      });
+      const lastProductionStepOrder = lastProductionStep 
+        ? (taskOrderMap.get(lastProductionStep.id) ?? Infinity)
+        : Infinity;
+      
+      const isProductionTask = (task: typeof scheduleTasks[0]): boolean => {
+        if (!lastProductionStep || !task.standard_task_id) return true;
+        const taskOrder = taskOrderMap.get(task.standard_task_id) ?? Infinity;
+        return taskOrder <= lastProductionStepOrder;
+      };
+      
+      const isMultiUserTask = (standardTaskId: string): boolean => {
+        const stdTask = standardTasks.find(st => st.id === standardTaskId);
+        return stdTask?.multi_user_task || false;
+      };
+      
+      // Helpers for scheduling
+      const isWorkDay = (date: Date): boolean => {
+        const day = getDay(date);
+        return !isWeekend(date) && 
+               whConfig.has(day) && 
+               !holidaySet.has(format(date, 'yyyy-MM-dd'));
+      };
+      
+      const nextWorkday = (date: Date): Date => {
+        let d = addDays(date, 1);
+        let iter = 0;
+        while (!isWorkDay(d) && iter < 365) { d = addDays(d, 1); iter++; }
+        return d;
+      };
+      
+      const getDayHours = (date: Date) => {
+        const wh = whConfig.get(getDay(date));
+        if (!wh) return null;
+        const [sh, sm] = wh.start_time.split(':').map(Number);
+        const [eh, em] = wh.end_time.split(':').map(Number);
+        return {
+          start: setMinutes(setHours(startOfDay(date), sh), sm),
+          end: setMinutes(setHours(startOfDay(date), eh), em),
+          breaks: (wh.breaks || []).map(b => ({
+            start: setMinutes(setHours(startOfDay(date), parseInt(b.start_time.split(':')[0])), parseInt(b.start_time.split(':')[1])),
+            end: setMinutes(setHours(startOfDay(date), parseInt(b.end_time.split(':')[0])), parseInt(b.end_time.split(':')[1]))
+          }))
+        };
+      };
+      
+      // Run a complete scheduling pass with given configuration
+      const runSchedulingPass = (
+        projectPriorities: Map<string, number>,
+        forceMultiUserProjects: Set<string>
+      ): {
+        scheduledTasks: Set<string>;
+        taskEndTimes: Map<string, Date>;
+        taskAssignments: Map<string, { employeeId: string; employeeName: string; workstationId: string; start: Date; end: Date }>;
+        employeeSchedule: Map<string, Array<{ start: Date; end: Date; taskId: string; workstationId: string; projectId?: string }>>;
+        wsSchedule: Map<string, Map<string, Array<{ start: Date; end: Date; empId: string }>>>;
+        unassignedTasks: typeof scheduleTasks;
+        projectLastEndTime: Map<string, { endTime: Date; employeeId: string; workstationId: string }>;
+      } => {
+        const scheduledTasks = new Set<string>();
+        const taskEndTimes = new Map<string, Date>();
+        const taskAssignments = new Map<string, { employeeId: string; employeeName: string; workstationId: string; start: Date; end: Date }>();
+        const employeeSchedule = new Map<string, Array<{ start: Date; end: Date; taskId: string; workstationId: string; projectId?: string }>>();
+        employees.forEach(e => employeeSchedule.set(e.id, []));
+        const wsSchedule = new Map<string, Map<string, Array<{ start: Date; end: Date; empId: string }>>>();
+        const projectLastEndTime = new Map<string, { endTime: Date; employeeId: string; workstationId: string }>();
+        const unassignedTasks: typeof scheduleTasks = [];
+        
+        // Helper: Check workstation capacity
+        const hasWsCapacity = (wsId: string, dateStr: string, start: Date, end: Date): boolean => {
+          const cap = wsCapacity.get(wsId) || 1;
+          if (!wsSchedule.has(dateStr)) return true;
+          const dayWs = wsSchedule.get(dateStr)!.get(wsId);
+          if (!dayWs) return true;
+          
+          const times = new Set<number>([start.getTime(), end.getTime()]);
+          dayWs.forEach(s => { times.add(s.start.getTime()); times.add(s.end.getTime()); });
+          
+          for (const t of times) {
+            if (t < start.getTime() || t >= end.getTime()) continue;
+            let concurrent = 1;
+            for (const slot of dayWs) {
+              if (t >= slot.start.getTime() && t < slot.end.getTime()) concurrent++;
+            }
+            if (concurrent > cap) return false;
+          }
+          return true;
+        };
+        
+        // Helper: Find earliest slot for employee
+        const findSlot = (
+          empId: string,
+          duration: number,
+          wsId: string,
+          minStart: Date
+        ): { start: Date; end: Date; dateStr: string } | null => {
+          const empSlots = employeeSchedule.get(empId) || [];
+          const sorted = [...empSlots].sort((a, b) => a.start.getTime() - b.start.getTime());
+          
+          for (let dayOffset = 0; dayOffset < daysToSchedule; dayOffset++) {
+            const date = addDays(startOfDay(timelineStart), dayOffset);
+            if (!isWorkDay(date)) continue;
+            
+            const dateStr = format(date, 'yyyy-MM-dd');
+            const hours = getDayHours(date);
+            if (!hours) continue;
+            
+            const daySlots = sorted
+              .filter(s => format(s.start, 'yyyy-MM-dd') === dateStr)
+              .sort((a, b) => a.start.getTime() - b.start.getTime());
+            
+            let candidate = date.getTime() < minStart.getTime() && format(minStart, 'yyyy-MM-dd') === dateStr
+              ? (minStart < hours.start ? hours.start : minStart)
+              : hours.start;
+            
+            const boundaries: { time: Date; type: 'slot_start' | 'slot_end' | 'break_start' | 'break_end' | 'day_end' }[] = [
+              ...daySlots.map(s => ({ time: s.start, type: 'slot_start' as const })),
+              ...daySlots.map(s => ({ time: s.end, type: 'slot_end' as const })),
+              ...hours.breaks.map(b => ({ time: b.start, type: 'break_start' as const })),
+              ...hours.breaks.map(b => ({ time: b.end, type: 'break_end' as const })),
+              { time: hours.end, type: 'day_end' as const }
+            ].sort((a, b) => a.time.getTime() - b.time.getTime());
+            
+            for (const boundary of boundaries) {
+              if (boundary.time.getTime() <= candidate.getTime()) {
+                if (boundary.type === 'slot_end' || boundary.type === 'break_end') {
+                  if (boundary.time > candidate) candidate = boundary.time;
+                }
+                continue;
+              }
+              
+              const inBreak = hours.breaks.some(b => candidate >= b.start && candidate < b.end);
+              if (inBreak) {
+                const brk = hours.breaks.find(b => candidate >= b.start && candidate < b.end)!;
+                candidate = brk.end;
+                continue;
+              }
+              
+              const inSlot = daySlots.some(s => candidate >= s.start && candidate < s.end);
+              if (inSlot) {
+                const slot = daySlots.find(s => candidate >= s.start && candidate < s.end)!;
+                candidate = slot.end;
+                continue;
+              }
+              
+              const available = differenceInMinutes(boundary.time, candidate);
+              if (available >= duration) {
+                const potentialEnd = addMinutes(candidate, duration);
+                if (hasWsCapacity(wsId, dateStr, candidate, potentialEnd)) {
+                  return { start: candidate, end: potentialEnd, dateStr };
+                }
+              }
+              
+              if (boundary.type === 'slot_end' || boundary.type === 'break_end') {
+                candidate = boundary.time;
+              } else if (boundary.type === 'slot_start') {
+                const s = daySlots.find(x => x.start.getTime() === boundary.time.getTime());
+                if (s) candidate = s.end;
+              } else if (boundary.type === 'break_start') {
+                const b = hours.breaks.find(x => x.start.getTime() === boundary.time.getTime());
+                if (b) candidate = b.end;
+              }
+            }
+          }
+          return null;
+        };
+        
+        // Helper: Schedule a task
+        const scheduleTask = (
+          task: typeof scheduleTasks[0],
+          empId: string,
+          empName: string,
+          wsId: string,
+          start: Date,
+          end: Date,
+          dateStr: string
+        ) => {
+          const projectId = task.project?.id;
+          
+          employeeSchedule.get(empId)!.push({ start, end, taskId: task.id, workstationId: wsId, projectId });
+          
+          if (!wsSchedule.has(dateStr)) wsSchedule.set(dateStr, new Map());
+          if (!wsSchedule.get(dateStr)!.has(wsId)) wsSchedule.get(dateStr)!.set(wsId, []);
+          wsSchedule.get(dateStr)!.get(wsId)!.push({ start, end, empId });
+          
+          taskEndTimes.set(task.id, end);
+          scheduledTasks.add(task.id);
+          taskAssignments.set(task.id, { employeeId: empId, employeeName: empName, workstationId: wsId, start, end });
+          
+          if (projectId) {
+            const existing = projectLastEndTime.get(projectId);
+            if (!existing || end > existing.endTime) {
+              projectLastEndTime.set(projectId, { endTime: end, employeeId: empId, workstationId: wsId });
+            }
+          }
+        };
+        
+        // Get minimum start from limit phases
+        const getMinStartFromLimitPhases = (
+          task: typeof scheduleTasks[0],
+          projectId: string,
+          allProjectTasks: typeof scheduleTasks
+        ): Date | null => {
+          if (!task.standard_task_id) return timelineStart;
+          
+          const limitStdIds = limitTaskMap.get(task.standard_task_id);
+          if (!limitStdIds || limitStdIds.length === 0) return timelineStart;
+          
+          let maxEndTime = timelineStart;
+          
+          for (const limitStdId of limitStdIds) {
+            const limitTask = allProjectTasks.find(
+              t => t.standard_task_id === limitStdId && t.project?.id === projectId
+            );
+            
+            if (!limitTask) continue;
+            
+            const endTime = taskEndTimes.get(limitTask.id);
+            if (!endTime) return null;
+            if (endTime > maxEndTime) maxEndTime = endTime;
+          }
+          
+          return maxEndTime;
+        };
+        
+        // Try to assign task with compact scheduling
+        const tryAssignEarliestSlot = (
+          task: typeof scheduleTasks[0], 
+          minStart: Date, 
+          forceMultiUser: boolean = false
+        ): boolean => {
+          if (!task.standard_task_id) return false;
+          
+          const eligible = employees.filter(e => e.standardTasks.includes(task.standard_task_id!));
+          if (eligible.length === 0) return false;
+          
+          const taskWsIds = task.workstations?.map(w => w.id) || [];
+          if (taskWsIds.length === 0) return false;
+          
+          const projectId = task.project?.id;
+          
+          let effectiveMinStart = minStart;
+          if (projectId) {
+            const projectContinuity = projectLastEndTime.get(projectId);
+            if (projectContinuity && projectContinuity.endTime > effectiveMinStart) {
+              effectiveMinStart = projectContinuity.endTime;
+            }
+          }
+          
+          const canUseMultiUser = (forceMultiUser || (projectId && forceMultiUserProjects.has(projectId))) && 
+                                   isMultiUserTask(task.standard_task_id) && 
+                                   eligible.length >= 2;
+          
+          if (canUseMultiUser) {
+            const splitDuration = Math.ceil(task.duration / 2);
+            
+            const scored = eligible.map(emp => {
+              const slots = employeeSchedule.get(emp.id) || [];
+              const workload = slots.reduce((sum, s) => sum + differenceInMinutes(s.end, s.start), 0);
+              
+              let continuityBonus = 0;
+              if (projectId) {
+                const lastProjectSlot = slots.filter(s => s.projectId === projectId).pop();
+                if (lastProjectSlot) {
+                  const minutesSinceProjectWork = differenceInMinutes(effectiveMinStart, lastProjectSlot.end);
+                  if (minutesSinceProjectWork <= 60) continuityBonus = 100000;
+                  else if (minutesSinceProjectWork <= 480) continuityBonus = 50000;
+                }
+              }
+              
+              return { emp, score: continuityBonus + (100000 - workload) };
+            }).sort((a, b) => b.score - a.score);
+            
+            for (let i = 0; i < scored.length; i++) {
+              for (let j = i + 1; j < scored.length; j++) {
+                const emp1 = scored[i].emp;
+                const emp2 = scored[j].emp;
+                
+                for (const wsId of taskWsIds) {
+                  const slot1 = findSlot(emp1.id, splitDuration, wsId, effectiveMinStart);
+                  if (!slot1) continue;
+                  
+                  const slot2 = findSlot(emp2.id, splitDuration, wsId, slot1.start);
+                  if (!slot2) continue;
+                  
+                  const timeDiff = Math.abs(differenceInMinutes(slot1.start, slot2.start));
+                  if (timeDiff <= 30) {
+                    const effectiveEnd = slot1.end < slot2.end ? slot1.end : slot2.end;
+                    
+                    employeeSchedule.get(emp1.id)!.push({ start: slot1.start, end: effectiveEnd, taskId: task.id, workstationId: wsId, projectId });
+                    employeeSchedule.get(emp2.id)!.push({ start: slot2.start, end: effectiveEnd, taskId: task.id, workstationId: wsId, projectId });
+                    
+                    if (!wsSchedule.has(slot1.dateStr)) wsSchedule.set(slot1.dateStr, new Map());
+                    if (!wsSchedule.get(slot1.dateStr)!.has(wsId)) wsSchedule.get(slot1.dateStr)!.set(wsId, []);
+                    wsSchedule.get(slot1.dateStr)!.get(wsId)!.push({ start: slot1.start, end: effectiveEnd, empId: emp1.id });
+                    wsSchedule.get(slot1.dateStr)!.get(wsId)!.push({ start: slot2.start, end: effectiveEnd, empId: emp2.id });
+                    
+                    taskEndTimes.set(task.id, effectiveEnd);
+                    scheduledTasks.add(task.id);
+                    taskAssignments.set(task.id, { 
+                      employeeId: emp1.id, 
+                      employeeName: `${emp1.name} + ${emp2.name}`, 
+                      workstationId: wsId, 
+                      start: slot1.start, 
+                      end: effectiveEnd 
+                    });
+                    
+                    if (projectId) {
+                      const existing = projectLastEndTime.get(projectId);
+                      if (!existing || effectiveEnd > existing.endTime) {
+                        projectLastEndTime.set(projectId, { endTime: effectiveEnd, employeeId: emp1.id, workstationId: wsId });
+                      }
+                    }
+                    
+                    return true;
+                  }
+                }
+              }
+            }
+          }
+          
+          // Single-user scheduling
+          const scored = eligible.map(emp => {
+            const slots = employeeSchedule.get(emp.id) || [];
+            const workload = slots.reduce((sum, s) => sum + differenceInMinutes(s.end, s.start), 0);
+            
+            let continuityBonus = 0;
+            if (projectId) {
+              const lastProjectSlot = slots.filter(s => s.projectId === projectId).pop();
+              if (lastProjectSlot) {
+                const minutesSinceProjectWork = differenceInMinutes(effectiveMinStart, lastProjectSlot.end);
+                if (minutesSinceProjectWork <= 60) continuityBonus = 100000;
+                else if (minutesSinceProjectWork <= 480) continuityBonus = 50000;
+              }
+            }
+            
+            return { emp, score: continuityBonus + (100000 - workload) };
+          }).sort((a, b) => b.score - a.score);
+          
+          for (const { emp } of scored) {
+            for (const wsId of taskWsIds) {
+              const slot = findSlot(emp.id, task.duration, wsId, effectiveMinStart);
+              if (slot) {
+                scheduleTask(task, emp.id, emp.name, wsId, slot.start, slot.end, slot.dateStr);
+                return true;
+              }
+            }
+          }
+          
+          return false;
+        };
+        
+        // Filter valid tasks
+        const validTasks = scheduleTasks.filter(t => {
+          if (!t.standard_task_id) return false;
+          if (t.status !== 'TODO' && t.status !== 'HOLD') return false;
+          if (t.project && t.project.start_date > today) return false;
+          return true;
+        });
+        
+        // Group tasks by project
+        const projectsMap = new Map<string, { project: any; tasks: typeof scheduleTasks }>();
+        validTasks.forEach(task => {
+          if (!task.project) return;
+          if (!projectsMap.has(task.project.id)) {
+            projectsMap.set(task.project.id, { project: task.project, tasks: [] });
+          }
+          projectsMap.get(task.project.id)!.tasks.push(task);
+        });
+        
+        // Sort projects by priority (higher priority = schedule earlier) then by installation date
+        const sortedProjects = Array.from(projectsMap.values()).sort((a, b) => {
+          const priorityA = projectPriorities.get(a.project.id) || 0;
+          const priorityB = projectPriorities.get(b.project.id) || 0;
+          if (priorityB !== priorityA) return priorityB - priorityA;
+          return new Date(a.project.installation_date).getTime() - new Date(b.project.installation_date).getTime();
+        });
+        
+        // Schedule all projects
+        for (const { project, tasks: projectTasks } of sortedProjects) {
+          const todoTasks = projectTasks
+            .filter(t => t.status === 'TODO')
+            .sort((a, b) => (taskOrderMap.get(a.standard_task_id!) ?? Infinity) - (taskOrderMap.get(b.standard_task_id!) ?? Infinity));
+          
+          const holdTasks = projectTasks
+            .filter(t => t.status === 'HOLD')
+            .sort((a, b) => (taskOrderMap.get(a.standard_task_id!) ?? Infinity) - (taskOrderMap.get(b.standard_task_id!) ?? Infinity));
+          
+          for (const task of todoTasks) {
+            if (scheduledTasks.has(task.id)) continue;
+            if (!tryAssignEarliestSlot(task, timelineStart)) {
+              unassignedTasks.push(task);
+            }
+          }
+          
+          for (const task of holdTasks) {
+            if (scheduledTasks.has(task.id)) continue;
+            const minStart = getMinStartFromLimitPhases(task, project.id, projectTasks);
+            if (minStart === null) {
+              unassignedTasks.push(task);
+              continue;
+            }
+            if (!tryAssignEarliestSlot(task, minStart)) {
+              unassignedTasks.push(task);
+            }
+          }
+        }
+        
+        // Resolve remaining dependencies
+        let iterations = 0;
+        while (unassignedTasks.length > 0 && iterations < 100) {
+          iterations++;
+          let madeProgress = false;
+          const stillPending: typeof scheduleTasks = [];
+          
+          for (const task of unassignedTasks) {
+            if (scheduledTasks.has(task.id)) continue;
+            
+            const projectTasks = task.project 
+              ? projectsMap.get(task.project.id)?.tasks || []
+              : [];
+            
+            if (task.status === 'HOLD') {
+              const minStart = getMinStartFromLimitPhases(task, task.project?.id || '', projectTasks);
+              if (minStart === null) {
+                stillPending.push(task);
+                continue;
+              }
+              if (tryAssignEarliestSlot(task, minStart)) {
+                madeProgress = true;
+              } else {
+                stillPending.push(task);
+              }
+            } else {
+              if (tryAssignEarliestSlot(task, timelineStart)) {
+                madeProgress = true;
+              } else {
+                stillPending.push(task);
+              }
+            }
+          }
+          
+          unassignedTasks.length = 0;
+          unassignedTasks.push(...stillPending);
+          if (!madeProgress) break;
+        }
+        
+        return {
+          scheduledTasks,
+          taskEndTimes,
+          taskAssignments,
+          employeeSchedule,
+          wsSchedule,
+          unassignedTasks,
+          projectLastEndTime
+        };
+      };
+      
+      // Calculate project completion status
+      const analyzeResults = (
+        taskAssignments: Map<string, { employeeId: string; employeeName: string; workstationId: string; start: Date; end: Date }>
+      ): { overdue: Array<{ projectId: string; project: any; daysOverdue: number; completionDate: Date }>, early: Array<{ projectId: string; project: any; daysEarly: number; completionDate: Date }>, score: number } => {
+        const projectEndTimes = new Map<string, { endTime: Date; project: any }>();
+        
+        taskAssignments.forEach(({ end }, taskId) => {
+          const task = scheduleTasks.find(t => t.id === taskId);
+          if (!task?.project || !isProductionTask(task)) return;
+          
+          const existing = projectEndTimes.get(task.project.id);
+          if (!existing || end > existing.endTime) {
+            projectEndTimes.set(task.project.id, { endTime: end, project: task.project });
+          }
+        });
+        
+        const overdue: Array<{ projectId: string; project: any; daysOverdue: number; completionDate: Date }> = [];
+        const early: Array<{ projectId: string; project: any; daysEarly: number; completionDate: Date }> = [];
+        let score = 0;
+        
+        projectEndTimes.forEach(({ endTime, project }, projectId) => {
+          const installDate = new Date(project.installation_date);
+          const diffDays = differenceInMinutes(installDate, endTime) / (24 * 60);
+          
+          if (diffDays < 0) {
+            overdue.push({ projectId, project, daysOverdue: Math.abs(diffDays), completionDate: endTime });
+            score -= Math.abs(diffDays) * 100; // Penalize heavily for overdue
+          } else if (diffDays > 2) {
+            early.push({ projectId, project, daysEarly: diffDays, completionDate: endTime });
+            score += 10; // Small bonus for on-time
+          } else {
+            score += 50; // Good bonus for just in time
+          }
+        });
+        
+        overdue.sort((a, b) => b.daysOverdue - a.daysOverdue);
+        early.sort((a, b) => b.daysEarly - a.daysEarly);
+        
+        return { overdue, early, score };
+      };
+      
+      // ===== MAIN OPTIMIZATION LOOP =====
+      console.log('🔄 Running initial scheduling pass...');
+      
+      // Initial pass with default urgency ordering
+      const projectPriorities = new Map<string, number>();
+      const forceMultiUserProjects = new Set<string>();
+      
+      let bestResult = runSchedulingPass(projectPriorities, forceMultiUserProjects);
+      let bestAnalysis = analyzeResults(bestResult.taskAssignments);
+      let bestScore = bestAnalysis.score;
+      
+      console.log(`📊 Initial: ${bestAnalysis.overdue.length} overdue, ${bestAnalysis.early.length} early, score: ${bestScore}`);
+      
+      let optimizationPass = 0;
+      const maxPasses = 50;
+      
+      while ((Date.now() - startTime) < maxOptimizationTime && optimizationPass < maxPasses) {
+        optimizationPass++;
+        
+        const { overdue, early } = bestAnalysis;
+        
+        // Exit if no more overdue projects
+        if (overdue.length === 0) {
+          console.log('✅ All projects on time! Optimization complete.');
+          break;
+        }
+        
+        console.log(`🔧 Optimization pass ${optimizationPass}: ${overdue.length} overdue projects...`);
+        
+        // Strategy 1: Increase priority of overdue projects
+        const newPriorities = new Map(projectPriorities);
+        overdue.forEach((o, index) => {
+          const currentPriority = newPriorities.get(o.projectId) || 0;
+          newPriorities.set(o.projectId, currentPriority + (overdue.length - index) * 100);
+        });
+        
+        // Strategy 2: Reduce priority of early projects (they have slack)
+        early.slice(0, Math.min(3, early.length)).forEach((e, index) => {
+          const currentPriority = newPriorities.get(e.projectId) || 0;
+          newPriorities.set(e.projectId, currentPriority - (3 - index) * 10);
+        });
+        
+        // Strategy 3: Force multi-user for overdue projects
+        const newForceMultiUser = new Set(forceMultiUserProjects);
+        overdue.slice(0, Math.min(5, overdue.length)).forEach(o => {
+          newForceMultiUser.add(o.projectId);
+        });
+        
+        // Run new pass
+        const newResult = runSchedulingPass(newPriorities, newForceMultiUser);
+        const newAnalysis = analyzeResults(newResult.taskAssignments);
+        
+        console.log(`  📊 Pass ${optimizationPass}: ${newAnalysis.overdue.length} overdue, score: ${newAnalysis.score}`);
+        
+        // Keep if better
+        if (newAnalysis.score > bestScore || newAnalysis.overdue.length < bestAnalysis.overdue.length) {
+          bestResult = newResult;
+          bestAnalysis = newAnalysis;
+          bestScore = newAnalysis.score;
+          projectPriorities.clear();
+          newPriorities.forEach((v, k) => projectPriorities.set(k, v));
+          forceMultiUserProjects.clear();
+          newForceMultiUser.forEach(p => forceMultiUserProjects.add(p));
+          console.log(`  ✅ Improved! New best score: ${bestScore}`);
+        }
+        
+        // Additional strategy: Try swapping slots between early and overdue projects
+        if (optimizationPass > 10 && overdue.length > 0 && early.length > 0) {
+          // Boost overdue even more, penalize early even more
+          overdue.forEach((o, index) => {
+            const currentPriority = projectPriorities.get(o.projectId) || 0;
+            projectPriorities.set(o.projectId, currentPriority + 500);
+          });
+          early.slice(0, 2).forEach(e => {
+            const currentPriority = projectPriorities.get(e.projectId) || 0;
+            projectPriorities.set(e.projectId, currentPriority - 200);
+          });
+        }
+      }
+      
+      const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`🎯 Optimization complete in ${totalTime}s after ${optimizationPass} passes`);
+      console.log(`📊 Final: ${bestAnalysis.overdue.length} overdue, ${bestAnalysis.early.length} early, score: ${bestScore}`);
+      
+      // ===== BUILD UI ASSIGNMENTS =====
+      const newAssignments: DailyEmployeeAssignment[] = [];
+      const empWsDays = new Map<string, Set<string>>();
+      
+      bestResult.taskAssignments.forEach(({ employeeId, workstationId, start }) => {
+        const dateStr = format(start, 'yyyy-MM-dd');
+        const key = `${dateStr}|${workstationId}`;
+        if (!empWsDays.has(key)) empWsDays.set(key, new Set());
+        empWsDays.get(key)!.add(employeeId);
+      });
+      
+      empWsDays.forEach((emps, key) => {
+        const [date, wsId] = key.split('|');
+        Array.from(emps).forEach((empId, index) => {
+          const emp = employees.find(e => e.id === empId);
+          if (emp) {
+            newAssignments.push({
+              date,
+              workstationId: wsId,
+              workerIndex: index,
+              employeeId: empId,
+              employeeName: emp.name,
+            });
+          }
+        });
+      });
+      
+      setDailyAssignments(newAssignments);
+      setScheduleGenerated(true);
+      
+      // ===== SAVE TO DATABASE =====
+      console.log('💾 Saving optimized schedules...');
+      
+      // First clear existing schedules
+      const { error: deleteError } = await supabase
+        .from('gantt_schedules')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      if (deleteError) {
+        console.error('Error clearing schedules:', deleteError);
+      }
+      
+      const schedulesByDate = new Map<string, GanttScheduleInsert[]>();
+      
+      bestResult.taskAssignments.forEach(({ employeeId, workstationId, start, end }, taskId) => {
+        const dateStr = format(start, 'yyyy-MM-dd');
+        
+        if (!schedulesByDate.has(dateStr)) {
+          schedulesByDate.set(dateStr, []);
+        }
+        
+        const assignment = newAssignments.find(
+          a => a.date === dateStr && a.workstationId === workstationId && a.employeeId === employeeId
+        );
+        
+        schedulesByDate.get(dateStr)!.push({
+          task_id: taskId,
+          workstation_id: workstationId,
+          employee_id: employeeId,
+          scheduled_date: dateStr,
+          start_time: start.toISOString(),
+          end_time: end.toISOString(),
+          worker_index: assignment?.workerIndex || 0,
+        });
+      });
+      
+      for (const [dateStr, dateSchedules] of schedulesByDate) {
+        await ganttScheduleService.saveSchedulesForDate(parseISO(dateStr), dateSchedules);
+      }
+      
+      console.log(`✅ Saved ${bestResult.taskAssignments.size} schedules`);
+      
+      // ===== BUILD COMPLETION DATA =====
+      const projectCompletionDates = new Map<string, { lastEndDate: Date; project: any }>();
+      
+      bestResult.taskAssignments.forEach(({ end }, taskId) => {
+        const task = scheduleTasks.find(t => t.id === taskId);
+        if (!task?.project || !isProductionTask(task)) return;
+        
+        const existing = projectCompletionDates.get(task.project.id);
+        if (!existing || end > existing.lastEndDate) {
+          projectCompletionDates.set(task.project.id, { lastEndDate: end, project: task.project });
+        }
+      });
+      
+      const completionData: ProjectCompletionInfo[] = [];
+      const todayDate = new Date();
+      
+      projectCompletionDates.forEach(({ lastEndDate, project }, projectId) => {
+        const installationDate = new Date(project.installation_date);
+        const daysRemaining = Math.ceil(differenceInMinutes(installationDate, todayDate) / (24 * 60));
+        
+        let status: ProjectCompletionInfo['status'] = 'on_track';
+        if (lastEndDate > installationDate) {
+          status = 'overdue';
+        } else if (differenceInMinutes(installationDate, lastEndDate) < 2 * 24 * 60) {
+          status = 'at_risk';
+        }
+        
+        completionData.push({
+          projectId,
+          projectName: project.name,
+          client: project.client || 'Onbekende klant',
+          installationDate,
+          lastProductionStepEnd: lastEndDate,
+          status,
+          daysRemaining
+        });
+      });
+      
+      completionData.sort((a, b) => a.installationDate.getTime() - b.installationDate.getTime());
+      
+      // Save completion data
+      const lastStepName = lastProductionStep ? `${lastProductionStep.task_number} - ${lastProductionStep.task_name}` : null;
+      await projectCompletionService.saveCompletionData(completionData, lastStepName);
+      
+      // Notify parent
+      onPlanningGenerated?.(completionData, lastStepName, false);
+      
+      // Show warnings if still have overdue
+      if (bestAnalysis.overdue.length > 0) {
+        const warnings: ProjectDeadlineWarning[] = bestAnalysis.overdue.map(o => ({
+          projectId: o.projectId,
+          projectName: o.project.name,
+          clientName: o.project.client || 'Onbekende klant',
+          installationDate: new Date(o.project.installation_date),
+          estimatedCompletionDate: o.completionDate,
+          daysOverdue: Math.ceil(o.daysOverdue),
+          canReschedule: false,
+          cause: `Na ${optimizationPass} optimalisatiepogingen kon dit project niet op tijd worden ingepland.`,
+          solution: 'Verhoog het aantal werknemers, markeer meer taken als "Multi-User", of verplaats de installatiedatum.'
+        }));
+        
+        setDeadlineWarnings(warnings);
+        setCapacityIssue(true);
+        setShowDeadlineWarning(true);
+      } else {
+        toast.success(`Optimalisatie voltooid in ${totalTime}s - Alle ${completionData.length} projecten op tijd!`);
+      }
+      
+    } catch (error) {
+      console.error('Optimization error:', error);
+      toast.error('Fout bij optimalisatie');
+      onPlanningGenerated?.([], null, false);
+    } finally {
+      setOptimizing(false);
     }
   };
   
@@ -3438,6 +4260,25 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                   <>
                     <Wand2 className="w-4 h-4 mr-2" />
                     Genereer Planning
+                  </>
+                )}
+              </Button>
+              <Button 
+                onClick={handleOptimizePlanning} 
+                variant="outline"
+                size="sm"
+                disabled={optimizing || generatingPlanning}
+                className="border-primary/50 hover:bg-primary/10"
+              >
+                {optimizing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Optimaliseren...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Optimaliseer
                   </>
                 )}
               </Button>
