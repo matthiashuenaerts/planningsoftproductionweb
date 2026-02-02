@@ -259,7 +259,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       setLimitPhases(lp || []);
       setLoading(false);
     })();
-  }, [selectedDate]);
+  }, []); // Tasks don't depend on selectedDate - only schedules do
 
   // Load saved schedules from database for the selected date
   const loadSavedSchedules = useCallback(async () => {
