@@ -17,7 +17,7 @@ export interface SchedulableTask {
   id: string;
   title: string;
   duration: number;
-  status: 'TODO' | 'IN PROGRESS' | 'HOLD';
+  status: 'TODO' | 'IN_PROGRESS' | 'HOLD';
   standard_task_id: string | null;
   phase_id: string;
   project_id: string;
@@ -150,7 +150,7 @@ class AutomaticSchedulingService {
   }
 
   /**
-   * Get all TODO, IN PROGRESS, and HOLD tasks for the given projects
+   * Get all TODO, IN_PROGRESS, and HOLD tasks for the given projects
    */
   async getTasksForProjects(projectIds: string[]): Promise<SchedulableTask[]> {
     const { data, error } = await supabase
@@ -164,7 +164,7 @@ class AutomaticSchedulingService {
         standard_tasks (task_number),
         task_workstation_links (workstation_id)
       `)
-      .in('status', ['TODO', 'IN PROGRESS', 'HOLD'])
+      .in('status', ['TODO', 'IN_PROGRESS', 'HOLD'])
       .in('phases.project_id', projectIds);
     
     if (error) {
@@ -176,7 +176,7 @@ class AutomaticSchedulingService {
       id: t.id,
       title: t.title,
       duration: t.duration || 60,
-      status: t.status as 'TODO' | 'IN PROGRESS' | 'HOLD',
+      status: t.status as 'TODO' | 'IN_PROGRESS' | 'HOLD',
       standard_task_id: t.standard_task_id,
       phase_id: t.phase_id,
       project_id: t.phases?.projects?.id || '',
@@ -536,13 +536,13 @@ class AutomaticSchedulingService {
       // Sort tasks by task_number for proper ordering
       projectTasks.sort((a, b) => a.task_number.localeCompare(b.task_number));
       
-      // Separate TODO/IN PROGRESS and HOLD tasks
-      const todoTasks = projectTasks.filter(t => t.status === 'TODO' || t.status === 'IN PROGRESS');
+      // Separate TODO/IN_PROGRESS and HOLD tasks
+      const todoTasks = projectTasks.filter(t => t.status === 'TODO' || t.status === 'IN_PROGRESS');
       const holdTasks = projectTasks.filter(t => t.status === 'HOLD');
       
-      console.log(`Project ${project.name}: ${todoTasks.length} TODO/IN PROGRESS, ${holdTasks.length} HOLD tasks`);
+      console.log(`Project ${project.name}: ${todoTasks.length} TODO/IN_PROGRESS, ${holdTasks.length} HOLD tasks`);
       
-      // Step 3: Schedule TODO/IN PROGRESS tasks first (in order)
+      // Step 3: Schedule TODO/IN_PROGRESS tasks first (in order)
       for (const task of todoTasks) {
         const result = this.scheduleTask(task, employees, startDate, workerIndexMap);
         if (result) {
