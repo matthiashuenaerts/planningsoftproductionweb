@@ -552,7 +552,10 @@ class AutomaticSchedulingService {
           if (task.standard_task_id === lastProductionStepId) {
             projectLastStepEnd.set(project.id, new Date(result.end_time));
           }
-                // Step 4: Schedule HOLD tasks (respecting dependencies)
+                  }
+      }
+      
+      // Step 4: Schedule HOLD tasks (respecting dependencies)
       // We may need multiple passes as dependencies get resolved
       let remainingHoldTasks = [...holdTasks];
       let maxPasses = 10;
