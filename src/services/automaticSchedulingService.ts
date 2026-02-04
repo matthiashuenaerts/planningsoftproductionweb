@@ -47,7 +47,6 @@ export interface ScheduleResult {
   start_time: string;
   end_time: string;
   worker_index: number;
-  part_index: number; // Added for splitting
 }
 
 export interface EmployeeTimeBlock {
@@ -294,7 +293,7 @@ class AutomaticSchedulingService {
   }
 
   /**
-   * Find the earliest available slot for a portion of a task
+   * Find the earliest available slot for a task
    */
   private findEarliestSlot(
     duration: number,
@@ -343,7 +342,8 @@ class AutomaticSchedulingService {
         
         // Check if end goes past work hours
         if (slotEnd > workHours.end) {
-          slotEnd = workHours.end; // Cap at end of work hours
+          // Can't fit in this day
+          break;
         }
         
         // Check if slot crosses a break
@@ -352,13 +352,14 @@ class AutomaticSchedulingService {
         );
         
         if (breakDuringSlot) {
-          slotEnd = breakDuringSlot.start; // Cap at break start
-        }
-        
-        const actualDuration = differenceInMinutes(slotEnd, slotStart);
-        if (actualDuration < 15) { // Minimum slot size, e.g., 15 minutes
-          slotStart = addMinutes(slotStart, 15);
-          continue;
+          // Adjust: use time before break if enough, otherwise skip to after break
+          const timeBeforeBreak = differenceInMinutes(breakDuringSlot.start, slotStart);
+          if (timeBeforeBreak >= duration) {
+            slotEnd = addMinutes(slotStart, duration);
+          } else {
+            slotStart = breakDuringSlot.end;
+            continue;
+          }
         }
         
         // Try to find an available employee for this slot
@@ -380,75 +381,58 @@ class AutomaticSchedulingService {
   }
 
   /**
-   * Schedule a task, allowing it to be split into multiple parts
+   * Schedule a single task
    */
   private scheduleTask(
     task: SchedulableTask,
     employees: EmployeeTaskEligibility[],
     minStartTime: Date,
     workerIndexMap: Map<string, number>
-  ): ScheduleResult[] {
+  ): ScheduleResult | null {
     if (task.workstation_ids.length === 0) {
       console.warn(`Task ${task.id} has no workstation assigned, skipping`);
-      return [];
+      return null;
     }
     
     const workstationId = task.workstation_ids[0]; // Use first workstation
-    const results: ScheduleResult[] = [];
-    let remainingDuration = task.duration;
-    let currentMinStartTime = minStartTime;
-    let partIndex = 0;
     
-    while (remainingDuration > 0) {
-      const slot = this.findEarliestSlot(
-        remainingDuration,
-        task.standard_task_id,
-        employees,
-        currentMinStartTime,
-        workstationId
-      );
-      
-      if (!slot) {
-        console.warn(`Could not find slot for remaining duration of task ${task.id}`);
-        break;
-      }
-      
-      const scheduledDuration = differenceInMinutes(slot.end, slot.start);
-      
-      // Block this time for the employee
-      this.employeeTimeBlocks.push({
-        employee_id: slot.employee.employee_id,
-        start: slot.start,
-        end: slot.end
-      });
-      
-      // Get worker index for this workstation
-      const currentIndex = workerIndexMap.get(workstationId) || 0;
-      workerIndexMap.set(workstationId, (currentIndex + 1) % 10); // Cycle through workers
-      
-      results.push({
-        task_id: task.id,
-        workstation_id: workstationId,
-        employee_id: slot.employee.employee_id,
-        employee_name: slot.employee.employee_name,
-        scheduled_date: format(slot.start, 'yyyy-MM-dd'),
-        start_time: slot.start.toISOString(),
-        end_time: slot.end.toISOString(),
-        worker_index: currentIndex,
-        part_index: partIndex
-      });
-      
-      remainingDuration -= scheduledDuration;
-      currentMinStartTime = slot.end; // Continue after this slot
-      partIndex++;
+    const slot = this.findEarliestSlot(
+      task.duration,
+      task.standard_task_id,
+      employees,
+      minStartTime,
+      workstationId
+    );
+    
+    if (!slot) {
+      console.warn(`Could not find slot for task ${task.id}`);
+      return null;
     }
     
-    // Track task end time for dependency resolution (use the last end time)
-    if (results.length > 0) {
-      this.scheduledTaskEndTimes.set(task.id, new Date(results[results.length - 1].end_time));
-    }
+    // Block this time for the employee
+    this.employeeTimeBlocks.push({
+      employee_id: slot.employee.employee_id,
+      start: slot.start,
+      end: slot.end
+    });
     
-    return results;
+    // Track task end time for dependency resolution
+    this.scheduledTaskEndTimes.set(task.id, slot.end);
+    
+    // Get worker index for this workstation
+    const currentIndex = workerIndexMap.get(workstationId) || 0;
+    workerIndexMap.set(workstationId, (currentIndex + 1) % 10); // Cycle through workers
+    
+    return {
+      task_id: task.id,
+      workstation_id: workstationId,
+      employee_id: slot.employee.employee_id,
+      employee_name: slot.employee.employee_name,
+      scheduled_date: format(slot.start, 'yyyy-MM-dd'),
+      start_time: slot.start.toISOString(),
+      end_time: slot.end.toISOString(),
+      worker_index: currentIndex
+    };
   }
 
   /**
@@ -560,13 +544,15 @@ class AutomaticSchedulingService {
       
       // Step 3: Schedule TODO/IN_PROGRESS tasks first (in order)
       for (const task of todoTasks) {
-        const results = this.scheduleTask(task, employees, startDate, workerIndexMap);
-        schedules.push(...results);
-        
-        // Track last production step end time (use the last part's end time)
-        if (task.standard_task_id === lastProductionStepId && results.length > 0) {
-          projectLastStepEnd.set(project.id, new Date(results[results.length - 1].end_time));
-        }
+        const result = this.scheduleTask(task, employees, startDate, workerIndexMap);
+        if (result) {
+          schedules.push(result);
+          
+          // Track last production step end time
+          if (task.standard_task_id === lastProductionStepId) {
+            projectLastStepEnd.set(project.id, new Date(result.end_time));
+          }
+                  }
       }
       
       // Step 4: Schedule HOLD tasks (respecting dependencies)
@@ -590,14 +576,14 @@ class AutomaticSchedulingService {
           
           // Schedule after dependencies
           const effectiveStartTime = minStartTime > startDate ? minStartTime : startDate;
-          const results = this.scheduleTask(task, employees, effectiveStartTime, workerIndexMap);
+          const result = this.scheduleTask(task, employees, effectiveStartTime, workerIndexMap);
           
-          if (results.length > 0) {
-            schedules.push(...results);
+          if (result) {
+            schedules.push(result);
             
-            // Track last production step end time (use the last part's end time)
+            // Track last production step end time
             if (task.standard_task_id === lastProductionStepId) {
-              projectLastStepEnd.set(project.id, new Date(results[results.length - 1].end_time));
+              projectLastStepEnd.set(project.id, new Date(result.end_time));
             }
           }
         }
@@ -666,8 +652,7 @@ class AutomaticSchedulingService {
         scheduled_date: dateStr,
         start_time: s.start_time,
         end_time: s.end_time,
-        worker_index: s.worker_index,
-        part_index: s.part_index // Added for splitting
+        worker_index: s.worker_index
       });
       byDate.set(dateStr, existing);
     });
