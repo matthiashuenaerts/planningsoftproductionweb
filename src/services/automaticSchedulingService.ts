@@ -131,10 +131,13 @@ class AutomaticSchedulingService {
    * Get the N most urgent projects based on installation_date
    */
   async getUrgentProjects(count: number): Promise<SchedulableProject[]> {
+    const today = format(new Date(), 'yyyy-MM-dd'); // Get today's date in YYYY-MM-DD format
+    
     const { data, error } = await supabase
       .from('projects')
       .select('id, name, client, installation_date, start_date, status')
       .in('status', ['planned', 'in_progress'])
+      .gte('installation_date', today) // Only include projects with installation_date >= today
       .order('installation_date', { ascending: true })
       .limit(count);
     
@@ -551,8 +554,7 @@ class AutomaticSchedulingService {
           }
         }
       }
-      
-      // Step 4: Schedule HOLD tasks (respecting dependencies)
+            // Step 4: Schedule HOLD tasks (respecting dependencies)
       // We may need multiple passes as dependencies get resolved
       let remainingHoldTasks = [...holdTasks];
       let maxPasses = 10;
