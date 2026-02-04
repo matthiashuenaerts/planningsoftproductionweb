@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import type { ProjectCompletionInfo } from '@/components/WorkstationGanttChart';
+import type { ProjectCompletionInfo } from '@/services/automaticSchedulingService';
 
 export interface ProjectCompletionData extends ProjectCompletionInfo {
   id?: string;
