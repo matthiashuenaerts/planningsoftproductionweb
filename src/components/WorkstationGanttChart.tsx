@@ -17,10 +17,12 @@ import { workstationService, Workstation } from '@/services/workstationService';
 import { workingHoursService, WorkingHours } from '@/services/workingHoursService';
 import { holidayService, Holiday } from '@/services/holidayService';
 import { ganttScheduleService } from '@/services/ganttScheduleService';
+import { automaticSchedulingService, ProjectCompletionInfo } from '@/services/automaticSchedulingService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus, ChevronDown, ChevronRight, ChevronLeft, User, Calendar, Save } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus, ChevronDown, ChevronRight, ChevronLeft, User, Calendar, Save, Wand2, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
@@ -57,15 +59,8 @@ interface LimitPhase {
   limit_standard_task_id: string;
 }
 
-export interface ProjectCompletionInfo {
-  projectId: string;
-  projectName: string;
-  client: string;
-  installationDate: Date;
-  lastProductionStepEnd: Date | null;
-  status: 'on_track' | 'at_risk' | 'overdue' | 'pending';
-  daysRemaining: number;
-}
+// Re-export ProjectCompletionInfo for backwards compatibility
+export type { ProjectCompletionInfo } from '@/services/automaticSchedulingService';
 
 interface WorkstationGanttChartProps {
   selectedDate: Date;
@@ -97,6 +92,9 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [standardTasks, setStandardTasks] = useState<Array<{ id: string; task_name: string; task_number: string; multi_user_task?: boolean }>>([]);
   const [loading, setLoading] = useState(true);
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
+  const [projectCount, setProjectCount] = useState(5);
+  const [completionInfo, setCompletionInfo] = useState<ProjectCompletionInfo[]>([]);
   const [zoom, setZoom] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [dailyAssignments, setDailyAssignments] = useState<DailyEmployeeAssignment[]>([]);
@@ -593,10 +591,57 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     toast.info('Deze functie is beschikbaar in de Instellingen pagina');
   };
 
-  // Auto-assign on mount and when dependencies change
-  // Auto-assign disabled to avoid auto-filling the chart; use the 'Genereer Planning' button instead
-  // useEffect(() => {
-  // }, []);
+  // Handle optimize schedule button click
+  const handleOptimizeSchedule = async () => {
+    setOptimizing(true);
+    
+    try {
+      toast.info(`Planning optimaliseren voor ${projectCount} meest urgente projecten...`);
+      
+      // Generate schedule using the automatic scheduling service
+      const { schedules, completions } = await automaticSchedulingService.generateSchedule(
+        projectCount,
+        selectedDate
+      );
+      
+      if (schedules.length === 0) {
+        toast.warning('Geen taken gevonden om te plannen. Controleer of projecten taken hebben met TODO/HOLD status.');
+        return;
+      }
+      
+      // Save schedules to database
+      await automaticSchedulingService.saveSchedulesToDatabase(schedules);
+      
+      // Update completion info
+      setCompletionInfo(completions);
+      
+      // Notify parent component
+      if (onPlanningGenerated) {
+        onPlanningGenerated(completions, null, false);
+      }
+      
+      // Reload saved schedules to refresh the view
+      await loadSavedSchedules();
+      
+      setScheduleGenerated(true);
+      
+      // Show summary
+      const onTrack = completions.filter(c => c.status === 'on_track').length;
+      const atRisk = completions.filter(c => c.status === 'at_risk').length;
+      const overdue = completions.filter(c => c.status === 'overdue').length;
+      
+      toast.success(
+        `Planning gegenereerd: ${schedules.length} taken gepland voor ${completions.length} projecten. ` +
+        `✅ ${onTrack} op schema, ⚠️ ${atRisk} risico, 🔴 ${overdue} te laat`
+      );
+      
+    } catch (error) {
+      console.error('Error optimizing schedule:', error);
+      toast.error('Fout bij het optimaliseren van de planning');
+    } finally {
+      setOptimizing(false);
+    }
+  };
 
   const timelineStart = getWorkHours(selectedDate)?.start || setHours(startOfDay(selectedDate), 8);
   const timeline = Array.from({ length: scale.totalUnits }, (_, i) => addMinutes(timelineStart, i * scale.unitInMinutes));
@@ -725,6 +770,71 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
               </Button>
             </div>
           </div>
+          
+          {/* Project Counter and Optimize Button */}
+          <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg border">
+            <div className="flex flex-col gap-2 flex-1 max-w-md">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Aantal projecten te plannen:</label>
+                <span className="text-lg font-bold text-primary">{projectCount}</span>
+              </div>
+              <Slider
+                value={[projectCount]}
+                onValueChange={(value) => setProjectCount(value[0])}
+                min={1}
+                max={20}
+                step={1}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>1 project</span>
+                <span>20 projecten</span>
+              </div>
+            </div>
+            
+            <Button
+              onClick={handleOptimizeSchedule}
+              disabled={optimizing}
+              className="h-12 px-6"
+              variant="default"
+            >
+              {optimizing ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Optimaliseren...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-4 h-4 mr-2" />
+                  Optimaliseer Planning
+                </>
+              )}
+            </Button>
+          </div>
+          
+          {/* Completion Timeline Summary */}
+          {completionInfo.length > 0 && (
+            <div className="flex items-center gap-4 p-3 bg-background rounded-lg border">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Deadline Status:</span>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle className="w-4 h-4 text-primary" />
+                  <span className="text-sm">{completionInfo.filter(c => c.status === 'on_track').length} op schema</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-warning" />
+                  <span className="text-sm">{completionInfo.filter(c => c.status === 'at_risk').length} risico</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-destructive" />
+                  <span className="text-sm">{completionInfo.filter(c => c.status === 'overdue').length} te laat</span>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* Status Indicators */}
           <div className="flex gap-4 text-xs text-muted-foreground flex-wrap">
