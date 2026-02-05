@@ -815,13 +815,13 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                 value={[projectCount]}
                 onValueChange={(value) => setProjectCount(value[0])}
                 min={1}
-                max={20}
+                max={200}
                 step={1}
                 className="w-full"
               />
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>1 project</span>
-                <span>20 projecten</span>
+                <span>200 projecten</span>
               </div>
             </div>
             
