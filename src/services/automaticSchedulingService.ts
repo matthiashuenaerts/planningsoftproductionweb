@@ -491,28 +491,27 @@ class AutomaticSchedulingService {
     
     // Track task end time for dependency resolution
     this.scheduledTaskEndTimes.set(task.id, lastSlotEnd);
-    
-    // Get worker index for this workstation
-    const currentIndex = workerIndexMap.get(workstationId) || 0;
-    
+     
     // Create a schedule slot for each time segment
     // Each segment gets a unique worker_index to avoid duplicate key constraints
-    return slots.map((slot, segmentIndex) => {
-      // Use a unique worker index for each segment of the task
-      const segmentWorkerIndex = currentIndex * 100 + segmentIndex;
-      workerIndexMap.set(workstationId, currentIndex + 1);
-      
-      return {
-      task_id: task.id,
-      workstation_id: workstationId,
-      employee_id: employee.employee_id,
-      employee_name: employee.employee_name,
-      scheduled_date: format(slot.start, 'yyyy-MM-dd'),
-      start_time: slot.start.toISOString(),
-      end_time: slot.end.toISOString(),
-      worker_index: segmentWorkerIndex
-      };
-    });
+return slots.map((slot, segmentIndex) => {
+  const dateKey = format(slot.start, 'yyyy-MM-dd');
+
+  // worker_index unique per task + day + segment
+  const segmentWorkerIndex = segmentIndex;
+
+  return {
+    task_id: task.id,
+    workstation_id: workstationId,
+    employee_id: employee.employee_id,
+    employee_name: employee.employee_name,
+    scheduled_date: dateKey,
+    start_time: slot.start.toISOString(),
+    end_time: slot.end.toISOString(),
+    worker_index: segmentWorkerIndex
+  };
+});
+
   }
 
   /**
@@ -717,25 +716,41 @@ class AutomaticSchedulingService {
     if (schedules.length === 0) return;
     
     // First, clear ALL existing schedules for all dates that will be affected
-    const affectedDates = new Set(schedules.map(s => s.scheduled_date));
-    console.log(`Clearing existing schedules for ${affectedDates.size} dates`);
-    
-    // Delete all affected dates first in parallel to avoid race conditions
-    const deletePromises = Array.from(affectedDates).map(async (dateStr) => {
-      const { error } = await supabase
-        .from('gantt_schedules')
-        .delete()
-        .eq('scheduled_date', dateStr);
-      if (error) {
-        console.error(`Error deleting schedules for ${dateStr}:`, error);
-        throw error;
-      }
-    });
-    
-    await Promise.all(deletePromises);
-    
-    // Small delay to ensure deletes are committed
-    await new Promise(resolve => setTimeout(resolve, 100));
+// SAFE DELETE: remove only rows that will be replaced
+const keys = schedules.map(s => ({
+  task_id: s.task_id,
+  scheduled_date: s.scheduled_date,
+  workstation_id: s.workstation_id
+}));
+
+// Deduplicate keys to avoid huge OR clauses
+const uniqueKeys = Array.from(
+  new Map(
+    keys.map(k => [
+      `${k.task_id}|${k.scheduled_date}|${k.workstation_id}`,
+      k
+    ])
+  ).values()
+);
+
+if (uniqueKeys.length > 0) {
+  const { error } = await supabase
+    .from('gantt_schedules')
+    .delete()
+    .or(
+      uniqueKeys
+        .map(k =>
+          `and(task_id.eq.${k.task_id},scheduled_date.eq.${k.scheduled_date},workstation_id.eq.${k.workstation_id})`
+        )
+        .join(',')
+    );
+
+  if (error) {
+    console.error('Error performing safe delete:', error);
+    throw error;
+  }
+}
+
     
     // Group by date
     const byDate = new Map<string, GanttScheduleInsert[]>();
