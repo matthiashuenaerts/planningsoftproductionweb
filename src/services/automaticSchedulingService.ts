@@ -492,31 +492,21 @@ class AutomaticSchedulingService {
     // Track task end time for dependency resolution
     this.scheduledTaskEndTimes.set(task.id, lastSlotEnd);
     
-// Worker index is unique per workstation + date
-const dateKey = format(slots[0].start, 'yyyy-MM-dd');
-const workerKey = `${workstationId}_${dateKey}`;
+// Get worker index ONCE per task
+const workerIndex = workerIndexMap.get(workstationId) ?? 0;
+workerIndexMap.set(workstationId, workerIndex + 1);
 
-let workerIndex = workerIndexMap.get(workerKey) ?? 0;
-
-const result = slots.map(slot => {
-  const slotWorkerIndex = workerIndex;
-  workerIndex++;
-  return {
-    task_id: task.id,
-    workstation_id: workstationId,
-    employee_id: employee.employee_id,
-    employee_name: employee.employee_name,
-    scheduled_date: format(slot.start, 'yyyy-MM-dd'),
-    start_time: slot.start.toISOString(),
-    end_time: slot.end.toISOString(),
-    worker_index: slotWorkerIndex
-  };
-});
-
-workerIndexMap.set(workerKey, workerIndex);
-
-return result;
-
+// Create schedule slots (same worker_index for all segments)
+return slots.map(slot => ({
+  task_id: task.id,
+  workstation_id: workstationId,
+  employee_id: employee.employee_id,
+  employee_name: employee.employee_name,
+  scheduled_date: format(slot.start, 'yyyy-MM-dd'),
+  start_time: slot.start.toISOString(),
+  end_time: slot.end.toISOString(),
+  worker_index: workerIndex
+}));
 
   }
 
