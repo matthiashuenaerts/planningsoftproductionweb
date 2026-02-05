@@ -494,10 +494,15 @@ class AutomaticSchedulingService {
     
     // Get worker index for this workstation
     const currentIndex = workerIndexMap.get(workstationId) || 0;
-    workerIndexMap.set(workstationId, (currentIndex + 1) % 10); // Cycle through workers
     
     // Create a schedule slot for each time segment
-    return slots.map(slot => ({
+    // Each segment gets a unique worker_index to avoid duplicate key constraints
+    return slots.map((slot, segmentIndex) => {
+      // Use a unique worker index for each segment of the task
+      const segmentWorkerIndex = currentIndex * 100 + segmentIndex;
+      workerIndexMap.set(workstationId, currentIndex + 1);
+      
+      return {
       task_id: task.id,
       workstation_id: workstationId,
       employee_id: employee.employee_id,
@@ -505,8 +510,9 @@ class AutomaticSchedulingService {
       scheduled_date: format(slot.start, 'yyyy-MM-dd'),
       start_time: slot.start.toISOString(),
       end_time: slot.end.toISOString(),
-      worker_index: currentIndex
-    }));
+      worker_index: segmentWorkerIndex
+      };
+    });
   }
 
   /**
@@ -714,10 +720,22 @@ class AutomaticSchedulingService {
     const affectedDates = new Set(schedules.map(s => s.scheduled_date));
     console.log(`Clearing existing schedules for ${affectedDates.size} dates`);
     
-    for (const dateStr of affectedDates) {
-      const date = new Date(dateStr);
-      await ganttScheduleService.deleteSchedulesForDate(date);
-    }
+    // Delete all affected dates first in parallel to avoid race conditions
+    const deletePromises = Array.from(affectedDates).map(async (dateStr) => {
+      const { error } = await supabase
+        .from('gantt_schedules')
+        .delete()
+        .eq('scheduled_date', dateStr);
+      if (error) {
+        console.error(`Error deleting schedules for ${dateStr}:`, error);
+        throw error;
+      }
+    });
+    
+    await Promise.all(deletePromises);
+    
+    // Small delay to ensure deletes are committed
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     // Group by date
     const byDate = new Map<string, GanttScheduleInsert[]>();
@@ -737,11 +755,29 @@ class AutomaticSchedulingService {
       byDate.set(dateStr, existing);
     });
     
-    // Save each date's schedules
-    for (const [dateStr, dateSchedules] of byDate) {
-      const date = new Date(dateStr);
-      await ganttScheduleService.saveSchedulesForDate(date, dateSchedules);
+    // Insert all schedules in one batch
+    const allInserts: GanttScheduleInsert[] = [];
+    for (const dateSchedules of byDate.values()) {
+      allInserts.push(...dateSchedules);
     }
+    
+    console.log(`Inserting ${allInserts.length} schedule entries`);
+    
+    // Insert in batches to avoid large payload issues
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < allInserts.length; i += BATCH_SIZE) {
+      const batch = allInserts.slice(i, i + BATCH_SIZE);
+      const { error } = await supabase
+        .from('gantt_schedules')
+        .insert(batch);
+      
+      if (error) {
+        console.error('Error inserting schedules batch:', error);
+        throw error;
+      }
+    }
+    
+    console.log('All schedules saved successfully');
   }
 }
 
