@@ -715,41 +715,21 @@ return slots.map((slot, segmentIndex) => {
   async saveSchedulesToDatabase(schedules: ScheduleSlot[]): Promise<void> {
     if (schedules.length === 0) return;
     
-    // First, clear ALL existing schedules for all dates that will be affected
-// SAFE DELETE: remove only rows that will be replaced
-const keys = schedules.map(s => ({
-  task_id: s.task_id,
-  scheduled_date: s.scheduled_date,
-  workstation_id: s.workstation_id
-}));
+   // Delete all existing schedules for the tasks we are about to reinsert
+const taskIds = Array.from(new Set(schedules.map(s => s.task_id)));
 
-// Deduplicate keys to avoid huge OR clauses
-const uniqueKeys = Array.from(
-  new Map(
-    keys.map(k => [
-      `${k.task_id}|${k.scheduled_date}|${k.workstation_id}`,
-      k
-    ])
-  ).values()
-);
-
-if (uniqueKeys.length > 0) {
+if (taskIds.length > 0) {
   const { error } = await supabase
     .from('gantt_schedules')
     .delete()
-    .or(
-      uniqueKeys
-        .map(k =>
-          `and(task_id.eq.${k.task_id},scheduled_date.eq.${k.scheduled_date},workstation_id.eq.${k.workstation_id})`
-        )
-        .join(',')
-    );
+    .in('task_id', taskIds);
 
   if (error) {
-    console.error('Error performing safe delete:', error);
+    console.error('Error deleting existing task schedules:', error);
     throw error;
   }
 }
+
 
     
     // Group by date
