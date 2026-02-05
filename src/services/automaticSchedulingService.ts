@@ -492,9 +492,13 @@ class AutomaticSchedulingService {
     // Track task end time for dependency resolution
     this.scheduledTaskEndTimes.set(task.id, lastSlotEnd);
     
-// Get worker index ONCE per task
-const workerIndex = workerIndexMap.get(workstationId) ?? 0;
-workerIndexMap.set(workstationId, workerIndex + 1);
+// Worker index is unique per workstation + date
+const dateKey = format(slots[0].start, 'yyyy-MM-dd');
+const workerKey = `${workstationId}_${dateKey}`;
+
+const workerIndex = workerIndexMap.get(workerKey) ?? 0;
+workerIndexMap.set(workerKey, workerIndex + 1);
+
 
 // Create schedule slots (same worker_index for all segments)
 return slots.map(slot => ({
