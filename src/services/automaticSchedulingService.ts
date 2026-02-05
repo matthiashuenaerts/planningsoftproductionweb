@@ -496,21 +496,30 @@ class AutomaticSchedulingService {
 const dateKey = format(slots[0].start, 'yyyy-MM-dd');
 const workerKey = `${workstationId}_${dateKey}`;
 
-const workerIndex = workerIndexMap.get(workerKey) ?? 0;
-workerIndexMap.set(workerKey, workerIndex + 1);
+const dateKey = format(slots[0].start, 'yyyy-MM-dd');
+const workerKey = `${workstationId}_${dateKey}`;
 
+let workerIndex = workerIndexMap.get(workerKey) ?? 0;
 
-// Create schedule slots (same worker_index for all segments)
-return slots.map(slot => ({
-  task_id: task.id,
-  workstation_id: workstationId,
-  employee_id: employee.employee_id,
-  employee_name: employee.employee_name,
-  scheduled_date: format(slot.start, 'yyyy-MM-dd'),
-  start_time: slot.start.toISOString(),
-  end_time: slot.end.toISOString(),
-  worker_index: workerIndex
-}));
+const result = slots.map(slot => {
+  const slotWorkerIndex = workerIndex;
+  workerIndex++;
+  return {
+    task_id: task.id,
+    workstation_id: workstationId,
+    employee_id: employee.employee_id,
+    employee_name: employee.employee_name,
+    scheduled_date: format(slot.start, 'yyyy-MM-dd'),
+    start_time: slot.start.toISOString(),
+    end_time: slot.end.toISOString(),
+    worker_index: slotWorkerIndex
+  };
+});
+
+workerIndexMap.set(workerKey, workerIndex);
+
+return result;
+
 
   }
 
