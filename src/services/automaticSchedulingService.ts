@@ -497,7 +497,7 @@ const workerIndex = workerIndexMap.get(workstationId) ?? 0;
 workerIndexMap.set(workstationId, workerIndex + 1);
 
 // Create schedule slots (same worker_index for all segments)
-return slots.map(slot => ({
+return slots.map((slot, segmentIndex) => ({
   task_id: task.id,
   workstation_id: workstationId,
   employee_id: employee.employee_id,
@@ -505,8 +505,11 @@ return slots.map(slot => ({
   scheduled_date: format(slot.start, 'yyyy-MM-dd'),
   start_time: slot.start.toISOString(),
   end_time: slot.end.toISOString(),
-  worker_index: workerIndex
+
+  // 👇 make it unique per slot per day
+  worker_index: workerIndex * 1000 + segmentIndex
 }));
+
 
   }
 
