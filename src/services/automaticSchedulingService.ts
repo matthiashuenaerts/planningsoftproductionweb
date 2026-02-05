@@ -496,9 +496,6 @@ class AutomaticSchedulingService {
 const dateKey = format(slots[0].start, 'yyyy-MM-dd');
 const workerKey = `${workstationId}_${dateKey}`;
 
-const dateKey = format(slots[0].start, 'yyyy-MM-dd');
-const workerKey = `${workstationId}_${dateKey}`;
-
 let workerIndex = workerIndexMap.get(workerKey) ?? 0;
 
 const result = slots.map(slot => {
