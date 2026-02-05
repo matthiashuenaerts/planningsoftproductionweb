@@ -186,6 +186,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       setEmployeeStandardTaskLinks(employeeTaskMap);
       
       // Fetch ALL TODO and HOLD tasks using pagination (Supabase limits to 1000 per request)
+      // Also include IN_PROGRESS tasks (treated same as TODO for scheduling)
       const BATCH_SIZE = 1000;
       let allTasks: any[] = [];
       let offset = 0;
@@ -202,7 +203,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             ),
             task_workstation_links ( workstations ( id, name ) )
           `)
-          .in('status', ['TODO', 'HOLD'])
+          .in('status', ['TODO', 'HOLD', 'IN_PROGRESS'])
           .order('due_date')
           .range(offset, offset + BATCH_SIZE - 1);
         
@@ -220,7 +221,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         }
       }
       
-      console.log(`Loaded ${allTasks.length} TODO/HOLD tasks from database`);
+      console.log(`Loaded ${allTasks.length} TODO/HOLD/IN_PROGRESS tasks from database`);
       
       const t = allTasks.map((d: any) => ({
         ...d,
@@ -538,20 +539,52 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     
     // Populate from saved schedules
     savedSchedules.forEach((schedule: any) => {
-      const task = tasks.find(t => t.id === schedule.task_id);
-      if (!task) return;
+      // Try to find task in our local tasks array
+      let task = tasks.find(t => t.id === schedule.task_id);
+      
+      // If task not found locally, construct a minimal task from schedule data
+      if (!task && schedule.tasks) {
+        task = {
+          id: schedule.task_id,
+          title: schedule.tasks.title || 'Unknown Task',
+          description: schedule.tasks.description,
+          duration: schedule.tasks.duration || 60,
+          status: schedule.tasks.status || 'TODO',
+          due_date: schedule.tasks.due_date || '',
+          phase_id: schedule.tasks.phase_id || '',
+          standard_task_id: schedule.tasks.standard_task_id,
+          priority: schedule.tasks.priority || 'medium',
+          phases: schedule.tasks.phases,
+          workstations: []
+        };
+      }
+      
+      if (!task) {
+        console.warn(`Task ${schedule.task_id} not found for schedule`);
+        return;
+      }
       
       const workerMap = all.get(schedule.workstation_id);
-      if (!workerMap) return;
+      if (!workerMap) {
+        console.warn(`Workstation ${schedule.workstation_id} not found for schedule`);
+        return;
+      }
       
       const start = new Date(schedule.start_time);
       const end = new Date(schedule.end_time);
       const workerIndex = schedule.worker_index || 0;
       
+      // Ensure worker index exists in map
+      if (!workerMap.has(workerIndex)) {
+        workerMap.set(workerIndex, []);
+      }
+      
       const taskList = workerMap.get(workerIndex) || [];
       taskList.push({ task, start, end, isVisible: isTaskVisible(task) });
       workerMap.set(workerIndex, taskList);
     });
+    
+    console.log(`Schedule built with ${savedSchedules.length} entries from saved schedules`);
     
     return all;
   }, [workstations, tasks, savedSchedules, searchTerm]);

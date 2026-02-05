@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { format, addMinutes, differenceInMinutes, startOfDay, setHours, setMinutes, getDay, isWeekend, addDays } from 'date-fns';
+import { format, addMinutes, differenceInMinutes, startOfDay, setHours, setMinutes, getDay, isWeekend, addDays, isSameDay } from 'date-fns';
 import { workingHoursService, WorkingHours } from '@/services/workingHoursService';
 import { holidayService, Holiday } from '@/services/holidayService';
 import { ganttScheduleService, GanttScheduleInsert } from '@/services/ganttScheduleService';
@@ -36,6 +36,17 @@ export interface EmployeeTaskEligibility {
 export interface LimitPhaseLink {
   standard_task_id: string;
   limit_standard_task_id: string;
+}
+
+export interface ScheduleSlot {
+  task_id: string;
+  workstation_id: string;
+  employee_id: string;
+  employee_name: string;
+  scheduled_date: string;
+  start_time: string;
+  end_time: string;
+  worker_index: number;
 }
 
 export interface ScheduleResult {
@@ -259,6 +270,79 @@ class AutomaticSchedulingService {
   }
 
   /**
+   * Split a task into multiple time slots respecting breaks and end of day
+   */
+  private getTaskSlots(from: Date, duration: number): { start: Date; end: Date }[] {
+    const res: { start: Date; end: Date }[] = [];
+    let remaining = duration;
+    let cur = from;
+    let wh = this.getWorkHours(cur);
+    
+    // If no working hours for this day, move to next workday
+    if (!wh) {
+      cur = this.getNextWorkday(cur);
+      wh = this.getWorkHours(cur);
+    }
+    
+    if (!wh) return res; // Safety check
+    
+    // If current time is before work start, move to work start
+    if (cur < wh.start) cur = wh.start;
+
+    let maxIterations = 1000; // Safety limit
+    while (remaining > 0 && maxIterations-- > 0) {
+      const endToday = wh!.end;
+      const breaks = wh!.breaks || [];
+      
+      // Check if we're past end of day
+      if (cur >= endToday) {
+        cur = this.getNextWorkday(cur);
+        wh = this.getWorkHours(cur);
+        if (!wh) break;
+        cur = wh.start;
+        continue;
+      }
+      
+      // Check if we're in a break
+      const currentBreak = breaks.find(b => cur >= b.start && cur < b.end);
+      if (currentBreak) {
+        cur = currentBreak.end;
+        continue;
+      }
+      
+      // Find the next break that starts after current position
+      const nextBreak = breaks.find(b => b.start > cur);
+      
+      // Calculate available time until next break or end of day
+      let availableEnd = endToday;
+      if (nextBreak && nextBreak.start < endToday) {
+        availableEnd = nextBreak.start;
+      }
+      
+      const availableMinutes = differenceInMinutes(availableEnd, cur);
+      
+      if (availableMinutes > 0) {
+        const used = Math.min(remaining, availableMinutes);
+        res.push({ start: cur, end: addMinutes(cur, used) });
+        remaining -= used;
+        cur = addMinutes(cur, used);
+      } else {
+        // No time available, move forward
+        if (nextBreak) {
+          cur = nextBreak.end;
+        } else {
+          cur = this.getNextWorkday(cur);
+          wh = this.getWorkHours(cur);
+          if (!wh) break;
+          cur = wh.start;
+        }
+      }
+    }
+    
+    return res;
+  }
+
+  /**
    * Find an available employee for a task at a given time
    */
   private findAvailableEmployee(
@@ -293,15 +377,15 @@ class AutomaticSchedulingService {
   }
 
   /**
-   * Find the earliest available slot for a task
+   * Find the earliest available slots for a task (may be multiple if task spans breaks/days)
    */
-  private findEarliestSlot(
+  private findEarliestSlots(
     duration: number,
     standardTaskId: string | null,
     employees: EmployeeTaskEligibility[],
     minStartTime: Date,
     workstationId: string
-  ): { start: Date; end: Date; employee: EmployeeTaskEligibility } | null {
+  ): { slots: { start: Date; end: Date }[]; employee: EmployeeTaskEligibility } | null {
     let currentDate = startOfDay(minStartTime);
     let maxDaysToSearch = 365; // Safety limit
     let daysSearched = 0;
@@ -321,12 +405,13 @@ class AutomaticSchedulingService {
       }
       
       // Start from minStartTime if it's on this day, otherwise from work start
-      let slotStart = currentDate.getTime() === startOfDay(minStartTime).getTime()
+      let slotStart = isSameDay(currentDate, minStartTime)
         ? (minStartTime > workHours.start ? minStartTime : workHours.start)
         : workHours.start;
       
-      // Try to find a slot in this day
-      while (slotStart < workHours.end) {
+      // Try to find a starting slot in this day
+      let maxSlotAttempts = 100;
+      while (slotStart < workHours.end && maxSlotAttempts-- > 0) {
         // Check if we're in a break
         const currentBreak = workHours.breaks.find(b => 
           slotStart >= b.start && slotStart < b.end
@@ -337,36 +422,19 @@ class AutomaticSchedulingService {
           continue;
         }
         
-        // Calculate end time
-        let slotEnd = addMinutes(slotStart, duration);
+        // Get all slots needed for this task duration (may span breaks/days)
+        const taskSlots = this.getTaskSlots(slotStart, duration);
+        if (taskSlots.length === 0) break;
         
-        // Check if end goes past work hours
-        if (slotEnd > workHours.end) {
-          // Can't fit in this day
-          break;
-        }
+        // Calculate total time span for employee blocking
+        const firstSlotStart = taskSlots[0].start;
+        const lastSlotEnd = taskSlots[taskSlots.length - 1].end;
         
-        // Check if slot crosses a break
-        const breakDuringSlot = workHours.breaks.find(b =>
-          slotStart < b.start && slotEnd > b.start
-        );
-        
-        if (breakDuringSlot) {
-          // Adjust: use time before break if enough, otherwise skip to after break
-          const timeBeforeBreak = differenceInMinutes(breakDuringSlot.start, slotStart);
-          if (timeBeforeBreak >= duration) {
-            slotEnd = addMinutes(slotStart, duration);
-          } else {
-            slotStart = breakDuringSlot.end;
-            continue;
-          }
-        }
-        
-        // Try to find an available employee for this slot
-        const employee = this.findAvailableEmployee(standardTaskId, slotStart, slotEnd, employees);
+        // Try to find an available employee for all slots
+        const employee = this.findAvailableEmployee(standardTaskId, firstSlotStart, lastSlotEnd, employees);
         
         if (employee) {
-          return { start: slotStart, end: slotEnd, employee };
+          return { slots: taskSlots, employee };
         }
         
         // Move to next slot (try every 15 minutes)
@@ -388,15 +456,15 @@ class AutomaticSchedulingService {
     employees: EmployeeTaskEligibility[],
     minStartTime: Date,
     workerIndexMap: Map<string, number>
-  ): ScheduleResult | null {
+  ): ScheduleSlot[] {
     if (task.workstation_ids.length === 0) {
       console.warn(`Task ${task.id} has no workstation assigned, skipping`);
-      return null;
+      return [];
     }
     
     const workstationId = task.workstation_ids[0]; // Use first workstation
     
-    const slot = this.findEarliestSlot(
+    const result = this.findEarliestSlots(
       task.duration,
       task.standard_task_id,
       employees,
@@ -404,35 +472,41 @@ class AutomaticSchedulingService {
       workstationId
     );
     
-    if (!slot) {
+    if (!result || result.slots.length === 0) {
       console.warn(`Could not find slot for task ${task.id}`);
-      return null;
+      return [];
     }
     
-    // Block this time for the employee
+    const { slots, employee } = result;
+    
+    // Block the entire time span for the employee (from first slot start to last slot end)
+    const firstSlotStart = slots[0].start;
+    const lastSlotEnd = slots[slots.length - 1].end;
+    
     this.employeeTimeBlocks.push({
-      employee_id: slot.employee.employee_id,
-      start: slot.start,
-      end: slot.end
+      employee_id: employee.employee_id,
+      start: firstSlotStart,
+      end: lastSlotEnd
     });
     
     // Track task end time for dependency resolution
-    this.scheduledTaskEndTimes.set(task.id, slot.end);
+    this.scheduledTaskEndTimes.set(task.id, lastSlotEnd);
     
     // Get worker index for this workstation
     const currentIndex = workerIndexMap.get(workstationId) || 0;
     workerIndexMap.set(workstationId, (currentIndex + 1) % 10); // Cycle through workers
     
-    return {
+    // Create a schedule slot for each time segment
+    return slots.map(slot => ({
       task_id: task.id,
       workstation_id: workstationId,
-      employee_id: slot.employee.employee_id,
-      employee_name: slot.employee.employee_name,
+      employee_id: employee.employee_id,
+      employee_name: employee.employee_name,
       scheduled_date: format(slot.start, 'yyyy-MM-dd'),
       start_time: slot.start.toISOString(),
       end_time: slot.end.toISOString(),
       worker_index: currentIndex
-    };
+    }));
   }
 
   /**
@@ -481,7 +555,7 @@ class AutomaticSchedulingService {
    * Main scheduling algorithm
    */
   async generateSchedule(projectCount: number, startDate: Date): Promise<{
-    schedules: ScheduleResult[];
+    schedules: ScheduleSlot[];
     completions: ProjectCompletionInfo[];
   }> {
     // Reset state
@@ -536,26 +610,25 @@ class AutomaticSchedulingService {
       // Sort tasks by task_number for proper ordering
       projectTasks.sort((a, b) => a.task_number.localeCompare(b.task_number));
       
-      // Separate TODO/IN_PROGRESS and HOLD tasks
+      // Separate TODO/IN_PROGRESS and HOLD tasks - treat IN_PROGRESS same as TODO
       const todoTasks = projectTasks.filter(t => t.status === 'TODO' || t.status === 'IN_PROGRESS');
       const holdTasks = projectTasks.filter(t => t.status === 'HOLD');
       
       console.log(`Project ${project.name}: ${todoTasks.length} TODO/IN_PROGRESS, ${holdTasks.length} HOLD tasks`);
       
-      // Step 3: Schedule TODO/IN_PROGRESS tasks first (in order)
+      // Schedule TODO/IN_PROGRESS tasks first (in order)
       for (const task of todoTasks) {
-        const result = this.scheduleTask(task, employees, startDate, workerIndexMap);
-        if (result) {
-          schedules.push(result);
-          
-          // Track last production step end time
-          if (task.standard_task_id === lastProductionStepId) {
-            projectLastStepEnd.set(project.id, new Date(result.end_time));
-          }
-                  }
+        const taskSlots = this.scheduleTask(task, employees, startDate, workerIndexMap);
+        schedules.push(...taskSlots);
+        
+        // Track last production step end time (use last slot's end time)
+        if (taskSlots.length > 0 && task.standard_task_id === lastProductionStepId) {
+          const lastSlotEnd = new Date(taskSlots[taskSlots.length - 1].end_time);
+          projectLastStepEnd.set(project.id, lastSlotEnd);
+        }
       }
       
-      // Step 4: Schedule HOLD tasks (respecting dependencies)
+      // Schedule HOLD tasks (respecting dependencies)
       // We may need multiple passes as dependencies get resolved
       let remainingHoldTasks = [...holdTasks];
       let maxPasses = 10;
@@ -576,15 +649,13 @@ class AutomaticSchedulingService {
           
           // Schedule after dependencies
           const effectiveStartTime = minStartTime > startDate ? minStartTime : startDate;
-          const result = this.scheduleTask(task, employees, effectiveStartTime, workerIndexMap);
+          const taskSlots = this.scheduleTask(task, employees, effectiveStartTime, workerIndexMap);
+          schedules.push(...taskSlots);
           
-          if (result) {
-            schedules.push(result);
-            
-            // Track last production step end time
-            if (task.standard_task_id === lastProductionStepId) {
-              projectLastStepEnd.set(project.id, new Date(result.end_time));
-            }
+          // Track last production step end time
+          if (taskSlots.length > 0 && task.standard_task_id === lastProductionStepId) {
+            const lastSlotEnd = new Date(taskSlots[taskSlots.length - 1].end_time);
+            projectLastStepEnd.set(project.id, lastSlotEnd);
           }
         }
         
@@ -636,8 +707,17 @@ class AutomaticSchedulingService {
   /**
    * Save schedules to database
    */
-  async saveSchedulesToDatabase(schedules: ScheduleResult[]): Promise<void> {
+  async saveSchedulesToDatabase(schedules: ScheduleSlot[]): Promise<void> {
     if (schedules.length === 0) return;
+    
+    // First, clear ALL existing schedules for all dates that will be affected
+    const affectedDates = new Set(schedules.map(s => s.scheduled_date));
+    console.log(`Clearing existing schedules for ${affectedDates.size} dates`);
+    
+    for (const dateStr of affectedDates) {
+      const date = new Date(dateStr);
+      await ganttScheduleService.deleteSchedulesForDate(date);
+    }
     
     // Group by date
     const byDate = new Map<string, GanttScheduleInsert[]>();
