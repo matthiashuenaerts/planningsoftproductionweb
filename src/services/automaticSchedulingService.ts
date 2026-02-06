@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, addMinutes, differenceInMinutes, startOfDay, setHours, setMinutes, getDay, isWeekend, addDays, isSameDay } from 'date-fns';
 import { workingHoursService, WorkingHours } from '@/services/workingHoursService';
 import { holidayService, Holiday } from '@/services/holidayService';
-import { ganttScheduleService, GanttScheduleInsert } from '@/services/ganttScheduleService';
+import { GanttScheduleInsert } from '@/services/ganttScheduleService';
 
 export interface SchedulableProject {
   id: string;
@@ -88,17 +88,18 @@ class AutomaticSchedulingService {
   // Track scheduled task end times for limit phase dependencies
   private scheduledTaskEndTimes: Map<string, Date> = new Map();
 
+  // Track employee lane index per workstation: ws_id -> employee_id -> lane_index
+  private wsEmployeeLaneMap: Map<string, Map<string, number>> = new Map();
+
   async initialize() {
     this.workingHours = await workingHoursService.getWorkingHours();
     this.holidays = await holidayService.getHolidays();
     
-    // Build working hours map
     this.workingHoursMap = new Map();
     this.workingHours
       .filter((w) => w.team === 'production' && w.is_active)
       .forEach((w) => this.workingHoursMap.set(w.day_of_week, w));
     
-    // Build holiday set
     this.holidaySet = new Set(
       this.holidays.filter((h) => h.team === 'production').map((h) => h.date)
     );
@@ -139,63 +140,102 @@ class AutomaticSchedulingService {
   }
 
   /**
-   * Get the N most urgent projects based on installation_date
+   * Get the employee's lane index for a workstation, assigning a new one if needed
    */
-  async getUrgentProjects(count: number): Promise<SchedulableProject[]> {
-    const today = format(new Date(), 'yyyy-MM-dd'); // Get today's date in YYYY-MM-DD format
-    
-    const { data, error } = await supabase
-      .from('projects')
-      .select('id, name, client, installation_date, start_date, status')
-      .in('status', ['planned', 'in_progress'])
-      .gte('installation_date', today) // Only include projects with installation_date >= today
-      .order('installation_date', { ascending: true })
-      .limit(count);
-    
-    if (error) {
-      console.error('Error fetching urgent projects:', error);
-      throw error;
+  private getEmployeeLaneIndex(workstationId: string, employeeId: string): number {
+    if (!this.wsEmployeeLaneMap.has(workstationId)) {
+      this.wsEmployeeLaneMap.set(workstationId, new Map());
     }
-    
-    return data || [];
+    const laneMap = this.wsEmployeeLaneMap.get(workstationId)!;
+    if (!laneMap.has(employeeId)) {
+      laneMap.set(employeeId, laneMap.size);
+    }
+    return laneMap.get(employeeId)!;
   }
 
   /**
-   * Get all TODO, IN_PROGRESS, and HOLD tasks for the given projects
+   * Get the N most urgent projects based on installation_date
    */
-  async getTasksForProjects(projectIds: string[]): Promise<SchedulableTask[]> {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select(`
-        id, title, duration, status, standard_task_id, phase_id,
-        phases!inner (
-          project_id,
-          projects!inner (id, name, installation_date)
-        ),
-        standard_tasks (task_number),
-        task_workstation_links (workstation_id)
-      `)
-      .in('status', ['TODO', 'IN_PROGRESS', 'HOLD'])
-      .in('phases.project_id', projectIds);
+  async getUrgentProjects(count: number): Promise<SchedulableProject[]> {
+    const today = format(new Date(), 'yyyy-MM-dd');
     
-    if (error) {
-      console.error('Error fetching tasks:', error);
-      throw error;
+    // Paginate to handle large counts
+    const BATCH_SIZE = 1000;
+    let allProjects: SchedulableProject[] = [];
+    let offset = 0;
+    
+    while (allProjects.length < count) {
+      const limit = Math.min(BATCH_SIZE, count - allProjects.length);
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, client, installation_date, start_date, status')
+        .in('status', ['planned', 'in_progress'])
+        .gte('installation_date', today)
+        .order('installation_date', { ascending: true })
+        .range(offset, offset + limit - 1);
+      
+      if (error) {
+        console.error('Error fetching urgent projects:', error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) break;
+      allProjects = [...allProjects, ...data];
+      offset += limit;
+      if (data.length < limit) break;
     }
     
-    return (data || []).map((t: any) => ({
-      id: t.id,
-      title: t.title,
-      duration: t.duration || 60,
-      status: t.status as 'TODO' | 'IN_PROGRESS' | 'HOLD',
-      standard_task_id: t.standard_task_id,
-      phase_id: t.phase_id,
-      project_id: t.phases?.projects?.id || '',
-      project_name: t.phases?.projects?.name || '',
-      installation_date: t.phases?.projects?.installation_date || '',
-      task_number: t.standard_tasks?.task_number || '999',
-      workstation_ids: (t.task_workstation_links || []).map((l: any) => l.workstation_id).filter(Boolean)
-    }));
+    return allProjects.slice(0, count);
+  }
+
+  /**
+   * Get all TODO, IN_PROGRESS, and HOLD tasks for the given projects (with pagination)
+   */
+  async getTasksForProjects(projectIds: string[]): Promise<SchedulableTask[]> {
+    // Process in batches of project IDs to avoid query limits
+    const BATCH_SIZE = 50;
+    const allTasks: SchedulableTask[] = [];
+    
+    for (let i = 0; i < projectIds.length; i += BATCH_SIZE) {
+      const batchIds = projectIds.slice(i, i + BATCH_SIZE);
+      
+      const { data, error } = await supabase
+        .from('tasks')
+        .select(`
+          id, title, duration, status, standard_task_id, phase_id,
+          phases!inner (
+            project_id,
+            projects!inner (id, name, installation_date)
+          ),
+          standard_tasks (task_number),
+          task_workstation_links (workstation_id)
+        `)
+        .in('status', ['TODO', 'IN_PROGRESS', 'HOLD'])
+        .in('phases.project_id', batchIds);
+      
+      if (error) {
+        console.error('Error fetching tasks batch:', error);
+        continue;
+      }
+      
+      const mapped = (data || []).map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        duration: t.duration || 60,
+        status: t.status as 'TODO' | 'IN_PROGRESS' | 'HOLD',
+        standard_task_id: t.standard_task_id,
+        phase_id: t.phase_id,
+        project_id: t.phases?.projects?.id || '',
+        project_name: t.phases?.projects?.name || '',
+        installation_date: t.phases?.projects?.installation_date || '',
+        task_number: t.standard_tasks?.task_number || '999',
+        workstation_ids: (t.task_workstation_links || []).map((l: any) => l.workstation_id).filter(Boolean)
+      }));
+      
+      allTasks.push(...mapped);
+    }
+    
+    return allTasks;
   }
 
   /**
@@ -215,7 +255,6 @@ class AutomaticSchedulingService {
       throw error;
     }
     
-    // Group by employee
     const employeeMap = new Map<string, EmployeeTaskEligibility>();
     (data || []).forEach((link: any) => {
       if (!link.employees) return;
@@ -252,12 +291,12 @@ class AutomaticSchedulingService {
   }
 
   /**
-   * Get the last production step standard task
+   * Get the last production step standard task (returns id and name)
    */
-  async getLastProductionStep(): Promise<string | null> {
+  async getLastProductionStep(): Promise<{ id: string; name: string } | null> {
     const { data, error } = await supabase
       .from('standard_tasks')
-      .select('id')
+      .select('id, task_name')
       .eq('is_last_production_step', true)
       .maybeSingle();
     
@@ -266,7 +305,7 @@ class AutomaticSchedulingService {
       return null;
     }
     
-    return data?.id || null;
+    return data ? { id: data.id, name: data.task_name } : null;
   }
 
   /**
@@ -278,23 +317,20 @@ class AutomaticSchedulingService {
     let cur = from;
     let wh = this.getWorkHours(cur);
     
-    // If no working hours for this day, move to next workday
     if (!wh) {
       cur = this.getNextWorkday(cur);
       wh = this.getWorkHours(cur);
     }
     
-    if (!wh) return res; // Safety check
+    if (!wh) return res;
     
-    // If current time is before work start, move to work start
     if (cur < wh.start) cur = wh.start;
 
-    let maxIterations = 1000; // Safety limit
+    let maxIterations = 1000;
     while (remaining > 0 && maxIterations-- > 0) {
       const endToday = wh!.end;
       const breaks = wh!.breaks || [];
       
-      // Check if we're past end of day
       if (cur >= endToday) {
         cur = this.getNextWorkday(cur);
         wh = this.getWorkHours(cur);
@@ -303,17 +339,14 @@ class AutomaticSchedulingService {
         continue;
       }
       
-      // Check if we're in a break
       const currentBreak = breaks.find(b => cur >= b.start && cur < b.end);
       if (currentBreak) {
         cur = currentBreak.end;
         continue;
       }
       
-      // Find the next break that starts after current position
       const nextBreak = breaks.find(b => b.start > cur);
       
-      // Calculate available time until next break or end of day
       let availableEnd = endToday;
       if (nextBreak && nextBreak.start < endToday) {
         availableEnd = nextBreak.start;
@@ -327,7 +360,6 @@ class AutomaticSchedulingService {
         remaining -= used;
         cur = addMinutes(cur, used);
       } else {
-        // No time available, move forward
         if (nextBreak) {
           cur = nextBreak.end;
         } else {
@@ -353,14 +385,12 @@ class AutomaticSchedulingService {
   ): EmployeeTaskEligibility | null {
     if (!standardTaskId) return null;
     
-    // Find employees who can do this task
     const eligibleEmployees = employees.filter(e => 
       e.standard_task_ids.includes(standardTaskId)
     );
     
     if (eligibleEmployees.length === 0) return null;
     
-    // Find the first employee who is available during this time
     for (const employee of eligibleEmployees) {
       const hasConflict = this.employeeTimeBlocks.some(block => 
         block.employee_id === employee.employee_id &&
@@ -377,7 +407,7 @@ class AutomaticSchedulingService {
   }
 
   /**
-   * Find the earliest available slots for a task (may be multiple if task spans breaks/days)
+   * Find the earliest available slots for a task
    */
   private findEarliestSlots(
     duration: number,
@@ -387,7 +417,7 @@ class AutomaticSchedulingService {
     workstationId: string
   ): { slots: { start: Date; end: Date }[]; employee: EmployeeTaskEligibility } | null {
     let currentDate = startOfDay(minStartTime);
-    let maxDaysToSearch = 365; // Safety limit
+    let maxDaysToSearch = 365;
     let daysSearched = 0;
     
     while (daysSearched < maxDaysToSearch) {
@@ -404,15 +434,12 @@ class AutomaticSchedulingService {
         continue;
       }
       
-      // Start from minStartTime if it's on this day, otherwise from work start
       let slotStart = isSameDay(currentDate, minStartTime)
         ? (minStartTime > workHours.start ? minStartTime : workHours.start)
         : workHours.start;
       
-      // Try to find a starting slot in this day
       let maxSlotAttempts = 100;
       while (slotStart < workHours.end && maxSlotAttempts-- > 0) {
-        // Check if we're in a break
         const currentBreak = workHours.breaks.find(b => 
           slotStart >= b.start && slotStart < b.end
         );
@@ -422,22 +449,18 @@ class AutomaticSchedulingService {
           continue;
         }
         
-        // Get all slots needed for this task duration (may span breaks/days)
         const taskSlots = this.getTaskSlots(slotStart, duration);
         if (taskSlots.length === 0) break;
         
-        // Calculate total time span for employee blocking
         const firstSlotStart = taskSlots[0].start;
         const lastSlotEnd = taskSlots[taskSlots.length - 1].end;
         
-        // Try to find an available employee for all slots
         const employee = this.findAvailableEmployee(standardTaskId, firstSlotStart, lastSlotEnd, employees);
         
         if (employee) {
           return { slots: taskSlots, employee };
         }
         
-        // Move to next slot (try every 15 minutes)
         slotStart = addMinutes(slotStart, 15);
       }
       
@@ -449,20 +472,19 @@ class AutomaticSchedulingService {
   }
 
   /**
-   * Schedule a single task
+   * Schedule a single task - returns slots with consistent employee lane indices
    */
   private scheduleTask(
     task: SchedulableTask,
     employees: EmployeeTaskEligibility[],
-    minStartTime: Date,
-    workerIndexMap: Map<string, number>
+    minStartTime: Date
   ): ScheduleSlot[] {
     if (task.workstation_ids.length === 0) {
       console.warn(`Task ${task.id} has no workstation assigned, skipping`);
       return [];
     }
     
-    const workstationId = task.workstation_ids[0]; // Use first workstation
+    const workstationId = task.workstation_ids[0];
     
     const result = this.findEarliestSlots(
       task.duration,
@@ -479,7 +501,7 @@ class AutomaticSchedulingService {
     
     const { slots, employee } = result;
     
-    // Block the entire time span for the employee (from first slot start to last slot end)
+    // Block the entire time span for the employee
     const firstSlotStart = slots[0].start;
     const lastSlotEnd = slots[slots.length - 1].end;
     
@@ -491,27 +513,29 @@ class AutomaticSchedulingService {
     
     // Track task end time for dependency resolution
     this.scheduledTaskEndTimes.set(task.id, lastSlotEnd);
-     
-    // Create a schedule slot for each time segment
-    // Each segment gets a unique worker_index to avoid duplicate key constraints
-return slots.map((slot, segmentIndex) => {
-  const dateKey = format(slot.start, 'yyyy-MM-dd');
-
-  // worker_index unique per task + day + segment
-  const segmentWorkerIndex = segmentIndex;
-
-  return {
-    task_id: task.id,
-    workstation_id: workstationId,
-    employee_id: employee.employee_id,
-    employee_name: employee.employee_name,
-    scheduled_date: dateKey,
-    start_time: slot.start.toISOString(),
-    end_time: slot.end.toISOString(),
-    worker_index: segmentWorkerIndex
-  };
-});
-
+    
+    // Get the stable lane index for this employee at this workstation
+    const employeeLaneIndex = this.getEmployeeLaneIndex(workstationId, employee.employee_id);
+    
+    // Create schedule slots - each segment gets a unique worker_index for DB uniqueness
+    // but they all share the same employee lane concept
+    return slots.map((slot, segmentIndex) => {
+      const dateKey = format(slot.start, 'yyyy-MM-dd');
+      // worker_index: combine employee lane with segment for uniqueness
+      // Use employeeLaneIndex * 100 + segmentIndex to ensure uniqueness
+      const workerIndex = employeeLaneIndex * 100 + segmentIndex;
+      
+      return {
+        task_id: task.id,
+        workstation_id: workstationId,
+        employee_id: employee.employee_id,
+        employee_name: employee.employee_name,
+        scheduled_date: dateKey,
+        start_time: slot.start.toISOString(),
+        end_time: slot.end.toISOString(),
+        worker_index: workerIndex
+      };
+    });
   }
 
   /**
@@ -533,18 +557,15 @@ return slots.map((slot, segmentIndex) => {
     let maxEndTime: Date | null = new Date(0);
     
     for (const lp of taskLimitPhases) {
-      // Find the limit task in the same project
       const limitTask = allTasks.find(t => 
         t.standard_task_id === lp.limit_standard_task_id &&
         t.project_id === task.project_id
       );
       
-      // If no such task exists in the project, it doesn't block scheduling
       if (!limitTask) continue;
       
       const endTime = this.scheduledTaskEndTimes.get(limitTask.id);
       if (!endTime) {
-        // Limit task exists but hasn't been scheduled yet
         return null;
       }
       
@@ -562,17 +583,19 @@ return slots.map((slot, segmentIndex) => {
   async generateSchedule(projectCount: number, startDate: Date): Promise<{
     schedules: ScheduleSlot[];
     completions: ProjectCompletionInfo[];
+    lastProductionStepName: string | null;
   }> {
     // Reset state
     this.employeeTimeBlocks = [];
     this.scheduledTaskEndTimes = new Map();
+    this.wsEmployeeLaneMap = new Map();
     
     await this.initialize();
     
     // Step 1: Get the most urgent projects
     const projects = await this.getUrgentProjects(projectCount);
     if (projects.length === 0) {
-      return { schedules: [], completions: [] };
+      return { schedules: [], completions: [], lastProductionStepName: null };
     }
     
     console.log(`Scheduling ${projects.length} projects:`, projects.map(p => p.name));
@@ -592,7 +615,9 @@ return slots.map((slot, segmentIndex) => {
     const limitPhases = await this.getLimitPhases();
     
     // Step 5: Get last production step for deadline tracking
-    const lastProductionStepId = await this.getLastProductionStep();
+    const lastProductionStep = await this.getLastProductionStep();
+    const lastProductionStepId = lastProductionStep?.id || null;
+    const lastProductionStepName = lastProductionStep?.name || null;
     
     // Group tasks by project
     const tasksByProject = new Map<string, SchedulableTask[]>();
@@ -603,30 +628,26 @@ return slots.map((slot, segmentIndex) => {
     });
     
     const schedules: ScheduleResult[] = [];
-    const workerIndexMap = new Map<string, number>();
     const projectLastStepEnd = new Map<string, Date>();
     
-    // Process projects in order of urgency (installation date)
+    // Process projects in order of urgency
     for (const project of projects) {
       const projectTasks = tasksByProject.get(project.id) || [];
       
       if (projectTasks.length === 0) continue;
       
-      // Sort tasks by task_number for proper ordering
       projectTasks.sort((a, b) => a.task_number.localeCompare(b.task_number));
       
-      // Separate TODO/IN_PROGRESS and HOLD tasks - treat IN_PROGRESS same as TODO
       const todoTasks = projectTasks.filter(t => t.status === 'TODO' || t.status === 'IN_PROGRESS');
       const holdTasks = projectTasks.filter(t => t.status === 'HOLD');
       
       console.log(`Project ${project.name}: ${todoTasks.length} TODO/IN_PROGRESS, ${holdTasks.length} HOLD tasks`);
       
-      // Schedule TODO/IN_PROGRESS tasks first (in order)
+      // Schedule TODO/IN_PROGRESS tasks first
       for (const task of todoTasks) {
-        const taskSlots = this.scheduleTask(task, employees, startDate, workerIndexMap);
+        const taskSlots = this.scheduleTask(task, employees, startDate);
         schedules.push(...taskSlots);
         
-        // Track last production step end time (use last slot's end time)
         if (taskSlots.length > 0 && task.standard_task_id === lastProductionStepId) {
           const lastSlotEnd = new Date(taskSlots[taskSlots.length - 1].end_time);
           projectLastStepEnd.set(project.id, lastSlotEnd);
@@ -634,7 +655,6 @@ return slots.map((slot, segmentIndex) => {
       }
       
       // Schedule HOLD tasks (respecting dependencies)
-      // We may need multiple passes as dependencies get resolved
       let remainingHoldTasks = [...holdTasks];
       let maxPasses = 10;
       let passCount = 0;
@@ -647,17 +667,14 @@ return slots.map((slot, segmentIndex) => {
           const minStartTime = this.areLimitPhasesSatisfied(task, limitPhases, allTasks);
           
           if (minStartTime === null) {
-            // Dependencies not yet satisfied
             stillPending.push(task);
             continue;
           }
           
-          // Schedule after dependencies
           const effectiveStartTime = minStartTime > startDate ? minStartTime : startDate;
-          const taskSlots = this.scheduleTask(task, employees, effectiveStartTime, workerIndexMap);
+          const taskSlots = this.scheduleTask(task, employees, effectiveStartTime);
           schedules.push(...taskSlots);
           
-          // Track last production step end time
           if (taskSlots.length > 0 && task.standard_task_id === lastProductionStepId) {
             const lastSlotEnd = new Date(taskSlots[taskSlots.length - 1].end_time);
             projectLastStepEnd.set(project.id, lastSlotEnd);
@@ -672,7 +689,7 @@ return slots.map((slot, segmentIndex) => {
       }
     }
     
-    // Step 6: Build completion info for deadline timeline
+    // Step 6: Build completion info
     const completions: ProjectCompletionInfo[] = projects.map(project => {
       const installationDate = new Date(project.installation_date);
       const lastStepEnd = projectLastStepEnd.get(project.id) || null;
@@ -706,59 +723,40 @@ return slots.map((slot, segmentIndex) => {
     
     console.log(`Generated ${schedules.length} schedule entries`);
     
-    return { schedules, completions };
+    return { schedules, completions, lastProductionStepName };
   }
 
   /**
-   * Save schedules to database
+   * Save schedules to database with batched deletes for large datasets
    */
   async saveSchedulesToDatabase(schedules: ScheduleSlot[]): Promise<void> {
     if (schedules.length === 0) return;
     
-   // Delete all existing schedules for the tasks we are about to reinsert
-const taskIds = Array.from(new Set(schedules.map(s => s.task_id)));
-
-if (taskIds.length > 0) {
-  const { error } = await supabase
-    .from('gantt_schedules')
-    .delete()
-    .in('task_id', taskIds);
-
-  if (error) {
-    console.error('Error deleting existing task schedules:', error);
-    throw error;
-  }
-}
-
-
+    // Delete all existing gantt_schedules (full wipe for clean state)
+    const { error: deleteError } = await supabase
+      .from('gantt_schedules')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
     
-    // Group by date
-    const byDate = new Map<string, GanttScheduleInsert[]>();
-    
-    schedules.forEach(s => {
-      const dateStr = s.scheduled_date;
-      const existing = byDate.get(dateStr) || [];
-      existing.push({
-        task_id: s.task_id,
-        workstation_id: s.workstation_id,
-        employee_id: s.employee_id,
-        scheduled_date: dateStr,
-        start_time: s.start_time,
-        end_time: s.end_time,
-        worker_index: s.worker_index
-      });
-      byDate.set(dateStr, existing);
-    });
-    
-    // Insert all schedules in one batch
-    const allInserts: GanttScheduleInsert[] = [];
-    for (const dateSchedules of byDate.values()) {
-      allInserts.push(...dateSchedules);
+    if (deleteError) {
+      console.error('Error clearing gantt_schedules:', deleteError);
+      throw deleteError;
     }
+    
+    // Build insert records
+    const allInserts: GanttScheduleInsert[] = schedules.map(s => ({
+      task_id: s.task_id,
+      workstation_id: s.workstation_id,
+      employee_id: s.employee_id,
+      scheduled_date: s.scheduled_date,
+      start_time: s.start_time,
+      end_time: s.end_time,
+      worker_index: s.worker_index
+    }));
     
     console.log(`Inserting ${allInserts.length} schedule entries`);
     
-    // Insert in batches to avoid large payload issues
+    // Insert in batches
     const BATCH_SIZE = 100;
     for (let i = 0; i < allInserts.length; i += BATCH_SIZE) {
       const batch = allInserts.slice(i, i + BATCH_SIZE);
@@ -767,7 +765,7 @@ if (taskIds.length > 0) {
         .insert(batch);
       
       if (error) {
-        console.error('Error inserting schedules batch:', error);
+        console.error(`Error inserting batch ${i / BATCH_SIZE + 1}:`, error);
         throw error;
       }
     }

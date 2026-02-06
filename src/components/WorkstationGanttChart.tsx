@@ -18,6 +18,7 @@ import { workingHoursService, WorkingHours } from '@/services/workingHoursServic
 import { holidayService, Holiday } from '@/services/holidayService';
 import { ganttScheduleService } from '@/services/ganttScheduleService';
 import { automaticSchedulingService, ProjectCompletionInfo } from '@/services/automaticSchedulingService';
+import { projectCompletionService } from '@/services/projectCompletionService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,9 +70,16 @@ interface WorkstationGanttChartProps {
 }
 
 interface DailyEmployeeAssignment {
-  date: string; // ISO date string
+  date: string;
   workstationId: string;
   workerIndex: number;
+  employeeId: string;
+  employeeName: string;
+}
+
+/** Per-workstation lane info: one lane per unique employee */
+interface WorkstationLaneInfo {
+  laneIndex: number;
   employeeId: string;
   employeeName: string;
 }
@@ -95,6 +103,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [optimizing, setOptimizing] = useState(false);
   const [projectCount, setProjectCount] = useState(5);
   const [completionInfo, setCompletionInfo] = useState<ProjectCompletionInfo[]>([]);
+  const [lastStepName, setLastStepName] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [dailyAssignments, setDailyAssignments] = useState<DailyEmployeeAssignment[]>([]);
@@ -110,10 +119,9 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const headerHeight = 80;
   const workstationLabelWidth = 250;
 
-  // Day-based scale - always show a single day with hour granularity
+  // Day-based scale
   const scale = useMemo(() => {
-    // Day-based view: show 24 hours for the selected day
-    const unitWidth = 60 * zoom; // 60 pixels per hour base
+    const unitWidth = 60 * zoom;
     return {
       unitInMinutes: 60,
       unitWidth,
@@ -135,7 +143,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       setWorkingHours(wh || []);
       setHolidays(hd || []);
       
-      // Fetch standard tasks with multi_user_task flag
       const { data: standardTasksData, error: standardTasksError } = await supabase
         .from('standard_tasks')
         .select('id, task_name, task_number, multi_user_task')
@@ -147,7 +154,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         setStandardTasks(standardTasksData || []);
       }
       
-      // Fetch workstation-employee links for UI
       const linksMap = new Map<string, Array<{ id: string; name: string }>>();
       for (const workstation of ws || []) {
         const employees = await workstationService.getEmployeesForWorkstation(workstation.id);
@@ -155,7 +161,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       }
       setWorkstationEmployeeLinks(linksMap);
       
-      // Fetch employee-standard_task links for planning
       const { data: employeeTaskLinks, error: linksError } = await supabase
         .from('employee_standard_task_links')
         .select('employee_id, standard_task_id, employees(id, name)');
@@ -164,7 +169,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         console.error('Error fetching employee task links:', linksError);
       }
       
-      // Group by employee
       const employeeTaskMap = new Map<string, Array<{ id: string; name: string; standardTasks: string[] }>>();
       (employeeTaskLinks || []).forEach((link: any) => {
         if (!link.employees) return;
@@ -185,8 +189,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       
       setEmployeeStandardTaskLinks(employeeTaskMap);
       
-      // Fetch ALL TODO and HOLD tasks using pagination (Supabase limits to 1000 per request)
-      // Also include IN_PROGRESS tasks (treated same as TODO for scheduling)
+      // Fetch tasks with pagination
       const BATCH_SIZE = 1000;
       let allTasks: any[] = [];
       let offset = 0;
@@ -232,7 +235,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       setLimitPhases(lp || []);
       setLoading(false);
     })();
-  }, []); // Tasks don't depend on selectedDate - only schedules do
+  }, []);
 
   // Load saved schedules from database for the selected date
   const loadSavedSchedules = useCallback(async () => {
@@ -241,33 +244,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       setSavedSchedules(schedules);
       
       if (schedules.length > 0) {
-        // Build daily assignments from saved schedules
-        const assignments: DailyEmployeeAssignment[] = [];
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        
-        schedules.forEach((schedule: any) => {
-          if (schedule.employee_id && schedule.employees) {
-            assignments.push({
-              date: dateStr,
-              workstationId: schedule.workstation_id,
-              workerIndex: schedule.worker_index,
-              employeeId: schedule.employee_id,
-              employeeName: schedule.employees.name,
-            });
-          }
-        });
-        
-        // Remove duplicates
-        const uniqueAssignments = assignments.filter((a, index, self) =>
-          index === self.findIndex(t => 
-            t.date === a.date && 
-            t.workstationId === a.workstationId && 
-            t.workerIndex === a.workerIndex &&
-            t.employeeId === a.employeeId
-          )
-        );
-        
-        setDailyAssignments(uniqueAssignments);
         setScheduleGenerated(true);
       }
     } catch (error) {
@@ -282,12 +258,10 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
 
   // Real-time subscription for schedule updates
   useEffect(() => {
-    // Cleanup previous subscription
     if (realtimeChannelRef.current) {
       ganttScheduleService.unsubscribeFromSchedules(realtimeChannelRef.current);
     }
     
-    // Subscribe to real-time updates for the selected date
     realtimeChannelRef.current = ganttScheduleService.subscribeToSchedules(
       selectedDate,
       (payload) => {
@@ -306,23 +280,17 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   // Day navigation handlers
   const handlePreviousDay = useCallback(() => {
     const newDate = subDays(selectedDate, 1);
-    if (onDateChange) {
-      onDateChange(newDate);
-    }
+    if (onDateChange) onDateChange(newDate);
   }, [selectedDate, onDateChange]);
 
   const handleNextDay = useCallback(() => {
     const newDate = addDays(selectedDate, 1);
-    if (onDateChange) {
-      onDateChange(newDate);
-    }
+    if (onDateChange) onDateChange(newDate);
   }, [selectedDate, onDateChange]);
 
   const handleToday = useCallback(() => {
     const today = startOfDay(new Date());
-    if (onDateChange) {
-      onDateChange(today);
-    }
+    if (onDateChange) onDateChange(today);
   }, [onDateChange]);
 
   // precomputed lookup structures
@@ -336,17 +304,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
 
   const holidaySet = useMemo(() => new Set(holidays.filter((h) => h.team === 'production').map((h) => h.date)), [holidays]);
 
-  const isWorkingDay = (date: Date) => {
-    const day = getDay(date);
-    return !isWeekend(date) && workingHoursMap.has(day) && !holidaySet.has(format(date, 'yyyy-MM-dd'));
-  };
-
-  const getNextWorkday = (date: Date) => {
-    let d = addDays(date, 1);
-    while (!isWorkingDay(d)) d = addDays(d, 1);
-    return d;
-  };
-
   const getWorkHours = (date: Date) => {
     const wh = workingHoursMap.get(getDay(date));
     if (!wh) return null;
@@ -355,7 +312,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     const s = setMinutes(setHours(startOfDay(date), sh), sm);
     const e = setMinutes(setHours(startOfDay(date), eh), em);
     
-    // Parse breaks and convert to Date objects for this specific day
     const breaks = (wh.breaks || [])
       .map(b => {
         const [bsh, bsm] = b.start_time.split(':').map(Number);
@@ -368,110 +324,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       .sort((a, b) => a.start.getTime() - b.start.getTime());
     
     return { start: s, end: e, breaks };
-  };
-
-  // split task across days and breaks — optimized loop
-  const getTaskSlots = (from: Date, duration: number) => {
-    const res: { start: Date; end: Date }[] = [];
-    let remaining = duration;
-    let cur = from;
-    let wh = getWorkHours(cur);
-    if (!wh) {
-      cur = getNextWorkday(cur);
-      wh = getWorkHours(cur);
-    }
-    if (cur < wh!.start) cur = wh!.start;
-
-    while (remaining > 0) {
-      const endToday = wh!.end;
-      const breaks = wh!.breaks || [];
-      
-      // Find the next break that starts at or after current position
-      const nextBreak = breaks.find(b => b.start >= cur);
-      
-      if (nextBreak && nextBreak.start < endToday) {
-        // There's a break before end of day
-        const availableBeforeBreak = differenceInMinutes(nextBreak.start, cur);
-        
-        if (availableBeforeBreak > 0) {
-          // Schedule work before the break
-          const used = Math.min(remaining, availableBeforeBreak);
-          res.push({ start: cur, end: addMinutes(cur, used) });
-          remaining -= used;
-          
-          if (remaining > 0) {
-            // Continue after the break
-            cur = nextBreak.end;
-          }
-        } else {
-          // We're at or past the break start, skip to after break
-          cur = nextBreak.end;
-        }
-      } else {
-        // No more breaks today, use remaining time until end of day
-        const available = differenceInMinutes(endToday, cur);
-        const used = Math.min(remaining, available);
-        
-        if (used > 0) {
-          res.push({ start: cur, end: addMinutes(cur, used) });
-          remaining -= used;
-        }
-        
-        if (remaining > 0) {
-          // Move to next workday
-          cur = getNextWorkday(cur);
-          wh = getWorkHours(cur);
-          cur = wh!.start;
-        }
-      }
-    }
-    return res;
-  };
-
-  // Build limit task dependencies map (maps standard_task_id -> array of limit_standard_task_id)
-  const limitTaskMap = useMemo(() => {
-    const map = new Map<string, string[]>();
-    limitPhases.forEach((lp) => {
-      const limits = map.get(lp.standard_task_id) || [];
-      limits.push(lp.limit_standard_task_id);
-      map.set(lp.standard_task_id, limits);
-    });
-    return map;
-  }, [limitPhases]);
-
-  // Given a HOLD task and the current scheduledTaskEndTimes, return the earliest Date this task is allowed to start
-  // due to limit-task dependencies in the same project. If there are limit tasks in the project that are not yet scheduled,
-  // return null to indicate this HOLD task cannot be scheduled in this pass.
-  const getRequiredDependencyEndForTask = (
-    task: Task,
-    scheduledTaskEndTimes: Map<string, Date>
-  ): Date | null => {
-    if (!task.standard_task_id) return new Date(0); // no dependency
-
-    const limitStdIds = limitTaskMap.get(task.standard_task_id);
-    if (!limitStdIds || limitStdIds.length === 0) return new Date(0);
-
-    let maxEnd: Date | null = new Date(0);
-
-    for (const limitStdId of limitStdIds) {
-      // find the limit task in the same project
-      const limitTask = tasks.find(
-        (t) => t.standard_task_id === limitStdId && t.phases?.projects?.id === task.phases?.projects?.id
-      );
-
-      // if no such task exists in the project, it doesn't block scheduling
-      if (!limitTask) continue;
-
-      const endTime = scheduledTaskEndTimes.get(limitTask.id);
-      if (!endTime) {
-        // limit task exists but hasn't been scheduled yet -> cannot schedule this HOLD task now
-        return null;
-      }
-
-      if (!maxEnd || endTime > maxEnd) maxEnd = endTime;
-    }
-
-    return maxEnd || new Date(0);
   };
 
   // Handler for updating active workers count
@@ -494,117 +346,133 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     }
   };
 
-  // Calculate daily workload for each workstation
-  const calculateDailyWorkload = (
-    date: Date,
-    workstationId: string,
-    scheduleMap: Map<string, Map<number, { task: Task; start: Date; end: Date; isVisible: boolean }[]>>
-  ): number => {
-    const workerMap = scheduleMap.get(workstationId);
-    if (!workerMap) return 0;
-
-    const dateStr = format(date, 'yyyy-MM-dd');
-    let totalMinutes = 0;
-
-    workerMap.forEach((tasks) => {
-      tasks.forEach(({ start, end }) => {
-        const taskDateStr = format(start, 'yyyy-MM-dd');
-        if (taskDateStr === dateStr) {
-          totalMinutes += differenceInMinutes(end, start);
-        }
-      });
-    });
-
-    return totalMinutes;
-  };
-
-  // Schedule computation from saved schedules
-  const schedule = useMemo(() => {
+  // ──────────────── CORE: Build schedule with employee-based lanes ────────────────
+  const { schedule, wsLaneInfo } = useMemo(() => {
     const all = new Map<string, Map<number, { task: Task; start: Date; end: Date; isVisible: boolean }[]>>();
+    const laneInfoMap = new Map<string, WorkstationLaneInfo[]>();
     
-    // Initialize all workstations with empty worker maps
-    workstations.forEach((ws) => {
-      const workerMap = new Map<number, { task: Task; start: Date; end: Date; isVisible: boolean }[]>();
-      for (let i = 0; i < (ws.active_workers || 1); i++) {
-        workerMap.set(i, []);
-      }
-      all.set(ws.id, workerMap);
-    });
-    
-    // Helper for search filtering
     const isTaskVisible = (task: Task) => {
       if (!searchTerm) return true;
       return task.phases?.projects?.name?.toLowerCase().includes(searchTerm.toLowerCase());
     };
     
-    // Populate from saved schedules
-    savedSchedules.forEach((schedule: any) => {
-      // Try to find task in our local tasks array
-      let task = tasks.find(t => t.id === schedule.task_id);
+    // Step 1: Group saved schedules by workstation -> employee
+    const wsEmployeeSchedules = new Map<string, Map<string, { schedule: any; employeeName: string }[]>>();
+    
+    savedSchedules.forEach((sched: any) => {
+      const wsId = sched.workstation_id;
+      const empId = sched.employee_id || 'unassigned';
+      const empName = sched.employees?.name || 'Niet toegewezen';
       
-      // If task not found locally, construct a minimal task from schedule data
-      if (!task && schedule.tasks) {
-        task = {
-          id: schedule.task_id,
-          title: schedule.tasks.title || 'Unknown Task',
-          description: schedule.tasks.description,
-          duration: schedule.tasks.duration || 60,
-          status: schedule.tasks.status || 'TODO',
-          due_date: schedule.tasks.due_date || '',
-          phase_id: schedule.tasks.phase_id || '',
-          standard_task_id: schedule.tasks.standard_task_id,
-          priority: schedule.tasks.priority || 'medium',
-          phases: schedule.tasks.phases,
-          workstations: []
-        };
+      if (!wsEmployeeSchedules.has(wsId)) {
+        wsEmployeeSchedules.set(wsId, new Map());
       }
-      
-      if (!task) {
-        console.warn(`Task ${schedule.task_id} not found for schedule`);
-        return;
+      const empMap = wsEmployeeSchedules.get(wsId)!;
+      if (!empMap.has(empId)) {
+        empMap.set(empId, []);
       }
-      
-      const workerMap = all.get(schedule.workstation_id);
-      if (!workerMap) {
-        console.warn(`Workstation ${schedule.workstation_id} not found for schedule`);
-        return;
-      }
-      
-      const start = new Date(schedule.start_time);
-      const end = new Date(schedule.end_time);
-      const workerIndex = schedule.worker_index || 0;
-      
-      // Ensure worker index exists in map
-      if (!workerMap.has(workerIndex)) {
-        workerMap.set(workerIndex, []);
-      }
-      
-      const taskList = workerMap.get(workerIndex) || [];
-      taskList.push({ task, start, end, isVisible: isTaskVisible(task) });
-      workerMap.set(workerIndex, taskList);
+      empMap.get(empId)!.push({ schedule: sched, employeeName: empName });
     });
     
-    console.log(`Schedule built with ${savedSchedules.length} entries from saved schedules`);
+    // Step 2: For each workstation, assign lane indices per unique employee
+    workstations.forEach((ws) => {
+      const empMap = wsEmployeeSchedules.get(ws.id);
+      const lanes: WorkstationLaneInfo[] = [];
+      const workerMap = new Map<number, { task: Task; start: Date; end: Date; isVisible: boolean }[]>();
+      
+      if (empMap && empMap.size > 0) {
+        let laneIdx = 0;
+        empMap.forEach((entries, empId) => {
+          lanes.push({
+            laneIndex: laneIdx,
+            employeeId: empId,
+            employeeName: entries[0].employeeName,
+          });
+          
+          // Place all this employee's tasks in their lane
+          const taskList: { task: Task; start: Date; end: Date; isVisible: boolean }[] = [];
+          
+          entries.forEach(({ schedule: sched }) => {
+            let task = tasks.find(t => t.id === sched.task_id);
+            
+            if (!task && sched.tasks) {
+              task = {
+                id: sched.task_id,
+                title: sched.tasks.title || 'Unknown Task',
+                description: sched.tasks.description,
+                duration: sched.tasks.duration || 60,
+                status: sched.tasks.status || 'TODO',
+                due_date: sched.tasks.due_date || '',
+                phase_id: sched.tasks.phase_id || '',
+                standard_task_id: sched.tasks.standard_task_id,
+                priority: sched.tasks.priority || 'medium',
+                phases: sched.tasks.phases,
+                workstations: []
+              };
+            }
+            
+            if (!task) return;
+            
+            const start = new Date(sched.start_time);
+            const end = new Date(sched.end_time);
+            taskList.push({ task, start, end, isVisible: isTaskVisible(task) });
+          });
+          
+          workerMap.set(laneIdx, taskList);
+          laneIdx++;
+        });
+      } else {
+        // No schedules for this workstation - show one empty lane
+        workerMap.set(0, []);
+      }
+      
+      laneInfoMap.set(ws.id, lanes);
+      all.set(ws.id, workerMap);
+    });
     
-    return all;
+    console.log(`Schedule built: ${savedSchedules.length} entries across ${workstations.length} workstations`);
+    
+    return { schedule: all, wsLaneInfo: laneInfoMap };
   }, [workstations, tasks, savedSchedules, searchTerm]);
 
-  // Get assigned employee for a specific worker on a specific date
-  const getAssignedEmployee = (date: Date, workstationId: string, workerIndex: number) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return dailyAssignments.find(
-      (a) => a.date === dateStr && a.workstationId === workstationId && a.workerIndex === workerIndex
-    );
-  };
+  // Build daily assignments from lane info (for ref/export compatibility)
+  const computedDailyAssignments = useMemo(() => {
+    const assignments: DailyEmployeeAssignment[] = [];
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    
+    wsLaneInfo.forEach((lanes, wsId) => {
+      lanes.forEach(lane => {
+        assignments.push({
+          date: dateStr,
+          workstationId: wsId,
+          workerIndex: lane.laneIndex,
+          employeeId: lane.employeeId,
+          employeeName: lane.employeeName,
+        });
+      });
+    });
+    
+    return assignments;
+  }, [wsLaneInfo, selectedDate]);
 
-  // Get unique employees from daily assignments
+  // Expose ref methods
+  useImperativeHandle(ref, () => ({
+    getDailyAssignments: () => computedDailyAssignments,
+    getSchedule: () => schedule,
+    getTasks: () => tasks,
+    getWorkstations: () => workstations,
+  }));
+
+  // Get unique employees from assignments
   const uniqueEmployees = useMemo(() => {
     const employeeMap = new Map<string, string>();
-    dailyAssignments.forEach(assignment => {
-      employeeMap.set(assignment.employeeId, assignment.employeeName);
+    computedDailyAssignments.forEach(a => {
+      if (a.employeeId !== 'unassigned') {
+        employeeMap.set(a.employeeId, a.employeeName);
+      }
     });
     return Array.from(employeeMap.entries()).map(([id, name]) => ({ id, name }));
-  }, [dailyAssignments]);
+  }, [computedDailyAssignments]);
 
   // Toggle employee expansion
   const toggleEmployeeExpansion = (employeeId: string) => {
@@ -619,7 +487,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     });
   };
 
-  // Handle toggling standard task for employee (placeholder - this requires backend update)
   const handleToggleStandardTask = async (employeeId: string, taskId: string) => {
     toast.info('Deze functie is beschikbaar in de Instellingen pagina');
   };
@@ -631,26 +498,40 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     try {
       toast.info(`Planning optimaliseren voor ${projectCount} meest urgente projecten...`);
       
-      // Generate schedule using the automatic scheduling service
-      const { schedules, completions } = await automaticSchedulingService.generateSchedule(
+      if (onPlanningGenerated) {
+        onPlanningGenerated([], null, true);
+      }
+      
+      const { schedules, completions, lastProductionStepName } = await automaticSchedulingService.generateSchedule(
         projectCount,
         selectedDate
       );
       
       if (schedules.length === 0) {
         toast.warning('Geen taken gevonden om te plannen. Controleer of projecten taken hebben met TODO/HOLD status.');
+        if (onPlanningGenerated) {
+          onPlanningGenerated([], null, false);
+        }
         return;
       }
       
       // Save schedules to database
       await automaticSchedulingService.saveSchedulesToDatabase(schedules);
       
-      // Update completion info
+      // Update local state
       setCompletionInfo(completions);
+      setLastStepName(lastProductionStepName);
+      
+      // Save completion data to database for cross-session visibility
+      try {
+        await projectCompletionService.saveCompletionData(completions, lastProductionStepName);
+      } catch (e) {
+        console.error('Error saving completion data:', e);
+      }
       
       // Notify parent component
       if (onPlanningGenerated) {
-        onPlanningGenerated(completions, null, false);
+        onPlanningGenerated(completions, lastProductionStepName, false);
       }
       
       // Reload saved schedules to refresh the view
@@ -671,6 +552,9 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     } catch (error) {
       console.error('Error optimizing schedule:', error);
       toast.error('Fout bij het optimaliseren van de planning');
+      if (onPlanningGenerated) {
+        onPlanningGenerated([], null, false);
+      }
     } finally {
       setOptimizing(false);
     }
@@ -688,36 +572,28 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       </Card>
     );
 
-  // Enhanced color coding based on project status and priority
+  // Enhanced color coding
   const getTaskColor = (task: Task) => {
     const project = task.phases?.projects;
     const today = format(new Date(), 'yyyy-MM-dd');
-    
-    // Default color from project ID
     const pid = project?.id || '';
     const hue = pid.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
     
-    // Status-based color modifications
     let saturation = 65;
     let lightness = 45;
     let border = 'rgba(0,0,0,0.2)';
     
     if (project) {
-      // Future project (not yet started)
       if (project.start_date > today) {
         saturation = 30;
         lightness = 60;
         border = 'rgba(0,0,0,0.1)';
-      }
-      // High priority or urgent installation
-      else if (task.priority === 'high' || 
-               differenceInMinutes(new Date(project.installation_date), new Date()) / (24 * 60) < 7) {
+      } else if (task.priority === 'high' || 
+                 differenceInMinutes(new Date(project.installation_date), new Date()) / (24 * 60) < 7) {
         saturation = 80;
         lightness = 40;
         border = 'rgba(255,0,0,0.3)';
-      }
-      // Delayed/blocked
-      else if (task.status === 'HOLD') {
+      } else if (task.status === 'HOLD') {
         saturation = 45;
         lightness = 55;
         border = 'rgba(255,165,0,0.4)';
@@ -731,11 +607,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     };
   };
 
-  const getColor = (id: string) => {
-    const hue = id.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
-    return { bg: `hsl(${hue},65%,45%)`, text: `hsl(${hue},100%,95%)` };
-  };
-
   return (
     <>
     <Card>
@@ -746,14 +617,8 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             <div className="flex items-center gap-4">
               <CardTitle>Workstation Gantt Chart</CardTitle>
               
-              {/* Day Navigation */}
               <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
-                <Button 
-                  onClick={handlePreviousDay} 
-                  variant="ghost" 
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                >
+                <Button onClick={handlePreviousDay} variant="ghost" size="sm" className="h-8 w-8 p-0">
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 
@@ -764,21 +629,11 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                   </span>
                 </div>
                 
-                <Button 
-                  onClick={handleNextDay} 
-                  variant="ghost" 
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                >
+                <Button onClick={handleNextDay} variant="ghost" size="sm" className="h-8 w-8 p-0">
                   <ChevronRight className="h-4 w-4" />
                 </Button>
                 
-                <Button 
-                  onClick={handleToday} 
-                  variant="outline" 
-                  size="sm"
-                  className="ml-2"
-                >
+                <Button onClick={handleToday} variant="outline" size="sm" className="ml-2">
                   Vandaag
                 </Button>
               </div>
@@ -896,9 +751,9 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             )}
           </div>
           
-          {dailyAssignments.length > 0 && (
+          {computedDailyAssignments.length > 0 && (
             <div className="p-2 bg-accent border border-border rounded text-xs">
-              ✅ <strong>{new Set(dailyAssignments.map(a => a.employeeId)).size}</strong> werknemers toegewezen voor{' '}
+              ✅ <strong>{new Set(computedDailyAssignments.map(a => a.employeeId)).size}</strong> werknemers toegewezen voor{' '}
               <strong>{format(selectedDate, 'd MMMM', { locale: nl })}</strong> met optimale werkverdeling
             </div>
           )}
@@ -906,7 +761,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
       </CardHeader>
       <CardContent>
         <div ref={scrollRef} className="overflow-auto border rounded-lg" style={{ maxHeight: 600 }}>
-          {/* header with fixed total width to ensure proper alignment */}
+          {/* header */}
           <div
             className="sticky top-0 z-10 flex border-b bg-muted"
             style={{ 
@@ -914,14 +769,12 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
               minWidth: workstationLabelWidth + (scale.totalUnits * scale.unitWidth)
             }}
           >
-            {/* Sticky label cell for header */}
             <div 
               className="sticky left-0 z-20 bg-muted border-r flex items-center justify-center font-medium"
               style={{ width: workstationLabelWidth, minWidth: workstationLabelWidth }}
             >
               {format(selectedDate, 'EEEE d MMMM', { locale: nl })}
             </div>
-            {/* Timeline columns */}
             <div className="flex">
               {timeline.map((t, i) => (
                 <div 
@@ -935,13 +788,14 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             </div>
           </div>
 
-          {/* rows */}
+          {/* rows - one per workstation, with employee-based lanes */}
           {workstations.map((ws) => {
             const workerMap = schedule.get(ws.id);
             if (!workerMap) return null;
             
-            const workerCount = ws.active_workers || 1;
-            const totalHeight = rowHeight * workerCount;
+            const lanes = wsLaneInfo.get(ws.id) || [];
+            const laneCount = Math.max(lanes.length, 1);
+            const totalHeight = rowHeight * laneCount;
             const timelineWidth = scale.totalUnits * scale.unitWidth;
             
             return (
@@ -960,71 +814,58 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                 >
                   <div className="px-3 py-2 border-b flex items-center justify-between">
                     <span className="font-medium">{ws.name}</span>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 w-6 p-0"
-                        onClick={() => handleUpdateWorkers(ws.id, -1)}
-                        disabled={workerCount <= 1}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="text-xs text-muted-foreground px-1">{workerCount}</span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 w-6 p-0"
-                        onClick={() => handleUpdateWorkers(ws.id, 1)}
-                        disabled={workerCount >= 10}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    <span className="text-xs text-muted-foreground">{laneCount}</span>
                   </div>
                   
-                  {/* Show worker lane labels with employee names */}
-                  {Array.from({ length: workerCount }).map((_, workerIndex) => {
-                    const assignment = getAssignedEmployee(selectedDate, ws.id, workerIndex);
-                    
-                    return (
+                  {/* Show employee lane labels */}
+                  {laneCount > 0 && (
+                    lanes.length > 0 ? (
+                      lanes.map((lane) => (
+                        <div
+                          key={lane.laneIndex}
+                          className="px-3 py-1 text-xs flex items-center"
+                          style={{ 
+                            height: rowHeight,
+                            borderTop: lane.laneIndex > 0 ? '1px dashed hsl(var(--border) / 0.3)' : undefined
+                          }}
+                        >
+                          <span className="text-muted-foreground">
+                            Werker {lane.laneIndex + 1}: 
+                          </span>
+                          <span className="ml-1 font-medium truncate">
+                            {lane.employeeName}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
                       <div
-                        key={workerIndex}
                         className="px-3 py-1 text-xs flex items-center"
-                        style={{ 
-                          height: rowHeight,
-                          borderTop: workerIndex > 0 ? '1px dashed hsl(var(--border) / 0.3)' : undefined
-                        }}
+                        style={{ height: rowHeight }}
                       >
-                        <span className="text-muted-foreground">
-                          Werker {workerIndex + 1}: 
-                        </span>
-                        <span className="ml-1 font-medium truncate">
-                          {assignment ? assignment.employeeName : 'Niet toegewezen'}
-                        </span>
+                        <span className="text-muted-foreground">Geen taken gepland</span>
                       </div>
-                    );
-                  })}
+                    )
+                  )}
                 </div>
                 
-                {/* Timeline area with fixed width */}
+                {/* Timeline area */}
                 <div className="relative" style={{ width: timelineWidth, minWidth: timelineWidth }}>
-                  {/* Render each worker lane */}
-                  {Array.from({ length: workerCount }).map((_, workerIndex) => {
-                    const tasks = workerMap.get(workerIndex) || [];
-                    const laneTop = workerIndex * rowHeight;
+                  {Array.from({ length: laneCount }).map((_, laneIndex) => {
+                    const taskEntries = workerMap.get(laneIndex) || [];
+                    const laneTop = laneIndex * rowHeight;
+                    const lane = lanes[laneIndex];
                     
                     return (
                       <div
-                        key={workerIndex}
+                        key={laneIndex}
                         className="absolute left-0 right-0"
                         style={{
                           top: laneTop,
                           height: rowHeight,
-                          borderTop: workerIndex > 0 ? '1px dashed hsl(var(--border) / 0.3)' : undefined
+                          borderTop: laneIndex > 0 ? '1px dashed hsl(var(--border) / 0.3)' : undefined
                         }}
                       >
-                        {/* Grid lines aligned with timeline columns */}
+                        {/* Grid lines */}
                         {timeline.map((_, i) => (
                           <div 
                             key={i} 
@@ -1033,7 +874,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                           />
                         ))}
                         <TooltipProvider>
-                          {tasks.map(({ task, start, end, isVisible }) => {
+                          {taskEntries.map(({ task, start, end, isVisible }) => {
                             if (!isVisible) return null;
 
                             const project = task.phases?.projects;
@@ -1041,17 +882,14 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                             const left = (differenceInMinutes(start, timelineStart) / scale.unitInMinutes) * scale.unitWidth;
                             const width = (differenceInMinutes(end, start) / scale.unitInMinutes) * scale.unitWidth;
                             
-                            // Get assigned employee for this date
-                            const assignment = getAssignedEmployee(start, ws.id, workerIndex);
-                            
                             return (
-                              <Tooltip key={`${task.id}-${start.toISOString()}-${workerIndex}`}>
+                              <Tooltip key={`${task.id}-${start.toISOString()}-${laneIndex}`}>
                                 <TooltipTrigger asChild>
                                   <div
                                     className="absolute rounded-md px-2 py-1 text-xs font-medium overflow-hidden"
                                     style={{
                                       left,
-                                      width: Math.max(width, 2), // Minimum width for visibility
+                                      width: Math.max(width, 2),
                                       top: 8,
                                       height: rowHeight - 16,
                                       background: bg,
@@ -1061,17 +899,14 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                                     }}
                                   >
                                     <div className="truncate font-semibold">
-                                      {project?.name || 'Project'} – {task.title}
+                                      {project?.name || 'Project'} – {task.title} ({task.duration} min)
                                     </div>
                                     <div className="text-[9px] opacity-75 truncate">
-                                      {task.priority === 'high' && '🔴 '}
-                                      {task.priority === 'medium' && '🟡 '}
-                                      {task.priority === 'low' && '🟢 '}
                                       {task.status === 'HOLD' && '🟠 HOLD '}
                                     </div>
-                                    {assignment && (
+                                    {lane && (
                                       <div className="text-[10px] opacity-80 truncate mt-0.5">
-                                        👤 {assignment.employeeName}
+                                        👤 {lane.employeeName}
                                       </div>
                                     )}
                                   </div>
@@ -1084,19 +919,17 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                                     <div><b>Einde:</b> {format(end, 'dd MMM HH:mm')}</div>
                                     <div><b>Duur:</b> {task.duration} min</div>
                                     <div><b>Status:</b> {task.status} {task.status === 'HOLD' && '🟠'}</div>
-                                    <div><b>Prioriteit:</b> {task.priority} {task.priority === 'high' && '🔴'}</div>
-                                    {assignment && (
-                                      <div><b>Werknemer:</b> {assignment.employeeName}</div>
+                                    <div><b>Prioriteit:</b> {task.priority}</div>
+                                    {lane && (
+                                      <div><b>Werknemer:</b> {lane.employeeName}</div>
                                     )}
                                     {project && (
-                                      <>
-                                        <div className="border-t pt-1 mt-1">
-                                          <div><b>Klant:</b> {project.client}</div>
-                                          <div><b>Project start:</b> {format(new Date(project.start_date), 'dd MMM yyyy')}</div>
-                                          <div><b>Installatie:</b> {format(new Date(project.installation_date), 'dd MMM yyyy')}</div>
-                                          <div><b>Status:</b> {project.status}</div>
-                                        </div>
-                                      </>
+                                      <div className="border-t pt-1 mt-1">
+                                        <div><b>Klant:</b> {project.client}</div>
+                                        <div><b>Project start:</b> {format(new Date(project.start_date), 'dd MMM yyyy')}</div>
+                                        <div><b>Installatie:</b> {format(new Date(project.installation_date), 'dd MMM yyyy')}</div>
+                                        <div><b>Status:</b> {project.status}</div>
+                                      </div>
                                     )}
                                   </div>
                                 </TooltipContent>
@@ -1113,14 +946,13 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
           })}
         </div>
 
-        {/* Employee Workstation Management */}
+        {/* Employee Management Section */}
         {uniqueEmployees.length > 0 && (
           <div className="mt-6 border-t pt-6 space-y-6">
-            {/* Statistics Section */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card>
                 <CardContent className="pt-4">
-                  <div className="text-2xl font-bold">{tasks.filter(t => t.status === 'TODO' || t.status === 'HOLD').length}</div>
+                  <div className="text-2xl font-bold">{tasks.filter(t => t.status === 'TODO' || t.status === 'HOLD' || t.status === 'IN_PROGRESS').length}</div>
                   <div className="text-xs text-muted-foreground">Totaal taken in planning</div>
                 </CardContent>
               </Card>
@@ -1133,14 +965,13 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
               <Card>
                 <CardContent className="pt-4">
                   <div className="text-2xl font-bold text-primary">
-                    {new Set(dailyAssignments.map(a => a.date)).size}
+                    {savedSchedules.length}
                   </div>
-                  <div className="text-xs text-muted-foreground">Dagen gepland</div>
+                  <div className="text-xs text-muted-foreground">Taken gepland vandaag</div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Employee Management */}
             <div>
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <User className="w-5 h-5" />
