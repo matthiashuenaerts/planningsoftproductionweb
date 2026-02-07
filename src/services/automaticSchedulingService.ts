@@ -3,6 +3,7 @@ import { format, addMinutes, differenceInMinutes, startOfDay, setHours, setMinut
 import { workingHoursService, WorkingHours } from '@/services/workingHoursService';
 import { holidayService, Holiday } from '@/services/holidayService';
 import { GanttScheduleInsert } from '@/services/ganttScheduleService';
+import { recurringTaskService, RecurringTaskSchedule } from '@/services/recurringTaskService';
 
 export interface SchedulableProject {
   id: string;
@@ -91,6 +92,9 @@ class AutomaticSchedulingService {
   // Track employee lane index per workstation: ws_id -> employee_id -> lane_index
   private wsEmployeeLaneMap: Map<string, Map<string, number>> = new Map();
 
+  // Recurring task schedules
+  private recurringSchedules: RecurringTaskSchedule[] = [];
+
   async initialize() {
     this.workingHours = await workingHoursService.getWorkingHours();
     this.holidays = await holidayService.getHolidays();
@@ -103,6 +107,16 @@ class AutomaticSchedulingService {
     this.holidaySet = new Set(
       this.holidays.filter((h) => h.team === 'production').map((h) => h.date)
     );
+
+    // Load recurring task schedules
+    try {
+      this.recurringSchedules = await recurringTaskService.getAll();
+      this.recurringSchedules = this.recurringSchedules.filter(s => s.is_active);
+      console.log(`Loaded ${this.recurringSchedules.length} active recurring task schedules`);
+    } catch (e) {
+      console.warn('Could not load recurring task schedules:', e);
+      this.recurringSchedules = [];
+    }
   }
 
   private isWorkingDay(date: Date): boolean {
@@ -592,6 +606,62 @@ class AutomaticSchedulingService {
     
     await this.initialize();
     
+    // Step 0: Pre-schedule recurring tasks - block their time slots for the assigned employees
+    const recurringScheduleSlots: ScheduleResult[] = [];
+    if (this.recurringSchedules.length > 0) {
+      console.log('📌 Pre-scheduling recurring tasks...');
+      
+      // Scan the next 365 days for recurring task occurrences
+      for (let dayOffset = 0; dayOffset < 365; dayOffset++) {
+        const currentDate = addDays(startDate, dayOffset);
+        const dayOfWeek = getDay(currentDate);
+        
+        if (!this.isWorkingDay(currentDate)) continue;
+        
+        // Find recurring schedules matching this day
+        const dayRecurrings = this.recurringSchedules.filter(r => r.day_of_week === dayOfWeek);
+        
+        for (const recurring of dayRecurrings) {
+          const [sh, sm] = recurring.start_time.split(':').map(Number);
+          const [eh, em] = recurring.end_time.split(':').map(Number);
+          const slotStart = setMinutes(setHours(startOfDay(currentDate), sh), sm);
+          const slotEnd = setMinutes(setHours(startOfDay(currentDate), eh), em);
+          
+          const dateStr = format(currentDate, 'yyyy-MM-dd');
+          const workstationId = recurring.workstation_id;
+          
+          // Block time for each assigned employee
+          for (const employeeId of recurring.employee_ids) {
+            // Block the employee's time
+            this.employeeTimeBlocks.push({
+              employee_id: employeeId,
+              start: slotStart,
+              end: slotEnd,
+            });
+            
+            // If a workstation is specified, create a schedule slot for it
+            if (workstationId) {
+              const employeeLaneIndex = this.getEmployeeLaneIndex(workstationId, employeeId);
+              
+              recurringScheduleSlots.push({
+                // Use a placeholder task_id - the recurring task doesn't have a real task
+                task_id: `recurring_${recurring.id}_${dateStr}`,
+                workstation_id: workstationId,
+                employee_id: employeeId,
+                employee_name: '',
+                scheduled_date: dateStr,
+                start_time: slotStart.toISOString(),
+                end_time: slotEnd.toISOString(),
+                worker_index: employeeLaneIndex * 100,
+              });
+            }
+          }
+        }
+      }
+      
+      console.log(`Pre-blocked ${recurringScheduleSlots.length} recurring task slots`);
+    }
+    
     // Step 1: Get the most urgent projects
     const projects = await this.getUrgentProjects(projectCount);
     if (projects.length === 0) {
@@ -730,7 +800,9 @@ class AutomaticSchedulingService {
    * Save schedules to database with batched deletes for large datasets
    */
   async saveSchedulesToDatabase(schedules: ScheduleSlot[]): Promise<void> {
-    if (schedules.length === 0) return;
+    // Filter out recurring task placeholder slots (they have non-UUID task_ids)
+    const validSchedules = schedules.filter(s => !s.task_id.startsWith('recurring_'));
+    if (validSchedules.length === 0) return;
     
     // Delete all existing gantt_schedules (full wipe for clean state)
     const { error: deleteError } = await supabase
@@ -743,8 +815,8 @@ class AutomaticSchedulingService {
       throw deleteError;
     }
     
-    // Build insert records
-    const allInserts: GanttScheduleInsert[] = schedules.map(s => ({
+    // Build insert records (use validSchedules to exclude recurring placeholders)
+    const allInserts: GanttScheduleInsert[] = validSchedules.map(s => ({
       task_id: s.task_id,
       workstation_id: s.workstation_id,
       employee_id: s.employee_id,

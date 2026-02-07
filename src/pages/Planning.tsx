@@ -1409,131 +1409,94 @@ const Planning = () => {
       setGeneratingSchedule(true);
       saveScrollPosition();
       
-      if (!ganttChartRef.current) {
-        toast({
-          title: "Error",
-          description: "Please switch to Gantt Chart view first to generate schedules from it.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      console.log('🎯 Generating schedules from Gantt chart for the following week...');
+      console.log('🎯 Generating schedules from gantt_schedules DB for the following 7 days...');
       
-      // Get the Gantt chart data
-      const { getDailyAssignments, getSchedule, getTasks, getWorkstations } = ganttChartRef.current;
-      
-      if (!getDailyAssignments || !getSchedule || !getTasks || !getWorkstations) {
-        toast({
-          title: "Error",
-          description: "Gantt chart data not available. Please ensure the chart is loaded.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const dailyAssignments = getDailyAssignments();
-      const schedule = getSchedule();
-      const tasks = getTasks();
-      const workstations = getWorkstations();
-
-      console.log('Daily assignments:', dailyAssignments.length);
-      console.log('Schedule entries:', schedule.size);
-
-      // Generate schedules for the next 7 days
       const startDate = startOfDay(selectedDate);
-      const scheduleInserts = [];
-      const workstationScheduleInserts = [];
-
-      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-        const currentDate = addDays(startDate, dayOffset);
-        const dateStr = format(currentDate, 'yyyy-MM-dd');
-
-        console.log(`Processing date: ${dateStr}`);
-
-        // Get assignments for this date
-        const dateAssignments = dailyAssignments.filter((a: any) => a.date === dateStr);
-        
-        console.log(`Assignments for ${dateStr}:`, dateAssignments.length);
-
-        // Process each workstation
-        for (const [workstationId, workerMap] of schedule.entries()) {
-          const workstation = workstations.find((ws: any) => ws.id === workstationId);
-          if (!workstation) continue;
-
-          // Process each worker in this workstation
-          for (const [workerIndex, taskSlots] of workerMap.entries()) {
-            // Get employee assignment for this worker on this date
-            const assignment = dateAssignments.find(
-              (a: any) => a.workstationId === workstationId && a.workerIndex === workerIndex
-            );
-
-            if (!assignment) continue;
-
-            // Create schedule entries for tasks assigned to this worker
-            for (const slot of taskSlots) {
-              const slotDateStr = format(slot.start, 'yyyy-MM-dd');
-              
-              // Only create schedule for the current date being processed
-              if (slotDateStr === dateStr) {
-                // Add worker schedule
-                scheduleInserts.push({
-                  employee_id: assignment.employeeId,
-                  task_id: slot.task.id,
-                  title: slot.task.title,
-                  description: slot.task.description,
-                  start_time: slot.start.toISOString(),
-                  end_time: slot.end.toISOString(),
-                  is_auto_generated: true,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                });
-
-                // Add workstation schedule
-                workstationScheduleInserts.push({
-                  workstation_id: workstationId,
-                  task_id: slot.task.id,
-                  task_title: slot.task.title,
-                  user_name: assignment.employeeName,
-                  start_time: slot.start.toISOString(),
-                  end_time: slot.end.toISOString(),
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                });
-              }
-            }
-          }
-        }
-      }
-
-      console.log(`Total schedule inserts: ${scheduleInserts.length}`);
-      console.log(`Total workstation schedule inserts: ${workstationScheduleInserts.length}`);
-
-      if (scheduleInserts.length === 0) {
+      const endDate = addDays(startDate, 7);
+      
+      // Step 1: Read all gantt_schedules from DB for the 7-day window
+      const startStr = format(startDate, 'yyyy-MM-dd');
+      const endStr = format(endDate, 'yyyy-MM-dd');
+      
+      const { data: ganttSchedules, error: ganttError } = await supabase
+        .from('gantt_schedules')
+        .select(`
+          *,
+          tasks (id, title, description, duration, status, priority, phase_id),
+          employees (id, name),
+          workstations (id, name)
+        `)
+        .gte('scheduled_date', startStr)
+        .lt('scheduled_date', endStr)
+        .order('scheduled_date')
+        .order('start_time');
+      
+      if (ganttError) throw ganttError;
+      
+      console.log(`Found ${ganttSchedules?.length || 0} gantt schedule entries for 7 days`);
+      
+      if (!ganttSchedules || ganttSchedules.length === 0) {
         toast({
-          title: "No schedules to generate",
-          description: "The Gantt chart doesn't have any task assignments for the following week.",
+          title: "No schedules found",
+          description: "No Gantt chart schedules found for the next 7 days. Please run the optimizer first.",
           variant: "default"
         });
         return;
       }
-
-      // Delete existing schedules for the week
-      const endDate = addDays(startDate, 7);
-      await supabase
+      
+      // Step 2: Clear ALL existing schedules in the schedules table
+      const { error: clearSchedulesError } = await supabase
         .from('schedules')
         .delete()
-        .gte('start_time', startDate.toISOString())
-        .lt('start_time', endDate.toISOString())
-        .eq('is_auto_generated', true);
-
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      if (clearSchedulesError) {
+        console.error('Error clearing schedules:', clearSchedulesError);
+        throw clearSchedulesError;
+      }
+      
+      // Also clear workstation_schedules for the period
       await supabase
         .from('workstation_schedules')
         .delete()
         .gte('start_time', startDate.toISOString())
         .lt('start_time', endDate.toISOString());
-
-      // Insert new schedules in batches
+      
+      // Step 3: Build schedule inserts from gantt_schedules
+      const scheduleInserts: any[] = [];
+      const workstationScheduleInserts: any[] = [];
+      
+      for (const gs of ganttSchedules) {
+        if (!gs.employee_id || !gs.tasks) continue;
+        
+        const employeeName = gs.employees?.name || 'Unknown';
+        
+        scheduleInserts.push({
+          employee_id: gs.employee_id,
+          task_id: gs.task_id,
+          title: gs.tasks.title || 'Unknown Task',
+          description: gs.tasks.description || '',
+          start_time: gs.start_time,
+          end_time: gs.end_time,
+          is_auto_generated: true,
+        });
+        
+        if (gs.workstation_id) {
+          workstationScheduleInserts.push({
+            workstation_id: gs.workstation_id,
+            task_id: gs.task_id,
+            task_title: gs.tasks.title || 'Unknown Task',
+            user_name: employeeName,
+            start_time: gs.start_time,
+            end_time: gs.end_time,
+          });
+        }
+      }
+      
+      console.log(`Total schedule inserts: ${scheduleInserts.length}`);
+      console.log(`Total workstation schedule inserts: ${workstationScheduleInserts.length}`);
+      
+      // Step 4: Insert in batches
       const batchSize = 100;
       for (let i = 0; i < scheduleInserts.length; i += batchSize) {
         const batch = scheduleInserts.slice(i, i + batchSize);
@@ -1546,7 +1509,7 @@ const Planning = () => {
           throw insertError;
         }
       }
-
+      
       for (let i = 0; i < workstationScheduleInserts.length; i += batchSize) {
         const batch = workstationScheduleInserts.slice(i, i + batchSize);
         const { error: insertError } = await supabase
@@ -1558,14 +1521,14 @@ const Planning = () => {
           throw insertError;
         }
       }
-
+      
       await fetchAllData();
-
+      
       toast({
         title: "Schedules Generated from Gantt Chart",
         description: `Successfully created ${scheduleInserts.length} worker schedules and ${workstationScheduleInserts.length} workstation schedules for the next 7 days.`,
       });
-
+      
     } catch (error: any) {
       console.error('Error generating schedules from Gantt:', error);
       toast({

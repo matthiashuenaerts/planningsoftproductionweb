@@ -18,6 +18,7 @@ import StockLocationsSettings from '@/components/settings/StockLocationsSettings
 import InstallationTeamsSettings from '@/components/settings/InstallationTeamsSettings';
 import { CsvImportConfigSettings } from '@/components/CsvImportConfigSettings';
 import ProductionRoutingSettings from '@/components/settings/ProductionRoutingSettings';
+import RecurringTaskSettings from '@/components/settings/RecurringTaskSettings';
 
 import MaterialSettings from '@/components/settings/MaterialSettings';
 import SupabaseConnectionSettings from '@/components/settings/SupabaseConnectionSettings';
@@ -107,6 +108,7 @@ const Settings: React.FC = () => {
               <TabsTrigger value="mail">Mail</TabsTrigger>
               <TabsTrigger value="help">Help Management</TabsTrigger>
               <TabsTrigger value="csv-import">CSV Import</TabsTrigger>
+              <TabsTrigger value="recurring-tasks">Recurring Tasks</TabsTrigger>
             </TabsList>
             
             <TabsContent value="workstations">
@@ -172,6 +174,10 @@ const Settings: React.FC = () => {
 
             <TabsContent value="csv-import">
               <CsvImportConfigSettings />
+            </TabsContent>
+
+            <TabsContent value="recurring-tasks">
+              <RecurringTaskSettings />
             </TabsContent>
           </Tabs>
         </div>

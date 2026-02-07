@@ -3147,6 +3147,63 @@ export type Database = {
         }
         Relationships: []
       }
+      recurring_task_schedules: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          employee_ids: string[]
+          end_time: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          standard_task_id: string
+          start_time: string
+          updated_at: string
+          workstation_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          employee_ids?: string[]
+          end_time: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          standard_task_id: string
+          start_time: string
+          updated_at?: string
+          workstation_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          employee_ids?: string[]
+          end_time?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          standard_task_id?: string
+          start_time?: string
+          updated_at?: string
+          workstation_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_task_schedules_standard_task_id_fkey"
+            columns: ["standard_task_id"]
+            isOneToOne: false
+            referencedRelation: "standard_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_task_schedules_workstation_id_fkey"
+            columns: ["workstation_id"]
+            isOneToOne: false
+            referencedRelation: "workstations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           can_access: boolean
