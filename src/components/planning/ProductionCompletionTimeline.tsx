@@ -1,10 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { AlertTriangle, CheckCircle2, Flag, Clock } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Flag, Clock, ChevronLeft, ChevronRight, FlaskConical } from 'lucide-react';
 import { format, addDays, startOfDay, differenceInDays, isWeekend, isSameDay, isValid } from 'date-fns';
 import { nl } from 'date-fns/locale';
+import { useLanguage } from '@/context/LanguageContext';
+import TestRushProjectDialog from './TestRushProjectDialog';
 
 export interface ProjectCompletionData {
   projectId: string;
@@ -27,7 +30,11 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
   loading = false,
   lastProductionStepName
 }) => {
-  const timelineStart = startOfDay(new Date());
+  const { t } = useLanguage();
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [showTestDialog, setShowTestDialog] = useState(false);
+
+  const timelineStart = useMemo(() => addDays(startOfDay(new Date()), weekOffset * 7), [weekOffset]);
   const daysToShow = 21;
   const dayWidth = 32;
 
@@ -39,12 +46,15 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
     return days;
   }, [timelineStart]);
 
-  // Sort projects by installation date
   const sortedProjects = useMemo(() => {
     return [...projectCompletions]
-      .filter(p => isValid(p.installationDate) && p.daysRemaining >= -3 && p.daysRemaining <= daysToShow)
+      .filter(p => {
+        if (!isValid(p.installationDate)) return false;
+        const daysDiff = differenceInDays(p.installationDate, timelineStart);
+        return daysDiff >= -3 && daysDiff <= daysToShow;
+      })
       .sort((a, b) => a.installationDate.getTime() - b.installationDate.getTime());
-  }, [projectCompletions, daysToShow]);
+  }, [projectCompletions, daysToShow, timelineStart]);
 
   const getStatusColor = (status: ProjectCompletionData['status']) => {
     switch (status) {
@@ -58,8 +68,8 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
   const getStatusBadge = (status: ProjectCompletionData['status']) => {
     switch (status) {
       case 'on_track': return <Badge className="bg-green-100 text-green-800 text-[10px] px-1 py-0">OK</Badge>;
-      case 'at_risk': return <Badge className="bg-yellow-100 text-yellow-800 text-[10px] px-1 py-0">Risk</Badge>;
-      case 'overdue': return <Badge className="bg-red-100 text-red-800 text-[10px] px-1 py-0">Late</Badge>;
+      case 'at_risk': return <Badge className="bg-yellow-100 text-yellow-800 text-[10px] px-1 py-0">{t('timeline_at_risk')}</Badge>;
+      case 'overdue': return <Badge className="bg-red-100 text-red-800 text-[10px] px-1 py-0">{t('timeline_overdue')}</Badge>;
       default: return <Badge variant="secondary" className="text-[10px] px-1 py-0">?</Badge>;
     }
   };
@@ -75,7 +85,7 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground p-2 bg-muted/50 rounded">
         <Clock className="h-3 w-3 animate-spin" />
-        <span>Berekenen productie deadlines...</span>
+        <span>{t('timeline_calculating')}</span>
       </div>
     );
   }
@@ -84,15 +94,28 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
     return (
       <div className="flex items-center gap-2 text-xs text-amber-700 p-2 bg-amber-50 rounded border border-amber-200">
         <AlertTriangle className="h-3 w-3" />
-        <span>Configureer "Laatste Productie Stap" in Instellingen → Standaard Taken</span>
+        <span>{t('timeline_configure_step')}</span>
       </div>
     );
   }
 
-  if (sortedProjects.length === 0) {
+  if (sortedProjects.length === 0 && weekOffset === 0) {
     return (
-      <div className="text-xs text-muted-foreground p-2 bg-muted/30 rounded">
-        Geen projecten met installatie in de komende {daysToShow} dagen
+      <div className="text-xs text-muted-foreground p-2 bg-muted/30 rounded flex items-center justify-between">
+        <span>{t('timeline_no_projects').replace('{{days}}', String(daysToShow))}</span>
+        <div className="flex items-center gap-1">
+          <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setWeekOffset(w => w - 1)}>
+            <ChevronLeft className="h-3 w-3" />
+          </Button>
+          {weekOffset !== 0 && (
+            <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setWeekOffset(0)}>
+              {t('timeline_today')}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setWeekOffset(w => w + 1)}>
+            <ChevronRight className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
     );
   }
@@ -103,21 +126,47 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
       <div className="flex items-center justify-between text-xs">
         <div className="flex items-center gap-1.5">
           <Flag className="h-3 w-3 text-primary" />
-          <span className="font-medium">Productie Deadline</span>
+          <span className="font-medium">{t('timeline_production_deadline')}</span>
           <span className="text-muted-foreground">({lastProductionStepName})</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <span className="text-green-600 font-medium">{stats.onTrack} ✓</span>
           <span className="text-yellow-600 font-medium">{stats.atRisk} ⚠</span>
           <span className="text-red-600 font-medium">{stats.overdue} ✗</span>
           <span className="text-muted-foreground">{stats.pending} ?</span>
+          
+          {/* Week navigation */}
+          <div className="flex items-center gap-0.5 ml-2 border-l pl-2">
+            <Button size="sm" variant="ghost" className="h-6 px-1.5" onClick={() => setWeekOffset(w => w - 1)}>
+              <ChevronLeft className="h-3 w-3" />
+            </Button>
+            {weekOffset !== 0 && (
+              <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={() => setWeekOffset(0)}>
+                {t('timeline_today')}
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" className="h-6 px-1.5" onClick={() => setWeekOffset(w => w + 1)}>
+              <ChevronRight className="h-3 w-3" />
+            </Button>
+          </div>
+
+          {/* Test Rush Project button */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-[10px] ml-1"
+            onClick={() => setShowTestDialog(true)}
+          >
+            <FlaskConical className="h-3 w-3 mr-1" />
+            {t('timeline_test_project')}
+          </Button>
         </div>
       </div>
 
       {/* Compact timeline */}
       <ScrollArea className="w-full">
         <div style={{ width: `${daysToShow * dayWidth}px` }} className="min-h-[80px]">
-          {/* Days header - super compact */}
+          {/* Days header */}
           <div className="flex border-b text-[10px]">
             {timelineDays.map((day, index) => {
               const isToday = isSameDay(day, new Date());
@@ -139,13 +188,15 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
             })}
           </div>
 
-          {/* Project rows - very compact */}
+          {/* Project rows */}
           <div className="relative">
             {/* Today indicator */}
-            <div
-              className="absolute top-0 bottom-0 w-0.5 bg-primary/50 z-10"
-              style={{ left: `${dayWidth / 2}px` }}
-            />
+            {weekOffset <= 0 && (
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-primary/50 z-10"
+                style={{ left: `${(-weekOffset * 7) * dayWidth + dayWidth / 2}px` }}
+              />
+            )}
 
             {sortedProjects.map((project) => {
               const installPos = differenceInDays(project.installationDate, timelineStart);
@@ -154,15 +205,12 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
                 : null;
 
               const isInView = installPos >= 0 && installPos < daysToShow;
-
               if (!isInView) return null;
 
               return (
                 <div key={project.projectId} className="h-6 relative flex items-center border-b border-muted/30">
-                  {/* Completion to Installation line */}
                   {completionPos !== null && completionPos >= 0 && (
                     <>
-                      {/* Completion marker */}
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -172,12 +220,11 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
                             />
                           </TooltipTrigger>
                           <TooltipContent side="top" className="text-xs">
-                            <div>Productie klaar: {format(project.lastProductionStepEnd!, 'dd/MM HH:mm')}</div>
+                            <div>{t('timeline_production_ready')}: {format(project.lastProductionStepEnd!, 'dd/MM HH:mm')}</div>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                       
-                      {/* Line */}
                       <div
                         className={`absolute h-0.5 ${getStatusColor(project.status)}`}
                         style={{
@@ -188,7 +235,6 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
                     </>
                   )}
 
-                  {/* Installation marker */}
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -206,10 +252,10 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
                       <TooltipContent side="top" className="text-xs max-w-60">
                         <div className="space-y-1">
                           <div className="font-bold">{project.projectName}</div>
-                          <div>Klant: {project.client}</div>
-                          <div>Installatie: {format(project.installationDate, 'dd/MM/yyyy')}</div>
+                          <div>{t('timeline_client')}: {project.client}</div>
+                          <div>{t('timeline_installation')}: {format(project.installationDate, 'dd/MM/yyyy')}</div>
                           {project.lastProductionStepEnd && (
-                            <div>Productie klaar: {format(project.lastProductionStepEnd, 'dd/MM HH:mm')}</div>
+                            <div>{t('timeline_production_ready')}: {format(project.lastProductionStepEnd, 'dd/MM HH:mm')}</div>
                           )}
                           <div className="flex items-center gap-1">
                             Status: {getStatusBadge(project.status)}
@@ -225,6 +271,13 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
         </div>
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
+
+      {/* Test Rush Project Dialog */}
+      <TestRushProjectDialog
+        open={showTestDialog}
+        onOpenChange={setShowTestDialog}
+        currentCompletions={projectCompletions}
+      />
     </div>
   );
 };
