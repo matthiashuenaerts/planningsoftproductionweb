@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -26,10 +27,12 @@ import { Button } from '@/components/ui/button';
 import { Settings as SettingsIcon } from 'lucide-react';
 
 const Settings: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const isAdmin = currentEmployee?.role === 'admin';
+  const defaultTab = searchParams.get('tab') || 'workstations';
 
   // Redirect non-admin users
   useEffect(() => {
@@ -90,7 +93,7 @@ const Settings: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           <h1 className="text-2xl font-bold mb-6">System Settings</h1>
           
-          <Tabs defaultValue="workstations">
+          <Tabs defaultValue={defaultTab}>
             <TabsList className="mb-4 overflow-x-auto w-full justify-start">
               <TabsTrigger value="workstations">Workstations</TabsTrigger>
               <TabsTrigger value="employees">Employees</TabsTrigger>
