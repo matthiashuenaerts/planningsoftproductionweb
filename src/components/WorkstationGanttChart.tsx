@@ -23,7 +23,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
-import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus, ChevronDown, ChevronRight, ChevronLeft, User, Calendar, Save, Wand2, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus, ChevronDown, ChevronRight, ChevronLeft, User, Calendar, Save, Wand2, AlertTriangle, CheckCircle, Clock, Settings } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
@@ -92,6 +93,7 @@ export interface WorkstationGanttChartRef {
 }
 
 const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGanttChartProps>(({ selectedDate, onDateChange, onPlanningGenerated }, ref) => {
+  const navigate = useNavigate();
   const [workstations, setWorkstations] = useState<Workstation[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [workingHours, setWorkingHours] = useState<WorkingHours[]>([]);
@@ -697,6 +699,15 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                   Optimaliseer Planning
                 </>
               )}
+            </Button>
+
+            <Button
+              onClick={() => navigate('/settings?tab=recurring-tasks')}
+              variant="outline"
+              className="h-12 px-4"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Terugkerende Taken
             </Button>
           </div>
           
