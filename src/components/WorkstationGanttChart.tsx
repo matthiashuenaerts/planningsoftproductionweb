@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { ZoomIn, ZoomOut, RefreshCw, Search, Plus, Minus, ChevronDown, ChevronRight, ChevronLeft, User, Calendar, Save, Wand2, AlertTriangle, CheckCircle, Clock, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '@/context/LanguageContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
@@ -94,6 +95,7 @@ export interface WorkstationGanttChartRef {
 
 const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGanttChartProps>(({ selectedDate, onDateChange, onPlanningGenerated }, ref) => {
   const navigate = useNavigate();
+  const { t, createLocalizedPath } = useLanguage();
   const [workstations, setWorkstations] = useState<Workstation[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [workingHours, setWorkingHours] = useState<WorkingHours[]>([]);
@@ -702,12 +704,12 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             </Button>
 
             <Button
-              onClick={() => navigate('/settings?tab=recurring-tasks')}
+              onClick={() => navigate(createLocalizedPath('/settings') + '?tab=recurring-tasks')}
               variant="outline"
               className="h-12 px-4"
             >
               <Settings className="w-4 h-4 mr-2" />
-              Terugkerende Taken
+              {t('planning_recurring_tasks')}
             </Button>
           </div>
           
