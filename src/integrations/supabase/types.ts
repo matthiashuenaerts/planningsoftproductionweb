@@ -5470,6 +5470,22 @@ export type Database = {
           workstation: string
         }[]
       }
+      authenticate_employee_for_tenant: {
+        Args: {
+          p_domain?: string
+          p_employee_name: string
+          p_employee_password: string
+          p_slug?: string
+        }
+        Returns: {
+          auth_user_id: string
+          email: string
+          employee_id: string
+          employee_name: string
+          preferred_language: string
+          tenant_id: string
+        }[]
+      }
       calculate_loading_date: {
         Args: { installation_date: string }
         Returns: string

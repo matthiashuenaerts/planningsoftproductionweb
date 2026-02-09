@@ -1,19 +1,46 @@
-
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import type { Session, User } from '@supabase/supabase-js';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import type { Session, User } from "@supabase/supabase-js";
 
 interface Employee {
   id: string;
   name: string;
-  role: 'admin' | 'manager' | 'worker' | 'workstation' | 'installation_team' | 'teamleader' | 'preparater';
+  role:
+    | "admin"
+    | "manager"
+    | "worker"
+    | "workstation"
+    | "installation_team"
+    | "teamleader"
+    | "preparater";
   workstation?: string;
   logistics?: boolean;
+  tenant_id?: string;
 }
+
+type AppRole =
+  | "admin"
+  | "manager"
+  | "worker"
+  | "workstation"
+  | "installation_team"
+  | "teamleader"
+  | "preparater"
+  | "advisor"
+  | "calculator"
+  | "developer";
 
 interface AuthContextType {
   currentEmployee: Employee | null;
+  roles: AppRole[];
+  isDeveloper: boolean;
   isAuthenticated: boolean;
   user: User | null;
   session: Session | null;
@@ -25,78 +52,100 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
+  const [roles, setRoles] = useState<AppRole[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-  
+
+  const isDeveloper = roles.includes("developer");
+
   // Fetch employee data based on auth user
   const fetchEmployeeData = async (userId: string) => {
     try {
       const { data: employee, error } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('auth_user_id', userId)
-        .single();
+        .from("employees")
+        .select("*")
+        .eq("auth_user_id", userId)
+        .maybeSingle();
 
       if (error) throw error;
-      
+
       if (employee) {
         setCurrentEmployee({
           id: employee.id,
           name: employee.name,
-          role: employee.role as 'admin' | 'manager' | 'worker' | 'workstation' | 'installation_team' | 'teamleader' | 'preparater',
+          role: employee.role as Employee["role"],
           workstation: employee.workstation,
-          logistics: employee.logistics
+          logistics: employee.logistics,
+          tenant_id: (employee as any).tenant_id,
         });
+      } else {
+        setCurrentEmployee(null);
       }
     } catch (error) {
-      console.error('Failed to fetch employee data:', error);
+      console.error("Failed to fetch employee data:", error);
       setCurrentEmployee(null);
+    }
+  };
+
+  const fetchUserRoles = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+
+      if (error) throw error;
+      setRoles(((data ?? []).map((r: any) => r.role) as AppRole[]) ?? []);
+    } catch (error) {
+      console.error("Failed to fetch user roles:", error);
+      setRoles([]);
     }
   };
 
   // Set up auth state listener
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event);
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Defer employee data fetch with setTimeout
-          setTimeout(() => {
-            fetchEmployeeData(session.user.id);
-          }, 0);
-        } else {
-          setCurrentEmployee(null);
-        }
-        
-        setIsLoading(false);
-      }
-    );
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event);
+      setSession(session);
+      setUser(session?.user ?? null);
 
-    // THEN check for existing session
+      if (session?.user) {
+        setTimeout(() => {
+          fetchEmployeeData(session.user.id);
+          fetchUserRoles(session.user.id);
+        }, 0);
+      } else {
+        setCurrentEmployee(null);
+        setRoles([]);
+      }
+
+      setIsLoading(false);
+    });
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         fetchEmployeeData(session.user.id);
+        fetchUserRoles(session.user.id);
       }
       setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
+
   const login = async (email: string, password: string) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password
+        password,
       });
 
       if (error) {
@@ -104,25 +153,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       if (data.user) {
-        await fetchEmployeeData(data.user.id);
+        await Promise.all([fetchEmployeeData(data.user.id), fetchUserRoles(data.user.id)]);
       }
 
       return {};
     } catch (error: any) {
-      console.error('Login error:', error);
-      return { error: error.message || 'Failed to login' };
+      console.error("Login error:", error);
+      return { error: error.message || "Failed to login" };
     }
   };
-  
+
   const logout = async () => {
     await supabase.auth.signOut();
     setCurrentEmployee(null);
+    setRoles([]);
     setUser(null);
     setSession(null);
-    navigate('/login');
+    navigate("/login");
   };
-  
-  // Don't render children until we've checked for existing session
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -130,16 +179,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       </div>
     );
   }
-  
+
   return (
     <AuthContext.Provider
       value={{
         currentEmployee,
+        roles,
+        isDeveloper,
         user,
         session,
-        isAuthenticated: !!currentEmployee && !!session,
+        isAuthenticated: !!session && (!!currentEmployee || isDeveloper),
         login,
-        logout
+        logout,
       }}
     >
       {children}
@@ -150,7 +201,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
