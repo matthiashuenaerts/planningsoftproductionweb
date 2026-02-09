@@ -5503,6 +5503,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_user_tenant_id: { Args: { p_user_id: string }; Returns: string }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]
@@ -5518,9 +5519,22 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_developer: { Args: { p_user_id: string }; Returns: boolean }
       is_employee_on_holiday: {
         Args: { check_date: string; emp_id: string }
         Returns: boolean
+      }
+      resolve_tenant: {
+        Args: { p_domain?: string; p_slug?: string }
+        Returns: {
+          custom_domain: string
+          id: string
+          is_active: boolean
+          logo_url: string
+          name: string
+          settings: Json
+          slug: string
+        }[]
       }
       setup_phase_offsets_table: { Args: never; Returns: boolean }
       table_exists: { Args: { table_name: string }; Returns: boolean }
