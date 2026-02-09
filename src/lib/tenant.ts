@@ -40,6 +40,7 @@ export function getTenantLookupFromLocation(loc: Location = window.location): Te
   // Preview/dev hosts: default to the existing single-tenant slug
   if (
     host.endsWith(".lovable.app") ||
+    host.endsWith(".lovableproject.com") ||
     host.endsWith(".netlify.app") ||
     host === "localhost" ||
     host.startsWith("localhost:") ||
