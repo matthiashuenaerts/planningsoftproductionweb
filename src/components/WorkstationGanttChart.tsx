@@ -28,7 +28,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-
+import RecurringTasksDialog from '@/components/planning/RecurringTasksDialog';
 
 interface Project {
   id: string;
@@ -116,6 +116,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [workstationEmployeeLinks, setWorkstationEmployeeLinks] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
   const [scheduleGenerated, setScheduleGenerated] = useState(false);
+  const [showRecurringDialog, setShowRecurringDialog] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const realtimeChannelRef = useRef<any>(null);
 
@@ -619,7 +620,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
           {/* Title and Day Navigation Row */}
           <div className="flex justify-between items-center gap-4 flex-wrap">
             <div className="flex items-center gap-4">
-              <CardTitle>Workstation Gantt Chart</CardTitle>
+              <CardTitle>{t('planning_gantt_chart')}</CardTitle>
               
               <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
                 <Button onClick={handlePreviousDay} variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -638,7 +639,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                 </Button>
                 
                 <Button onClick={handleToday} variant="outline" size="sm" className="ml-2">
-                  Vandaag
+                  {t('timeline_today')}
                 </Button>
               </div>
             </div>
@@ -648,7 +649,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Zoek project..."
+                  placeholder={t('search_projects_placeholder')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8 w-64"
@@ -667,7 +668,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
           <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg border">
             <div className="flex flex-col gap-2 flex-1 max-w-md">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Aantal projecten te plannen:</label>
+                <label className="text-sm font-medium">{t('planning_projects_to_plan')}:</label>
                 <span className="text-lg font-bold text-primary">{projectCount}</span>
               </div>
               <Slider
@@ -679,8 +680,8 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                 className="w-full"
               />
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>1 project</span>
-                <span>200 projecten</span>
+                <span>1 {t('planning_project_singular')}</span>
+                <span>200 {t('planning_project_plural')}</span>
               </div>
             </div>
             
@@ -693,18 +694,18 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
               {optimizing ? (
                 <>
                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Optimaliseren...
+                  {t('planning_optimizing')}
                 </>
               ) : (
                 <>
                   <Wand2 className="w-4 h-4 mr-2" />
-                  Optimaliseer Planning
+                  {t('planning_optimize')}
                 </>
               )}
             </Button>
 
             <Button
-              onClick={() => navigate(createLocalizedPath('/settings') + '?tab=recurring-tasks')}
+              onClick={() => setShowRecurringDialog(true)}
               variant="outline"
               className="h-12 px-4"
             >
@@ -718,20 +719,20 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             <div className="flex items-center gap-4 p-3 bg-background rounded-lg border">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Deadline Status:</span>
+                <span className="text-sm font-medium">{t('planning_deadline_status')}:</span>
               </div>
               <div className="flex gap-3">
                 <div className="flex items-center gap-1.5">
                   <CheckCircle className="w-4 h-4 text-primary" />
-                  <span className="text-sm">{completionInfo.filter(c => c.status === 'on_track').length} op schema</span>
+                  <span className="text-sm">{completionInfo.filter(c => c.status === 'on_track').length} {t('timeline_on_track')}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <AlertTriangle className="w-4 h-4 text-warning" />
-                  <span className="text-sm">{completionInfo.filter(c => c.status === 'at_risk').length} risico</span>
+                  <span className="text-sm">{completionInfo.filter(c => c.status === 'at_risk').length} {t('timeline_at_risk')}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <AlertTriangle className="w-4 h-4 text-destructive" />
-                  <span className="text-sm">{completionInfo.filter(c => c.status === 'overdue').length} te laat</span>
+                  <span className="text-sm">{completionInfo.filter(c => c.status === 'overdue').length} {t('timeline_overdue')}</span>
                 </div>
               </div>
             </div>
@@ -741,33 +742,33 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
           <div className="flex gap-4 text-xs text-muted-foreground flex-wrap">
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded bg-destructive"></div>
-              <span>🔴 Hoge prioriteit / Urgent</span>
+              <span>🔴 {t('gantt_legend_urgent')}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded bg-primary"></div>
-              <span>🟢 Actief project</span>
+              <span>🟢 {t('gantt_legend_active')}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded bg-warning"></div>
-              <span>🟠 Geblokkeerd (HOLD)</span>
+              <span>🟠 {t('gantt_legend_hold')}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded bg-muted-foreground/30"></div>
-              <span>⚪ Toekomstig project</span>
+              <span>⚪ {t('gantt_legend_future')}</span>
             </div>
             
             {savedSchedules.length > 0 && (
               <div className="flex items-center gap-1.5 ml-4 text-primary">
                 <Save className="w-3 h-3" />
-                <span>{savedSchedules.length} taken geladen uit database</span>
+                <span>{savedSchedules.length} {t('gantt_tasks_loaded')}</span>
               </div>
             )}
           </div>
           
           {computedDailyAssignments.length > 0 && (
             <div className="p-2 bg-accent border border-border rounded text-xs">
-              ✅ <strong>{new Set(computedDailyAssignments.map(a => a.employeeId)).size}</strong> werknemers toegewezen voor{' '}
-              <strong>{format(selectedDate, 'd MMMM', { locale: nl })}</strong> met optimale werkverdeling
+              ✅ <strong>{new Set(computedDailyAssignments.map(a => a.employeeId)).size}</strong> {t('gantt_employees_assigned')}{' '}
+              <strong>{format(selectedDate, 'd MMMM', { locale: nl })}</strong> {t('gantt_optimal_distribution')}
             </div>
           )}
         </div>
@@ -1051,6 +1052,12 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         )}
       </CardContent>
     </Card>
+
+    {/* Recurring Tasks Dialog */}
+    <RecurringTasksDialog 
+      open={showRecurringDialog} 
+      onOpenChange={setShowRecurringDialog} 
+    />
     </>
   );
 });
