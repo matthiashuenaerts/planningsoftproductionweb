@@ -37,7 +37,7 @@ export function getTenantLookupFromLocation(loc: Location = window.location): Te
     }
   }
 
-  // Preview/dev hosts: default to the existing single-tenant slug
+  // Preview/dev hosts: default to the first available tenant via slug
   if (
     host.endsWith(".lovable.app") ||
     host.endsWith(".lovableproject.com") ||
@@ -46,7 +46,7 @@ export function getTenantLookupFromLocation(loc: Location = window.location): Te
     host.startsWith("localhost:") ||
     host.startsWith("127.0.0.1")
   ) {
-    return { mode: "tenant", slug: "default" };
+    return { mode: "tenant", slug: "thonon" };
   }
 
   // Otherwise treat as custom domain tenant
