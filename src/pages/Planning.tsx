@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { format, startOfDay, addDays, parseISO } from 'date-fns';
+import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from "@/components/ui/button";
@@ -103,6 +104,7 @@ interface WorkerSchedule {
 }
 
 const Planning = () => {
+  const { t } = useLanguage();
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [workers, setWorkers] = useState<any[]>([]);
   const [workerSchedules, setWorkerSchedules] = useState<WorkerSchedule[]>([]);
@@ -2001,9 +2003,9 @@ const Planning = () => {
           <div className="max-w-7xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
               <div>
-                <h1 className="text-3xl font-bold">Worker Daily Planning</h1>
+                <h1 className="text-3xl font-bold">{t('planning_title')}</h1>
                 <p className="text-slate-600 mt-1">
-                  Create and manage continuous daily schedules for workers based on their assigned tasks
+                  {t('planning_description')}
                 </p>
               </div>
               
@@ -2018,7 +2020,7 @@ const Planning = () => {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                      {selectedDate ? format(selectedDate, "PPP") : <span>{t('planning_pick_date')}</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="end">
@@ -2038,7 +2040,7 @@ const Planning = () => {
                   size="sm"
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Refresh
+                  {t('planning_refresh')}
                 </Button>
                 
                 {isAdmin && (
@@ -2049,7 +2051,7 @@ const Planning = () => {
                       className="whitespace-nowrap"
                     >
                       <Settings className="mr-2 h-4 w-4" />
-                      Add Standard Task
+                      {t('planning_add_standard_task')}
                     </Button>
                     <Button
                       onClick={() => setShowSchedulingMethodDialog(true)}
@@ -2057,7 +2059,7 @@ const Planning = () => {
                       className="whitespace-nowrap"
                     >
                       <Zap className="mr-2 h-4 w-4" />
-                      {generatingSchedule ? 'Generating...' : 'Generate All Schedules'}
+                      {generatingSchedule ? t('planning_generating') : t('planning_generate_all')}
                     </Button>
                     <Button
                       onClick={generateTomorrowSchedule}
@@ -2066,7 +2068,7 @@ const Planning = () => {
                       className="whitespace-nowrap"
                     >
                       <ArrowRight className="mr-2 h-4 w-4" />
-                      {generatingSchedule ? 'Generating...' : 'Generate Schedule Next Working Day'}
+                      {generatingSchedule ? t('planning_generating') : t('planning_generate_next_day')}
                     </Button>
                   </div>
                 )}
@@ -2077,9 +2079,9 @@ const Planning = () => {
             {isSelectedDateHoliday() && (
               <Alert className="mb-6">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Production Team Holiday</AlertTitle>
+                <AlertTitle>{t('planning_production_holiday')}</AlertTitle>
                 <AlertDescription>
-                  {format(selectedDate, 'PPP')} is marked as a production team holiday. No scheduling can be performed on this date.
+                  {t('planning_holiday_message').replace('{{date}}', format(selectedDate, 'PPP'))}
                 </AlertDescription>
               </Alert>
             )}
@@ -2088,9 +2090,9 @@ const Planning = () => {
             {isAdmin && isNextWorkingDay() && !checkTodayHasSchedules() && (
               <Alert className="mb-6">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Schedule Today First</AlertTitle>
+                <AlertTitle>{t('planning_schedule_today_first_title')}</AlertTitle>
                 <AlertDescription>
-                  You need to generate schedules for today before you can generate the next working day's schedule.
+                  {t('planning_schedule_today_first_desc')}
                 </AlertDescription>
               </Alert>
             )}
@@ -2103,21 +2105,21 @@ const Planning = () => {
                   variant={activeView === 'worker' ? "default" : "outline"}
                 >
                   <Users className="mr-2 h-4 w-4" />
-                  Worker Schedules
+                  {t('planning_worker_schedules')}
                 </Button>
                 <Button
                   onClick={() => setActiveView('workstation')}
                   variant={activeView === 'workstation' ? "default" : "outline"}
                 >
                   <Settings className="mr-2 h-4 w-4" />
-                  Workstation Schedules
+                  {t('planning_workstation_schedules')}
                 </Button>
                 <Button
                   onClick={() => setActiveView('gantt')}
                   variant={activeView === 'gantt' ? "default" : "outline"}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  Gantt Chart – Workstations
+                  {t('planning_gantt_chart')}
                 </Button>
               </div>
             </div>
@@ -2153,9 +2155,9 @@ const Planning = () => {
                 {workers.length === 0 ? (
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>No Workers Found</AlertTitle>
+                    <AlertTitle>{t('planning_no_workers_title')}</AlertTitle>
                     <AlertDescription>
-                      No employees with the 'worker' role were found. Please ensure workers are properly configured in the system.
+                      {t('planning_no_workers_desc')}
                     </AlertDescription>
                   </Alert>
                 ) : (
@@ -2165,7 +2167,7 @@ const Planning = () => {
                       <div className="w-64">
                         <Select value={selectedWorker || ''} onValueChange={setSelectedWorker}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a worker" />
+                            <SelectValue placeholder={t('planning_select_worker')} />
                           </SelectTrigger>
                           <SelectContent>
                             {workers.map((worker) => (
@@ -2192,13 +2194,13 @@ const Planning = () => {
                             variant="outline"
                           >
                             <Zap className="mr-2 h-4 w-4" />
-                            Generate Schedule
+                            {t('planning_generate_schedule')}
                           </Button>
                           <Button
                             onClick={() => setShowTaskManager(true)}
                           >
                             <Plus className="mr-2 h-4 w-4" />
-                            Add Task
+                            {t('planning_add_task')}
                           </Button>
                         </div>
                       )}
@@ -2209,11 +2211,11 @@ const Planning = () => {
                       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                         <Card>
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">TODO Tasks</CardTitle>
+                            <CardTitle className="text-sm font-medium">{t('planning_todo_tasks')}</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <div className="text-2xl font-bold">{selectedWorkerSchedule.tasks.length}</div>
-                            <p className="text-xs text-muted-foreground">Ready to schedule</p>
+                            <p className="text-xs text-muted-foreground">{t('planning_ready_to_schedule')}</p>
                           </CardContent>
                         </Card>
                         
@@ -2229,41 +2231,41 @@ const Planning = () => {
                         
                         <Card>
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Total Duration</CardTitle>
+                            <CardTitle className="text-sm font-medium">{t('planning_total_duration')}</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <div className="text-2xl font-bold">{Math.round(selectedWorkerSchedule.totalDuration / 60)}h</div>
-                            <p className="text-xs text-muted-foreground">Of TODO tasks</p>
+                            <p className="text-xs text-muted-foreground">{t('planning_of_todo_tasks')}</p>
                           </CardContent>
                         </Card>
                         
                         <Card>
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Working Hours</CardTitle>
+                            <CardTitle className="text-sm font-medium">{t('planning_working_hours')}</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <div className="text-2xl font-bold">{Math.round(totalWorkingMinutes / 60)}h</div>
-                            <p className="text-xs text-muted-foreground">Daily capacity</p>
+                            <p className="text-xs text-muted-foreground">{t('planning_daily_capacity')}</p>
                           </CardContent>
                         </Card>
                         
                         <Card>
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Scheduled Items</CardTitle>
+                            <CardTitle className="text-sm font-medium">{t('planning_scheduled_items')}</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <div className="text-2xl font-bold">{selectedWorkerSchedule.schedule.length}</div>
-                            <p className="text-xs text-muted-foreground">Today's schedule</p>
+                            <p className="text-xs text-muted-foreground">{t('planning_todays_schedule')}</p>
                           </CardContent>
                         </Card>
 
                         <Card>
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Efficiency</CardTitle>
+                            <CardTitle className="text-sm font-medium">{t('planning_efficiency')}</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <div className="text-2xl font-bold">{calculateScheduleEfficiency(selectedWorkerSchedule.schedule)}%</div>
-                            <p className="text-xs text-muted-foreground">Time utilization</p>
+                            <p className="text-xs text-muted-foreground">{t('planning_time_utilization')}</p>
                           </CardContent>
                         </Card>
                       </div>
@@ -2276,7 +2278,7 @@ const Planning = () => {
                           <CardTitle className="flex items-center justify-between">
                             <div className="flex items-center">
                               <Users className="h-5 w-5 mr-2" />
-                              {selectedWorkerSchedule.employee.name} - Daily Schedule
+                              {selectedWorkerSchedule.employee.name} - {t('planning_daily_schedule')}
                             </div>
                             <div className="flex items-center space-x-2">
                               {selectedWorkerSchedule.assignedWorkstations.map(ws => (
@@ -2425,16 +2427,11 @@ const Planning = () => {
                           ) : (
                             <div className="rounded border-2 border-dashed border-gray-200 py-8 text-center text-gray-500">
                               <Clock className="mx-auto mb-2 h-8 w-8 text-gray-400" />
-                              <p>No tasks scheduled for this day</p>
+                              <p>{t('planning_no_tasks_today')}</p>
                               {isAdmin && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setShowTaskManager(true)}
-                                  className="mt-2"
-                                >
+                                <Button variant="ghost" size="sm" onClick={() => setShowTaskManager(true)} className="mt-2">
                                   <Plus className="h-4 w-4 mr-2" />
-                                  Add Task
+                                  {t('planning_add_task')}
                                 </Button>
                               )}
                             </div>
@@ -2568,32 +2565,28 @@ const Planning = () => {
             <AlertDialog open={showSchedulingMethodDialog} onOpenChange={setShowSchedulingMethodDialog}>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Choose Scheduling Method</AlertDialogTitle>
+                <AlertDialogTitle>{t('planning_choose_method')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    How would you like to generate schedules?
+                    {t('planning_choose_method_desc')}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <h4 className="font-medium">Current Algorithm</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Uses the intelligent task assignment algorithm to generate schedules based on priorities, continuity, and workload balancing.
-                    </p>
+                    <h4 className="font-medium">{t('planning_algorithm_method')}</h4>
+                    <p className="text-sm text-muted-foreground">{t('planning_algorithm_desc')}</p>
                   </div>
                   <div className="space-y-2">
-                    <h4 className="font-medium">Gantt Chart</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Uses the Gantt chart's optimized daily employee assignments to create worker and workstation schedules for the following week.
-                    </p>
+                    <h4 className="font-medium">{t('planning_gantt_method')}</h4>
+                    <p className="text-sm text-muted-foreground">{t('planning_gantt_desc')}</p>
                   </div>
                 </div>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                   <AlertDialogAction onClick={() => handleSchedulingMethodChoice('algorithm')}>
-                    Use Algorithm
+                    {t('planning_algorithm_method')}
                   </AlertDialogAction>
                   <AlertDialogAction onClick={() => handleSchedulingMethodChoice('gantt')}>
-                    Use Gantt Chart
+                    {t('planning_gantt_method')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

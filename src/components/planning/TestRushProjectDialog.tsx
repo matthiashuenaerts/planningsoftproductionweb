@@ -103,6 +103,8 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
     setSimulating(true);
     setSimulationResult(null);
 
+    let tempProjectId: string | null = null;
+
     try {
       // Step 1: Count existing projects to get the right count
       const { count, error: countError } = await supabase
@@ -111,9 +113,10 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
         .in('status', ['planned', 'in_progress']);
       
       if (countError) throw countError;
-      const projectCount = (count || 0) + 1; // +1 for the test project
+      const existingCount = count || 0;
+      const projectCount = existingCount + 1; // +1 for the test project
 
-      // Step 2: Create temporary project, phases, and tasks
+      // Step 2: Create temporary project
       const { data: tempProject, error: projectError } = await supabase
         .from('projects')
         .insert({
@@ -129,8 +132,9 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
         .single();
 
       if (projectError) throw projectError;
+      tempProjectId = tempProject.id;
 
-      // Step 3: Create phase for the test project
+      // Step 3: Create phase
       const { data: tempPhase, error: phaseError } = await supabase
         .from('phases')
         .insert({
@@ -145,7 +149,7 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
 
       if (phaseError) throw phaseError;
 
-      // Step 4: Get tasks based on route or all standard tasks
+      // Step 4: Get tasks based on route
       let standardTasks: StandardTask[] = [];
       if (selectedRouteId) {
         const routeTasks = await productionRouteService.getRouteTasks(selectedRouteId);
@@ -156,7 +160,7 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
         standardTasks = await standardTasksService.getAll();
       }
 
-      // Step 5: Create tasks for the test project
+      // Step 5: Create tasks
       const projectValue = values.project_value;
       const taskInserts = [];
 
@@ -165,9 +169,7 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
           ? Math.round(stdTask.time_coefficient * projectValue)
           : 60;
 
-        // Get workstation for task
         const links = await workstationService.getWorkstationsForStandardTask(stdTask.id);
-        const workstationId = links?.[0]?.id || null;
 
         taskInserts.push({
           phase_id: tempPhase.id,
@@ -191,22 +193,27 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
 
         // Create task_workstation_links
         if (createdTasks) {
+          const linkInserts: { task_id: string; workstation_id: string }[] = [];
           for (const task of createdTasks) {
             if (task.standard_task_id) {
               const links = await workstationService.getWorkstationsForStandardTask(task.standard_task_id);
               if (links && links.length > 0) {
-                await supabase.from('task_workstation_links').insert(
-                  links.map(l => ({ task_id: task.id, workstation_id: l.id }))
-                );
+                linkInserts.push(...links.map(l => ({ task_id: task.id, workstation_id: l.id })));
               }
             }
+          }
+          if (linkInserts.length > 0) {
+            await supabase.from('task_workstation_links').insert(linkInserts);
           }
         }
       }
 
       // Step 6: Run the scheduling engine with the test project included
-      const { completions: simulatedCompletions, lastProductionStepName } = 
+      console.log(`Running simulation with ${projectCount} projects...`);
+      const { completions: simulatedCompletions } = 
         await automaticSchedulingService.generateSchedule(projectCount, new Date());
+
+      console.log(`Simulation returned ${simulatedCompletions.length} completions`);
 
       // Step 7: Compare results with current completions
       const originalMap = new Map(
@@ -221,7 +228,7 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
 
           const daysDiff = (original.daysRemaining || 0) - (sim.daysRemaining || 0);
           
-          // Only show if status changed or days shifted significantly
+          // Show if status changed or days shifted
           if (original.status === sim.status && Math.abs(daysDiff) < 1) return null;
 
           return {
@@ -246,21 +253,26 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
         totalScheduleSlots: simulatedCompletions.length,
       });
 
-      // Step 8: Cleanup - remove the temporary project (cascades delete phases/tasks)
+      // Step 8: Cleanup - remove the temporary project (cascades)
       await supabase.from('projects').delete().eq('id', tempProject.id);
+      tempProjectId = null;
 
-      // Step 9: Restore original gantt_schedules by re-running without test project
-      const { schedules: originalSchedules } = 
-        await automaticSchedulingService.generateSchedule(count || 0, new Date());
-      await automaticSchedulingService.saveSchedulesToDatabase(originalSchedules);
+      // Step 9: Restore original schedule by re-running without test project
+      console.log(`Restoring original schedule with ${existingCount} projects...`);
+      const { schedules: restoredSchedules } = 
+        await automaticSchedulingService.generateSchedule(existingCount, new Date());
+      await automaticSchedulingService.saveSchedulesToDatabase(restoredSchedules);
+      console.log('Original schedule restored');
 
     } catch (error: any) {
       console.error('Simulation error:', error);
-      // Cleanup: try to delete the test project if it exists
-      try {
-        await supabase.from('projects').delete().eq('description', 'SIMULATION_TEST_PROJECT');
-      } catch (cleanupError) {
-        console.error('Cleanup error:', cleanupError);
+      // Cleanup on error
+      if (tempProjectId) {
+        try {
+          await supabase.from('projects').delete().eq('id', tempProjectId);
+        } catch (cleanupError) {
+          console.error('Cleanup error:', cleanupError);
+        }
       }
     } finally {
       setSimulating(false);
