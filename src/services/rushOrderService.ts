@@ -203,15 +203,17 @@ export const rushOrderService = {
         .from('rush_orders')
         .select(`
           *,
-          tasks:rush_order_tasks(
+      tasks:rush_order_tasks(
             id,
             rush_order_id,
-            standard_task_id
+            standard_task_id,
+            created_at
           ),
           assignments:rush_order_assignments(
             id,
             rush_order_id,
-            employee_id
+            employee_id,
+            created_at
           )
         `)
         .order('created_at', { ascending: false });
@@ -235,15 +237,17 @@ export const rushOrderService = {
         .from('rush_orders')
         .select(`
           *,
-          tasks:rush_order_tasks(
+      tasks:rush_order_tasks(
             id,
             rush_order_id,
-            standard_task_id
+            standard_task_id,
+            created_at
           ),
           assignments:rush_order_assignments(
             id,
             rush_order_id,
-            employee_id
+            employee_id,
+            created_at
           )
         `)
         .eq('id', id)
