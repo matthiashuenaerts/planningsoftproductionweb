@@ -101,15 +101,20 @@ const Login: React.FC = () => {
       }
 
       // Tenant portal: resolve employee -> email via SECURITY DEFINER RPC
+      const lookup = tenantLookup as { mode: "tenant"; slug?: string; domain?: string };
+      console.log("Tenant lookup for login:", lookup);
+      
       const { data, error } = await supabase.rpc(
         "authenticate_employee_for_tenant",
         {
           p_employee_name: nameOrEmail,
           p_employee_password: password,
-          p_slug: (tenantLookup as any).slug ?? null,
-          p_domain: (tenantLookup as any).domain ?? null,
+          p_slug: lookup.slug ?? null,
+          p_domain: lookup.domain ?? null,
         }
       );
+
+      console.log("RPC response:", { data, error });
 
       if (error) {
         throw new Error(error.message);
