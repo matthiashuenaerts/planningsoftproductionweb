@@ -4504,6 +4504,7 @@ export type Database = {
         | "preparater"
         | "advisor"
         | "calculator"
+        | "developer"
       holiday_request_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
@@ -4641,6 +4642,7 @@ export const Constants = {
         "preparater",
         "advisor",
         "calculator",
+        "developer",
       ],
       holiday_request_status: ["pending", "approved", "rejected"],
     },
