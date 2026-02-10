@@ -133,7 +133,7 @@ const LandingPage: React.FC = () => {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </a>
-            <Link to="/thonon/">
+            <Link to="/thonon/nl">
               <Button
                 size="lg"
                 variant="outline"
