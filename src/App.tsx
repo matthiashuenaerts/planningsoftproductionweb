@@ -74,7 +74,11 @@ function App() {
                 <Routes>
                   <Route path="/" element={<HomeRedirect />} />
 
+                  {/* Tenant login (subdomain) */}
                   <Route path="/login" element={<Login />} />
+                  {/* Developer login (base domain) */}
+                  <Route path="/dev/login" element={<Login />} />
+
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
 

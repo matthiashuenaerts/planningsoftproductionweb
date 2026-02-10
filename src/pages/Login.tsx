@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,9 +26,10 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { login, isAuthenticated, isDeveloper } = useAuth();
+  const location = useLocation();
 
-  const tenantLookup = getTenantLookupFromLocation();
-  const isDeveloperPortal = tenantLookup.mode === "developer";
+  // Developer login is accessed via /dev/login route
+  const isDeveloperPortal = location.pathname.startsWith("/dev/login");
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 100);
@@ -113,8 +114,8 @@ const Login: React.FC = () => {
       }
 
       // Tenant portal: resolve employee -> email via SECURITY DEFINER RPC
-      const lookup = tenantLookup as { mode: "tenant"; slug?: string; domain?: string };
-      
+      const lookup = getTenantLookupFromLocation() as { mode: "tenant"; slug?: string; domain?: string };
+
       const { data, error } = await supabase.rpc(
         "authenticate_employee_for_tenant",
         {
@@ -288,12 +289,14 @@ const Login: React.FC = () => {
                 )}
               </Button>
 
-              <Link
-                to="/forgot-password"
-                className="text-sm text-center text-blue-600 hover:text-blue-700 hover:underline"
-              >
-                Forgot your password?
-              </Link>
+              {!isDeveloperPortal && (
+                <Link
+                  to="/forgot-password"
+                  className="text-sm text-center text-blue-600 hover:text-blue-700 hover:underline"
+                >
+                  Forgot your password?
+                </Link>
+              )}
             </CardFooter>
           </form>
         </Card>
