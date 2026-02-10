@@ -86,14 +86,26 @@ const Login: React.FC = () => {
     try {
       setLoading(true);
 
-      // Developer portal: login directly with email
+      // Developer portal: resolve name -> email via RPC, then sign in
       if (isDeveloperPortal) {
-        const loginResult = await login(nameOrEmail, password);
+        const { data: devData, error: devError } = await supabase.rpc(
+          "authenticate_developer_by_name",
+          { p_name: nameOrEmail, p_password: password }
+        );
+
+        if (devError) throw new Error(devError.message);
+
+        const devRow = Array.isArray(devData) ? devData[0] : devData;
+        if (!devRow || !devRow.email || !devRow.auth_user_id) {
+          throw new Error("Invalid developer credentials");
+        }
+
+        const loginResult = await login(devRow.email, password);
         if (loginResult.error) throw new Error(loginResult.error);
 
         toast({
           title: "Login successful",
-          description: "Welcome back!",
+          description: `Welcome back, ${devRow.employee_name}!`,
         });
 
         navigate("/dev");
@@ -218,18 +230,18 @@ const Login: React.FC = () => {
                   htmlFor="name"
                   className="text-sm font-medium text-gray-700"
                 >
-                  {isDeveloperPortal ? "Email" : "Gebruikersnaam"}
+                  {isDeveloperPortal ? "Developer Name" : "Gebruikersnaam"}
                 </Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     id="name"
-                    type={isDeveloperPortal ? "email" : "text"}
+                    type="text"
                     value={nameOrEmail}
                     onChange={(e) => setNameOrEmail(e.target.value)}
                     placeholder={
                       isDeveloperPortal
-                        ? "you@company.com"
+                        ? "Enter your developer name"
                         : "Enter your employee name"
                     }
                     disabled={loading}

@@ -49,6 +49,6 @@ export function getTenantLookupFromLocation(loc: Location = window.location): Te
     return { mode: "tenant", slug: "thonon" };
   }
 
-  // Otherwise treat as custom domain tenant
+  // Otherwise treat as custom domain tenant (includes alias domains)
   return { mode: "tenant", domain: host };
 }
