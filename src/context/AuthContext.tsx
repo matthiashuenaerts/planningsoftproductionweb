@@ -91,10 +91,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const fetchUserRoles = async (userId: string) => {
     try {
+      // user_roles.user_id references employees.id, so first get employee id
+      const { data: emp } = await supabase
+        .from("employees")
+        .select("id")
+        .eq("auth_user_id", userId)
+        .maybeSingle();
+
+      if (!emp) {
+        setRoles([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", userId);
+        .eq("user_id", emp.id);
 
       if (error) throw error;
       setRoles(((data ?? []).map((r: any) => r.role) as AppRole[]) ?? []);
