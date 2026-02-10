@@ -15,7 +15,7 @@ const DeveloperRoute: React.FC<DeveloperRouteProps> = ({ children }) => {
       "redirectAfterLogin",
       location.pathname + location.search
     );
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/dev/login" replace />;
   }
 
   if (!isDeveloper) {
