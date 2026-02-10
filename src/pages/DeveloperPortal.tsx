@@ -252,7 +252,7 @@ const DeveloperPortal: React.FC = () => {
             <div className="space-y-1">
               <Label className="text-slate-300">Slug</Label>
               <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder={suggestedSlug || "thonon"} className="bg-white/10 border-white/20 text-white placeholder:text-slate-500" />
-              <p className="text-xs text-slate-500">{(slug || suggestedSlug || "slug")}.automattion-compass.com</p>
+              <p className="text-xs text-slate-500">automattion-compass.com/{slug || suggestedSlug || "slug"}/</p>
             </div>
             <div className="space-y-1">
               <Label className="text-slate-300">Primary Domain (optional)</Label>
@@ -317,9 +317,7 @@ const DeveloperPortal: React.FC = () => {
                           {t.is_active ? "Deactivate" : "Activate"}
                         </Button>
                         <a
-                          href={`https://${t.slug}.automattion-compass.com`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          href={`/${t.slug}/login`}
                           className="text-slate-400 hover:text-blue-400"
                         >
                           <ExternalLink className="h-4 w-4" />
@@ -408,7 +406,8 @@ const DeveloperPortal: React.FC = () => {
                         <div>
                           <h3 className="text-sm font-semibold text-slate-300 mb-2">Access URLs</h3>
                           <div className="text-xs text-slate-400 space-y-1">
-                            <p>Subdomain: <code className="text-blue-300">https://{t.slug}.automattion-compass.com</code></p>
+                            <p>Path: <code className="text-blue-300">automattion-compass.com/{t.slug}/</code></p>
+                            <p>Login: <a href={`/${t.slug}/login`} className="text-blue-300 hover:underline">/{t.slug}/login</a></p>
                             {t.custom_domain && <p>Custom domain: <code className="text-purple-300">https://{t.custom_domain}</code></p>}
                             {tenantAliases.map((a) => (
                               <p key={a.id}>Alias: <code className="text-purple-300">https://{a.domain}</code></p>
