@@ -4809,6 +4809,41 @@ export type Database = {
           },
         ]
       }
+      tenant_aliases: {
+        Row: {
+          created_at: string | null
+          domain: string
+          id: string
+          is_primary: boolean | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          domain: string
+          id?: string
+          is_primary?: boolean | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          domain?: string
+          id?: string
+          is_primary?: boolean | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_aliases_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           created_at: string
@@ -5460,6 +5495,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      authenticate_developer_by_name: {
+        Args: { p_name: string; p_password: string }
+        Returns: {
+          auth_user_id: string
+          email: string
+          employee_id: string
+          employee_name: string
+        }[]
+      }
       authenticate_employee: {
         Args: { employee_name: string; employee_password: string }
         Returns: {
