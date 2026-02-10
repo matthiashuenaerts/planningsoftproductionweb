@@ -1,54 +1,33 @@
-export type TenantMode = "developer" | "tenant";
+export type TenantMode = "public" | "developer" | "tenant";
 
 export type TenantLookup =
+  | { mode: "public" }
   | { mode: "developer" }
-  | { mode: "tenant"; slug?: string; domain?: string };
+  | { mode: "tenant"; slug: string };
 
-const BASE_DOMAIN = "automattion-compass.com";
+/**
+ * Resolve tenant from a URL pathname.
+ * 
+ * /                     → public (landing page)
+ * /dev, /dev/login      → developer
+ * /thonon/...           → tenant with slug "thonon"
+ */
+export function getTenantFromPath(pathname: string): TenantLookup {
+  const segments = pathname.split("/").filter(Boolean);
 
-function getTenantOverrideFromQuery(loc: Location): string | null {
-  try {
-    const params = new URLSearchParams(loc.search);
-    return params.get("tenant");
-  } catch {
-    return null;
-  }
-}
-
-export function getTenantLookupFromLocation(loc: Location = window.location): TenantLookup {
-  const override = getTenantOverrideFromQuery(loc);
-  if (override) {
-    return { mode: "tenant", slug: override };
+  if (segments.length === 0) {
+    return { mode: "public" };
   }
 
-  const host = (loc.hostname || "").toLowerCase();
-
-  // Root domain -> developer portal
-  if (host === BASE_DOMAIN || host === `www.${BASE_DOMAIN}`) {
+  if (segments[0] === "dev") {
     return { mode: "developer" };
   }
 
-  // Subdomain of base domain -> tenant slug
-  if (host.endsWith(`.${BASE_DOMAIN}`)) {
-    const sub = host.slice(0, -(BASE_DOMAIN.length + 1));
-    const slug = sub.split(".")[0];
-    if (slug && slug !== "www") {
-      return { mode: "tenant", slug };
-    }
-  }
+  // First segment is the tenant slug
+  return { mode: "tenant", slug: segments[0] };
+}
 
-  // Preview/dev hosts: default to the first available tenant via slug
-  if (
-    host.endsWith(".lovable.app") ||
-    host.endsWith(".lovableproject.com") ||
-    host.endsWith(".netlify.app") ||
-    host === "localhost" ||
-    host.startsWith("localhost:") ||
-    host.startsWith("127.0.0.1")
-  ) {
-    return { mode: "tenant", slug: "thonon" };
-  }
-
-  // Otherwise treat as custom domain tenant (includes alias domains)
-  return { mode: "tenant", domain: host };
+/** @deprecated Use getTenantFromPath instead */
+export function getTenantLookupFromLocation(loc: Location = window.location): TenantLookup {
+  return getTenantFromPath(loc.pathname);
 }
