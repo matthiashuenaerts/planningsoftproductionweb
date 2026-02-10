@@ -51,6 +51,7 @@ import { TenantProvider } from "@/context/TenantContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import DeveloperRoute from "@/components/DeveloperRoute";
 import HomeRedirect from "@/components/HomeRedirect";
+import TenantLayout from "@/components/TenantLayout";
 import DeveloperPortal from "@/pages/DeveloperPortal";
 
 const queryClient = new QueryClient({
@@ -62,6 +63,11 @@ const queryClient = new QueryClient({
   },
 });
 
+/** Helper to wrap a page in ProtectedRoute */
+const P = ({ children }: { children: React.ReactNode }) => (
+  <ProtectedRoute>{children}</ProtectedRoute>
+);
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -72,16 +78,11 @@ function App() {
               <LanguageProvider>
                 <GlobalComponents />
                 <Routes>
+                  {/* ── Public ─────────────────────────── */}
                   <Route path="/" element={<HomeRedirect />} />
 
-                  {/* Tenant login (subdomain) */}
-                  <Route path="/login" element={<Login />} />
-                  {/* Developer login (base domain) */}
+                  {/* ── Developer ──────────────────────── */}
                   <Route path="/dev/login" element={<Login />} />
-
-                  <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-
                   <Route
                     path="/dev"
                     element={
@@ -91,303 +92,54 @@ function App() {
                     }
                   />
 
-                  <Route
-                    path="/pdf-editor"
-                    element={
-                      <ProtectedRoute>
-                        <PDFEditorFullscreen />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/migrate-auth"
-                    element={
-                      <ProtectedRoute>
-                        <MigrateAuth />
-                      </ProtectedRoute>
-                    }
-                  />
+                  {/* ── Global (non-tenant) ────────────── */}
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/pdf-editor" element={<P><PDFEditorFullscreen /></P>} />
+                  <Route path="/migrate-auth" element={<P><MigrateAuth /></P>} />
 
-                  <Route
-                    path="/:lang/"
-                    element={
-                      <ProtectedRoute>
-                        <Index />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/projects"
-                    element={
-                      <ProtectedRoute>
-                        <Projects />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/projects/:projectId"
-                    element={
-                      <ProtectedRoute>
-                        <ProjectDetails />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/projects/:projectId/orders"
-                    element={
-                      <ProtectedRoute>
-                        <ProjectOrders />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/projects/:projectId/edit"
-                    element={
-                      <ProtectedRoute>
-                        <EditProject />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/projects/:projectId/calculation"
-                    element={
-                      <ProtectedRoute>
-                        <ProjectCalculation />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/workstations"
-                    element={
-                      <ProtectedRoute>
-                        <Workstations />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/floorplan"
-                    element={
-                      <ProtectedRoute>
-                        <Floorplan />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/broken-parts"
-                    element={
-                      <ProtectedRoute>
-                        <BrokenParts />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/broken-parts/summary"
-                    element={
-                      <ProtectedRoute>
-                        <BrokenPartsSummary />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/broken-parts/new"
-                    element={
-                      <ProtectedRoute>
-                        <NewBrokenPart />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/personal-tasks"
-                    element={
-                      <ProtectedRoute>
-                        <PersonalTasks />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/notes-and-tasks"
-                    element={
-                      <ProtectedRoute>
-                        <NotesAndTasks />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/daily-tasks"
-                    element={
-                      <ProtectedRoute>
-                        <DailyTasks />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/planning"
-                    element={
-                      <ProtectedRoute>
-                        <Planning />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/orders"
-                    element={
-                      <ProtectedRoute>
-                        <Orders />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/orders/new"
-                    element={
-                      <ProtectedRoute>
-                        <Orders />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/orders/:orderId"
-                    element={
-                      <ProtectedRoute>
-                        <Orders />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/orders/:orderId/edit"
-                    element={
-                      <ProtectedRoute>
-                        <Orders />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/logistics"
-                    element={
-                      <ProtectedRoute>
-                        <Logistics />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/logistics-out"
-                    element={
-                      <ProtectedRoute>
-                        <LogisticsOut />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/rush-orders"
-                    element={
-                      <ProtectedRoute>
-                        <RushOrders />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/rush-orders/:rushOrderId"
-                    element={
-                      <ProtectedRoute>
-                        <RushOrderDetails />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/calculation"
-                    element={
-                      <ProtectedRoute>
-                        <Calculation />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/calculation/new"
-                    element={
-                      <ProtectedRoute>
-                        <NewCabinetProject />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/calculation/project/:projectId"
-                    element={
-                      <ProtectedRoute>
-                        <CabinetProjectDetails />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/calculation/project/:projectId/library"
-                    element={
-                      <ProtectedRoute>
-                        <CabinetLibrary />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/calculation/project/:projectId/editor/:modelId"
-                    element={
-                      <ProtectedRoute>
-                        <CabinetEditor />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/calculation/model-builder/:modelId?"
-                    element={
-                      <ProtectedRoute>
-                        <CabinetModelBuilder />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/time-registrations"
-                    element={
-                      <ProtectedRoute>
-                        <TimeRegistrations />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/general-schedule"
-                    element={
-                      <ProtectedRoute>
-                        <GeneralSchedule />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/settings"
-                    element={
-                      <ProtectedRoute>
-                        <Settings />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/control-panel"
-                    element={
-                      <ProtectedRoute>
-                        <ControlPanel />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/control-panel/:workstationId"
-                    element={
-                      <ProtectedRoute>
-                        <WorkstationControl />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/:lang/truck-loading"
-                    element={
-                      <ProtectedRoute>
-                        <TruckLoadingView />
-                      </ProtectedRoute>
-                    }
-                  />
+                  {/* ── Tenant routes: /:tenant/... ────── */}
+                  <Route path="/:tenant" element={<TenantLayout />}>
+                    <Route path="login" element={<Login />} />
+                    <Route path="forgot-password" element={<ForgotPassword />} />
+
+                    {/* Tenant app pages under /:tenant/:lang/... */}
+                    <Route path=":lang" element={<P><Index /></P>} />
+                    <Route path=":lang/projects" element={<P><Projects /></P>} />
+                    <Route path=":lang/projects/:projectId" element={<P><ProjectDetails /></P>} />
+                    <Route path=":lang/projects/:projectId/orders" element={<P><ProjectOrders /></P>} />
+                    <Route path=":lang/projects/:projectId/edit" element={<P><EditProject /></P>} />
+                    <Route path=":lang/projects/:projectId/calculation" element={<P><ProjectCalculation /></P>} />
+                    <Route path=":lang/workstations" element={<P><Workstations /></P>} />
+                    <Route path=":lang/floorplan" element={<P><Floorplan /></P>} />
+                    <Route path=":lang/broken-parts" element={<P><BrokenParts /></P>} />
+                    <Route path=":lang/broken-parts/summary" element={<P><BrokenPartsSummary /></P>} />
+                    <Route path=":lang/broken-parts/new" element={<P><NewBrokenPart /></P>} />
+                    <Route path=":lang/personal-tasks" element={<P><PersonalTasks /></P>} />
+                    <Route path=":lang/notes-and-tasks" element={<P><NotesAndTasks /></P>} />
+                    <Route path=":lang/daily-tasks" element={<P><DailyTasks /></P>} />
+                    <Route path=":lang/planning" element={<P><Planning /></P>} />
+                    <Route path=":lang/orders" element={<P><Orders /></P>} />
+                    <Route path=":lang/orders/new" element={<P><Orders /></P>} />
+                    <Route path=":lang/orders/:orderId" element={<P><Orders /></P>} />
+                    <Route path=":lang/orders/:orderId/edit" element={<P><Orders /></P>} />
+                    <Route path=":lang/logistics" element={<P><Logistics /></P>} />
+                    <Route path=":lang/logistics-out" element={<P><LogisticsOut /></P>} />
+                    <Route path=":lang/rush-orders" element={<P><RushOrders /></P>} />
+                    <Route path=":lang/rush-orders/:rushOrderId" element={<P><RushOrderDetails /></P>} />
+                    <Route path=":lang/calculation" element={<P><Calculation /></P>} />
+                    <Route path=":lang/calculation/new" element={<P><NewCabinetProject /></P>} />
+                    <Route path=":lang/calculation/project/:projectId" element={<P><CabinetProjectDetails /></P>} />
+                    <Route path=":lang/calculation/project/:projectId/library" element={<P><CabinetLibrary /></P>} />
+                    <Route path=":lang/calculation/project/:projectId/editor/:modelId" element={<P><CabinetEditor /></P>} />
+                    <Route path=":lang/calculation/model-builder/:modelId?" element={<P><CabinetModelBuilder /></P>} />
+                    <Route path=":lang/time-registrations" element={<P><TimeRegistrations /></P>} />
+                    <Route path=":lang/general-schedule" element={<P><GeneralSchedule /></P>} />
+                    <Route path=":lang/settings" element={<P><Settings /></P>} />
+                    <Route path=":lang/control-panel" element={<P><ControlPanel /></P>} />
+                    <Route path=":lang/control-panel/:workstationId" element={<P><WorkstationControl /></P>} />
+                    <Route path=":lang/truck-loading" element={<P><TruckLoadingView /></P>} />
+                  </Route>
                 </Routes>
                 <Toaster />
               </LanguageProvider>

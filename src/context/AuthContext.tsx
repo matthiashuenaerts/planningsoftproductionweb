@@ -5,9 +5,10 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
+import { useTenant } from "@/context/TenantContext";
 
 interface Employee {
   id: string;
@@ -57,6 +58,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { tenantSlug } = useTenant();
 
   const isDeveloper = roles.includes("developer");
 
@@ -91,7 +94,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const fetchUserRoles = async (userId: string) => {
     try {
-      // user_roles.user_id references employees.id, so first get employee id
       const { data: emp } = await supabase
         .from("employees")
         .select("id")
@@ -116,7 +118,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Set up auth state listener
   useEffect(() => {
     const {
       data: { subscription },
@@ -181,7 +182,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setRoles([]);
     setUser(null);
     setSession(null);
-    navigate("/login");
+
+    // Extract tenant from current path to redirect to tenant login
+    const segs = location.pathname.split("/").filter(Boolean);
+    const firstSeg = segs[0];
+    if (firstSeg && firstSeg !== "dev") {
+      navigate(`/${firstSeg}/login`);
+    } else {
+      navigate("/");
+    }
   };
 
   if (isLoading) {

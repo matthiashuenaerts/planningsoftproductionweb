@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, Link, useLocation } from "react-router-dom";
+import { useNavigate, Link, useLocation, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,7 +14,6 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { getTenantLookupFromLocation } from "@/lib/tenant";
 import { User, Lock } from "lucide-react";
 
 const Login: React.FC = () => {
@@ -27,6 +26,7 @@ const Login: React.FC = () => {
   const { toast } = useToast();
   const { login, isAuthenticated, isDeveloper } = useAuth();
   const location = useLocation();
+  const { tenant } = useParams<{ tenant: string }>();
 
   // Developer login is accessed via /dev/login route
   const isDeveloperPortal = location.pathname.startsWith("/dev/login");
@@ -49,10 +49,12 @@ const Login: React.FC = () => {
 
     if (isDeveloper) {
       navigate("/dev");
+    } else if (tenant) {
+      navigate(`/${tenant}/nl/`);
     } else {
       navigate("/");
     }
-  }, [isAuthenticated, isDeveloper, navigate]);
+  }, [isAuthenticated, isDeveloper, navigate, tenant]);
 
   // Global Enter key handler
   useEffect(() => {
@@ -114,15 +116,17 @@ const Login: React.FC = () => {
       }
 
       // Tenant portal: resolve employee -> email via SECURITY DEFINER RPC
-      const lookup = getTenantLookupFromLocation() as { mode: "tenant"; slug?: string; domain?: string };
+      if (!tenant) {
+        throw new Error("No tenant specified in URL");
+      }
 
       const { data, error } = await supabase.rpc(
         "authenticate_employee_for_tenant",
         {
           p_employee_name: nameOrEmail,
           p_employee_password: password,
-          p_slug: lookup.slug ?? null,
-          p_domain: lookup.domain ?? null,
+          p_slug: tenant,
+          p_domain: null,
         }
       );
 
@@ -154,10 +158,9 @@ const Login: React.FC = () => {
       const redirectPath = sessionStorage.getItem("redirectAfterLogin");
       if (redirectPath) {
         sessionStorage.removeItem("redirectAfterLogin");
-        const pathWithoutLang = redirectPath.replace(/^\/(nl|en|fr)/, "");
-        navigate(`/${preferredLanguage}${pathWithoutLang || ""}`);
+        navigate(redirectPath);
       } else {
-        navigate(`/${preferredLanguage}/`);
+        navigate(`/${tenant}/${preferredLanguage}/`);
       }
     } catch (error: any) {
       console.error("Login error:", error);
@@ -198,7 +201,7 @@ const Login: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center justify-center space-x-2">
               <h1 className="font-bold text-4xl text-[#195F85]">
                 AutoMattiOn
               </h1>
@@ -220,7 +223,7 @@ const Login: React.FC = () => {
             <CardDescription className="text-gray-600">
               {isDeveloperPortal
                 ? "Sign in to manage tenants"
-                : "Sign in to access your workspace"}
+                : `Sign in to ${tenant || "your workspace"}`}
             </CardDescription>
           </CardHeader>
 
@@ -289,9 +292,9 @@ const Login: React.FC = () => {
                 )}
               </Button>
 
-              {!isDeveloperPortal && (
+              {!isDeveloperPortal && tenant && (
                 <Link
-                  to="/forgot-password"
+                  to={`/${tenant}/forgot-password`}
                   className="text-sm text-center text-blue-600 hover:text-blue-700 hover:underline"
                 >
                   Forgot your password?
