@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import thononLogo from "@/assets/thonon-logo.png";
 import { Button } from "@/components/ui/button";
 import {
   BarChart3,
@@ -132,6 +133,16 @@ const LandingPage: React.FC = () => {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </a>
+            <Link to="/thonon/login">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white/20 hover:bg-white/10 text-white px-6 h-12 text-base font-semibold gap-3"
+              >
+                <img src={thononLogo} alt="Thonon" className="h-6 w-auto" />
+                Thonon Portal
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
