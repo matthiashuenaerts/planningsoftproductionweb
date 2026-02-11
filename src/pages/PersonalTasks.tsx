@@ -18,6 +18,9 @@ import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import { holidayService } from '@/services/holidayService';
 import { startOfDay, endOfDay, format, parseISO, addDays, isToday, isTomorrow } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { standardTasksService } from '@/services/standardTasksService';
+import { checklistService } from '@/services/checklistService';
+import TaskCompletionChecklistDialog from '@/components/TaskCompletionChecklistDialog';
 
 interface Task {
   id: string;
@@ -85,6 +88,11 @@ const PersonalTasks = () => {
   const [showBarcodeDialog, setShowBarcodeDialog] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const isMobile = useIsMobile();
+  const [checklistDialogTask, setChecklistDialogTask] = useState<{
+    taskId: string;
+    standardTaskId: string;
+    taskName: string;
+  } | null>(null);
 
   // Helper function to get next workday (skip weekends and holidays)
   const getNextWorkday = async (date: Date) => {
@@ -286,20 +294,154 @@ const PersonalTasks = () => {
     }
   };
 
+  // Check and update HOLD tasks based on limit phases after a task is completed
+  const checkAndUpdateLimitPhases = async (completedTask: Task) => {
+    const projectId = completedTask.phases?.projects?.id;
+    if (!projectId) return;
+    try {
+      const { data: holdTasks, error: holdError } = await supabase
+        .from('tasks')
+        .select(`*, phases!inner(project_id)`)
+        .eq('phases.project_id', projectId)
+        .eq('status', 'HOLD')
+        .not('standard_task_id', 'is', null);
+
+      if (holdError) {
+        console.error('Error fetching HOLD tasks:', holdError);
+        return;
+      }
+      if (!holdTasks || holdTasks.length === 0) return;
+
+      const tasksToUpdate = [];
+      for (const holdTask of holdTasks) {
+        if (holdTask.standard_task_id) {
+          try {
+            const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(holdTask.standard_task_id, projectId);
+            if (limitPhasesSatisfied) {
+              tasksToUpdate.push(holdTask);
+            }
+          } catch (error) {
+            console.error(`Error checking limit phases for task ${holdTask.id}:`, error);
+          }
+        }
+      }
+
+      if (tasksToUpdate.length > 0) {
+        console.log(`Updating ${tasksToUpdate.length} tasks from HOLD to TODO`);
+        for (const task of tasksToUpdate) {
+          await supabase.from('tasks').update({
+            status: 'TODO',
+            status_changed_at: new Date().toISOString()
+          }).eq('id', task.id);
+        }
+        toast({
+          title: t('tasks_updated'),
+          description: t('tasks_updated_desc', { count: tasksToUpdate.length.toString() }),
+        });
+      }
+    } catch (error) {
+      console.error('Error in checkAndUpdateLimitPhases:', error);
+    }
+  };
+
+  // Check limit phases before starting a task
+  const checkLimitPhasesBeforeStart = async (task: Task): Promise<boolean> => {
+    const projectId = task.phases?.projects?.id;
+    if (!projectId || !task.standard_task_id) return true;
+    try {
+      const limitPhasesSatisfied = await standardTasksService.checkLimitPhasesCompleted(task.standard_task_id, projectId);
+      if (!limitPhasesSatisfied) {
+        toast({
+          title: t('cannot_start_task'),
+          description: t('cannot_start_task_desc'),
+          variant: "destructive"
+        });
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error checking limit phases before start:', error);
+      return true;
+    }
+  };
+
+  // Check if task has a checklist before completing
+  const checkChecklistBeforeComplete = async (taskId: string, task: Task): Promise<boolean> => {
+    if (!task.standard_task_id) return true;
+    try {
+      const checklistItems = await checklistService.getChecklistItems(task.standard_task_id);
+      if (checklistItems.length > 0) {
+        setChecklistDialogTask({
+          taskId,
+          standardTaskId: task.standard_task_id,
+          taskName: task.title || 'Task'
+        });
+        return false; // Don't complete yet - show checklist dialog
+      }
+      return true;
+    } catch (error) {
+      console.error('Error checking checklist items:', error);
+      return true; // Allow completion if checklist check fails
+    }
+  };
+
+  const completeTaskAfterChecks = async (taskId: string) => {
+    if (!currentEmployee) return;
+    const task = tasks.find(t => t.id === taskId);
+    
+    console.log('Completing task:', taskId);
+    await timeRegistrationService.completeTask(taskId, currentEmployee?.id);
+    await fetchActiveTimeRegistrations();
+    
+    await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+    await queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
+    
+    toast({
+      title: t("task_completed"),
+      description: t("task_completed_desc"),
+    });
+
+    // Check and update HOLD tasks based on limit phases
+    if (task) {
+      await checkAndUpdateLimitPhases(task);
+    }
+
+    await fetchPersonalData();
+  };
+
+  const handleChecklistComplete = async () => {
+    if (!checklistDialogTask) return;
+    try {
+      await completeTaskAfterChecks(checklistDialogTask.taskId);
+      setChecklistDialogTask(null);
+    } catch (error: any) {
+      console.error('Error completing task after checklist:', error);
+      toast({
+        title: t('error'),
+        description: t('task_status_update_error', { message: error.message }),
+        variant: 'destructive'
+      });
+    }
+  };
+
   const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
     if (!currentEmployee) return;
 
     try {
       console.log('Handling task status change:', { taskId, newStatus, currentEmployee: currentEmployee.id });
+      const currentTask = tasks.find(t => t.id === taskId);
       
       if (newStatus === 'IN_PROGRESS') {
+        // Check limit phases before starting
+        if (currentTask) {
+          const canStart = await checkLimitPhasesBeforeStart(currentTask);
+          if (!canStart) return;
+        }
+
         console.log('Starting task and time registration for:', taskId);
         await timeRegistrationService.startTask(currentEmployee.id, taskId);
         
-        // Refresh active time registrations immediately
         await fetchActiveTimeRegistrations();
-        
-        // Invalidate queries to refresh UI components
         await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
         await queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
         
@@ -308,17 +450,13 @@ const PersonalTasks = () => {
           description: t("task_started_desc"),
         });
       } else if (newStatus === 'COMPLETED') {
-        console.log('Completing task:', taskId);
-        await timeRegistrationService.completeTask(taskId, currentEmployee?.id);
-        await fetchActiveTimeRegistrations();
-        
-        await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
-        await queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
-        
-        toast({
-          title: t("task_completed"),
-          description: t("task_completed_desc"),
-        });
+        // Check checklist before completing
+        if (currentTask) {
+          const canComplete = await checkChecklistBeforeComplete(taskId, currentTask);
+          if (!canComplete) return; // Checklist dialog will handle completion
+        }
+
+        await completeTaskAfterChecks(taskId);
       } else if (newStatus === 'TODO' && isTaskActive(taskId)) {
         console.log('Pausing task:', taskId);
         await timeRegistrationService.stopActiveRegistrations(currentEmployee.id);
@@ -332,7 +470,6 @@ const PersonalTasks = () => {
           description: t("task_updated_desc", { status: newStatus }),
         });
       } else {
-        // Regular status update
         console.log('Regular status update:', { taskId, newStatus });
         const { error } = await supabase
           .from('tasks')
@@ -345,7 +482,6 @@ const PersonalTasks = () => {
         if (error) throw error;
       }
 
-      // Refresh tasks data
       await fetchPersonalData();
     } catch (error: any) {
       console.error('Error updating task status:', error);
@@ -636,6 +772,18 @@ const PersonalTasks = () => {
             onClose={() => setShowBarcodeDialog(null)}
             projectId={showBarcodeDialog}
             projectName={tasks.find(task => task.phases.projects.id === showBarcodeDialog)?.phases.projects.name || t("unknown_project")}
+          />
+        )}
+
+        {checklistDialogTask && (
+          <TaskCompletionChecklistDialog
+            open={!!checklistDialogTask}
+            onOpenChange={(open) => {
+              if (!open) setChecklistDialogTask(null);
+            }}
+            standardTaskId={checklistDialogTask.standardTaskId}
+            taskName={checklistDialogTask.taskName}
+            onComplete={handleChecklistComplete}
           />
         )}
       </div>
