@@ -84,19 +84,47 @@ serve(async (req) => {
       console.log(`Created auth user with ID: ${authUserId}`);
     }
 
-    // Create employee record with auth_user_id
+    // Resolve the caller's tenant_id from their auth token
+    const authHeader = req.headers.get('Authorization');
+    let callerTenantId: string | null = null;
+    if (authHeader) {
+      const callerClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: { user: callerUser } } = await callerClient.auth.getUser();
+      if (callerUser) {
+        const { data: callerEmployee } = await supabaseAdmin
+          .from('employees')
+          .select('tenant_id')
+          .eq('auth_user_id', callerUser.id)
+          .single();
+        if (callerEmployee) {
+          callerTenantId = callerEmployee.tenant_id;
+        }
+      }
+    }
+    console.log(`Resolved caller tenant_id: ${callerTenantId}`);
+
+    // Create employee record with auth_user_id and correct tenant
+    const insertData: Record<string, any> = {
+      name,
+      email: userEmail,
+      password,
+      role: role || 'worker',
+      logistics: logistics || false,
+      workstation: workstation || null,
+      auth_user_id: authUserId,
+      preferred_language: preferred_language || 'nl'
+    };
+    if (callerTenantId) {
+      insertData.tenant_id = callerTenantId;
+    }
+
     const { data: employee, error: employeeError } = await supabaseAdmin
       .from('employees')
-      .insert([{
-        name,
-        email: userEmail,
-        password,
-        role: role || 'worker',
-        logistics: logistics || false,
-        workstation: workstation || null,
-        auth_user_id: authUserId,
-        preferred_language: preferred_language || 'nl'
-      }])
+      .insert([insertData])
       .select()
       .single();
 
