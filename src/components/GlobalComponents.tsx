@@ -13,8 +13,13 @@ const GlobalComponents = () => {
     return null;
   }
 
-  // Hide TaskTimer on control panel pages
+  // Hide on control panel and marketing site pages
   const isControlPanel = location.pathname.includes('/control-panel');
+  const isMarketingSite = location.pathname.startsWith('/site');
+
+  if (isMarketingSite) {
+    return null;
+  }
 
   return (
     <>
