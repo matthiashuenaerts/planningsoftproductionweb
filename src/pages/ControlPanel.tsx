@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, isWeekend, differenceInDays, startOfDay } from 'date-fns';
 import { holidayService } from '@/services/holidayService';
 import { rushOrderService } from '@/services/rushOrderService';
+import { useTenant } from '@/context/TenantContext';
 
 interface LoadingAssignment {
   project: {
@@ -28,6 +29,7 @@ interface LoadingAssignment {
 const ControlPanel: React.FC = () => {
   const navigate = useNavigate();
   const { t, createLocalizedPath } = useLanguage();
+  const { tenant } = useTenant();
   const [workstationStatuses, setWorkstationStatuses] = useState<WorkstationStatus[]>([]);
   const [workstationErrors, setWorkstationErrors] = useState<Record<string, number>>({});
   const [workstationBufferTimes, setWorkstationBufferTimes] = useState<Record<string, number>>({});
@@ -45,8 +47,8 @@ const ControlPanel: React.FC = () => {
   });
 
   const { data: workstations = [] } = useQuery({
-    queryKey: ['workstations'],
-    queryFn: () => workstationService.getAll()
+    queryKey: ['workstations', tenant?.id],
+    queryFn: () => workstationService.getAll(tenant?.id)
   });
 
   // Get unique production lines and check if there are multiple
@@ -159,7 +161,7 @@ const ControlPanel: React.FC = () => {
   const loadTruckLoadingData = async () => {
     try {
       // Fetch holidays
-      const holidays = await holidayService.getHolidays();
+      const holidays = await holidayService.getHolidays(tenant?.id);
       
       // Helper to calculate loading date
       const getPreviousWorkday = (date: Date): Date => {

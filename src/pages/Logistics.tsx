@@ -18,6 +18,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/context/AuthContext';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { useToast } from '@/hooks/use-toast';
+import { useTenant } from '@/context/TenantContext';
 
 const Logistics = () => {
   const { t } = useLanguage();
@@ -28,14 +29,15 @@ const Logistics = () => {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isStartingRegistration, setIsStartingRegistration] = useState(false);
   const isMobile = useIsMobile();
+  const { tenant } = useTenant();
   
   const {
     data: rawOrders = [],
     isLoading,
     refetch
   } = useQuery({
-    queryKey: ['all-orders'],
-    queryFn: () => orderService.getAllOrders()
+    queryKey: ['all-orders', tenant?.id],
+    queryFn: () => orderService.getAllOrders(tenant?.id)
   });
 
   // Enhance orders with project names

@@ -24,6 +24,7 @@ import { useNavigate } from 'react-router-dom';
 import { QRCodeScanner } from '@/components/QRCodeScanner';
 import { qrCodeService } from '@/services/qrCodeService';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useTenant } from '@/context/TenantContext';
 
 // Define workstation with appropriate icon mapping
 interface WorkstationWithIcon {
@@ -57,10 +58,11 @@ const Workstations: React.FC = () => {
   const queryClient = useQueryClient();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { tenant } = useTenant();
   useEffect(() => {
     const loadWorkstations = async () => {
       try {
-        const data = await workstationService.getAll();
+        const data = await workstationService.getAll(tenant?.id);
 
         // Map workstations to include icons
         const workstationsWithIcons = data.map(ws => {

@@ -8,6 +8,7 @@ import { FloorplanToolbar } from '@/components/floorplan/FloorplanToolbar';
 import { AnimatedWorkstationDetailsDialog } from '@/components/floorplan/AnimatedWorkstationDetailsDialog';
 import { toast } from 'sonner';
 import Navbar from '@/components/Navbar';
+import { useTenant } from '@/context/TenantContext';
 
 
 // Import the uploaded floorplan image
@@ -28,11 +29,12 @@ const Floorplan: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const isAdmin = true; // This should come from auth context
+  const { tenant } = useTenant();
 
   // Fetch workstations
   const { data: workstations = [] } = useQuery({
-    queryKey: ['workstations'],
-    queryFn: () => workstationService.getAll()
+    queryKey: ['workstations', tenant?.id],
+    queryFn: () => workstationService.getAll(tenant?.id)
   });
 
   // Load initial data

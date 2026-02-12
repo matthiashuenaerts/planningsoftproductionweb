@@ -1,11 +1,14 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Order, OrderItem, OrderAttachment, OrderStep } from '@/types/order';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 
 export const orderService = {
-  async getAll(): Promise<Order[]> {
-    const { data, error } = await supabase
+  async getAll(tenantId?: string | null): Promise<Order[]> {
+    let query = supabase
       .from('orders')
       .select('*, order_items(count)');
+    query = applyTenantFilter(query, tenantId);
+    const { data, error } = await query;
 
     if (error) throw error;
     
@@ -22,8 +25,8 @@ export const orderService = {
     });
   },
 
-  async getAllOrders(): Promise<Order[]> {
-    const { data, error } = await supabase
+  async getAllOrders(tenantId?: string | null): Promise<Order[]> {
+    let query = supabase
       .from('orders')
       .select(`
         *,
@@ -38,6 +41,8 @@ export const orderService = {
           notes
         )
       `);
+    query = applyTenantFilter(query, tenantId);
+    const { data, error } = await query;
 
     if (error) throw error;
     

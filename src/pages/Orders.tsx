@@ -38,6 +38,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import ImportStockOrderModal from '@/components/ImportStockOrderModal';
 import { EnhancedDeliveryConfirmationModal } from '@/components/logistics/EnhancedDeliveryConfirmationModal';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useTenant } from '@/context/TenantContext';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,6 +70,7 @@ const Orders: React.FC = () => {
   const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const isMobile = useIsMobile();
+  const { tenant } = useTenant();
   
   const isAdminOrTeamleader = currentEmployee?.role === 'admin' || currentEmployee?.role === 'teamleader';
   const canDeleteOrder = currentEmployee?.role && ['admin', 'manager', 'preparater', 'teamleader'].includes(currentEmployee.role);
@@ -79,7 +81,7 @@ const Orders: React.FC = () => {
         setLoading(true);
         
         // Get all orders
-        const allOrders = await orderService.getAllOrders();
+        const allOrders = await orderService.getAllOrders(tenant?.id);
 
         // Filter out semi-finished orders with no items (logistics out orders)
         const ordersToDisplay = allOrders.filter(order => {
@@ -250,7 +252,7 @@ const Orders: React.FC = () => {
         setLoading(true);
         
         // Get all orders
-        const allOrders = await orderService.getAllOrders();
+        const allOrders = await orderService.getAllOrders(tenant?.id);
 
         // Filter out semi-finished orders with no items (logistics out orders)
         const ordersToDisplay = allOrders.filter(order => {
@@ -342,7 +344,7 @@ const Orders: React.FC = () => {
         setLoading(true);
         
         // Get all orders
-        const allOrders = await orderService.getAllOrders();
+        const allOrders = await orderService.getAllOrders(tenant?.id);
 
         // Filter out semi-finished orders with no items (logistics out orders)
         const ordersToDisplay = allOrders.filter(order => {

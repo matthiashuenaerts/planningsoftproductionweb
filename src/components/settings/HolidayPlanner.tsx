@@ -12,15 +12,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
+import { useTenant } from '@/context/TenantContext';
 
 const HolidayPlanner: React.FC = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [editingTeam, setEditingTeam] = useState<'production' | 'installation' | 'preparation'>('production');
+  const { tenant } = useTenant();
 
   const { data: holidays = [], isLoading } = useQuery<Holiday[]>({
-    queryKey: ['holidays'],
-    queryFn: () => holidayService.getHolidays(),
+    queryKey: ['holidays', tenant?.id],
+    queryFn: () => holidayService.getHolidays(tenant?.id),
   });
 
   const { data: workingHours = [] } = useQuery<WorkingHours[]>({

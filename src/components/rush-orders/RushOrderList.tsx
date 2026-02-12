@@ -31,6 +31,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import EditRushOrderForm from './EditRushOrderForm';
 import { useLanguage } from '@/context/LanguageContext';
+import { useTenant } from '@/context/TenantContext';
 
 interface RushOrderListProps {
   statusFilter?: "pending" | "in_progress" | "completed" | "all";
@@ -42,6 +43,7 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
   const { currentEmployee } = useAuth();
   const queryClient = useQueryClient();
   const { t, createLocalizedPath } = useLanguage();
+  const { tenant } = useTenant();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<RushOrder | null>(null);
@@ -49,8 +51,8 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
   const isAdmin = currentEmployee?.role === 'admin';
   
   const { data: rushOrders, isLoading, error, refetch } = useQuery({
-    queryKey: ['rushOrders', statusFilter],
-    queryFn: () => rushOrderService.getAllRushOrders(),
+    queryKey: ['rushOrders', statusFilter, tenant?.id],
+    queryFn: () => rushOrderService.getAllRushOrders(tenant?.id),
   });
 
   const deleteMutation = useMutation({

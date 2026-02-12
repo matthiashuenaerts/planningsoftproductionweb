@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from '@/context/LanguageContext';
 import { BrokenPartDetailDialog } from './BrokenPartDetailDialog';
 import { useAuth } from '@/context/AuthContext';
+import { useTenant } from '@/context/TenantContext';
 import { useToast } from '@/hooks/use-toast';
 import {
   DropdownMenu,
@@ -37,13 +38,14 @@ const BrokenPartsList: React.FC = () => {
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { tenant } = useTenant();
   
   const isAdmin = currentEmployee?.role === 'admin';
 
   const { data: brokenParts = [], isLoading, error } = useQuery({
-    queryKey: ['broken-parts'],
+    queryKey: ['broken-parts', tenant?.id],
     queryFn: async () => {
-      return brokenPartsService.getAll();
+      return brokenPartsService.getAll(tenant?.id);
     }
   });
 

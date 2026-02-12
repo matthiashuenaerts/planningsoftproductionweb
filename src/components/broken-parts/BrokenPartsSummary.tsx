@@ -12,20 +12,22 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts';
 import { brokenPartsService, BrokenPart } from '@/services/brokenPartsService';
 import { CalendarDays, ListFilter, Users, Filter, List, PlusCircle } from 'lucide-react';
+import { useTenant } from '@/context/TenantContext';
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 type TimeFilter = 'day' | 'week' | 'month' | 'year' | 'all';
 type GroupBy = 'project' | 'workstation' | 'employee';
 const BrokenPartsSummary: React.FC = () => {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('month');
   const [groupBy, setGroupBy] = useState<GroupBy>('workstation');
+  const { tenant } = useTenant();
 
   // Fetch broken parts
   const {
     data: brokenParts = [],
     isLoading
   } = useQuery({
-    queryKey: ['broken-parts'],
-    queryFn: () => brokenPartsService.getAll()
+    queryKey: ['broken-parts', tenant?.id],
+    queryFn: () => brokenPartsService.getAll(tenant?.id)
   });
 
   // Filter data based on time period
