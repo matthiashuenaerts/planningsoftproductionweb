@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/context/TenantContext';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +24,7 @@ interface StockLocation {
 }
 
 const StockLocationsSettings: React.FC = () => {
+  const { tenant } = useTenant();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -37,11 +40,12 @@ const StockLocationsSettings: React.FC = () => {
   const { data: locations, isLoading } = useQuery({
     queryKey: ['stock-locations'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('stock_locations')
         .select('*')
         .order('display_order', { ascending: true });
-      
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
       if (error) throw error;
       return data as StockLocation[];
     },

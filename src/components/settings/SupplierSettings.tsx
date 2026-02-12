@@ -8,6 +8,8 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
+import { useTenant } from '@/context/TenantContext';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 import {
   Dialog,
   DialogContent,
@@ -31,6 +33,7 @@ interface Supplier {
 }
 
 const SupplierSettings: React.FC = () => {
+  const { tenant } = useTenant();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -53,10 +56,12 @@ const SupplierSettings: React.FC = () => {
 
   const fetchSuppliers = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('suppliers')
         .select('*')
         .order('name');
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
       
       if (error) throw error;
       setSuppliers(data || []);

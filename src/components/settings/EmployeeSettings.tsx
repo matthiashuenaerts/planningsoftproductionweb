@@ -51,8 +51,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useTenant } from '@/context/TenantContext';
 
 const EmployeeSettings: React.FC = () => {
+  const { tenant } = useTenant();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -77,7 +79,7 @@ const EmployeeSettings: React.FC = () => {
   const loadEmployees = async () => {
     try {
       setLoading(true);
-      const data = await employeeService.getAll();
+      const data = await employeeService.getAll(tenant?.id);
       setEmployees(data);
     } catch (error: any) {
       console.error('Error loading employees:', error);

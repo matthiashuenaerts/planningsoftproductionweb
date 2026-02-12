@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/context/TenantContext';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,6 +77,7 @@ const categories = ['Panel', 'Edge Banding', 'Hardware', 'Finish', 'Other'];
 const units = ['m²', 'm', 'piece', 'kg', 'L'];
 
 const MaterialSettings: React.FC = () => {
+  const { tenant } = useTenant();
   const { toast } = useToast();
   const [materials, setMaterials] = useState<CabinetMaterial[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,11 +92,13 @@ const MaterialSettings: React.FC = () => {
 
   const fetchMaterials = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from('cabinet_materials')
       .select('*')
       .order('category', { ascending: true })
       .order('name', { ascending: true });
+    query = applyTenantFilter(query, tenant?.id);
+    const { data, error } = await query;
 
     if (error) {
       toast({

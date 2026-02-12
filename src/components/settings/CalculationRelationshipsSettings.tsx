@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { projectCalculationService, CalculationTaskRelationship } from '@/services/projectCalculationService';
 import { standardTasksService } from '@/services/standardTasksService';
 import { Trash2, Plus } from 'lucide-react';
+import { useTenant } from '@/context/TenantContext';
 
 interface StandardTask {
   id: string;
@@ -35,6 +36,7 @@ const VARIABLE_OPTIONS = [
 ];
 
 const CalculationRelationshipsSettings: React.FC = () => {
+  const { tenant } = useTenant();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -57,7 +59,7 @@ const CalculationRelationshipsSettings: React.FC = () => {
       setLoading(true);
       const [relationshipsData, tasksData] = await Promise.all([
         projectCalculationService.getAllTaskRelationships(),
-        standardTasksService.getAll()
+        standardTasksService.getAll(tenant?.id)
       ]);
       
       setRelationships(relationshipsData);

@@ -17,6 +17,8 @@ import { z } from 'zod';
 import { Plus, Edit, Trash2, Upload, ExternalLink, FileText, Package, Search, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTenant } from '@/context/TenantContext';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 import GroupProductDialog from './GroupProductDialog';
 import { CsvDuplicateDialog, DuplicateProduct } from './CsvDuplicateDialog';
 
@@ -67,6 +69,7 @@ interface ProductGroup {
 const PRODUCTS_PER_PAGE = 100;
 
 const ProductsSettings: React.FC = () => {
+  const { tenant } = useTenant();
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -170,6 +173,8 @@ const ProductsSettings: React.FC = () => {
         .order('name')
         .range(pageNum * PRODUCTS_PER_PAGE, (pageNum + 1) * PRODUCTS_PER_PAGE - 1);
 
+      query = applyTenantFilter(query, tenant?.id);
+
       if (search.trim()) {
         query = query.or(`name.ilike.%${search}%,article_code.ilike.%${search}%,supplier.ilike.%${search}%`);
       }
@@ -204,10 +209,12 @@ const ProductsSettings: React.FC = () => {
   const fetchProductGroups = async () => {
     try {
       // First get all groups
-      const { data: groups, error: groupsError } = await supabase
+      let groupsQuery = supabase
         .from('product_groups')
         .select('*')
         .order('name');
+      groupsQuery = applyTenantFilter(groupsQuery, tenant?.id);
+      const { data: groups, error: groupsError } = await groupsQuery;
 
       if (groupsError) throw groupsError;
 
@@ -278,11 +285,13 @@ const ProductsSettings: React.FC = () => {
 
   const fetchSuppliers = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('suppliers')
         .select('name')
         .eq('is_active', true)
         .order('name');
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
 
       if (error) throw error;
       setSuppliers(data || []);

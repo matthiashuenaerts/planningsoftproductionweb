@@ -41,7 +41,9 @@ import { useForm } from 'react-hook-form';
 import { TaskWorkstationsManager } from './TaskWorkstationsManager';
 import { WorkstationTasksManager } from './WorkstationTasksManager';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/context/TenantContext';
 const WorkstationSettings: React.FC = () => {
+  const { tenant } = useTenant();
   const [workstations, setWorkstations] = useState<Workstation[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null);
@@ -73,7 +75,7 @@ const WorkstationSettings: React.FC = () => {
   const loadWorkstations = async () => {
     try {
       setLoading(true);
-      const data = await workstationService.getAll();
+      const data = await workstationService.getAll(tenant?.id);
       setWorkstations(data);
       
       // Load positions

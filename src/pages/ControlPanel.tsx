@@ -46,7 +46,7 @@ const ControlPanel: React.FC = () => {
 
   const { data: workstations = [] } = useQuery({
     queryKey: ['workstations'],
-    queryFn: workstationService.getAll
+    queryFn: () => workstationService.getAll()
   });
 
   // Get unique production lines and check if there are multiple

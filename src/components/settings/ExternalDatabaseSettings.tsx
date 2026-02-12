@@ -8,8 +8,11 @@ import { Loader2, CheckCircle, XCircle, Database, Key, Search, RefreshCw } from 
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/context/TenantContext';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 
 const ExternalDatabaseSettings: React.FC = () => {
+  const { tenant } = useTenant();
   // Helper function to convert week number to date
   const convertWeekNumberToDate = (weekNumber: string): string => {
     console.log(`Converting date/week: ${weekNumber}`);
@@ -103,9 +106,11 @@ const ExternalDatabaseSettings: React.FC = () => {
   const loadConfigurations = async () => {
     setLoadingConfig(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('external_api_configs')
         .select('*');
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error loading API configs:', error);

@@ -41,6 +41,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Plus, Edit, Trash2, X, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/context/TenantContext';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 
 interface InstallationTeam {
   id: string;
@@ -65,6 +67,7 @@ interface TeamMember {
 }
 
 const InstallationTeamsSettings: React.FC = () => {
+  const { tenant } = useTenant();
   const [teams, setTeams] = useState<InstallationTeam[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [teamMembers, setTeamMembers] = useState<Record<string, TeamMember[]>>({});
@@ -90,10 +93,12 @@ const InstallationTeamsSettings: React.FC = () => {
   const loadTeams = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('placement_teams')
         .select('*')
         .order('name');
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
       
       if (error) throw error;
       setTeams(data || []);

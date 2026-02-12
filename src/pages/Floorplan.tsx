@@ -32,7 +32,7 @@ const Floorplan: React.FC = () => {
   // Fetch workstations
   const { data: workstations = [] } = useQuery({
     queryKey: ['workstations'],
-    queryFn: workstationService.getAll
+    queryFn: () => workstationService.getAll()
   });
 
   // Load initial data
