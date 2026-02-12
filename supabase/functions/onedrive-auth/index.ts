@@ -7,7 +7,6 @@ const corsHeaders = {
 };
 
 const MICROSOFT_CLIENT_ID = Deno.env.get("MICROSOFT_CLIENT_ID");
-const MICROSOFT_CLIENT_SECRET = Deno.env.get("MICROSOFT_CLIENT_SECRET");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -20,24 +19,26 @@ serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
-    if (!MICROSOFT_CLIENT_ID || !MICROSOFT_CLIENT_SECRET) {
+    if (!MICROSOFT_CLIENT_ID) {
       return new Response(
-        JSON.stringify({ error: "Microsoft credentials not configured" }),
+        JSON.stringify({ error: "Microsoft Client ID not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Generate auth URL for OAuth flow
+    // Generate auth URL for OAuth PKCE flow (public client, no secret needed)
     if (action === "get-auth-url") {
-      const { redirectUri, state } = await req.json();
+      const { redirectUri, state, codeChallenge } = await req.json();
       
       const authUrl = new URL("https://login.microsoftonline.com/common/oauth2/v2.0/authorize");
       authUrl.searchParams.set("client_id", MICROSOFT_CLIENT_ID);
       authUrl.searchParams.set("response_type", "code");
       authUrl.searchParams.set("redirect_uri", redirectUri);
-      authUrl.searchParams.set("scope", "Files.Read Files.Read.All offline_access");
+      authUrl.searchParams.set("scope", "Files.Read Files.Read.All Files.ReadWrite Files.ReadWrite.All offline_access");
       authUrl.searchParams.set("state", state);
       authUrl.searchParams.set("response_mode", "query");
+      authUrl.searchParams.set("code_challenge_method", "S256");
+      authUrl.searchParams.set("code_challenge", codeChallenge);
 
       return new Response(
         JSON.stringify({ authUrl: authUrl.toString() }),
@@ -45,19 +46,19 @@ serve(async (req) => {
       );
     }
 
-    // Exchange code for tokens
+    // Exchange code for tokens (PKCE flow - no client_secret)
     if (action === "exchange-code") {
-      const { code, redirectUri } = await req.json();
+      const { code, redirectUri, codeVerifier } = await req.json();
 
       const tokenResponse = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           client_id: MICROSOFT_CLIENT_ID,
-          client_secret: MICROSOFT_CLIENT_SECRET,
           code,
           redirect_uri: redirectUri,
           grant_type: "authorization_code",
+          code_verifier: codeVerifier,
         }),
       });
 
@@ -80,7 +81,7 @@ serve(async (req) => {
       );
     }
 
-    // Refresh access token
+    // Refresh access token (PKCE flow - no client_secret)
     if (action === "refresh-token") {
       const { refreshToken } = await req.json();
 
@@ -89,7 +90,6 @@ serve(async (req) => {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           client_id: MICROSOFT_CLIENT_ID,
-          client_secret: MICROSOFT_CLIENT_SECRET,
           refresh_token: refreshToken,
           grant_type: "refresh_token",
         }),
