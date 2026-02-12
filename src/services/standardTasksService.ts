@@ -1,5 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { applyTenantFilter } from "@/lib/tenantQuery";
 
 export interface StandardTask {
   id: string;
@@ -23,12 +24,14 @@ export interface LimitPhase {
 }
 
 export const standardTasksService = {
-  async getAll(): Promise<StandardTask[]> {
+  async getAll(tenantId?: string | null): Promise<StandardTask[]> {
     console.log('Fetching all standard tasks...');
-    const { data, error } = await supabase
+    let query = supabase
       .from('standard_tasks')
       .select('*')
       .order('task_number', { ascending: true });
+    query = applyTenantFilter(query, tenantId);
+    const { data, error } = await query;
     
     if (error) {
       console.error('Error fetching standard tasks:', error);

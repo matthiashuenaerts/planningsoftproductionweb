@@ -37,7 +37,7 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
   // Query for getting standard task details for each task
   const { data: standardTasks } = useQuery({
     queryKey: ['standardTasks'],
-    queryFn: standardTasksService.getAll,
+    queryFn: () => standardTasksService.getAll(),
     enabled: !!rushOrder?.tasks,
   });
   

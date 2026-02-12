@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { standardTasksService } from "./standardTasksService";
+import { applyTenantFilter } from "@/lib/tenantQuery";
 
 // Project Types
 export interface Project {
@@ -840,11 +841,13 @@ export const taskService = {
 
 // Employee service functions
 export const employeeService = {
-  async getAll(): Promise<Employee[]> {
-    const { data, error } = await supabase
+  async getAll(tenantId?: string | null): Promise<Employee[]> {
+    let query = supabase
       .from('employees')
       .select('*')
       .order('name');
+    query = applyTenantFilter(query, tenantId);
+    const { data, error } = await query;
     
     if (error) throw error;
     return data as Employee[] || [];

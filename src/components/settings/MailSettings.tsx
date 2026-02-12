@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/context/TenantContext';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +30,7 @@ interface ScheduleConfig {
 }
 
 const MailSettings: React.FC = () => {
+  const { tenant } = useTenant();
   const { toast } = useToast();
   const [configs, setConfigs] = useState<EmailConfiguration[]>([]);
   const [scheduleConfigs, setScheduleConfigs] = useState<{ [key: string]: ScheduleConfig }>({});
@@ -42,18 +45,22 @@ const MailSettings: React.FC = () => {
 
   const fetchConfigurations = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('email_configurations')
         .select('*')
         .order('function_name');
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
 
       if (error) throw error;
       setConfigs(data || []);
 
       // Fetch schedule configurations
-      const { data: schedules, error: schedError } = await supabase
+      let schedQuery = supabase
         .from('email_schedule_configs')
         .select('*');
+      schedQuery = applyTenantFilter(schedQuery, tenant?.id);
+      const { data: schedules, error: schedError } = await schedQuery;
 
       if (schedError) throw schedError;
       

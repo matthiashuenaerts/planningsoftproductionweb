@@ -49,7 +49,7 @@ const EditRushOrderForm: React.FC<EditRushOrderFormProps> = ({ rushOrder, onSucc
   // Fetch standard tasks
   const { data: standardTasks, isLoading: loadingTasks } = useQuery({
     queryKey: ['standardTasks'],
-    queryFn: standardTasksService.getAll
+    queryFn: () => standardTasksService.getAll()
   });
 
   // Fetch employees

@@ -1,5 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { applyTenantFilter } from "@/lib/tenantQuery";
 
 export interface Workstation {
   id: string;
@@ -22,12 +23,14 @@ const normalizeWorkstation = (ws: any): Workstation => ({
 });
 
 export const workstationService = {
-  async getAll(): Promise<Workstation[]> {
-    const { data, error } = await supabase
+  async getAll(tenantId?: string | null): Promise<Workstation[]> {
+    let query = supabase
       .from('workstations')
       .select('*')
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true });
+    query = applyTenantFilter(query, tenantId);
+    const { data, error } = await query;
     
     if (error) {
       throw new Error(`Failed to fetch workstations: ${error.message}`);

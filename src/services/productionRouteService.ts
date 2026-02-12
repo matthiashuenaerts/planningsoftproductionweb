@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 
 export interface ProductionRoute {
   id: string;
@@ -20,11 +21,13 @@ export interface ProductionRouteWithTasks extends ProductionRoute {
 }
 
 export const productionRouteService = {
-  async getAll(): Promise<ProductionRoute[]> {
-    const { data, error } = await supabase
+  async getAll(tenantId?: string | null): Promise<ProductionRoute[]> {
+    let query = supabase
       .from('production_routes')
       .select('*')
       .order('name');
+    query = applyTenantFilter(query, tenantId);
+    const { data, error } = await query;
 
     if (error) throw error;
     return data || [];

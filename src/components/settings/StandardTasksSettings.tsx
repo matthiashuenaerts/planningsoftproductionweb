@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StandardTask, standardTasksService } from '@/services/standardTasksService';
+import { useTenant } from '@/context/TenantContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +35,7 @@ interface TaskFormData {
 }
 
 const StandardTasksSettings: React.FC = () => {
+  const { tenant } = useTenant();
   const [standardTasks, setStandardTasks] = useState<StandardTask[]>([]);
   const [limitPhases, setLimitPhases] = useState<Record<string, LimitPhase[]>>({});
   const [allStandardTasks, setAllStandardTasks] = useState<StandardTask[]>([]);
@@ -87,7 +89,7 @@ const StandardTasksSettings: React.FC = () => {
   const fetchData = async () => {
     try {
       console.log('Fetching standard tasks...');
-      const tasks = await standardTasksService.getAll();
+      const tasks = await standardTasksService.getAll(tenant?.id);
       console.log('Standard tasks loaded:', tasks);
       setStandardTasks(tasks);
       

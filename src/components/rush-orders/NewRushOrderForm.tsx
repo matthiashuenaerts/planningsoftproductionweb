@@ -67,7 +67,7 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
   // Fetch standard tasks
   const { data: standardTasks, isLoading: loadingTasks } = useQuery({
     queryKey: ['standardTasks'],
-    queryFn: standardTasksService.getAll
+    queryFn: () => standardTasksService.getAll()
   });
   
   // Fetch employees

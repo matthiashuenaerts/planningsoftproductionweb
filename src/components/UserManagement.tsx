@@ -50,7 +50,7 @@ const UserManagement = () => {
   
   const { data: employees, refetch } = useQuery({
     queryKey: ['employees'],
-    queryFn: employeeService.getAll,
+    queryFn: () => employeeService.getAll(),
   });
 
   const handleOpenDialog = (employee: Employee | null) => {

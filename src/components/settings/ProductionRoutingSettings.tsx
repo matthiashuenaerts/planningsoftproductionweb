@@ -35,10 +35,12 @@ import { Plus, Pencil, Trash2, Route } from 'lucide-react';
 import { productionRouteService, ProductionRoute } from '@/services/productionRouteService';
 import { standardTasksService, StandardTask } from '@/services/standardTasksService';
 import { useLanguage } from '@/context/LanguageContext';
+import { useTenant } from '@/context/TenantContext';
 
 const ProductionRoutingSettings: React.FC = () => {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const { tenant } = useTenant();
   const [loading, setLoading] = useState(true);
   const [routes, setRoutes] = useState<ProductionRoute[]>([]);
   const [standardTasks, setStandardTasks] = useState<StandardTask[]>([]);
@@ -63,8 +65,8 @@ const ProductionRoutingSettings: React.FC = () => {
     try {
       setLoading(true);
       const [routesData, tasksData] = await Promise.all([
-        productionRouteService.getAll(),
-        standardTasksService.getAll()
+        productionRouteService.getAll(tenant?.id),
+        standardTasksService.getAll(tenant?.id)
       ]);
       setRoutes(routesData);
       setStandardTasks(tasksData);
