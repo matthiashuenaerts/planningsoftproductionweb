@@ -54,6 +54,14 @@ import HomeRedirect from "@/components/HomeRedirect";
 import TenantLayout from "@/components/TenantLayout";
 import DeveloperPortal from "@/pages/DeveloperPortal";
 
+// Marketing site
+import MarketingLayout from "@/components/marketing/MarketingLayout";
+import MarketingHome from "@/pages/marketing/MarketingHome";
+import MarketingFeatures from "@/pages/marketing/MarketingFeatures";
+import MarketingSolutions from "@/pages/marketing/MarketingSolutions";
+import MarketingIntegration from "@/pages/marketing/MarketingIntegration";
+import MarketingContact from "@/pages/marketing/MarketingContact";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -78,8 +86,17 @@ function App() {
               <LanguageProvider>
                 <GlobalComponents />
                 <Routes>
-                  {/* ── Public ─────────────────────────── */}
+                  {/* ── Public root → redirect to /site ── */}
                   <Route path="/" element={<HomeRedirect />} />
+
+                  {/* ── Marketing site ─────────────────── */}
+                  <Route path="/site" element={<MarketingLayout />}>
+                    <Route index element={<MarketingHome />} />
+                    <Route path="features" element={<MarketingFeatures />} />
+                    <Route path="solutions" element={<MarketingSolutions />} />
+                    <Route path="integration" element={<MarketingIntegration />} />
+                    <Route path="contact" element={<MarketingContact />} />
+                  </Route>
 
                   {/* ── Developer ──────────────────────── */}
                   <Route path="/dev/login" element={<Login />} />
