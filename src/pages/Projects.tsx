@@ -17,6 +17,7 @@ import { exportProjectData, exportProjectDataAsZip } from '@/services/projectExp
 import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useTenant } from '@/context/TenantContext';
 
 const Projects = () => {
   const navigate = useNavigate();
@@ -35,6 +36,7 @@ const Projects = () => {
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [projectProgress, setProjectProgress] = useState<Record<string, { earliestIncomplete: string | null, farthestTodo: string | null }>>({});
   const isAdmin = ['admin', 'teamleader', 'preparater', 'manager'].includes(currentEmployee?.role);
+  const { tenant } = useTenant();
 
 
   useEffect(() => {
@@ -44,7 +46,7 @@ const Projects = () => {
 
   const loadWorkstations = async () => {
     try {
-      const data = await workstationService.getAll();
+      const data = await workstationService.getAll(tenant?.id);
       setWorkstations(data);
     } catch (error) {
       console.error('Error loading workstations:', error);
@@ -72,7 +74,7 @@ const Projects = () => {
   const loadProjects = async () => {
     setIsLoading(true);
     try {
-      const data = await projectService.getAll();
+      const data = await projectService.getAll(tenant?.id);
       // Sort projects by installation date (latest first)
       const sortedData = data.sort((a, b) => 
         new Date(b.installation_date).getTime() - new Date(a.installation_date).getTime()

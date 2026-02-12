@@ -31,6 +31,7 @@ import { employeeService, Employee } from '@/services/dataService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Edit, Trash2 } from 'lucide-react';
+import { useTenant } from '@/context/TenantContext';
 
 const UserManagement = () => {
   const { currentEmployee } = useAuth();
@@ -47,10 +48,11 @@ const UserManagement = () => {
     workstation: '',
   });
   const { toast } = useToast();
+  const { tenant } = useTenant();
   
   const { data: employees, refetch } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => employeeService.getAll(),
+    queryKey: ['employees', tenant?.id],
+    queryFn: () => employeeService.getAll(tenant?.id),
   });
 
   const handleOpenDialog = (employee: Employee | null) => {

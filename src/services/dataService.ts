@@ -67,11 +67,13 @@ export interface Employee {
 
 // Project service functions
 export const projectService = {
-  async getAll(): Promise<Project[]> {
-    const { data, error } = await supabase
+  async getAll(tenantId?: string | null): Promise<Project[]> {
+    let query = supabase
       .from('projects')
       .select('*')
       .order('start_date', { ascending: true });
+    query = applyTenantFilter(query, tenantId);
+    const { data, error } = await query;
     
     if (error) throw error;
     return data as Project[] || [];
@@ -499,11 +501,13 @@ export const taskService = {
     return data as Task[] || [];
   },
 
-  async getAll(): Promise<Task[]> {
-    const { data, error } = await supabase
+  async getAll(tenantId?: string | null): Promise<Task[]> {
+    let query = supabase
       .from('tasks')
       .select('*')
       .order('due_date', { ascending: true });
+    query = applyTenantFilter(query, tenantId);
+    const { data, error } = await query;
     
     if (error) throw error;
     return data as Task[] || [];
@@ -895,12 +899,14 @@ export const employeeService = {
 
 // Work hours service
 export const workHoursService = {
-  async getAll(): Promise<any[]> {
-    const { data, error } = await supabase
+  async getAll(tenantId?: string | null): Promise<any[]> {
+    let query = supabase
       .from('work_hours')
       .select('*')
       .order('day_of_week', { ascending: true })
       .order('start_time', { ascending: true });
+    query = applyTenantFilter(query, tenantId);
+    const { data, error } = await query;
     
     if (error) throw error;
     return data || [];

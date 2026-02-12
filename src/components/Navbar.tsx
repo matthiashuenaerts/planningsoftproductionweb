@@ -4,6 +4,7 @@ import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck,
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
+import { useTenant } from '@/context/TenantContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -29,6 +30,7 @@ const NavbarContent = ({
     createLocalizedPath
   } = useLanguage();
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+  const { tenant } = useTenant();
 
   // Allow admin, manager, installation_team, and worker roles to see the Rush Orders menu
   const canSeeRushOrders = currentEmployee && ['admin', 'manager', 'installation_team', 'worker'].includes(currentEmployee.role);
@@ -41,8 +43,8 @@ const NavbarContent = ({
     data: rushOrders,
     isLoading
   } = useQuery({
-    queryKey: ['rushOrders', 'navbar'],
-    queryFn: rushOrderService.getAllRushOrders,
+    queryKey: ['rushOrders', 'navbar', tenant?.id],
+    queryFn: () => rushOrderService.getAllRushOrders(tenant?.id),
     enabled: !!canSeeRushOrders,
     refetchInterval: 30000 // Refetch every 30 seconds
   });

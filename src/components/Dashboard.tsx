@@ -19,6 +19,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { supabase } from '@/integrations/supabase/client';
 import { holidayService, Holiday } from '@/services/holidayService';
 import { cn } from '@/lib/utils';
+import { useTenant } from '@/context/TenantContext';
 interface LoadingAssignment {
   project: {
     id: string;
@@ -93,13 +94,14 @@ const Dashboard: React.FC = () => {
     t
   } = useLanguage();
   const navigate = useNavigate();
+  const { tenant } = useTenant();
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
 
         // Fetch projects
-        const projectsData = await projectService.getAll();
+        const projectsData = await projectService.getAll(tenant?.id);
         setProjects(projectsData);
 
         // Efficient parallel queries for dashboard data
@@ -450,7 +452,7 @@ const Dashboard: React.FC = () => {
   const fetchInitialTruckLoadingData = async () => {
     try {
       // Fetch holidays
-      const holidaysData = await holidayService.getHolidays();
+      const holidaysData = await holidayService.getHolidays(tenant?.id);
       setHolidays(holidaysData);
 
       // Fetch existing overrides in parallel

@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 
 export interface Holiday {
   id: string;
@@ -10,8 +11,10 @@ export interface Holiday {
 }
 
 export const holidayService = {
-  async getHolidays(): Promise<Holiday[]> {
-    const { data, error } = await supabase.from('holidays').select('*');
+  async getHolidays(tenantId?: string | null): Promise<Holiday[]> {
+    let query = supabase.from('holidays').select('*');
+    query = applyTenantFilter(query, tenantId);
+    const { data, error } = await query;
     if (error) throw error;
     return data as Holiday[];
   },

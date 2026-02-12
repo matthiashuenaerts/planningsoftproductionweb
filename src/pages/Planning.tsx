@@ -60,6 +60,7 @@ import { ProjectCompletionInfo } from '@/services/automaticSchedulingService';
 import ProductionCompletionTimeline, { ProjectCompletionData } from '@/components/planning/ProductionCompletionTimeline';
 import { projectCompletionService } from '@/services/projectCompletionService';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useTenant } from '@/context/TenantContext';
 
 interface WorkerTask {
   id: string;
@@ -128,6 +129,7 @@ const Planning = () => {
   const { toast } = useToast();
   const isAdmin = currentEmployee?.role === 'admin';
   const isMobile = useIsMobile();
+  const { tenant } = useTenant();
 
   // Scroll position preservation
   const scrollPositionRef = useRef<number>(0);
@@ -177,7 +179,7 @@ const Planning = () => {
   useEffect(() => {
     const loadHolidays = async () => {
       try {
-        const holidayData = await holidayService.getHolidays();
+        const holidayData = await holidayService.getHolidays(tenant?.id);
         setHolidays(holidayData);
       } catch (error) {
         console.error('Error loading holidays:', error);
@@ -302,7 +304,7 @@ const Planning = () => {
       saveScrollPosition(); // Save scroll position before data update
       
       // Fetch all workers (exclude admins from schedule generation)
-      const employeeData = await employeeService.getAll();
+      const employeeData = await employeeService.getAll(tenant?.id);
       const workerEmployees = employeeData.filter(emp => ['worker', 'preparater', 'teamleader'].includes(emp.role));
       setWorkers(workerEmployees);
 

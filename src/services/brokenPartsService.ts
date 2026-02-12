@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { applyTenantFilter } from "@/lib/tenantQuery";
 
 export interface BrokenPart {
   id?: string;
@@ -66,9 +67,9 @@ export const brokenPartsService = {
   },
   
   // Get all broken parts
-  async getAll(): Promise<BrokenPart[]> {
+  async getAll(tenantId?: string | null): Promise<BrokenPart[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('broken_parts')
         .select(`
           *,
@@ -77,6 +78,8 @@ export const brokenPartsService = {
           employees:reported_by (name)
         `)
         .order('created_at', { ascending: false });
+      query = applyTenantFilter(query, tenantId);
+      const { data, error } = await query;
       
       if (error) {
         console.error('Error fetching broken parts:', error);

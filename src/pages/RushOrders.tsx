@@ -18,6 +18,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
 import { useLanguage } from '@/context/LanguageContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useTenant } from '@/context/TenantContext';
 
 const RushOrders = () => {
   const { currentEmployee } = useAuth();
@@ -25,6 +26,7 @@ const RushOrders = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { t } = useLanguage();
   const isMobile = useIsMobile();
+  const { tenant } = useTenant();
   
   // Allow all authenticated roles to create rush orders
   const canCreateRushOrder = !!currentEmployee;
@@ -37,8 +39,8 @@ const RushOrders = () => {
 
   // Fetch all rush orders to get counts - with more frequent refetching
   const { data: allRushOrders } = useQuery({
-    queryKey: ['rushOrders', 'all'],
-    queryFn: rushOrderService.getAllRushOrders,
+    queryKey: ['rushOrders', 'all', tenant?.id],
+    queryFn: () => rushOrderService.getAllRushOrders(tenant?.id),
     refetchInterval: 15000, // Refetch every 15 seconds
   });
 

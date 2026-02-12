@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { RushOrder, RushOrderTask, RushOrderAssignment, RushOrderMessage, EditRushOrderPayload } from "@/types/rushOrder";
 import { toast } from "@/hooks/use-toast";
 import { ensureStorageBucket } from "@/integrations/supabase/createBucket";
+import { applyTenantFilter } from "@/lib/tenantQuery";
 
 export const rushOrderService = {
   async createRushOrder(
@@ -197,9 +198,9 @@ export const rushOrderService = {
     }
   },
   
-  async getAllRushOrders(): Promise<RushOrder[]> {
+  async getAllRushOrders(tenantId?: string | null): Promise<RushOrder[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('rush_orders')
         .select(`
           *,
@@ -217,6 +218,8 @@ export const rushOrderService = {
           )
         `)
         .order('created_at', { ascending: false });
+      query = applyTenantFilter(query, tenantId);
+      const { data, error } = await query;
         
       if (error) throw error;
       return data as RushOrder[] || [];

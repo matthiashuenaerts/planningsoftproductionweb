@@ -45,6 +45,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from './ui/label';
+import { useTenant } from '@/context/TenantContext';
 
 // Add the missing interface
 interface NewProjectModalProps {
@@ -94,6 +95,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
   onSuccess
 }) => {
   const { toast } = useToast();
+  const { tenant } = useTenant();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -188,14 +190,14 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         
         // Get all workstations and routes in parallel
         const [workstationData, routesData] = await Promise.all([
-          workstationService.getAll(),
-          productionRouteService.getAll()
+          workstationService.getAll(tenant?.id),
+          productionRouteService.getAll(tenant?.id)
         ]);
         setWorkstations(workstationData.map(w => ({ id: w.id, name: w.name })));
         setRoutes(routesData);
         
         // Get all standard tasks with their linked workstations
-        const standardTasks = await standardTasksService.getAll();
+        const standardTasks = await standardTasksService.getAll(tenant?.id);
         
         const taskItems: TaskItem[] = [];
         
