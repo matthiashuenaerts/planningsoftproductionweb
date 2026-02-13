@@ -26,11 +26,13 @@ import { EditTimeRegistrationDialog } from '@/components/EditTimeRegistrationDia
 import { workingHoursService, WorkingHours } from '@/services/workingHoursService';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { standardTasksService, StandardTask } from '@/services/standardTasksService';
+import { useTenant } from '@/context/TenantContext';
 
 const TimeRegistrations = () => {
   const { currentEmployee } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
+  const { tenant } = useTenant();
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState({
     startDate: '',
@@ -56,14 +58,14 @@ const TimeRegistrations = () => {
   const canViewAllRegistrations = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
 
   const { data: allRegistrations = [], isLoading } = useQuery({
-    queryKey: ['allTimeRegistrations'],
-    queryFn: () => timeRegistrationService.getAllRegistrations(),
+    queryKey: ['allTimeRegistrations', tenant?.id],
+    queryFn: () => timeRegistrationService.getAllRegistrations(tenant?.id),
     enabled: !!canViewAllRegistrations
   });
 
   const { data: myRegistrations = [] } = useQuery({
-    queryKey: ['myTimeRegistrations', currentEmployee?.id],
-    queryFn: () => currentEmployee ? timeRegistrationService.getRegistrationsByEmployee(currentEmployee.id) : [],
+    queryKey: ['myTimeRegistrations', currentEmployee?.id, tenant?.id],
+    queryFn: () => currentEmployee ? timeRegistrationService.getRegistrationsByEmployee(currentEmployee.id, tenant?.id) : [],
     enabled: !!currentEmployee
   });
 

@@ -56,7 +56,7 @@ const Workstations: React.FC = () => {
     currentEmployee
   } = useAuth();
   const queryClient = useQueryClient();
-  const { t } = useLanguage();
+  const { t, createLocalizedPath } = useLanguage();
   const navigate = useNavigate();
   const { tenant } = useTenant();
   useEffect(() => {
@@ -323,7 +323,7 @@ const Workstations: React.FC = () => {
                       <h1 className="text-2xl font-bold">{t('workstations_title')}</h1>
                       <Button 
                         variant="outline" 
-                        onClick={() => navigate('/nl/floorplan')}
+                        onClick={() => navigate(createLocalizedPath('/floorplan'))}
                         className="flex items-center gap-2"
                       >
                         <Map className="h-4 w-4" />

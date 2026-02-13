@@ -7,6 +7,8 @@ import { ChevronLeft, ChevronRight, Calendar, GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ProjectAssignmentDialog } from './ProjectAssignmentDialog';
+import { useTenant } from '@/context/TenantContext';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 
 interface Employee {
   id: string;
@@ -68,6 +70,7 @@ const mapTeamToCategory = (teamName: string, placementTeams: any[]): string => {
 };
 
 const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React.ReactNode => {
+  const { tenant } = useTenant();
   const [teams, setTeams] = useState<PlacementTeam[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
@@ -322,16 +325,18 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         setLoading(true);
 
         // Fetch placement teams
-        const { data: teamsData, error: teamsError } = await supabase
+        let teamsQuery = supabase
           .from('placement_teams')
           .select('id, name, color, is_active')
           .eq('is_active', true)
           .order('name');
+        teamsQuery = applyTenantFilter(teamsQuery, tenant?.id);
+        const { data: teamsData, error: teamsError } = await teamsQuery;
 
         if (teamsError) throw teamsError;
 
         // Fetch projects directly from projects table
-        const { data: projectsData, error: projectsError } = await supabase
+        let projectsQuery = supabase
           .from('projects')
           .select(`
             id,
@@ -342,6 +347,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
           `)
           .not('installation_date', 'is', null)
           .order('installation_date');
+        projectsQuery = applyTenantFilter(projectsQuery, tenant?.id);
+        const { data: projectsData, error: projectsError } = await projectsQuery;
 
         if (projectsError) throw projectsError;
 

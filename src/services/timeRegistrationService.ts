@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { applyTenantFilter } from '@/lib/tenantQuery';
 
 export interface TimeRegistration {
   id: string;
@@ -476,7 +477,7 @@ export const timeRegistrationService = {
     return data as TimeRegistration | null;
   },
 
-  async getAllRegistrations(): Promise<any[]> {
+  async getAllRegistrations(tenantId?: string | null): Promise<any[]> {
     // Use pagination to fetch all registrations (Supabase has a default limit of 1000)
     let allRegistrations: any[] = [];
     let from = 0;
@@ -484,7 +485,7 @@ export const timeRegistrationService = {
     let hasMore = true;
 
     while (hasMore) {
-      const { data: batch, error } = await supabase
+      let query = supabase
         .from('time_registrations')
         .select(`
           *,
@@ -499,6 +500,8 @@ export const timeRegistrationService = {
         `)
         .order('start_time', { ascending: false })
         .range(from, from + batchSize - 1);
+      query = applyTenantFilter(query, tenantId);
+      const { data: batch, error } = await query;
       
       if (error) throw error;
       
@@ -514,7 +517,7 @@ export const timeRegistrationService = {
     return allRegistrations;
   },
 
-  async getRegistrationsByEmployee(employeeId: string): Promise<any[]> {
+  async getRegistrationsByEmployee(employeeId: string, tenantId?: string | null): Promise<any[]> {
     // Use pagination to fetch all registrations (Supabase has a default limit of 1000)
     let allRegistrations: any[] = [];
     let from = 0;
@@ -522,7 +525,7 @@ export const timeRegistrationService = {
     let hasMore = true;
 
     while (hasMore) {
-      const { data: batch, error } = await supabase
+      let query = supabase
         .from('time_registrations')
         .select(`
           *,
@@ -538,6 +541,8 @@ export const timeRegistrationService = {
         .eq('employee_id', employeeId)
         .order('start_time', { ascending: false })
         .range(from, from + batchSize - 1);
+      query = applyTenantFilter(query, tenantId);
+      const { data: batch, error } = await query;
       
       if (error) throw error;
       

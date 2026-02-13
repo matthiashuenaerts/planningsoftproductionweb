@@ -108,32 +108,34 @@ const Dashboard: React.FC = () => {
         const today = startOfToday();
         const sevenDaysAgo = format(subDays(today, 6), 'yyyy-MM-dd');
         
-        const [
-          tasksStatusCount,
-          tasksPriorityCount,
-          completedTasksLast7Days
-        ] = await Promise.all([
-          // Status distribution - count only
-          supabase
+        // Build tenant-filtered task queries
+        let statusQuery = supabase
             .from('tasks')
             .select('status', { count: 'exact', head: false })
-            .in('status', ['TODO', 'IN_PROGRESS', 'COMPLETED']),
-          
-          // Priority distribution - count only
-          supabase
+            .in('status', ['TODO', 'IN_PROGRESS', 'COMPLETED']);
+        let priorityQuery = supabase
             .from('tasks')
             .select('priority', { count: 'exact', head: false })
-            .in('priority', ['Low', 'Medium', 'High', 'Urgent']),
-          
-          // Completed tasks in last 7 days
-          supabase
+            .in('priority', ['Low', 'Medium', 'High', 'Urgent']);
+        let completedQuery = supabase
             .from('tasks')
             .select('completed_at')
             .eq('status', 'COMPLETED')
             .not('completed_at', 'is', null)
             .gte('completed_at', sevenDaysAgo)
-            .order('completed_at', { ascending: false })
-        ]);
+            .order('completed_at', { ascending: false });
+
+        if (tenant?.id) {
+          statusQuery = statusQuery.eq('tenant_id', tenant.id);
+          priorityQuery = priorityQuery.eq('tenant_id', tenant.id);
+          completedQuery = completedQuery.eq('tenant_id', tenant.id);
+        }
+
+        const [
+          tasksStatusCount,
+          tasksPriorityCount,
+          completedTasksLast7Days
+        ] = await Promise.all([statusQuery, priorityQuery, completedQuery]);
 
         // Process status data
         const statusCount: Record<string, number> = {
@@ -214,7 +216,7 @@ const Dashboard: React.FC = () => {
       }
     };
     fetchDashboardData();
-  }, [toast]);
+  }, [toast, tenant?.id]);
   const fetchWorkstationStats = async () => {
     if (!currentEmployee) return;
     
@@ -492,20 +494,24 @@ const Dashboard: React.FC = () => {
       const holidaysList = holidaysData || holidays;
 
       // Fetch placement teams for color lookup
-      const { data: placementTeamsData, error: teamsError } = await supabase
+      let teamsQuery = supabase
         .from('placement_teams')
         .select('id, name, color')
         .eq('is_active', true);
+      if (tenant?.id) teamsQuery = teamsQuery.eq('tenant_id', tenant.id);
+      const { data: placementTeamsData, error: teamsError } = await teamsQuery;
       
       if (teamsError) throw teamsError;
       const placementTeamsMap = new Map((placementTeamsData || []).map(team => [team.id, team.color]));
 
       // Fetch projects for this week range
+      let projectsQuery = supabase.from('projects').select('id, name, client, status, installation_date, progress').not('installation_date', 'is', null).gte('installation_date', format(subDays(weekStart, 10), 'yyyy-MM-dd'))
+      .lte('installation_date', format(addDays(weekEnd, 10), 'yyyy-MM-dd')).order('installation_date');
+      if (tenant?.id) projectsQuery = projectsQuery.eq('tenant_id', tenant.id);
       const {
         data: projectsData,
         error: projectsError
-      } = await supabase.from('projects').select('id, name, client, status, installation_date, progress').not('installation_date', 'is', null).gte('installation_date', format(subDays(weekStart, 10), 'yyyy-MM-dd')) // Buffer for loading date calculation
-      .lte('installation_date', format(addDays(weekEnd, 10), 'yyyy-MM-dd')).order('installation_date');
+      } = await projectsQuery;
       if (projectsError) throw projectsError;
 
       // Calculate loading dates for projects
