@@ -20,6 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { supabase } from "@/integrations/supabase/client";
 import { ensureStorageBucket } from "@/integrations/supabase/createBucket";
+import { useTenant } from '@/context/TenantContext';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 
 interface Employee {
   id: string;
@@ -51,6 +53,7 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
   const [date, setDate] = useState<Date>(initialValues?.deadline || new Date());
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
+  const { tenant } = useTenant();
   
   // Camera states
   const [cameraMode, setCameraMode] = useState<'none' | 'camera' | 'preview'>('none');
@@ -72,13 +75,14 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
   
   // Fetch employees
   const { data: employees, isLoading: loadingEmployees } = useQuery({
-    queryKey: ['employees'],
+    queryKey: ['employees', tenant?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('employees')
         .select('*')
         .in('role', ['admin', 'manager', 'worker', 'installation_team']);
-      
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
       if (error) throw error;
       return data as Employee[];
     }
@@ -86,13 +90,14 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
 
   // Fetch projects
   const { data: projects, isLoading: loadingProjects } = useQuery({
-    queryKey: ['projects'],
+    queryKey: ['projects', tenant?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('projects')
         .select('id, name, client')
         .order('name');
-      
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     }

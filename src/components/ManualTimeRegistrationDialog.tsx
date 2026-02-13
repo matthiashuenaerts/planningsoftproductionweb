@@ -8,6 +8,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/LanguageContext';
+import { useTenant } from '@/context/TenantContext';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 
 interface ManualTimeRegistrationDialogProps {
   open: boolean;
@@ -21,6 +23,7 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
   const { t } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { tenant } = useTenant();
 
   const [formData, setFormData] = useState({
     employee_id: '',
@@ -35,12 +38,14 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
 
   // Fetch employees
   const { data: employees = [] } = useQuery({
-    queryKey: ['employees'],
+    queryKey: ['employees', tenant?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('employees')
         .select('id, name')
         .order('name');
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     }
@@ -48,12 +53,14 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
 
   // Fetch projects
   const { data: projects = [] } = useQuery({
-    queryKey: ['projects'],
+    queryKey: ['projects', tenant?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('projects')
         .select('id, name')
         .order('name');
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     }

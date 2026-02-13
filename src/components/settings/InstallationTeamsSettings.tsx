@@ -38,11 +38,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Plus, Edit, Trash2, X, Users } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, X, Users, Truck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface InstallationTeam {
   id: string;
@@ -66,6 +67,15 @@ interface TeamMember {
   is_default: boolean;
 }
 
+interface TruckData {
+  id: string;
+  truck_number: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  tenant_id: string;
+}
+
 const InstallationTeamsSettings: React.FC = () => {
   const { tenant } = useTenant();
   const [teams, setTeams] = useState<InstallationTeam[]>([]);
@@ -87,6 +97,15 @@ const InstallationTeamsSettings: React.FC = () => {
   
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [newExternalName, setNewExternalName] = useState('');
+  
+  // Trucks state
+  const [trucks, setTrucks] = useState<TruckData[]>([]);
+  const [trucksLoading, setTrucksLoading] = useState(true);
+  const [isTruckDialogOpen, setIsTruckDialogOpen] = useState(false);
+  const [editingTruck, setEditingTruck] = useState<TruckData | null>(null);
+  const [truckFormData, setTruckFormData] = useState({ truck_number: '', description: '' });
+  const [truckToDelete, setTruckToDelete] = useState<TruckData | null>(null);
+  const [isTruckDeleteOpen, setIsTruckDeleteOpen] = useState(false);
   
   const { toast } = useToast();
 
@@ -135,11 +154,12 @@ const InstallationTeamsSettings: React.FC = () => {
 
   const loadEmployees = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('employees')
         .select('id, name')
         .order('name');
-      
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
       if (error) throw error;
       setEmployees(data || []);
     } catch (error: any) {
@@ -147,10 +167,82 @@ const InstallationTeamsSettings: React.FC = () => {
     }
   };
 
+  const loadTrucks = async () => {
+    try {
+      setTrucksLoading(true);
+      let query = supabase
+        .from('trucks')
+        .select('*')
+        .order('truck_number');
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
+      if (error) throw error;
+      setTrucks(data || []);
+    } catch (error: any) {
+      console.error('Error loading trucks:', error);
+      toast({ title: "Error", description: `Failed to load trucks: ${error.message}`, variant: "destructive" });
+    } finally {
+      setTrucksLoading(false);
+    }
+  };
+
+  const handleOpenTruckDialog = (truck: TruckData | null) => {
+    if (truck) {
+      setEditingTruck(truck);
+      setTruckFormData({ truck_number: truck.truck_number.toString(), description: truck.description || '' });
+    } else {
+      setEditingTruck(null);
+      setTruckFormData({ truck_number: '', description: '' });
+    }
+    setIsTruckDialogOpen(true);
+  };
+
+  const handleSaveTruck = async () => {
+    try {
+      if (!truckFormData.truck_number) {
+        toast({ title: "Error", description: "Truck number is required", variant: "destructive" });
+        return;
+      }
+      const payload = {
+        truck_number: truckFormData.truck_number,
+        description: truckFormData.description || null,
+      };
+      if (editingTruck) {
+        const { error } = await supabase.from('trucks').update(payload).eq('id', editingTruck.id);
+        if (error) throw error;
+        toast({ title: "Success", description: "Truck updated successfully" });
+      } else {
+        const { error } = await supabase.from('trucks').insert([payload]).select();
+        if (error) throw error;
+        toast({ title: "Success", description: "Truck added successfully" });
+      }
+      setIsTruckDialogOpen(false);
+      loadTrucks();
+    } catch (error: any) {
+      toast({ title: "Error", description: `Failed to save truck: ${error.message}`, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteTruck = async () => {
+    if (!truckToDelete) return;
+    try {
+      const { error } = await supabase.from('trucks').delete().eq('id', truckToDelete.id);
+      if (error) throw error;
+      toast({ title: "Success", description: "Truck deleted successfully" });
+      loadTrucks();
+    } catch (error: any) {
+      toast({ title: "Error", description: `Failed to delete truck: ${error.message}`, variant: "destructive" });
+    } finally {
+      setIsTruckDeleteOpen(false);
+      setTruckToDelete(null);
+    }
+  };
+
   useEffect(() => {
     loadTeams();
     loadEmployees();
-  }, []);
+    loadTrucks();
+  }, [tenant?.id]);
 
   const handleOpenAddOrEditDialog = (team: InstallationTeam | null) => {
     if (team) {
@@ -303,6 +395,12 @@ const InstallationTeamsSettings: React.FC = () => {
   };
 
   return (
+    <Tabs defaultValue="teams" className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="teams"><Users className="h-4 w-4 mr-2" />Teams</TabsTrigger>
+        <TabsTrigger value="trucks"><Truck className="h-4 w-4 mr-2" />Trucks</TabsTrigger>
+      </TabsList>
+      <TabsContent value="teams">
     <div className="space-y-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -557,6 +655,90 @@ const InstallationTeamsSettings: React.FC = () => {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+      </TabsContent>
+      <TabsContent value="trucks">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Trucks</CardTitle>
+              <CardDescription>Manage available trucks for installation</CardDescription>
+            </div>
+            <Button onClick={() => handleOpenTruckDialog(null)}>
+              <Plus className="mr-2 h-4 w-4" />Add Truck
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {trucksLoading ? (
+              <div className="flex justify-center p-4"><Loader2 className="animate-spin h-6 w-6" /></div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Truck Number</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {trucks.length === 0 ? (
+                    <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No trucks found</TableCell></TableRow>
+                  ) : (
+                    trucks.map((truck) => (
+                      <TableRow key={truck.id}>
+                        <TableCell className="font-medium">T{truck.truck_number}</TableCell>
+                        <TableCell>{truck.description || <span className="text-muted-foreground">—</span>}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="icon" onClick={() => handleOpenTruckDialog(truck)}><Edit className="h-4 w-4" /></Button>
+                            <Button variant="destructive" size="icon" onClick={() => { setTruckToDelete(truck); setIsTruckDeleteOpen(true); }}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={isTruckDialogOpen} onOpenChange={setIsTruckDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingTruck ? 'Edit Truck' : 'Add New Truck'}</DialogTitle>
+              <DialogDescription>{editingTruck ? 'Update truck details.' : 'Add a new truck.'}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="truck_number">Truck Number</Label>
+                <Input id="truck_number" placeholder="e.g., 1" value={truckFormData.truck_number} onChange={(e) => setTruckFormData(prev => ({ ...prev, truck_number: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="truck_desc">Description</Label>
+                <Input id="truck_desc" placeholder="e.g., Large delivery truck" value={truckFormData.description} onChange={(e) => setTruckFormData(prev => ({ ...prev, description: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2 mt-4">
+              <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+              <Button onClick={handleSaveTruck}>{editingTruck ? 'Update' : 'Add'}</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={isTruckDeleteOpen} onOpenChange={setIsTruckDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Truck?</AlertDialogTitle>
+              <AlertDialogDescription>This will permanently delete truck T{truckToDelete?.truck_number}.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteTruck}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </TabsContent>
+    </Tabs>
   );
 };
 

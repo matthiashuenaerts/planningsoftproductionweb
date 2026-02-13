@@ -8,6 +8,8 @@ import InstallationTeamCalendar from '@/components/InstallationTeamCalendar';
 import TruckLoadingCalendar from '@/components/TruckLoadingCalendar';
 import OrdersGanttChart from '@/components/OrdersGanttChart';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useTenant } from '@/context/TenantContext';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 interface ProjectWithTeam {
   id: string;
   name: string;
@@ -29,6 +31,7 @@ const DailyTasks: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { tenant } = useTenant();
 
   // Fetch all projects with installation dates and team assignments
   useEffect(() => {
@@ -37,7 +40,7 @@ const DailyTasks: React.FC = () => {
         setLoading(true);
 
         // Get all projects with installation dates and their team assignments
-        const { data, error } = await supabase
+        let query = supabase
           .from('projects')
           .select(`
             *,
@@ -49,6 +52,8 @@ const DailyTasks: React.FC = () => {
           `)
           .not('installation_date', 'is', null)
           .order('installation_date', { ascending: true });
+        query = applyTenantFilter(query, tenant?.id);
+        const { data, error } = await query;
         
         if (error) throw error;
         setAllProjects(data || []);
@@ -65,7 +70,7 @@ const DailyTasks: React.FC = () => {
       }
     };
     fetchAllProjects();
-  }, [toast]);
+  }, [toast, tenant?.id]);
   return <div className="flex min-h-screen">
       {!isMobile && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">

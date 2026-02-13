@@ -9,6 +9,8 @@ import { ChevronLeft, ChevronRight, Truck, Calendar, AlertTriangle, Clock } from
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { holidayService, Holiday } from '@/services/holidayService';
+import { useTenant } from '@/context/TenantContext';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 
 interface Project {
   id: string;
@@ -25,6 +27,7 @@ interface LoadingAssignment {
 }
 
 const TruckLoadingCalendar = () => {
+  const { tenant } = useTenant();
   const [weekStartDate, setWeekStartDate] = useState(() => {
     const today = new Date();
     return startOfWeek(today, { weekStartsOn: 1 });
@@ -69,7 +72,7 @@ const TruckLoadingCalendar = () => {
         setLoading(true);
         
         // Fetch holidays
-        const holidaysData = await holidayService.getHolidays();
+        const holidaysData = await holidayService.getHolidays(tenant?.id);
         setHolidays(holidaysData);
         
         // Fetch existing overrides
@@ -87,11 +90,13 @@ const TruckLoadingCalendar = () => {
         setManualOverrides(overridesMap);
         
         // Fetch all projects with installation dates
-        const { data: projectsData, error: projectsError } = await supabase
+        let projectsQuery = supabase
           .from('projects')
           .select('id, name, client, status, installation_date')
           .not('installation_date', 'is', null)
           .order('installation_date');
+        projectsQuery = applyTenantFilter(projectsQuery, tenant?.id);
+        const { data: projectsData, error: projectsError } = await projectsQuery;
           
         if (projectsError) throw projectsError;
         

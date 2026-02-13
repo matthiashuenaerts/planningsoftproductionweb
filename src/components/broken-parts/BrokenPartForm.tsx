@@ -11,10 +11,13 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Camera, Check, X, RotateCcw, Image } from 'lucide-react';
+import { useTenant } from '@/context/TenantContext';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 
 const BrokenPartForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { tenant } = useTenant();
   const { currentEmployee } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cameraMode, setCameraMode] = useState<'none' | 'camera' | 'preview'>('none');
@@ -35,13 +38,14 @@ const BrokenPartForm = () => {
 
   // Fetch projects
   const { data: projects = [] } = useQuery({
-    queryKey: ['projects'],
+    queryKey: ['projects', tenant?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('projects')
         .select('id, name')
         .order('name');
-
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     }
@@ -49,13 +53,14 @@ const BrokenPartForm = () => {
 
   // Fetch workstations
   const { data: workstations = [] } = useQuery({
-    queryKey: ['workstations'],
+    queryKey: ['workstations', tenant?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('workstations')
         .select('id, name')
         .order('name');
-
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     }
