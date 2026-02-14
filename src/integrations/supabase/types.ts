@@ -920,6 +920,45 @@ export type Database = {
           },
         ]
       }
+      calculation_variable_definitions: {
+        Row: {
+          created_at: string
+          default_value: number
+          description: string | null
+          display_name: string
+          display_order: number
+          id: string
+          is_active: boolean
+          tenant_id: string
+          updated_at: string
+          variable_key: string
+        }
+        Insert: {
+          created_at?: string
+          default_value?: number
+          description?: string | null
+          display_name: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          tenant_id?: string
+          updated_at?: string
+          variable_key: string
+        }
+        Update: {
+          created_at?: string
+          default_value?: number
+          description?: string | null
+          display_name?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          tenant_id?: string
+          updated_at?: string
+          variable_key?: string
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           chat_room_id: string
@@ -3057,6 +3096,51 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_calculation_variable_values: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          tenant_id: string
+          updated_at: string
+          value: number
+          variable_definition_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          tenant_id?: string
+          updated_at?: string
+          value?: number
+          variable_definition_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          tenant_id?: string
+          updated_at?: string
+          value?: number
+          variable_definition_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_calculation_variable_values_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_calculation_variable_values_variable_definition_id_fkey"
+            columns: ["variable_definition_id"]
+            isOneToOne: false
+            referencedRelation: "calculation_variable_definitions"
             referencedColumns: ["id"]
           },
         ]

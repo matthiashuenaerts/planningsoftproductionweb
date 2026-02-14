@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { projectCalculationService, CalculationTaskRelationship } from '@/services/projectCalculationService';
 import { standardTasksService } from '@/services/standardTasksService';
+import { calculationVariableDefinitionsService, CalculationVariableDefinition } from '@/services/calculationVariableDefinitionsService';
 import { Trash2, Plus } from 'lucide-react';
 import { useTenant } from '@/context/TenantContext';
 
@@ -18,23 +19,6 @@ interface StandardTask {
   task_number: string;
 }
 
-const VARIABLE_OPTIONS = [
-  'aantal_objecten',
-  'aantal_kasten',
-  'aantal_stuks',
-  'aantal_platen',
-  'aantal_zaagsnedes',
-  'aantal_lopende_meters_zaagsnede',
-  'aantal_verschillende_kantenbanden',
-  'aantal_lopende_meter_kantenbanden',
-  'aantal_drevel_programmas',
-  'aantal_cnc_programmas',
-  'aantal_boringen',
-  'aantal_kasten_te_monteren',
-  'aantal_manueel_te_monteren_kasten',
-  'aantal_manueel_te_monteren_objecten'
-];
-
 const CalculationRelationshipsSettings: React.FC = () => {
   const { tenant } = useTenant();
   const { toast } = useToast();
@@ -42,6 +26,7 @@ const CalculationRelationshipsSettings: React.FC = () => {
   const [saving, setSaving] = useState<string | null>(null);
   const [relationships, setRelationships] = useState<CalculationTaskRelationship[]>([]);
   const [standardTasks, setStandardTasks] = useState<StandardTask[]>([]);
+  const [variableDefinitions, setVariableDefinitions] = useState<CalculationVariableDefinition[]>([]);
   const [newRelationship, setNewRelationship] = useState({
     variable_name: '',
     standard_task_id: '',
@@ -57,13 +42,15 @@ const CalculationRelationshipsSettings: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [relationshipsData, tasksData] = await Promise.all([
+      const [relationshipsData, tasksData, variableDefs] = await Promise.all([
         projectCalculationService.getAllTaskRelationships(),
-        standardTasksService.getAll(tenant?.id)
+        standardTasksService.getAll(tenant?.id),
+        calculationVariableDefinitionsService.getAll()
       ]);
       
       setRelationships(relationshipsData);
       setStandardTasks(tasksData);
+      setVariableDefinitions(variableDefs);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -187,9 +174,9 @@ const CalculationRelationshipsSettings: React.FC = () => {
                     <SelectValue placeholder="Select variable" />
                   </SelectTrigger>
                   <SelectContent>
-                    {VARIABLE_OPTIONS.map(variable => (
-                      <SelectItem key={variable} value={variable}>
-                        {variable.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    {variableDefinitions.map(varDef => (
+                      <SelectItem key={varDef.variable_key} value={varDef.variable_key}>
+                        {varDef.display_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -223,7 +210,7 @@ const CalculationRelationshipsSettings: React.FC = () => {
                 className="font-mono"
               />
               <p className="text-sm text-muted-foreground mt-1">
-                Available variables: {VARIABLE_OPTIONS.join(', ')}
+                Available variables: {variableDefinitions.map(v => v.variable_key).join(', ')}
               </p>
             </div>
           </div>
@@ -250,7 +237,7 @@ const CalculationRelationshipsSettings: React.FC = () => {
                     <div>
                       <Label className="text-sm font-medium">Variable</Label>
                       <p className="text-sm">
-                        {relationship.variable_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        {variableDefinitions.find(v => v.variable_key === relationship.variable_name)?.display_name || relationship.variable_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                       </p>
                     </div>
                     <div>
