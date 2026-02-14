@@ -216,11 +216,13 @@ export const orderService = {
     }
   },
 
-  async getLogisticsOutOrders(): Promise<Order[]> {
-    const { data, error } = await supabase
+  async getLogisticsOutOrders(tenantId?: string | null): Promise<Order[]> {
+    let query = supabase
       .from('orders')
       .select('*, order_items(count)')
       .eq('order_type', 'semi-finished');
+    query = applyTenantFilter(query, tenantId);
+    const { data, error } = await query;
 
     if (error) throw error;
 
