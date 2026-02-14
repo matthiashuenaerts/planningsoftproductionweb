@@ -11,6 +11,7 @@ import { Settings, Plus, Trash2, Save, ArrowUpDown, Loader2 } from 'lucide-react
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import CalculationVariableDefinitionsSettings from '@/components/settings/CalculationVariableDefinitionsSettings';
 
 interface CsvImportConfig {
   id: string;
@@ -354,6 +355,7 @@ export const CsvImportConfigSettings: React.FC = () => {
         <TabsList className="mb-4">
           <TabsTrigger value="parts_list">Parts List Import</TabsTrigger>
           <TabsTrigger value="accessories">Accessories Import</TabsTrigger>
+          <TabsTrigger value="project_variables">Project Properties Variables</TabsTrigger>
         </TabsList>
         
         <TabsContent value="parts_list">
@@ -372,6 +374,10 @@ export const CsvImportConfigSettings: React.FC = () => {
             title="Accessories CSV Column Mappings"
             description="Configure how CSV column headers map to database fields for accessories imports."
           />
+        </TabsContent>
+        
+        <TabsContent value="project_variables">
+          <CalculationVariableDefinitionsSettings />
         </TabsContent>
       </Tabs>
     </div>
