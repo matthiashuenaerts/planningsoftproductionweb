@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { format, startOfDay, addDays, parseISO } from 'date-fns';
+import { format, startOfDay, addDays, parseISO, getDay, setHours, setMinutes } from 'date-fns';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -61,6 +61,7 @@ import ProductionCompletionTimeline, { ProjectCompletionData } from '@/component
 import { projectCompletionService } from '@/services/projectCompletionService';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
+import { recurringTaskService } from '@/services/recurringTaskService';
 
 interface WorkerTask {
   id: string;
@@ -1497,8 +1498,70 @@ const Planning = () => {
         }
       }
       
-      console.log(`Total schedule inserts: ${scheduleInserts.length}`);
-      console.log(`Total workstation schedule inserts: ${workstationScheduleInserts.length}`);
+      // Step 3b: Also add recurring tasks to personal & workstation schedules
+      const allRecurringSchedules = await recurringTaskService.getAll();
+      const activeRecurring = allRecurringSchedules.filter(r => r.is_active);
+      
+      if (activeRecurring.length > 0) {
+        // Get standard task names for titles
+        const { data: stdTasks } = await supabase
+          .from('standard_tasks')
+          .select('id, task_name, task_number');
+        const stdTaskMap = new Map((stdTasks || []).map(t => [t.id, t]));
+        
+        // Get employee names
+        const allEmpIds = [...new Set(activeRecurring.flatMap(r => r.employee_ids))];
+        const { data: empData } = await supabase
+          .from('employees')
+          .select('id, name')
+          .in('id', allEmpIds);
+        const empNameMap = new Map((empData || []).map(e => [e.id, e.name]));
+        
+        for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+          const currentDate = addDays(startDate, dayOffset);
+          const dayOfWeek = getDay(currentDate);
+          
+          const dayRecurrings = activeRecurring.filter(r => r.day_of_week === dayOfWeek);
+          
+          for (const recurring of dayRecurrings) {
+            const [sh, sm] = recurring.start_time.split(':').map(Number);
+            const [eh, em] = recurring.end_time.split(':').map(Number);
+            const slotStart = setMinutes(setHours(startOfDay(currentDate), sh), sm);
+            const slotEnd = setMinutes(setHours(startOfDay(currentDate), eh), em);
+            
+            const stdTask = stdTaskMap.get(recurring.standard_task_id);
+            const taskTitle = stdTask ? `🔄 ${stdTask.task_name}` : '🔄 Recurring Task';
+            
+            for (const employeeId of recurring.employee_ids) {
+              const employeeName = empNameMap.get(employeeId) || 'Unknown';
+              
+              scheduleInserts.push({
+                employee_id: employeeId,
+                task_id: null,
+                title: taskTitle,
+                description: recurring.notes || 'Recurring scheduled task',
+                start_time: slotStart.toISOString(),
+                end_time: slotEnd.toISOString(),
+                is_auto_generated: true,
+              });
+              
+              if (recurring.workstation_id) {
+                workstationScheduleInserts.push({
+                  workstation_id: recurring.workstation_id,
+                  task_id: null,
+                  task_title: taskTitle,
+                  user_name: employeeName,
+                  start_time: slotStart.toISOString(),
+                  end_time: slotEnd.toISOString(),
+                });
+              }
+            }
+          }
+        }
+      }
+      
+      console.log(`Total schedule inserts (incl. recurring): ${scheduleInserts.length}`);
+      console.log(`Total workstation schedule inserts (incl. recurring): ${workstationScheduleInserts.length}`);
       
       // Step 4: Insert in batches
       const batchSize = 100;

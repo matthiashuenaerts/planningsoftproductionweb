@@ -19,6 +19,7 @@ import { holidayService, Holiday } from '@/services/holidayService';
 import { ganttScheduleService } from '@/services/ganttScheduleService';
 import { automaticSchedulingService, ProjectCompletionInfo } from '@/services/automaticSchedulingService';
 import { projectCompletionService } from '@/services/projectCompletionService';
+import { recurringTaskService } from '@/services/recurringTaskService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -242,19 +243,80 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     })();
   }, []);
 
-  // Load saved schedules from database for the selected date
+  // Load saved schedules from database for the selected date, including recurring tasks
   const loadSavedSchedules = useCallback(async () => {
     try {
       const schedules = await ganttScheduleService.getSchedulesWithDetailsForDate(selectedDate);
-      setSavedSchedules(schedules);
       
-      if (schedules.length > 0) {
+      // Also load recurring tasks for this day and inject them as synthetic schedule entries
+      const dayOfWeek = getDay(selectedDate);
+      const recurringForDay = await recurringTaskService.getActiveForDay(dayOfWeek);
+      
+      const syntheticRecurring: any[] = [];
+      
+      for (const recurring of recurringForDay) {
+        const [sh, sm] = recurring.start_time.split(':').map(Number);
+        const [eh, em] = recurring.end_time.split(':').map(Number);
+        const slotStart = setMinutes(setHours(startOfDay(selectedDate), sh), sm);
+        const slotEnd = setMinutes(setHours(startOfDay(selectedDate), eh), em);
+        
+        // Look up the standard task name
+        const stdTask = standardTasks.find(st => st.id === recurring.standard_task_id);
+        const taskName = stdTask ? `🔄 ${stdTask.task_name}` : '🔄 Recurring Task';
+        
+        for (const employeeId of recurring.employee_ids) {
+          syntheticRecurring.push({
+            id: `recurring_${recurring.id}_${employeeId}`,
+            task_id: `recurring_${recurring.id}`,
+            workstation_id: recurring.workstation_id || '',
+            employee_id: employeeId,
+            scheduled_date: format(selectedDate, 'yyyy-MM-dd'),
+            start_time: slotStart.toISOString(),
+            end_time: slotEnd.toISOString(),
+            worker_index: 0,
+            tasks: {
+              id: `recurring_${recurring.id}`,
+              title: taskName,
+              description: recurring.notes || 'Recurring task',
+              duration: (eh * 60 + em) - (sh * 60 + sm),
+              status: 'TODO',
+              due_date: '',
+              phase_id: '',
+              standard_task_id: recurring.standard_task_id,
+              priority: 'medium',
+              phases: null,
+            },
+            employees: null, // Will be resolved from employee_id
+            workstations: recurring.workstation_id ? { id: recurring.workstation_id, name: '' } : null,
+            _isRecurring: true,
+          });
+        }
+      }
+      
+      // Fetch employee names for recurring entries
+      if (syntheticRecurring.length > 0) {
+        const empIds = [...new Set(syntheticRecurring.map(s => s.employee_id))];
+        const { data: empData } = await supabase
+          .from('employees')
+          .select('id, name')
+          .in('id', empIds);
+        
+        const empMap = new Map((empData || []).map(e => [e.id, e.name]));
+        syntheticRecurring.forEach(s => {
+          s.employees = { id: s.employee_id, name: empMap.get(s.employee_id) || 'Unknown' };
+        });
+      }
+      
+      const allSchedules = [...schedules, ...syntheticRecurring];
+      setSavedSchedules(allSchedules);
+      
+      if (allSchedules.length > 0) {
         setScheduleGenerated(true);
       }
     } catch (error) {
       console.error('Error loading saved schedules:', error);
     }
-  }, [selectedDate]);
+  }, [selectedDate, standardTasks]);
 
   // Load schedules when date changes
   useEffect(() => {
