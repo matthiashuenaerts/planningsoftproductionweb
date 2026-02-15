@@ -51,6 +51,9 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
   const [filePreview, setFilePreview] = useState<{ name: string; type: string; url?: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [date, setDate] = useState<Date>(initialValues?.deadline || new Date());
+  const [deadlineTime, setDeadlineTime] = useState<string>(
+    initialValues?.deadline ? format(initialValues.deadline, 'HH:mm') : '17:00'
+  );
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const { tenant } = useTenant();
@@ -149,10 +152,13 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
     }
   }, [initialValues?.attachment, setValue]);
   
-  // Update date in form when popover date changes
+  // Update date in form when popover date or time changes
   useEffect(() => {
-    setValue('deadline', date);
-  }, [date, setValue]);
+    const [hours, minutes] = deadlineTime.split(':').map(Number);
+    const combined = new Date(date);
+    combined.setHours(hours, minutes, 0, 0);
+    setValue('deadline', combined);
+  }, [date, deadlineTime, setValue]);
   
   // Camera functions
   const startCamera = async () => {
@@ -479,28 +485,37 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
           
           <div className="space-y-2">
             <label className="block text-sm font-medium">Deadline</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(newDate) => newDate && setDate(newDate)}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+            <div className="flex gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "flex-1 justify-start text-left font-normal",
+                      !date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? format(date, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(newDate) => newDate && setDate(newDate)}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+              <Input
+                type="time"
+                value={deadlineTime}
+                onChange={(e) => setDeadlineTime(e.target.value)}
+                className="w-28"
+              />
+            </div>
           </div>
           
           <div className="space-y-2">
