@@ -437,6 +437,28 @@ export const rushOrderService = {
         .eq('id', id);
         
       if (error) throw error;
+
+      // When marking as completed, also complete all linked tasks
+      if (status === 'completed') {
+        const { data: links, error: linksError } = await supabase
+          .from('rush_order_task_links')
+          .select('task_id')
+          .eq('rush_order_id', id);
+
+        if (linksError && linksError.code !== 'PGRST116') throw linksError;
+
+        const taskIds = (links || []).map((l: any) => l.task_id).filter(Boolean);
+
+        if (taskIds.length > 0) {
+          const { error: taskUpdateError } = await supabase
+            .from('tasks')
+            .update({ status: 'COMPLETED', updated_at: new Date().toISOString() })
+            .in('id', taskIds);
+
+          if (taskUpdateError) throw taskUpdateError;
+        }
+      }
+
       return true;
     } catch (error: any) {
       console.error('Error updating rush order status:', error);
