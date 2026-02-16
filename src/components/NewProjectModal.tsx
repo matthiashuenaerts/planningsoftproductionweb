@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format } from 'date-fns';
-import { CalendarIcon, Plus, Trash } from 'lucide-react';
+import { CalendarIcon, Plus, Trash, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from './ui/label';
 import { useTenant } from '@/context/TenantContext';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 
 // Add the missing interface
 interface NewProjectModalProps {
@@ -98,8 +99,12 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
   const { tenant } = useTenant();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncedData, setSyncedData] = useState<any>(null);
+  const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+  const [pendingTeamAssignment, setPendingTeamAssignment] = useState<any>(null);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [allTasks, setAllTasks] = useState<TaskItem[]>([]); // Store all tasks for filtering
+  const [allTasks, setAllTasks] = useState<TaskItem[]>([]);
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskWorkstation, setNewTaskWorkstation] = useState('');
   const [workstations, setWorkstations] = useState<{id: string, name: string}[]>([]);
@@ -345,6 +350,220 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
     return partialMatch?.id;
   };
 
+  // Helper to convert week number or dd/MM/yyyy to Date
+  const parseExternalDate = (input: string | null | undefined): Date | null => {
+    if (!input) return null;
+    const trimmed = String(input).trim();
+    // Support d/M/yyyy and dd/MM/yyyy
+    const m = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) {
+      const [, d, mth, y] = m;
+      return new Date(parseInt(y, 10), parseInt(mth, 10) - 1, parseInt(d, 10));
+    }
+    // Week number format (202544)
+    if (/^\d{6}$/.test(trimmed)) {
+      const year = parseInt(trimmed.substring(0, 4));
+      const week = parseInt(trimmed.substring(4, 6));
+      const jan1 = new Date(year, 0, 1);
+      const jan1Day = jan1.getDay();
+      const daysToFirstMonday = jan1Day === 0 ? 1 : (8 - jan1Day);
+      const firstMonday = new Date(year, 0, 1 + daysToFirstMonday);
+      return new Date(firstMonday.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000);
+    }
+    // ISO / other parseable string
+    try {
+      const date = new Date(trimmed);
+      if (!isNaN(date.getTime())) return date;
+    } catch (_) {}
+    return null;
+  };
+
+  const handleSyncProject = async () => {
+    const linkId = form.getValues('project_link_id');
+    if (!linkId?.trim()) {
+      toast({ title: 'Error', description: 'Please enter a Project Link ID first', variant: 'destructive' });
+      return;
+    }
+
+    setSyncing(true);
+    try {
+      // Load API configs from database
+      let projectsQuery = supabase.from('external_api_configs').select('*');
+      projectsQuery = applyTenantFilter(projectsQuery, tenant?.id);
+      const { data: configs } = await projectsQuery;
+
+      const projectsConfig = configs?.find((c: any) => c.api_type === 'projects');
+      const ordersConfig = configs?.find((c: any) => c.api_type === 'orders');
+
+      // --- 1. Fetch project data from Projects API ---
+      if (projectsConfig) {
+        try {
+          // Authenticate
+          const authRes = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/external-db-proxy', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
+            },
+            body: JSON.stringify({
+              action: 'authenticate',
+              baseUrl: projectsConfig.base_url,
+              username: projectsConfig.username,
+              password: projectsConfig.password
+            })
+          });
+          const authData = await authRes.json();
+          const projToken = authData?.response?.token;
+
+          if (projToken) {
+            // Query project data
+            const queryRes = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/external-db-proxy', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
+              },
+              body: JSON.stringify({
+                action: 'query',
+                baseUrl: projectsConfig.base_url,
+                token: projToken,
+                orderNumber: linkId.trim()
+              })
+            });
+            const queryData = await queryRes.json();
+
+            // Parse script result
+            let orderData: any = null;
+            try {
+              const scriptResult = queryData?.response?.scriptResult;
+              if (scriptResult) {
+                orderData = JSON.parse(scriptResult);
+              }
+            } catch (_) {}
+
+            if (orderData?.order) {
+              const order = orderData.order;
+              setSyncedData(order);
+
+              // Fill client name
+              if (order.klant) {
+                form.setValue('client', order.klant);
+              }
+
+              // Fill project name from order if available
+              if (order.projectnaam) {
+                form.setValue('project_name', order.projectnaam);
+              }
+
+              // Fill start date from order date (besteldatum)
+              if (order.besteldatum) {
+                const startDate = parseExternalDate(order.besteldatum);
+                if (startDate) form.setValue('start_date', startDate);
+              }
+
+              // Fill installation date from placement date
+              if (order.plaatsingsdatum) {
+                const instDate = parseExternalDate(order.plaatsingsdatum);
+                if (instDate) form.setValue('installation_date', instDate);
+              }
+
+              // Handle planning data (installation team, start/end dates)
+              if (Array.isArray(order.planning) && order.planning.length > 0) {
+                const planning = order.planning[0];
+                const planStart = parseExternalDate(planning.datum_start || planning.start_date);
+                const planEnd = parseExternalDate(planning.datum_einde || planning.end_date);
+
+                // Use planning start as installation date (overrides placement date)
+                if (planStart) {
+                  form.setValue('installation_date', planStart);
+                }
+
+                // Extract team info for later save
+                let teamNames: string[] = [];
+                if (planning.teams) {
+                  if (Array.isArray(planning.teams)) teamNames = planning.teams;
+                  else if (typeof planning.teams === 'string') teamNames = [planning.teams];
+                  else if (typeof planning.teams === 'object') teamNames = Object.values(planning.teams).filter(v => typeof v === 'string') as string[];
+                }
+
+                if (planStart && planEnd) {
+                  const diffDays = Math.round((planEnd.getTime() - planStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                  setPendingTeamAssignment({
+                    start_date: format(planStart, 'yyyy-MM-dd'),
+                    duration: diffDays,
+                    teams: teamNames
+                  });
+                }
+              }
+
+              toast({ title: 'Project Synced', description: `Data loaded for "${order.klant || linkId}"` });
+            } else {
+              toast({ title: 'No Data', description: 'No project data found for this Link ID', variant: 'destructive' });
+            }
+          }
+        } catch (err) {
+          console.error('Project sync error:', err);
+          toast({ title: 'Project Sync Failed', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+        }
+      }
+
+      // --- 2. Fetch orders from Orders API ---
+      if (ordersConfig) {
+        try {
+          const authRes = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/orders-api-proxy', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
+            },
+            body: JSON.stringify({
+              action: 'authenticate',
+              baseUrl: ordersConfig.base_url,
+              username: ordersConfig.username,
+              password: ordersConfig.password
+            })
+          });
+          const authData = await authRes.json();
+          const ordToken = authData?.response?.token;
+
+          if (ordToken) {
+            const queryRes = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/orders-api-proxy', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
+              },
+              body: JSON.stringify({
+                action: 'query',
+                baseUrl: ordersConfig.base_url,
+                token: ordToken,
+                projectLinkId: linkId.trim()
+              })
+            });
+            const ordersData = await queryRes.json();
+
+            if (ordersData?.bestellingen && Array.isArray(ordersData.bestellingen)) {
+              setPendingOrders(ordersData.bestellingen);
+              toast({ title: 'Orders Loaded', description: `${ordersData.bestellingen.length} orders found and will be imported on save` });
+            }
+          }
+        } catch (err) {
+          console.error('Orders sync error:', err);
+          toast({ title: 'Orders Sync Failed', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+        }
+      }
+
+      if (!projectsConfig && !ordersConfig) {
+        toast({ title: 'No API Configured', description: 'Please configure external database APIs in Settings first', variant: 'destructive' });
+      }
+    } catch (err) {
+      console.error('Sync error:', err);
+      toast({ title: 'Sync Failed', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const onSubmit = async (data: FormValues) => {
     if (submitting) return; // Prevent multiple submissions
     
@@ -481,13 +700,128 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         }
       }
       
+      // --- Save pending orders from sync ---
+      if (pendingOrders.length > 0) {
+        let importedCount = 0;
+        for (const bestelling of pendingOrders) {
+          try {
+            const orderNumber = bestelling.bestelnummer || bestelling.ordernummer || '';
+            const supplier = bestelling.leverancier || 'Unknown';
+            const deliveryWeek = bestelling.leverweek;
+            const isDelivered = bestelling.isVolledigOntvangen;
+
+            // Convert delivery week to date
+            let expectedDeliveryDate = new Date().toISOString();
+            if (deliveryWeek && /^\d{6}$/.test(deliveryWeek)) {
+              const year = parseInt(deliveryWeek.substring(0, 4));
+              const week = parseInt(deliveryWeek.substring(4, 6));
+              const jan1 = new Date(year, 0, 1);
+              const jan1Day = jan1.getDay();
+              const daysToFirstMonday = jan1Day === 0 ? 1 : (8 - jan1Day);
+              const firstMonday = new Date(year, 0, 1 + daysToFirstMonday);
+              const targetDate = new Date(firstMonday.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000);
+              expectedDeliveryDate = targetDate.toISOString();
+            }
+
+            const orderStatus = isDelivered ? 'delivered' : 'pending';
+            const itemsCount = Array.isArray(bestelling.artikelen) ? bestelling.artikelen.length : 0;
+
+            const { data: order, error: orderError } = await supabase
+              .from('orders')
+              .upsert({
+                external_order_number: orderNumber,
+                project_id: newProject.id,
+                supplier,
+                order_date: new Date().toISOString(),
+                expected_delivery: expectedDeliveryDate,
+                status: orderStatus,
+                order_type: 'external',
+                notes: `Imported from Orders API | Supplier: ${supplier} | Delivery week: ${deliveryWeek || 'N/A'} | Items: ${itemsCount}`,
+              }, { onConflict: 'external_order_number', ignoreDuplicates: false })
+              .select()
+              .single();
+
+            if (orderError) {
+              console.error(`Error importing order ${orderNumber}:`, orderError);
+              continue;
+            }
+
+            // Process order items
+            if (Array.isArray(bestelling.artikelen) && bestelling.artikelen.length > 0 && order) {
+              const itemsToInsert = bestelling.artikelen.map((artikel: any) => {
+                const qty = parseInt(artikel.aantal) || 1;
+                return {
+                  order_id: order.id,
+                  description: artikel.omschrijving || 'No description',
+                  quantity: qty,
+                  delivered_quantity: isDelivered ? qty : 0,
+                  article_code: artikel.artikel || null,
+                  ean: artikel.ean || null,
+                  notes: artikel.categorie ? `Category: ${artikel.categorie}` : null,
+                };
+              });
+
+              await supabase.from('order_items').insert(itemsToInsert);
+            }
+            importedCount++;
+          } catch (err) {
+            console.error('Error importing order:', err);
+          }
+        }
+        console.log(`Imported ${importedCount} orders for new project`);
+      }
+
+      // --- Save pending team assignment from sync ---
+      if (pendingTeamAssignment) {
+        try {
+          // Try to match team
+          const { data: placementTeams } = await supabase
+            .from('placement_teams')
+            .select('id, name, external_team_names');
+
+          let teamId: string | null = null;
+          let teamName = 'unnamed';
+
+          if (pendingTeamAssignment.teams?.length > 0 && placementTeams) {
+            for (const teamText of pendingTeamAssignment.teams) {
+              const normalized = teamText.trim().toLowerCase();
+              const match = placementTeams.find((t: any) =>
+                t.external_team_names?.some((extName: string) => {
+                  const n = extName.trim().toLowerCase();
+                  return n === normalized || normalized.includes(n) || n.includes(normalized);
+                })
+              );
+              if (match) {
+                teamId = match.id;
+                teamName = match.name;
+                break;
+              }
+            }
+            if (!teamId) teamName = pendingTeamAssignment.teams[0];
+          }
+
+          await supabase.from('project_team_assignments').upsert({
+            project_id: newProject.id,
+            team_id: teamId,
+            team: teamName,
+            start_date: pendingTeamAssignment.start_date,
+            duration: pendingTeamAssignment.duration,
+          }, { onConflict: 'project_id' });
+        } catch (err) {
+          console.error('Error saving team assignment:', err);
+        }
+      }
+
       toast({
         title: "Success",
-        description: `Project created successfully with ${selectedTasks.length} tasks`,
+        description: `Project created successfully with ${selectedTasks.length} tasks${pendingOrders.length > 0 ? ` and ${pendingOrders.length} orders imported` : ''}`,
       });
       
       form.reset();
       setProjectCode('');
+      setSyncedData(null);
+      setPendingOrders([]);
+      setPendingTeamAssignment(null);
       onOpenChange(false);
       if (onSuccess) onSuccess();
     } catch (error: any) {
@@ -512,6 +846,41 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
               
+              {/* Project Link ID + Sync Button - at the top */}
+              <FormField
+                control={form.control}
+                name="project_link_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Project Link ID</FormLabel>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <Input placeholder="Enter project link ID (optional)" {...field} />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleSyncProject}
+                        disabled={syncing || !field.value?.trim()}
+                      >
+                        {syncing ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                        )}
+                        Sync
+                      </Button>
+                    </div>
+                    {syncedData && (
+                      <div className="text-xs text-green-600 mt-1">
+                        ✓ Synced{pendingOrders.length > 0 ? ` — ${pendingOrders.length} orders ready to import` : ''}
+                      </div>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* Project Type Toggle */}
               <FormField
                 control={form.control}
@@ -599,19 +968,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 )}
               />
               
-              <FormField
-                control={form.control}
-                name="project_link_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Project Link ID</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter project link ID (optional)" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Project Link ID is at the top of the form */}
               
               <FormField
                 control={form.control}
