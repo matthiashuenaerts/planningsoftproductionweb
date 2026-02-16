@@ -47,6 +47,7 @@ import {
 import { Label } from './ui/label';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
+import { useLanguage } from '@/context/LanguageContext';
 
 // Add the missing interface
 interface NewProjectModalProps {
@@ -97,6 +98,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 }) => {
   const { toast } = useToast();
   const { tenant } = useTenant();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -170,8 +172,8 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
     } catch (error) {
       console.error('Error generating project code:', error);
       toast({
-        title: "Error",
-        description: "Failed to generate project code",
+        title: t('npm_error'),
+        description: t('npm_failed_generate_code'),
         variant: "destructive"
       });
     } finally {
@@ -237,8 +239,8 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       } catch (error) {
         console.error('Error fetching data:', error);
         toast({
-          title: "Error",
-          description: "Failed to load standard tasks and workstations",
+          title: t('npm_error'),
+          description: t('npm_failed_load_tasks'),
           variant: "destructive"
         });
       } finally {
@@ -274,9 +276,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       setTasks(filteredTasks);
     } catch (error) {
       console.error('Error loading route tasks:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load route tasks",
+        toast({
+          title: t('npm_error'),
+          description: t('npm_failed_load_route'),
         variant: "destructive"
       });
     }
@@ -381,7 +383,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
   const handleSyncProject = async () => {
     const linkId = form.getValues('project_link_id');
     if (!linkId?.trim()) {
-      toast({ title: 'Error', description: 'Please enter a Project Link ID first', variant: 'destructive' });
+      toast({ title: t('npm_error'), description: t('npm_enter_link_id'), variant: 'destructive' });
       return;
     }
 
@@ -496,14 +498,14 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 }
               }
 
-              toast({ title: 'Project Synced', description: `Data loaded for "${order.klant || linkId}"` });
+              toast({ title: t('npm_project_synced'), description: t('npm_data_loaded', { name: order.klant || linkId }) });
             } else {
-              toast({ title: 'No Data', description: 'No project data found for this Link ID', variant: 'destructive' });
+              toast({ title: t('npm_no_data'), description: t('npm_no_data_found'), variant: 'destructive' });
             }
           }
         } catch (err) {
           console.error('Project sync error:', err);
-          toast({ title: 'Project Sync Failed', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+          toast({ title: t('npm_project_sync_failed'), description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
         }
       }
 
@@ -544,21 +546,21 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
             if (ordersData?.bestellingen && Array.isArray(ordersData.bestellingen)) {
               setPendingOrders(ordersData.bestellingen);
-              toast({ title: 'Orders Loaded', description: `${ordersData.bestellingen.length} orders found and will be imported on save` });
+              toast({ title: t('npm_orders_loaded'), description: t('npm_orders_found', { count: ordersData.bestellingen.length }) });
             }
           }
         } catch (err) {
           console.error('Orders sync error:', err);
-          toast({ title: 'Orders Sync Failed', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+          toast({ title: t('npm_orders_sync_failed'), description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
         }
       }
 
       if (!projectsConfig && !ordersConfig) {
-        toast({ title: 'No API Configured', description: 'Please configure external database APIs in Settings first', variant: 'destructive' });
+        toast({ title: t('npm_no_api_configured'), description: t('npm_configure_api'), variant: 'destructive' });
       }
     } catch (err) {
       console.error('Sync error:', err);
-      toast({ title: 'Sync Failed', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+      toast({ title: t('npm_sync_failed'), description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
     } finally {
       setSyncing(false);
     }
@@ -813,8 +815,10 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       }
 
       toast({
-        title: "Success",
-        description: `Project created successfully with ${selectedTasks.length} tasks${pendingOrders.length > 0 ? ` and ${pendingOrders.length} orders imported` : ''}`,
+        title: t('npm_success'),
+        description: pendingOrders.length > 0
+          ? t('npm_project_created_orders', { tasks: String(selectedTasks.length), orders: String(pendingOrders.length) })
+          : t('npm_project_created', { tasks: String(selectedTasks.length) }),
       });
       
       form.reset();
@@ -826,8 +830,8 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       if (onSuccess) onSuccess();
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: `Failed to create project: ${error.message}`,
+        title: t('npm_error'),
+        description: t('npm_failed_create', { message: error.message }),
         variant: "destructive",
       });
     } finally {
@@ -839,7 +843,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>Create New Project</DialogTitle>
+          <DialogTitle>{t('npm_create_new_project')}</DialogTitle>
         </DialogHeader>
         
         <ScrollArea className="max-h-[70vh] pr-4">
@@ -852,10 +856,10 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 name="project_link_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Project Link ID</FormLabel>
+                    <FormLabel>{t('npm_project_link_id')}</FormLabel>
                     <div className="flex gap-2">
                       <FormControl>
-                        <Input placeholder="Enter project link ID (optional)" {...field} />
+                        <Input placeholder={t('npm_project_link_placeholder')} {...field} />
                       </FormControl>
                       <Button
                         type="button"
@@ -868,12 +872,12 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                         ) : (
                           <RefreshCw className="h-4 w-4 mr-2" />
                         )}
-                        Sync
+                        {t('npm_sync')}
                       </Button>
                     </div>
                     {syncedData && (
-                      <div className="text-xs text-green-600 mt-1">
-                        ✓ Synced{pendingOrders.length > 0 ? ` — ${pendingOrders.length} orders ready to import` : ''}
+                      <div className="text-xs text-muted-foreground mt-1">
+                        ✓ {t('npm_synced')}{pendingOrders.length > 0 ? ` — ${t('npm_orders_ready', { count: String(pendingOrders.length) })}` : ''}
                       </div>
                     )}
                     <FormMessage />
@@ -888,9 +892,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 render={({ field }) => (
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
-                      <FormLabel className="text-base">Project Type</FormLabel>
+                      <FormLabel className="text-base">{t('npm_project_type')}</FormLabel>
                       <div className="text-sm text-muted-foreground">
-                        {field.value ? 'After-sales Service (11)' : 'Normal Project (10)'}
+                        {field.value ? t('npm_after_sales') : t('npm_normal_project')}
                       </div>
                     </div>
                     <FormControl>
@@ -906,15 +910,15 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
               {/* Project Code Display */}
               <div className="rounded-lg border p-4 bg-muted/50">
-                <div className="text-sm font-medium text-muted-foreground mb-1">Generated Project Code</div>
+                <div className="text-sm font-medium text-muted-foreground mb-1">{t('npm_generated_code')}</div>
                 <div className="text-lg font-mono font-bold">
                   {isGeneratingCode ? (
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating...
+                      {t('npm_generating')}
                     </div>
                   ) : (
-                    projectCode || 'Error generating code'
+                    projectCode || t('npm_error_generating')
                   )}
                 </div>
               </div>
@@ -924,12 +928,12 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 name="project_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Project Name</FormLabel>
+                    <FormLabel>{t('npm_project_name')}</FormLabel>
                     <FormControl>
                       <Input placeholder="Kitchen Pro - Client XYZ" {...field} />
                     </FormControl>
                     <div className="text-sm text-muted-foreground">
-                      Full name will be: <span className="font-mono">{projectCode}_</span><span className="font-medium">{field.value || 'Project Name'}</span>
+                      {t('npm_full_name_will_be')} <span className="font-mono">{projectCode}_</span><span className="font-medium">{field.value || t('npm_project_name')}</span>
                     </div>
                     <FormMessage />
                   </FormItem>
@@ -941,9 +945,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 name="client"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Client</FormLabel>
+                    <FormLabel>{t('npm_client')}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Client Name" {...field} />
+                      <Input placeholder={t('npm_client_placeholder')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -955,10 +959,10 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>{t('npm_description')}</FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Project details..." 
+                        placeholder={t('npm_description_placeholder')} 
                         className="resize-none" 
                         {...field} 
                       />
@@ -975,7 +979,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 name="project_value"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Project Value (1-100)</FormLabel>
+                    <FormLabel>{t('npm_project_value')}</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
@@ -996,7 +1000,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   name="start_date"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Start Date</FormLabel>
+                      <FormLabel>{t('npm_start_date')}</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -1010,7 +1014,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                               {field.value ? (
                                 format(field.value, "PPP")
                               ) : (
-                                <span>Pick a date</span>
+                                <span>{t('npm_pick_date')}</span>
                               )}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
@@ -1037,7 +1041,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   name="installation_date"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Installation Date</FormLabel>
+                      <FormLabel>{t('npm_installation_date')}</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -1051,7 +1055,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                               {field.value ? (
                                 format(field.value, "PPP")
                               ) : (
-                                <span>Pick a date</span>
+                                <span>{t('npm_pick_date')}</span>
                               )}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
@@ -1079,15 +1083,15 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
               <div className="border rounded-md p-4">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-medium">Project Tasks</h3>
+                  <h3 className="font-medium">{t('npm_project_tasks')}</h3>
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="route-select" className="text-sm whitespace-nowrap">Production Route:</Label>
+                    <Label htmlFor="route-select" className="text-sm whitespace-nowrap">{t('npm_production_route')}</Label>
                     <Select value={selectedRouteId} onValueChange={handleRouteChange}>
                       <SelectTrigger id="route-select" className="w-[200px]">
-                        <SelectValue placeholder="All Tasks" />
+                        <SelectValue placeholder={t('npm_all_tasks')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Tasks</SelectItem>
+                        <SelectItem value="all">{t('npm_all_tasks')}</SelectItem>
                         {routes.map(route => (
                           <SelectItem key={route.id} value={route.id}>
                             {route.name}
@@ -1140,13 +1144,13 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 <div className="grid grid-cols-1 gap-2 mt-2">
                   <div className="flex gap-2">
                     <Input
-                      placeholder="New task name"
+                      placeholder={t('npm_new_task_placeholder')}
                       value={newTaskName}
                       onChange={(e) => setNewTaskName(e.target.value)}
                       className="flex-1"
                     />
                     <Input
-                      placeholder="Workstation (optional)"
+                      placeholder={t('npm_workstation_placeholder')}
                       value={newTaskWorkstation}
                       onChange={(e) => setNewTaskWorkstation(e.target.value)}
                       className="flex-1"
@@ -1165,19 +1169,19 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
               <DialogFooter className="pt-4">
                 <DialogClose asChild>
                   <Button type="button" variant="outline" disabled={submitting}>
-                    Cancel
+                    {t('npm_cancel')}
                   </Button>
                 </DialogClose>
                 <Button type="submit" disabled={isGeneratingCode || submitting}>
                   {submitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating Project...
+                      {t('npm_creating_project')}
                     </>
                   ) : isGeneratingCode ? (
-                    'Generating Code...'
+                    t('npm_generating_code')
                   ) : (
-                    'Create Project'
+                    t('npm_create_project')
                   )}
                 </Button>
               </DialogFooter>
