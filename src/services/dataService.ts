@@ -754,25 +754,54 @@ export const taskService = {
           .from('tasks')
           .select(`
             *,
-            phases!inner(project_id)
+            phases!inner(project_id),
+            task_workstation_links(workstation_id)
           `)
           .eq('id', id)
           .single();
         
         if (fetchError) throw fetchError;
         
+        const projectId = (currentTask as any).phases.project_id;
+        
         if (currentTask.standard_task_id) {
-          const projectId = (currentTask as any).phases.project_id;
-          
           // After updating this task, check all HOLD tasks in the same project
-          // to see if any can be moved to TODO status
           setTimeout(async () => {
             try {
               await this.checkAndUpdateHoldTasks(projectId);
             } catch (error) {
               console.error('Error checking hold tasks:', error);
             }
-          }, 1000); // Small delay to ensure the task update is committed
+          }, 1000);
+        }
+
+        // Parts tracking: check if this was the last task for this project in each linked workstation
+        const workstationIds = ((currentTask as any).task_workstation_links || []).map((l: any) => l.workstation_id);
+        if (workstationIds.length > 0) {
+          setTimeout(async () => {
+            try {
+              const { partTrackingService } = await import('@/services/partTrackingService');
+              for (const wsId of workstationIds) {
+                // Check if there are remaining incomplete tasks for this project in this workstation
+                const { data: remainingTasks } = await supabase
+                  .from('tasks')
+                  .select('id, phases!inner(project_id), task_workstation_links!inner(workstation_id)')
+                  .eq('phases.project_id', projectId)
+                  .eq('task_workstation_links.workstation_id', wsId)
+                  .in('status', ['TODO', 'IN_PROGRESS']);
+
+                if (!remainingTasks || remainingTasks.length === 0) {
+                  // Last task completed - mark parts as completed for this workstation
+                  const count = await partTrackingService.completePartsForWorkstation(projectId, wsId);
+                  if (count > 0) {
+                    console.log(`Parts tracking: marked ${count} parts as completed for workstation ${wsId} in project ${projectId}`);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('Error updating parts tracking:', error);
+            }
+          }, 1500);
         }
       }
     }

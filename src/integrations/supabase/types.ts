@@ -2240,6 +2240,61 @@ export type Database = {
           },
         ]
       }
+      part_workstation_tracking: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          part_id: string
+          status: string
+          tenant_id: string
+          updated_at: string
+          workstation_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          part_id: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          workstation_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          part_id?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          workstation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "part_workstation_tracking_part_id_fkey"
+            columns: ["part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "part_workstation_tracking_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "part_workstation_tracking_workstation_id_fkey"
+            columns: ["workstation_id"]
+            isOneToOne: false
+            referencedRelation: "workstations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parts: {
         Row: {
           aantal: number | null
@@ -5357,6 +5412,93 @@ export type Database = {
           },
           {
             foreignKeyName: "workstation_errors_workstation_id_fkey"
+            columns: ["workstation_id"]
+            isOneToOne: false
+            referencedRelation: "workstations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workstation_part_tracking_conditions: {
+        Row: {
+          column_name: string
+          created_at: string
+          id: string
+          operator: string
+          rule_id: string
+          tenant_id: string
+          value: string | null
+        }
+        Insert: {
+          column_name: string
+          created_at?: string
+          id?: string
+          operator?: string
+          rule_id: string
+          tenant_id?: string
+          value?: string | null
+        }
+        Update: {
+          column_name?: string
+          created_at?: string
+          id?: string
+          operator?: string
+          rule_id?: string
+          tenant_id?: string
+          value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workstation_part_tracking_conditions_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "workstation_part_tracking_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workstation_part_tracking_conditions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workstation_part_tracking_rules: {
+        Row: {
+          created_at: string
+          id: string
+          logic_operator: string
+          tenant_id: string
+          updated_at: string
+          workstation_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          logic_operator?: string
+          tenant_id?: string
+          updated_at?: string
+          workstation_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          logic_operator?: string
+          tenant_id?: string
+          updated_at?: string
+          workstation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workstation_part_tracking_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workstation_part_tracking_rules_workstation_id_fkey"
             columns: ["workstation_id"]
             isOneToOne: false
             referencedRelation: "workstations"

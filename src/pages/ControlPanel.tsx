@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { workstationService } from '@/services/workstationService';
 import { floorplanService, WorkstationStatus } from '@/services/floorplanService';
 import { workstationErrorService } from '@/services/workstationErrorService';
-import { ArrowRight, Activity, AlertCircle, CheckCircle2, Clock, Users, AlertTriangle, Truck, Calendar, Zap } from 'lucide-react';
+import { ArrowRight, Activity, AlertCircle, CheckCircle2, Clock, Users, AlertTriangle, Truck, Calendar, Zap, Package } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import { format, subDays, isWeekend, differenceInDays, startOfDay } from 'date-f
 import { holidayService } from '@/services/holidayService';
 import { rushOrderService } from '@/services/rushOrderService';
 import { useTenant } from '@/context/TenantContext';
+import { partTrackingService } from '@/services/partTrackingService';
 
 interface LoadingAssignment {
   project: {
@@ -33,6 +34,7 @@ const ControlPanel: React.FC = () => {
   const [workstationStatuses, setWorkstationStatuses] = useState<WorkstationStatus[]>([]);
   const [workstationErrors, setWorkstationErrors] = useState<Record<string, number>>({});
   const [workstationBufferTimes, setWorkstationBufferTimes] = useState<Record<string, number>>({});
+  const [workstationPartCounts, setWorkstationPartCounts] = useState<Record<string, number>>({});
   const [activeEmployees, setActiveEmployees] = useState<any[]>([]);
   const [rushOrdersCount, setRushOrdersCount] = useState(0);
   const [selectedProductionLine, setSelectedProductionLine] = useState<number | null>(null);
@@ -69,6 +71,7 @@ const ControlPanel: React.FC = () => {
 
   useEffect(() => {
     loadStatuses();
+    loadPartCounts();
     loadTruckLoadingData();
     loadActiveEmployees();
     loadRushOrders();
@@ -87,6 +90,18 @@ const ControlPanel: React.FC = () => {
       clearInterval(loadingInterval);
     };
   }, []);
+
+  const loadPartCounts = async () => {
+    try {
+      const counts: Record<string, number> = {};
+      for (const ws of workstations) {
+        counts[ws.id] = await partTrackingService.getBufferedPartCount(ws.id);
+      }
+      setWorkstationPartCounts(counts);
+    } catch (error) {
+      console.error('Error loading part counts:', error);
+    }
+  };
 
   const loadRushOrders = async () => {
     try {
@@ -406,19 +421,31 @@ const ControlPanel: React.FC = () => {
               const bufferMinutes = workstationBufferTimes[workstation.id] || 0;
               const bufferHours = Math.floor(bufferMinutes / 60);
               const remainingMinutes = bufferMinutes % 60;
+              const partCount = workstationPartCounts[workstation.id] || 0;
               
               return (
                 <React.Fragment key={workstation.id}>
                   {index > 0 && (
                     <div className="flex flex-col items-center gap-1.5">
-                      {bufferMinutes > 0 && (
+                      {(bufferMinutes > 0 || partCount > 0) && (
                         <div className="flex flex-col items-center bg-slate-700/50 px-2 py-1 rounded-lg border border-slate-600">
-                          <Clock className="w-3 h-3 text-blue-400 mb-0.5" />
-                          <span className="text-white font-semibold text-xs">
-                            {bufferHours > 0 && `${bufferHours}h `}
-                            {remainingMinutes > 0 && `${remainingMinutes}m`}
-                          </span>
-                          <span className="text-slate-400 text-xs">buffer</span>
+                          {bufferMinutes > 0 && (
+                            <>
+                              <Clock className="w-3 h-3 text-blue-400 mb-0.5" />
+                              <span className="text-white font-semibold text-xs">
+                                {bufferHours > 0 && `${bufferHours}h `}
+                                {remainingMinutes > 0 && `${remainingMinutes}m`}
+                              </span>
+                              <span className="text-slate-400 text-xs">buffer</span>
+                            </>
+                          )}
+                          {partCount > 0 && (
+                            <>
+                              <Package className="w-3 h-3 text-amber-400 mb-0.5 mt-1" />
+                              <span className="text-white font-semibold text-xs">{partCount}</span>
+                              <span className="text-slate-400 text-xs">parts</span>
+                            </>
+                          )}
                         </div>
                       )}
                       <ArrowRight className="w-6 h-6 text-slate-600 flex-shrink-0" />

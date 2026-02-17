@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { csvImportConfigService } from './csvImportConfigService';
+import { partTrackingService } from './partTrackingService';
 
 export interface PartsList {
   id: string;
@@ -107,6 +108,13 @@ export class PartsListService {
         .insert(parts);
 
       if (partsError) throw partsError;
+    }
+
+    // Auto-generate tracking records for this parts list
+    try {
+      await partTrackingService.generateTrackingForPartsList(partsList.id);
+    } catch (trackingError) {
+      console.error('Error generating parts tracking:', trackingError);
     }
 
     return partsList;

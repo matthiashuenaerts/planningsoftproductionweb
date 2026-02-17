@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package, Barcode, Loader2, CheckCircle } from 'lucide-react';
+import { PlayCircle, Clock, Users, FileText, AlertTriangle, ExternalLink, Package, Barcode, Loader2, CheckCircle, ScanBarcode } from 'lucide-react';
 import { format, differenceInDays, isAfter, isBefore } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
@@ -25,6 +25,7 @@ import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import TaskCompletionChecklistDialog from '@/components/TaskCompletionChecklistDialog';
 import TaskExtraTimeDialog from '@/components/TaskExtraTimeDialog';
 import { useLanguage } from '@/context/LanguageContext';
+import { partTrackingService } from '@/services/partTrackingService';
 
 interface WorkstationViewProps {
   workstationName?: string;
@@ -43,6 +44,22 @@ interface ExtendedTask extends Task {
   is_workstation_task?: boolean;
   isCompleting?: boolean;
 }
+
+// Small helper component for parts count badge
+const PartsCountBadge: React.FC<{ workstationId: string }> = ({ workstationId }) => {
+  const { data: count = 0 } = useQuery({
+    queryKey: ['partsCount', workstationId],
+    queryFn: () => partTrackingService.getBufferedPartCount(workstationId),
+    refetchInterval: 30000,
+  });
+  if (count === 0) return null;
+  return (
+    <Badge variant="secondary" className="text-lg px-3 py-1 gap-1">
+      <Package className="h-4 w-4" />
+      {count} parts
+    </Badge>
+  );
+};
 
 const WorkstationView: React.FC<WorkstationViewProps> = ({
   workstationName,
@@ -978,9 +995,16 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
               {t('back')}
             </Button>
           )}
-          <Badge variant="outline" className="text-lg px-3 py-1">
-            {t('active_tasks', { count: tasks.length.toString() })}
-          </Badge>
+          <div className="flex gap-2 items-center">
+            {(() => {
+              const wsId = workstationId;
+              if (!wsId) return null;
+              return <PartsCountBadge workstationId={wsId} />;
+            })()}
+            <Badge variant="outline" className="text-lg px-3 py-1">
+              {t('active_tasks', { count: tasks.length.toString() })}
+            </Badge>
+          </div>
         </div>
       </div>
       
