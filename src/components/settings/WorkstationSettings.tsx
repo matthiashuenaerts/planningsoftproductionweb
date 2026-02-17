@@ -34,12 +34,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { PlusCircle, Edit, Trash, Loader2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash, Loader2, ScanBarcode } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { workstationService, Workstation } from '@/services/workstationService';
 import { useForm } from 'react-hook-form';
 import { TaskWorkstationsManager } from './TaskWorkstationsManager';
 import { WorkstationTasksManager } from './WorkstationTasksManager';
+import PartsTrackingSettingsDialog from './PartsTrackingSettingsDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/context/TenantContext';
 const WorkstationSettings: React.FC = () => {
@@ -54,6 +55,7 @@ const WorkstationSettings: React.FC = () => {
   const [showTasksManager, setShowTasksManager] = useState(false);
   const [showImageDialog, setShowImageDialog] = useState(false);
   const [showIconDialog, setShowIconDialog] = useState(false);
+  const [showPartsTracking, setShowPartsTracking] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -388,6 +390,17 @@ const WorkstationSettings: React.FC = () => {
                             }}
                           >
                             Workstation Tasks
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedWorkstation(workstation);
+                              setShowPartsTracking(true);
+                            }}
+                          >
+                            <ScanBarcode className="h-3 w-3 mr-1" />
+                            Parts Tracking
                           </Button>
                           <Button
                             variant="outline"
@@ -730,6 +743,15 @@ const WorkstationSettings: React.FC = () => {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {selectedWorkstation && (
+        <PartsTrackingSettingsDialog
+          isOpen={showPartsTracking}
+          onClose={() => setShowPartsTracking(false)}
+          workstationId={selectedWorkstation.id}
+          workstationName={selectedWorkstation.name}
+        />
+      )}
     </div>
   );
 };
