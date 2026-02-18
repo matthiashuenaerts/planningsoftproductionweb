@@ -10,8 +10,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import {
   Building2, Users, Globe, Plus, Trash2, ExternalLink,
-  ChevronDown, ChevronRight, LogOut, Shield,
+  ChevronDown, ChevronRight, LogOut, Shield, Rocket,
 } from "lucide-react";
+import TenantOnboardingWizard from "@/components/developer/TenantOnboardingWizard";
 
 type TenantRow = {
   id: string;
@@ -97,6 +98,8 @@ const DeveloperPortal: React.FC = () => {
   // Alias form per tenant
   const [aliasInputs, setAliasInputs] = useState<Record<string, string>>({});
 
+  // Onboarding wizard state
+  const [onboardingTenant, setOnboardingTenant] = useState<{ id: string; name: string; slug: string } | null>(null);
   const suggestedSlug = name
     .toLowerCase()
     .trim()
@@ -120,12 +123,13 @@ const DeveloperPortal: React.FC = () => {
 
     try {
       setSaving(true);
-      const { error } = await supabase.from("tenants").insert({
-        name: name.trim(),
+      const tenantName = name.trim();
+      const { data: inserted, error } = await supabase.from("tenants").insert({
+        name: tenantName,
         slug: finalSlug,
         custom_domain: customDomain.trim() || null,
         is_active: true,
-      });
+      }).select("id").single();
       if (error) throw error;
 
       setName("");
@@ -133,6 +137,9 @@ const DeveloperPortal: React.FC = () => {
       setCustomDomain("");
       await qc.invalidateQueries({ queryKey: ["dev"] });
       toast({ title: "Tenant created", description: `Created ${finalSlug}` });
+      
+      // Open onboarding wizard for the new tenant
+      setOnboardingTenant({ id: inserted.id, name: tenantName, slug: finalSlug });
     } catch (e: any) {
       toast({ title: "Failed", description: e?.message ?? "Error creating tenant", variant: "destructive" });
     } finally {
@@ -311,6 +318,14 @@ const DeveloperPortal: React.FC = () => {
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="text-blue-400 hover:text-blue-300"
+                          onClick={() => setOnboardingTenant({ id: t.id, name: t.name, slug: t.slug })}
+                        >
+                          <Rocket className="h-4 w-4 mr-1" /> Setup
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="text-slate-400 hover:text-white"
                           onClick={() => toggleTenantActive.mutate({ id: t.id, is_active: !t.is_active })}
                         >
@@ -423,6 +438,18 @@ const DeveloperPortal: React.FC = () => {
           )}
         </div>
       </div>
+      {onboardingTenant && (
+        <TenantOnboardingWizard
+          tenantId={onboardingTenant.id}
+          tenantName={onboardingTenant.name}
+          tenantSlug={onboardingTenant.slug}
+          onComplete={() => {
+            setOnboardingTenant(null);
+            qc.invalidateQueries({ queryKey: ["dev"] });
+          }}
+          onCancel={() => setOnboardingTenant(null)}
+        />
+      )}
     </main>
   );
 };
