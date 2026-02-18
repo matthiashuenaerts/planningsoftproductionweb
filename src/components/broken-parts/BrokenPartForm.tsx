@@ -13,12 +13,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { Camera, Check, X, RotateCcw, Image } from 'lucide-react';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
+import { useLanguage } from '@/context/LanguageContext';
 
 const BrokenPartForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { tenant } = useTenant();
   const { currentEmployee } = useAuth();
+  const { createLocalizedPath } = useLanguage();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cameraMode, setCameraMode] = useState<'none' | 'camera' | 'preview'>('none');
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -229,7 +231,7 @@ const BrokenPartForm = () => {
         description: "Broken part reported successfully",
       });
       
-      navigate('/broken-parts');
+      navigate(createLocalizedPath('/broken-parts'));
     } catch (error) {
       console.error('Error reporting broken part:', error);
       toast({
