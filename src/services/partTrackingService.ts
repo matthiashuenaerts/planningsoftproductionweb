@@ -287,16 +287,13 @@ class PartTrackingService {
     return counts;
   }
 
-  // Get buffered part count for a workstation (all projects, pending status)
+  // Get buffered part count for a workstation - only counts parts where the project has a TODO task at that workstation
   async getBufferedPartCount(workstationId: string): Promise<number> {
-    const { count, error } = await supabase
-      .from('part_workstation_tracking')
-      .select('id', { count: 'exact', head: true })
-      .eq('workstation_id', workstationId)
-      .eq('status', 'pending');
+    const { data, error } = await supabase
+      .rpc('get_buffered_part_count_with_todo', { p_workstation_id: workstationId });
 
     if (error) throw error;
-    return count || 0;
+    return data || 0;
   }
 
   // Mark parts as completed for a workstation when last task completes
