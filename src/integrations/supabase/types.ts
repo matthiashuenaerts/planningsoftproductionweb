@@ -1408,6 +1408,7 @@ export type Database = {
           id: string
           logistics: boolean | null
           name: string
+          onboarding_completed: boolean | null
           password: string
           preferred_language: string | null
           role: string
@@ -1421,6 +1422,7 @@ export type Database = {
           id?: string
           logistics?: boolean | null
           name: string
+          onboarding_completed?: boolean | null
           password: string
           preferred_language?: string | null
           role: string
@@ -1434,6 +1436,7 @@ export type Database = {
           id?: string
           logistics?: boolean | null
           name?: string
+          onboarding_completed?: boolean | null
           password?: string
           preferred_language?: string | null
           role?: string
@@ -5776,6 +5779,10 @@ export type Database = {
           policy_name: string
         }
         Returns: undefined
+      }
+      get_buffered_part_count_with_todo: {
+        Args: { p_workstation_id: string }
+        Returns: number
       }
       get_employee_id_from_auth: { Args: { user_id: string }; Returns: string }
       get_phase_offsets: {
