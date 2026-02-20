@@ -254,6 +254,52 @@ const MailSettings: React.FC = () => {
     }
   };
 
+  const createDefaultConfigs = async () => {
+    if (!tenant?.id) return;
+    try {
+      const defaults = [
+        { function_name: 'holiday_request', description: 'Email addresses to notify when a new holiday request is created', recipient_emails: [], language: 'nl' },
+        { function_name: 'holiday_status', description: 'Email addresses to notify when a holiday request status changes', recipient_emails: [], language: 'nl' },
+        { function_name: 'send_project_forecast', description: 'Weekly project forecast with installation dates and undelivered orders', recipient_emails: [], language: 'nl' },
+      ];
+
+      const { data, error } = await supabase
+        .from('email_configurations')
+        .insert(defaults)
+        .select();
+
+      if (error) throw error;
+      setConfigs(data || []);
+
+      // Create default schedule config for project forecast
+      await supabase
+        .from('email_schedule_configs')
+        .insert({
+          function_name: 'send_project_forecast',
+          schedule_day: 'monday',
+          schedule_time: '08:00',
+          forecast_weeks: 4,
+          is_active: false,
+          language: 'nl',
+        });
+
+      // Refetch to get schedule configs
+      await fetchConfigurations();
+
+      toast({
+        title: 'Success',
+        description: 'Default email configurations created',
+      });
+    } catch (error) {
+      console.error('Error creating default configs:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create default email configurations',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
@@ -270,6 +316,22 @@ const MailSettings: React.FC = () => {
           Manage email recipients for different system notifications
         </p>
       </div>
+
+      {configs.length === 0 && (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <Mail className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">No Email Configurations</h3>
+            <p className="text-muted-foreground mb-4">
+              Set up default email configurations for holiday requests and project forecasts.
+            </p>
+            <Button onClick={createDefaultConfigs}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Default Configurations
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6">
         {configs.map((config) => (

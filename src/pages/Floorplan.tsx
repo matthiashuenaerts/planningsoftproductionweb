@@ -9,10 +9,17 @@ import { AnimatedWorkstationDetailsDialog } from '@/components/floorplan/Animate
 import { toast } from 'sonner';
 import Navbar from '@/components/Navbar';
 import { useTenant } from '@/context/TenantContext';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Upload, ImageIcon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 
-// Import the uploaded floorplan image
-const FLOORPLAN_IMAGE = "/lovable-uploads/grondplan_page-0002.jpg";
+// Default floorplan image
+const DEFAULT_FLOORPLAN_IMAGE = "/lovable-uploads/grondplan_page-0002.jpg";
 
 const Floorplan: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -25,11 +32,84 @@ const Floorplan: React.FC = () => {
   const [isAddingFlowLine, setIsAddingFlowLine] = useState(false);
   const [newFlowLine, setNewFlowLine] = useState<any>(null);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
+  const [floorplanImage, setFloorplanImage] = useState<string>(DEFAULT_FLOORPLAN_IMAGE);
+  const [uploading, setUploading] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
-  const isAdmin = true; // This should come from auth context
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { currentEmployee } = useAuth();
+  const isAdmin = currentEmployee?.role === 'admin';
   const { tenant } = useTenant();
+
+  // Fetch tenant floorplan image
+  useEffect(() => {
+    const loadFloorplanImage = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('floorplan_settings')
+          .select('image_url')
+          .maybeSingle();
+        
+        if (!error && data?.image_url) {
+          setFloorplanImage(data.image_url);
+        }
+      } catch (error) {
+        console.error('Error loading floorplan image:', error);
+      }
+    };
+    loadFloorplanImage();
+  }, [tenant?.id]);
+
+  // Handle image upload
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `floorplan-${tenant?.id || 'default'}-${Date.now()}.${fileExt}`;
+      const filePath = `floorplan/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('attachments')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('attachments')
+        .getPublicUrl(filePath);
+
+      // Upsert floorplan settings
+      const { data: existing } = await supabase
+        .from('floorplan_settings')
+        .select('id')
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from('floorplan_settings')
+          .update({ image_url: publicUrl })
+          .eq('id', existing.id);
+      } else {
+        await supabase
+          .from('floorplan_settings')
+          .insert({ image_url: publicUrl } as any);
+      }
+
+      setFloorplanImage(publicUrl);
+      setUploadDialogOpen(false);
+      toast.success('Floorplan image updated successfully');
+    } catch (error) {
+      console.error('Error uploading floorplan image:', error);
+      toast.error('Failed to upload floorplan image');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Fetch workstations
   const { data: workstations = [] } = useQuery({
@@ -198,7 +278,7 @@ const Floorplan: React.FC = () => {
             {/* Background Image */}
             <img
               ref={imageRef}
-              src={FLOORPLAN_IMAGE}
+              src={floorplanImage}
               alt="Production Hall Floorplan"
               className="block max-w-full max-h-full object-contain"
               onLoad={() => {
@@ -326,6 +406,53 @@ const Floorplan: React.FC = () => {
           totalActiveUsers={totalActiveUsers}
           isAdmin={isAdmin}
         />
+
+        {/* Admin: Upload Floorplan Image */}
+        {isAdmin && (
+          <div className="absolute top-4 right-4 z-10">
+            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="bg-background/95 backdrop-blur shadow-lg">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Change Floorplan Image
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Upload Floorplan Image</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Upload a new floorplan image (JPG, PNG). This will replace the current image for your organization.
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="floorplan-upload">Select Image</Label>
+                    <Input
+                      id="floorplan-upload"
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={uploading}
+                      className="mt-1"
+                    />
+                  </div>
+                  {uploading && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      Uploading...
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
 
         {/* Legend */}
         <div className="absolute bottom-4 right-4 bg-background/95 backdrop-blur rounded-lg shadow-lg p-4">

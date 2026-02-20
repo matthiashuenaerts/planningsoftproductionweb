@@ -141,6 +141,43 @@ const HolidayPlanner: React.FC = () => {
     upsertWorkingHoursMutation.mutate(updatedHours);
   };
 
+  // Ensure working hours exist for a day before adding a break
+  const ensureWorkingHoursAndAddBreak = async (day: number) => {
+    let dayHours = workingHoursService.getWorkingHoursForDay(workingHours, editingTeam, day);
+    
+    if (!dayHours) {
+      // Create working hours for this day first
+      try {
+        const created = await workingHoursService.upsertWorkingHours({
+          team: editingTeam,
+          day_of_week: day,
+          start_time: '08:00',
+          end_time: '17:00',
+          break_minutes: 0,
+          is_active: true,
+        });
+        // Now add the break
+        addBreakMutation.mutate({
+          workingHoursId: created.id,
+          startTime: '12:00',
+          endTime: '12:30',
+        });
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: `Failed to create working hours: ${error.message}`,
+          variant: 'destructive',
+        });
+      }
+    } else {
+      addBreakMutation.mutate({
+        workingHoursId: dayHours.id,
+        startTime: '12:00',
+        endTime: '12:30',
+      });
+    }
+  };
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
@@ -235,22 +272,14 @@ const HolidayPlanner: React.FC = () => {
                         <div className="space-y-2 pl-4">
                           <div className="flex items-center justify-between">
                             <Label className="text-sm font-medium">Breaks</Label>
-                            {dayHours && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  addBreakMutation.mutate({
-                                    workingHoursId: dayHours.id,
-                                    startTime: '12:00',
-                                    endTime: '12:30',
-                                  });
-                                }}
-                              >
-                                <Plus className="h-4 w-4 mr-1" />
-                                Add Break
-                              </Button>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => ensureWorkingHoursAndAddBreak(dayIndex)}
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              Add Break
+                            </Button>
                           </div>
                           
                           {dayHours?.breaks && dayHours.breaks.length > 0 ? (

@@ -49,6 +49,7 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { TenantProvider } from "@/context/TenantContext";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import RoleProtectedRoute from "./components/RoleProtectedRoute";
 import DeveloperRoute from "@/components/DeveloperRoute";
 import HomeRedirect from "@/components/HomeRedirect";
 import TenantLayout from "@/components/TenantLayout";
@@ -74,6 +75,15 @@ const queryClient = new QueryClient({
 /** Helper to wrap a page in ProtectedRoute */
 const P = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>{children}</ProtectedRoute>
+);
+
+/** Helper for role-restricted routes */
+const R = ({ children, roles, logistics }: { children: React.ReactNode; roles: string[]; logistics?: boolean }) => (
+  <ProtectedRoute>
+    <RoleProtectedRoute allowedRoles={roles} requireLogistics={logistics}>
+      {children}
+    </RoleProtectedRoute>
+  </ProtectedRoute>
 );
 
 function App() {
@@ -134,28 +144,28 @@ function App() {
                     <Route path=":lang/broken-parts/new" element={<P><NewBrokenPart /></P>} />
                     <Route path=":lang/personal-tasks" element={<P><PersonalTasks /></P>} />
                     <Route path=":lang/notes-and-tasks" element={<P><NotesAndTasks /></P>} />
-                    <Route path=":lang/daily-tasks" element={<P><DailyTasks /></P>} />
-                    <Route path=":lang/planning" element={<P><Planning /></P>} />
-                    <Route path=":lang/orders" element={<P><Orders /></P>} />
-                    <Route path=":lang/orders/new" element={<P><Orders /></P>} />
-                    <Route path=":lang/orders/:orderId" element={<P><Orders /></P>} />
-                    <Route path=":lang/orders/:orderId/edit" element={<P><Orders /></P>} />
-                    <Route path=":lang/logistics" element={<P><Logistics /></P>} />
-                    <Route path=":lang/logistics-out" element={<P><LogisticsOut /></P>} />
-                    <Route path=":lang/rush-orders" element={<P><RushOrders /></P>} />
-                    <Route path=":lang/rush-orders/:rushOrderId" element={<P><RushOrderDetails /></P>} />
-                    <Route path=":lang/calculation" element={<P><Calculation /></P>} />
-                    <Route path=":lang/calculation/new" element={<P><NewCabinetProject /></P>} />
-                    <Route path=":lang/calculation/project/:projectId" element={<P><CabinetProjectDetails /></P>} />
-                    <Route path=":lang/calculation/project/:projectId/library" element={<P><CabinetLibrary /></P>} />
-                    <Route path=":lang/calculation/project/:projectId/editor/:modelId" element={<P><CabinetEditor /></P>} />
-                    <Route path=":lang/calculation/model-builder/:modelId?" element={<P><CabinetModelBuilder /></P>} />
-                    <Route path=":lang/time-registrations" element={<P><TimeRegistrations /></P>} />
+                    <Route path=":lang/daily-tasks" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader']}><DailyTasks /></R>} />
+                    <Route path=":lang/planning" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader']}><Planning /></R>} />
+                    <Route path=":lang/orders" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']}><Orders /></R>} />
+                    <Route path=":lang/orders/new" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']}><Orders /></R>} />
+                    <Route path=":lang/orders/:orderId" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']}><Orders /></R>} />
+                    <Route path=":lang/orders/:orderId/edit" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']}><Orders /></R>} />
+                    <Route path=":lang/logistics" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']} logistics><Logistics /></R>} />
+                    <Route path=":lang/logistics-out" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']} logistics><LogisticsOut /></R>} />
+                    <Route path=":lang/rush-orders" element={<R roles={['admin', 'manager', 'installation_team', 'worker']}><RushOrders /></R>} />
+                    <Route path=":lang/rush-orders/:rushOrderId" element={<R roles={['admin', 'manager', 'installation_team', 'worker']}><RushOrderDetails /></R>} />
+                    <Route path=":lang/calculation" element={<R roles={['admin']}><Calculation /></R>} />
+                    <Route path=":lang/calculation/new" element={<R roles={['admin']}><NewCabinetProject /></R>} />
+                    <Route path=":lang/calculation/project/:projectId" element={<R roles={['admin']}><CabinetProjectDetails /></R>} />
+                    <Route path=":lang/calculation/project/:projectId/library" element={<R roles={['admin']}><CabinetLibrary /></R>} />
+                    <Route path=":lang/calculation/project/:projectId/editor/:modelId" element={<R roles={['admin']}><CabinetEditor /></R>} />
+                    <Route path=":lang/calculation/model-builder/:modelId?" element={<R roles={['admin']}><CabinetModelBuilder /></R>} />
+                    <Route path=":lang/time-registrations" element={<R roles={['admin', 'manager']}><TimeRegistrations /></R>} />
                     <Route path=":lang/general-schedule" element={<P><GeneralSchedule /></P>} />
-                    <Route path=":lang/settings" element={<P><Settings /></P>} />
-                    <Route path=":lang/control-panel" element={<P><ControlPanel /></P>} />
-                    <Route path=":lang/control-panel/:workstationId" element={<P><WorkstationControl /></P>} />
-                    <Route path=":lang/truck-loading" element={<P><TruckLoadingView /></P>} />
+                    <Route path=":lang/settings" element={<R roles={['admin']}><Settings /></R>} />
+                    <Route path=":lang/control-panel" element={<R roles={['admin', 'manager', 'teamleader']}><ControlPanel /></R>} />
+                    <Route path=":lang/control-panel/:workstationId" element={<R roles={['admin', 'manager', 'teamleader']}><WorkstationControl /></R>} />
+                    <Route path=":lang/truck-loading" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader']}><TruckLoadingView /></R>} />
                   </Route>
                 </Routes>
                 <Toaster />
