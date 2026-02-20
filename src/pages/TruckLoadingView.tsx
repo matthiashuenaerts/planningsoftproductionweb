@@ -10,6 +10,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, isWeekend, differenceInDays, startOfDay } from 'date-fns';
 import { holidayService } from '@/services/holidayService';
 
+interface PlacementTeam {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
 interface LoadingAssignment {
   project: {
     id: string;
@@ -21,7 +27,7 @@ interface LoadingAssignment {
   };
   loading_date: string;
   truck?: { id: string; name: string } | null;
-  team?: { id: string; name: string } | null;
+  team?: { id: string; name: string; color?: string | null } | null;
 }
 
 const TruckLoadingView: React.FC = () => {
@@ -99,15 +105,15 @@ const TruckLoadingView: React.FC = () => {
         }
       });
 
-      // Fetch team assignments
+      // Fetch team assignments with color
       const { data: teamAssignments } = await supabase
         .from('project_team_assignments')
-        .select('project_id, team_id, placement_teams(id, name)');
+        .select('project_id, team_id, placement_teams(id, name, color)');
 
-      const teamMap: Record<string, { id: string; name: string }> = {};
+      const teamMap: Record<string, { id: string; name: string; color?: string | null }> = {};
       (teamAssignments || []).forEach((ta: any) => {
         if (ta.placement_teams) {
-          teamMap[ta.project_id] = { id: ta.placement_teams.id, name: ta.placement_teams.name };
+          teamMap[ta.project_id] = { id: ta.placement_teams.id, name: ta.placement_teams.name, color: ta.placement_teams.color };
         }
       });
 
@@ -194,7 +200,15 @@ const TruckLoadingView: React.FC = () => {
               {truckLoadingData.todayLoadings.map((loading) => (
                 <Card 
                   key={loading.project.id}
-                  className="bg-orange-500/10 border-orange-500/30 p-4 cursor-pointer hover:bg-orange-500/20 transition-colors flex flex-col"
+                  className="border p-4 cursor-pointer hover:opacity-90 transition-colors flex flex-col"
+                  style={{
+                    backgroundColor: loading.team?.color 
+                      ? `${loading.team.color}25` 
+                      : 'rgba(249, 115, 22, 0.1)',
+                    borderColor: loading.team?.color 
+                      ? `${loading.team.color}50` 
+                      : 'rgba(249, 115, 22, 0.3)',
+                  }}
                   onClick={() => navigate(createLocalizedPath(`/projects/${loading.project.id}`))}
                 >
                   <div className="flex items-start justify-between gap-2 mb-3">
@@ -270,7 +284,15 @@ const TruckLoadingView: React.FC = () => {
               {truckLoadingData.upcomingLoadings.map((loading) => (
                 <Card 
                   key={loading.project.id}
-                  className="bg-slate-700/30 border-slate-600 p-2.5 cursor-pointer hover:bg-slate-700/50 transition-colors flex flex-col"
+                  className="border p-2.5 cursor-pointer hover:opacity-80 transition-colors flex flex-col"
+                  style={{
+                    backgroundColor: loading.team?.color 
+                      ? `${loading.team.color}20` 
+                      : 'rgba(51, 65, 85, 0.3)',
+                    borderColor: loading.team?.color 
+                      ? `${loading.team.color}40` 
+                      : 'rgba(71, 85, 105, 1)',
+                  }}
                   onClick={() => navigate(createLocalizedPath(`/projects/${loading.project.id}`))}
                 >
                   <p className="text-white font-semibold text-xs truncate mb-1">{loading.project.name}</p>
