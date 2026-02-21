@@ -237,18 +237,15 @@ const NavbarContent = ({
 const Navbar = () => {
   const isMobile = useIsMobile();
   if (isMobile) {
-    return <Drawer direction="left">
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    return <Drawer direction="left" open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerTrigger asChild>
           <Button variant="outline" size="icon" className="fixed top-4 left-4 z-50 bg-sky-800 border-sky-600 text-white hover:bg-sky-700">
             <Menu className="h-4 w-4" />
           </Button>
         </DrawerTrigger>
         <DrawerContent className="h-full w-64 mt-0 rounded-none">
-          <DrawerClose asChild>
-            <div className="h-full">
-              <NavbarContent onItemClick={() => {}} />
-            </div>
-          </DrawerClose>
+          <NavbarContent onItemClick={() => setDrawerOpen(false)} />
         </DrawerContent>
       </Drawer>;
   }

@@ -23,8 +23,8 @@ export interface WorkingHours {
 }
 
 export const workingHoursService = {
-  async getWorkingHours(): Promise<WorkingHours[]> {
-    const { data, error } = await supabase
+  async getWorkingHours(tenantId?: string | null): Promise<WorkingHours[]> {
+    let query = supabase
       .from('working_hours')
       .select(`
         *,
@@ -33,6 +33,8 @@ export const workingHoursService = {
       .eq('is_active', true)
       .order('team')
       .order('day_of_week');
+    if (tenantId) query = query.eq('tenant_id', tenantId);
+    const { data, error } = await query;
     if (error) throw error;
     return data as WorkingHours[];
   },

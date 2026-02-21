@@ -26,8 +26,8 @@ const HolidayPlanner: React.FC = () => {
   });
 
   const { data: workingHours = [] } = useQuery<WorkingHours[]>({
-    queryKey: ['workingHours'],
-    queryFn: () => workingHoursService.getWorkingHours(),
+    queryKey: ['workingHours', tenant?.id],
+    queryFn: () => workingHoursService.getWorkingHours(tenant?.id),
   });
 
   const mutationOptions = {

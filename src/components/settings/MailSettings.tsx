@@ -300,6 +300,13 @@ const MailSettings: React.FC = () => {
     }
   };
 
+  // Auto-create default configs for new tenants if none exist
+  useEffect(() => {
+    if (!loading && configs.length === 0 && tenant?.id) {
+      createDefaultConfigs();
+    }
+  }, [loading, configs.length, tenant?.id]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
