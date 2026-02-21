@@ -721,10 +721,9 @@ const Dashboard: React.FC = () => {
   // Get team background style using hex color codes from settings
   const getTeamBackgroundStyle = (teamColor?: string): React.CSSProperties => {
     if (!teamColor) return {};
-    // teamColor is now a hex code like #141eb3 from placement_teams.color
     return {
-      backgroundColor: `${teamColor}25`,
-      borderColor: `${teamColor}60`,
+      backgroundColor: `${teamColor}45`,
+      borderColor: `${teamColor}99`,
     };
   };
 
