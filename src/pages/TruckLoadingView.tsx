@@ -203,10 +203,10 @@ const TruckLoadingView: React.FC = () => {
                   className="border p-4 cursor-pointer hover:opacity-90 transition-colors flex flex-col"
                   style={{
                     backgroundColor: loading.team?.color 
-                      ? `${loading.team.color}25` 
+                      ? `${loading.team.color}45` 
                       : 'rgba(249, 115, 22, 0.1)',
                     borderColor: loading.team?.color 
-                      ? `${loading.team.color}50` 
+                      ? `${loading.team.color}99` 
                       : 'rgba(249, 115, 22, 0.3)',
                   }}
                   onClick={() => navigate(createLocalizedPath(`/projects/${loading.project.id}`))}
@@ -287,10 +287,10 @@ const TruckLoadingView: React.FC = () => {
                   className="border p-2.5 cursor-pointer hover:opacity-80 transition-colors flex flex-col"
                   style={{
                     backgroundColor: loading.team?.color 
-                      ? `${loading.team.color}20` 
+                      ? `${loading.team.color}40` 
                       : 'rgba(51, 65, 85, 0.3)',
                     borderColor: loading.team?.color 
-                      ? `${loading.team.color}40` 
+                      ? `${loading.team.color}90` 
                       : 'rgba(71, 85, 105, 1)',
                   }}
                   onClick={() => navigate(createLocalizedPath(`/projects/${loading.project.id}`))}
