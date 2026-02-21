@@ -718,29 +718,14 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Get team background color based on team name
-  const getTeamBackgroundColor = (teamColor?: string) => {
-    if (!teamColor) return 'bg-gray-200/70';
-    switch (teamColor) {
-      case 'green':
-        return 'bg-green-200/70';
-      case 'blue':
-        return 'bg-blue-200/70';
-      case 'orange':
-        return 'bg-orange-200/70';
-      default:
-        return 'bg-gray-200/70';
-    }
-  };
-
-  // Determine team color from team name
-  const getTeamColorFromName = (teamName: string): string => {
-    if (!teamName) return '';
-    const lowerTeamName = teamName.toLowerCase();
-    if (lowerTeamName.includes('groen')) return 'green';
-    if (lowerTeamName.includes('blauw')) return 'blue';
-    if (lowerTeamName.includes('oranje')) return 'orange';
-    return '';
+  // Get team background style using hex color codes from settings
+  const getTeamBackgroundStyle = (teamColor?: string): React.CSSProperties => {
+    if (!teamColor) return {};
+    // teamColor is now a hex code like #141eb3 from placement_teams.color
+    return {
+      backgroundColor: `${teamColor}25`,
+      borderColor: `${teamColor}60`,
+    };
   };
 
   // Calculate statistics
@@ -830,7 +815,7 @@ const Dashboard: React.FC = () => {
                     {dayAssignments.map((assignment, index) => {
                   const isManuallyAdjusted = manualOverrides[assignment.project.id] !== undefined;
                   const isCharged = assignment.orderStatus?.allCharged;
-                  return <div key={`${assignment.project.id}-${index}`} className={cn("p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity relative", getProjectColor(assignment.project.status), getTeamBackgroundColor(assignment.teamColor), isManuallyAdjusted && "ring-2 ring-orange-400", isCharged && "opacity-50")} onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}>
+                  return <div key={`${assignment.project.id}-${index}`} className={cn("p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity relative", getProjectColor(assignment.project.status), isManuallyAdjusted && "ring-2 ring-orange-400", isCharged && "opacity-50")} style={getTeamBackgroundStyle(assignment.teamColor)} onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}>
                           {/* Order status indicator */}
                           {assignment.orderStatus && <div className={cn("absolute -top-1 -right-1 rounded-full text-xs font-bold text-white flex items-center justify-center min-w-[16px] h-4 px-1", isCharged ? "bg-green-600" : assignment.orderStatus.allDelivered ? "bg-green-500" : "bg-red-500")}>
                               {isCharged || assignment.orderStatus.allDelivered ? "✓" : assignment.orderStatus.undeliveredCount}
