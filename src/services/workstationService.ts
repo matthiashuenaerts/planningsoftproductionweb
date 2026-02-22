@@ -82,7 +82,7 @@ export const workstationService = {
     return normalizeWorkstation(data);
   },
 
-  async update(id: string, updates: Partial<Pick<Workstation, 'name' | 'description' | 'image_path' | 'icon_path' | 'sort_order' | 'production_line'>>): Promise<Workstation> {
+  async update(id: string, updates: Partial<Pick<Workstation, 'name' | 'description' | 'image_path' | 'icon_path' | 'sort_order' | 'production_line' | 'active_workers'>>): Promise<Workstation> {
     const { data, error } = await supabase
       .from('workstations')
       .update(updates as any)
