@@ -70,8 +70,7 @@ const WorkstationSettings: React.FC = () => {
       x_position: 50,
       y_position: 50,
       sort_order: 0,
-      production_line: 1,
-      active_workers: 1
+      production_line: 1
     }
   });
 
@@ -119,8 +118,7 @@ const WorkstationSettings: React.FC = () => {
       x_position: pos?.x ?? 50,
       y_position: pos?.y ?? 50,
       sort_order: workstation.sort_order ?? 0,
-      production_line: workstation.production_line ?? 1,
-      active_workers: workstation.active_workers ?? 1
+      production_line: workstation.production_line ?? 1
     });
     setShowEditDialog(true);
   };
@@ -149,7 +147,7 @@ const WorkstationSettings: React.FC = () => {
     }
   };
 
-  const handleUpdate = async (data: { name: string; description: string; x_position: number; y_position: number; sort_order: number; production_line: number; active_workers: number }) => {
+  const handleUpdate = async (data: { name: string; description: string; x_position: number; y_position: number; sort_order: number; production_line: number }) => {
     if (!selectedWorkstation) return;
     
     try {
@@ -157,8 +155,7 @@ const WorkstationSettings: React.FC = () => {
         name: data.name,
         description: data.description || null,
         sort_order: data.sort_order,
-        production_line: data.production_line,
-        active_workers: data.active_workers
+        production_line: data.production_line
       });
       
       // Update or insert position
@@ -352,7 +349,6 @@ const WorkstationSettings: React.FC = () => {
                   <TableHead className="w-16">Order</TableHead>
                   <TableHead className="w-16">Line</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead className="w-20">Max Employees</TableHead>
                   <TableHead className="hidden md:table-cell">Description</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -360,7 +356,7 @@ const WorkstationSettings: React.FC = () => {
               <TableBody>
                 {workstations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                       No workstations found. Create your first one!
                     </TableCell>
                   </TableRow>
@@ -372,7 +368,6 @@ const WorkstationSettings: React.FC = () => {
                       <TableCell className="text-center font-medium">{workstation.sort_order ?? 0}</TableCell>
                       <TableCell className="text-center">{workstation.production_line ?? 1}</TableCell>
                       <TableCell>{workstation.name}</TableCell>
-                      <TableCell className="text-center">{workstation.active_workers ?? 1}</TableCell>
                       <TableCell className="hidden md:table-cell">{workstation.description}</TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
@@ -689,28 +684,6 @@ const WorkstationSettings: React.FC = () => {
                   )}
                 />
               </div>
-
-              <FormField
-                control={form.control}
-                name="active_workers"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Max Scheduleable Employees</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min="1"
-                        max="20"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Maximum number of employees that can be scheduled simultaneously at this workstation
-                    </FormDescription>
-                  </FormItem>
-                )}
-              />
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
