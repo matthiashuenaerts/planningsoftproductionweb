@@ -52,7 +52,7 @@ export const workingHoursService = {
           is_active: workingHours.is_active,
         },
         {
-          onConflict: 'team,day_of_week',
+          onConflict: 'team,day_of_week,tenant_id',
         }
       )
       .select()
