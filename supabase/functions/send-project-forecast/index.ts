@@ -23,12 +23,26 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get email configuration
-    const { data: emailConfig, error: configError } = await supabase
+    // Try to get tenant_id from request body
+    let tenantId: string | null = null;
+    try {
+      const body = await req.json();
+      tenantId = body?.tenantId || null;
+    } catch {
+      // No body or invalid JSON, proceed without tenant filter
+    }
+
+    // Get email configuration - filter by tenant if available
+    let emailQuery = supabase
       .from('email_configurations')
-      .select('recipient_emails')
-      .eq('function_name', 'send_project_forecast')
-      .single();
+      .select('recipient_emails, tenant_id')
+      .eq('function_name', 'send_project_forecast');
+    
+    if (tenantId) {
+      emailQuery = emailQuery.eq('tenant_id', tenantId);
+    }
+
+    const { data: emailConfig, error: configError } = await emailQuery.single();
 
     if (configError || !emailConfig) {
       console.error('Error fetching email configuration:', configError);
@@ -38,13 +52,21 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Use the resolved tenant_id from the config if not provided
+    const resolvedTenantId = tenantId || emailConfig.tenant_id;
+
     // Get schedule configuration
-    const { data: scheduleConfig, error: scheduleError } = await supabase
+    let schedQuery = supabase
       .from('email_schedule_configs')
       .select('*')
       .eq('function_name', 'send_project_forecast')
-      .eq('is_active', true)
-      .single();
+      .eq('is_active', true);
+    
+    if (resolvedTenantId) {
+      schedQuery = schedQuery.eq('tenant_id', resolvedTenantId);
+    }
+
+    const { data: scheduleConfig, error: scheduleError } = await schedQuery.single();
 
     if (scheduleError || !scheduleConfig) {
       console.error('Error fetching schedule configuration:', scheduleError);
@@ -75,13 +97,19 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Fetching projects with installation dates between ${today.toISOString()} and ${futureDate.toISOString()}`);
 
-    // Fetch projects within the forecast period
-    const { data: projects, error: projectsError } = await supabase
+    // Fetch projects within the forecast period, filtered by tenant
+    let projectQuery = supabase
       .from('projects')
       .select('id, name, client, installation_date, status, description')
       .gte('installation_date', today.toISOString().split('T')[0])
       .lte('installation_date', futureDate.toISOString().split('T')[0])
       .order('installation_date', { ascending: true });
+    
+    if (resolvedTenantId) {
+      projectQuery = projectQuery.eq('tenant_id', resolvedTenantId);
+    }
+
+    const { data: projects, error: projectsError } = await projectQuery;
 
     if (projectsError) {
       console.error('Error fetching projects:', projectsError);

@@ -21,6 +21,7 @@ const sendHolidayRequestEmail = async (request: {
   endDate: string;
   reason?: string;
   requestId: string;
+  tenantId?: string;
 }) => {
   try {
     const { data, error } = await supabase.functions.invoke('send-holiday-request-email', {
@@ -31,6 +32,7 @@ const sendHolidayRequestEmail = async (request: {
         endDate: request.endDate,
         reason: request.reason,
         requestId: request.requestId,
+        tenantId: request.tenantId,
       },
     });
 
@@ -58,7 +60,7 @@ export const holidayRequestService = {
     
     const { data: employee, error: employeeError } = await supabase
       .from('employees')
-      .select('id, email')
+      .select('id, email, tenant_id')
       .eq('id', request.user_id)
       .single();
 
@@ -88,6 +90,7 @@ export const holidayRequestService = {
       endDate: request.end_date,
       reason: request.reason,
       requestId: data.id,
+      tenantId: employee.tenant_id,
     });
 
     return data;
@@ -146,10 +149,10 @@ export const holidayRequestService = {
       throw new Error('Request not found');
     }
 
-    // Get employee email
+    // Get employee email and tenant_id
     const { data: employee, error: employeeError } = await supabase
       .from('employees')
-      .select('email')
+      .select('email, tenant_id')
       .eq('id', request.user_id)
       .single();
 
@@ -189,6 +192,7 @@ export const holidayRequestService = {
           status: status,
           adminNotes: adminNotes,
           requestId: id,
+          tenantId: employee.tenant_id,
         },
       });
       console.log('Status notification email sent successfully');
