@@ -1,0 +1,1 @@
+UPDATE tenants SET name = 'THONON nv.', logo_url = 'https://static.wixstatic.com/media/99c033_1a7ab564e9824576a1bac4d93fbfb7c7~mv2.png' WHERE slug = 'thonon'
