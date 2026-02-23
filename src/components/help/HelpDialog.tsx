@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -393,7 +394,10 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
           <div className="prose prose-sm max-w-none">
             <div
               dangerouslySetInnerHTML={{
-                __html: selectedArticle.content.replace(/\n/g, '<br>')
+                __html: DOMPurify.sanitize(
+                  selectedArticle.content.replace(/\n/g, '<br>'),
+                  { ALLOWED_TAGS: ['br', 'b', 'i', 'u', 'a', 'p', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'strong', 'em', 'span', 'div', 'img'], ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'class'] }
+                )
               }}
             />
           </div>
