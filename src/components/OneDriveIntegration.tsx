@@ -82,6 +82,26 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
     }
   }, []);
 
+  function base64UrlEncode(buffer: ArrayBuffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+async function generatePKCE() {
+  const random = crypto.getRandomValues(new Uint8Array(32));
+  const codeVerifier = base64UrlEncode(random);
+
+  const encoder = new TextEncoder();
+  const data = encoder.encode(codeVerifier);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+
+  const codeChallenge = base64UrlEncode(digest);
+
+  return { codeVerifier, codeChallenge };
+}
+
   // Handle OAuth callback
   useEffect(() => {
     const handleCallback = async () => {
@@ -98,10 +118,22 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
 
           const redirectUri = `${window.location.origin}${window.location.pathname}`;
           
-          const { data, error } = await supabase.functions.invoke('onedrive-auth', {
-            body: { code, redirectUri },
-            headers: { 'Content-Type': 'application/json' },
-          });
+const codeVerifier = sessionStorage.getItem('onedrive_code_verifier');
+
+if (!codeVerifier) {
+  throw new Error('Missing PKCE code verifier');
+}
+
+const { data, error } = await supabase.functions.invoke(
+  'onedrive-auth?action=exchange-code',
+  {
+    body: { code, redirectUri, codeVerifier },
+  }
+);
+
+if (error) throw error;
+
+sessionStorage.removeItem('onedrive_code_verifier');
 
           if (error) throw error;
 
@@ -138,9 +170,12 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
 
   const refreshAccessToken = async (refreshToken: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('onedrive-auth', {
-        body: { refreshToken, action: 'refresh-token' },
-      });
+const { data, error } = await supabase.functions.invoke(
+  'onedrive-auth?action=refresh-token',
+  {
+    body: { refreshToken },
+  }
+);
 
       if (error) throw error;
 
@@ -229,29 +264,37 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
   };
 
   const handleAuthenticate = async () => {
-    try {
-      const state = Math.random().toString(36).substring(7);
-      sessionStorage.setItem('onedrive_oauth_state', state);
-      
-      const redirectUri = `${window.location.origin}${window.location.pathname}`;
-      
-      const { data, error } = await supabase.functions.invoke('onedrive-auth?action=get-auth-url', {
-        body: { redirectUri, state },
-      });
+  try {
+    const state = Math.random().toString(36).substring(7);
+    sessionStorage.setItem('onedrive_oauth_state', state);
 
-      if (error) throw error;
-      
-      window.location.href = data.authUrl;
-    } catch (error) {
-      console.error('Auth error:', error);
-      toast({
-        title: 'Fout',
-        description: 'Kon niet verbinden met Microsoft',
-        variant: 'destructive',
-      });
-    }
-  };
+    // ✅ Generate PKCE
+    const { codeVerifier, codeChallenge } = await generatePKCE();
 
+    // ✅ Store verifier for later
+    sessionStorage.setItem('onedrive_code_verifier', codeVerifier);
+
+    const redirectUri = `${window.location.origin}${window.location.pathname}`;
+
+    const { data, error } = await supabase.functions.invoke(
+      'onedrive-auth?action=get-auth-url',
+      {
+        body: { redirectUri, state, codeChallenge },
+      }
+    );
+
+    if (error) throw error;
+
+    window.location.href = data.authUrl;
+  } catch (error) {
+    console.error('Auth error:', error);
+    toast({
+      title: 'Fout',
+      description: 'Kon niet verbinden met Microsoft',
+      variant: 'destructive',
+    });
+  }
+};
   const handleLogout = () => {
     localStorage.removeItem(TOKENS_STORAGE_KEY);
     setIsAuthenticated(false);
