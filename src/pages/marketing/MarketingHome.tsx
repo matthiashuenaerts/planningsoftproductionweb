@@ -71,7 +71,7 @@ const MarketingHome: React.FC = () => {
             {t("hero_subtitle")}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a href="mailto:info@automattion.com">
+            <a href="mailto:info@automattion-compass.com">
               <Button
                 size="lg"
                 className="bg-gradient-to-r from-[#195F85] to-[#42A5DB] hover:from-[#164f70] hover:to-[#3994c5] text-white px-8 h-12 text-base font-semibold shadow-lg shadow-blue-500/25"
@@ -180,7 +180,7 @@ const MarketingHome: React.FC = () => {
             {t("contact_subtitle")}{" "}
             <code className="text-blue-300">yourcompany.automattion-compass.com</code>
           </p>
-          <a href="mailto:info@automattion.com">
+          <a href="mailto:info@automattion-compass.com">
             <Button
               size="lg"
               className="bg-gradient-to-r from-[#195F85] to-[#42A5DB] hover:from-[#164f70] hover:to-[#3994c5] text-white px-8 h-12"
