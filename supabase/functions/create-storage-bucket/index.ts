@@ -15,14 +15,15 @@ serve(async (req) => {
   
   // Authenticate the caller
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader) {
+  if (!authHeader?.startsWith('Bearer ')) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
   const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
-  const { data: { user }, error: authError } = await authClient.auth.getUser();
-  if (authError || !user) {
+  const token = authHeader.replace('Bearer ', '');
+  const { data, error: authError } = await authClient.auth.getClaims(token);
+  if (authError || !data?.claims) {
     return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
   
