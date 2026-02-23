@@ -26,7 +26,7 @@ const MarketingContact: React.FC = () => {
             {t("contact_email")}
           </a>
         </p>
-        <a href="mailto:info@automattion.com">
+        <a href="mailto:info@automattion-compass.com">
           <Button
             size="lg"
             className="bg-gradient-to-r from-[#195F85] to-[#42A5DB] hover:from-[#164f70] hover:to-[#3994c5] text-white px-10 h-14 text-lg font-semibold shadow-lg shadow-blue-500/25"
