@@ -104,63 +104,55 @@ serve(async (req) => {
   }
 });
 
-// Function to set up comprehensive storage policies for a bucket
+// Function to set up storage policies - now uses authenticated-only access
 async function setupBucketPolicies(supabase: any, bucketName: string) {
   try {
-    // Create policy for SELECT access (view files)
+    // Create policy for SELECT access (authenticated users only)
     const { error: selectError } = await supabase.rpc('create_storage_policy', {
       bucket_name: bucketName,
       policy_name: `${bucketName}_select_policy`,
-      definition: `bucket_id = '${bucketName}'`,
+      definition: `bucket_id = '${bucketName}' AND auth.role() = 'authenticated'`,
       operation: 'SELECT'
     });
     
     if (selectError) {
       console.error(`Error creating SELECT policy for ${bucketName}:`, selectError);
-    } else {
-      console.log(`SELECT policy for ${bucketName} created successfully`);
     }
     
-    // Create policy for INSERT access (upload files)
+    // Create policy for INSERT access (authenticated users only)
     const { error: insertError } = await supabase.rpc('create_storage_policy', {
       bucket_name: bucketName,
       policy_name: `${bucketName}_insert_policy`,
-      definition: `bucket_id = '${bucketName}'`,
+      definition: `bucket_id = '${bucketName}' AND auth.role() = 'authenticated'`,
       operation: 'INSERT'
     });
     
     if (insertError) {
       console.error(`Error creating INSERT policy for ${bucketName}:`, insertError);
-    } else {
-      console.log(`INSERT policy for ${bucketName} created successfully`);
     }
     
-    // Create policy for UPDATE access (modify files)
+    // Create policy for UPDATE access (admin only)
     const { error: updateError } = await supabase.rpc('create_storage_policy', {
       bucket_name: bucketName,
       policy_name: `${bucketName}_update_policy`,
-      definition: `bucket_id = '${bucketName}'`,
+      definition: `bucket_id = '${bucketName}' AND public.check_employee_role(auth.uid(), 'admin')`,
       operation: 'UPDATE'
     });
     
     if (updateError) {
       console.error(`Error creating UPDATE policy for ${bucketName}:`, updateError);
-    } else {
-      console.log(`UPDATE policy for ${bucketName} created successfully`);
     }
     
-    // Create policy for DELETE access (remove files)
+    // Create policy for DELETE access (admin only)
     const { error: deleteError } = await supabase.rpc('create_storage_policy', {
       bucket_name: bucketName,
       policy_name: `${bucketName}_delete_policy`,
-      definition: `bucket_id = '${bucketName}'`,
+      definition: `bucket_id = '${bucketName}' AND public.check_employee_role(auth.uid(), 'admin')`,
       operation: 'DELETE'
     });
     
     if (deleteError) {
       console.error(`Error creating DELETE policy for ${bucketName}:`, deleteError);
-    } else {
-      console.log(`DELETE policy for ${bucketName} created successfully`);
     }
   } catch (error) {
     console.error(`Error setting up policies for ${bucketName}:`, error);
