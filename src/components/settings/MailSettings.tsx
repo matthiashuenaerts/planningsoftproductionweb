@@ -231,7 +231,7 @@ const MailSettings: React.FC = () => {
     setTriggering(functionName);
     try {
       const { data, error } = await supabase.functions.invoke(functionName.replace(/_/g, '-'), {
-        body: {},
+        body: { tenantId: tenant?.id },
       });
 
       if (error) throw error;

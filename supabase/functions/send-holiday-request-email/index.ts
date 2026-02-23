@@ -17,6 +17,7 @@ interface HolidayRequestEmailData {
   endDate: string;
   reason?: string;
   requestId: string;
+  tenantId?: string;
 }
 
 // Define translations
@@ -73,7 +74,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { employeeName, employeeEmail, startDate, endDate, reason, requestId }: HolidayRequestEmailData = await req.json();
+    const { employeeName, employeeEmail, startDate, endDate, reason, requestId, tenantId }: HolidayRequestEmailData = await req.json();
 
     // Create Supabase client
     const supabase = createClient(
@@ -81,12 +82,17 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Fetch email configuration from database
-    const { data: emailConfig, error: configError } = await supabase
+    // Fetch email configuration from database, filtered by tenant
+    let configQuery = supabase
       .from('email_configurations')
       .select('recipient_emails, language')
-      .eq('function_name', 'holiday_request')
-      .single();
+      .eq('function_name', 'holiday_request');
+    
+    if (tenantId) {
+      configQuery = configQuery.eq('tenant_id', tenantId);
+    }
+    
+    const { data: emailConfig, error: configError } = await configQuery.single();
 
     if (configError) {
       console.error('Error fetching email configuration:', configError);

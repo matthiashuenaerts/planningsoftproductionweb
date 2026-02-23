@@ -19,6 +19,7 @@ type TenantRow = {
   name: string;
   slug: string;
   custom_domain: string | null;
+  logo_url: string | null;
   is_active: boolean;
   created_at: string;
 };
@@ -42,7 +43,7 @@ type AliasRow = {
 async function fetchTenants(): Promise<TenantRow[]> {
   const { data, error } = await supabase
     .from("tenants")
-    .select("id,name,slug,custom_domain,is_active,created_at")
+    .select("id,name,slug,custom_domain,logo_url,is_active,created_at")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as TenantRow[];
@@ -90,6 +91,7 @@ const DeveloperPortal: React.FC = () => {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [customDomain, setCustomDomain] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Expanded tenant cards
@@ -97,7 +99,8 @@ const DeveloperPortal: React.FC = () => {
 
   // Alias form per tenant
   const [aliasInputs, setAliasInputs] = useState<Record<string, string>>({});
-
+  // Tenant name editing
+  const [editingNames, setEditingNames] = useState<Record<string, string>>({});
   // Onboarding wizard state
   const [onboardingTenant, setOnboardingTenant] = useState<{ id: string; name: string; slug: string } | null>(null);
   const suggestedSlug = name
@@ -128,6 +131,7 @@ const DeveloperPortal: React.FC = () => {
         name: tenantName,
         slug: finalSlug,
         custom_domain: customDomain.trim() || null,
+        logo_url: logoUrl.trim() || null,
         is_active: true,
       }).select("id").single();
       if (error) throw error;
@@ -135,6 +139,7 @@ const DeveloperPortal: React.FC = () => {
       setName("");
       setSlug("");
       setCustomDomain("");
+      setLogoUrl("");
       await qc.invalidateQueries({ queryKey: ["dev"] });
       toast({ title: "Tenant created", description: `Created ${finalSlug}` });
       
@@ -182,6 +187,20 @@ const DeveloperPortal: React.FC = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["dev", "tenants"] });
+    },
+  });
+
+  const updateTenantName = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase.from("tenants").update({ name }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["dev", "tenants"] });
+      toast({ title: "Tenant name updated" });
+    },
+    onError: (e: any) => {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
     },
   });
 
@@ -251,7 +270,7 @@ const DeveloperPortal: React.FC = () => {
               <Plus className="h-5 w-5" /> Create New Tenant
             </CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-4">
+          <CardContent className="grid gap-4 md:grid-cols-5">
             <div className="space-y-1">
               <Label className="text-slate-300">Company Name</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Thonon" className="bg-white/10 border-white/20 text-white placeholder:text-slate-500" />
@@ -264,6 +283,10 @@ const DeveloperPortal: React.FC = () => {
             <div className="space-y-1">
               <Label className="text-slate-300">Primary Domain (optional)</Label>
               <Input value={customDomain} onChange={(e) => setCustomDomain(e.target.value)} placeholder="planning.thonon.be" className="bg-white/10 border-white/20 text-white placeholder:text-slate-500" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-slate-300">Logo URL (optional)</Label>
+              <Input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." className="bg-white/10 border-white/20 text-white placeholder:text-slate-500" />
             </div>
             <div className="flex items-end">
               <Button onClick={handleCreateTenant} disabled={saving} className="bg-blue-600 hover:bg-blue-700 w-full">
@@ -343,6 +366,34 @@ const DeveloperPortal: React.FC = () => {
                     {/* Expanded Details */}
                     {isExpanded && (
                       <div className="border-t border-white/10 p-4 space-y-6">
+                        {/* Tenant Name Edit */}
+                        <div>
+                          <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+                            <Building2 className="h-4 w-4" /> Display Name
+                          </h3>
+                          <div className="flex gap-2">
+                            <Input
+                              value={editingNames[t.id] ?? t.name}
+                              onChange={(e) => setEditingNames((p) => ({ ...p, [t.id]: e.target.value }))}
+                              className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 flex-1 max-w-sm"
+                            />
+                            <Button
+                              size="sm"
+                              className="bg-blue-600 hover:bg-blue-700"
+                              disabled={(editingNames[t.id] ?? t.name) === t.name}
+                              onClick={() => {
+                                const newName = editingNames[t.id]?.trim();
+                                if (newName && newName !== t.name) {
+                                  updateTenantName.mutate({ id: t.id, name: newName });
+                                }
+                              }}
+                            >
+                              Save Name
+                            </Button>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">This name is shown in the sidebar of the tenant's application</p>
+                        </div>
+
                         {/* Employees */}
                         <div>
                           <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
