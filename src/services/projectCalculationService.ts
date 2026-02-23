@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { Parser } from 'expr-eval';
 
 export interface ProjectCalculationVariables {
   id: string;
@@ -42,14 +43,9 @@ export function evaluateFormula(formula: string, variables: Record<string, numbe
       expression = expression.replace(regex, value.toString());
     }
     
-    // Evaluate the mathematical expression safely
-    // Only allow numbers, operators, parentheses, and whitespace
-    if (!/^[\d+\-*/().\s]+$/.test(expression)) {
-      throw new Error('Invalid formula: contains unauthorized characters');
-    }
-    
-    // Use Function constructor for safe evaluation
-    const result = new Function('return ' + expression)();
+    // Evaluate the mathematical expression safely using expr-eval (no Function constructor)
+    const parser = new Parser();
+    const result = parser.evaluate(expression);
     return typeof result === 'number' && !isNaN(result) ? Math.round(result) : 0;
   } catch (error) {
     console.error('Formula evaluation error:', error);
