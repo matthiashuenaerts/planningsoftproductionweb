@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 const UserMenu: React.FC = () => {
   const [showHolidayModal, setShowHolidayModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const { currentEmployee } = useAuth();
   const { createLocalizedPath, t } = useLanguage();
@@ -46,27 +47,43 @@ const UserMenu: React.FC = () => {
     }
   }, [canManageRequests]);
 
+  // Close dropdown first, then open dialog after a tick to avoid Radix pointer-events conflict
+  const openHolidayModal = () => {
+    setDropdownOpen(false);
+    setTimeout(() => setShowHolidayModal(true), 0);
+  };
+
+  const openAdminModal = () => {
+    setDropdownOpen(false);
+    setTimeout(() => setShowAdminModal(true), 0);
+  };
+
+  const handleNavigate = (path: string) => {
+    setDropdownOpen(false);
+    navigate(path);
+  };
+
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="text-white hover:bg-sky-700">
             <MoreVertical className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => setShowHolidayModal(true)}>
+          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); openHolidayModal(); }}>
             <CalendarDays className="mr-2 h-4 w-4" />
             {t('holiday')}
           </DropdownMenuItem>
           {canViewGeneralSchedule && (
-            <DropdownMenuItem onSelect={() => navigate(createLocalizedPath('/general-schedule'))}>
+            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleNavigate(createLocalizedPath('/general-schedule')); }}>
               <Calendar className="mr-2 h-4 w-4" />
               {t('general_schedule')}
             </DropdownMenuItem>
           )}
           {canManageRequests && (
-            <DropdownMenuItem onSelect={() => setShowAdminModal(true)}>
+            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); openAdminModal(); }}>
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center">
                   <Users className="mr-2 h-4 w-4" />
