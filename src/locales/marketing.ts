@@ -139,7 +139,7 @@ const marketing: Record<string, Record<string, string>> = {
     contact_title: "Klaar om uw productie te stroomlijnen?",
     contact_subtitle: "Krijg uw eigen dedicated omgeving op",
     contact_cta: "Contacteer Ons",
-    contact_email: "info@automattion.com",
+    contact_email: "info@automattion-compass.com",
     contact_or: "of mail rechtstreeks naar",
 
     // Footer
@@ -280,7 +280,7 @@ const marketing: Record<string, Record<string, string>> = {
     contact_title: "Ready to streamline your production?",
     contact_subtitle: "Get your own dedicated environment at",
     contact_cta: "Contact Us",
-    contact_email: "info@automattion.com",
+    contact_email: "info@automattion-compass.com",
     contact_or: "or email directly to",
 
     footer_rights: "All rights reserved.",
@@ -420,7 +420,7 @@ const marketing: Record<string, Record<string, string>> = {
     contact_title: "Prêt à optimiser votre production ?",
     contact_subtitle: "Obtenez votre propre environnement dédié sur",
     contact_cta: "Contactez-Nous",
-    contact_email: "info@automattion.com",
+    contact_email: "info@automattion-compass.com",
     contact_or: "ou envoyez un email directement à",
 
     footer_rights: "Tous droits réservés.",
