@@ -75,7 +75,7 @@ const MarketingNav: React.FC = () => {
             ))}
           </div>
 
-          <a href="mailto:info@automattion.com">
+          <a href="mailto:info@automattion-compass.com">
             <Button
               size="sm"
               className="bg-gradient-to-r from-[#195F85] to-[#42A5DB] text-white text-sm font-semibold"
@@ -122,7 +122,7 @@ const MarketingNav: React.FC = () => {
               </button>
             ))}
           </div>
-          <a href="mailto:info@automattion.com" className="block pt-2">
+          <a href="mailto:info@automattion-compass.com" className="block pt-2">
             <Button className="w-full bg-gradient-to-r from-[#195F85] to-[#42A5DB] text-white">
               {t("nav_demo")}
             </Button>
