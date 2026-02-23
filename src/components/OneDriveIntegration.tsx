@@ -91,7 +91,7 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
 
 async function generatePKCE() {
   const random = crypto.getRandomValues(new Uint8Array(32));
-  const codeVerifier = base64UrlEncode(random);
+  const codeVerifier = base64UrlEncode(random.buffer as ArrayBuffer);
 
   const encoder = new TextEncoder();
   const data = encoder.encode(codeVerifier);
