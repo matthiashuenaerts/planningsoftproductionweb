@@ -236,8 +236,9 @@ const NavbarContent = ({
 };
 const Navbar = () => {
   const isMobile = useIsMobile();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   if (isMobile) {
-    const [drawerOpen, setDrawerOpen] = useState(false);
     return <Drawer direction="left" open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerTrigger asChild>
           <Button variant="outline" size="icon" className="fixed top-4 left-4 z-50 bg-sky-800 border-sky-600 text-white hover:bg-sky-700">
