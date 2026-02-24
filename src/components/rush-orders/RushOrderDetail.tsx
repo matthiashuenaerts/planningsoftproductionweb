@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import { Check, Clock, UserCheck, ListChecks, File as FileIcon, Play } from 'lucide-react';
+import SignedStorageImage from '@/components/SignedStorageImage';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { supabase } from '@/integrations/supabase/client';
 import RushOrderChat from './RushOrderChat';
 import { useLanguage } from '@/context/LanguageContext';
@@ -20,6 +22,11 @@ interface RushOrderDetailProps {
   rushOrderId: string;
   onStatusChange?: () => void;
 }
+
+const isImageFile = (url: string | undefined): boolean => {
+  if (!url) return false;
+  return /\.(jpg|jpeg|png|gif|svg|webp)$/i.test(url);
+};
 
 const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatusChange }) => {
   const { toast } = useToast();
@@ -33,6 +40,12 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
     queryKey: ['rushOrder', rushOrderId],
     queryFn: () => rushOrderService.getRushOrderById(rushOrderId),
   });
+
+  // Get signed URL for the image (hook must be at top level)
+  const imageSignedUrl = useSignedUrl(
+    'attachments',
+    rushOrder?.image_url && isImageFile(rushOrder.image_url) ? rushOrder.image_url : null
+  );
   
   // Query for getting standard task details for each task
   const { data: standardTasks } = useQuery({
@@ -78,10 +91,7 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
     enabled: !!rushOrder?.project_id,
   });
   
-  const isImage = (url: string | undefined): boolean => {
-    if (!url) return false;
-    return /\.(jpg|jpeg|png|gif|svg|webp)$/i.test(url);
-  };
+  const isImage = isImageFile;
   
   const handleStatusUpdate = async (newStatus: "pending" | "in_progress" | "completed") => {
     try {
@@ -238,29 +248,25 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
               <h3 className="text-sm font-medium text-gray-500 mb-2">{t('attachment_label')}</h3>
               <div className="overflow-hidden rounded-lg border">
                 {isImage(rushOrder.image_url) ? (
-                  <img 
-                    src={rushOrder.image_url} 
-                    alt={rushOrder.title} 
+                  <SignedStorageImage
+                    bucket="attachments"
+                    path={rushOrder.image_url}
+                    alt={rushOrder.title}
                     className="w-full h-auto max-h-96 object-contain cursor-pointer hover:opacity-90 transition-opacity"
                     onClick={() => setShowImageModal(true)}
                   />
                 ) : (
-                  <a 
-                    href={rushOrder.image_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="block p-4 hover:bg-gray-50"
-                  >
+                  <div className="block p-4 hover:bg-gray-50">
                     <div className="flex items-center gap-4">
                       <FileIcon className="h-10 w-10 text-gray-500 flex-shrink-0" />
                       <div className="flex-grow overflow-hidden">
                         <p className="font-medium truncate">{decodeURIComponent(rushOrder.image_url.split('/').pop() ?? 'Document')}</p>
-                        <span className="text-sm text-blue-600 hover:underline">
+                        <span className="text-sm text-blue-600">
                           {t('view_document')}
                         </span>
                       </div>
                     </div>
-                  </a>
+                  </div>
                 )}
               </div>
             </div>
@@ -381,9 +387,9 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
       <RushOrderChat rushOrderId={rushOrderId} />
       
       {/* Fullscreen Image Modal */}
-      {rushOrder.image_url && isImage(rushOrder.image_url) && (
+      {rushOrder.image_url && isImage(rushOrder.image_url) && imageSignedUrl && (
         <ImageModal
-          src={rushOrder.image_url}
+          src={imageSignedUrl}
           alt={rushOrder.title}
           isOpen={showImageModal}
           onClose={() => setShowImageModal(false)}
