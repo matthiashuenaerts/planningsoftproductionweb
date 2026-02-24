@@ -52,20 +52,15 @@ export const rushOrderService = {
           
         if (uploadError) throw uploadError;
         
-        // Get public URL
-        const { data: publicUrlData } = supabase.storage
-          .from('attachments')
-          .getPublicUrl(filePath);
-          
-        // Update rush order with image URL
+        // Store the storage path (not public URL) since bucket is private
         const { error: updateError } = await supabase
           .from('rush_orders')
-          .update({ image_url: publicUrlData.publicUrl })
+          .update({ image_url: filePath })
           .eq('id', data.id);
           
         if (updateError) throw updateError;
         
-        data.image_url = publicUrlData.publicUrl;
+        data.image_url = filePath;
       }
       
       return data as RushOrder;
@@ -328,11 +323,8 @@ export const rushOrderService = {
           
         if (uploadError) throw uploadError;
         
-        const { data: publicUrlData } = supabase.storage
-          .from('attachments')
-          .getPublicUrl(filePath);
-        
-        updatePayload.image_url = publicUrlData.publicUrl;
+        // Store the storage path (not public URL) since bucket is private
+        updatePayload.image_url = filePath;
       }
 
       const { data, error } = await supabase

@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, File as FileIcon, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import SignedStorageImage from '@/components/SignedStorageImage';
 import { useAuth } from '@/context/AuthContext';
 import {
   DropdownMenu,
@@ -200,9 +201,10 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
             {order.image_url && (
               <div className="mt-4">
                 {isImage(order.image_url) ? (
-                  <img 
-                    src={order.image_url} 
-                    alt={order.title} 
+                  <SignedStorageImage
+                    bucket="attachments"
+                    path={order.image_url}
+                    alt={order.title}
                     className="h-40 w-full object-cover rounded-md"
                   />
                 ) : (
