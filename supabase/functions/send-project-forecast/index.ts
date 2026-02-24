@@ -9,8 +9,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/** Format a date string or Date to DD/MM/YYYY */
+function formatDate(input: string | Date): string {
+  const d = typeof input === 'string' ? new Date(input) : input;
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
 const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -18,18 +26,16 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     console.log("Starting project forecast email process...");
 
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Try to get tenant_id from request body
     let tenantId: string | null = null;
     try {
       const body = await req.json();
       tenantId = body?.tenantId || null;
     } catch {
-      // No body or invalid JSON, proceed without tenant filter
+      // No body or invalid JSON
     }
 
     // Get email configuration - filter by tenant if available
@@ -52,10 +58,8 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Use the resolved tenant_id from the config if not provided
     const resolvedTenantId = tenantId || emailConfig.tenant_id;
 
-    // Get schedule configuration
     let schedQuery = supabase
       .from('email_schedule_configs')
       .select('*')
@@ -90,14 +94,12 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Calculate date range
     const today = new Date();
     const futureDate = new Date();
     futureDate.setDate(today.getDate() + (forecastWeeks * 7));
 
     console.log(`Fetching projects with installation dates between ${today.toISOString()} and ${futureDate.toISOString()}`);
 
-    // Fetch projects within the forecast period, filtered by tenant
     let projectQuery = supabase
       .from('projects')
       .select('id, name, client, installation_date, status, description')
@@ -218,7 +220,6 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Found ${projects?.length || 0} projects in forecast period`);
 
     if (!projects || projects.length === 0) {
-      // Send email indicating no projects in the forecast period
       await resend.emails.send({
         from: "Project Forecast <noreply@automattion-compass.com>",
         to: recipients,
@@ -226,7 +227,7 @@ const handler = async (req: Request): Promise<Response> => {
         html: `
           <h1>${t.title(forecastWeeks)}</h1>
           <p>${t.noProjects(forecastWeeks)}</p>
-          <p>${t.period} ${today.toLocaleDateString()} - ${futureDate.toLocaleDateString()}</p>
+          <p>${t.period} ${formatDate(today)} - ${formatDate(futureDate)}</p>
         `,
       });
 
@@ -270,7 +271,6 @@ const handler = async (req: Request): Promise<Response> => {
           return { ...project, orders: [], hasUndeliveredItems: false };
         }
 
-        // Filter orders to only include those with undelivered items
         const ordersWithUndeliveredItems = (orders || []).map(order => {
           const undeliveredItems = (order.order_items || []).filter(
             item => item.quantity > (item.delivered_quantity || 0)
@@ -278,7 +278,6 @@ const handler = async (req: Request): Promise<Response> => {
           return { ...order, order_items: undeliveredItems };
         }).filter(order => order.order_items.length > 0);
 
-        // Check if project has any undelivered items
         const hasUndeliveredItems = ordersWithUndeliveredItems.length > 0;
 
         return { 
@@ -289,7 +288,7 @@ const handler = async (req: Request): Promise<Response> => {
       })
     );
 
-    // Generate HTML email content
+    // Generate HTML email content - all dates use DD/MM/YYYY
     const emailHtml = `
       <!DOCTYPE html>
       <html>
@@ -301,8 +300,6 @@ const handler = async (req: Request): Promise<Response> => {
           h2 { color: #1e40af; margin-top: 30px; }
           h3 { color: #475569; margin-top: 20px; }
           .project { background: #f8fafc; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #2563eb; }
-          .project-delivered { border-left: 4px solid #16a34a !important; }
-          .project-undelivered { border-left: 4px solid #dc2626 !important; }
           .order { background: #fff; padding: 15px; margin: 15px 0; border-radius: 6px; border: 1px solid #e2e8f0; }
           .order-item { background: #f1f5f9; padding: 10px; margin: 10px 0; border-radius: 4px; }
           .status { padding: 4px 8px; border-radius: 4px; font-weight: bold; display: inline-block; }
@@ -320,7 +317,7 @@ const handler = async (req: Request): Promise<Response> => {
         <div class="container">
           <h1>${t.title(forecastWeeks)}</h1>
           <div class="summary">
-            <strong>${t.period}</strong> ${today.toLocaleDateString()} - ${futureDate.toLocaleDateString()}<br>
+            <strong>${t.period}</strong> ${formatDate(today)} - ${formatDate(futureDate)}<br>
             <strong>${t.totalProjects}</strong> ${projectsWithOrders.length}<br>
             <strong>${t.totalOrders}</strong> ${projectsWithOrders.reduce((acc, p) => acc + p.orders.length, 0)}
           </div>
@@ -332,7 +329,7 @@ const handler = async (req: Request): Promise<Response> => {
                 <h2>🏗️ ${project.name}</h2>
                 <table>
                   <tr><th>${t.client}</th><td>${project.client || 'N/A'}</td></tr>
-                  <tr><th>${t.installationDate}</th><td>${new Date(project.installation_date).toLocaleDateString()}</td></tr>
+                  <tr><th>${t.installationDate}</th><td>${formatDate(project.installation_date)}</td></tr>
                   <tr><th>${t.status}</th><td><span class="status status-${project.status}">${project.status}</span></td></tr>
                   ${project.description ? `<tr><th>${t.description}</th><td>${project.description}</td></tr>` : ''}
                 </table>
@@ -343,8 +340,8 @@ const handler = async (req: Request): Promise<Response> => {
                     <div class="order">
                       <strong>${t.supplier}</strong> ${order.supplier}<br>
                       <strong>${t.orderType}</strong> ${order.order_type}<br>
-                      <strong>${t.orderDate}</strong> ${new Date(order.order_date).toLocaleDateString()}<br>
-                      <strong>${t.expectedDelivery}</strong> ${new Date(order.expected_delivery).toLocaleDateString()}<br>
+                      <strong>${t.orderDate}</strong> ${formatDate(order.order_date)}<br>
+                      <strong>${t.expectedDelivery}</strong> ${formatDate(order.expected_delivery)}<br>
                       <strong>${t.status}</strong> <span class="status status-${order.status}">${order.status}</span><br>
                       ${order.external_order_number ? `<strong>${t.orderNumber}</strong> ${order.external_order_number}<br>` : ''}
                       ${order.notes ? `<strong>${t.notes}</strong> ${order.notes}<br>` : ''}
@@ -378,7 +375,6 @@ const handler = async (req: Request): Promise<Response> => {
       </html>
     `;
 
-    // Send email
     console.log(`Sending forecast email to ${recipients.length} recipient(s)`);
     const emailResponse = await resend.emails.send({
       from: "Project Forecast <noreply@automattion-compass.com>",

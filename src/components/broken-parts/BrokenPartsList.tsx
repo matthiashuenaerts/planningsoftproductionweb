@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   Table, 
@@ -11,13 +11,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { brokenPartsService } from '@/services/brokenPartsService';
 import { Button } from "@/components/ui/button";
-import { Plus, AlertTriangle, X, Eye, MoreVertical, Trash } from 'lucide-react';
+import { Plus, AlertTriangle, X, Eye, MoreVertical, Trash, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from '@/context/LanguageContext';
 import { BrokenPartDetailDialog } from './BrokenPartDetailDialog';
 import { useAuth } from '@/context/AuthContext';
@@ -30,15 +29,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const PAGE_SIZE = 20;
+
 const BrokenPartsList: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedBrokenPart, setSelectedBrokenPart] = useState<any | null>(null);
   const [imageError, setImageError] = useState<Record<string, boolean>>({});
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const { t, createLocalizedPath } = useLanguage();
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { tenant } = useTenant();
+  const sentinelRef = useRef<HTMLDivElement>(null);
   
   const isAdmin = currentEmployee?.role === 'admin';
 
@@ -48,6 +51,29 @@ const BrokenPartsList: React.FC = () => {
       return brokenPartsService.getAll(tenant?.id);
     }
   });
+
+  const visibleParts = brokenParts.slice(0, visibleCount);
+  const hasMore = visibleCount < brokenParts.length;
+
+  // Intersection observer for infinite scroll
+  useEffect(() => {
+    if (!sentinelRef.current || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount(prev => Math.min(prev + PAGE_SIZE, brokenParts.length));
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, brokenParts.length]);
+
+  // Reset visible count when data changes
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [tenant?.id]);
 
   const getImageUrl = (path: string) => {
     if (!path) return null;
@@ -129,95 +155,106 @@ const BrokenPartsList: React.FC = () => {
         </CardHeader>
         <CardContent>
           {brokenParts.length > 0 ? (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {isAdmin && <TableHead className="w-[50px]"></TableHead>}
-                    <TableHead>Image</TableHead>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Workstation</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Reported By</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {brokenParts.map((part: any) => (
-                    <TableRow 
-                      key={part.id} 
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => setSelectedBrokenPart(part)}
-                    >
-                      {isAdmin && (
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start">
-                              <DropdownMenuItem
-                                onClick={(e) => handleDelete(part.id, e)}
-                                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+            <>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {isAdmin && <TableHead className="w-[50px]"></TableHead>}
+                      <TableHead>Image</TableHead>
+                      <TableHead>Project</TableHead>
+                      <TableHead>Workstation</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Reported By</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visibleParts.map((part: any) => (
+                      <TableRow 
+                        key={part.id} 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setSelectedBrokenPart(part)}
+                      >
+                        {isAdmin && (
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start">
+                                <DropdownMenuItem
+                                  onClick={(e) => handleDelete(part.id, e)}
+                                  className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                >
+                                  <Trash className="mr-2 h-4 w-4" />
+                                  {t('delete') || 'Delete'}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        )}
+                        <TableCell>
+                          {part.image_path ? (
+                            <div className="relative">
+                              <div 
+                                className="w-20 h-20 relative overflow-hidden rounded-md cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openImageDialog(part.image_path);
+                                }}
                               >
-                                <Trash className="mr-2 h-4 w-4" />
-                                {t('delete') || 'Delete'}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      )}
-                      <TableCell>
-                        {part.image_path ? (
-                          <div className="relative">
-                            <div 
-                              className="w-20 h-20 relative overflow-hidden rounded-md cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openImageDialog(part.image_path);
-                              }}
-                            >
-                              <AspectRatio ratio={1/1}>
-                                {imageError[part.id] ? (
-                                  <div className="flex items-center justify-center w-full h-full bg-gray-100">
-                                    <AlertTriangle className="h-8 w-8 text-amber-500" />
-                                  </div>
-                                ) : (
-                                  <img
-                                    src={getImageUrl(part.image_path)}
-                                    alt="Broken part"
-                                    className="object-cover w-full h-full"
-                                    onError={() => handleImageError(part.id)}
-                                  />
-                                )}
-                              </AspectRatio>
-                              <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 flex items-center justify-center transition-all">
-                                <Eye className="h-6 w-6 text-white opacity-0 hover:opacity-100" />
+                                <AspectRatio ratio={1/1}>
+                                  {imageError[part.id] ? (
+                                    <div className="flex items-center justify-center w-full h-full bg-gray-100">
+                                      <AlertTriangle className="h-8 w-8 text-amber-500" />
+                                    </div>
+                                  ) : (
+                                    <img
+                                      src={getImageUrl(part.image_path)}
+                                      alt="Broken part"
+                                      className="object-cover w-full h-full"
+                                      onError={() => handleImageError(part.id)}
+                                    />
+                                  )}
+                                </AspectRatio>
+                                <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 flex items-center justify-center transition-all">
+                                  <Eye className="h-6 w-6 text-white opacity-0 hover:opacity-100" />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ) : (
-                          <div className="w-20 h-20 bg-gray-100 flex items-center justify-center rounded-md text-gray-400">
-                            No image
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>{part.projects?.name || "Not specified"}</TableCell>
-                      <TableCell>{part.workstations?.name || "Not specified"}</TableCell>
-                      <TableCell className="max-w-xs">
-                        <div className="truncate">{part.description}</div>
-                      </TableCell>
-                      <TableCell>{part.employees?.name}</TableCell>
-                      <TableCell>
-                        {part.created_at && format(new Date(part.created_at), 'MMM d, yyyy HH:mm')}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                          ) : (
+                            <div className="w-20 h-20 bg-gray-100 flex items-center justify-center rounded-md text-gray-400">
+                              No image
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>{part.projects?.name || "Not specified"}</TableCell>
+                        <TableCell>{part.workstations?.name || "Not specified"}</TableCell>
+                        <TableCell className="max-w-xs">
+                          <div className="truncate">{part.description}</div>
+                        </TableCell>
+                        <TableCell>{part.employees?.name}</TableCell>
+                        <TableCell>
+                          {part.created_at && format(new Date(part.created_at), 'MMM d, yyyy HH:mm')}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Sentinel for infinite scroll + loading indicator */}
+              {hasMore && (
+                <div ref={sentinelRef} className="flex justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-sm text-muted-foreground">
+                    {visibleCount} / {brokenParts.length}
+                  </span>
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-10">
               <AlertTriangle className="mx-auto h-12 w-12 text-gray-300" />
