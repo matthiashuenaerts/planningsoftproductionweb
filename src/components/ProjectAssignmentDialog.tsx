@@ -443,11 +443,11 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       console.log('Save completed successfully!');
       toast.success('Project updated successfully');
       
+      // Close the dialog first so UI feels responsive
+      onClose();
+      
       // Call onUpdate to refresh the data
       await onUpdate();
-      
-      // Close the dialog
-      onClose();
     } catch (error: any) {
       console.error('Save failed:', error);
       toast.error(`Failed to update project: ${error.message || 'Unknown error'}`);

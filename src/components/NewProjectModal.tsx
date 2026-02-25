@@ -401,38 +401,30 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       if (projectsConfig) {
         try {
           // Authenticate
-          const authRes = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/external-db-proxy', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
-            },
-            body: JSON.stringify({
+          const { data: authData, error: authError } = await supabase.functions.invoke('external-db-proxy', {
+            body: {
               action: 'authenticate',
               baseUrl: projectsConfig.base_url,
               username: projectsConfig.username,
               password: projectsConfig.password
-            })
+            }
           });
-          const authData = await authRes.json();
+          
+          if (authError) throw authError;
           const projToken = authData?.response?.token;
 
           if (projToken) {
             // Query project data
-            const queryRes = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/external-db-proxy', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
-              },
-              body: JSON.stringify({
+            const { data: queryData, error: queryError } = await supabase.functions.invoke('external-db-proxy', {
+              body: {
                 action: 'query',
                 baseUrl: projectsConfig.base_url,
                 token: projToken,
                 orderNumber: linkId.trim()
-              })
+              }
             });
-            const queryData = await queryRes.json();
+            
+            if (queryError) throw queryError;
 
             // Parse script result
             let orderData: any = null;
@@ -512,37 +504,27 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       // --- 2. Fetch orders from Orders API ---
       if (ordersConfig) {
         try {
-          const authRes = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/orders-api-proxy', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
-            },
-            body: JSON.stringify({
+          const { data: authData, error: authErr } = await supabase.functions.invoke('orders-api-proxy', {
+            body: {
               action: 'authenticate',
               baseUrl: ordersConfig.base_url,
               username: ordersConfig.username,
               password: ordersConfig.password
-            })
+            }
           });
-          const authData = await authRes.json();
+          if (authErr) throw authErr;
           const ordToken = authData?.response?.token;
 
           if (ordToken) {
-            const queryRes = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/orders-api-proxy', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
-              },
-              body: JSON.stringify({
+            const { data: ordersData, error: queryErr } = await supabase.functions.invoke('orders-api-proxy', {
+              body: {
                 action: 'query',
                 baseUrl: ordersConfig.base_url,
                 token: ordToken,
                 projectLinkId: linkId.trim()
-              })
+              }
             });
-            const ordersData = await queryRes.json();
+            if (queryErr) throw queryErr;
 
             if (ordersData?.bestellingen && Array.isArray(ordersData.bestellingen)) {
               setPendingOrders(ordersData.bestellingen);

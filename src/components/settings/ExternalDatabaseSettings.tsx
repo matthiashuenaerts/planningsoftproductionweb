@@ -172,32 +172,23 @@ const ExternalDatabaseSettings: React.FC = () => {
     console.log('Username:', config.username);
     
     try {
-      const response = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/external-db-proxy', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
-        },
-        body: JSON.stringify({
+      const { data, error: invokeError } = await supabase.functions.invoke('external-db-proxy', {
+        body: {
           action: 'authenticate',
           baseUrl: config.baseUrl,
           username: config.username,
           password: config.password
-        })
+        }
       });
 
-      console.log('Edge function response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Edge function error:', errorData);
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      if (invokeError) {
+        console.error('Edge function error:', invokeError);
+        throw new Error(invokeError.message || 'Edge function invocation failed');
       }
 
-      const data = await response.json();
       console.log('Edge function response data:', data);
-      
-      if (data.response && data.response.token) {
+
+      if (data?.response && data.response.token) {
         setToken(data.response.token);
         setConnectionStatus('success');
         console.log('Token received via edge function:', data.response.token);
@@ -255,29 +246,20 @@ const ExternalDatabaseSettings: React.FC = () => {
     console.log('Token:', token);
     
     try {
-      const response = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/external-db-proxy', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
-        },
-        body: JSON.stringify({
+      const { data, error: invokeError } = await supabase.functions.invoke('external-db-proxy', {
+        body: {
           action: 'query',
           baseUrl: config.baseUrl,
           token: token,
           orderNumber: config.testOrderNumber
-        })
+        }
       });
 
-      console.log('Query response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Query error:', errorData);
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      if (invokeError) {
+        console.error('Query error:', invokeError);
+        throw new Error(invokeError.message || 'Query failed');
       }
 
-      const data = await response.json();
       console.log('Query response data:', data);
       setQueryResult(JSON.stringify(data, null, 2));
       
@@ -358,7 +340,7 @@ const ExternalDatabaseSettings: React.FC = () => {
           username: config.username,
           password: config.password,
           updated_at: new Date().toISOString()
-        }, { onConflict: 'api_type' });
+        }, { onConflict: 'tenant_id,api_type' });
 
       if (error) throw error;
       
@@ -397,32 +379,23 @@ const ExternalDatabaseSettings: React.FC = () => {
     console.log('Username:', ordersConfig.username);
     
     try {
-      const response = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/orders-api-proxy', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
-        },
-        body: JSON.stringify({
+      const { data, error: invokeError } = await supabase.functions.invoke('orders-api-proxy', {
+        body: {
           action: 'authenticate',
           baseUrl: ordersConfig.baseUrl,
           username: ordersConfig.username,
           password: ordersConfig.password
-        })
+        }
       });
 
-      console.log('Orders edge function response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Orders edge function error:', errorData);
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      if (invokeError) {
+        console.error('Orders edge function error:', invokeError);
+        throw new Error(invokeError.message || 'Orders API authentication failed');
       }
 
-      const data = await response.json();
       console.log('Orders edge function response data:', data);
       
-      if (data.response && data.response.token) {
+      if (data?.response && data.response.token) {
         setOrdersToken(data.response.token);
         setOrdersConnectionStatus('success');
         console.log('Orders token received via edge function:', data.response.token);
@@ -480,29 +453,20 @@ const ExternalDatabaseSettings: React.FC = () => {
     console.log('Token:', ordersToken);
     
     try {
-      const response = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/orders-api-proxy', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
-        },
-        body: JSON.stringify({
+      const { data, error: invokeError } = await supabase.functions.invoke('orders-api-proxy', {
+        body: {
           action: 'query',
           baseUrl: ordersConfig.baseUrl,
           token: ordersToken,
           projectLinkId: ordersConfig.testOrderNumber
-        })
+        }
       });
 
-      console.log('Orders query response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Orders query error:', errorData);
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      if (invokeError) {
+        console.error('Orders query error:', invokeError);
+        throw new Error(invokeError.message || 'Orders query failed');
       }
 
-      const data = await response.json();
       console.log('Orders query response data:', data);
       setOrdersQueryResult(JSON.stringify(data, null, 2));
       
@@ -544,7 +508,7 @@ const ExternalDatabaseSettings: React.FC = () => {
           username: ordersConfig.username,
           password: ordersConfig.password,
           updated_at: new Date().toISOString()
-        }, { onConflict: 'api_type' });
+        }, { onConflict: 'tenant_id,api_type' });
 
       if (error) throw error;
       

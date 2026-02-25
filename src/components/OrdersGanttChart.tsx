@@ -1205,7 +1205,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
           currentDuration={selectedProject.duration}
           onUpdate={async () => {
             // Refresh data after update
-            const { data: projectsData, error: projectsError } = await supabase
+            let projectsQuery = supabase
               .from('projects')
               .select(`
                 id,
@@ -1216,6 +1216,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
               `)
               .not('installation_date', 'is', null)
               .order('installation_date');
+            projectsQuery = applyTenantFilter(projectsQuery, tenant?.id);
+            const { data: projectsData, error: projectsError } = await projectsQuery;
 
             if (!projectsError && projectsData) {
               const projectIds = projectsData.map(p => p.id).filter(Boolean);

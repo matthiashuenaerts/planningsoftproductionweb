@@ -1272,6 +1272,7 @@ export type Database = {
           schedule_day: string
           schedule_time: string
           tenant_id: string
+          timezone: string
           updated_at: string
         }
         Insert: {
@@ -1284,6 +1285,7 @@ export type Database = {
           schedule_day?: string
           schedule_time?: string
           tenant_id: string
+          timezone?: string
           updated_at?: string
         }
         Update: {
@@ -1296,6 +1298,7 @@ export type Database = {
           schedule_day?: string
           schedule_time?: string
           tenant_id?: string
+          timezone?: string
           updated_at?: string
         }
         Relationships: [
