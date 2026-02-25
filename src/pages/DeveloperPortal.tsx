@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Building2, Users, Globe, Plus, Trash2, ExternalLink,
-  ChevronDown, ChevronRight, LogOut, Shield, Rocket,
+  ChevronDown, ChevronRight, LogOut, Shield, Rocket, UserPlus,
 } from "lucide-react";
 import TenantOnboardingWizard from "@/components/developer/TenantOnboardingWizard";
 
@@ -40,6 +41,12 @@ type AliasRow = {
   is_primary: boolean;
 };
 
+type UserRoleRow = {
+  id: string;
+  user_id: string;
+  role: string;
+};
+
 async function fetchTenants(): Promise<TenantRow[]> {
   const { data, error } = await supabase
     .from("tenants")
@@ -67,6 +74,14 @@ async function fetchAllAliases(): Promise<AliasRow[]> {
   return (data ?? []) as AliasRow[];
 }
 
+async function fetchAllRoles(): Promise<UserRoleRow[]> {
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("id,user_id,role");
+  if (error) throw error;
+  return (data ?? []) as UserRoleRow[];
+}
+
 const DeveloperPortal: React.FC = () => {
   const { toast } = useToast();
   const { logout, currentEmployee } = useAuth();
@@ -87,6 +102,11 @@ const DeveloperPortal: React.FC = () => {
     queryFn: fetchAllAliases,
   });
 
+  const { data: userRoles } = useQuery({
+    queryKey: ["dev", "userRoles"],
+    queryFn: fetchAllRoles,
+  });
+
   // Create tenant form
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -101,6 +121,9 @@ const DeveloperPortal: React.FC = () => {
   const [aliasInputs, setAliasInputs] = useState<Record<string, string>>({});
   // Tenant name editing
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
+  // Add user form per tenant
+  const [addUserForms, setAddUserForms] = useState<Record<string, { email: string; name: string; password: string; role: string }>>({});
+  const [addingUser, setAddingUser] = useState<string | null>(null);
   // Onboarding wizard state
   const [onboardingTenant, setOnboardingTenant] = useState<{ id: string; name: string; slug: string } | null>(null);
   const suggestedSlug = name
@@ -207,8 +230,49 @@ const DeveloperPortal: React.FC = () => {
   const getEmployeesForTenant = (tenantId: string) =>
     (employees ?? []).filter((e) => e.tenant_id === tenantId);
 
+  const getRolesForEmployee = (employeeId: string) =>
+    (userRoles ?? []).filter((r) => r.user_id === employeeId).map((r) => r.role);
+
   const getAliasesForTenant = (tenantId: string) =>
     (aliases ?? []).filter((a) => a.tenant_id === tenantId);
+
+  const handleAddUserToTenant = async (tenantId: string) => {
+    const form = addUserForms[tenantId];
+    if (!form?.email || !form?.name || !form?.password || !form?.role) {
+      toast({ title: "Missing fields", description: "All fields are required", variant: "destructive" });
+      return;
+    }
+    setAddingUser(tenantId);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-employee', {
+        body: {
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          role: form.role,
+          tenantId,
+        }
+      });
+      if (error) throw error;
+
+      // If a role other than the employee role is specified, also add to user_roles
+      const employeeId = data?.employee?.id;
+      if (employeeId && ['admin', 'developer', 'advisor', 'calculator'].includes(form.role)) {
+        await supabase.from('user_roles').insert({
+          user_id: employeeId,
+          role: form.role as any,
+        } as any);
+      }
+
+      setAddUserForms((p) => ({ ...p, [tenantId]: { email: '', name: '', password: '', role: 'worker' } }));
+      await qc.invalidateQueries({ queryKey: ["dev"] });
+      toast({ title: "User created", description: `${form.name} added to tenant` });
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message ?? "Error creating user", variant: "destructive" });
+    } finally {
+      setAddingUser(null);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
@@ -403,21 +467,88 @@ const DeveloperPortal: React.FC = () => {
                             <p className="text-xs text-slate-500">No employees found.</p>
                           ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                              {tenantEmployees.map((emp) => (
-                                <div key={emp.id} className="flex items-center justify-between bg-white/5 rounded-md px-3 py-2">
-                                  <div>
-                                    <p className="text-sm font-medium text-white">{emp.name}</p>
-                                    <p className="text-xs text-slate-400">
-                                      {emp.role} {emp.email ? `· ${emp.email}` : ""}
-                                    </p>
+                              {tenantEmployees.map((emp) => {
+                                const empRoles = getRolesForEmployee(emp.id);
+                                return (
+                                  <div key={emp.id} className="flex items-center justify-between bg-white/5 rounded-md px-3 py-2">
+                                    <div>
+                                      <p className="text-sm font-medium text-white">{emp.name}</p>
+                                      <p className="text-xs text-slate-400">
+                                        {emp.role} {emp.email ? `· ${emp.email}` : ""}
+                                      </p>
+                                      {empRoles.length > 0 && (
+                                        <div className="flex gap-1 mt-1">
+                                          {empRoles.map((r) => (
+                                            <Badge key={r} className="text-[10px] bg-blue-600/60 px-1.5 py-0">{r}</Badge>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <Badge variant="outline" className={emp.auth_user_id ? "border-emerald-500 text-emerald-400" : "border-amber-500 text-amber-400"}>
+                                      {emp.auth_user_id ? "Linked" : "Not migrated"}
+                                    </Badge>
                                   </div>
-                                  <Badge variant="outline" className={emp.auth_user_id ? "border-emerald-500 text-emerald-400" : "border-amber-500 text-amber-400"}>
-                                    {emp.auth_user_id ? "Linked" : "Not migrated"}
-                                  </Badge>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
+
+                          {/* Add User Form */}
+                          <div className="mt-3 p-3 bg-white/5 rounded-md space-y-2">
+                            <h4 className="text-xs font-semibold text-slate-400 flex items-center gap-1">
+                              <UserPlus className="h-3 w-3" /> Add New User
+                            </h4>
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                              <Input
+                                value={addUserForms[t.id]?.name || ""}
+                                onChange={(e) => setAddUserForms((p) => ({ ...p, [t.id]: { ...p[t.id] || { email: '', password: '', role: 'worker' }, name: e.target.value } }))}
+                                placeholder="Name"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 text-xs h-8"
+                              />
+                              <Input
+                                value={addUserForms[t.id]?.email || ""}
+                                onChange={(e) => setAddUserForms((p) => ({ ...p, [t.id]: { ...p[t.id] || { name: '', password: '', role: 'worker' }, email: e.target.value } }))}
+                                placeholder="Email"
+                                type="email"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 text-xs h-8"
+                              />
+                              <Input
+                                value={addUserForms[t.id]?.password || ""}
+                                onChange={(e) => setAddUserForms((p) => ({ ...p, [t.id]: { ...p[t.id] || { name: '', email: '', role: 'worker' }, password: e.target.value } }))}
+                                placeholder="Password"
+                                type="password"
+                                className="bg-white/10 border-white/20 text-white placeholder:text-slate-500 text-xs h-8"
+                              />
+                              <Select
+                                value={addUserForms[t.id]?.role || "worker"}
+                                onValueChange={(v) => setAddUserForms((p) => ({ ...p, [t.id]: { ...p[t.id] || { name: '', email: '', password: '' }, role: v } }))}
+                              >
+                                <SelectTrigger className="bg-white/10 border-white/20 text-white text-xs h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="admin">Admin</SelectItem>
+                                  <SelectItem value="manager">Manager</SelectItem>
+                                  <SelectItem value="teamleader">Teamleader</SelectItem>
+                                  <SelectItem value="worker">Worker</SelectItem>
+                                  <SelectItem value="preparater">Preparater</SelectItem>
+                                  <SelectItem value="workstation">Workstation</SelectItem>
+                                  <SelectItem value="installation_team">Installation Team</SelectItem>
+                                  <SelectItem value="advisor">Advisor</SelectItem>
+                                  <SelectItem value="calculator">Calculator</SelectItem>
+                                  <SelectItem value="developer">Developer</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                size="sm"
+                                className="bg-emerald-600 hover:bg-emerald-700 h-8 text-xs"
+                                disabled={addingUser === t.id}
+                                onClick={() => handleAddUserToTenant(t.id)}
+                              >
+                                {addingUser === t.id ? "Adding..." : "Add User"}
+                              </Button>
+                            </div>
+                          </div>
                         </div>
 
                         {/* Alias URLs */}

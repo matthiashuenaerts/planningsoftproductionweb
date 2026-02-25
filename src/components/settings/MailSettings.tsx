@@ -24,6 +24,7 @@ interface ScheduleConfig {
   function_name: string;
   schedule_day: string;
   schedule_time: string;
+  timezone: string;
   forecast_weeks: number;
   is_active: boolean;
   language: string;
@@ -281,6 +282,8 @@ const MailSettings: React.FC = () => {
           forecast_weeks: 4,
           is_active: false,
           language: 'nl',
+          timezone: 'Europe/Brussels',
+          tenant_id: tenant.id,
         });
 
       // Refetch to get schedule configs
@@ -528,12 +531,35 @@ const MailSettings: React.FC = () => {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    <div className="space-y-2">
+                      <Label>Timezone</Label>
+                      <Select
+                        value={scheduleConfigs[config.function_name].timezone || 'Europe/Brussels'}
+                        onValueChange={(value) => handleUpdateSchedule(config.function_name, 'timezone', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Europe/Brussels">Europe/Brussels (CET)</SelectItem>
+                          <SelectItem value="Europe/Amsterdam">Europe/Amsterdam (CET)</SelectItem>
+                          <SelectItem value="Europe/Paris">Europe/Paris (CET)</SelectItem>
+                          <SelectItem value="Europe/London">Europe/London (GMT)</SelectItem>
+                          <SelectItem value="Europe/Berlin">Europe/Berlin (CET)</SelectItem>
+                          <SelectItem value="America/New_York">America/New York (EST)</SelectItem>
+                          <SelectItem value="America/Chicago">America/Chicago (CST)</SelectItem>
+                          <SelectItem value="America/Los_Angeles">America/Los Angeles (PST)</SelectItem>
+                          <SelectItem value="Asia/Dubai">Asia/Dubai (GST)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="h-4 w-4" />
                     <span>
-                      Email will be sent every {scheduleConfigs[config.function_name].schedule_day} at {scheduleConfigs[config.function_name].schedule_time} 
+                      Email will be sent every {scheduleConfigs[config.function_name].schedule_day} at {scheduleConfigs[config.function_name].schedule_time} ({scheduleConfigs[config.function_name].timezone || 'Europe/Brussels'})
                       with a {scheduleConfigs[config.function_name].forecast_weeks}-week forecast
                     </span>
                   </div>
