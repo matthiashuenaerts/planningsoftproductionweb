@@ -1283,7 +1283,7 @@ export type Database = {
           language?: string
           schedule_day?: string
           schedule_time?: string
-          tenant_id?: string
+          tenant_id: string
           updated_at?: string
         }
         Update: {
