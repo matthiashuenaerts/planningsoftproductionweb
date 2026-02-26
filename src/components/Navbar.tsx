@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock, FileText, HelpCircle } from 'lucide-react';
+import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock, FileText, HelpCircle, Receipt } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
@@ -37,6 +37,9 @@ const NavbarContent = ({
 
   // Allow admin and manager to see time registrations
   const canSeeTimeRegistrations = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
+
+  // Allow manager to see invoices
+  const canSeeInvoices = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
 
   // Query rush orders to get counts for pending orders and unread messages
   const {
@@ -190,6 +193,12 @@ const NavbarContent = ({
               <NavLink to={createLocalizedPath("/time-registrations")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <Clock className="w-5 h-5 text-white group-hover:text-white" />
                 <span className="ml-3">{t('time_registrations')}</span>
+              </NavLink>
+            </li>}
+          {canSeeInvoices && <li>
+              <NavLink to={createLocalizedPath("/invoices")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <Receipt className="w-5 h-5 text-white group-hover:text-white" />
+                <span className="ml-3">Invoices</span>
               </NavLink>
             </li>}
           {currentEmployee?.role === 'admin' && <li>

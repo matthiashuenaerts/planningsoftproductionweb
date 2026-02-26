@@ -192,3 +192,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.external-delivery-confirmation]
 verify_jwt = false
+[functions.send-support-notification]
+verify_jwt = false
