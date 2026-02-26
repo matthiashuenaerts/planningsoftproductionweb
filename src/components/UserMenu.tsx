@@ -4,17 +4,19 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { MoreVertical, CalendarDays, Plus, Users, Calendar } from 'lucide-react';
+import { MoreVertical, CalendarDays, Plus, Users, Calendar, LifeBuoy } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { holidayRequestService } from '@/services/holidayRequestService';
 import HolidayRequestDialog from './HolidayRequestDialog';
 import HolidayRequestsList from './HolidayRequestsList';
 import { useLanguage } from '@/context/LanguageContext';
 import { useNavigate } from 'react-router-dom';
+import SupportDialog from './support/SupportDialog';
 
 const UserMenu: React.FC = () => {
   const [showHolidayModal, setShowHolidayModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const { currentEmployee } = useAuth();
@@ -58,6 +60,11 @@ const UserMenu: React.FC = () => {
     setTimeout(() => setShowAdminModal(true), 0);
   };
 
+  const openSupportDialog = () => {
+    setDropdownOpen(false);
+    setTimeout(() => setShowSupportDialog(true), 0);
+  };
+
   const handleNavigate = (path: string) => {
     setDropdownOpen(false);
     navigate(path);
@@ -97,6 +104,10 @@ const UserMenu: React.FC = () => {
               </div>
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); openSupportDialog(); }}>
+            <LifeBuoy className="mr-2 h-4 w-4" />
+            Support
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -145,6 +156,8 @@ const UserMenu: React.FC = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      <SupportDialog open={showSupportDialog} onOpenChange={setShowSupportDialog} />
     </>
   );
 };

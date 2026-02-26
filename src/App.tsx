@@ -28,6 +28,7 @@ import LogisticsOut from "./pages/LogisticsOut";
 import RushOrders from "./pages/RushOrders";
 import RushOrderDetails from "./pages/RushOrderDetails";
 import TimeRegistrations from "./pages/TimeRegistrations";
+import Invoices from "./pages/Invoices";
 import GeneralSchedule from "./pages/GeneralSchedule";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
@@ -161,6 +162,7 @@ function App() {
                     <Route path=":lang/calculation/project/:projectId/editor/:modelId" element={<R roles={['admin']}><CabinetEditor /></R>} />
                     <Route path=":lang/calculation/model-builder/:modelId?" element={<R roles={['admin']}><CabinetModelBuilder /></R>} />
                     <Route path=":lang/time-registrations" element={<R roles={['admin', 'manager']}><TimeRegistrations /></R>} />
+                    <Route path=":lang/invoices" element={<R roles={['admin', 'manager']}><Invoices /></R>} />
                     <Route path=":lang/general-schedule" element={<P><GeneralSchedule /></P>} />
                     <Route path=":lang/settings" element={<R roles={['admin']}><Settings /></R>} />
                     <Route path=":lang/control-panel" element={<R roles={['admin', 'manager', 'teamleader']}><ControlPanel /></R>} />
