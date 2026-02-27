@@ -3,37 +3,25 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 // Function to convert week number to date
 function convertWeekNumberToDate(weekNumber: string): string {
   console.log(`Converting date/week: ${weekNumber}`);
-  
-  // Check if it's a week number format (like 202544)
   if (/^\d{6}$/.test(weekNumber)) {
     const year = parseInt(weekNumber.substring(0, 4));
     const week = parseInt(weekNumber.substring(4, 6));
-    
     console.log(`Detected week number - Year: ${year}, Week: ${week}`);
-    
-    // Calculate the first day of the year
     const jan1 = new Date(year, 0, 1);
-    
-    // Find the first Monday of the year
     const jan1Day = jan1.getDay();
     const daysToFirstMonday = jan1Day === 0 ? 1 : (8 - jan1Day);
     const firstMonday = new Date(year, 0, 1 + daysToFirstMonday);
-    
-    // Calculate the target week's Monday
     const targetDate = new Date(firstMonday.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000);
-    
     const result = targetDate.toISOString().split('T')[0];
     console.log(`Week ${weekNumber} converted to: ${result}`);
     return result;
   }
-  
-  // If it's already a date string, try to parse and format it
   if (weekNumber) {
     try {
       const date = new Date(weekNumber);
@@ -46,23 +34,19 @@ function convertWeekNumberToDate(weekNumber: string): string {
       console.warn(`Failed to parse date: ${weekNumber}`);
     }
   }
-  
   console.log(`Using original value: ${weekNumber}`);
   return weekNumber;
 }
 
-// Helper to parse external dates like dd/MM/yyyy into ISO date (yyyy-MM-dd)
 function parseExternalDate(input: string | null | undefined): string | null {
   if (!input) return null;
   const trimmed = String(input).trim();
-  // Support d/M/yyyy and dd/MM/yyyy
   const m = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (m) {
     const [, d, mth, y] = m;
     const date = new Date(Date.UTC(parseInt(y, 10), parseInt(mth, 10) - 1, parseInt(d, 10)));
     if (!isNaN(date.getTime())) return date.toISOString().slice(0, 10);
   }
-  // Fallback to existing converter (handles week numbers or ISO strings)
   try {
     const converted = convertWeekNumberToDate(trimmed);
     return converted || null;
@@ -71,7 +55,6 @@ function parseExternalDate(input: string | null | undefined): string | null {
   }
 }
 
-// Inclusive day difference (e.g., start=end -> 1 day)
 function daysBetweenInclusive(startISO: string, endISO: string): number {
   const s = new Date(startISO);
   const e = new Date(endISO);
@@ -79,525 +62,315 @@ function daysBetweenInclusive(startISO: string, endISO: string): number {
   return diffDays + 1;
 }
 
+/**
+ * Process a single project against the external API.
+ * Returns sync detail object.
+ */
+async function syncProject(
+  supabase: any,
+  project: any,
+  externalDbConfig: { baseUrl: string; username: string; password: string },
+  placementTeams: any[]
+): Promise<{ detail: any; synced: boolean; error?: string }> {
+  let token: string | null = null;
+  try {
+    console.log(`Processing project ${project.name} (${project.id}) with order number ${project.project_link_id}`);
+
+    // Authenticate with external DB
+    const authResponse = await fetch(`${externalDbConfig.baseUrl}/sessions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Basic ' + btoa(`${externalDbConfig.username}:${externalDbConfig.password}`)
+      }
+    });
+
+    if (!authResponse.ok) {
+      const authError = await authResponse.text();
+      console.error(`Authentication failed for project ${project.name}:`, authResponse.status, authError);
+      throw new Error(`Authentication failed (${authResponse.status}): ${authError}`);
+    }
+
+    const authData = await authResponse.json();
+    if (!authData.response || !authData.response.token) {
+      throw new Error('No token received from authentication');
+    }
+    token = authData.response.token;
+    console.log(`Authentication successful for project ${project.name}`);
+
+    // Query external API
+    let rawPlacementDate: string | null = null;
+    let planningStartRaw: string | null = null;
+    let planningEndRaw: string | null = null;
+    let planningTeams: string[] = [];
+
+    const queryResponse = await fetch(
+      `${externalDbConfig.baseUrl}/layouts/API_order/script/FindOrderNumber?script.param=${project.project_link_id}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (queryResponse.ok) {
+      const queryData = await queryResponse.json();
+      if (queryData.response && queryData.response.scriptResult) {
+        try {
+          const orderData = JSON.parse(queryData.response.scriptResult);
+          if (orderData.order) {
+            if (orderData.order.plaatsingsdatum) {
+              rawPlacementDate = orderData.order.plaatsingsdatum;
+            }
+            if (Array.isArray(orderData.order.planning) && orderData.order.planning.length > 0) {
+              const p = orderData.order.planning[0];
+              planningStartRaw = p.datum_start || p.start_date || null;
+              planningEndRaw = p.datum_einde || p.end_date || null;
+              if (p.teams) {
+                if (Array.isArray(p.teams)) planningTeams = p.teams;
+                else if (typeof p.teams === 'string') planningTeams = [p.teams];
+                else if (typeof p.teams === 'object') planningTeams = Object.values(p.teams).filter(v => typeof v === 'string') as string[];
+              }
+            }
+          }
+        } catch (parseErr) {
+          console.error(`Failed to parse script result for project ${project.name}:`, parseErr);
+        }
+      }
+    } else {
+      const queryError = await queryResponse.text();
+      console.error(`Query failed for project ${project.name}:`, queryResponse.status, queryError);
+    }
+
+    // Process dates
+    if (!planningStartRaw && !rawPlacementDate) {
+      return {
+        detail: { project_name: project.name, project_link_id: project.project_link_id, status: 'no_date_found' },
+        synced: false
+      };
+    }
+
+    const startFromPlanning = planningStartRaw ? parseExternalDate(planningStartRaw) : null;
+    const endFromPlanning = planningEndRaw ? parseExternalDate(planningEndRaw) : null;
+    const placementConverted = rawPlacementDate ? convertWeekNumberToDate(rawPlacementDate) : null;
+    const externalInstallationDate = startFromPlanning || placementConverted;
+
+    const normalizedExternal = externalInstallationDate ? new Date(externalInstallationDate).toISOString().split('T')[0] : null;
+    const normalizedCurrent = project.installation_date ? new Date(project.installation_date).toISOString().split('T')[0] : null;
+
+    if (normalizedExternal === normalizedCurrent) {
+      return {
+        detail: { project_name: project.name, project_link_id: project.project_link_id, status: 'up_to_date', current_date: normalizedCurrent },
+        synced: false
+      };
+    }
+
+    // Update project installation date
+    const { error: updateProjectError } = await supabase
+      .from('projects')
+      .update({ installation_date: normalizedExternal, updated_at: new Date().toISOString() })
+      .eq('id', project.id);
+
+    if (updateProjectError) throw new Error(`Failed to update project: ${updateProjectError.message}`);
+
+    // Upsert team assignment
+    if (startFromPlanning && endFromPlanning) {
+      const durationDays = daysBetweenInclusive(startFromPlanning, endFromPlanning);
+      let matchedTeam: any = null;
+      let externalTeamName = 'unnamed';
+
+      for (const teamText of planningTeams) {
+        if (!teamText || typeof teamText !== 'string') continue;
+        const normalizedTeamText = teamText.trim().toLowerCase();
+        matchedTeam = placementTeams?.find(team => {
+          if (!team.external_team_names || !Array.isArray(team.external_team_names)) return false;
+          return team.external_team_names.some((extName: string) => {
+            const n = extName.trim().toLowerCase();
+            return n === normalizedTeamText || normalizedTeamText.includes(n) || n.includes(normalizedTeamText);
+          });
+        });
+        if (matchedTeam) { externalTeamName = teamText; break; }
+      }
+
+      const { error: upsertErr } = await supabase
+        .from('project_team_assignments')
+        .upsert({
+          project_id: project.id,
+          team_id: matchedTeam?.id || null,
+          team: matchedTeam?.name || externalTeamName,
+          start_date: startFromPlanning,
+          duration: durationDays,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'project_id' });
+
+      if (upsertErr) console.warn(`PTA upsert failed: ${upsertErr.message}`);
+
+      // Enforce installation_date = start date
+      await supabase.from('projects')
+        .update({ installation_date: startFromPlanning, updated_at: new Date().toISOString() })
+        .eq('id', project.id);
+    }
+
+    // Recalculate task due dates
+    const { data: phases } = await supabase.from('phases').select('id').eq('project_id', project.id);
+    if (phases && phases.length > 0) {
+      for (const phase of phases) {
+        const { data: tasks } = await supabase.from('tasks').select('id, standard_task_id').eq('phase_id', phase.id);
+        for (const task of tasks || []) {
+          if (task.standard_task_id && normalizedExternal) {
+            const { data: st } = await supabase.from('standard_tasks').select('day_counter').eq('id', task.standard_task_id).single();
+            if (st) {
+              const installDate = new Date(normalizedExternal);
+              installDate.setDate(installDate.getDate() - (st.day_counter || 0));
+              await supabase.from('tasks').update({ due_date: installDate.toISOString().split('T')[0], updated_at: new Date().toISOString() }).eq('id', task.id);
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      detail: { project_name: project.name, project_link_id: project.project_link_id, status: 'updated', old_date: normalizedCurrent, new_date: normalizedExternal },
+      synced: true
+    };
+
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`Error processing project ${project.name}:`, msg);
+    return {
+      detail: { project_name: project.name, project_link_id: project.project_link_id, status: 'error', error: msg },
+      synced: false,
+      error: msg
+    };
+  } finally {
+    if (token) {
+      try {
+        await fetch(`${externalDbConfig.baseUrl}/sessions/${token}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+      } catch (_) {}
+    }
+  }
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     console.log('Starting project sync process...');
-
-    // Parse request body to get configuration
-    const body = await req.json();
+    const body = await req.json().catch(() => ({ automated: true }));
     const { automated = false } = body;
-    console.log('Request body:', JSON.stringify(body, null, 2));
 
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Load external DB credentials from database if not provided in request
-    let externalDbConfig = body.config;
-    
-    if (!externalDbConfig) {
-      console.log('Loading API config from database...');
-      const { data: configData, error: configError } = await supabase
+    // Determine configs to use
+    let configsToProcess: Array<{ tenantId: string; config: { baseUrl: string; username: string; password: string } }> = [];
+
+    if (body.config) {
+      // Manual call with explicit config — use it for all projects (legacy behavior)
+      configsToProcess.push({ tenantId: '', config: body.config });
+    } else {
+      // Load ALL tenant configs for 'projects' API type
+      console.log('Loading ALL tenant project API configs from database...');
+      const { data: allConfigs, error: configError } = await supabase
         .from('external_api_configs')
         .select('*')
-        .eq('api_type', 'projects')
-        .single();
-      
-      if (configError || !configData) {
-        console.error('Failed to load projects API config from database:', configError);
-        throw new Error('Projects API configuration not found. Please save the configuration in Settings first.');
+        .eq('api_type', 'projects');
+
+      if (configError || !allConfigs || allConfigs.length === 0) {
+        console.error('No project API configs found:', configError);
+        throw new Error('No Projects API configurations found. Please save the configuration in Settings first.');
       }
-      
-      externalDbConfig = {
-        baseUrl: configData.base_url,
-        username: configData.username,
-        password: configData.password
-      };
-      console.log('Loaded API config from database');
-    }
 
-    console.log('Using external DB config:', {
-      baseUrl: externalDbConfig.baseUrl,
-      username: externalDbConfig.username,
-      passwordProvided: !!externalDbConfig.password,
-      automated
-    });
-
-    // Get all projects with project_link_id
-    const { data: projects, error: projectsError } = await supabase
-      .from('projects')
-      .select('id, name, project_link_id, installation_date')
-      .not('project_link_id', 'is', null)
-      .not('project_link_id', 'eq', '');
-
-    if (projectsError) {
-      throw new Error(`Failed to fetch projects: ${projectsError.message}`);
-    }
-
-    console.log(`Found ${projects?.length || 0} projects with project_link_id`);
-
-    // Fetch all placement teams for mapping external team names to team IDs
-    const { data: placementTeams, error: teamsError } = await supabase
-      .from('placement_teams')
-      .select('id, name, external_team_names');
-
-    if (teamsError) {
-      console.error('Failed to fetch placement teams:', teamsError);
-      throw new Error(`Failed to fetch placement teams: ${teamsError.message}`);
-    }
-
-    console.log(`Found ${placementTeams?.length || 0} placement teams`);
-
-    let syncedCount = 0;
-    let errorCount = 0;
-    const syncDetails: any[] = [];
-    const errorDetails: string[] = [];
-
-    for (const project of projects || []) {
-      let token: string | null = null;
-      
-      try {
-        console.log(`Processing project ${project.name} (${project.id}) with order number ${project.project_link_id}`);
-
-        // Authenticate with external DB
-        const authResponse = await fetch(`${externalDbConfig.baseUrl}/sessions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Basic ' + btoa(`${externalDbConfig.username}:${externalDbConfig.password}`)
-          }
+      console.log(`Found ${allConfigs.length} tenant project API configs`);
+      for (const cfg of allConfigs) {
+        configsToProcess.push({
+          tenantId: cfg.tenant_id,
+          config: { baseUrl: cfg.base_url, username: cfg.username, password: cfg.password }
         });
+      }
+    }
 
-        if (!authResponse.ok) {
-          const authError = await authResponse.text();
-          console.error(`Authentication failed for project ${project.name}:`, {
-            status: authResponse.status,
-            statusText: authResponse.statusText,
-            error: authError,
-            url: `${externalDbConfig.baseUrl}/sessions`
-          });
-          throw new Error(`Authentication failed (${authResponse.status}): ${authError}`);
-        }
+    // Fetch placement teams once
+    const { data: placementTeams } = await supabase.from('placement_teams').select('id, name, external_team_names');
 
-        const authData = await authResponse.json();
-        
-        if (!authData.response || !authData.response.token) {
-          throw new Error('No token received from authentication');
-        }
-        
-        token = authData.response.token;
-        console.log(`Authentication successful for project ${project.name}`);
+    let totalSynced = 0;
+    let totalErrors = 0;
+    let totalProjects = 0;
+    const allDetails: any[] = [];
+    const allErrorDetails: string[] = [];
 
-        // Query external API using the working endpoint from external-db-proxy
-let rawPlacementDate: string | null = null;
-let planningStartRaw: string | null = null;
-let planningEndRaw: string | null = null;
-let planningTeams: string[] = [];
+    for (const { tenantId, config: externalDbConfig } of configsToProcess) {
+      console.log(`Processing tenant ${tenantId || 'all'} with baseUrl: ${externalDbConfig.baseUrl}`);
 
-        
-        console.log(`Querying for order number: ${project.project_link_id}`);
-        
-        const queryResponse = await fetch(
-          `${externalDbConfig.baseUrl}/layouts/API_order/script/FindOrderNumber?script.param=${project.project_link_id}`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+      // Get projects for this tenant
+      let query = supabase
+        .from('projects')
+        .select('id, name, project_link_id, installation_date')
+        .not('project_link_id', 'is', null)
+        .not('project_link_id', 'eq', '');
 
-        if (queryResponse.ok) {
-          const queryData = await queryResponse.json();
-          console.log(`Query response for project ${project.name}:`, JSON.stringify(queryData));
-          
-          // Extract placement date from response
-          if (queryData.response && queryData.response.scriptResult) {
-            try {
-              const orderData = JSON.parse(queryData.response.scriptResult);
-              console.log(`Parsed script result for project ${project.name}:`, JSON.stringify(orderData));
-              
-              if (orderData.order) {
-                if (orderData.order.plaatsingsdatum) {
-                  rawPlacementDate = orderData.order.plaatsingsdatum;
-                  console.log(`Found placement date in script result: ${rawPlacementDate}`);
-                }
-                if (Array.isArray(orderData.order.planning) && orderData.order.planning.length > 0) {
-                  const p = orderData.order.planning[0];
-                  planningStartRaw = p.datum_start || p.start_date || null;
-                  planningEndRaw = p.datum_einde || p.end_date || null;
-                  
-                  // Extract teams - handle different possible formats
-                  if (p.teams) {
-                    if (Array.isArray(p.teams)) {
-                      planningTeams = p.teams;
-                    } else if (typeof p.teams === 'string') {
-                      planningTeams = [p.teams];
-                    } else if (typeof p.teams === 'object') {
-                      // If teams is an object, try to extract string values
-                      planningTeams = Object.values(p.teams).filter(v => typeof v === 'string') as string[];
-                    }
-                  }
-                  
-                  console.log(`Found planning for project ${project.name}:`);
-                  console.log(`  - start=${planningStartRaw}`);
-                  console.log(`  - end=${planningEndRaw}`);
-                  console.log(`  - teams raw=${JSON.stringify(p.teams)}`);
-                  console.log(`  - teams extracted=${JSON.stringify(planningTeams)}`);
-                }
-              }
-            } catch (parseErr) {
-              console.error(`Failed to parse script result for project ${project.name}:`, parseErr);
-            }
-          }
-        } else {
-          const queryError = await queryResponse.text();
-          console.error(`Query failed for project ${project.name}:`, {
-            status: queryResponse.status,
-            statusText: queryResponse.statusText,
-            error: queryError,
-            orderNumber: project.project_link_id
-          });
-        }
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
 
-        // Process the placement date if found
-if (planningStartRaw || rawPlacementDate) {
-          if (planningStartRaw) {
-            console.log(`Raw planning start for project ${project.name}: ${planningStartRaw}`);
-          }
-          if (rawPlacementDate) {
-            console.log(`Raw placement date for project ${project.name}: ${rawPlacementDate}`);
-            console.log(`Placement date type: ${typeof rawPlacementDate}, value: "${rawPlacementDate}"`);
-          }
-          
-          // Use planning start date as installation date; fallback to placement date/week number
-          const startFromPlanning = planningStartRaw ? parseExternalDate(planningStartRaw) : null;
-          const endFromPlanning = planningEndRaw ? parseExternalDate(planningEndRaw) : null;
-          const placementConverted = rawPlacementDate ? convertWeekNumberToDate(rawPlacementDate) : null;
-          // Installation date should be the START date from planning, not end date
-          const externalInstallationDate = startFromPlanning || placementConverted;
-          const currentInstallationDate = project.installation_date;
+      const { data: projects, error: projectsError } = await query;
 
-          console.log(`Project ${project.name}: Current date: ${currentInstallationDate}, External date (preferred start): ${externalInstallationDate}`);
+      if (projectsError) {
+        console.error(`Failed to fetch projects for tenant ${tenantId}:`, projectsError.message);
+        allErrorDetails.push(`Tenant ${tenantId}: ${projectsError.message}`);
+        totalErrors++;
+        continue;
+      }
 
-          // Normalize dates for comparison
-          const normalizedExternal = externalInstallationDate ? new Date(externalInstallationDate).toISOString().split('T')[0] : null;
-          const normalizedCurrent = currentInstallationDate ? new Date(currentInstallationDate).toISOString().split('T')[0] : null;
+      console.log(`Found ${projects?.length || 0} projects for tenant ${tenantId || 'all'}`);
+      totalProjects += projects?.length || 0;
 
-          // Check if dates are different
-          if (normalizedExternal !== normalizedCurrent) {
-            console.log(`Updating project ${project.name} installation date from ${normalizedCurrent} to ${normalizedExternal}`);
-
-            // Calculate the date difference for task updates
-            let daysDifference = 0;
-            if (normalizedCurrent && normalizedExternal) {
-              const currentDate = new Date(normalizedCurrent);
-              const newDate = new Date(normalizedExternal);
-              daysDifference = Math.round((newDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
-            }
-
-            // Update project installation date
-            const { error: updateProjectError } = await supabase
-              .from('projects')
-              .update({ 
-                installation_date: normalizedExternal,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', project.id);
-
-            if (updateProjectError) {
-              console.error(`Failed to update project ${project.name}:`, updateProjectError);
-              throw new Error(`Failed to update project: ${updateProjectError.message}`);
-            }
-            
-            console.log(`Successfully updated project ${project.name} installation date to ${normalizedExternal}`);
-
-            // Upsert/update project_team_assignments based on planning
-            try {
-              if (startFromPlanning && endFromPlanning) {
-                const durationDays = daysBetweenInclusive(startFromPlanning, endFromPlanning);
-                
-                // Try to match the external team name against placement_teams
-                let matchedTeam = null;
-                let externalTeamName = 'unnamed';
-                
-                // Loop through all team names from planning and find the first match
-                if (planningTeams && planningTeams.length > 0) {
-                  for (const teamText of planningTeams) {
-                    if (!teamText || typeof teamText !== 'string') continue;
-                    
-                    const normalizedTeamText = teamText.trim().toLowerCase();
-                    console.log(`Checking team text: "${teamText}" (normalized: "${normalizedTeamText}")`);
-                    
-                    // Search for this team text in placement_teams.external_team_names
-                    matchedTeam = placementTeams?.find(team => {
-                      if (!team.external_team_names || !Array.isArray(team.external_team_names)) {
-                        return false;
-                      }
-                      
-                      return team.external_team_names.some((extName: string) => {
-                        const normalizedExtName = extName.trim().toLowerCase();
-                        const matches = normalizedExtName === normalizedTeamText || 
-                                      normalizedTeamText.includes(normalizedExtName) ||
-                                      normalizedExtName.includes(normalizedTeamText);
-                        
-                        if (matches) {
-                          console.log(`  ✓ Matched with external_team_name: "${extName}" in team "${team.name}"`);
-                        }
-                        return matches;
-                      });
-                    });
-                    
-                    if (matchedTeam) {
-                      externalTeamName = teamText;
-                      break;
-                    }
-                  }
-                }
-                
-                const teamId = matchedTeam ? matchedTeam.id : null;
-                const teamName = matchedTeam ? matchedTeam.name : externalTeamName;
-                
-                console.log(`Final mapping for project ${project.name}:`);
-                console.log(`  - External team text: "${externalTeamName}"`);
-                console.log(`  - Matched team_id: ${teamId}`);
-                console.log(`  - Matched team name: ${teamName}`);
-                
-                const payload = {
-                  project_id: project.id,
-                  team_id: teamId,
-                  team: teamName,
-                  start_date: startFromPlanning,
-                  duration: durationDays,
-                  updated_at: new Date().toISOString()
-                };
-                const { error: upsertPtaError } = await supabase
-                  .from('project_team_assignments')
-                  .upsert(payload, { onConflict: 'project_id' });
-                if (upsertPtaError) {
-                  console.warn(`Failed to upsert team assignment for project ${project.name}: ${upsertPtaError.message}`);
-                } else {
-                  console.log(`Upserted team assignment for project ${project.name} (team_id: ${teamId}, team: ${teamName}, start: ${startFromPlanning}, duration: ${durationDays})`);
-                  // After PTA upsert, ensure installation_date remains the START date
-                  try {
-                    const normalizedStart = startFromPlanning ? new Date(startFromPlanning).toISOString().slice(0, 10) : null;
-                    if (normalizedStart) {
-                      const { error: enforceInstallError } = await supabase
-                        .from('projects')
-                        .update({ installation_date: normalizedStart, updated_at: new Date().toISOString() })
-                        .eq('id', project.id);
-                      if (enforceInstallError) {
-                        console.warn(`Failed to enforce installation_date to start date for project ${project.name}: ${enforceInstallError.message}`);
-                      } else {
-                        console.log(`Ensured project ${project.name} installation_date set to start date ${normalizedStart}`);
-                      }
-                    }
-                  } catch (enforceErr) {
-                    console.warn(`Post-PTA install_date enforcement failed for project ${project.name}:`, enforceErr);
-                  }
-                }
-              }
-            } catch (ptaErr) {
-              console.warn(`PTA upsert failed for project ${project.name}:`, ptaErr);
-            }
-
-            // Get all tasks for this project and update their due dates based on standard task day_counter
-            const { data: phases, error: phasesError } = await supabase
-              .from('phases')
-              .select('id')
-              .eq('project_id', project.id);
-
-            if (phasesError) {
-              console.warn(`Failed to fetch phases for project ${project.name}: ${phasesError.message}`);
-            } else if (phases && phases.length > 0) {
-              console.log(`Found ${phases.length} phases for project ${project.name}`);
-              console.log(`Recalculating task due dates based on new installation date: ${normalizedExternal}`);
-              
-              let updatedTasksCount = 0;
-              
-              for (const phase of phases) {
-                const { data: tasks, error: tasksError } = await supabase
-                  .from('tasks')
-                  .select('id, standard_task_id')
-                  .eq('phase_id', phase.id);
-
-                if (tasksError) {
-                  console.error(`Failed to fetch tasks for phase ${phase.id}: ${tasksError.message}`);
-                  continue;
-                }
-
-                console.log(`Found ${tasks?.length || 0} tasks in phase ${phase.id}`);
-
-                // Update each task's due date based on standard task day_counter
-                for (const task of tasks || []) {
-                  if (task.standard_task_id) {
-                    // Get the day_counter for this standard task
-                    const { data: standardTask, error: standardTaskError } = await supabase
-                      .from('standard_tasks')
-                      .select('day_counter')
-                      .eq('id', task.standard_task_id)
-                      .single();
-
-                    if (standardTaskError) {
-                      console.error(`Failed to fetch standard task ${task.standard_task_id}: ${standardTaskError.message}`);
-                      continue;
-                    }
-
-                    const dayCounter = standardTask?.day_counter || 0;
-                    if (normalizedExternal) {
-                      const installationDate = new Date(normalizedExternal);
-                      const dueDate = new Date(installationDate);
-                      dueDate.setDate(dueDate.getDate() - dayCounter);
-                      const newDueDate = dueDate.toISOString().split('T')[0];
-                      
-                      console.log(`Updating task ${task.id} due date to ${newDueDate} (installation: ${normalizedExternal}, day_counter: ${dayCounter})`);
-                      
-                      const { error: updateTaskError } = await supabase
-                        .from('tasks')
-                        .update({
-                          due_date: newDueDate,
-                          updated_at: new Date().toISOString()
-                        })
-                        .eq('id', task.id);
-
-                      if (updateTaskError) {
-                        console.error(`Failed to update task ${task.id}: ${updateTaskError.message}`);
-                      } else {
-                        console.log(`Successfully updated task ${task.id} due date`);
-                        // tasksUpdated counter will be handled at higher level
-                      }
-                    }
-                  }
-                }
-              }
-              
-              console.log(`Updated ${updatedTasksCount} task due dates for project ${project.name} based on day_counter`);
-            } else {
-              console.log(`No phases found for project ${project.name}`);
-            }
-
-            syncedCount++;
-            syncDetails.push({
-              project_name: project.name,
-              project_link_id: project.project_link_id,
-              status: 'updated',
-              old_date: normalizedCurrent,
-              new_date: normalizedExternal,
-              raw_placement_date: rawPlacementDate
-            });
-            console.log(`Successfully synced project ${project.name}`);
-          } else {
-            console.log(`Project ${project.name} installation date is already up to date`);
-            syncDetails.push({
-              project_name: project.name,
-              project_link_id: project.project_link_id,
-              status: 'up_to_date',
-              current_date: normalizedCurrent,
-              external_date: normalizedExternal
-            });
-          }
-        } else {
-          console.log(`No placement or planning start date found for project ${project.name} - tried both find and script approaches`);
-          syncDetails.push({
-            project_name: project.name,
-            project_link_id: project.project_link_id,
-            status: 'no_date_found',
-            message: 'No placement or planning start date found in external database'
-          });
-        }
-
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error(`Error processing project ${project.name} (order: ${project.project_link_id}):`, errorMessage);
-        console.error(`Full error details:`, error);
-        
-        // Log specific error context
-        if (error instanceof Error) {
-          console.error(`Error stack:`, error.stack);
-          console.error(`Error name:`, error.name);
-        }
-        
-        errorDetails.push(`Project ${project.project_link_id}: ${errorMessage}`);
-        syncDetails.push({
-          project_name: project.name,
-          project_link_id: project.project_link_id,
-          status: 'error',
-          error: errorMessage
-        });
-        errorCount++;
-      } finally {
-        // Always try to logout from external DB if we have a token
-        if (token) {
-          try {
-            await fetch(`${externalDbConfig.baseUrl}/sessions/${token}`, {
-              method: 'DELETE',
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            });
-          } catch (logoutError) {
-            console.warn(`Failed to logout token for project ${project.name}:`, logoutError);
-          }
+      for (const project of projects || []) {
+        const result = await syncProject(supabase, project, externalDbConfig, placementTeams || []);
+        allDetails.push(result.detail);
+        if (result.synced) totalSynced++;
+        if (result.error) {
+          totalErrors++;
+          allErrorDetails.push(`Project ${project.project_link_id}: ${result.error}`);
         }
       }
     }
 
-    // Log sync results to database
-    console.log('Logging sync results to project_sync_logs table...');
+    // Log sync results
     try {
-      const syncLogEntry = {
-        synced_count: syncedCount,
-        error_count: errorCount,
+      await supabase.from('project_sync_logs').insert({
+        synced_count: totalSynced,
+        error_count: totalErrors,
         details: {
           automated,
-          total_projects: projects?.length || 0,
-          sync_details: syncDetails,
-          error_details: errorDetails,
-          timestamp: new Date().toISOString(),
-          config_used: {
-            baseUrl: externalDbConfig.baseUrl,
-            username: externalDbConfig.username
-          }
+          total_projects: totalProjects,
+          tenants_processed: configsToProcess.length,
+          sync_details: allDetails,
+          error_details: allErrorDetails,
+          timestamp: new Date().toISOString()
         }
-      };
-
-      const { error: logError } = await supabase
-        .from('project_sync_logs')
-        .insert(syncLogEntry);
-
-      if (logError) {
-        console.error('Error logging sync results:', logError);
-      } else {
-        console.log('Sync results logged successfully to project_sync_logs');
-      }
-    } catch (logError) {
-      console.error('Failed to log sync results:', logError);
+      });
+    } catch (logErr) {
+      console.error('Failed to log sync results:', logErr);
     }
-
-    const message = automated 
-      ? `Automated sync completed: ${syncedCount} projects updated, ${errorCount} errors`
-      : `Manual sync completed: ${syncedCount} projects updated, ${errorCount} errors`;
 
     const result = {
       success: true,
-      message,
-      syncedCount,
-      errorCount,
-      totalProjects: projects?.length || 0,
+      message: `${automated ? 'Automated' : 'Manual'} sync completed: ${totalSynced} projects updated, ${totalErrors} errors`,
+      syncedCount: totalSynced,
+      errorCount: totalErrors,
+      totalProjects,
       automated,
-      details: syncDetails,
+      details: allDetails,
       timestamp: new Date().toISOString()
     };
 
     console.log('Sync process completed:', result);
-
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
@@ -605,16 +378,9 @@ if (planningStartRaw || rawPlacementDate) {
 
   } catch (error) {
     console.error('Sync process failed:', error);
-    
     return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        timestamp: new Date().toISOString()
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error', timestamp: new Date().toISOString() }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
 });

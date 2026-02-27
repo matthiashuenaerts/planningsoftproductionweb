@@ -194,3 +194,7 @@ verify_jwt = false
 verify_jwt = false
 [functions.send-support-notification]
 verify_jwt = false
+[functions.project-sync]
+verify_jwt = false
+[functions.orders-sync]
+verify_jwt = false
