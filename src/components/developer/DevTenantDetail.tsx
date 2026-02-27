@@ -34,11 +34,22 @@ const DevTenantDetail: React.FC<DevTenantDetailProps> = ({ tenant, onBack, onSet
   const [addUserForm, setAddUserForm] = useState({ email: '', name: '', password: '', role: 'worker' });
   const [addingUser, setAddingUser] = useState(false);
 
-  // Fetch tenant employees
+  // Fetch tenant employees (exclude developers who may have other tenant_ids)
   const { data: employees } = useQuery({
     queryKey: ["dev", "employees", tenant.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("employees").select("id,name,role,email,auth_user_id,tenant_id").eq("tenant_id", tenant.id).order("name");
+      // Get all developer user_ids to exclude
+      const { data: devRoles } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "developer" as any);
+      const devIds = (devRoles ?? []).map((r: any) => r.user_id);
+
+      let query = supabase.from("employees").select("id,name,role,email,auth_user_id,tenant_id").eq("tenant_id", tenant.id).order("name");
+      if (devIds.length > 0) {
+        query = query.not("id", "in", `(${devIds.join(",")})`);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data ?? [];
     },

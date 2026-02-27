@@ -17,8 +17,13 @@ const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({
   allowedRoles,
   requireLogistics,
 }) => {
-  const { currentEmployee } = useAuth();
+  const { currentEmployee, isDeveloper } = useAuth();
   const { tenant, lang } = useParams<{ tenant: string; lang: string }>();
+
+  if (!currentEmployee && !isDeveloper) return null;
+
+  // Developers bypass all role checks
+  if (isDeveloper) return <>{children}</>;
 
   if (!currentEmployee) return null;
 
@@ -26,7 +31,6 @@ const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({
   const hasLogistics = requireLogistics ? currentEmployee.logistics : false;
 
   if (!hasRole && !hasLogistics) {
-    // Redirect to tenant dashboard
     const base = tenant ? `/${tenant}/${lang || "nl"}` : "/";
     return <Navigate to={base} replace />;
   }

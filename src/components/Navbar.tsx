@@ -21,7 +21,8 @@ const NavbarContent = ({
 }) => {
   const {
     currentEmployee,
-    logout
+    logout,
+    isDeveloper
   } = useAuth();
   const {
     t,
@@ -32,13 +33,9 @@ const NavbarContent = ({
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const { tenant } = useTenant();
 
-  // Allow admin, manager, installation_team, and worker roles to see the Rush Orders menu
-  const canSeeRushOrders = currentEmployee && ['admin', 'manager', 'installation_team', 'worker'].includes(currentEmployee.role);
-
-  // Allow admin and manager to see time registrations
-  const canSeeTimeRegistrations = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
-
-  // Allow manager to see invoices
+  // Developers can see everything
+  const canSeeRushOrders = isDeveloper || (currentEmployee && ['admin', 'manager', 'installation_team', 'worker', 'teamleader'].includes(currentEmployee.role));
+  const canSeeTimeRegistrations = isDeveloper || (currentEmployee && ['admin', 'manager', 'teamleader'].includes(currentEmployee.role));
   const canSeeInvoices = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
 
   // Query rush orders to get counts for pending orders and unread messages
@@ -83,8 +80,8 @@ const NavbarContent = ({
               <span className="ml-3">{t('dashboard')}</span>
             </NavLink>
           </li>
-          {/* Control Panel (visible only to admin, manager, teamleader) */}
-          {currentEmployee && ['admin', 'manager', 'teamleader'].includes(currentEmployee.role) && (
+          {/* Control Panel (visible only to admin, manager, teamleader, developer) */}
+          {(isDeveloper || (currentEmployee && ['admin', 'manager', 'teamleader'].includes(currentEmployee.role))) && (
             <li>
               <NavLink
                 to={createLocalizedPath("/control-panel")}
@@ -142,32 +139,32 @@ const NavbarContent = ({
               <span className="ml-3">{t('Tasks_Notes')}</span>
             </NavLink>
           </li>
-          {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader'].includes(currentEmployee.role) && <li>
+          {(isDeveloper || (currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader'].includes(currentEmployee.role))) && <li>
               <NavLink to={createLocalizedPath("/daily-tasks")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <ListChecks className="w-5 h-5 text-white group-hover:text-white" />
                 <span className="ml-3">{t('installation_planning')}</span>
               </NavLink>
             </li>}
 
-          {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader'].includes(currentEmployee.role) && <li>
+          {(isDeveloper || (currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader'].includes(currentEmployee.role))) && <li>
               <NavLink to={createLocalizedPath("/planning")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <Users className="w-5 h-5 text-white group-hover:text-white" />
                 <span className="ml-3">{t('planning')}</span>
               </NavLink>
             </li>}
-          {currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader', 'preparater'].includes(currentEmployee.role) && <li>
+          {(isDeveloper || (currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader', 'preparater'].includes(currentEmployee.role))) && <li>
               <NavLink to={createLocalizedPath("/orders")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <PackagePlus className="w-5 h-5 text-white group-hover:text-white" />
                 <span className="ml-3">{t('orders')}</span>
               </NavLink>
             </li>}
-          {currentEmployee && (currentEmployee.logistics || ['admin', 'manager', 'installation_team', 'teamleader', 'preparater'].includes(currentEmployee.role)) && <li>
+          {(isDeveloper || (currentEmployee && (currentEmployee.logistics || ['admin', 'manager', 'installation_team', 'teamleader', 'preparater'].includes(currentEmployee.role)))) && <li>
               <NavLink to={createLocalizedPath("/logistics")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <Truck className="w-5 h-5 text-white group-hover:text-white" />
                 <span className="ml-3">{t('logistics')}</span>
               </NavLink>
             </li>}
-          {currentEmployee && (currentEmployee.logistics || ['admin', 'manager', 'installation_team', 'teamleader', 'preparater'].includes(currentEmployee.role)) && <li>
+          {(isDeveloper || (currentEmployee && (currentEmployee.logistics || ['admin', 'manager', 'installation_team', 'teamleader', 'preparater'].includes(currentEmployee.role)))) && <li>
               <NavLink to={createLocalizedPath("/logistics-out")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <Truck className="w-5 h-5 text-white group-hover:text-white" />
                 <span className="ml-3">{t('logistics_out')}</span>
@@ -201,7 +198,7 @@ const NavbarContent = ({
                 <span className="ml-3">Invoices</span>
               </NavLink>
             </li>}
-          {currentEmployee?.role === 'admin' && <li>
+          {(isDeveloper || (currentEmployee && ['admin', 'teamleader'].includes(currentEmployee.role))) && <li>
               <NavLink to={createLocalizedPath("/settings")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <Settings className="w-5 h-5 text-white group-hover:text-white" />
                 <span className="ml-3">{t('settings')}</span>

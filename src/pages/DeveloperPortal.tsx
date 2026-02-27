@@ -18,6 +18,7 @@ import {
 import TenantOnboardingWizard from "@/components/developer/TenantOnboardingWizard";
 import DevTenantDetail from "@/components/developer/DevTenantDetail";
 import DevDeveloperManagement from "@/components/developer/DevDeveloperManagement";
+import DevDashboard from "@/components/developer/DevDashboard";
 import DevSupportManagement from "@/components/developer/DevSupportManagement";
 
 type TenantRow = {
@@ -107,8 +108,11 @@ const DeveloperPortal: React.FC = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <Tabs defaultValue="tenants" className="space-y-6">
+        <Tabs defaultValue="dashboard" className="space-y-6">
           <TabsList className="bg-white/10 border border-white/10">
+            <TabsTrigger value="dashboard" className="data-[state=active]:bg-white/20 text-white">
+              <Activity className="h-4 w-4 mr-1" /> Dashboard
+            </TabsTrigger>
             <TabsTrigger value="tenants" className="data-[state=active]:bg-white/20 text-white">
               <Building2 className="h-4 w-4 mr-1" /> Tenants
             </TabsTrigger>
@@ -119,6 +123,11 @@ const DeveloperPortal: React.FC = () => {
               <LifeBuoy className="h-4 w-4 mr-1" /> Support
             </TabsTrigger>
           </TabsList>
+
+          {/* Dashboard Tab */}
+          <TabsContent value="dashboard">
+            <DevDashboard />
+          </TabsContent>
 
           {/* Tenants Tab */}
           <TabsContent value="tenants" className="space-y-6">
