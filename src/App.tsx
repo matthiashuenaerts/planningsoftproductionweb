@@ -153,18 +153,18 @@ function App() {
                     <Route path=":lang/orders/:orderId/edit" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']}><Orders /></R>} />
                     <Route path=":lang/logistics" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']} logistics><Logistics /></R>} />
                     <Route path=":lang/logistics-out" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']} logistics><LogisticsOut /></R>} />
-                    <Route path=":lang/rush-orders" element={<R roles={['admin', 'manager', 'installation_team', 'worker']}><RushOrders /></R>} />
-                    <Route path=":lang/rush-orders/:rushOrderId" element={<R roles={['admin', 'manager', 'installation_team', 'worker']}><RushOrderDetails /></R>} />
+                    <Route path=":lang/rush-orders" element={<R roles={['admin', 'manager', 'installation_team', 'worker', 'teamleader']}><RushOrders /></R>} />
+                    <Route path=":lang/rush-orders/:rushOrderId" element={<R roles={['admin', 'manager', 'installation_team', 'worker', 'teamleader']}><RushOrderDetails /></R>} />
                     <Route path=":lang/calculation" element={<R roles={['admin']}><Calculation /></R>} />
                     <Route path=":lang/calculation/new" element={<R roles={['admin']}><NewCabinetProject /></R>} />
                     <Route path=":lang/calculation/project/:projectId" element={<R roles={['admin']}><CabinetProjectDetails /></R>} />
                     <Route path=":lang/calculation/project/:projectId/library" element={<R roles={['admin']}><CabinetLibrary /></R>} />
                     <Route path=":lang/calculation/project/:projectId/editor/:modelId" element={<R roles={['admin']}><CabinetEditor /></R>} />
                     <Route path=":lang/calculation/model-builder/:modelId?" element={<R roles={['admin']}><CabinetModelBuilder /></R>} />
-                    <Route path=":lang/time-registrations" element={<R roles={['admin', 'manager']}><TimeRegistrations /></R>} />
+                    <Route path=":lang/time-registrations" element={<R roles={['admin', 'manager', 'teamleader']}><TimeRegistrations /></R>} />
                     <Route path=":lang/invoices" element={<R roles={['admin', 'manager']}><Invoices /></R>} />
                     <Route path=":lang/general-schedule" element={<P><GeneralSchedule /></P>} />
-                    <Route path=":lang/settings" element={<R roles={['admin']}><Settings /></R>} />
+                    <Route path=":lang/settings" element={<R roles={['admin', 'teamleader']}><Settings /></R>} />
                     <Route path=":lang/control-panel" element={<R roles={['admin', 'manager', 'teamleader']}><ControlPanel /></R>} />
                     <Route path=":lang/control-panel/:workstationId" element={<R roles={['admin', 'manager', 'teamleader']}><WorkstationControl /></R>} />
                     <Route path=":lang/truck-loading" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader']}><TruckLoadingView /></R>} />
