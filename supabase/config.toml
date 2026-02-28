@@ -198,3 +198,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.orders-sync]
 verify_jwt = false
+[functions.developer-otp]
+verify_jwt = false
