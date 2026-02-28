@@ -6,37 +6,30 @@ import Navbar from '@/components/Navbar';
 import WorkstationDashboard from '@/components/WorkstationDashboard';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLanguage } from '@/context/LanguageContext';
-import AppOnboardingWizard from '@/components/AppOnboardingWizard';
 
 const Index = () => {
-  const {
-    currentEmployee
-  } = useAuth();
+  const { currentEmployee } = useAuth();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
 
-  // Display dedicated workstation dashboard ONLY for workstation role
   if (currentEmployee?.role === 'workstation') {
     return <WorkstationDashboard />;
   }
   return (
-    <AppOnboardingWizard>
-      <div className="flex min-h-screen">
-        {!isMobile && (
-          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-            <Navbar />
-          </div>
-        )}
-        {isMobile && <Navbar />}
-        <div className={`w-full p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
-          <div className="max-w-7xl mx-auto">
-            <h1 className="text-3xl font-bold mb-6">{t('dashboard')}</h1>
-            <Dashboard />
-            {currentEmployee?.role === 'admin' || currentEmployee?.role === 'teamleader'}
-          </div>
+    <div className="flex min-h-screen">
+      {!isMobile && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+      {isMobile && <Navbar />}
+      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-3xl font-bold mb-6">{t('dashboard')}</h1>
+          <Dashboard />
         </div>
       </div>
-    </AppOnboardingWizard>
+    </div>
   );
 };
 export default Index;
