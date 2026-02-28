@@ -207,20 +207,29 @@ serve(async (req) => {
               const hasChanges =
                 existingOrder.expected_delivery !== deliveryDate ||
                 existingOrder.status !== orderData.status ||
-                existingOrder.supplier !== orderData.supplier ||
-                existingOrder.notes !== orderData.notes;
+                existingOrder.supplier !== orderData.supplier;
 
               if (hasChanges) {
+                // Build update payload - NEVER overwrite notes if they were manually edited
+                const updatePayload: Record<string, any> = {
+                  expected_delivery: deliveryDate,
+                  status: orderData.status,
+                  supplier: orderData.supplier,
+                  source: 'external database',
+                  updated_at: new Date().toISOString()
+                };
+
+                // Only update notes if the existing order has no notes (never manually edited)
+                // or if the existing notes exactly match the incoming external reference
+                if (!existingOrder.notes || existingOrder.notes === orderData.notes) {
+                  updatePayload.notes = orderData.notes;
+                } else {
+                  console.log(`Preserving manual notes for order ${orderNumber}: "${existingOrder.notes}"`);
+                }
+
                 const { error: updateError } = await supabase
                   .from('orders')
-                  .update({
-                    expected_delivery: deliveryDate,
-                    status: orderData.status,
-                    supplier: orderData.supplier,
-                    notes: orderData.notes,
-                    source: 'external database',
-                    updated_at: new Date().toISOString()
-                  })
+                  .update(updatePayload)
                   .eq('id', existingOrder.id);
 
                 if (updateError) {

@@ -14,7 +14,12 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { User, Lock } from "lucide-react";
+import { User, Lock, Shield, RefreshCw } from "lucide-react";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 
 const Login: React.FC = () => {
   const [nameOrEmail, setNameOrEmail] = useState("");
@@ -22,13 +27,19 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
+  // Developer 2FA state
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [otpEmail, setOtpEmail] = useState("");
+  const [resendingOtp, setResendingOtp] = useState(false);
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const { login, isAuthenticated, isDeveloper } = useAuth();
   const location = useLocation();
   const { tenant } = useParams<{ tenant: string }>();
 
-  // Developer login is accessed via /dev/login route
   const isDeveloperPortal = location.pathname.startsWith("/dev/login");
 
   useEffect(() => {
@@ -36,9 +47,9 @@ const Login: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (but not if waiting for OTP)
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || otpStep) return;
 
     const redirectPath = sessionStorage.getItem("redirectAfterLogin");
     if (redirectPath) {
@@ -54,23 +65,25 @@ const Login: React.FC = () => {
     } else {
       navigate("/");
     }
-  }, [isAuthenticated, isDeveloper, navigate, tenant]);
+  }, [isAuthenticated, isDeveloper, navigate, tenant, otpStep]);
 
   // Global Enter key handler
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && !loading) {
+      if (e.key === "Enter" && !loading && !verifyingOtp) {
         e.preventDefault();
-        const form = document.querySelector("form");
-        if (form) {
-          form.requestSubmit();
+        if (otpStep) {
+          if (otpCode.length === 6) handleVerifyOtp();
+        } else {
+          const form = document.querySelector("form");
+          if (form) form.requestSubmit();
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [loading]);
+  }, [loading, verifyingOtp, otpStep, otpCode]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,7 +102,7 @@ const Login: React.FC = () => {
     try {
       setLoading(true);
 
-      // Developer portal: resolve name -> email via RPC, then sign in
+      // Developer portal login with 2FA
       if (isDeveloperPortal) {
         const { data: devData, error: devError } = await supabase.rpc(
           "authenticate_developer_by_name",
@@ -103,19 +116,41 @@ const Login: React.FC = () => {
           throw new Error("Invalid developer credentials");
         }
 
+        // Authenticate with Supabase Auth first
         const loginResult = await login(devRow.email, password);
         if (loginResult.error) throw new Error(loginResult.error);
 
-        toast({
-          title: "Login successful",
-          description: `Welcome back, ${devRow.employee_name}!`,
-        });
+        // Send OTP for 2FA
+        try {
+          const { data: otpResult, error: otpError } = await supabase.functions.invoke(
+            "developer-otp",
+            { body: { action: "send" } }
+          );
 
-        navigate("/dev");
+          if (otpError) throw otpError;
+
+          setOtpEmail(otpResult?.email || devRow.email);
+          setOtpStep(true);
+
+          toast({
+            title: "Verification required",
+            description: `A verification code has been sent to ${otpResult?.email || "your email"}`,
+          });
+        } catch (otpSendError: any) {
+          console.error("OTP send error:", otpSendError);
+          toast({
+            title: "Warning",
+            description: "Could not send verification email. Please try again.",
+            variant: "destructive",
+          });
+          // Sign out since 2FA failed
+          await supabase.auth.signOut();
+        }
+
         return;
       }
 
-      // Tenant portal: resolve employee -> email via SECURITY DEFINER RPC
+      // Tenant portal login
       if (!tenant) {
         throw new Error("No tenant specified in URL");
       }
@@ -130,15 +165,11 @@ const Login: React.FC = () => {
         }
       );
 
-      if (error) {
-        throw new Error(error.message);
-      }
+      if (error) throw new Error(error.message);
 
       const row = Array.isArray(data) ? data[0] : data;
 
-      if (!row) {
-        throw new Error("Invalid username or password");
-      }
+      if (!row) throw new Error("Invalid username or password");
 
       if (!row.auth_user_id || !row.email) {
         throw new Error(
@@ -148,6 +179,22 @@ const Login: React.FC = () => {
 
       const loginResult = await login(row.email, password);
       if (loginResult.error) throw new Error(loginResult.error);
+
+      // If user is a developer logging into a tenant, activate that tenant context
+      // We need to check roles - use a quick query
+      const { data: devRoleCheck } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", row.employee_id)
+        .eq("role", "developer" as any)
+        .maybeSingle();
+
+      if (devRoleCheck) {
+        // Developer logging into a tenant - set active tenant
+        await supabase.rpc("set_developer_active_tenant", {
+          p_tenant_id: row.tenant_id,
+        });
+      }
 
       toast({
         title: "Login successful",
@@ -173,6 +220,171 @@ const Login: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const handleVerifyOtp = async () => {
+    if (otpCode.length !== 6) {
+      toast({
+        title: "Error",
+        description: "Please enter the 6-digit verification code",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setVerifyingOtp(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("developer-otp", {
+        body: { action: "verify", code: otpCode },
+      });
+
+      if (error) throw error;
+
+      if (data?.verified) {
+        // Clear developer active tenant for dev portal access
+        await supabase.rpc("clear_developer_active_tenant");
+
+        toast({
+          title: "Verified!",
+          description: "Welcome to the Developer Portal",
+        });
+        navigate("/dev");
+      } else {
+        toast({
+          title: "Invalid code",
+          description: data?.error || "The verification code is invalid or expired",
+          variant: "destructive",
+        });
+        setOtpCode("");
+      }
+    } catch (error: any) {
+      console.error("OTP verify error:", error);
+      toast({
+        title: "Verification failed",
+        description: error.message || "Failed to verify code",
+        variant: "destructive",
+      });
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setResendingOtp(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("developer-otp", {
+        body: { action: "resend" },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Code resent",
+        description: `A new code has been sent to ${data?.email || "your email"}`,
+      });
+      setOtpCode("");
+    } catch (error: any) {
+      toast({
+        title: "Failed to resend",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setResendingOtp(false);
+    }
+  };
+
+  // OTP verification screen for developer 2FA
+  if (otpStep) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+        <div
+          className={`w-full max-w-md space-y-8 transform transition-all duration-700 ${
+            isVisible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
+          }`}
+        >
+          <div className="text-center space-y-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/20">
+              <Shield className="h-8 w-8 text-blue-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">
+                Two-Factor Authentication
+              </h1>
+              <p className="text-slate-400 mt-2">
+                A verification code has been sent to{" "}
+                <span className="text-blue-400">{otpEmail}</span>
+              </p>
+            </div>
+          </div>
+
+          <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
+            <CardContent className="pt-6 space-y-6">
+              <div className="flex justify-center">
+                <InputOTP
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(value) => setOtpCode(value)}
+                >
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} className="bg-white/10 border-white/20 text-white text-lg w-12 h-14" />
+                    <InputOTPSlot index={1} className="bg-white/10 border-white/20 text-white text-lg w-12 h-14" />
+                    <InputOTPSlot index={2} className="bg-white/10 border-white/20 text-white text-lg w-12 h-14" />
+                    <InputOTPSlot index={3} className="bg-white/10 border-white/20 text-white text-lg w-12 h-14" />
+                    <InputOTPSlot index={4} className="bg-white/10 border-white/20 text-white text-lg w-12 h-14" />
+                    <InputOTPSlot index={5} className="bg-white/10 border-white/20 text-white text-lg w-12 h-14" />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+
+              <Button
+                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                onClick={handleVerifyOtp}
+                disabled={verifyingOtp || otpCode.length !== 6}
+              >
+                {verifyingOtp ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Verifying...</span>
+                  </div>
+                ) : (
+                  "Verify & Continue"
+                )}
+              </Button>
+
+              <div className="flex items-center justify-between text-sm">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-slate-400 hover:text-white"
+                  onClick={handleResendOtp}
+                  disabled={resendingOtp}
+                >
+                  <RefreshCw className={`h-3 w-3 mr-1 ${resendingOtp ? "animate-spin" : ""}`} />
+                  Resend code
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-slate-400 hover:text-white"
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    setOtpStep(false);
+                    setOtpCode("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <p className="text-center text-xs text-slate-500">
+            Code expires in 5 minutes
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center p-4 relative overflow-hidden">

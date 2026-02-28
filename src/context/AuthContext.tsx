@@ -177,6 +177,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
+    // Clear developer active tenant if applicable
+    if (isDeveloper) {
+      try {
+        await supabase.rpc('clear_developer_active_tenant');
+      } catch (e) {
+        console.error('Failed to clear developer active tenant:', e);
+      }
+    }
     await supabase.auth.signOut();
     setCurrentEmployee(null);
     setRoles([]);
