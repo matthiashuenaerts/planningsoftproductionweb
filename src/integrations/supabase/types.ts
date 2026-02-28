@@ -1220,6 +1220,80 @@ export type Database = {
           },
         ]
       }
+      developer_active_tenants: {
+        Row: {
+          active_tenant_id: string
+          employee_id: string
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          active_tenant_id: string
+          employee_id: string
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          active_tenant_id?: string
+          employee_id?: string
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "developer_active_tenants_active_tenant_id_fkey"
+            columns: ["active_tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "developer_active_tenants_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      developer_otp_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          email: string
+          employee_id: string
+          expires_at: string
+          id: string
+          used: boolean | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          email: string
+          employee_id: string
+          expires_at: string
+          id?: string
+          used?: boolean | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          email?: string
+          employee_id?: string
+          expires_at?: string
+          id?: string
+          used?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "developer_otp_codes_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_configurations: {
         Row: {
           created_at: string
@@ -5856,6 +5930,7 @@ export type Database = {
           icon_path: string | null
           id: string
           image_path: string | null
+          max_workers: number | null
           name: string
           production_line: number | null
           sort_order: number | null
@@ -5870,6 +5945,7 @@ export type Database = {
           icon_path?: string | null
           id?: string
           image_path?: string | null
+          max_workers?: number | null
           name: string
           production_line?: number | null
           sort_order?: number | null
@@ -5884,6 +5960,7 @@ export type Database = {
           icon_path?: string | null
           id?: string
           image_path?: string | null
+          max_workers?: number | null
           name?: string
           production_line?: number | null
           sort_order?: number | null
@@ -5952,6 +6029,7 @@ export type Database = {
         Args: { required_roles: string[]; user_id: string }
         Returns: boolean
       }
+      clear_developer_active_tenant: { Args: never; Returns: undefined }
       create_storage_policy: {
         Args: {
           bucket_name: string
@@ -6009,6 +6087,10 @@ export type Database = {
           settings: Json
           slug: string
         }[]
+      }
+      set_developer_active_tenant: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
       }
       setup_phase_offsets_table: { Args: never; Returns: boolean }
       table_exists: { Args: { table_name: string }; Returns: boolean }
