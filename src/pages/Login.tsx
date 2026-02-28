@@ -29,6 +29,7 @@ const Login: React.FC = () => {
 
   // Developer 2FA state
   const [otpStep, setOtpStep] = useState(false);
+  const otpPendingRef = React.useRef(false);
   const [otpCode, setOtpCode] = useState("");
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [otpEmail, setOtpEmail] = useState("");
@@ -49,7 +50,7 @@ const Login: React.FC = () => {
 
   // Redirect if already authenticated (but not if waiting for OTP)
   useEffect(() => {
-    if (!isAuthenticated || otpStep) return;
+    if (!isAuthenticated || otpStep || otpPendingRef.current) return;
 
     const redirectPath = sessionStorage.getItem("redirectAfterLogin");
     if (redirectPath) {
@@ -116,9 +117,15 @@ const Login: React.FC = () => {
           throw new Error("Invalid developer credentials");
         }
 
+        // Mark OTP pending BEFORE login to prevent redirect race condition
+        otpPendingRef.current = true;
+
         // Authenticate with Supabase Auth first
         const loginResult = await login(devRow.email, password);
-        if (loginResult.error) throw new Error(loginResult.error);
+        if (loginResult.error) {
+          otpPendingRef.current = false;
+          throw new Error(loginResult.error);
+        }
 
         // Send OTP for 2FA
         try {
@@ -144,6 +151,7 @@ const Login: React.FC = () => {
             variant: "destructive",
           });
           // Sign out since 2FA failed
+          otpPendingRef.current = false;
           await supabase.auth.signOut();
         }
 
@@ -367,6 +375,7 @@ const Login: React.FC = () => {
                   size="sm"
                   className="text-slate-400 hover:text-white"
                   onClick={async () => {
+                    otpPendingRef.current = false;
                     await supabase.auth.signOut();
                     setOtpStep(false);
                     setOtpCode("");
