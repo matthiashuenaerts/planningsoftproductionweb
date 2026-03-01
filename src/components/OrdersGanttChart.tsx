@@ -1204,22 +1204,25 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
           currentStartDate={selectedProject.startDate}
           currentDuration={selectedProject.duration}
           onUpdate={async () => {
-            // Refresh data after update
-            let projectsQuery = supabase
-              .from('projects')
-              .select(`
-                id,
-                name,
-                client,
-                installation_date,
-                progress
-              `)
-              .not('installation_date', 'is', null)
-              .order('installation_date');
-            projectsQuery = applyTenantFilter(projectsQuery, tenant?.id);
-            const { data: projectsData, error: projectsError } = await projectsQuery;
+            try {
+              // Refresh data after update
+              let projectsQuery = supabase
+                .from('projects')
+                .select(`
+                  id,
+                  name,
+                  client,
+                  installation_date,
+                  progress
+                `)
+                .not('installation_date', 'is', null)
+                .order('installation_date');
+              projectsQuery = applyTenantFilter(projectsQuery, tenant?.id);
+              const { data: projectsData, error: projectsError } = await projectsQuery;
 
-            if (!projectsError && projectsData) {
+              if (projectsError) throw projectsError;
+              if (!projectsData) return;
+
               const projectIds = projectsData.map(p => p.id).filter(Boolean);
               let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
               if (projectIds.length > 0) {
@@ -1247,7 +1250,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                   project_id,
                   trucks!inner(truck_number, description)
                 `)
-                .in('project_id', projectIds as string[]);
+                .in('project_id', projectIds.length > 0 ? projectIds as string[] : ['__none__']);
               
               const trucksByProject = new Map(
                 (truckAssignmentsData || []).map(ta => [
@@ -1264,13 +1267,11 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                     return { ...project, truck: trucksByProject.get(project.id) };
                   }
                   
-                  // Calculate end date for the project
                   const endDate = format(
                     addDays(parseYMD(assignment.start_date), assignment.duration - 1),
                     'yyyy-MM-dd'
                   );
 
-                  // Fetch employees from daily team assignments across the entire project duration
                   const { data: dailyAssignments } = await supabase
                     .from('daily_team_assignments')
                     .select(`
@@ -1281,7 +1282,6 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                     .gte('date', assignment.start_date)
                     .lte('date', endDate);
 
-                  // Get unique employees
                   const uniqueEmployees = new Map<string, Employee>();
                   dailyAssignments?.forEach((da: any) => {
                     if (da.employees) {
@@ -1290,7 +1290,6 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                   });
                   const employees = Array.from(uniqueEmployees.values());
                   
-                  // Check holiday requests
                   const { data: holidayData } = await supabase
                     .from('holiday_requests')
                     .select('user_id')
@@ -1310,6 +1309,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
               );
               
               setProjects(projectsWithEmployees);
+            } catch (err) {
+              console.error('Failed to refresh Gantt data:', err);
             }
           }}
         />
