@@ -744,12 +744,16 @@ const InstallationTeamCalendar = ({
       const fetchedTeams = teamsData || [];
       setTeams(fetchedTeams);
       
-      // Initialize collapsed states for all teams
-      const initialCollapsedStates: Record<string, boolean> = {};
-      fetchedTeams.forEach(team => {
-        initialCollapsedStates[team.id] = true; // Start collapsed
+      // Initialize collapsed states for all teams - only on first load
+      setTeamCollapsedStates(prev => {
+        const hasExistingStates = Object.keys(prev).length > 0;
+        if (hasExistingStates) return prev; // Preserve existing states on refresh
+        const initialCollapsedStates: Record<string, boolean> = {};
+        fetchedTeams.forEach(team => {
+          initialCollapsedStates[team.id] = true; // Start collapsed
+        });
+        return initialCollapsedStates;
       });
-      setTeamCollapsedStates(initialCollapsedStates);
 
       // Fetch team assignments
       const {
