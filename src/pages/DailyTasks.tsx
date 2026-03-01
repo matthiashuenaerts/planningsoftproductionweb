@@ -29,48 +29,56 @@ const DailyTasks: React.FC = () => {
   const [displayMode, setDisplayMode] = useState<'gantt' | 'teams' | 'trucks'>('gantt');
   const [allProjects, setAllProjects] = useState<ProjectWithTeam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [projectsRefreshKey, setProjectsRefreshKey] = useState(0);
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { tenant } = useTenant();
 
-  // Fetch all projects with installation dates and team assignments
-  useEffect(() => {
-    const fetchAllProjects = async () => {
-      try {
-        setLoading(true);
+  const fetchAllProjects = async () => {
+    try {
+      setLoading(true);
+      let query = supabase
+        .from('projects')
+        .select(`
+          *,
+          project_team_assignments!left (
+            team,
+            duration,
+            start_date
+          )
+        `)
+        .not('installation_date', 'is', null)
+        .order('installation_date', { ascending: true });
+      query = applyTenantFilter(query, tenant?.id);
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      setAllProjects(data || []);
+    } catch (error: any) {
+      console.error('Error fetching projects:', error);
+      toast({
+        title: "Error",
+        description: `Failed to load projects: ${error.message}`,
+        variant: "destructive"
+      });
+      setAllProjects([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        // Get all projects with installation dates and their team assignments
-        let query = supabase
-          .from('projects')
-          .select(`
-            *,
-            project_team_assignments!left (
-              team,
-              duration,
-              start_date
-            )
-          `)
-          .not('installation_date', 'is', null)
-          .order('installation_date', { ascending: true });
-        query = applyTenantFilter(query, tenant?.id);
-        const { data, error } = await query;
-        
-        if (error) throw error;
-        setAllProjects(data || []);
-      } catch (error: any) {
-        console.error('Error fetching projects:', error);
-        toast({
-          title: "Error",
-          description: `Failed to load projects: ${error.message}`,
-          variant: "destructive"
-        });
-        setAllProjects([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Fetch on mount
+  useEffect(() => {
     fetchAllProjects();
   }, [toast, tenant?.id]);
+
+  // Refetch projects when switching display mode (so calendar/trucks get fresh data)
+  useEffect(() => {
+    if (displayMode !== 'gantt') {
+      fetchAllProjects();
+      setProjectsRefreshKey(prev => prev + 1);
+    }
+  }, [displayMode]);
   return <div className="flex min-h-screen">
       {!isMobile && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
@@ -100,7 +108,7 @@ const DailyTasks: React.FC = () => {
           {displayMode === 'gantt' ? (
             <OrdersGanttChart className="h-[calc(100vh-200px)]" />
           ) : displayMode === 'teams' ? (
-            <InstallationTeamCalendar projects={allProjects} />
+            <InstallationTeamCalendar projects={allProjects} key={projectsRefreshKey} />
           ) : (
             <TruckLoadingCalendar />
           )}
