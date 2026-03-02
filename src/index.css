@@ -177,6 +177,21 @@
   animation-play-state: paused;
 }
 
+/* Override Radix UI's injected scrollbar-hiding on Select viewports */
+[data-radix-select-viewport] {
+  scrollbar-width: thin !important;
+  -ms-overflow-style: auto !important;
+  overflow-y: auto !important;
+}
+[data-radix-select-viewport]::-webkit-scrollbar {
+  display: block !important;
+  width: 6px;
+}
+[data-radix-select-viewport]::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--border));
+  border-radius: 3px;
+}
+
 @layer utilities {
   /* Hide scrollbars while keeping scroll behavior */
   .scrollbar-hide {
