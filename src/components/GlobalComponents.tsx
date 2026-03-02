@@ -15,14 +15,30 @@ const GlobalComponents = () => {
   useEffect(() => {
     const observer = new MutationObserver(() => {
       if (document.body.style.pointerEvents === 'none') {
-        document.body.style.pointerEvents = '';
+        // Only reset pointer-events if no Radix overlay is actually open
+        const hasOpenOverlay = document.querySelector('[data-radix-select-content], [data-radix-dropdown-menu-content], [data-radix-dialog-overlay]');
+        if (!hasOpenOverlay) {
+          document.body.style.pointerEvents = '';
+        }
       }
     });
     observer.observe(document.body, {
       attributes: true,
       attributeFilter: ['style'],
     });
-    return () => observer.disconnect();
+
+    // Also clean up stale overflow:hidden left by Radix on unmount
+    const cleanupInterval = setInterval(() => {
+      const hasOpenDialog = document.querySelector('[data-state="open"][role="dialog"]');
+      if (!hasOpenDialog && document.body.style.overflow === 'hidden') {
+        document.body.style.overflow = '';
+      }
+    }, 2000);
+
+    return () => {
+      observer.disconnect();
+      clearInterval(cleanupInterval);
+    };
   }, []);
 
   if (!currentEmployee) {
