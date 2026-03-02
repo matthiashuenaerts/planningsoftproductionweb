@@ -44,7 +44,7 @@ interface LoadingAssignment {
 }
 const Dashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [recentCompletedTasks, setRecentCompletedTasks] = useState<Task[]>([]);
+  const [todayCompletedCount, setTodayCompletedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tasksByPriority, setTasksByPriority] = useState<any[]>([]);
   const [tasksByStatus, setTasksByStatus] = useState<any[]>([]);
@@ -105,72 +105,79 @@ const Dashboard: React.FC = () => {
         const projectsData = await projectService.getAll(tenant?.id);
         setProjects(projectsData);
 
-        // Efficient parallel queries for dashboard data
+        // Efficient parallel queries using server-side counts (bypasses 1000-row limit)
         const today = startOfToday();
+        const todayStr = format(today, 'yyyy-MM-dd');
         const sevenDaysAgo = format(subDays(today, 6), 'yyyy-MM-dd');
         
-        // Build tenant-filtered task queries
-        let statusQuery = supabase
-            .from('tasks')
-            .select('status', { count: 'exact', head: false })
-            .in('status', ['TODO', 'IN_PROGRESS', 'COMPLETED']);
-        let priorityQuery = supabase
-            .from('tasks')
-            .select('priority', { count: 'exact', head: false })
-            .in('priority', ['Low', 'Medium', 'High', 'Urgent']);
-        let completedQuery = supabase
-            .from('tasks')
-            .select('completed_at')
-            .eq('status', 'COMPLETED')
-            .not('completed_at', 'is', null)
-            .gte('completed_at', sevenDaysAgo)
-            .order('completed_at', { ascending: false });
+        // Build count queries per status (head: true = no row data, just count)
+        const buildCountQuery = (column: string, value: string) => {
+          const base: any = supabase.from('tasks');
+          let q = base.select('id', { count: 'exact', head: true }).eq(column, value);
+          if (tenant?.id) q = q.eq('tenant_id', tenant.id);
+          return q;
+        };
 
-        if (tenant?.id) {
-          statusQuery = statusQuery.eq('tenant_id', tenant.id);
-          priorityQuery = priorityQuery.eq('tenant_id', tenant.id);
-          completedQuery = completedQuery.eq('tenant_id', tenant.id);
-        }
+        // Today completed count query
+        let todayCompletedQuery = supabase
+          .from('tasks')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'COMPLETED')
+          .not('completed_at', 'is', null)
+          .gte('completed_at', todayStr);
+        if (tenant?.id) todayCompletedQuery = todayCompletedQuery.eq('tenant_id', tenant.id);
+
+        // Last 7 days completed tasks (need dates, not just count)
+        let completedQuery = supabase
+          .from('tasks')
+          .select('completed_at')
+          .eq('status', 'COMPLETED')
+          .not('completed_at', 'is', null)
+          .gte('completed_at', sevenDaysAgo)
+          .order('completed_at', { ascending: false })
+          .limit(5000);
+        if (tenant?.id) completedQuery = completedQuery.eq('tenant_id', tenant.id);
 
         const [
-          tasksStatusCount,
-          tasksPriorityCount,
+          todoCount,
+          inProgressCount,
+          completedCount,
+          lowCount,
+          mediumCount,
+          highCount,
+          urgentCount,
+          todayCompletedResult,
           completedTasksLast7Days
-        ] = await Promise.all([statusQuery, priorityQuery, completedQuery]);
+        ] = await Promise.all([
+          buildCountQuery('status', 'TODO'),
+          buildCountQuery('status', 'IN_PROGRESS'),
+          buildCountQuery('status', 'COMPLETED'),
+          buildCountQuery('priority', 'Low'),
+          buildCountQuery('priority', 'Medium'),
+          buildCountQuery('priority', 'High'),
+          buildCountQuery('priority', 'Urgent'),
+          todayCompletedQuery,
+          completedQuery
+        ]);
 
-        // Process status data
-        const statusCount: Record<string, number> = {
-          TODO: 0,
-          IN_PROGRESS: 0,
-          COMPLETED: 0
-        };
-        (tasksStatusCount.data || []).forEach((task: any) => {
-          if (task.status in statusCount) {
-            statusCount[task.status]++;
-          }
-        });
-        const statusData = Object.entries(statusCount).map(([name, value]) => ({
-          name: name === 'TODO' ? t('dashboard_to_do') : name === 'IN_PROGRESS' ? t('dashboard_in_progress') : t('dashboard_completed'),
-          value
-        }));
+        // Set today's completed count
+        setTodayCompletedCount(todayCompletedResult.count ?? 0);
+
+        // Process status data using server counts
+        const statusData = [
+          { name: t('dashboard_to_do'), value: todoCount.count ?? 0 },
+          { name: t('dashboard_in_progress'), value: inProgressCount.count ?? 0 },
+          { name: t('dashboard_completed'), value: completedCount.count ?? 0 },
+        ];
         setTasksByStatus(statusData);
 
-        // Process priority data
-        const priorityCount: Record<string, number> = {
-          Low: 0,
-          Medium: 0,
-          High: 0,
-          Urgent: 0
-        };
-        (tasksPriorityCount.data || []).forEach((task: any) => {
-          if (task.priority in priorityCount) {
-            priorityCount[task.priority]++;
-          }
-        });
-        const priorityData = Object.entries(priorityCount).map(([name, value]) => ({
-          name,
-          value
-        }));
+        // Process priority data using server counts
+        const priorityData = [
+          { name: 'Low', value: lowCount.count ?? 0 },
+          { name: 'Medium', value: mediumCount.count ?? 0 },
+          { name: 'High', value: highCount.count ?? 0 },
+          { name: 'Urgent', value: urgentCount.count ?? 0 },
+        ];
         setTasksByPriority(priorityData);
 
         // Process task completion trend (last 7 days)
@@ -183,7 +190,6 @@ const Dashboard: React.FC = () => {
           };
         });
 
-        // Count completed tasks per day
         (completedTasksLast7Days.data || []).forEach((task: any) => {
           if (task.completed_at) {
             const completedDate = parseISO(task.completed_at);
@@ -381,51 +387,68 @@ const Dashboard: React.FC = () => {
   const fetchUpcomingExternalProcessingEvents = async () => {
     try {
       const logisticsOutOrders = await orderService.getLogisticsOutOrders();
-      const events: any[] = [];
-      for (const order of logisticsOutOrders) {
-        try {
-          const allSteps = await orderService.getOrderSteps(order.id);
-          const processingSteps = allSteps.filter(step => step.supplier && step.supplier.trim() !== '' && step.start_date);
-          const project = await projectService.getById(order.project_id);
-          const projectName = project?.name || "Unknown Project";
-          processingSteps.forEach(step => {
-            if (step.start_date && step.supplier) {
-              // Add start date event
-              const startDate = format(new Date(step.start_date), 'yyyy-MM-dd');
-              events.push({
-                date: startDate,
-                type: 'start',
-                title: `${step.name}`,
-                description: `${projectName} - ${step.supplier}`,
-                project_name: projectName
-              });
-
-              // Add expected return date if duration is provided
-              if (step.expected_duration_days) {
-                const returnDate = addDays(new Date(step.start_date), step.expected_duration_days);
-                const returnDateStr = format(returnDate, 'yyyy-MM-dd');
-                events.push({
-                  date: returnDateStr,
-                  type: 'return',
-                  title: `${step.name}`,
-                  description: `${projectName} - ${step.supplier}`,
-                  project_name: projectName
-                });
-              }
-            }
-          });
-        } catch (error) {
-          console.error(`Error processing order ${order.id}:`, error);
-        }
+      if (!logisticsOutOrders.length) {
+        setUpcomingEvents([]);
+        return;
       }
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const upcomingEvents = events.filter(event => {
-        const eventDate = new Date(event.date);
-        eventDate.setHours(0, 0, 0, 0);
-        return eventDate >= today;
-      }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 5);
-      setUpcomingEvents(upcomingEvents);
+
+      // Fetch all steps and projects in parallel batches instead of sequential loops
+      const orderIds = logisticsOutOrders.map(o => o.id);
+      const projectIds = [...new Set(logisticsOutOrders.map(o => o.project_id))];
+
+      const [stepsResults, projectsResults] = await Promise.all([
+        // Fetch all order steps at once
+        supabase.from('order_steps')
+          .select('order_id, name, supplier, start_date, expected_duration_days')
+          .in('order_id', orderIds)
+          .not('supplier', 'is', null)
+          .neq('supplier', '')
+          .not('start_date', 'is', null),
+        // Fetch all project names at once
+        supabase.from('projects')
+          .select('id, name')
+          .in('id', projectIds)
+      ]);
+
+      const projectNameMap = new Map(
+        (projectsResults.data || []).map((p: any) => [p.id, p.name])
+      );
+      const orderProjectMap = new Map(
+        logisticsOutOrders.map(o => [o.id, o.project_id])
+      );
+
+      const events: any[] = [];
+      (stepsResults.data || []).forEach((step: any) => {
+        const projectId = orderProjectMap.get(step.order_id);
+        const projectName = projectId ? projectNameMap.get(projectId) || 'Unknown' : 'Unknown';
+
+        events.push({
+          date: format(new Date(step.start_date), 'yyyy-MM-dd'),
+          type: 'start',
+          title: step.name,
+          description: `${projectName} - ${step.supplier}`,
+          project_name: projectName
+        });
+
+        if (step.expected_duration_days) {
+          const returnDate = addDays(new Date(step.start_date), step.expected_duration_days);
+          events.push({
+            date: format(returnDate, 'yyyy-MM-dd'),
+            type: 'return',
+            title: step.name,
+            description: `${projectName} - ${step.supplier}`,
+            project_name: projectName
+          });
+        }
+      });
+
+      const todayDate = new Date();
+      todayDate.setHours(0, 0, 0, 0);
+      const upcoming = events
+        .filter(event => new Date(event.date) >= todayDate)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(0, 5);
+      setUpcomingEvents(upcoming);
     } catch (error) {
       console.error('Error fetching external processing events:', error);
     }
@@ -579,23 +602,31 @@ const Dashboard: React.FC = () => {
         (truckAssignmentsData || []).map(ta => [ta.project_id, { id: ta.trucks.id, name: `T${ta.trucks.truck_number}` }])
       );
 
+        // Fetch all order items in one query for relevant orders
+        const undeliveredOrderIds = (ordersData || [])
+          .filter(o => ['pending', 'delayed', 'partially_delivered'].includes(o.status))
+          .map(o => o.id);
+        
+        let orderItemsMap = new Map<string, number>();
+        if (undeliveredOrderIds.length > 0) {
+          const { data: allItems } = await supabase
+            .from('order_items')
+            .select('order_id, quantity, delivered_quantity')
+            .in('order_id', undeliveredOrderIds);
+          
+          (allItems || []).forEach((item: any) => {
+            if ((item.quantity || 0) > (item.delivered_quantity || 0)) {
+              orderItemsMap.set(item.order_id, (orderItemsMap.get(item.order_id) || 0) + 1);
+            }
+          });
+        }
+
         // Enhance assignments with order status and team colors
-        const enhancedAssignments = await Promise.all(weekLoadingAssignments.map(async assignment => {
-          // Calculate order status - count undelivered items instead of undelivered orders
+        const enhancedAssignments = weekLoadingAssignments.map(assignment => {
           const projectOrders = ordersData?.filter(o => o.project_id === assignment.project.id) || [];
           let undeliveredItemsCount = 0;
-
-          // Count undelivered items from orders with certain statuses
           for (const order of projectOrders) {
-            if (['pending', 'delayed', 'partially_delivered'].includes(order.status)) {
-              try {
-                const items = await orderService.getOrderItems(order.id);
-                const undeliveredItems = items.filter(item => (item.quantity || 0) > (item.delivered_quantity || 0));
-                undeliveredItemsCount += undeliveredItems.length;
-              } catch (error) {
-                console.error(`Error loading order items for order ${order.id}:`, error);
-              }
-            }
+            undeliveredItemsCount += orderItemsMap.get(order.id) || 0;
           }
           const allOrdersDelivered = projectOrders.length > 0 && projectOrders.every(o => o.status === 'delivered');
           const allOrdersCharged = projectOrders.length > 0 && projectOrders.every(o => o.status === 'charged');
@@ -629,7 +660,7 @@ const Dashboard: React.FC = () => {
             teamColor,
             truck
         };
-      }));
+      });
 
       // Merge with existing assignments and recalculate truck loading stats
       setAllLoadingAssignments(prev => {
@@ -732,9 +763,6 @@ const Dashboard: React.FC = () => {
   const totalProjects = projects.length;
   const completedProjects = projects.filter(p => p.status === 'completed').length;
   const inProgressProjects = projects.filter(p => p.status === 'in_progress').length;
-
-  // Tasks completed today
-  const todayCompletedCount = recentCompletedTasks.filter(task => task.completed_at && isToday(parseISO(task.completed_at))).length;
 
   // Priority colors for charts
   const PRIORITY_COLORS = {
