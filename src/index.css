@@ -189,20 +189,3 @@
   }
 }
 
-/* Global fix: ensure Radix UI select viewports and dropdown menus are scrollable */
-[data-radix-select-viewport] {
-  max-height: var(--radix-select-content-available-height, 300px) !important;
-  overflow-y: auto !important;
-}
-
-[data-radix-dropdown-menu-content],
-[data-radix-context-menu-content] {
-  max-height: 80vh !important;
-  overflow-y: auto !important;
-}
-
-/* Ensure Radix popovers with select inside them allow scrolling */
-[data-radix-popper-content-wrapper] {
-  max-height: 85vh;
-}
-
