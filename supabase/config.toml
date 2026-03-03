@@ -200,3 +200,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.developer-otp]
 verify_jwt = false
+[functions.auto-generate-schedule]
+verify_jwt = false

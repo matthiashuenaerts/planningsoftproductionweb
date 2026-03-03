@@ -89,6 +89,11 @@ class AutomaticSchedulingService {
   // Track scheduled task end times for limit phase dependencies
   private scheduledTaskEndTimes: Map<string, Date> = new Map();
 
+  // Time registration affinity: task_id -> employee_id (last registrant)
+  private taskAffinityMap: Map<string, string> = new Map();
+  // Project+workstation affinity: "projectId:workstationId" -> employee_id
+  private projectWorkstationAffinityMap: Map<string, string> = new Map();
+
   // Track employee lane index per workstation: ws_id -> employee_id -> lane_index
   private wsEmployeeLaneMap: Map<string, Map<string, number>> = new Map();
 
@@ -389,18 +394,62 @@ class AutomaticSchedulingService {
   }
 
   /**
-   * Find an available employee for a task at a given time
+   * Find an available employee for a task at a given time.
+   * Respects time registration affinity: if a task has been started by someone,
+   * only that person can continue it (if still assigned to the standard task).
+   * Also applies project+workstation affinity for other tasks in the same project/workstation.
    */
   private findAvailableEmployee(
-    standardTaskId: string | null,
+    task: SchedulableTask,
     startTime: Date,
     endTime: Date,
     employees: EmployeeTaskEligibility[]
   ): EmployeeTaskEligibility | null {
-    if (!standardTaskId) return null;
+    if (!task.standard_task_id) return null;
     
+    const workstationId = task.workstation_ids[0] || '';
+    
+    // CHECK 1: Direct task affinity — this task was already started by someone
+    const affinityEmployeeId = this.taskAffinityMap.get(task.id);
+    if (affinityEmployeeId) {
+      const affinityEmployee = employees.find(e => 
+        e.employee_id === affinityEmployeeId && 
+        e.standard_task_ids.includes(task.standard_task_id!)
+      );
+      if (affinityEmployee) {
+        const hasConflict = this.employeeTimeBlocks.some(block => 
+          block.employee_id === affinityEmployee.employee_id &&
+          startTime < block.end && endTime > block.start
+        );
+        if (!hasConflict) return affinityEmployee;
+        // If the affinity employee has a conflict, return null — nobody else may do it
+        return null;
+      }
+      // Affinity employee no longer assigned to this standard task — fall through to normal logic
+    }
+    
+    // CHECK 2: Project+workstation affinity — another task in same project/ws was started by someone
+    const pwKey = `${task.project_id}:${workstationId}`;
+    const pwAffinityEmployeeId = this.projectWorkstationAffinityMap.get(pwKey);
+    if (pwAffinityEmployeeId) {
+      const pwEmployee = employees.find(e =>
+        e.employee_id === pwAffinityEmployeeId &&
+        e.standard_task_ids.includes(task.standard_task_id!)
+      );
+      if (pwEmployee) {
+        const hasConflict = this.employeeTimeBlocks.some(block =>
+          block.employee_id === pwEmployee.employee_id &&
+          startTime < block.end && endTime > block.start
+        );
+        if (!hasConflict) return pwEmployee;
+        // Conflict — fall through to normal assignment
+      }
+      // PW affinity employee not assigned to this standard task — fall through
+    }
+    
+    // CHECK 3: Normal assignment — find any eligible, available employee
     const eligibleEmployees = employees.filter(e => 
-      e.standard_task_ids.includes(standardTaskId)
+      e.standard_task_ids.includes(task.standard_task_id!)
     );
     
     if (eligibleEmployees.length === 0) return null;
@@ -424,8 +473,7 @@ class AutomaticSchedulingService {
    * Find the earliest available slots for a task
    */
   private findEarliestSlots(
-    duration: number,
-    standardTaskId: string | null,
+    task: SchedulableTask,
     employees: EmployeeTaskEligibility[],
     minStartTime: Date,
     workstationId: string
@@ -463,13 +511,13 @@ class AutomaticSchedulingService {
           continue;
         }
         
-        const taskSlots = this.getTaskSlots(slotStart, duration);
+        const taskSlots = this.getTaskSlots(slotStart, task.duration);
         if (taskSlots.length === 0) break;
         
         const firstSlotStart = taskSlots[0].start;
         const lastSlotEnd = taskSlots[taskSlots.length - 1].end;
         
-        const employee = this.findAvailableEmployee(standardTaskId, firstSlotStart, lastSlotEnd, employees);
+        const employee = this.findAvailableEmployee(task, firstSlotStart, lastSlotEnd, employees);
         
         if (employee) {
           return { slots: taskSlots, employee };
@@ -501,8 +549,7 @@ class AutomaticSchedulingService {
     const workstationId = task.workstation_ids[0];
     
     const result = this.findEarliestSlots(
-      task.duration,
-      task.standard_task_id,
+      task,
       employees,
       minStartTime,
       workstationId
@@ -592,6 +639,73 @@ class AutomaticSchedulingService {
   }
 
   /**
+   * Load time registration data to build affinity maps.
+   * For each task with registrations, the LAST registrant gets affinity.
+   * Also builds project+workstation affinity from that data.
+   */
+  private async loadTimeRegistrationAffinity(): Promise<void> {
+    // Fetch all time registrations that have a task_id, ordered by start_time desc
+    const { data, error } = await supabase
+      .from('time_registrations')
+      .select('task_id, employee_id')
+      .not('task_id', 'is', null)
+      .order('start_time', { ascending: false });
+    
+    if (error) {
+      console.warn('Could not load time registrations for affinity:', error);
+      return;
+    }
+    
+    if (!data || data.length === 0) return;
+    
+    // Build task -> last employee map (first occurrence in desc order = most recent)
+    const taskLastEmployee = new Map<string, string>();
+    for (const reg of data) {
+      if (reg.task_id && reg.employee_id && !taskLastEmployee.has(reg.task_id)) {
+        taskLastEmployee.set(reg.task_id, reg.employee_id);
+      }
+    }
+    
+    this.taskAffinityMap = taskLastEmployee;
+    console.log(`Loaded affinity for ${taskLastEmployee.size} tasks from time registrations`);
+    
+    // Now build project+workstation affinity:
+    // For each task with affinity, look up its project_id and workstation_ids
+    // We need task details — fetch them
+    const taskIds = Array.from(taskLastEmployee.keys());
+    if (taskIds.length === 0) return;
+    
+    // Batch fetch task details
+    const BATCH = 200;
+    for (let i = 0; i < taskIds.length; i += BATCH) {
+      const batch = taskIds.slice(i, i + BATCH);
+      const { data: tasks } = await supabase
+        .from('tasks')
+        .select('id, phases!inner(project_id), task_workstation_links(workstation_id)')
+        .in('id', batch);
+      
+      if (!tasks) continue;
+      
+      for (const t of tasks) {
+        const employeeId = taskLastEmployee.get(t.id);
+        if (!employeeId) continue;
+        const projectId = (t as any).phases?.project_id;
+        const wsIds = ((t as any).task_workstation_links || []).map((l: any) => l.workstation_id).filter(Boolean);
+        
+        for (const wsId of wsIds) {
+          const key = `${projectId}:${wsId}`;
+          // Only set if not already set (first = most recent registration wins)
+          if (!this.projectWorkstationAffinityMap.has(key)) {
+            this.projectWorkstationAffinityMap.set(key, employeeId);
+          }
+        }
+      }
+    }
+    
+    console.log(`Built project+workstation affinity for ${this.projectWorkstationAffinityMap.size} combinations`);
+  }
+
+  /**
    * Main scheduling algorithm
    */
   async generateSchedule(projectCount: number, startDate: Date): Promise<{
@@ -603,8 +717,15 @@ class AutomaticSchedulingService {
     this.employeeTimeBlocks = [];
     this.scheduledTaskEndTimes = new Map();
     this.wsEmployeeLaneMap = new Map();
+    this.taskAffinityMap = new Map();
+    this.projectWorkstationAffinityMap = new Map();
     
     await this.initialize();
+    
+    // Step 0a: Load time registration affinity data
+    // For each task, find the last person who registered time on it
+    console.log('🔗 Loading time registration affinity data...');
+    await this.loadTimeRegistrationAffinity();
     
     // Step 0: Pre-schedule recurring tasks - block their time slots for the assigned employees
     const recurringScheduleSlots: ScheduleResult[] = [];
