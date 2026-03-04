@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Edit, Plus, Save, X, Palette, Settings, Users, Activity } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -64,125 +65,134 @@ export const FloorplanToolbar: React.FC<FloorplanToolbarProps> = ({
   ];
 
   return (
-    <div className="absolute top-4 left-4 z-10 bg-background/95 backdrop-blur rounded-lg shadow-lg p-4 space-y-4">
-      {/* Status Overview */}
-      <div className="flex items-center space-x-4">
-        <div className="flex items-center space-x-2">
-          <Settings className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Workstations</span>
-          <Badge variant="outline">{totalWorkstations}</Badge>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          <Activity className="h-4 w-4 text-green-500" />
-          <span className="text-sm font-medium">Active</span>
-          <Badge variant="default" className="bg-green-500">{activeWorkstations}</Badge>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          <Users className="h-4 w-4 text-blue-500" />
-          <span className="text-sm font-medium">Users</span>
-          <Badge variant="default" className="bg-blue-500">{totalActiveUsers}</Badge>
-        </div>
-      </div>
-
-      {/* Admin Controls */}
-      {isAdmin && (
-        <div className="flex items-center space-x-2 pt-2 border-t">
-          <Button
-            onClick={onToggleEditing}
-            variant={isEditing ? "default" : "outline"}
-            size="sm"
-            className="flex items-center space-x-2"
-          >
-            {isEditing ? <Save className="h-4 w-4" /> : <Edit className="h-4 w-4" />}
-            <span>{isEditing ? 'Save Changes' : 'Edit Layout'}</span>
+    <div className="absolute top-4 left-4 z-10">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="icon" className="bg-background/95 backdrop-blur shadow-lg">
+            <Settings className="h-4 w-4" />
           </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-auto p-4 space-y-4">
+          {/* Status Overview */}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Settings className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Workstations</span>
+              <Badge variant="outline">{totalWorkstations}</Badge>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Activity className="h-4 w-4 text-green-500" />
+              <span className="text-sm font-medium">Active</span>
+              <Badge variant="default" className="bg-green-500">{activeWorkstations}</Badge>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Users className="h-4 w-4 text-blue-500" />
+              <span className="text-sm font-medium">Users</span>
+              <Badge variant="default" className="bg-blue-500">{totalActiveUsers}</Badge>
+            </div>
+          </div>
+
+          {/* Admin Controls */}
+          {isAdmin && (
+            <div className="flex items-center space-x-2 pt-2 border-t">
+              <Button
+                onClick={onToggleEditing}
+                variant={isEditing ? "default" : "outline"}
+                size="sm"
+                className="flex items-center space-x-2"
+              >
+                {isEditing ? <Save className="h-4 w-4" /> : <Edit className="h-4 w-4" />}
+                <span>{isEditing ? 'Save Changes' : 'Edit Layout'}</span>
+              </Button>
+
+              {isEditing && (
+                <Dialog open={isAddingLine} onOpenChange={setIsAddingLine}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center space-x-2">
+                      <Plus className="h-4 w-4" />
+                      <span>Add Flow Line</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add Production Flow Line</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="lineName">Line Name</Label>
+                        <Input
+                          id="lineName"
+                          value={newLine.name}
+                          onChange={(e) => setNewLine({ ...newLine, name: e.target.value })}
+                          placeholder="e.g. Assembly to Packaging"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label>Color</Label>
+                        <div className="flex space-x-2 mt-2">
+                          {flowLineColors.map((color) => (
+                            <button
+                              key={color}
+                              onClick={() => setNewLine({ ...newLine, color })}
+                              className={`w-8 h-8 rounded-full border-2 ${
+                                newLine.color === color ? 'border-primary' : 'border-muted'
+                              }`}
+                              style={{ backgroundColor: color }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="strokeWidth">Line Width</Label>
+                        <Input
+                          id="strokeWidth"
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={newLine.stroke_width}
+                          onChange={(e) => setNewLine({ ...newLine, stroke_width: parseInt(e.target.value) })}
+                        />
+                      </div>
+                      
+                      <div className="text-sm text-muted-foreground">
+                        After clicking "Create Line", click on the floorplan to set start and end points.
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <Button 
+                          onClick={handleAddLine}
+                          disabled={!newLine.name}
+                          className="flex-1"
+                        >
+                          Create Line
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setIsAddingLine(false)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+          )}
 
           {isEditing && (
-            <Dialog open={isAddingLine} onOpenChange={setIsAddingLine}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="flex items-center space-x-2">
-                  <Plus className="h-4 w-4" />
-                  <span>Add Flow Line</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add Production Flow Line</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="lineName">Line Name</Label>
-                    <Input
-                      id="lineName"
-                      value={newLine.name}
-                      onChange={(e) => setNewLine({ ...newLine, name: e.target.value })}
-                      placeholder="e.g. Assembly to Packaging"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label>Color</Label>
-                    <div className="flex space-x-2 mt-2">
-                      {flowLineColors.map((color) => (
-                        <button
-                          key={color}
-                          onClick={() => setNewLine({ ...newLine, color })}
-                          className={`w-8 h-8 rounded-full border-2 ${
-                            newLine.color === color ? 'border-primary' : 'border-gray-300'
-                          }`}
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="strokeWidth">Line Width</Label>
-                    <Input
-                      id="strokeWidth"
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={newLine.stroke_width}
-                      onChange={(e) => setNewLine({ ...newLine, stroke_width: parseInt(e.target.value) })}
-                    />
-                  </div>
-                  
-                  <div className="text-sm text-muted-foreground">
-                    After clicking "Create Line", click on the floorplan to set start and end points.
-                  </div>
-                  
-                  <div className="flex space-x-2">
-                    <Button 
-                      onClick={handleAddLine}
-                      disabled={!newLine.name}
-                      className="flex-1"
-                    >
-                      Create Line
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setIsAddingLine(false)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <div className="text-xs text-muted-foreground pt-2 border-t">
+              <div>• Drag workstation dots to reposition</div>
+              <div>• Click flow lines to delete them</div>
+              <div>• Click "Save Changes" when done</div>
+            </div>
           )}
-        </div>
-      )}
-
-      {isEditing && (
-        <div className="text-xs text-muted-foreground pt-2 border-t">
-          <div>• Drag workstation dots to reposition</div>
-          <div>• Click flow lines to delete them</div>
-          <div>• Click "Save Changes" when done</div>
-        </div>
-      )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 };
