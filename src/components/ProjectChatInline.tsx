@@ -12,6 +12,7 @@ import { projectChatService, ProjectMessage } from '@/services/projectChatServic
 import { useAuth } from '@/context/AuthContext';
 import { Send, Paperclip, X, MessageCircle, Users, Reply } from 'lucide-react';
 import { format } from 'date-fns';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 
 interface ProjectChatInlineProps {
   projectId: string;
@@ -292,22 +293,9 @@ export const ProjectChatInline: React.FC<ProjectChatInlineProps> = ({
             {message.file_url && (
               <div className="mt-2">
                 {message.is_image ? (
-                  <img
-                    src={message.file_url}
-                    alt={message.file_name || 'Image'}
-                    className="max-w-full max-h-64 rounded cursor-pointer"
-                    onClick={() => window.open(message.file_url, '_blank')}
-                  />
+                  <ChatSignedImage fileUrl={message.file_url} fileName={message.file_name || 'Image'} />
                 ) : (
-                  <a
-                    href={message.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm underline hover:no-underline"
-                  >
-                    <Paperclip className="w-4 h-4" />
-                    {message.file_name}
-                  </a>
+                  <ChatSignedFileLink fileUrl={message.file_url} fileName={message.file_name || 'File'} />
                 )}
               </div>
             )}
@@ -508,5 +496,35 @@ export const ProjectChatInline: React.FC<ProjectChatInlineProps> = ({
         </div>
       </CardContent>
     </Card>
+  );
+};
+
+// Helper components for signed URL file display
+const ChatSignedImage: React.FC<{ fileUrl: string; fileName: string }> = ({ fileUrl, fileName }) => {
+  const signedUrl = useSignedUrl('project_files', fileUrl);
+  if (!signedUrl) return <div className="w-32 h-32 bg-muted rounded animate-pulse" />;
+  return (
+    <img
+      src={signedUrl}
+      alt={fileName}
+      className="max-w-full max-h-64 rounded cursor-pointer"
+      onClick={() => window.open(signedUrl, '_blank')}
+    />
+  );
+};
+
+const ChatSignedFileLink: React.FC<{ fileUrl: string; fileName: string }> = ({ fileUrl, fileName }) => {
+  const signedUrl = useSignedUrl('project_files', fileUrl);
+  if (!signedUrl) return <span className="text-sm text-muted-foreground">Loading...</span>;
+  return (
+    <a
+      href={signedUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 text-sm underline hover:no-underline"
+    >
+      <Paperclip className="w-4 h-4" />
+      {fileName}
+    </a>
   );
 };

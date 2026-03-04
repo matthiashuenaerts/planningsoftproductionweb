@@ -116,11 +116,8 @@ export const projectChatService = {
 
         if (uploadError) throw uploadError;
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('project_files')
-          .getPublicUrl(filePath);
-
-        file_url = publicUrl;
+        // Store the storage path (not a public URL) since the bucket is private
+        file_url = filePath;
         file_name = file.name;
         file_type = file.type;
         is_image = file.type.startsWith('image/');

@@ -72,15 +72,19 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
     return imageExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
   };
 
-  const getImageUrl = async (filePath: string) => {
-    const { data } = await supabase.storage
+  const getSignedImageUrl = async (filePath: string) => {
+    const { data, error } = await supabase.storage
       .from('personal-attachments')
-      .getPublicUrl(filePath);
-    return data.publicUrl;
+      .createSignedUrl(filePath, 3600);
+    if (error) {
+      console.error('Error creating signed URL:', error);
+      return '';
+    }
+    return data.signedUrl;
   };
 
   const handleImageClick = async (attachment: any) => {
-    const imageUrl = await getImageUrl(attachment.file_path);
+    const imageUrl = await getSignedImageUrl(attachment.file_path);
     setSelectedImage({
       src: imageUrl,
       alt: attachment.file_name
@@ -315,10 +319,11 @@ const ImagePreview: React.FC<{
   React.useEffect(() => {
     const loadImage = async () => {
       try {
-        const { data } = await supabase.storage
+        const { data, error } = await supabase.storage
           .from('personal-attachments')
-          .getPublicUrl(attachment.file_path);
-        setImageUrl(data.publicUrl);
+          .createSignedUrl(attachment.file_path, 3600);
+        if (error) throw error;
+        setImageUrl(data.signedUrl);
       } catch (error) {
         console.error('Error loading image:', error);
       } finally {
