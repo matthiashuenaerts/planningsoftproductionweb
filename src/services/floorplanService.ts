@@ -6,6 +6,8 @@ export interface WorkstationPosition {
   workstation_id: string;
   x_position: number;
   y_position: number;
+  buffer_x_position: number;
+  buffer_y_position: number;
   created_at: string;
   updated_at: string;
 }

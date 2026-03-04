@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { workstationService } from '@/services/workstationService';
 import { floorplanService, WorkstationPosition, ProductionFlowLine, WorkstationStatus } from '@/services/floorplanService';
@@ -16,6 +16,13 @@ import { Upload, ImageIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+
+interface FloorplanProject {
+  project_id: string;
+  project_name: string;
+  workstation_id: string;
+  is_active: boolean; // has active time registration at this workstation
+}
 
 
 // Default floorplan image
@@ -35,6 +42,7 @@ const Floorplan: React.FC = () => {
   const [floorplanImage, setFloorplanImage] = useState<string>(DEFAULT_FLOORPLAN_IMAGE);
   const [uploading, setUploading] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [floorplanProjects, setFloorplanProjects] = useState<FloorplanProject[]>([]);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -188,6 +196,76 @@ const Floorplan: React.FC = () => {
     }
   };
 
+  // Fetch projects and determine their locations on the floorplan
+  const loadFloorplanProjects = async () => {
+    try {
+      // Get all tasks that are TODO or IN_PROGRESS with their workstation links
+      const { data: tasks, error } = await supabase
+        .from('tasks')
+        .select(`
+          id, status,
+          task_workstation_links(workstation_id),
+          phases!inner(project_id, projects!inner(id, name))
+        `)
+        .in('status', ['TODO', 'IN_PROGRESS']);
+      
+      if (error) throw error;
+
+      // Get active time registrations to know which projects are actively being worked on at which workstation
+      const { data: activeRegs } = await supabase
+        .from('time_registrations')
+        .select(`
+          task_id,
+          tasks!inner(
+            task_workstation_links(workstation_id),
+            phases!inner(project_id)
+          )
+        `)
+        .eq('is_active', true);
+
+      // Build a set of "projectId::workstationId" that are actively being worked on
+      const activeProjectWorkstations = new Set<string>();
+      activeRegs?.forEach((reg: any) => {
+        const projectId = reg.tasks?.phases?.project_id;
+        reg.tasks?.task_workstation_links?.forEach((link: any) => {
+          if (projectId && link.workstation_id) {
+            activeProjectWorkstations.add(`${projectId}::${link.workstation_id}`);
+          }
+        });
+      });
+
+      // Group by project+workstation, deduplicate
+      const projectMap = new Map<string, FloorplanProject>();
+      tasks?.forEach((task: any) => {
+        const projectId = task.phases?.projects?.id;
+        const projectName = task.phases?.projects?.name;
+        task.task_workstation_links?.forEach((link: any) => {
+          if (projectId && link.workstation_id) {
+            const key = `${projectId}::${link.workstation_id}`;
+            if (!projectMap.has(key)) {
+              projectMap.set(key, {
+                project_id: projectId,
+                project_name: projectName,
+                workstation_id: link.workstation_id,
+                is_active: activeProjectWorkstations.has(key)
+              });
+            }
+          }
+        });
+      });
+
+      setFloorplanProjects(Array.from(projectMap.values()));
+    } catch (error) {
+      console.error('Error loading floorplan projects:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadFloorplanProjects();
+    const interval = setInterval(loadFloorplanProjects, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleWorkstationPositionChange = async (workstationId: string, x: number, y: number) => {
     try {
       await floorplanService.updateWorkstationPosition(workstationId, x, y);
@@ -248,18 +326,48 @@ const Floorplan: React.FC = () => {
     return position ? { x: position.x_position, y: position.y_position } : getDefaultPosition(workstationId);
   };
 
+  const getBufferPosition = (workstationId: string) => {
+    const position = workstationPositions.find(p => p.workstation_id === workstationId);
+    if (position && (position.buffer_x_position || position.buffer_y_position)) {
+      return { x: position.buffer_x_position, y: position.buffer_y_position };
+    }
+    // Fallback: offset from workstation position
+    const wsPos = getWorkstationPosition(workstationId);
+    return { x: wsPos.x + 3, y: wsPos.y + 5 };
+  };
+
   const getDefaultPosition = (workstationId: string) => {
-    // Generate default positions in a grid pattern
     const index = workstations.findIndex(w => w.id === workstationId);
     const cols = Math.ceil(Math.sqrt(workstations.length));
     const row = Math.floor(index / cols);
     const col = index % cols;
     
     return {
-      x: 10 + (col * 15), // Spread across width
-      y: 10 + (row * 15)  // Spread across height
+      x: 10 + (col * 15),
+      y: 10 + (row * 15)
     };
   };
+
+  // Group projects by position for stacking
+  const projectNametags = useMemo(() => {
+    return floorplanProjects.map((fp, idx) => {
+      const pos = fp.is_active 
+        ? getWorkstationPosition(fp.workstation_id) 
+        : getBufferPosition(fp.workstation_id);
+      
+      // Find how many other projects share the same workstation+active status for offset
+      const siblings = floorplanProjects.filter(
+        p => p.workstation_id === fp.workstation_id && p.is_active === fp.is_active
+      );
+      const siblingIndex = siblings.findIndex(p => p.project_id === fp.project_id);
+      
+      return {
+        ...fp,
+        x: pos.x,
+        y: pos.y + (siblingIndex * 2.5), // stack vertically
+      };
+    });
+  }, [floorplanProjects, workstationPositions, workstations]);
 
   const getWorkstationStatus = (workstationId: string) => {
     return workstationStatuses.find(s => s.workstation_id === workstationId);
@@ -363,7 +471,27 @@ const Floorplan: React.FC = () => {
                 );
               })}
 
-              {/* Production Flow Lines */}
+              {/* Project Nametags */}
+              {projectNametags.map((tag) => (
+                <div
+                  key={`${tag.project_id}-${tag.workstation_id}`}
+                  className="absolute transform -translate-x-1/2 pointer-events-none"
+                  style={{
+                    left: `${tag.x}%`,
+                    top: `${tag.y + 2.5}%`,
+                    zIndex: 5,
+                  }}
+                >
+                  <div className={`px-1.5 py-0.5 rounded text-[9px] font-medium whitespace-nowrap shadow border ${
+                    tag.is_active 
+                      ? 'bg-primary text-primary-foreground border-primary' 
+                      : 'bg-muted text-muted-foreground border-border'
+                  }`}>
+                    {tag.project_name}
+                  </div>
+                </div>
+              ))}
+
               {imageRef.current && (
                 <svg className="absolute inset-0 w-full h-full pointer-events-none">
                   {productionFlowLines.map((line) => (
@@ -473,6 +601,14 @@ const Floorplan: React.FC = () => {
             <div className="flex items-center space-x-2">
               <div className="w-4 h-1 bg-blue-500"></div>
               <span>Production Flow</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="px-1 py-0.5 rounded text-[8px] bg-primary text-primary-foreground">AB</div>
+              <span>Active Project</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="px-1 py-0.5 rounded text-[8px] bg-muted text-muted-foreground border">AB</div>
+              <span>Buffered Project</span>
             </div>
           </div>
         </div>
