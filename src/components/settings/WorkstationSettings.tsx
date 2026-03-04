@@ -60,7 +60,7 @@ const WorkstationSettings: React.FC = () => {
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadIconFile, setUploadIconFile] = useState<File | null>(null);
-  const [workstationPositions, setWorkstationPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const [workstationPositions, setWorkstationPositions] = useState<Map<string, { x: number; y: number; buffer_x: number; buffer_y: number }>>(new Map());
   const { toast } = useToast();
 
   const form = useForm({
@@ -69,6 +69,8 @@ const WorkstationSettings: React.FC = () => {
       description: '',
       x_position: 50,
       y_position: 50,
+      buffer_x_position: 0,
+      buffer_y_position: 0,
       sort_order: 0,
       production_line: 1,
       active_workers: 1
@@ -87,9 +89,14 @@ const WorkstationSettings: React.FC = () => {
         .select('*');
       
       if (!posError && positions) {
-        const posMap = new Map<string, { x: number; y: number }>();
+        const posMap = new Map<string, { x: number; y: number; buffer_x: number; buffer_y: number }>();
         positions.forEach((p: any) => {
-          posMap.set(p.workstation_id, { x: Number(p.x_position), y: Number(p.y_position) });
+          posMap.set(p.workstation_id, { 
+            x: Number(p.x_position), 
+            y: Number(p.y_position),
+            buffer_x: Number(p.buffer_x_position ?? 0),
+            buffer_y: Number(p.buffer_y_position ?? 0)
+          });
         });
         setWorkstationPositions(posMap);
       }
@@ -118,6 +125,8 @@ const WorkstationSettings: React.FC = () => {
       description: workstation.description || '',
       x_position: pos?.x ?? 50,
       y_position: pos?.y ?? 50,
+      buffer_x_position: pos?.buffer_x ?? 0,
+      buffer_y_position: pos?.buffer_y ?? 0,
       sort_order: workstation.sort_order ?? 0,
       production_line: workstation.production_line ?? 1,
       active_workers: workstation.active_workers ?? 1
@@ -149,7 +158,7 @@ const WorkstationSettings: React.FC = () => {
     }
   };
 
-  const handleUpdate = async (data: { name: string; description: string; x_position: number; y_position: number; sort_order: number; production_line: number; active_workers: number }) => {
+  const handleUpdate = async (data: { name: string; description: string; x_position: number; y_position: number; buffer_x_position: number; buffer_y_position: number; sort_order: number; production_line: number; active_workers: number }) => {
     if (!selectedWorkstation) return;
     
     try {
@@ -167,8 +176,10 @@ const WorkstationSettings: React.FC = () => {
         .upsert({
           workstation_id: selectedWorkstation.id,
           x_position: data.x_position,
-          y_position: data.y_position
-        }, { onConflict: 'workstation_id' });
+          y_position: data.y_position,
+          buffer_x_position: data.buffer_x_position,
+          buffer_y_position: data.buffer_y_position
+        } as any, { onConflict: 'workstation_id' });
       
       if (posError) throw posError;
       
@@ -754,6 +765,54 @@ const WorkstationSettings: React.FC = () => {
                       </FormControl>
                       <FormDescription>
                         Vertical position on floor plan (0-100%)
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="buffer_x_position"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Buffer X Position (%)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          max="100" 
+                          step="0.1"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Buffer location horizontal position
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="buffer_y_position"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Buffer Y Position (%)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          max="100" 
+                          step="0.1"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Buffer location vertical position
                       </FormDescription>
                     </FormItem>
                   )}

@@ -5766,6 +5766,8 @@ export type Database = {
       }
       workstation_positions: {
         Row: {
+          buffer_x_position: number | null
+          buffer_y_position: number | null
           created_at: string
           id: string
           tenant_id: string
@@ -5775,6 +5777,8 @@ export type Database = {
           y_position: number
         }
         Insert: {
+          buffer_x_position?: number | null
+          buffer_y_position?: number | null
           created_at?: string
           id?: string
           tenant_id?: string
@@ -5784,6 +5788,8 @@ export type Database = {
           y_position?: number
         }
         Update: {
+          buffer_x_position?: number | null
+          buffer_y_position?: number | null
           created_at?: string
           id?: string
           tenant_id?: string
