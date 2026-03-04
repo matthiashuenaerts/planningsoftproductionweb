@@ -43,6 +43,7 @@ const Floorplan: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [floorplanProjects, setFloorplanProjects] = useState<FloorplanProject[]>([]);
+  const [hoveredBufferWorkstation, setHoveredBufferWorkstation] = useState<string | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -471,26 +472,54 @@ const Floorplan: React.FC = () => {
                 );
               })}
 
-              {/* Project Nametags */}
-              {projectNametags.map((tag) => (
-                <div
-                  key={`${tag.project_id}-${tag.workstation_id}`}
-                  className="absolute transform -translate-x-1/2 pointer-events-none"
-                  style={{
-                    left: `${tag.x}%`,
-                    top: `${tag.y + 2.5}%`,
-                    zIndex: 5,
-                  }}
-                >
-                  <div className={`px-1.5 py-0.5 rounded text-[9px] font-medium whitespace-nowrap shadow border ${
-                    tag.is_active 
-                      ? 'bg-primary text-primary-foreground border-primary' 
-                      : 'bg-muted text-muted-foreground border-border'
-                  }`}>
-                    {tag.project_name}
+              {/* Buffer hover zones - invisible areas to trigger hover */}
+              {workstations.map((ws) => {
+                const bufferPos = getBufferPosition(ws.id);
+                const hasBufferedProjects = floorplanProjects.some(p => p.workstation_id === ws.id && !p.is_active);
+                if (!hasBufferedProjects) return null;
+                return (
+                  <div
+                    key={`buffer-zone-${ws.id}`}
+                    className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                    style={{
+                      left: `${bufferPos.x}%`,
+                      top: `${bufferPos.y}%`,
+                      width: '40px',
+                      height: '40px',
+                      zIndex: 4,
+                    }}
+                    onMouseEnter={() => setHoveredBufferWorkstation(ws.id)}
+                    onMouseLeave={() => setHoveredBufferWorkstation(null)}
+                  >
+                    <div className="w-2 h-2 rounded-sm bg-muted-foreground/30 mx-auto mt-[16px]" />
                   </div>
-                </div>
-              ))}
+                );
+              })}
+
+              {/* Project Nametags */}
+              {projectNametags.map((tag) => {
+                // Hide buffer tags unless hovered
+                if (!tag.is_active && hoveredBufferWorkstation !== tag.workstation_id) return null;
+                return (
+                  <div
+                    key={`${tag.project_id}-${tag.workstation_id}`}
+                    className="absolute transform -translate-x-1/2 pointer-events-none"
+                    style={{
+                      left: `${tag.x}%`,
+                      top: `${tag.y + 2.5}%`,
+                      zIndex: tag.is_active ? 5 : 15,
+                    }}
+                  >
+                    <div className={`px-1.5 py-0.5 rounded text-[9px] font-medium whitespace-nowrap shadow border ${
+                      tag.is_active 
+                        ? 'bg-primary text-primary-foreground border-primary' 
+                        : 'bg-muted text-muted-foreground border-border'
+                    }`}>
+                      {tag.project_name}
+                    </div>
+                  </div>
+                );
+              })}
 
               {imageRef.current && (
                 <svg className="absolute inset-0 w-full h-full pointer-events-none">
