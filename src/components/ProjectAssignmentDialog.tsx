@@ -402,7 +402,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
         console.log(`Inserting ${newAssignments.length} assignments...`);
         const { error: assignmentsError } = await supabase
           .from('daily_team_assignments')
-          .insert(newAssignments);
+          .upsert(newAssignments, { onConflict: 'team_id,employee_id,date' });
 
         if (assignmentsError) {
           console.error('Assignments error:', assignmentsError);
