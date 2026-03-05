@@ -506,12 +506,21 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       toast.error('Please select a team first');
       return;
     }
+    if (!startDate || !duration || duration < 1) {
+      toast.error('Please set a valid start date and duration first');
+      return;
+    }
+    const parsedStart = new Date(startDate);
+    if (isNaN(parsedStart.getTime())) {
+      toast.error('Invalid start date');
+      return;
+    }
 
     try {
       // Get all dates in the project duration
       const dates = eachDayOfInterval({
-        start: new Date(startDate),
-        end: new Date(new Date(startDate).getTime() + (duration - 1) * 24 * 60 * 60 * 1000)
+        start: parsedStart,
+        end: new Date(parsedStart.getTime() + (duration - 1) * 24 * 60 * 60 * 1000)
       });
 
       // Create assignments for each day
