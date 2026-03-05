@@ -96,6 +96,22 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
     }
   }, [selectedTeamId]);
 
+  const fetchInstallationDate = async () => {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('installation_date')
+      .eq('id', projectId)
+      .maybeSingle();
+
+    if (!error && data?.installation_date) {
+      setInstallationDate(data.installation_date);
+      // If no start date is set, pre-populate with installation date
+      if (!currentStartDate) {
+        setStartDate(data.installation_date);
+      }
+    }
+  };
+
   const fetchTeams = async () => {
     const { data, error } = await supabase
       .from('placement_teams')
