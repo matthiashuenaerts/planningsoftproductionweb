@@ -131,14 +131,21 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   };
 
   const fetchAssignedEmployees = async () => {
-    if (!currentTeamId) {
-      console.log('No current team ID, skipping fetch assigned employees');
+    if (!currentTeamId || !currentStartDate || !currentDuration || currentDuration < 1) {
+      console.log('No valid team/date/duration, skipping fetch assigned employees');
+      setAssignedEmployees([]);
+      return;
+    }
+
+    const parsedStart = new Date(currentStartDate);
+    if (isNaN(parsedStart.getTime())) {
+      console.log('Invalid start date, skipping fetch assigned employees');
       setAssignedEmployees([]);
       return;
     }
 
     const endDate = format(
-      new Date(new Date(currentStartDate).getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000),
+      new Date(parsedStart.getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000),
       'yyyy-MM-dd'
     );
 
