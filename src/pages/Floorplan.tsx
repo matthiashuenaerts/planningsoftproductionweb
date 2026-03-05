@@ -40,7 +40,7 @@ const Floorplan: React.FC = () => {
   const [isAddingFlowLine, setIsAddingFlowLine] = useState(false);
   const [newFlowLine, setNewFlowLine] = useState<any>(null);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
-  const [floorplanImage, setFloorplanImage] = useState<string>(DEFAULT_FLOORPLAN_IMAGE);
+  const [floorplanImagePath, setFloorplanImagePath] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [floorplanProjects, setFloorplanProjects] = useState<FloorplanProject[]>([]);
