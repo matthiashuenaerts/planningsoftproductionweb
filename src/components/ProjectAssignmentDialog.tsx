@@ -323,13 +323,13 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
 
       // Handle daily team assignments synchronization
       console.log('Handling daily team assignments...');
-      const oldEndDate = format(
-        new Date(new Date(currentStartDate).getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000),
-        'yyyy-MM-dd'
-      );
 
-      // Delete old assignments only if there are employees and a valid team ID
-      if (assignedEmployees.length > 0 && currentTeamId) {
+      // Delete old assignments only if there are employees, a valid team ID, and valid old dates
+      if (assignedEmployees.length > 0 && currentTeamId && currentStartDate && currentDuration > 0) {
+        const oldEndDate = format(
+          new Date(new Date(currentStartDate).getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000),
+          'yyyy-MM-dd'
+        );
         console.log('Deleting old assignments...', {
           teamId: currentTeamId,
           dateRange: `${currentStartDate} to ${oldEndDate}`,
