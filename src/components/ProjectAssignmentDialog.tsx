@@ -59,6 +59,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   const [loading, setLoading] = useState(false);
   const [trucks, setTrucks] = useState<TruckOption[]>([]);
   const [selectedTruckId, setSelectedTruckId] = useState<string>('');
+  const [installationDate, setInstallationDate] = useState<string>('');
 
   useEffect(() => {
     if (isOpen) {
@@ -72,10 +73,11 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       // Reset state with current values
       setSelectedTeamId(currentTeamId || '');
       setStartDate(currentStartDate);
-      setDuration(currentDuration);
+      setDuration(currentDuration || 1);
       setAssignedEmployees([]);
       setEmployeesOnHoliday(new Set());
       setSelectedTruckId('');
+      setInstallationDate('');
       
       // Fetch all data
       fetchTeams();
@@ -84,6 +86,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       checkHolidayRequests();
       fetchTrucks();
       fetchTruckAssignment();
+      fetchInstallationDate();
     }
   }, [isOpen, projectId, currentTeamId, currentStartDate, currentDuration]);
 
@@ -92,6 +95,22 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       fetchTeamMembers(selectedTeamId);
     }
   }, [selectedTeamId]);
+
+  const fetchInstallationDate = async () => {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('installation_date')
+      .eq('id', projectId)
+      .maybeSingle();
+
+    if (!error && data?.installation_date) {
+      setInstallationDate(data.installation_date);
+      // If no start date is set, pre-populate with installation date
+      if (!currentStartDate) {
+        setStartDate(data.installation_date);
+      }
+    }
+  };
 
   const fetchTeams = async () => {
     const { data, error } = await supabase
@@ -131,14 +150,21 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   };
 
   const fetchAssignedEmployees = async () => {
-    if (!currentTeamId) {
-      console.log('No current team ID, skipping fetch assigned employees');
+    if (!currentTeamId || !currentStartDate || !currentDuration || currentDuration < 1) {
+      console.log('No valid team/date/duration, skipping fetch assigned employees');
+      setAssignedEmployees([]);
+      return;
+    }
+
+    const parsedStart = new Date(currentStartDate);
+    if (isNaN(parsedStart.getTime())) {
+      console.log('Invalid start date, skipping fetch assigned employees');
       setAssignedEmployees([]);
       return;
     }
 
     const endDate = format(
-      new Date(new Date(currentStartDate).getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000),
+      new Date(parsedStart.getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000),
       'yyyy-MM-dd'
     );
 
@@ -173,8 +199,14 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   };
 
   const checkHolidayRequests = async () => {
+    if (!currentStartDate || !currentDuration || currentDuration < 1) {
+      return;
+    }
+    const parsedStart = new Date(currentStartDate);
+    if (isNaN(parsedStart.getTime())) return;
+
     const endDate = format(
-      new Date(new Date(currentStartDate).getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000),
+      new Date(parsedStart.getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000),
       'yyyy-MM-dd'
     );
 
@@ -370,7 +402,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
         console.log(`Inserting ${newAssignments.length} assignments...`);
         const { error: assignmentsError } = await supabase
           .from('daily_team_assignments')
-          .insert(newAssignments);
+          .upsert(newAssignments, { onConflict: 'team_id,employee_id,date' });
 
         if (assignmentsError) {
           console.error('Assignments error:', assignmentsError);
@@ -461,14 +493,23 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   };
 
   const handleRemoveEmployee = async (employeeId: string) => {
+    if (!startDate || !duration || duration < 1) {
+      toast.error('Please set a valid start date and duration first');
+      return;
+    }
     try {
+      const parsedStart = new Date(startDate);
+      if (isNaN(parsedStart.getTime())) {
+        toast.error('Invalid start date');
+        return;
+      }
       const { error } = await supabase
         .from('daily_team_assignments')
         .delete()
         .eq('employee_id', employeeId)
         .eq('team_id', selectedTeamId || '')
         .gte('date', startDate)
-        .lte('date', format(new Date(new Date(startDate).getTime() + (duration - 1) * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
+        .lte('date', format(new Date(parsedStart.getTime() + (duration - 1) * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
 
       if (error) throw error;
 
@@ -484,12 +525,21 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       toast.error('Please select a team first');
       return;
     }
+    if (!startDate || !duration || duration < 1) {
+      toast.error('Please set a valid start date and duration first');
+      return;
+    }
+    const parsedStart = new Date(startDate);
+    if (isNaN(parsedStart.getTime())) {
+      toast.error('Invalid start date');
+      return;
+    }
 
     try {
       // Get all dates in the project duration
       const dates = eachDayOfInterval({
-        start: new Date(startDate),
-        end: new Date(new Date(startDate).getTime() + (duration - 1) * 24 * 60 * 60 * 1000)
+        start: parsedStart,
+        end: new Date(parsedStart.getTime() + (duration - 1) * 24 * 60 * 60 * 1000)
       });
 
       // Create assignments for each day
@@ -502,7 +552,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
 
       const { error } = await supabase
         .from('daily_team_assignments')
-        .insert(assignments);
+        .upsert(assignments, { onConflict: 'team_id,employee_id,date' });
 
       if (error) throw error;
 
@@ -545,7 +595,12 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
 
         <div className="space-y-6">
           <div>
-            <h3 className="text-lg font-semibold mb-2">{projectName}</h3>
+            <h3 className="text-lg font-semibold mb-1">{projectName}</h3>
+            {installationDate && (
+              <p className="text-sm text-muted-foreground">
+                Installation date: {format(new Date(installationDate), 'dd/MM/yyyy')}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
