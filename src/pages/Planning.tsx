@@ -276,7 +276,7 @@ const Planning = () => {
             )
           )
         `)
-        .in('status', ['TODO', 'HOLD'])
+        .eq('status', 'TODO')
         .order('priority', { ascending: false })
         .order('due_date', { ascending: true });
 
@@ -2426,24 +2426,14 @@ const Planning = () => {
                                       >
                                         <div className={cn(
                                             "relative h-full overflow-hidden rounded border p-2",
-                                            item.task?.status === 'HOLD'
-                                              ? 'bg-purple-100 text-purple-900 border-purple-400 border-l-4 border-l-purple-600'
-                                              : getPriorityColor(item.task?.priority || '')
+                                            getPriorityColor(item.task?.priority || '')
                                           )}>
                                           <div className="flex justify-between h-full">
                                             <div className="flex-1 pr-2 overflow-hidden">
-                                              {item.task?.status === 'HOLD' && (
-                                                <Badge className="bg-purple-600 text-white text-[10px] py-0 px-1 mb-1">HOLD</Badge>
-                                              )}
                                               <h5 className="font-medium text-sm truncate" title={item.title}>{item.title}</h5>
                                               {item.task?.phases?.projects?.name && (
                                                 <p className="text-xs text-blue-700 truncate" title={item.task.phases.projects.name}>
                                                   {item.task.phases.projects.name}
-                                                </p>
-                                              )}
-                                              {item.task?.status === 'HOLD' && item.task?.phases?.name && (
-                                                <p className="text-xs text-purple-700 truncate" title={item.task.phases.name}>
-                                                  Phase: {item.task.phases.name}
                                                 </p>
                                               )}
                                               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
