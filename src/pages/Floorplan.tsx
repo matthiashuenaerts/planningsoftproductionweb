@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { useQuery } from '@tanstack/react-query';
 import { workstationService } from '@/services/workstationService';
 import { floorplanService, WorkstationPosition, ProductionFlowLine, WorkstationStatus } from '@/services/floorplanService';
@@ -39,7 +40,7 @@ const Floorplan: React.FC = () => {
   const [isAddingFlowLine, setIsAddingFlowLine] = useState(false);
   const [newFlowLine, setNewFlowLine] = useState<any>(null);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
-  const [floorplanImage, setFloorplanImage] = useState<string>(DEFAULT_FLOORPLAN_IMAGE);
+  const [floorplanImagePath, setFloorplanImagePath] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [floorplanProjects, setFloorplanProjects] = useState<FloorplanProject[]>([]);
@@ -52,7 +53,11 @@ const Floorplan: React.FC = () => {
   const isAdmin = currentEmployee?.role === 'admin';
   const { tenant } = useTenant();
 
-  // Fetch tenant floorplan image
+  // Resolve signed URL for the private attachments bucket
+  const signedFloorplanUrl = useSignedUrl('attachments', floorplanImagePath);
+  const floorplanImage = signedFloorplanUrl || DEFAULT_FLOORPLAN_IMAGE;
+
+  // Fetch tenant floorplan image path from DB
   useEffect(() => {
     const loadFloorplanImage = async () => {
       try {
@@ -62,7 +67,7 @@ const Floorplan: React.FC = () => {
           .maybeSingle();
         
         if (!error && data?.image_url) {
-          setFloorplanImage(data.image_url);
+          setFloorplanImagePath(data.image_url);
         }
       } catch (error) {
         console.error('Error loading floorplan image:', error);
@@ -109,7 +114,7 @@ const Floorplan: React.FC = () => {
           .insert({ image_url: publicUrl } as any);
       }
 
-      setFloorplanImage(publicUrl);
+      setFloorplanImagePath(publicUrl);
       setUploadDialogOpen(false);
       toast.success('Floorplan image updated successfully');
     } catch (error) {
