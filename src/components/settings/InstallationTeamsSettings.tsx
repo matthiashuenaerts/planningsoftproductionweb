@@ -729,7 +729,7 @@ const InstallationTeamsSettings: React.FC = () => {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Truck?</AlertDialogTitle>
-              <AlertDialogDescription>This will permanently delete truck T{truckToDelete?.truck_number}.</AlertDialogDescription>
+              <AlertDialogDescription>This will permanently delete truck {truckToDelete?.truck_number}.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
