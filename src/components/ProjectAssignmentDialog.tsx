@@ -180,8 +180,14 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   };
 
   const checkHolidayRequests = async () => {
+    if (!currentStartDate || !currentDuration || currentDuration < 1) {
+      return;
+    }
+    const parsedStart = new Date(currentStartDate);
+    if (isNaN(parsedStart.getTime())) return;
+
     const endDate = format(
-      new Date(new Date(currentStartDate).getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000),
+      new Date(parsedStart.getTime() + (currentDuration - 1) * 24 * 60 * 60 * 1000),
       'yyyy-MM-dd'
     );
 

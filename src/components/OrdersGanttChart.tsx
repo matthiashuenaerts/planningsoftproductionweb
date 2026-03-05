@@ -964,8 +964,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                         id: project.id,
                                         name: project.name,
                                         teamId: null,
-                                        startDate: '',
-                                        duration: 0,
+                                        startDate: project.installation_date ? format(parseYMD(project.installation_date), 'yyyy-MM-dd') : '',
+                                        duration: 1,
                                       });
                                     }}
                                     title={`${project.name} - Not scheduled`}
