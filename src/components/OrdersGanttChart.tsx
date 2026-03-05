@@ -1057,16 +1057,25 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                               (placeOutsideLabelLeft ? leftSpacePx : rightSpacePx) - 12
                             );
 
+                            const basePxLeft = (containerWidth / position.totalDays) * position.left;
+                            const basePxWidth = (containerWidth / position.totalDays) * position.width;
+                            
+                            // Apply live drag offset
+                            const effectiveLeft = basePxLeft + dragLeftOffset;
+                            // Apply live resize deltas
+                            const effectiveLeftWithResize = effectiveLeft + resizeLeftOffset;
+                            const effectiveWidth = basePxWidth - resizeLeftOffset + (isResizingThisProject ? resizeDelta.right : 0);
+
                             return (
                               <div
                                 key={project.id}
                                 className="absolute flex items-center gap-1"
                                 style={{
-                                  left: `calc(100% / ${position.totalDays} * ${position.left})`,
+                                  left: `${effectiveLeftWithResize}px`,
                                   top: `${8 + idx * 32}px`,
                                   height: '28px',
+                                  transition: (isDraggingThisProject || isResizingThisProject) ? 'none' : 'left 0.15s, width 0.15s',
                                 }}
-
                               >
                                  {/* Label outside bar on the LEFT if needed */}
                                  {!labelFitsInside && placeOutsideLabelLeft && outsideLabelMaxWidth > 0 && (
@@ -1085,15 +1094,27 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
 
                                  {/* Project bar */}
                                  <div
-                                   className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto cursor-pointer"
+                                   className={cn(
+                                     "relative h-7 hover:opacity-90 rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto",
+                                     isDraggingThisProject ? 'cursor-grabbing' : 'cursor-grab',
+                                     isResizingThisProject && 'ring-2 ring-white/50'
+                                   )}
                                    style={{
-                                     width: `${(containerWidth / position.totalDays) * position.width}px`,
+                                     width: `${Math.max(20, effectiveWidth)}px`,
                                      backgroundColor: hasEmployeeOnHoliday ? '#ef4444' : teamColor,
-                                     opacity: isDraggingThisProject ? 0.8 : 1,
+                                     opacity: isDraggingThisProject ? 0.7 : 1,
+                                     transition: (isDraggingThisProject || isResizingThisProject) ? 'none' : 'width 0.15s, opacity 0.15s',
                                    }}
                                    title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
-                                   onClick={() => {
-                                     if (teamAssignment) {
+                                   onMouseDown={(e) => {
+                                     // Only start drag from the bar body, not from resize handles
+                                     if (!(e.target as HTMLElement).closest('[data-resize-handle]')) {
+                                       handleMouseDown(e, project, team.id);
+                                     }
+                                   }}
+                                   onClick={(e) => {
+                                     // Only open dialog if we didn't drag
+                                     if (!isDraggingThisProject && teamAssignment) {
                                        setSelectedProject({
                                          id: project.id,
                                          name: project.name,
@@ -1106,7 +1127,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                  >
                                    {/* Left resize handle */}
                                    <div
-                                     className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
+                                     data-resize-handle
+                                     className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
                                      onMouseDown={(e) => handleResizeStart(e, project, team.id, 'left')}
                                      onClick={(e) => e.stopPropagation()}
                                    >
@@ -1115,7 +1137,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
 
                                    {/* Right resize handle */}
                                    <div
-                                     className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
+                                     data-resize-handle
+                                     className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
                                      onMouseDown={(e) => handleResizeStart(e, project, team.id, 'right')}
                                      onClick={(e) => e.stopPropagation()}
                                    >
