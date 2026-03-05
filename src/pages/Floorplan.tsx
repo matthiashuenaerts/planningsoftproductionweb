@@ -114,7 +114,7 @@ const Floorplan: React.FC = () => {
           .insert({ image_url: publicUrl } as any);
       }
 
-      setFloorplanImage(publicUrl);
+      setFloorplanImagePath(publicUrl);
       setUploadDialogOpen(false);
       toast.success('Floorplan image updated successfully');
     } catch (error) {
