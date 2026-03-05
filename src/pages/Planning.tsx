@@ -276,7 +276,7 @@ const Planning = () => {
             )
           )
         `)
-        .eq('status', 'TODO')
+        .in('status', ['TODO', 'HOLD'])
         .order('priority', { ascending: false })
         .order('due_date', { ascending: true });
 
