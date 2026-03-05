@@ -59,6 +59,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   const [loading, setLoading] = useState(false);
   const [trucks, setTrucks] = useState<TruckOption[]>([]);
   const [selectedTruckId, setSelectedTruckId] = useState<string>('');
+  const [installationDate, setInstallationDate] = useState<string>('');
 
   useEffect(() => {
     if (isOpen) {
@@ -72,10 +73,11 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       // Reset state with current values
       setSelectedTeamId(currentTeamId || '');
       setStartDate(currentStartDate);
-      setDuration(currentDuration);
+      setDuration(currentDuration || 1);
       setAssignedEmployees([]);
       setEmployeesOnHoliday(new Set());
       setSelectedTruckId('');
+      setInstallationDate('');
       
       // Fetch all data
       fetchTeams();
@@ -84,6 +86,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       checkHolidayRequests();
       fetchTrucks();
       fetchTruckAssignment();
+      fetchInstallationDate();
     }
   }, [isOpen, projectId, currentTeamId, currentStartDate, currentDuration]);
 
