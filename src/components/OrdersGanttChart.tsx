@@ -97,6 +97,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const [resizeDelta, setResizeDelta] = useState({ left: 0, right: 0 });
   const [containerWidth, setContainerWidth] = useState(0);
   const timelineRef = useRef<HTMLDivElement>(null);
+  const didDragRef = useRef(false);
   const [selectedProject, setSelectedProject] = useState<{
     id: string;
     name: string;
