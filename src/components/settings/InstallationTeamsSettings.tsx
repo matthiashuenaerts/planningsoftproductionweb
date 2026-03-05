@@ -685,7 +685,7 @@ const InstallationTeamsSettings: React.FC = () => {
                   ) : (
                     trucks.map((truck) => (
                       <TableRow key={truck.id}>
-                        <TableCell className="font-medium">T{truck.truck_number}</TableCell>
+                        <TableCell className="font-medium">{truck.truck_number}</TableCell>
                         <TableCell>{truck.description || <span className="text-muted-foreground">—</span>}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -729,7 +729,7 @@ const InstallationTeamsSettings: React.FC = () => {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Truck?</AlertDialogTitle>
-              <AlertDialogDescription>This will permanently delete truck T{truckToDelete?.truck_number}.</AlertDialogDescription>
+              <AlertDialogDescription>This will permanently delete truck {truckToDelete?.truck_number}.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
