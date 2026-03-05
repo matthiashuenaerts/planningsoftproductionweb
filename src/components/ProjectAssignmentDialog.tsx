@@ -474,14 +474,23 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   };
 
   const handleRemoveEmployee = async (employeeId: string) => {
+    if (!startDate || !duration || duration < 1) {
+      toast.error('Please set a valid start date and duration first');
+      return;
+    }
     try {
+      const parsedStart = new Date(startDate);
+      if (isNaN(parsedStart.getTime())) {
+        toast.error('Invalid start date');
+        return;
+      }
       const { error } = await supabase
         .from('daily_team_assignments')
         .delete()
         .eq('employee_id', employeeId)
         .eq('team_id', selectedTeamId || '')
         .gte('date', startDate)
-        .lte('date', format(new Date(new Date(startDate).getTime() + (duration - 1) * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
+        .lte('date', format(new Date(parsedStart.getTime() + (duration - 1) * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
 
       if (error) throw error;
 
