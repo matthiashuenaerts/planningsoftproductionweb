@@ -246,10 +246,12 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     if (draggingProject) {
       const { project, dayWidth: dw } = draggingProject;
       const daysMoved = Math.round(dragOffset / dw);
+      const wasDragged = daysMoved !== 0;
+      didDragRef.current = wasDragged;
       setDraggingProject(null);
       setDragOffset(0);
 
-      if (daysMoved === 0) return;
+      if (!wasDragged) return;
 
       const assignment = project.project_team_assignments?.[0];
       if (!assignment) return;
