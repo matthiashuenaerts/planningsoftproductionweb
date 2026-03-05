@@ -1080,7 +1080,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                    }}
                                    onClick={(e) => {
                                      // Only open dialog if we didn't drag
-                                     if (!isDraggingThisProject && teamAssignment) {
+                                     if (didDragRef.current) { didDragRef.current = false; return; }
+                                     if (teamAssignment) {
                                        setSelectedProject({
                                          id: project.id,
                                          name: project.name,
