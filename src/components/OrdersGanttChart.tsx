@@ -97,6 +97,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const [resizeDelta, setResizeDelta] = useState({ left: 0, right: 0 });
   const [containerWidth, setContainerWidth] = useState(0);
   const timelineRef = useRef<HTMLDivElement>(null);
+  const didDragRef = useRef(false);
   const [selectedProject, setSelectedProject] = useState<{
     id: string;
     name: string;
@@ -104,6 +105,76 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     startDate: string;
     duration: number;
   } | null>(null);
+
+
+  // Reusable full project fetch (with employees, trucks, holidays)
+  const fetchFullProjects = async () => {
+    let projectsQuery = supabase
+      .from('projects')
+      .select('id, name, client, installation_date, progress')
+      .not('installation_date', 'is', null)
+      .order('installation_date');
+    projectsQuery = applyTenantFilter(projectsQuery, tenant?.id);
+    const { data: projectsData, error: projectsError } = await projectsQuery;
+    if (projectsError || !projectsData) return;
+
+    const projectIds = projectsData.map(p => p.id).filter(Boolean);
+    let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
+    if (projectIds.length > 0) {
+      const { data: assignments } = await supabase
+        .from('project_team_assignments')
+        .select('project_id, team, team_id, start_date, duration')
+        .in('project_id', projectIds as string[]);
+      if (assignments) {
+        assignmentsByProject = assignments.reduce((acc: any, a: any) => {
+          (acc[a.project_id] = acc[a.project_id] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
+          return acc;
+        }, {});
+      }
+    }
+    const mergedProjects = projectsData.map((p: any) => ({
+      ...p,
+      project_team_assignments: assignmentsByProject[p.id] || [],
+    }));
+
+    // Fetch truck assignments
+    const { data: truckAssignmentsData } = await supabase
+      .from('project_truck_assignments')
+      .select('project_id, trucks!inner(truck_number, description)')
+      .in('project_id', projectIds.length > 0 ? projectIds as string[] : ['__none__']);
+    const trucksByProject = new Map(
+      (truckAssignmentsData || []).map((ta: any) => [ta.project_id, { truck_number: ta.trucks.truck_number, description: ta.trucks.description }])
+    );
+
+    // Fetch employees & holidays per project
+    const projectsWithEmployees = await Promise.all(
+      mergedProjects.map(async (project) => {
+        const assignment = project.project_team_assignments?.[0];
+        if (!assignment?.team_id || !assignment?.start_date || !assignment?.duration) {
+          return { ...project, truck: trucksByProject.get(project.id) };
+        }
+        const endDate = format(addDays(parseYMD(assignment.start_date), assignment.duration - 1), 'yyyy-MM-dd');
+        const { data: dailyAssignments } = await supabase
+          .from('daily_team_assignments')
+          .select('employee_id, employees!inner(id, name)')
+          .eq('team_id', assignment.team_id)
+          .gte('date', assignment.start_date)
+          .lte('date', endDate);
+        const uniqueEmployees = new Map<string, Employee>();
+        dailyAssignments?.forEach((da: any) => { if (da.employees) uniqueEmployees.set(da.employees.id, da.employees); });
+        const employees = Array.from(uniqueEmployees.values());
+        const { data: holidayData } = await supabase
+          .from('holiday_requests')
+          .select('user_id')
+          .eq('status', 'approved')
+          .lte('start_date', endDate)
+          .gte('end_date', assignment.start_date);
+        const employeesOnHoliday = new Set(holidayData?.map(h => h.user_id) || []);
+        return { ...project, employees, employeesOnHoliday, truck: trucksByProject.get(project.id) };
+      })
+    );
+    setProjects(projectsWithEmployees);
+  };
 
 
   
@@ -128,195 +199,85 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const handleMouseUp = async (e: React.MouseEvent) => {
     if (resizingProject) {
       const { project, edge, originalStartDate, originalDuration, startX } = resizingProject;
-
-      // Calculate days moved based on pixel movement
       const container = e.currentTarget as HTMLElement;
       const rect = container.getBoundingClientRect();
-      // Calendar grid is the full width minus the 16rem (256px) team name column
       const calendarGridWidth = rect.width - 256;
       const dayWidth = calendarGridWidth / dateRange.length;
       const pixelsMoved = e.clientX - startX;
       const daysMoved = Math.round(pixelsMoved / dayWidth);
 
-      if (daysMoved === 0) {
-        setResizingProject(null);
-        setResizeDelta({ left: 0, right: 0 });
-        return;
-      }
+      setResizingProject(null);
+      setResizeDelta({ left: 0, right: 0 });
+
+      if (daysMoved === 0) return;
 
       let newStartDate: Date;
       let newDuration: number;
-
       if (edge === 'left') {
-        // Resizing from left - adjust start date and duration
         newStartDate = addDays(originalStartDate, daysMoved);
         newDuration = Math.max(1, originalDuration - daysMoved);
       } else {
-        // Resizing from right - keep start date, adjust duration
         newStartDate = originalStartDate;
         newDuration = Math.max(1, originalDuration + daysMoved);
       }
 
+      // Optimistically update local state (preserve employees/truck)
+      setProjects(prev => prev.map(p =>
+        p.id === project.id
+          ? { ...p, project_team_assignments: p.project_team_assignments?.map((a, i) => i === 0 ? { ...a, start_date: format(newStartDate, 'yyyy-MM-dd'), duration: newDuration } : a) || [] }
+          : p
+      ));
+
       try {
         const { error } = await supabase
           .from('project_team_assignments')
-          .update({
-            start_date: format(newStartDate, 'yyyy-MM-dd'),
-            duration: newDuration,
-          })
+          .update({ start_date: format(newStartDate, 'yyyy-MM-dd'), duration: newDuration })
           .eq('project_id', project.id);
-
         if (error) throw error;
-
         toast.success('Project duration updated');
-
-        // Optimistically update local state
-        setProjects(prevProjects =>
-          prevProjects.map(p =>
-            p.id === project.id
-              ? {
-                  ...p,
-                  project_team_assignments: p.project_team_assignments?.map((assignment, idx) =>
-                    idx === 0
-                      ? { ...assignment, start_date: format(newStartDate, 'yyyy-MM-dd'), duration: newDuration }
-                      : assignment
-                  ) || []
-                }
-              : p
-          )
-        );
-
-        // Refresh data in background
-        const { data: projectsData, error: projectsError } = await supabase
-          .from('projects')
-          .select(`
-            id,
-            name,
-            client,
-            installation_date,
-            progress
-          `)
-          .not('installation_date', 'is', null)
-          .order('installation_date');
-
-        if (!projectsError && projectsData) {
-          const projectIds = projectsData.map(p => p.id).filter(Boolean);
-          let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
-          if (projectIds.length > 0) {
-            const { data: assignments, error: assignError } = await supabase
-              .from('project_team_assignments')
-              .select('project_id, team, team_id, start_date, duration')
-              .in('project_id', projectIds as string[]);
-            if (!assignError && assignments) {
-              assignmentsByProject = assignments.reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>, a: any) => {
-                const pid = a.project_id as string;
-                (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
-                return acc;
-              }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>);
-            }
-          }
-          const mergedProjects = projectsData.map((p: any) => ({
-            ...p,
-            project_team_assignments: assignmentsByProject[p.id] || [],
-          }));
-          setProjects(mergedProjects);
-        }
+        fetchFullProjects();
       } catch (error) {
         console.error('Error updating project duration:', error);
         toast.error('Failed to update project duration');
-        // Reset deltas on error
-        setResizeDelta({ left: 0, right: 0 });
+        fetchFullProjects(); // revert
       }
-
-      setResizingProject(null);
-      setResizeDelta({ left: 0, right: 0 });
     }
 
     if (draggingProject) {
-      const { project, teamId, initialLeft, dayWidth } = draggingProject;
-      const daysMoved = Math.round(dragOffset / dayWidth);
-
-      if (daysMoved !== 0) {
-        const teamAssignments = project.project_team_assignments;
-        const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
-
-        if (assignment) {
-          const newStartDate = addDays(parseYMD(assignment.start_date), daysMoved);
-
-          try {
-            const { error } = await supabase
-              .from('project_team_assignments')
-              .update({
-                start_date: format(newStartDate, 'yyyy-MM-dd'),
-              })
-              .eq('project_id', project.id);
-
-            if (error) throw error;
-
-            toast.success('Project moved successfully');
-
-            // Optimistically update local state
-            setProjects(prevProjects =>
-              prevProjects.map(p =>
-                p.id === project.id
-                  ? {
-                      ...p,
-                      project_team_assignments: p.project_team_assignments?.map((assignment, idx) =>
-                        idx === 0
-                          ? { ...assignment, start_date: format(newStartDate, 'yyyy-MM-dd') }
-                          : assignment
-                      ) || []
-                    }
-                  : p
-              )
-            );
-
-            // Refresh data in background
-            const { data: projectsData, error: projectsError } = await supabase
-              .from('projects')
-              .select(`
-                id,
-                name,
-                client,
-                installation_date,
-                progress
-              `)
-              .not('installation_date', 'is', null)
-              .order('installation_date');
-
-            if (!projectsError && projectsData) {
-              const projectIds = projectsData.map(p => p.id).filter(Boolean);
-              let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
-              if (projectIds.length > 0) {
-                const { data: assignments, error: assignError } = await supabase
-                  .from('project_team_assignments')
-                  .select('project_id, team, team_id, start_date, duration')
-                  .in('project_id', projectIds as string[]);
-                if (!assignError && assignments) {
-                  assignmentsByProject = assignments.reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>, a: any) => {
-                    const pid = a.project_id as string;
-                    (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
-                    return acc;
-                  }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>);
-                }
-              }
-              const mergedProjects = projectsData.map((p: any) => ({
-                ...p,
-                project_team_assignments: assignmentsByProject[p.id] || [],
-              }));
-              setProjects(mergedProjects);
-            }
-          } catch (error) {
-            console.error('Error updating project position:', error);
-            toast.error('Failed to move project');
-            // Reset offset on error
-            setDragOffset(0);
-          }
-        }
-      }
-
+      const { project, dayWidth: dw } = draggingProject;
+      const daysMoved = Math.round(dragOffset / dw);
+      const wasDragged = daysMoved !== 0;
+      didDragRef.current = wasDragged;
       setDraggingProject(null);
       setDragOffset(0);
+
+      if (!wasDragged) return;
+
+      const assignment = project.project_team_assignments?.[0];
+      if (!assignment) return;
+
+      const newStartDate = addDays(parseYMD(assignment.start_date), daysMoved);
+
+      // Optimistic update (preserve employees/truck)
+      setProjects(prev => prev.map(p =>
+        p.id === project.id
+          ? { ...p, project_team_assignments: p.project_team_assignments?.map((a, i) => i === 0 ? { ...a, start_date: format(newStartDate, 'yyyy-MM-dd') } : a) || [] }
+          : p
+      ));
+
+      try {
+        const { error } = await supabase
+          .from('project_team_assignments')
+          .update({ start_date: format(newStartDate, 'yyyy-MM-dd') })
+          .eq('project_id', project.id);
+        if (error) throw error;
+        toast.success('Project moved successfully');
+        fetchFullProjects();
+      } catch (error) {
+        console.error('Error updating project position:', error);
+        toast.error('Failed to move project');
+        fetchFullProjects(); // revert
+      }
     }
   };
   useEffect(() => {
@@ -732,7 +693,6 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     }
 
     try {
-      // Update the project team assignment in the database
       const { error } = await supabase
         .from('project_team_assignments')
         .update({
@@ -745,43 +705,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
       if (error) throw error;
 
       toast.success('Project moved successfully');
-      
-      // Refresh data
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select(`
-          id,
-          name,
-          client,
-          installation_date,
-          progress
-        `)
-        .not('installation_date', 'is', null)
-        .order('installation_date');
-
-      if (!projectsError && projectsData) {
-        // fetch assignments again and merge
-        const projectIds = projectsData.map(p => p.id).filter(Boolean);
-        let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
-        if (projectIds.length > 0) {
-          const { data: assignments, error: assignError } = await supabase
-            .from('project_team_assignments')
-            .select('project_id, team, team_id, start_date, duration')
-            .in('project_id', projectIds as string[]);
-          if (!assignError && assignments) {
-            assignmentsByProject = assignments.reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>, a: any) => {
-              const pid = a.project_id as string;
-              (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
-              return acc;
-            }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>);
-          }
-        }
-        const mergedProjects = projectsData.map((p: any) => ({
-          ...p,
-          project_team_assignments: assignmentsByProject[p.id] || [],
-        }));
-        setProjects(mergedProjects);
-      }
+      fetchFullProjects();
     } catch (error) {
       console.error('Error updating project assignment:', error);
       toast.error('Failed to move project');
@@ -1099,16 +1023,25 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                               (placeOutsideLabelLeft ? leftSpacePx : rightSpacePx) - 12
                             );
 
+                            const basePxLeft = (containerWidth / position.totalDays) * position.left;
+                            const basePxWidth = (containerWidth / position.totalDays) * position.width;
+                            
+                            // Apply live drag offset
+                            const effectiveLeft = basePxLeft + dragLeftOffset;
+                            // Apply live resize deltas
+                            const effectiveLeftWithResize = effectiveLeft + resizeLeftOffset;
+                            const effectiveWidth = basePxWidth - resizeLeftOffset + (isResizingThisProject ? resizeDelta.right : 0);
+
                             return (
                               <div
                                 key={project.id}
                                 className="absolute flex items-center gap-1"
                                 style={{
-                                  left: `calc(100% / ${position.totalDays} * ${position.left})`,
+                                  left: `${effectiveLeftWithResize}px`,
                                   top: `${8 + idx * 32}px`,
                                   height: '28px',
+                                  transition: (isDraggingThisProject || isResizingThisProject) ? 'none' : 'left 0.15s, width 0.15s',
                                 }}
-
                               >
                                  {/* Label outside bar on the LEFT if needed */}
                                  {!labelFitsInside && placeOutsideLabelLeft && outsideLabelMaxWidth > 0 && (
@@ -1127,14 +1060,27 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
 
                                  {/* Project bar */}
                                  <div
-                                   className="relative h-7 hover:opacity-90 transition-opacity rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto cursor-pointer"
+                                   className={cn(
+                                     "relative h-7 hover:opacity-90 rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto",
+                                     isDraggingThisProject ? 'cursor-grabbing' : 'cursor-grab',
+                                     isResizingThisProject && 'ring-2 ring-white/50'
+                                   )}
                                    style={{
-                                     width: `${(containerWidth / position.totalDays) * position.width}px`,
+                                     width: `${Math.max(20, effectiveWidth)}px`,
                                      backgroundColor: hasEmployeeOnHoliday ? '#ef4444' : teamColor,
-                                     opacity: isDraggingThisProject ? 0.8 : 1,
+                                     opacity: isDraggingThisProject ? 0.7 : 1,
+                                     transition: (isDraggingThisProject || isResizingThisProject) ? 'none' : 'width 0.15s, opacity 0.15s',
                                    }}
                                    title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
-                                   onClick={() => {
+                                   onMouseDown={(e) => {
+                                     // Only start drag from the bar body, not from resize handles
+                                     if (!(e.target as HTMLElement).closest('[data-resize-handle]')) {
+                                       handleMouseDown(e, project, team.id);
+                                     }
+                                   }}
+                                   onClick={(e) => {
+                                     // Only open dialog if we didn't drag
+                                     if (didDragRef.current) { didDragRef.current = false; return; }
                                      if (teamAssignment) {
                                        setSelectedProject({
                                          id: project.id,
@@ -1148,7 +1094,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                  >
                                    {/* Left resize handle */}
                                    <div
-                                     className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
+                                     data-resize-handle
+                                     className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
                                      onMouseDown={(e) => handleResizeStart(e, project, team.id, 'left')}
                                      onClick={(e) => e.stopPropagation()}
                                    >
@@ -1157,7 +1104,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
 
                                    {/* Right resize handle */}
                                    <div
-                                     className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
+                                     data-resize-handle
+                                     className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center"
                                      onMouseDown={(e) => handleResizeStart(e, project, team.id, 'right')}
                                      onClick={(e) => e.stopPropagation()}
                                    >
@@ -1203,116 +1151,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
           currentTeamId={selectedProject.teamId}
           currentStartDate={selectedProject.startDate}
           currentDuration={selectedProject.duration}
-          onUpdate={async () => {
-            try {
-              // Refresh data after update
-              let projectsQuery = supabase
-                .from('projects')
-                .select(`
-                  id,
-                  name,
-                  client,
-                  installation_date,
-                  progress
-                `)
-                .not('installation_date', 'is', null)
-                .order('installation_date');
-              projectsQuery = applyTenantFilter(projectsQuery, tenant?.id);
-              const { data: projectsData, error: projectsError } = await projectsQuery;
-
-              if (projectsError) throw projectsError;
-              if (!projectsData) return;
-
-              const projectIds = projectsData.map(p => p.id).filter(Boolean);
-              let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
-              if (projectIds.length > 0) {
-                const { data: assignments, error: assignError } = await supabase
-                  .from('project_team_assignments')
-                  .select('project_id, team, team_id, start_date, duration')
-                  .in('project_id', projectIds as string[]);
-                if (!assignError && assignments) {
-                  assignmentsByProject = assignments.reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>, a: any) => {
-                    const pid = a.project_id as string;
-                    (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
-                    return acc;
-                  }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>);
-                }
-              }
-              const mergedProjects = projectsData.map((p: any) => ({
-                ...p,
-                project_team_assignments: assignmentsByProject[p.id] || [],
-              }));
-              
-              // Fetch truck assignments for all projects
-              const { data: truckAssignmentsData } = await supabase
-                .from('project_truck_assignments')
-                .select(`
-                  project_id,
-                  trucks!inner(truck_number, description)
-                `)
-                .in('project_id', projectIds.length > 0 ? projectIds as string[] : ['__none__']);
-              
-              const trucksByProject = new Map(
-                (truckAssignmentsData || []).map(ta => [
-                  ta.project_id,
-                  { truck_number: ta.trucks.truck_number, description: ta.trucks.description }
-                ])
-              );
-
-              // Re-fetch employees and holiday data for updated projects
-              const projectsWithEmployees = await Promise.all(
-                mergedProjects.map(async (project) => {
-                  const assignment = project.project_team_assignments?.[0];
-                  if (!assignment?.team_id || !assignment?.start_date || !assignment?.duration) {
-                    return { ...project, truck: trucksByProject.get(project.id) };
-                  }
-                  
-                  const endDate = format(
-                    addDays(parseYMD(assignment.start_date), assignment.duration - 1),
-                    'yyyy-MM-dd'
-                  );
-
-                  const { data: dailyAssignments } = await supabase
-                    .from('daily_team_assignments')
-                    .select(`
-                      employee_id,
-                      employees!inner(id, name)
-                    `)
-                    .eq('team_id', assignment.team_id)
-                    .gte('date', assignment.start_date)
-                    .lte('date', endDate);
-
-                  const uniqueEmployees = new Map<string, Employee>();
-                  dailyAssignments?.forEach((da: any) => {
-                    if (da.employees) {
-                      uniqueEmployees.set(da.employees.id, da.employees);
-                    }
-                  });
-                  const employees = Array.from(uniqueEmployees.values());
-                  
-                  const { data: holidayData } = await supabase
-                    .from('holiday_requests')
-                    .select('user_id')
-                    .eq('status', 'approved')
-                    .lte('start_date', endDate)
-                    .gte('end_date', assignment.start_date);
-                  
-                  const employeesOnHoliday = new Set(holidayData?.map(h => h.user_id) || []);
-                  
-                  return {
-                    ...project,
-                    employees,
-                    employeesOnHoliday,
-                    truck: trucksByProject.get(project.id)
-                  };
-                })
-              );
-              
-              setProjects(projectsWithEmployees);
-            } catch (err) {
-              console.error('Failed to refresh Gantt data:', err);
-            }
-          }}
+          onUpdate={fetchFullProjects}
         />
       )}
     </div>
