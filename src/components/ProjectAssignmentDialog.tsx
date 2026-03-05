@@ -443,16 +443,14 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       console.log('Save completed successfully!');
       toast.success('Project updated successfully');
       
-      // Close dialog immediately so user sees feedback
-      onClose();
-      
-      // Refresh data in the background (don't block on it)
+      // Refresh data FIRST so the chart updates, then close dialog
       try {
         await onUpdate();
       } catch (refreshError) {
         console.error('Failed to refresh data after save:', refreshError);
-        // Data was saved successfully, refresh will happen on next load
       }
+      
+      onClose();
     } catch (error: any) {
       console.error('Save failed:', error);
       toast.error(`Failed to update project: ${error.message || 'Unknown error'}`);
