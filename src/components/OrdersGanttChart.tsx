@@ -106,6 +106,76 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   } | null>(null);
 
 
+  // Reusable full project fetch (with employees, trucks, holidays)
+  const fetchFullProjects = async () => {
+    let projectsQuery = supabase
+      .from('projects')
+      .select('id, name, client, installation_date, progress')
+      .not('installation_date', 'is', null)
+      .order('installation_date');
+    projectsQuery = applyTenantFilter(projectsQuery, tenant?.id);
+    const { data: projectsData, error: projectsError } = await projectsQuery;
+    if (projectsError || !projectsData) return;
+
+    const projectIds = projectsData.map(p => p.id).filter(Boolean);
+    let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
+    if (projectIds.length > 0) {
+      const { data: assignments } = await supabase
+        .from('project_team_assignments')
+        .select('project_id, team, team_id, start_date, duration')
+        .in('project_id', projectIds as string[]);
+      if (assignments) {
+        assignmentsByProject = assignments.reduce((acc: any, a: any) => {
+          (acc[a.project_id] = acc[a.project_id] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
+          return acc;
+        }, {});
+      }
+    }
+    const mergedProjects = projectsData.map((p: any) => ({
+      ...p,
+      project_team_assignments: assignmentsByProject[p.id] || [],
+    }));
+
+    // Fetch truck assignments
+    const { data: truckAssignmentsData } = await supabase
+      .from('project_truck_assignments')
+      .select('project_id, trucks!inner(truck_number, description)')
+      .in('project_id', projectIds.length > 0 ? projectIds as string[] : ['__none__']);
+    const trucksByProject = new Map(
+      (truckAssignmentsData || []).map((ta: any) => [ta.project_id, { truck_number: ta.trucks.truck_number, description: ta.trucks.description }])
+    );
+
+    // Fetch employees & holidays per project
+    const projectsWithEmployees = await Promise.all(
+      mergedProjects.map(async (project) => {
+        const assignment = project.project_team_assignments?.[0];
+        if (!assignment?.team_id || !assignment?.start_date || !assignment?.duration) {
+          return { ...project, truck: trucksByProject.get(project.id) };
+        }
+        const endDate = format(addDays(parseYMD(assignment.start_date), assignment.duration - 1), 'yyyy-MM-dd');
+        const { data: dailyAssignments } = await supabase
+          .from('daily_team_assignments')
+          .select('employee_id, employees!inner(id, name)')
+          .eq('team_id', assignment.team_id)
+          .gte('date', assignment.start_date)
+          .lte('date', endDate);
+        const uniqueEmployees = new Map<string, Employee>();
+        dailyAssignments?.forEach((da: any) => { if (da.employees) uniqueEmployees.set(da.employees.id, da.employees); });
+        const employees = Array.from(uniqueEmployees.values());
+        const { data: holidayData } = await supabase
+          .from('holiday_requests')
+          .select('user_id')
+          .eq('status', 'approved')
+          .lte('start_date', endDate)
+          .gte('end_date', assignment.start_date);
+        const employeesOnHoliday = new Set(holidayData?.map(h => h.user_id) || []);
+        return { ...project, employees, employeesOnHoliday, truck: trucksByProject.get(project.id) };
+      })
+    );
+    setProjects(projectsWithEmployees);
+  };
+
+
   
   const handleResizeStart = (e: React.MouseEvent, project: Project, teamId: string, edge: 'left' | 'right') => {
     e.stopPropagation();
