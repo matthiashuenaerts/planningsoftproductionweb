@@ -595,7 +595,12 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
 
         <div className="space-y-6">
           <div>
-            <h3 className="text-lg font-semibold mb-2">{projectName}</h3>
+            <h3 className="text-lg font-semibold mb-1">{projectName}</h3>
+            {installationDate && (
+              <p className="text-sm text-muted-foreground">
+                Installation date: {format(new Date(installationDate), 'dd/MM/yyyy')}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
