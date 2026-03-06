@@ -531,33 +531,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     getWorkstations: () => workstations,
   }));
 
-  // Get unique employees from assignments
-  const uniqueEmployees = useMemo(() => {
-    const employeeMap = new Map<string, string>();
-    computedDailyAssignments.forEach(a => {
-      if (a.employeeId !== 'unassigned') {
-        employeeMap.set(a.employeeId, a.employeeName);
-      }
-    });
-    return Array.from(employeeMap.entries()).map(([id, name]) => ({ id, name }));
-  }, [computedDailyAssignments]);
-
-  // Toggle employee expansion
-  const toggleEmployeeExpansion = (employeeId: string) => {
-    setExpandedEmployees(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(employeeId)) {
-        newSet.delete(employeeId);
-      } else {
-        newSet.add(employeeId);
-      }
-      return newSet;
-    });
-  };
-
-  const handleToggleStandardTask = async (employeeId: string, taskId: string) => {
-    toast.info('Deze functie is beschikbaar in de Instellingen pagina');
-  };
 
   // Handle optimize schedule button click
   const handleOptimizeSchedule = async () => {
