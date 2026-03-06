@@ -161,6 +161,17 @@ Deno.serve(async (req) => {
 
     console.log(`Task affinity: ${taskAffinityMap.size}, Project+WS affinity: ${projectWsAffinity.size}`)
 
+    // Load workstation capacity (active_workers = max concurrent employees)
+    const { data: workstationsData } = await supabase
+      .from('workstations')
+      .select('id, active_workers')
+    
+    const workstationCapacityMap = new Map<string, number>()
+    for (const ws of workstationsData || []) {
+      workstationCapacityMap.set(ws.id, ws.active_workers || 1)
+    }
+    console.log(`Loaded capacity for ${workstationCapacityMap.size} workstations`)
+
     // Step 3: Build working hours map
     const whMap = new Map<number, any>()
     for (const wh of workingHours) {
@@ -172,6 +183,7 @@ Deno.serve(async (req) => {
     startDate.setHours(0, 0, 0, 0)
 
     const employeeTimeBlocks: Array<{ employee_id: string; start: Date; end: Date }> = []
+    const workstationTimeBlocks: Array<{ workstation_id: string; employee_id: string; start: Date; end: Date }> = []
     const scheduledTaskEndTimes = new Map<string, Date>()
 
     function isWorkingDay(date: Date): boolean {
