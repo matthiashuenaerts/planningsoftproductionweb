@@ -116,7 +116,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [savedSchedules, setSavedSchedules] = useState<any[]>([]);
   const [employeeStandardTaskLinks, setEmployeeStandardTaskLinks] = useState<Map<string, Array<{ id: string; name: string; standardTasks: string[] }>>>(new Map());
   const [workstationEmployeeLinks, setWorkstationEmployeeLinks] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
-  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  
   const [scheduleGenerated, setScheduleGenerated] = useState(false);
   const [showRecurringDialog, setShowRecurringDialog] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
