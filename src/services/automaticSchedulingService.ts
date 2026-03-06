@@ -788,6 +788,7 @@ class AutomaticSchedulingService {
   }> {
     // Reset state
     this.employeeTimeBlocks = [];
+    this.workstationTimeBlocks = [];
     this.scheduledTaskEndTimes = new Map();
     this.wsEmployeeLaneMap = new Map();
     this.taskAffinityMap = new Map();
