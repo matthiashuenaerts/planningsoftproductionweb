@@ -637,6 +637,14 @@ class AutomaticSchedulingService {
       end: lastSlotEnd
     });
     
+    // Track workstation occupancy for capacity enforcement
+    this.workstationTimeBlocks.push({
+      workstation_id: workstationId,
+      employee_id: employee.employee_id,
+      start: firstSlotStart,
+      end: lastSlotEnd
+    });
+    
     // Track task end time for dependency resolution
     this.scheduledTaskEndTimes.set(task.id, lastSlotEnd);
     
