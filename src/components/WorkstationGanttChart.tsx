@@ -114,8 +114,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [searchTerm, setSearchTerm] = useState('');
   const [dailyAssignments, setDailyAssignments] = useState<DailyEmployeeAssignment[]>([]);
   const [savedSchedules, setSavedSchedules] = useState<any[]>([]);
-  const [employeeStandardTaskLinks, setEmployeeStandardTaskLinks] = useState<Map<string, Array<{ id: string; name: string; standardTasks: string[] }>>>(new Map());
-  const [workstationEmployeeLinks, setWorkstationEmployeeLinks] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
   
   const [scheduleGenerated, setScheduleGenerated] = useState(false);
   const [showRecurringDialog, setShowRecurringDialog] = useState(false);
