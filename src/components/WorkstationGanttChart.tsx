@@ -159,40 +159,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         setStandardTasks(standardTasksData || []);
       }
       
-      const linksMap = new Map<string, Array<{ id: string; name: string }>>();
-      for (const workstation of ws || []) {
-        const employees = await workstationService.getEmployeesForWorkstation(workstation.id);
-        linksMap.set(workstation.id, employees);
-      }
-      setWorkstationEmployeeLinks(linksMap);
-      
-      const { data: employeeTaskLinks, error: linksError } = await supabase
-        .from('employee_standard_task_links')
-        .select('employee_id, standard_task_id, employees(id, name)');
-      
-      if (linksError) {
-        console.error('Error fetching employee task links:', linksError);
-      }
-      
-      const employeeTaskMap = new Map<string, Array<{ id: string; name: string; standardTasks: string[] }>>();
-      (employeeTaskLinks || []).forEach((link: any) => {
-        if (!link.employees) return;
-        
-        if (!employeeTaskMap.has(link.employee_id)) {
-          employeeTaskMap.set(link.employee_id, [{
-            id: link.employees.id,
-            name: link.employees.name,
-            standardTasks: [link.standard_task_id]
-          }]);
-        } else {
-          const existing = employeeTaskMap.get(link.employee_id)![0];
-          if (!existing.standardTasks.includes(link.standard_task_id)) {
-            existing.standardTasks.push(link.standard_task_id);
-          }
-        }
-      });
-      
-      setEmployeeStandardTaskLinks(employeeTaskMap);
       
       // Fetch tasks with pagination
       const BATCH_SIZE = 1000;
