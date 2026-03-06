@@ -30,6 +30,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import RecurringTasksDialog from '@/components/planning/RecurringTasksDialog';
+import EmployeeTaskAssignmentPanel from '@/components/planning/EmployeeTaskAssignmentPanel';
 
 interface Project {
   id: string;
@@ -113,9 +114,7 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const [searchTerm, setSearchTerm] = useState('');
   const [dailyAssignments, setDailyAssignments] = useState<DailyEmployeeAssignment[]>([]);
   const [savedSchedules, setSavedSchedules] = useState<any[]>([]);
-  const [employeeStandardTaskLinks, setEmployeeStandardTaskLinks] = useState<Map<string, Array<{ id: string; name: string; standardTasks: string[] }>>>(new Map());
-  const [workstationEmployeeLinks, setWorkstationEmployeeLinks] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
-  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  
   const [scheduleGenerated, setScheduleGenerated] = useState(false);
   const [showRecurringDialog, setShowRecurringDialog] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -160,40 +159,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         setStandardTasks(standardTasksData || []);
       }
       
-      const linksMap = new Map<string, Array<{ id: string; name: string }>>();
-      for (const workstation of ws || []) {
-        const employees = await workstationService.getEmployeesForWorkstation(workstation.id);
-        linksMap.set(workstation.id, employees);
-      }
-      setWorkstationEmployeeLinks(linksMap);
-      
-      const { data: employeeTaskLinks, error: linksError } = await supabase
-        .from('employee_standard_task_links')
-        .select('employee_id, standard_task_id, employees(id, name)');
-      
-      if (linksError) {
-        console.error('Error fetching employee task links:', linksError);
-      }
-      
-      const employeeTaskMap = new Map<string, Array<{ id: string; name: string; standardTasks: string[] }>>();
-      (employeeTaskLinks || []).forEach((link: any) => {
-        if (!link.employees) return;
-        
-        if (!employeeTaskMap.has(link.employee_id)) {
-          employeeTaskMap.set(link.employee_id, [{
-            id: link.employees.id,
-            name: link.employees.name,
-            standardTasks: [link.standard_task_id]
-          }]);
-        } else {
-          const existing = employeeTaskMap.get(link.employee_id)![0];
-          if (!existing.standardTasks.includes(link.standard_task_id)) {
-            existing.standardTasks.push(link.standard_task_id);
-          }
-        }
-      });
-      
-      setEmployeeStandardTaskLinks(employeeTaskMap);
       
       // Fetch tasks with pagination
       const BATCH_SIZE = 1000;
@@ -530,33 +495,6 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
     getWorkstations: () => workstations,
   }));
 
-  // Get unique employees from assignments
-  const uniqueEmployees = useMemo(() => {
-    const employeeMap = new Map<string, string>();
-    computedDailyAssignments.forEach(a => {
-      if (a.employeeId !== 'unassigned') {
-        employeeMap.set(a.employeeId, a.employeeName);
-      }
-    });
-    return Array.from(employeeMap.entries()).map(([id, name]) => ({ id, name }));
-  }, [computedDailyAssignments]);
-
-  // Toggle employee expansion
-  const toggleEmployeeExpansion = (employeeId: string) => {
-    setExpandedEmployees(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(employeeId)) {
-        newSet.delete(employeeId);
-      } else {
-        newSet.add(employeeId);
-      }
-      return newSet;
-    });
-  };
-
-  const handleToggleStandardTask = async (employeeId: string, taskId: string) => {
-    toast.info('Deze functie is beschikbaar in de Instellingen pagina');
-  };
 
   // Handle optimize schedule button click
   const handleOptimizeSchedule = async () => {
@@ -1023,95 +961,8 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
         </div>
 
         {/* Employee Management Section */}
-        {uniqueEmployees.length > 0 && (
-          <div className="mt-6 border-t pt-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card>
-                <CardContent className="pt-4">
-                  <div className="text-2xl font-bold">{tasks.filter(t => t.status === 'TODO' || t.status === 'HOLD' || t.status === 'IN_PROGRESS').length}</div>
-                  <div className="text-xs text-muted-foreground">Totaal taken in planning</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-4">
-                  <div className="text-2xl font-bold text-primary">{uniqueEmployees.length}</div>
-                  <div className="text-xs text-muted-foreground">Toegewezen werknemers</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-4">
-                  <div className="text-2xl font-bold text-primary">
-                    {savedSchedules.length}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Taken gepland vandaag</div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <User className="w-5 h-5" />
-                Toegewezen Werknemers ({uniqueEmployees.length})
-              </h3>
-              <div className="space-y-2">
-                {uniqueEmployees.map(employee => {
-                  const isExpanded = expandedEmployees.has(employee.id);
-                  const employeeData = Array.from(employeeStandardTaskLinks.values())
-                    .flat()
-                    .find(emp => emp.id === employee.id);
-                  const assignedTasksCount = employeeData?.standardTasks.length || 0;
-
-                  return (
-                    <div key={employee.id} className="border rounded-lg overflow-hidden">
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-between p-4 h-auto hover:bg-muted/50"
-                        onClick={() => toggleEmployeeExpansion(employee.id)}
-                      >
-                        <div className="flex items-center gap-3">
-                          {isExpanded ? (
-                            <ChevronDown className="w-4 h-4" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4" />
-                          )}
-                          <span className="font-medium">{employee.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            ({assignedTasksCount} standaard taken)
-                          </span>
-                        </div>
-                      </Button>
-                      
-                      {isExpanded && (
-                        <div className="px-4 pb-4 pt-2 bg-muted/20">
-                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                            {standardTasks.map(task => {
-                              const isAssigned = employeeData?.standardTasks.includes(task.id) || false;
-
-                              return (
-                                <label
-                                  key={task.id}
-                                  className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer transition-colors"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={isAssigned}
-                                    onChange={() => handleToggleStandardTask(employee.id, task.id)}
-                                    className="rounded border-border"
-                                  />
-                                  <span className="text-sm">{task.task_number} - {task.task_name}</span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Employee Task Assignment Panel - Always visible */}
+        <EmployeeTaskAssignmentPanel standardTasks={standardTasks} />
       </CardContent>
     </Card>
 
