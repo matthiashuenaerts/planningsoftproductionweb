@@ -834,6 +834,16 @@ class AutomaticSchedulingService {
               end: slotEnd,
             });
             
+            // Track workstation occupancy for recurring tasks too
+            if (workstationId) {
+              this.workstationTimeBlocks.push({
+                workstation_id: workstationId,
+                employee_id: employeeId,
+                start: slotStart,
+                end: slotEnd,
+              });
+            }
+            
             // If a workstation is specified, create a schedule slot for it
             if (workstationId) {
               const employeeLaneIndex = this.getEmployeeLaneIndex(workstationId, employeeId);
