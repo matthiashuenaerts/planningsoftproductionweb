@@ -134,6 +134,55 @@ class AutomaticSchedulingService {
       console.warn('Could not load recurring task schedules:', e);
       this.recurringSchedules = [];
     }
+
+    // Load workstation capacity (active_workers)
+    await this.loadWorkstationCapacity();
+  }
+
+  private async loadWorkstationCapacity(): Promise<void> {
+    const { data, error } = await supabase
+      .from('workstations')
+      .select('id, active_workers');
+    
+    if (error) {
+      console.warn('Could not load workstation capacity:', error);
+      return;
+    }
+    
+    this.workstationCapacityMap = new Map();
+    (data || []).forEach((ws: any) => {
+      this.workstationCapacityMap.set(ws.id, ws.active_workers || 1);
+    });
+    console.log(`Loaded capacity for ${this.workstationCapacityMap.size} workstations`);
+  }
+
+  /**
+   * Check if adding an employee to a workstation at the given time would exceed capacity
+   */
+  private isWorkstationAtCapacity(
+    workstationId: string,
+    employeeId: string,
+    startTime: Date,
+    endTime: Date
+  ): boolean {
+    const maxWorkers = this.workstationCapacityMap.get(workstationId) || 1;
+    
+    // Count distinct employees already scheduled at this workstation during [startTime, endTime)
+    const concurrentEmployees = new Set<string>();
+    for (const block of this.workstationTimeBlocks) {
+      if (
+        block.workstation_id === workstationId &&
+        block.start < endTime &&
+        block.end > startTime
+      ) {
+        concurrentEmployees.add(block.employee_id);
+      }
+    }
+    
+    // If this employee is already counted, it's fine
+    if (concurrentEmployees.has(employeeId)) return false;
+    
+    return concurrentEmployees.size >= maxWorkers;
   }
 
   private isWorkingDay(date: Date): boolean {
