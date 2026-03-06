@@ -287,6 +287,18 @@ Deno.serve(async (req) => {
       return null
     }
 
+    function isWorkstationAtCapacity(wsId: string, empId: string, startTime: Date, endTime: Date): boolean {
+      const maxWorkers = workstationCapacityMap.get(wsId) || 1
+      const concurrentEmployees = new Set<string>()
+      for (const block of workstationTimeBlocks) {
+        if (block.workstation_id === wsId && block.start < endTime && block.end > startTime) {
+          concurrentEmployees.add(block.employee_id)
+        }
+      }
+      if (concurrentEmployees.has(empId)) return false
+      return concurrentEmployees.size >= maxWorkers
+    }
+
     // Map tasks
     const mappedTasks = allTasks.map((t: any) => ({
       id: t.id,
