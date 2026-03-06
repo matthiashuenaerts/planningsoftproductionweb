@@ -30,6 +30,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import RecurringTasksDialog from '@/components/planning/RecurringTasksDialog';
+import EmployeeTaskAssignmentPanel from '@/components/planning/EmployeeTaskAssignmentPanel';
 
 interface Project {
   id: string;
