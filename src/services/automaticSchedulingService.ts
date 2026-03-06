@@ -77,6 +77,13 @@ export interface ProjectCompletionInfo {
   daysRemaining: number;
 }
 
+interface WorkstationTimeBlock {
+  workstation_id: string;
+  employee_id: string;
+  start: Date;
+  end: Date;
+}
+
 class AutomaticSchedulingService {
   private workingHours: WorkingHours[] = [];
   private holidays: Holiday[] = [];
@@ -96,6 +103,11 @@ class AutomaticSchedulingService {
 
   // Track employee lane index per workstation: ws_id -> employee_id -> lane_index
   private wsEmployeeLaneMap: Map<string, Map<string, number>> = new Map();
+
+  // Workstation capacity: ws_id -> max concurrent employees (active_workers)
+  private workstationCapacityMap: Map<string, number> = new Map();
+  // Track workstation time blocks to enforce capacity
+  private workstationTimeBlocks: WorkstationTimeBlock[] = [];
 
   // Recurring task schedules
   private recurringSchedules: RecurringTaskSchedule[] = [];
