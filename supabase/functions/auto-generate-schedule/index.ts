@@ -383,8 +383,9 @@ Deno.serve(async (req) => {
             const lastEnd = taskSlots[taskSlots.length - 1].end
 
             const emp = findAvailableEmployee(task.id, task.standard_task_id, task.project_id, wsId, firstStart, lastEnd)
-            if (emp) {
+            if (emp && !isWorkstationAtCapacity(wsId, emp.employee_id, firstStart, lastEnd)) {
               employeeTimeBlocks.push({ employee_id: emp.employee_id, start: firstStart, end: lastEnd })
+              workstationTimeBlocks.push({ workstation_id: wsId, employee_id: emp.employee_id, start: firstStart, end: lastEnd })
               scheduledTaskEndTimes.set(task.id, lastEnd)
               const laneIdx = getEmployeeLaneIndex(wsId, emp.employee_id)
 
