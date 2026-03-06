@@ -161,6 +161,17 @@ Deno.serve(async (req) => {
 
     console.log(`Task affinity: ${taskAffinityMap.size}, Project+WS affinity: ${projectWsAffinity.size}`)
 
+    // Load workstation capacity (active_workers = max concurrent employees)
+    const { data: workstationsData } = await supabase
+      .from('workstations')
+      .select('id, active_workers')
+    
+    const workstationCapacityMap = new Map<string, number>()
+    for (const ws of workstationsData || []) {
+      workstationCapacityMap.set(ws.id, ws.active_workers || 1)
+    }
+    console.log(`Loaded capacity for ${workstationCapacityMap.size} workstations`)
+
     // Step 3: Build working hours map
     const whMap = new Map<number, any>()
     for (const wh of workingHours) {
@@ -172,6 +183,7 @@ Deno.serve(async (req) => {
     startDate.setHours(0, 0, 0, 0)
 
     const employeeTimeBlocks: Array<{ employee_id: string; start: Date; end: Date }> = []
+    const workstationTimeBlocks: Array<{ workstation_id: string; employee_id: string; start: Date; end: Date }> = []
     const scheduledTaskEndTimes = new Map<string, Date>()
 
     function isWorkingDay(date: Date): boolean {
@@ -275,6 +287,18 @@ Deno.serve(async (req) => {
       return null
     }
 
+    function isWorkstationAtCapacity(wsId: string, empId: string, startTime: Date, endTime: Date): boolean {
+      const maxWorkers = workstationCapacityMap.get(wsId) || 1
+      const concurrentEmployees = new Set<string>()
+      for (const block of workstationTimeBlocks) {
+        if (block.workstation_id === wsId && block.start < endTime && block.end > startTime) {
+          concurrentEmployees.add(block.employee_id)
+        }
+      }
+      if (concurrentEmployees.has(empId)) return false
+      return concurrentEmployees.size >= maxWorkers
+    }
+
     // Map tasks
     const mappedTasks = allTasks.map((t: any) => ({
       id: t.id,
@@ -359,8 +383,9 @@ Deno.serve(async (req) => {
             const lastEnd = taskSlots[taskSlots.length - 1].end
 
             const emp = findAvailableEmployee(task.id, task.standard_task_id, task.project_id, wsId, firstStart, lastEnd)
-            if (emp) {
+            if (emp && !isWorkstationAtCapacity(wsId, emp.employee_id, firstStart, lastEnd)) {
               employeeTimeBlocks.push({ employee_id: emp.employee_id, start: firstStart, end: lastEnd })
+              workstationTimeBlocks.push({ workstation_id: wsId, employee_id: emp.employee_id, start: firstStart, end: lastEnd })
               scheduledTaskEndTimes.set(task.id, lastEnd)
               const laneIdx = getEmployeeLaneIndex(wsId, emp.employee_id)
 

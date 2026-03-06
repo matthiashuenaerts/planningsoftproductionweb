@@ -77,6 +77,13 @@ export interface ProjectCompletionInfo {
   daysRemaining: number;
 }
 
+interface WorkstationTimeBlock {
+  workstation_id: string;
+  employee_id: string;
+  start: Date;
+  end: Date;
+}
+
 class AutomaticSchedulingService {
   private workingHours: WorkingHours[] = [];
   private holidays: Holiday[] = [];
@@ -96,6 +103,11 @@ class AutomaticSchedulingService {
 
   // Track employee lane index per workstation: ws_id -> employee_id -> lane_index
   private wsEmployeeLaneMap: Map<string, Map<string, number>> = new Map();
+
+  // Workstation capacity: ws_id -> max concurrent employees (active_workers)
+  private workstationCapacityMap: Map<string, number> = new Map();
+  // Track workstation time blocks to enforce capacity
+  private workstationTimeBlocks: WorkstationTimeBlock[] = [];
 
   // Recurring task schedules
   private recurringSchedules: RecurringTaskSchedule[] = [];
@@ -122,6 +134,55 @@ class AutomaticSchedulingService {
       console.warn('Could not load recurring task schedules:', e);
       this.recurringSchedules = [];
     }
+
+    // Load workstation capacity (active_workers)
+    await this.loadWorkstationCapacity();
+  }
+
+  private async loadWorkstationCapacity(): Promise<void> {
+    const { data, error } = await supabase
+      .from('workstations')
+      .select('id, active_workers');
+    
+    if (error) {
+      console.warn('Could not load workstation capacity:', error);
+      return;
+    }
+    
+    this.workstationCapacityMap = new Map();
+    (data || []).forEach((ws: any) => {
+      this.workstationCapacityMap.set(ws.id, ws.active_workers || 1);
+    });
+    console.log(`Loaded capacity for ${this.workstationCapacityMap.size} workstations`);
+  }
+
+  /**
+   * Check if adding an employee to a workstation at the given time would exceed capacity
+   */
+  private isWorkstationAtCapacity(
+    workstationId: string,
+    employeeId: string,
+    startTime: Date,
+    endTime: Date
+  ): boolean {
+    const maxWorkers = this.workstationCapacityMap.get(workstationId) || 1;
+    
+    // Count distinct employees already scheduled at this workstation during [startTime, endTime)
+    const concurrentEmployees = new Set<string>();
+    for (const block of this.workstationTimeBlocks) {
+      if (
+        block.workstation_id === workstationId &&
+        block.start < endTime &&
+        block.end > startTime
+      ) {
+        concurrentEmployees.add(block.employee_id);
+      }
+    }
+    
+    // If this employee is already counted, it's fine
+    if (concurrentEmployees.has(employeeId)) return false;
+    
+    return concurrentEmployees.size >= maxWorkers;
   }
 
   private isWorkingDay(date: Date): boolean {
@@ -520,7 +581,11 @@ class AutomaticSchedulingService {
         const employee = this.findAvailableEmployee(task, firstSlotStart, lastSlotEnd, employees);
         
         if (employee) {
-          return { slots: taskSlots, employee };
+          // Check workstation capacity - ensure we don't exceed max concurrent employees
+          const atCapacity = this.isWorkstationAtCapacity(workstationId, employee.employee_id, firstSlotStart, lastSlotEnd);
+          if (!atCapacity) {
+            return { slots: taskSlots, employee };
+          }
         }
         
         slotStart = addMinutes(slotStart, 15);
@@ -567,6 +632,14 @@ class AutomaticSchedulingService {
     const lastSlotEnd = slots[slots.length - 1].end;
     
     this.employeeTimeBlocks.push({
+      employee_id: employee.employee_id,
+      start: firstSlotStart,
+      end: lastSlotEnd
+    });
+    
+    // Track workstation occupancy for capacity enforcement
+    this.workstationTimeBlocks.push({
+      workstation_id: workstationId,
       employee_id: employee.employee_id,
       start: firstSlotStart,
       end: lastSlotEnd
@@ -715,6 +788,7 @@ class AutomaticSchedulingService {
   }> {
     // Reset state
     this.employeeTimeBlocks = [];
+    this.workstationTimeBlocks = [];
     this.scheduledTaskEndTimes = new Map();
     this.wsEmployeeLaneMap = new Map();
     this.taskAffinityMap = new Map();
@@ -759,6 +833,16 @@ class AutomaticSchedulingService {
               start: slotStart,
               end: slotEnd,
             });
+            
+            // Track workstation occupancy for recurring tasks too
+            if (workstationId) {
+              this.workstationTimeBlocks.push({
+                workstation_id: workstationId,
+                employee_id: employeeId,
+                start: slotStart,
+                end: slotEnd,
+              });
+            }
             
             // If a workstation is specified, create a schedule slot for it
             if (workstationId) {
