@@ -581,7 +581,11 @@ class AutomaticSchedulingService {
         const employee = this.findAvailableEmployee(task, firstSlotStart, lastSlotEnd, employees);
         
         if (employee) {
-          return { slots: taskSlots, employee };
+          // Check workstation capacity - ensure we don't exceed max concurrent employees
+          const atCapacity = this.isWorkstationAtCapacity(workstationId, employee.employee_id, firstSlotStart, lastSlotEnd);
+          if (!atCapacity) {
+            return { slots: taskSlots, employee };
+          }
         }
         
         slotStart = addMinutes(slotStart, 15);
