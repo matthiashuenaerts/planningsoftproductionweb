@@ -236,7 +236,8 @@ const NewOrderModal = ({
         expected_delivery: '',
         status: 'pending',
         notes: '',
-        order_reference: ''
+        order_reference: '',
+        task_group_id: ''
       });
       setOrderItems([]);
       setOrderSteps([]);
