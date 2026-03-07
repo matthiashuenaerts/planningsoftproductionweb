@@ -97,7 +97,12 @@ const InstallationTeamsSettings: React.FC = () => {
     name: '',
     color: '#3b82f6',
     external_team_names: [] as string[],
-    is_active: true
+    is_active: true,
+    team_type: 'conventional' as string,
+    start_street: '',
+    start_number: '',
+    start_postal_code: '',
+    start_city: '',
   });
   
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
