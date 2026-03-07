@@ -665,6 +665,11 @@ const InstallationTeamsSettings: React.FC = () => {
                       <TableRow key={team.id}>
                         <TableCell className="font-medium">{team.name}</TableCell>
                         <TableCell>
+                          <Badge variant={team.team_type === 'service' ? 'outline' : 'secondary'} className="text-xs">
+                            {team.team_type === 'service' ? 'Service' : 'Conventional'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-2">
                             <div 
                               className="w-6 h-6 rounded border border-border" 
