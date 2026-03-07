@@ -33,7 +33,11 @@ const EditProject = () => {
     start_date: '',
     installation_date: '',
     status: 'planned' as "planned" | "in_progress" | "completed" | "on_hold",
-    project_link_id: ''
+    project_link_id: '',
+    address_street: '',
+    address_number: '',
+    address_postal_code: '',
+    address_city: ''
   });
 
   useEffect(() => {
