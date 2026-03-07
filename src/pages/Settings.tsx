@@ -112,7 +112,7 @@ const Settings: React.FC = () => {
               <TabsTrigger value="mail">Mail</TabsTrigger>
               <TabsTrigger value="help">Help Management</TabsTrigger>
               <TabsTrigger value="csv-import">CSV Import</TabsTrigger>
-              
+              <TabsTrigger value="order-task-groups">Order Task Groups</TabsTrigger>
             </TabsList>
             
             <TabsContent value="workstations">
