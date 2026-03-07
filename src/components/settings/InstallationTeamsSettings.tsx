@@ -573,6 +573,50 @@ const InstallationTeamsSettings: React.FC = () => {
                     </p>
                   )}
                 </div>
+
+                {/* Start Address for Service Teams */}
+                {teamData.team_type === 'service' && (
+                  <div className="space-y-2 border rounded-md p-3 bg-muted/30">
+                    <Label className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Start Address (departure point)
+                    </Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Street</Label>
+                        <Input
+                          placeholder="Street name"
+                          value={teamData.start_street}
+                          onChange={(e) => setTeamData(prev => ({ ...prev, start_street: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Number</Label>
+                        <Input
+                          placeholder="Nr"
+                          value={teamData.start_number}
+                          onChange={(e) => setTeamData(prev => ({ ...prev, start_number: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Postal Code</Label>
+                        <Input
+                          placeholder="1000"
+                          value={teamData.start_postal_code}
+                          onChange={(e) => setTeamData(prev => ({ ...prev, start_postal_code: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">City</Label>
+                        <Input
+                          placeholder="City"
+                          value={teamData.start_city}
+                          onChange={(e) => setTeamData(prev => ({ ...prev, start_city: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="flex justify-end space-x-2 mt-4">
