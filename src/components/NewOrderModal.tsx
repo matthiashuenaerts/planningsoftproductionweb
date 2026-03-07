@@ -194,7 +194,8 @@ const NewOrderModal = ({
         expected_delivery: new Date(formData.expected_delivery).toISOString(),
         status: formData.status,
         order_type: orderType,
-        notes: `Order Reference: ${formData.order_reference}\n\n${formData.notes}`.trim()
+        notes: `Order Reference: ${formData.order_reference}\n\n${formData.notes}`.trim(),
+        task_group_id: formData.task_group_id || null
       };
       const order = await orderService.create(orderData);
 
