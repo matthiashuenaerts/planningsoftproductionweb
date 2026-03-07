@@ -112,6 +112,10 @@ class AutomaticSchedulingService {
   // Recurring task schedules
   private recurringSchedules: RecurringTaskSchedule[] = [];
 
+  // Order delivery constraints: standard_task_id -> earliest start date per project
+  // Map key = "projectId:standardTaskId" -> Date (earliest allowed start)
+  private orderDeliveryConstraints: Map<string, Date> = new Map();
+
   async initialize() {
     this.workingHours = await workingHoursService.getWorkingHours();
     this.holidays = await holidayService.getHolidays();
