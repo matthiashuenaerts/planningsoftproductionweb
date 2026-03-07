@@ -66,7 +66,11 @@ const formSchema = z.object({
     .min(1, { message: 'Project value must be at least 1' })
     .max(100, { message: 'Project value must be at most 100' }),
   is_after_sales: z.boolean(),
-  project_link_id: z.string().optional()
+  project_link_id: z.string().optional(),
+  address_street: z.string().optional(),
+  address_number: z.string().optional(),
+  address_postal_code: z.string().optional(),
+  address_city: z.string().optional(),
 }).refine(
   (data) => {
     return data.installation_date >= data.start_date;
