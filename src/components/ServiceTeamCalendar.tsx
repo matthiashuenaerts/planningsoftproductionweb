@@ -176,6 +176,23 @@ const ServiceTeamCalendar: React.FC = () => {
     }
   };
 
+  // Geocode an address using Nominatim
+  const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+    try {
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+        { headers: { 'User-Agent': 'ServiceCalendarApp/1.0' } }
+      );
+      const data = await resp.json();
+      if (data && data.length > 0) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleOptimizeRoute = async (teamId: string, dateStr: string) => {
     setOptimizing(true);
     try {
@@ -188,54 +205,161 @@ const ServiceTeamCalendar: React.FC = () => {
         return;
       }
 
-      // Build addresses for routing
+      // Geocode team start address
       const teamStartAddress = [team?.start_street, team?.start_number, team?.start_postal_code, team?.start_city].filter(Boolean).join(' ');
+      const startCoords = teamStartAddress ? await geocodeAddress(teamStartAddress) : null;
+
+      // Geocode all project addresses
+      const geocodedProjects = await Promise.all(
+        dayProjects.map(async (p) => {
+          const addr = getProjectAddress(p);
+          const coords = addr !== 'No address' ? await geocodeAddress(addr) : null;
+          return { ...p, coords, fullAddress: addr };
+        })
+      );
+
+      const projectsWithCoords = geocodedProjects.filter(p => p.coords !== null);
       
-      // Simple nearest-neighbor optimization using address-based heuristics
-      // For real routing, integrate a maps API. This uses a basic distance approximation.
-      const projectsWithAddr = dayProjects.map(p => ({
-        ...p,
-        fullAddress: getProjectAddress(p),
-        postalNum: parseInt(p.address_postal_code || '0') || 0
-      }));
-
-      // Sort by postal code as a proximity heuristic (nearest neighbor from start)
-      const startPostal = parseInt(team?.start_postal_code || '0') || 0;
-      const sorted: typeof projectsWithAddr = [];
-      const remaining = [...projectsWithAddr];
-      let currentPostal = startPostal;
-
-      while (remaining.length > 0) {
-        // Find nearest by postal code difference
-        let nearestIdx = 0;
-        let nearestDist = Math.abs(remaining[0].postalNum - currentPostal);
-        for (let i = 1; i < remaining.length; i++) {
-          const dist = Math.abs(remaining[i].postalNum - currentPostal);
-          if (dist < nearestDist) {
-            nearestDist = dist;
-            nearestIdx = i;
-          }
-        }
-        sorted.push(remaining[nearestIdx]);
-        currentPostal = remaining[nearestIdx].postalNum;
-        remaining.splice(nearestIdx, 1);
+      if (projectsWithCoords.length < 2) {
+        // Fallback to postal code heuristic if geocoding fails
+        toast({ title: 'Warning', description: 'Could not geocode enough addresses. Using postal code fallback.' });
+        await fallbackPostalOptimize(team, dayProjects, teamId, dateStr);
+        return;
       }
 
-      // Update service_order for each assignment
-      for (let i = 0; i < sorted.length; i++) {
+      // Build OSRM coordinates string: start + all projects
+      const coordinates: string[] = [];
+      if (startCoords) {
+        coordinates.push(`${startCoords.lng},${startCoords.lat}`);
+      }
+      projectsWithCoords.forEach(p => {
+        coordinates.push(`${p.coords!.lng},${p.coords!.lat}`);
+      });
+
+      // Use OSRM Trip API for Travelling Salesman optimization
+      const sourceParam = startCoords ? '&source=first' : '';
+      const osrmUrl = `https://router.project-osrm.org/trip/v1/driving/${coordinates.join(';')}?overview=full&geometries=geojson&steps=false${sourceParam}&roundtrip=false`;
+      
+      const osrmResp = await fetch(osrmUrl);
+      const osrmData = await osrmResp.json();
+
+      if (osrmData.code !== 'Ok' || !osrmData.trips || osrmData.trips.length === 0) {
+        toast({ title: 'Warning', description: 'Route optimization service unavailable. Using postal code fallback.' });
+        await fallbackPostalOptimize(team, dayProjects, teamId, dateStr);
+        return;
+      }
+
+      const trip = osrmData.trips[0];
+      const waypointOrder = osrmData.waypoints.map((wp: any) => wp.waypoint_index);
+      
+      // Map OSRM waypoint order back to projects (skip index 0 if start point was included)
+      const offset = startCoords ? 1 : 0;
+      const orderedProjects = waypointOrder
+        .filter((_: number, i: number) => i >= offset)
+        .map((wpIdx: number) => {
+          const projectIdx = wpIdx - offset;
+          return projectsWithCoords[projectIdx];
+        })
+        .filter(Boolean);
+
+      // Update service_order in DB
+      for (let i = 0; i < orderedProjects.length; i++) {
         await supabase
           .from('project_team_assignments')
           .update({ service_order: i + 1 } as any)
-          .eq('id', sorted[i].assignment.id);
+          .eq('id', orderedProjects[i].assignment.id);
       }
 
-      toast({ title: 'Route Optimized', description: `Optimized order for ${sorted.length} service visits` });
+      // Build route geometry (GeoJSON coords are [lng, lat], Leaflet needs [lat, lng])
+      const routeGeometry: [number, number][] = trip.geometry.coordinates.map(
+        (c: [number, number]) => [c[1], c[0]] as [number, number]
+      );
+
+      // Build waypoints for map
+      const mapWps: RouteWaypoint[] = orderedProjects.map((p: any, i: number) => ({
+        name: p.name,
+        client: p.client,
+        address: p.fullAddress,
+        lat: p.coords!.lat,
+        lng: p.coords!.lng,
+        order: i + 1,
+        serviceHours: p.assignment.service_hours,
+      }));
+
+      const routeKey = `${teamId}_${dateStr}`;
+      const startPt = startCoords ? { ...startCoords, address: teamStartAddress } : undefined;
+      
+      setOptimizedRoutes(prev => ({
+        ...prev,
+        [routeKey]: {
+          waypoints: mapWps,
+          geometry: routeGeometry,
+          startPoint: startPt,
+        }
+      }));
+
+      toast({ title: 'Route Optimized', description: `Optimized route for ${orderedProjects.length} stops based on real road distances` });
       loadData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
       setOptimizing(false);
     }
+  };
+
+  // Fallback: postal code nearest-neighbor (original logic)
+  const fallbackPostalOptimize = async (
+    team: ServiceTeam | undefined,
+    dayProjects: (ServiceProject & { assignment: ServiceAssignment })[],
+    teamId: string,
+    dateStr: string
+  ) => {
+    const projectsWithAddr = dayProjects.map(p => ({
+      ...p,
+      postalNum: parseInt(p.address_postal_code || '0') || 0
+    }));
+    const startPostal = parseInt(team?.start_postal_code || '0') || 0;
+    const sorted: typeof projectsWithAddr = [];
+    const remaining = [...projectsWithAddr];
+    let currentPostal = startPostal;
+
+    while (remaining.length > 0) {
+      let nearestIdx = 0;
+      let nearestDist = Math.abs(remaining[0].postalNum - currentPostal);
+      for (let i = 1; i < remaining.length; i++) {
+        const dist = Math.abs(remaining[i].postalNum - currentPostal);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestIdx = i;
+        }
+      }
+      sorted.push(remaining[nearestIdx]);
+      currentPostal = remaining[nearestIdx].postalNum;
+      remaining.splice(nearestIdx, 1);
+    }
+
+    for (let i = 0; i < sorted.length; i++) {
+      await supabase
+        .from('project_team_assignments')
+        .update({ service_order: i + 1 } as any)
+        .eq('id', sorted[i].assignment.id);
+    }
+
+    toast({ title: 'Route Optimized', description: `Optimized order for ${sorted.length} service visits (postal code approximation)` });
+    loadData();
+  };
+
+  const handleShowMap = (teamId: string, dateStr: string, teamName: string) => {
+    const routeKey = `${teamId}_${dateStr}`;
+    const route = optimizedRoutes[routeKey];
+    if (!route) return;
+    
+    setMapWaypoints(route.waypoints);
+    setMapRouteGeometry(route.geometry);
+    setMapStartPoint(route.startPoint);
+    setMapTeamName(teamName);
+    setMapDateLabel(format(new Date(dateStr + 'T12:00:00'), 'EEEE, MMM d yyyy'));
+    setMapOpen(true);
   };
 
   const handleRemoveAssignment = async (assignmentId: string) => {
