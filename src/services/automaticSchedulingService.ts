@@ -161,6 +161,55 @@ class AutomaticSchedulingService {
   }
 
   /**
+   * Load order delivery constraints: for each order with a task_group_id,
+   * find which standard_tasks are linked and create constraints per project.
+   */
+  private async loadOrderDeliveryConstraints(): Promise<void> {
+    this.orderDeliveryConstraints = new Map();
+
+    const { data: orders, error: ordersErr } = await supabase
+      .from('orders')
+      .select('project_id, expected_delivery, task_group_id')
+      .not('task_group_id', 'is', null)
+      .not('project_id', 'is', null)
+      .in('status', ['pending', 'delayed']);
+
+    if (ordersErr || !orders || orders.length === 0) return;
+
+    const groupIds = [...new Set(orders.map((o: any) => o.task_group_id).filter(Boolean))];
+    if (groupIds.length === 0) return;
+
+    const { data: links } = await supabase
+      .from('order_task_group_links')
+      .select('group_id, standard_task_id')
+      .in('group_id', groupIds);
+
+    if (!links || links.length === 0) return;
+
+    const groupTaskMap = new Map<string, string[]>();
+    for (const link of links) {
+      const existing = groupTaskMap.get(link.group_id) || [];
+      existing.push(link.standard_task_id);
+      groupTaskMap.set(link.group_id, existing);
+    }
+
+    for (const order of orders) {
+      const taskIds = groupTaskMap.get((order as any).task_group_id) || [];
+      const deliveryDate = new Date((order as any).expected_delivery);
+
+      for (const stId of taskIds) {
+        const key = `${(order as any).project_id}:${stId}`;
+        const existing = this.orderDeliveryConstraints.get(key);
+        if (!existing || deliveryDate > existing) {
+          this.orderDeliveryConstraints.set(key, deliveryDate);
+        }
+      }
+    }
+
+    console.log(`Loaded ${this.orderDeliveryConstraints.size} order delivery constraints`);
+  }
+
+  /**
    * Check if adding an employee to a workstation at the given time would exceed capacity
    */
   private isWorkstationAtCapacity(
