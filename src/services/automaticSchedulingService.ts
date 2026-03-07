@@ -846,13 +846,16 @@ class AutomaticSchedulingService {
     this.wsEmployeeLaneMap = new Map();
     this.taskAffinityMap = new Map();
     this.projectWorkstationAffinityMap = new Map();
+    this.orderDeliveryConstraints = new Map();
     
     await this.initialize();
     
-    // Step 0a: Load time registration affinity data
-    // For each task, find the last person who registered time on it
+    // Step 0a: Load time registration affinity data and order delivery constraints
     console.log('🔗 Loading time registration affinity data...');
-    await this.loadTimeRegistrationAffinity();
+    await Promise.all([
+      this.loadTimeRegistrationAffinity(),
+      this.loadOrderDeliveryConstraints(),
+    ]);
     
     // Step 0: Pre-schedule recurring tasks - block their time slots for the assigned employees
     const recurringScheduleSlots: ScheduleResult[] = [];
