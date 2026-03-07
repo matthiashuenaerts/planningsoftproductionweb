@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Route, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Route, Loader2, Map } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -21,6 +21,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import RouteMapDialog, { type RouteWaypoint } from '@/components/service/RouteMapDialog';
 
 interface ServiceTeam {
   id: string;
@@ -71,6 +72,18 @@ const ServiceTeamCalendar: React.FC = () => {
   const [assignProjectId, setAssignProjectId] = useState<string>('');
   const [assignHours, setAssignHours] = useState<number>(2);
   const [optimizing, setOptimizing] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+  const [mapWaypoints, setMapWaypoints] = useState<RouteWaypoint[]>([]);
+  const [mapRouteGeometry, setMapRouteGeometry] = useState<[number, number][]>([]);
+  const [mapStartPoint, setMapStartPoint] = useState<{ lat: number; lng: number; address: string } | undefined>();
+  const [mapTeamName, setMapTeamName] = useState('');
+  const [mapDateLabel, setMapDateLabel] = useState('');
+  // Track which team+date combos have been optimized so we can show "Show on Map"
+  const [optimizedRoutes, setOptimizedRoutes] = useState<Record<string, {
+    waypoints: RouteWaypoint[];
+    geometry: [number, number][];
+    startPoint?: { lat: number; lng: number; address: string };
+  }>>({});
 
   const weekDays = eachDayOfInterval({
     start: currentWeekStart,
@@ -163,6 +176,23 @@ const ServiceTeamCalendar: React.FC = () => {
     }
   };
 
+  // Geocode an address using Nominatim
+  const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+    try {
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+        { headers: { 'User-Agent': 'ServiceCalendarApp/1.0' } }
+      );
+      const data = await resp.json();
+      if (data && data.length > 0) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleOptimizeRoute = async (teamId: string, dateStr: string) => {
     setOptimizing(true);
     try {
@@ -175,54 +205,161 @@ const ServiceTeamCalendar: React.FC = () => {
         return;
       }
 
-      // Build addresses for routing
+      // Geocode team start address
       const teamStartAddress = [team?.start_street, team?.start_number, team?.start_postal_code, team?.start_city].filter(Boolean).join(' ');
+      const startCoords = teamStartAddress ? await geocodeAddress(teamStartAddress) : null;
+
+      // Geocode all project addresses
+      const geocodedProjects = await Promise.all(
+        dayProjects.map(async (p) => {
+          const addr = getProjectAddress(p);
+          const coords = addr !== 'No address' ? await geocodeAddress(addr) : null;
+          return { ...p, coords, fullAddress: addr };
+        })
+      );
+
+      const projectsWithCoords = geocodedProjects.filter(p => p.coords !== null);
       
-      // Simple nearest-neighbor optimization using address-based heuristics
-      // For real routing, integrate a maps API. This uses a basic distance approximation.
-      const projectsWithAddr = dayProjects.map(p => ({
-        ...p,
-        fullAddress: getProjectAddress(p),
-        postalNum: parseInt(p.address_postal_code || '0') || 0
-      }));
-
-      // Sort by postal code as a proximity heuristic (nearest neighbor from start)
-      const startPostal = parseInt(team?.start_postal_code || '0') || 0;
-      const sorted: typeof projectsWithAddr = [];
-      const remaining = [...projectsWithAddr];
-      let currentPostal = startPostal;
-
-      while (remaining.length > 0) {
-        // Find nearest by postal code difference
-        let nearestIdx = 0;
-        let nearestDist = Math.abs(remaining[0].postalNum - currentPostal);
-        for (let i = 1; i < remaining.length; i++) {
-          const dist = Math.abs(remaining[i].postalNum - currentPostal);
-          if (dist < nearestDist) {
-            nearestDist = dist;
-            nearestIdx = i;
-          }
-        }
-        sorted.push(remaining[nearestIdx]);
-        currentPostal = remaining[nearestIdx].postalNum;
-        remaining.splice(nearestIdx, 1);
+      if (projectsWithCoords.length < 2) {
+        // Fallback to postal code heuristic if geocoding fails
+        toast({ title: 'Warning', description: 'Could not geocode enough addresses. Using postal code fallback.' });
+        await fallbackPostalOptimize(team, dayProjects, teamId, dateStr);
+        return;
       }
 
-      // Update service_order for each assignment
-      for (let i = 0; i < sorted.length; i++) {
+      // Build OSRM coordinates string: start + all projects
+      const coordinates: string[] = [];
+      if (startCoords) {
+        coordinates.push(`${startCoords.lng},${startCoords.lat}`);
+      }
+      projectsWithCoords.forEach(p => {
+        coordinates.push(`${p.coords!.lng},${p.coords!.lat}`);
+      });
+
+      // Use OSRM Trip API for Travelling Salesman optimization
+      const sourceParam = startCoords ? '&source=first' : '';
+      const osrmUrl = `https://router.project-osrm.org/trip/v1/driving/${coordinates.join(';')}?overview=full&geometries=geojson&steps=false${sourceParam}&roundtrip=false`;
+      
+      const osrmResp = await fetch(osrmUrl);
+      const osrmData = await osrmResp.json();
+
+      if (osrmData.code !== 'Ok' || !osrmData.trips || osrmData.trips.length === 0) {
+        toast({ title: 'Warning', description: 'Route optimization service unavailable. Using postal code fallback.' });
+        await fallbackPostalOptimize(team, dayProjects, teamId, dateStr);
+        return;
+      }
+
+      const trip = osrmData.trips[0];
+      const waypointOrder = osrmData.waypoints.map((wp: any) => wp.waypoint_index);
+      
+      // Map OSRM waypoint order back to projects (skip index 0 if start point was included)
+      const offset = startCoords ? 1 : 0;
+      const orderedProjects = waypointOrder
+        .filter((_: number, i: number) => i >= offset)
+        .map((wpIdx: number) => {
+          const projectIdx = wpIdx - offset;
+          return projectsWithCoords[projectIdx];
+        })
+        .filter(Boolean);
+
+      // Update service_order in DB
+      for (let i = 0; i < orderedProjects.length; i++) {
         await supabase
           .from('project_team_assignments')
           .update({ service_order: i + 1 } as any)
-          .eq('id', sorted[i].assignment.id);
+          .eq('id', orderedProjects[i].assignment.id);
       }
 
-      toast({ title: 'Route Optimized', description: `Optimized order for ${sorted.length} service visits` });
+      // Build route geometry (GeoJSON coords are [lng, lat], Leaflet needs [lat, lng])
+      const routeGeometry: [number, number][] = trip.geometry.coordinates.map(
+        (c: [number, number]) => [c[1], c[0]] as [number, number]
+      );
+
+      // Build waypoints for map
+      const mapWps: RouteWaypoint[] = orderedProjects.map((p: any, i: number) => ({
+        name: p.name,
+        client: p.client,
+        address: p.fullAddress,
+        lat: p.coords!.lat,
+        lng: p.coords!.lng,
+        order: i + 1,
+        serviceHours: p.assignment.service_hours,
+      }));
+
+      const routeKey = `${teamId}_${dateStr}`;
+      const startPt = startCoords ? { ...startCoords, address: teamStartAddress } : undefined;
+      
+      setOptimizedRoutes(prev => ({
+        ...prev,
+        [routeKey]: {
+          waypoints: mapWps,
+          geometry: routeGeometry,
+          startPoint: startPt,
+        }
+      }));
+
+      toast({ title: 'Route Optimized', description: `Optimized route for ${orderedProjects.length} stops based on real road distances` });
       loadData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
       setOptimizing(false);
     }
+  };
+
+  // Fallback: postal code nearest-neighbor (original logic)
+  const fallbackPostalOptimize = async (
+    team: ServiceTeam | undefined,
+    dayProjects: (ServiceProject & { assignment: ServiceAssignment })[],
+    teamId: string,
+    dateStr: string
+  ) => {
+    const projectsWithAddr = dayProjects.map(p => ({
+      ...p,
+      postalNum: parseInt(p.address_postal_code || '0') || 0
+    }));
+    const startPostal = parseInt(team?.start_postal_code || '0') || 0;
+    const sorted: typeof projectsWithAddr = [];
+    const remaining = [...projectsWithAddr];
+    let currentPostal = startPostal;
+
+    while (remaining.length > 0) {
+      let nearestIdx = 0;
+      let nearestDist = Math.abs(remaining[0].postalNum - currentPostal);
+      for (let i = 1; i < remaining.length; i++) {
+        const dist = Math.abs(remaining[i].postalNum - currentPostal);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestIdx = i;
+        }
+      }
+      sorted.push(remaining[nearestIdx]);
+      currentPostal = remaining[nearestIdx].postalNum;
+      remaining.splice(nearestIdx, 1);
+    }
+
+    for (let i = 0; i < sorted.length; i++) {
+      await supabase
+        .from('project_team_assignments')
+        .update({ service_order: i + 1 } as any)
+        .eq('id', sorted[i].assignment.id);
+    }
+
+    toast({ title: 'Route Optimized', description: `Optimized order for ${sorted.length} service visits (postal code approximation)` });
+    loadData();
+  };
+
+  const handleShowMap = (teamId: string, dateStr: string, teamName: string) => {
+    const routeKey = `${teamId}_${dateStr}`;
+    const route = optimizedRoutes[routeKey];
+    if (!route) return;
+    
+    setMapWaypoints(route.waypoints);
+    setMapRouteGeometry(route.geometry);
+    setMapStartPoint(route.startPoint);
+    setMapTeamName(teamName);
+    setMapDateLabel(format(new Date(dateStr + 'T12:00:00'), 'EEEE, MMM d yyyy'));
+    setMapOpen(true);
   };
 
   const handleRemoveAssignment = async (assignmentId: string) => {
@@ -417,16 +554,29 @@ const ServiceTeamCalendar: React.FC = () => {
                           + Add Service
                         </Button>
                         {dayProjects.length >= 2 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-6 text-xs"
-                            disabled={optimizing}
-                            onClick={() => handleOptimizeRoute(team.id, dateStr)}
-                          >
-                            {optimizing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Route className="h-3 w-3 mr-1" />}
-                            Optimize Route
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full h-6 text-xs"
+                              disabled={optimizing}
+                              onClick={() => handleOptimizeRoute(team.id, dateStr)}
+                            >
+                              {optimizing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Route className="h-3 w-3 mr-1" />}
+                              Optimize Route
+                            </Button>
+                            {optimizedRoutes[`${team.id}_${dateStr}`] && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="w-full h-6 text-xs"
+                                onClick={() => handleShowMap(team.id, dateStr, team.name)}
+                              >
+                                <Map className="h-3 w-3 mr-1" />
+                                Show on Map
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -496,6 +646,17 @@ const ServiceTeamCalendar: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Route Map Dialog */}
+      <RouteMapDialog
+        open={mapOpen}
+        onOpenChange={setMapOpen}
+        waypoints={mapWaypoints}
+        routeGeometry={mapRouteGeometry}
+        teamName={mapTeamName}
+        dateLabel={mapDateLabel}
+        startPoint={mapStartPoint}
+      />
     </div>
   );
 };
