@@ -46,12 +46,14 @@ const NewOrderModal = ({
   const [loading, setLoading] = useState(false);
   const [orderType, setOrderType] = useState<'standard' | 'semi-finished'>('standard');
   const [suppliers, setSuppliers] = useState<{id: string, name: string}[]>([]);
+  const [taskGroups, setTaskGroups] = useState<{id: string, name: string}[]>([]);
   const [formData, setFormData] = useState({
     supplier: '',
     expected_delivery: '',
     status: 'pending' as Order['status'],
     notes: '',
-    order_reference: ''
+    order_reference: '',
+    task_group_id: ''
   });
   const [orderItems, setOrderItems] = useState<Partial<OrderItem>[]>([]);
   const [orderSteps, setOrderSteps] = useState<Partial<OrderStep>[]>([]);
