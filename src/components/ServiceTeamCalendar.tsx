@@ -82,10 +82,10 @@ const ServiceTeamCalendar: React.FC = () => {
       setLoading(true);
       
       // Load service teams
-      let teamsQuery = supabase
+      let teamsQuery = (supabase
         .from('placement_teams')
-        .select('*')
-        .eq('team_type' as any, 'service')
+        .select('*') as any)
+        .eq('team_type', 'service')
         .eq('is_active', true)
         .order('name');
       teamsQuery = applyTenantFilter(teamsQuery, tenant?.id);
