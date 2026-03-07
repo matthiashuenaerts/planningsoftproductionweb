@@ -130,6 +130,10 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       project_value: 50,
       is_after_sales: false,
       project_link_id: '',
+      address_street: '',
+      address_number: '',
+      address_postal_code: '',
+      address_city: '',
     },
   });
 
