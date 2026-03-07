@@ -33,7 +33,11 @@ const EditProject = () => {
     start_date: '',
     installation_date: '',
     status: 'planned' as "planned" | "in_progress" | "completed" | "on_hold",
-    project_link_id: ''
+    project_link_id: '',
+    address_street: '',
+    address_number: '',
+    address_postal_code: '',
+    address_city: ''
   });
 
   useEffect(() => {
@@ -56,7 +60,11 @@ const EditProject = () => {
             start_date: projectData.start_date,
             installation_date: projectData.installation_date,
             status: projectData.status,
-            project_link_id: projectData.project_link_id || ''
+            project_link_id: projectData.project_link_id || '',
+            address_street: projectData.address_street || '',
+            address_number: projectData.address_number || '',
+            address_postal_code: projectData.address_postal_code || '',
+            address_city: projectData.address_city || ''
           });
         }
         
@@ -313,6 +321,48 @@ const EditProject = () => {
                       />
                     </div>
                     
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="address_street">{t('street')}</Label>
+                        <Input
+                          id="address_street"
+                          value={formData.address_street}
+                          onChange={(e) => setFormData({ ...formData, address_street: e.target.value })}
+                          placeholder={t('street')}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="address_number">{t('number')}</Label>
+                        <Input
+                          id="address_number"
+                          value={formData.address_number}
+                          onChange={(e) => setFormData({ ...formData, address_number: e.target.value })}
+                          placeholder={t('number')}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="address_postal_code">{t('postal_code')}</Label>
+                        <Input
+                          id="address_postal_code"
+                          value={formData.address_postal_code}
+                          onChange={(e) => setFormData({ ...formData, address_postal_code: e.target.value })}
+                          placeholder={t('postal_code')}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="address_city">{t('city')}</Label>
+                        <Input
+                          id="address_city"
+                          value={formData.address_city}
+                          onChange={(e) => setFormData({ ...formData, address_city: e.target.value })}
+                          placeholder={t('city')}
+                        />
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="start_date">{t('start_date')}</Label>

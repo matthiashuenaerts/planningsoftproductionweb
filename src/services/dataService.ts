@@ -15,6 +15,10 @@ export interface Project {
   created_at: string;
   updated_at: string;
   project_link_id?: string | null;
+  address_street?: string | null;
+  address_number?: string | null;
+  address_postal_code?: string | null;
+  address_city?: string | null;
 }
 
 // Phase Types
