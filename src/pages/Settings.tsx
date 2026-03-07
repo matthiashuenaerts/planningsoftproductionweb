@@ -180,6 +180,10 @@ const Settings: React.FC = () => {
               <CsvImportConfigSettings />
             </TabsContent>
 
+            <TabsContent value="order-task-groups">
+              <OrderTaskGroupsSettings />
+            </TabsContent>
+
           </Tabs>
         </div>
       </div>
