@@ -72,6 +72,18 @@ const ServiceTeamCalendar: React.FC = () => {
   const [assignProjectId, setAssignProjectId] = useState<string>('');
   const [assignHours, setAssignHours] = useState<number>(2);
   const [optimizing, setOptimizing] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+  const [mapWaypoints, setMapWaypoints] = useState<RouteWaypoint[]>([]);
+  const [mapRouteGeometry, setMapRouteGeometry] = useState<[number, number][]>([]);
+  const [mapStartPoint, setMapStartPoint] = useState<{ lat: number; lng: number; address: string } | undefined>();
+  const [mapTeamName, setMapTeamName] = useState('');
+  const [mapDateLabel, setMapDateLabel] = useState('');
+  // Track which team+date combos have been optimized so we can show "Show on Map"
+  const [optimizedRoutes, setOptimizedRoutes] = useState<Record<string, {
+    waypoints: RouteWaypoint[];
+    geometry: [number, number][];
+    startPoint?: { lat: number; lng: number; address: string };
+  }>>({});
 
   const weekDays = eachDayOfInterval({
     start: currentWeekStart,
