@@ -129,23 +129,21 @@ const NewOrderModal = ({
   }, [formData.expected_delivery, stepDurations, stepCount, orderType, installationDate, internalProcessingDays]);
 
   useEffect(() => {
-    const fetchSuppliers = async () => {
+    const fetchData = async () => {
       try {
-        const { data, error } = await supabase
-          .from('suppliers')
-          .select('id, name')
-          .eq('is_active', true)
-          .order('name');
-        
-        if (error) throw error;
-        setSuppliers(data || []);
+        const [suppliersRes, groupsRes] = await Promise.all([
+          supabase.from('suppliers').select('id, name').eq('is_active', true).order('name'),
+          supabase.from('order_task_groups').select('id, name').order('name'),
+        ]);
+        setSuppliers(suppliersRes.data || []);
+        setTaskGroups((groupsRes.data as {id: string, name: string}[]) || []);
       } catch (error) {
-        console.error('Error fetching suppliers:', error);
+        console.error('Error fetching data:', error);
       }
     };
 
     if (open) {
-      fetchSuppliers();
+      fetchData();
     }
   }, [open]);
 
