@@ -66,7 +66,11 @@ const formSchema = z.object({
     .min(1, { message: 'Project value must be at least 1' })
     .max(100, { message: 'Project value must be at most 100' }),
   is_after_sales: z.boolean(),
-  project_link_id: z.string().optional()
+  project_link_id: z.string().optional(),
+  address_street: z.string().optional(),
+  address_number: z.string().optional(),
+  address_postal_code: z.string().optional(),
+  address_city: z.string().optional(),
 }).refine(
   (data) => {
     return data.installation_date >= data.start_date;
@@ -126,6 +130,10 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       project_value: 50,
       is_after_sales: false,
       project_link_id: '',
+      address_street: '',
+      address_number: '',
+      address_postal_code: '',
+      address_city: '',
     },
   });
 
@@ -566,7 +574,11 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         status: 'planned',
         progress: 0,
         project_link_id: data.project_link_id || null,
-      });
+        address_street: data.address_street || null,
+        address_number: data.address_number || null,
+        address_postal_code: data.address_postal_code || null,
+        address_city: data.address_city || null,
+      } as any);
       
       // Create a generic phase for these tasks
       const phase = await phaseService.create({
@@ -921,6 +933,57 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   </FormItem>
                 )}
               />
+
+              {/* Address Fields */}
+              <div className="border rounded-md p-3 space-y-3">
+                <Label className="text-sm font-medium">Project Address</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <FormField
+                    control={form.control}
+                    name="address_street"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input placeholder="Street" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="address_number"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input placeholder="Number" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="address_postal_code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input placeholder="Postal Code" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="address_city"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input placeholder="City" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
               
               <FormField
                 control={form.control}

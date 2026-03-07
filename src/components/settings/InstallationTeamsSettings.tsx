@@ -38,7 +38,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Plus, Edit, Trash2, X, Users, Truck } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, X, Users, Truck, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/context/TenantContext';
@@ -51,6 +51,11 @@ interface InstallationTeam {
   color: string;
   external_team_names: string[];
   is_active: boolean;
+  team_type: string;
+  start_street?: string;
+  start_number?: string;
+  start_postal_code?: string;
+  start_city?: string;
   created_at: string;
   updated_at: string;
 }
@@ -92,7 +97,12 @@ const InstallationTeamsSettings: React.FC = () => {
     name: '',
     color: '#3b82f6',
     external_team_names: [] as string[],
-    is_active: true
+    is_active: true,
+    team_type: 'conventional' as string,
+    start_street: '',
+    start_number: '',
+    start_postal_code: '',
+    start_city: '',
   });
   
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
@@ -120,7 +130,7 @@ const InstallationTeamsSettings: React.FC = () => {
       const { data, error } = await query;
       
       if (error) throw error;
-      setTeams(data || []);
+      setTeams((data as any) || []);
       
       // Load team members for all teams
       if (data && data.length > 0) {
@@ -251,7 +261,12 @@ const InstallationTeamsSettings: React.FC = () => {
         name: team.name,
         color: team.color,
         external_team_names: team.external_team_names || [],
-        is_active: team.is_active
+        is_active: team.is_active,
+        team_type: team.team_type || 'conventional',
+        start_street: team.start_street || '',
+        start_number: team.start_number || '',
+        start_postal_code: team.start_postal_code || '',
+        start_city: team.start_city || '',
       });
       // Load existing team members
       const existingMembers = teamMembers[team.id] || [];
@@ -262,7 +277,12 @@ const InstallationTeamsSettings: React.FC = () => {
         name: '',
         color: '#3b82f6',
         external_team_names: [],
-        is_active: true
+        is_active: true,
+        team_type: 'conventional',
+        start_street: '',
+        start_number: '',
+        start_postal_code: '',
+        start_city: '',
       });
       setSelectedMemberIds([]);
     }
@@ -423,7 +443,36 @@ const InstallationTeamsSettings: React.FC = () => {
                 </DialogDescription>
               </DialogHeader>
               
-              <div className="space-y-4 py-2">
+              <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
+                {/* Team Type */}
+                <div className="space-y-2">
+                  <Label>Team Type</Label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="team_type"
+                        value="conventional"
+                        checked={teamData.team_type === 'conventional'}
+                        onChange={() => setTeamData(prev => ({ ...prev, team_type: 'conventional' }))}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm">Conventional</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="team_type"
+                        value="service"
+                        checked={teamData.team_type === 'service'}
+                        onChange={() => setTeamData(prev => ({ ...prev, team_type: 'service' }))}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm">Service</span>
+                    </label>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="name">Team Name</Label>
                   <Input 
@@ -524,6 +573,50 @@ const InstallationTeamsSettings: React.FC = () => {
                     </p>
                   )}
                 </div>
+
+                {/* Start Address for Service Teams */}
+                {teamData.team_type === 'service' && (
+                  <div className="space-y-2 border rounded-md p-3 bg-muted/30">
+                    <Label className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Start Address (departure point)
+                    </Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Street</Label>
+                        <Input
+                          placeholder="Street name"
+                          value={teamData.start_street}
+                          onChange={(e) => setTeamData(prev => ({ ...prev, start_street: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Number</Label>
+                        <Input
+                          placeholder="Nr"
+                          value={teamData.start_number}
+                          onChange={(e) => setTeamData(prev => ({ ...prev, start_number: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Postal Code</Label>
+                        <Input
+                          placeholder="1000"
+                          value={teamData.start_postal_code}
+                          onChange={(e) => setTeamData(prev => ({ ...prev, start_postal_code: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">City</Label>
+                        <Input
+                          placeholder="City"
+                          value={teamData.start_city}
+                          onChange={(e) => setTeamData(prev => ({ ...prev, start_city: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="flex justify-end space-x-2 mt-4">
@@ -546,6 +639,7 @@ const InstallationTeamsSettings: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Team Name</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Color</TableHead>
                   <TableHead>Default Members</TableHead>
                   <TableHead>External Team Names</TableHead>
@@ -556,7 +650,7 @@ const InstallationTeamsSettings: React.FC = () => {
               <TableBody>
                 {teams.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       No installation teams found
                     </TableCell>
                   </TableRow>
@@ -570,6 +664,11 @@ const InstallationTeamsSettings: React.FC = () => {
                     return (
                       <TableRow key={team.id}>
                         <TableCell className="font-medium">{team.name}</TableCell>
+                        <TableCell>
+                          <Badge variant={team.team_type === 'service' ? 'outline' : 'secondary'} className="text-xs">
+                            {team.team_type === 'service' ? 'Service' : 'Conventional'}
+                          </Badge>
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <div 
