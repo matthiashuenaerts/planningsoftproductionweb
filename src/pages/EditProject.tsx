@@ -60,7 +60,11 @@ const EditProject = () => {
             start_date: projectData.start_date,
             installation_date: projectData.installation_date,
             status: projectData.status,
-            project_link_id: projectData.project_link_id || ''
+            project_link_id: projectData.project_link_id || '',
+            address_street: projectData.address_street || '',
+            address_number: projectData.address_number || '',
+            address_postal_code: projectData.address_postal_code || '',
+            address_city: projectData.address_city || ''
           });
         }
         
