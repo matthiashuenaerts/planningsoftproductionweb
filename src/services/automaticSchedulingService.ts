@@ -112,6 +112,10 @@ class AutomaticSchedulingService {
   // Recurring task schedules
   private recurringSchedules: RecurringTaskSchedule[] = [];
 
+  // Order delivery constraints: standard_task_id -> earliest start date per project
+  // Map key = "projectId:standardTaskId" -> Date (earliest allowed start)
+  private orderDeliveryConstraints: Map<string, Date> = new Map();
+
   async initialize() {
     this.workingHours = await workingHoursService.getWorkingHours();
     this.holidays = await holidayService.getHolidays();
@@ -154,6 +158,55 @@ class AutomaticSchedulingService {
       this.workstationCapacityMap.set(ws.id, ws.active_workers || 1);
     });
     console.log(`Loaded capacity for ${this.workstationCapacityMap.size} workstations`);
+  }
+
+  /**
+   * Load order delivery constraints: for each order with a task_group_id,
+   * find which standard_tasks are linked and create constraints per project.
+   */
+  private async loadOrderDeliveryConstraints(): Promise<void> {
+    this.orderDeliveryConstraints = new Map();
+
+    const { data: orders, error: ordersErr } = await supabase
+      .from('orders')
+      .select('project_id, expected_delivery, task_group_id')
+      .not('task_group_id', 'is', null)
+      .not('project_id', 'is', null)
+      .in('status', ['pending', 'delayed']);
+
+    if (ordersErr || !orders || orders.length === 0) return;
+
+    const groupIds = [...new Set(orders.map((o: any) => o.task_group_id).filter(Boolean))];
+    if (groupIds.length === 0) return;
+
+    const { data: links } = await supabase
+      .from('order_task_group_links')
+      .select('group_id, standard_task_id')
+      .in('group_id', groupIds);
+
+    if (!links || links.length === 0) return;
+
+    const groupTaskMap = new Map<string, string[]>();
+    for (const link of links) {
+      const existing = groupTaskMap.get(link.group_id) || [];
+      existing.push(link.standard_task_id);
+      groupTaskMap.set(link.group_id, existing);
+    }
+
+    for (const order of orders) {
+      const taskIds = groupTaskMap.get((order as any).task_group_id) || [];
+      const deliveryDate = new Date((order as any).expected_delivery);
+
+      for (const stId of taskIds) {
+        const key = `${(order as any).project_id}:${stId}`;
+        const existing = this.orderDeliveryConstraints.get(key);
+        if (!existing || deliveryDate > existing) {
+          this.orderDeliveryConstraints.set(key, deliveryDate);
+        }
+      }
+    }
+
+    console.log(`Loaded ${this.orderDeliveryConstraints.size} order delivery constraints`);
   }
 
   /**
@@ -793,13 +846,16 @@ class AutomaticSchedulingService {
     this.wsEmployeeLaneMap = new Map();
     this.taskAffinityMap = new Map();
     this.projectWorkstationAffinityMap = new Map();
+    this.orderDeliveryConstraints = new Map();
     
     await this.initialize();
     
-    // Step 0a: Load time registration affinity data
-    // For each task, find the last person who registered time on it
+    // Step 0a: Load time registration affinity data and order delivery constraints
     console.log('🔗 Loading time registration affinity data...');
-    await this.loadTimeRegistrationAffinity();
+    await Promise.all([
+      this.loadTimeRegistrationAffinity(),
+      this.loadOrderDeliveryConstraints(),
+    ]);
     
     // Step 0: Pre-schedule recurring tasks - block their time slots for the assigned employees
     const recurringScheduleSlots: ScheduleResult[] = [];
@@ -920,7 +976,16 @@ class AutomaticSchedulingService {
       
       // Schedule TODO/IN_PROGRESS tasks first
       for (const task of todoTasks) {
-        const taskSlots = this.scheduleTask(task, employees, startDate);
+        // Check order delivery constraint for this task
+        let effectiveStart = startDate;
+        if (task.standard_task_id) {
+          const constraintKey = `${task.project_id}:${task.standard_task_id}`;
+          const deliveryDate = this.orderDeliveryConstraints.get(constraintKey);
+          if (deliveryDate && deliveryDate > effectiveStart) {
+            effectiveStart = deliveryDate;
+          }
+        }
+        const taskSlots = this.scheduleTask(task, employees, effectiveStart);
         schedules.push(...taskSlots);
         
         if (taskSlots.length > 0 && task.standard_task_id === lastProductionStepId) {
@@ -946,7 +1011,15 @@ class AutomaticSchedulingService {
             continue;
           }
           
-          const effectiveStartTime = minStartTime > startDate ? minStartTime : startDate;
+          let effectiveStartTime = minStartTime > startDate ? minStartTime : startDate;
+          // Also apply order delivery constraint
+          if (task.standard_task_id) {
+            const constraintKey = `${task.project_id}:${task.standard_task_id}`;
+            const deliveryDate = this.orderDeliveryConstraints.get(constraintKey);
+            if (deliveryDate && deliveryDate > effectiveStartTime) {
+              effectiveStartTime = deliveryDate;
+            }
+          }
           const taskSlots = this.scheduleTask(task, employees, effectiveStartTime);
           schedules.push(...taskSlots);
           

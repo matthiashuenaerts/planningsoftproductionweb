@@ -2304,6 +2304,87 @@ export type Database = {
           },
         ]
       }
+      order_task_group_links: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          standard_task_id: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          standard_task_id: string
+          tenant_id?: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          standard_task_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_task_group_links_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "order_task_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_task_group_links_standard_task_id_fkey"
+            columns: ["standard_task_id"]
+            isOneToOne: false
+            referencedRelation: "standard_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_task_group_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_task_groups: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_task_groups_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           created_at: string
@@ -2317,6 +2398,7 @@ export type Database = {
           source: string | null
           status: string
           supplier: string
+          task_group_id: string | null
           tenant_id: string
           updated_at: string
         }
@@ -2332,6 +2414,7 @@ export type Database = {
           source?: string | null
           status: string
           supplier: string
+          task_group_id?: string | null
           tenant_id?: string
           updated_at?: string
         }
@@ -2347,6 +2430,7 @@ export type Database = {
           source?: string | null
           status?: string
           supplier?: string
+          task_group_id?: string | null
           tenant_id?: string
           updated_at?: string
         }
@@ -2356,6 +2440,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_task_group_id_fkey"
+            columns: ["task_group_id"]
+            isOneToOne: false
+            referencedRelation: "order_task_groups"
             referencedColumns: ["id"]
           },
           {

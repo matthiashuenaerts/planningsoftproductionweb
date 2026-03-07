@@ -19,6 +19,7 @@ import StockLocationsSettings from '@/components/settings/StockLocationsSettings
 import InstallationTeamsSettings from '@/components/settings/InstallationTeamsSettings';
 import { CsvImportConfigSettings } from '@/components/CsvImportConfigSettings';
 import ProductionRoutingSettings from '@/components/settings/ProductionRoutingSettings';
+import OrderTaskGroupsSettings from '@/components/settings/OrderTaskGroupsSettings';
 
 
 import MaterialSettings from '@/components/settings/MaterialSettings';
@@ -111,7 +112,7 @@ const Settings: React.FC = () => {
               <TabsTrigger value="mail">Mail</TabsTrigger>
               <TabsTrigger value="help">Help Management</TabsTrigger>
               <TabsTrigger value="csv-import">CSV Import</TabsTrigger>
-              
+              <TabsTrigger value="order-task-groups">Order Task Groups</TabsTrigger>
             </TabsList>
             
             <TabsContent value="workstations">
@@ -177,6 +178,10 @@ const Settings: React.FC = () => {
 
             <TabsContent value="csv-import">
               <CsvImportConfigSettings />
+            </TabsContent>
+
+            <TabsContent value="order-task-groups">
+              <OrderTaskGroupsSettings />
             </TabsContent>
 
           </Tabs>

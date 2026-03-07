@@ -46,12 +46,14 @@ const NewOrderModal = ({
   const [loading, setLoading] = useState(false);
   const [orderType, setOrderType] = useState<'standard' | 'semi-finished'>('standard');
   const [suppliers, setSuppliers] = useState<{id: string, name: string}[]>([]);
+  const [taskGroups, setTaskGroups] = useState<{id: string, name: string}[]>([]);
   const [formData, setFormData] = useState({
     supplier: '',
     expected_delivery: '',
     status: 'pending' as Order['status'],
     notes: '',
-    order_reference: ''
+    order_reference: '',
+    task_group_id: ''
   });
   const [orderItems, setOrderItems] = useState<Partial<OrderItem>[]>([]);
   const [orderSteps, setOrderSteps] = useState<Partial<OrderStep>[]>([]);
@@ -127,23 +129,21 @@ const NewOrderModal = ({
   }, [formData.expected_delivery, stepDurations, stepCount, orderType, installationDate, internalProcessingDays]);
 
   useEffect(() => {
-    const fetchSuppliers = async () => {
+    const fetchData = async () => {
       try {
-        const { data, error } = await supabase
-          .from('suppliers')
-          .select('id, name')
-          .eq('is_active', true)
-          .order('name');
-        
-        if (error) throw error;
-        setSuppliers(data || []);
+        const [suppliersRes, groupsRes] = await Promise.all([
+          supabase.from('suppliers').select('id, name').eq('is_active', true).order('name'),
+          supabase.from('order_task_groups').select('id, name').order('name'),
+        ]);
+        setSuppliers(suppliersRes.data || []);
+        setTaskGroups((groupsRes.data as {id: string, name: string}[]) || []);
       } catch (error) {
-        console.error('Error fetching suppliers:', error);
+        console.error('Error fetching data:', error);
       }
     };
 
     if (open) {
-      fetchSuppliers();
+      fetchData();
     }
   }, [open]);
 
@@ -175,7 +175,8 @@ const NewOrderModal = ({
         expected_delivery: '',
         status: 'pending',
         notes: '',
-        order_reference: ''
+        order_reference: '',
+        task_group_id: ''
       });
       setInternalProcessingDays(0);
     }
@@ -193,7 +194,8 @@ const NewOrderModal = ({
         expected_delivery: new Date(formData.expected_delivery).toISOString(),
         status: formData.status,
         order_type: orderType,
-        notes: `Order Reference: ${formData.order_reference}\n\n${formData.notes}`.trim()
+        notes: `Order Reference: ${formData.order_reference}\n\n${formData.notes}`.trim(),
+        task_group_id: formData.task_group_id || null
       };
       const order = await orderService.create(orderData);
 
@@ -235,7 +237,8 @@ const NewOrderModal = ({
         expected_delivery: '',
         status: 'pending',
         notes: '',
-        order_reference: ''
+        order_reference: '',
+        task_group_id: ''
       });
       setOrderItems([]);
       setOrderSteps([]);
@@ -384,8 +387,24 @@ const NewOrderModal = ({
               </SelectContent>
             </Select>
           </div>
+          {taskGroups.length > 0 && (
+            <div>
+              <Label htmlFor="task_group">Task Dependency Group</Label>
+              <Select value={formData.task_group_id} onValueChange={(value) => setFormData(prev => ({ ...prev, task_group_id: value === '_none_' ? '' : value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="None (no task blocking)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none_">None</SelectItem>
+                  {taskGroups.map(g => (
+                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">Linked tasks won't be scheduled before the expected delivery date</p>
+            </div>
+          )}
         </div>
-        
         {orderType === 'semi-finished' && (
             <div>
                 <Label htmlFor="internal_processing_days">Internal Processing Duration (days)</Label>

@@ -11,6 +11,7 @@ export interface Order {
   order_type: 'standard' | 'semi-finished';
   notes?: string | null;
   order_items_count?: number;
+  task_group_id?: string | null;
 }
 
 export interface OrderItem {
