@@ -130,7 +130,7 @@ const InstallationTeamsSettings: React.FC = () => {
       const { data, error } = await query;
       
       if (error) throw error;
-      setTeams(data || []);
+      setTeams((data as any) || []);
       
       // Load team members for all teams
       if (data && data.length > 0) {
