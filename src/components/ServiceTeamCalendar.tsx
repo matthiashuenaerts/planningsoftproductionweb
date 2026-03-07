@@ -646,6 +646,17 @@ const ServiceTeamCalendar: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Route Map Dialog */}
+      <RouteMapDialog
+        open={mapOpen}
+        onOpenChange={setMapOpen}
+        waypoints={mapWaypoints}
+        routeGeometry={mapRouteGeometry}
+        teamName={mapTeamName}
+        dateLabel={mapDateLabel}
+        startPoint={mapStartPoint}
+      />
     </div>
   );
 };
