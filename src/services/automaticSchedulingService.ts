@@ -976,7 +976,16 @@ class AutomaticSchedulingService {
       
       // Schedule TODO/IN_PROGRESS tasks first
       for (const task of todoTasks) {
-        const taskSlots = this.scheduleTask(task, employees, startDate);
+        // Check order delivery constraint for this task
+        let effectiveStart = startDate;
+        if (task.standard_task_id) {
+          const constraintKey = `${task.project_id}:${task.standard_task_id}`;
+          const deliveryDate = this.orderDeliveryConstraints.get(constraintKey);
+          if (deliveryDate && deliveryDate > effectiveStart) {
+            effectiveStart = deliveryDate;
+          }
+        }
+        const taskSlots = this.scheduleTask(task, employees, effectiveStart);
         schedules.push(...taskSlots);
         
         if (taskSlots.length > 0 && task.standard_task_id === lastProductionStepId) {
