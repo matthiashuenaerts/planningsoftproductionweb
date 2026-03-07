@@ -19,6 +19,7 @@ import StockLocationsSettings from '@/components/settings/StockLocationsSettings
 import InstallationTeamsSettings from '@/components/settings/InstallationTeamsSettings';
 import { CsvImportConfigSettings } from '@/components/CsvImportConfigSettings';
 import ProductionRoutingSettings from '@/components/settings/ProductionRoutingSettings';
+import OrderTaskGroupsSettings from '@/components/settings/OrderTaskGroupsSettings';
 
 
 import MaterialSettings from '@/components/settings/MaterialSettings';
