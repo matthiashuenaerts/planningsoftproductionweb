@@ -23,7 +23,7 @@ interface ProjectWithTeam {
     team: string;
     duration: number;
     start_date: string;
-  } | null;
+  }[] | null;
   [key: string]: any;
 }
 const DailyTasks: React.FC = () => {

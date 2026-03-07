@@ -3086,6 +3086,11 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          start_city: string | null
+          start_number: string | null
+          start_postal_code: string | null
+          start_street: string | null
+          team_type: string
           tenant_id: string
           updated_at: string
         }
@@ -3096,6 +3101,11 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          start_city?: string | null
+          start_number?: string | null
+          start_postal_code?: string | null
+          start_street?: string | null
+          team_type?: string
           tenant_id?: string
           updated_at?: string
         }
@@ -3106,6 +3116,11 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          start_city?: string | null
+          start_number?: string | null
+          start_postal_code?: string | null
+          start_street?: string | null
+          team_type?: string
           tenant_id?: string
           updated_at?: string
         }
@@ -4057,6 +4072,8 @@ export type Database = {
           duration: number
           id: string
           project_id: string
+          service_hours: number | null
+          service_order: number | null
           start_date: string
           team: string
           team_id: string | null
@@ -4068,6 +4085,8 @@ export type Database = {
           duration?: number
           id?: string
           project_id: string
+          service_hours?: number | null
+          service_order?: number | null
           start_date: string
           team: string
           team_id?: string | null
@@ -4079,6 +4098,8 @@ export type Database = {
           duration?: number
           id?: string
           project_id?: string
+          service_hours?: number | null
+          service_order?: number | null
           start_date?: string
           team?: string
           team_id?: string | null
@@ -4089,7 +4110,7 @@ export type Database = {
           {
             foreignKeyName: "project_team_assignments_project_id_fkey"
             columns: ["project_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
@@ -4172,6 +4193,10 @@ export type Database = {
       }
       projects: {
         Row: {
+          address_city: string | null
+          address_number: string | null
+          address_postal_code: string | null
+          address_street: string | null
           client: string
           created_at: string
           description: string | null
@@ -4187,6 +4212,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          address_city?: string | null
+          address_number?: string | null
+          address_postal_code?: string | null
+          address_street?: string | null
           client: string
           created_at?: string
           description?: string | null
@@ -4202,6 +4231,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          address_city?: string | null
+          address_number?: string | null
+          address_postal_code?: string | null
+          address_street?: string | null
           client?: string
           created_at?: string
           description?: string | null
