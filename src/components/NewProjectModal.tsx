@@ -574,7 +574,11 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         status: 'planned',
         progress: 0,
         project_link_id: data.project_link_id || null,
-      });
+        address_street: data.address_street || null,
+        address_number: data.address_number || null,
+        address_postal_code: data.address_postal_code || null,
+        address_city: data.address_city || null,
+      } as any);
       
       // Create a generic phase for these tasks
       const phase = await phaseService.create({
