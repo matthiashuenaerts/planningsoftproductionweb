@@ -399,8 +399,16 @@ Deno.serve(async (req) => {
           if (!canSchedule) continue
         }
 
+        // Apply order delivery constraint
+        let taskMinStart = new Date(startDate)
+        const constraintKey = `${task.project_id}:${task.standard_task_id}`
+        const deliveryConstraint = orderDeliveryConstraints.get(constraintKey)
+        if (deliveryConstraint && deliveryConstraint > taskMinStart) {
+          taskMinStart = deliveryConstraint
+        }
+
         // Find slot
-        let currentDate = new Date(startDate)
+        let currentDate = new Date(taskMinStart)
         let found = false
         let daysSearched = 0
 
