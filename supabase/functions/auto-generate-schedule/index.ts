@@ -172,6 +172,44 @@ Deno.serve(async (req) => {
     }
     console.log(`Loaded capacity for ${workstationCapacityMap.size} workstations`)
 
+    // Load order delivery constraints
+    const orderDeliveryConstraints = new Map<string, Date>()
+    const { data: constraintOrders } = await supabase
+      .from('orders')
+      .select('project_id, expected_delivery, task_group_id')
+      .not('task_group_id', 'is', null)
+      .not('project_id', 'is', null)
+      .in('status', ['pending', 'delayed'])
+
+    if (constraintOrders && constraintOrders.length > 0) {
+      const groupIds = [...new Set(constraintOrders.map((o: any) => o.task_group_id).filter(Boolean))]
+      const { data: groupLinks } = await supabase
+        .from('order_task_group_links')
+        .select('group_id, standard_task_id')
+        .in('group_id', groupIds)
+
+      if (groupLinks && groupLinks.length > 0) {
+        const groupTaskMap = new Map<string, string[]>()
+        for (const link of groupLinks) {
+          const existing = groupTaskMap.get(link.group_id) || []
+          existing.push(link.standard_task_id)
+          groupTaskMap.set(link.group_id, existing)
+        }
+        for (const order of constraintOrders) {
+          const taskIds = groupTaskMap.get((order as any).task_group_id) || []
+          const deliveryDate = new Date((order as any).expected_delivery)
+          for (const stId of taskIds) {
+            const key = `${(order as any).project_id}:${stId}`
+            const existing = orderDeliveryConstraints.get(key)
+            if (!existing || deliveryDate > existing) {
+              orderDeliveryConstraints.set(key, deliveryDate)
+            }
+          }
+        }
+      }
+    }
+    console.log(`Loaded ${orderDeliveryConstraints.size} order delivery constraints`)
+
     // Step 3: Build working hours map
     const whMap = new Map<number, any>()
     for (const wh of workingHours) {
