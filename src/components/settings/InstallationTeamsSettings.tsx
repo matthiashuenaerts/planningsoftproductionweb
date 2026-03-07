@@ -261,7 +261,12 @@ const InstallationTeamsSettings: React.FC = () => {
         name: team.name,
         color: team.color,
         external_team_names: team.external_team_names || [],
-        is_active: team.is_active
+        is_active: team.is_active,
+        team_type: team.team_type || 'conventional',
+        start_street: team.start_street || '',
+        start_number: team.start_number || '',
+        start_postal_code: team.start_postal_code || '',
+        start_city: team.start_city || '',
       });
       // Load existing team members
       const existingMembers = teamMembers[team.id] || [];
