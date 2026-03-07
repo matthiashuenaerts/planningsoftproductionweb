@@ -1011,7 +1011,15 @@ class AutomaticSchedulingService {
             continue;
           }
           
-          const effectiveStartTime = minStartTime > startDate ? minStartTime : startDate;
+          let effectiveStartTime = minStartTime > startDate ? minStartTime : startDate;
+          // Also apply order delivery constraint
+          if (task.standard_task_id) {
+            const constraintKey = `${task.project_id}:${task.standard_task_id}`;
+            const deliveryDate = this.orderDeliveryConstraints.get(constraintKey);
+            if (deliveryDate && deliveryDate > effectiveStartTime) {
+              effectiveStartTime = deliveryDate;
+            }
+          }
           const taskSlots = this.scheduleTask(task, employees, effectiveStartTime);
           schedules.push(...taskSlots);
           
