@@ -554,16 +554,29 @@ const ServiceTeamCalendar: React.FC = () => {
                           + Add Service
                         </Button>
                         {dayProjects.length >= 2 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-6 text-xs"
-                            disabled={optimizing}
-                            onClick={() => handleOptimizeRoute(team.id, dateStr)}
-                          >
-                            {optimizing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Route className="h-3 w-3 mr-1" />}
-                            Optimize Route
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full h-6 text-xs"
+                              disabled={optimizing}
+                              onClick={() => handleOptimizeRoute(team.id, dateStr)}
+                            >
+                              {optimizing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Route className="h-3 w-3 mr-1" />}
+                              Optimize Route
+                            </Button>
+                            {optimizedRoutes[`${team.id}_${dateStr}`] && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="w-full h-6 text-xs"
+                                onClick={() => handleShowMap(team.id, dateStr, team.name)}
+                              >
+                                <Map className="h-3 w-3 mr-1" />
+                                Show on Map
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
