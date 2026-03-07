@@ -387,8 +387,24 @@ const NewOrderModal = ({
               </SelectContent>
             </Select>
           </div>
+          {taskGroups.length > 0 && (
+            <div>
+              <Label htmlFor="task_group">Task Dependency Group</Label>
+              <Select value={formData.task_group_id} onValueChange={(value) => setFormData(prev => ({ ...prev, task_group_id: value === '_none_' ? '' : value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="None (no task blocking)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none_">None</SelectItem>
+                  {taskGroups.map(g => (
+                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">Linked tasks won't be scheduled before the expected delivery date</p>
+            </div>
+          )}
         </div>
-        
         {orderType === 'semi-finished' && (
             <div>
                 <Label htmlFor="internal_processing_days">Internal Processing Duration (days)</Label>
