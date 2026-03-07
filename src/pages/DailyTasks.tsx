@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Truck } from 'lucide-react';
+import { Truck, Wrench } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import InstallationTeamCalendar from '@/components/InstallationTeamCalendar';
 import TruckLoadingCalendar from '@/components/TruckLoadingCalendar';
 import OrdersGanttChart from '@/components/OrdersGanttChart';
+import ServiceTeamCalendar from '@/components/ServiceTeamCalendar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
@@ -26,7 +27,7 @@ interface ProjectWithTeam {
   [key: string]: any;
 }
 const DailyTasks: React.FC = () => {
-  const [displayMode, setDisplayMode] = useState<'gantt' | 'teams' | 'trucks'>('gantt');
+  const [displayMode, setDisplayMode] = useState<'gantt' | 'teams' | 'trucks' | 'service'>('gantt');
   const [allProjects, setAllProjects] = useState<ProjectWithTeam[]>([]);
   const [loading, setLoading] = useState(true);
   const [projectsRefreshKey, setProjectsRefreshKey] = useState(0);
@@ -74,7 +75,7 @@ const DailyTasks: React.FC = () => {
 
   // Refetch projects when switching display mode (so calendar/trucks get fresh data)
   useEffect(() => {
-    if (displayMode !== 'gantt') {
+    if (displayMode !== 'gantt' && displayMode !== 'service') {
       fetchAllProjects();
       setProjectsRefreshKey(prev => prev + 1);
     }
@@ -102,6 +103,10 @@ const DailyTasks: React.FC = () => {
                 <Truck className="h-4 w-4 mr-2" />
                 Truck Loading
               </Button>
+              <Button variant={displayMode === 'service' ? 'default' : 'outline'} onClick={() => setDisplayMode('service')}>
+                <Wrench className="h-4 w-4 mr-2" />
+                Service Teams
+              </Button>
             </div>
           </div>
           
@@ -109,6 +114,8 @@ const DailyTasks: React.FC = () => {
             <OrdersGanttChart className="h-[calc(100vh-200px)]" />
           ) : displayMode === 'teams' ? (
             <InstallationTeamCalendar projects={allProjects} key={projectsRefreshKey} />
+          ) : displayMode === 'service' ? (
+            <ServiceTeamCalendar />
           ) : (
             <TruckLoadingCalendar />
           )}
