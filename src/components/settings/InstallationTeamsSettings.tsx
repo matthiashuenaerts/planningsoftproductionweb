@@ -51,6 +51,11 @@ interface InstallationTeam {
   color: string;
   external_team_names: string[];
   is_active: boolean;
+  team_type: string;
+  start_street?: string;
+  start_number?: string;
+  start_postal_code?: string;
+  start_city?: string;
   created_at: string;
   updated_at: string;
 }
