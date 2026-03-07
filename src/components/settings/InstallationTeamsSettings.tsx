@@ -443,7 +443,36 @@ const InstallationTeamsSettings: React.FC = () => {
                 </DialogDescription>
               </DialogHeader>
               
-              <div className="space-y-4 py-2">
+              <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
+                {/* Team Type */}
+                <div className="space-y-2">
+                  <Label>Team Type</Label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="team_type"
+                        value="conventional"
+                        checked={teamData.team_type === 'conventional'}
+                        onChange={() => setTeamData(prev => ({ ...prev, team_type: 'conventional' }))}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm">Conventional</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="team_type"
+                        value="service"
+                        checked={teamData.team_type === 'service'}
+                        onChange={() => setTeamData(prev => ({ ...prev, team_type: 'service' }))}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm">Service</span>
+                    </label>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="name">Team Name</Label>
                   <Input 
