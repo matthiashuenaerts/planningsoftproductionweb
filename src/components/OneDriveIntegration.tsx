@@ -219,7 +219,11 @@ const { data, error } = await supabase.functions.invoke(
     // ✅ Store verifier for later
     sessionStorage.setItem('onedrive_code_verifier', codeVerifier);
 
-    const redirectUri = `${window.location.origin}${window.location.pathname}`;
+    // ✅ Save current path to return after callback
+    sessionStorage.setItem('onedrive_return_path', window.location.pathname + window.location.search);
+
+    // ✅ Use fixed redirect URI
+    const redirectUri = `${window.location.origin}/onedrive-callback`;
 
     const { data, error } = await supabase.functions.invoke(
       'onedrive-auth?action=get-auth-url',
