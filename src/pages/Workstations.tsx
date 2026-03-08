@@ -468,6 +468,7 @@ const Workstations: React.FC = () => {
         onClose={() => setShowQRScanner(null)}
         onQRCodeDetected={handleQRCodeDetected}
         workstationName={workstations.find(ws => ws.id === showQRScanner)?.name || ''}
+        workstationId={showQRScanner || undefined}
       />
 
       {/* Create Error Dialog */}
