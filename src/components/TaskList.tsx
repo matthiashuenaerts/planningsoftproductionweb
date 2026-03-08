@@ -515,7 +515,7 @@ const TaskList: React.FC<TaskListProps> = ({
                   {task.total_duration && (
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      <span>{t('tl_duration_short', { duration: task.total_duration })}</span>
+                      <span>{t('tl_duration_short', { duration: String(task.total_duration) })}</span>
                     </div>
                   )}
                 </div>
