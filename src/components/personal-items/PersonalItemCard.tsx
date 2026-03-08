@@ -336,9 +336,11 @@ const ImagePreview: React.FC<{
   React.useEffect(() => {
     const loadImage = async () => {
       try {
+        const storagePath = extractStoragePath('personal-attachments', attachment.file_path);
+        if (!storagePath) { setLoading(false); return; }
         const { data, error } = await supabase.storage
           .from('personal-attachments')
-          .createSignedUrl(attachment.file_path, 3600);
+          .createSignedUrl(storagePath, 3600);
         if (error) throw error;
         setImageUrl(data.signedUrl);
       } catch (error) {
