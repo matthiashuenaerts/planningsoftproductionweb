@@ -603,74 +603,82 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
         </CardHeader>
         <CardContent>
           {showForm && (
-            <Card className="mb-4">
-              <CardHeader>
-                <CardTitle>Add New Accessory</CardTitle>
+            <Card className="mb-4 rounded-xl border-border/60">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Add New Accessory</CardTitle>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <form onSubmit={handleSubmit} className="space-y-3">
+                  <div className="space-y-3">
                     <div>
-                      <Label htmlFor="article_name">Article Name *</Label>
+                      <Label htmlFor="article_name" className="text-xs font-medium">Article Name *</Label>
                       <Input
                         id="article_name"
                         value={formData.article_name}
                         onChange={(e) => setFormData(prev => ({ ...prev, article_name: e.target.value }))}
                         required
+                        className="h-10 rounded-xl mt-1"
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="article_code">Article Code</Label>
-                      <Input
-                        id="article_code"
-                        value={formData.article_code}
-                        onChange={(e) => setFormData(prev => ({ ...prev, article_code: e.target.value }))}
-                      />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="article_code" className="text-xs font-medium">Article Code</Label>
+                        <Input
+                          id="article_code"
+                          value={formData.article_code}
+                          onChange={(e) => setFormData(prev => ({ ...prev, article_code: e.target.value }))}
+                          className="h-10 rounded-xl mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="quantity" className="text-xs font-medium">Quantity *</Label>
+                        <Input
+                          id="quantity"
+                          type="number"
+                          min="1"
+                          value={formData.quantity}
+                          onChange={(e) => setFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                          required
+                          className="h-10 rounded-xl mt-1"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="supplier" className="text-xs font-medium">Supplier</Label>
+                        <Select
+                          value={formData.supplier}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, supplier: value }))}
+                        >
+                          <SelectTrigger className="h-10 rounded-xl mt-1">
+                            <SelectValue placeholder="Select supplier" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {suppliers.map((supplier) => (
+                              <SelectItem key={supplier.id} value={supplier.name}>
+                                {supplier.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="stock_location" className="text-xs font-medium">Stock Location</Label>
+                        <Input
+                          id="stock_location"
+                          value={formData.stock_location}
+                          onChange={(e) => setFormData(prev => ({ ...prev, stock_location: e.target.value }))}
+                          className="h-10 rounded-xl mt-1"
+                        />
+                      </div>
                     </div>
                     <div>
-                      <Label htmlFor="quantity">Quantity *</Label>
-                      <Input
-                        id="quantity"
-                        type="number"
-                        min="1"
-                        value={formData.quantity}
-                        onChange={(e) => setFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="supplier">Supplier</Label>
-                      <Select
-                        value={formData.supplier}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, supplier: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select supplier" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {suppliers.map((supplier) => (
-                            <SelectItem key={supplier.id} value={supplier.name}>
-                              {supplier.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="stock_location">Stock Location</Label>
-                      <Input
-                        id="stock_location"
-                        value={formData.stock_location}
-                        onChange={(e) => setFormData(prev => ({ ...prev, stock_location: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="status">Status</Label>
+                      <Label htmlFor="status" className="text-xs font-medium">Status</Label>
                       <Select
                         value={formData.status}
                         onValueChange={(value: Accessory['status']) => setFormData(prev => ({ ...prev, status: value }))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-10 rounded-xl mt-1">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -682,33 +690,36 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                         </SelectContent>
                       </Select>
                     </div>
+                    <div>
+                      <Label htmlFor="article_description" className="text-xs font-medium">Description</Label>
+                      <Textarea
+                        id="article_description"
+                        value={formData.article_description}
+                        onChange={(e) => setFormData(prev => ({ ...prev, article_description: e.target.value }))}
+                        rows={2}
+                        className="rounded-xl mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="qr_code_text" className="text-xs font-medium">QR Code Text</Label>
+                      <Input
+                        id="qr_code_text"
+                        value={formData.qr_code_text}
+                        onChange={(e) => setFormData(prev => ({ ...prev, qr_code_text: e.target.value }))}
+                        placeholder="Optional QR code text"
+                        className="h-10 rounded-xl mt-1"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="article_description">Description</Label>
-                    <Textarea
-                      id="article_description"
-                      value={formData.article_description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, article_description: e.target.value }))}
-                      rows={3}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="qr_code_text">QR Code Text</Label>
-                    <Input
-                      id="qr_code_text"
-                      value={formData.qr_code_text}
-                      onChange={(e) => setFormData(prev => ({ ...prev, qr_code_text: e.target.value }))}
-                      placeholder="Optional QR code text"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="submit" disabled={loading}>
+                  <div className="flex gap-2 pt-1">
+                    <Button type="submit" disabled={loading} className="flex-1 h-10 rounded-xl active:scale-[0.98] transition-transform">
                       {loading ? "Adding..." : "Add Accessory"}
                     </Button>
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => setShowForm(false)}
+                      className="flex-1 h-10 rounded-xl active:scale-[0.98] transition-transform"
                     >
                       Cancel
                     </Button>
@@ -736,64 +747,73 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
           )}
 
           {editingAccessoryId && (
-            <Card className="mb-4">
-              <CardHeader>
-                <CardTitle>Edit Accessory</CardTitle>
+            <Card className="mb-4 rounded-xl border-border/60">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Edit Accessory</CardTitle>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleUpdateAccessory} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <form onSubmit={handleUpdateAccessory} className="space-y-3">
+                  <div className="space-y-3">
                     <div>
-                      <Label htmlFor="edit_article_name">Article Name *</Label>
+                      <Label htmlFor="edit_article_name" className="text-xs font-medium">Article Name *</Label>
                       <Input
                         id="edit_article_name"
                         value={editFormData.article_name}
                         onChange={(e) => setEditFormData(prev => ({ ...prev, article_name: e.target.value }))}
                         required
+                        className="h-10 rounded-xl mt-1"
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="edit_article_code">Article Code</Label>
-                      <Input
-                        id="edit_article_code"
-                        value={editFormData.article_code}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, article_code: e.target.value }))}
-                      />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="edit_article_code" className="text-xs font-medium">Article Code</Label>
+                        <Input
+                          id="edit_article_code"
+                          value={editFormData.article_code}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, article_code: e.target.value }))}
+                          className="h-10 rounded-xl mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_quantity" className="text-xs font-medium">Quantity *</Label>
+                        <Input
+                          id="edit_quantity"
+                          type="number"
+                          min="1"
+                          value={editFormData.quantity}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                          required
+                          className="h-10 rounded-xl mt-1"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="edit_supplier" className="text-xs font-medium">Supplier</Label>
+                        <Input
+                          id="edit_supplier"
+                          value={editFormData.supplier}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, supplier: e.target.value }))}
+                          className="h-10 rounded-xl mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_stock_location" className="text-xs font-medium">Stock Location</Label>
+                        <Input
+                          id="edit_stock_location"
+                          value={editFormData.stock_location}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, stock_location: e.target.value }))}
+                          className="h-10 rounded-xl mt-1"
+                        />
+                      </div>
                     </div>
                     <div>
-                      <Label htmlFor="edit_quantity">Quantity *</Label>
-                      <Input
-                        id="edit_quantity"
-                        type="number"
-                        min="1"
-                        value={editFormData.quantity}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="edit_supplier">Supplier</Label>
-                      <Input
-                        id="edit_supplier"
-                        value={editFormData.supplier}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, supplier: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="edit_stock_location">Stock Location</Label>
-                      <Input
-                        id="edit_stock_location"
-                        value={editFormData.stock_location}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, stock_location: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="edit_status">Status</Label>
+                      <Label htmlFor="edit_status" className="text-xs font-medium">Status</Label>
                       <Select
                         value={editFormData.status}
                         onValueChange={(value: Accessory['status']) => setEditFormData(prev => ({ ...prev, status: value }))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-10 rounded-xl mt-1">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -805,33 +825,36 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                         </SelectContent>
                       </Select>
                     </div>
+                    <div>
+                      <Label htmlFor="edit_article_description" className="text-xs font-medium">Description</Label>
+                      <Textarea
+                        id="edit_article_description"
+                        value={editFormData.article_description}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, article_description: e.target.value }))}
+                        rows={2}
+                        className="rounded-xl mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_qr_code_text" className="text-xs font-medium">QR Code Text</Label>
+                      <Input
+                        id="edit_qr_code_text"
+                        value={editFormData.qr_code_text}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, qr_code_text: e.target.value }))}
+                        placeholder="Optional QR code text"
+                        className="h-10 rounded-xl mt-1"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="edit_article_description">Description</Label>
-                    <Textarea
-                      id="edit_article_description"
-                      value={editFormData.article_description}
-                      onChange={(e) => setEditFormData(prev => ({ ...prev, article_description: e.target.value }))}
-                      rows={3}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="edit_qr_code_text">QR Code Text</Label>
-                    <Input
-                      id="edit_qr_code_text"
-                      value={editFormData.qr_code_text}
-                      onChange={(e) => setEditFormData(prev => ({ ...prev, qr_code_text: e.target.value }))}
-                      placeholder="Optional QR code text"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="submit" disabled={loading}>
+                  <div className="flex gap-2 pt-1">
+                    <Button type="submit" disabled={loading} className="flex-1 h-10 rounded-xl active:scale-[0.98] transition-transform">
                       {loading ? "Updating..." : "Update Accessory"}
                     </Button>
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => setEditingAccessoryId(null)}
+                      className="flex-1 h-10 rounded-xl active:scale-[0.98] transition-transform"
                     >
                       Cancel
                     </Button>
