@@ -7,6 +7,7 @@ export interface TimeRegistration {
   task_id?: string;
   workstation_task_id?: string;
   rush_order_id?: string;
+  service_assignment_id?: string;
   project_name?: string;
   start_time: string;
   end_time?: string;
