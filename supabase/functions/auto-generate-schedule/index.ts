@@ -350,6 +350,7 @@ Deno.serve(async (req) => {
       installation_date: t.phases?.projects?.installation_date || '',
       task_number: t.standard_tasks?.task_number || '999',
       workstation_ids: (t.task_workstation_links || []).map((l: any) => l.workstation_id).filter(Boolean),
+      is_multi_user: t.standard_tasks?.multi_user_task || false,
     }))
 
     // Group by project
