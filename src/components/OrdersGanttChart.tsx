@@ -898,7 +898,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                       data-timeline
                     >
                       <div className="flex absolute inset-0">
-                        <div className="w-64 flex-shrink-0 border-r border-border bg-muted/30 py-2">
+                        <div className={`${sideColClass} flex-shrink-0 border-r border-border bg-muted/30 py-2`}>
                           {/* Team members in left column */}
                           {teamProjects.map((project, idx) => (
                             <div
