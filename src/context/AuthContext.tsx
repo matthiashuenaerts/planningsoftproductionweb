@@ -198,8 +198,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const refetchEmployee = async () => {
-    if (user) {
-      await fetchEmployeeData(user.id);
+    const userId = user?.id ?? (await supabase.auth.getSession()).data.session?.user?.id;
+    if (userId) {
+      await fetchEmployeeData(userId);
     }
   };
 
