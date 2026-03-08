@@ -407,13 +407,15 @@ const Orders: React.FC = () => {
           </div>
           
           {/* Filters */}
-          <div className="flex flex-wrap gap-3 mb-4">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{t('ord_filters')}</span>
-            </div>
+          <div className={`flex flex-wrap gap-2 mb-3 ${isMobile ? 'items-stretch' : 'items-center gap-3 mb-4'}`}>
+            {!isMobile && (
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{t('ord_filters')}</span>
+              </div>
+            )}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32 md:w-40 h-9">
+              <SelectTrigger className={`h-8 ${isMobile ? 'flex-1 min-w-0 text-xs' : 'w-40 h-9'}`}>
                 <SelectValue placeholder={t('ord_all_status')} />
               </SelectTrigger>
               <SelectContent>
@@ -425,7 +427,7 @@ const Orders: React.FC = () => {
               </SelectContent>
             </Select>
             <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
-              <SelectTrigger className="w-32 md:w-40 h-9">
+              <SelectTrigger className={`h-8 ${isMobile ? 'flex-1 min-w-0 text-xs' : 'w-40 h-9'}`}>
                 <SelectValue placeholder={t('ord_all_types')} />
               </SelectTrigger>
               <SelectContent>
