@@ -771,16 +771,16 @@ const AppOnboardingWizard: React.FC<AppOnboardingWizardProps> = ({ children }) =
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/20 text-green-400">
                   <CheckCircle2 className="h-8 w-8" />
                 </div>
-                <h2 className="text-2xl font-bold text-white">Setup Complete!</h2>
+                <h2 className="text-2xl font-bold text-white">{ui.setupComplete}</h2>
                 <p className="text-slate-300">
-                  Your workspace is configured. Would you like a guided tour of the application?
+                  {ui.setupCompleteDesc}
                 </p>
                 <div className="flex gap-3 justify-center">
                   <Button variant="outline" className="text-slate-300 border-slate-600" onClick={markOnboardingComplete}>
-                    Skip Tour
+                    {ui.skipTourBtn}
                   </Button>
                   <Button className="bg-blue-600 hover:bg-blue-700" onClick={startTour}>
-                    <Eye className="mr-2 h-4 w-4" /> Take the Tour
+                    <Eye className="mr-2 h-4 w-4" /> {ui.takeTour}
                   </Button>
                 </div>
               </div>
