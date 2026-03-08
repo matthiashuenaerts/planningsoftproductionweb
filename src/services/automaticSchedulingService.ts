@@ -26,6 +26,7 @@ export interface SchedulableTask {
   installation_date: string;
   task_number: string;
   workstation_ids: string[];
+  is_multi_user?: boolean;
 }
 
 export interface EmployeeTaskEligibility {
