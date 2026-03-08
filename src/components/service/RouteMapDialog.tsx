@@ -7,6 +7,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Clock, Route as RouteIcon } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 export interface RouteWaypoint {
   name: string;
@@ -26,6 +28,7 @@ interface RouteMapDialogProps {
   teamName: string;
   dateLabel: string;
   startPoint?: { lat: number; lng: number; address: string };
+  totalDrivingMinutes?: number;
 }
 
 const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
@@ -36,14 +39,19 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
   teamName,
   dateLabel,
   startPoint,
+  totalDrivingMinutes,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
 
+  const totalServiceHours = waypoints.reduce((sum, wp) => sum + (wp.serviceHours || 0), 0);
+  const drivingHours = totalDrivingMinutes ? Math.round(totalDrivingMinutes) / 60 : 0;
+  const totalHours = totalServiceHours + drivingHours;
+
   useEffect(() => {
     if (!open || !mapContainerRef.current) return;
 
-    // Small delay to ensure dialog DOM is ready
+    // Delay to ensure dialog DOM is fully rendered
     const timer = setTimeout(() => {
       if (!mapContainerRef.current) return;
 
@@ -53,7 +61,9 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
         mapRef.current = null;
       }
 
-      const map = L.map(mapContainerRef.current).setView([50.85, 4.35], 9);
+      const map = L.map(mapContainerRef.current, {
+        zoomControl: true,
+      }).setView([50.85, 4.35], 9);
       mapRef.current = map;
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -110,7 +120,8 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
 
       // Fix tile rendering after dialog animation
       setTimeout(() => map.invalidateSize(), 300);
-    }, 100);
+      setTimeout(() => map.invalidateSize(), 600);
+    }, 250);
 
     return () => {
       clearTimeout(timer);
@@ -123,15 +134,34 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh]">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] [&_.leaflet-pane]:z-[1] [&_.leaflet-top]:z-[2] [&_.leaflet-bottom]:z-[2]">
         <DialogHeader>
           <DialogTitle>
             Route — {teamName} — {dateLabel}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          {/* Time summary */}
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <Badge variant="outline" className="gap-1">
+              <Clock className="h-3 w-3" />
+              Service: {totalServiceHours}h
+            </Badge>
+            {totalDrivingMinutes != null && (
+              <Badge variant="outline" className="gap-1">
+                <RouteIcon className="h-3 w-3" />
+                Driving: {Math.round(totalDrivingMinutes)}min
+              </Badge>
+            )}
+            {totalDrivingMinutes != null && (
+              <Badge variant="secondary" className="gap-1 font-semibold">
+                <Clock className="h-3 w-3" />
+                Total: {totalHours.toFixed(1)}h
+              </Badge>
+            )}
+          </div>
           {/* Legend */}
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
               <div className="w-5 h-5 rounded-full bg-green-500 text-white text-xs flex items-center justify-center font-bold">S</div>
               <span>Start</span>
@@ -147,7 +177,7 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
           <div
             ref={mapContainerRef}
             className="w-full rounded-lg border border-border"
-            style={{ height: '500px' }}
+            style={{ height: '500px', zIndex: 0, position: 'relative' }}
           />
         </div>
       </DialogContent>

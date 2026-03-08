@@ -83,6 +83,7 @@ const ServiceTeamCalendar: React.FC = () => {
     waypoints: RouteWaypoint[];
     geometry: [number, number][];
     startPoint?: { lat: number; lng: number; address: string };
+    totalDrivingMinutes?: number;
   }>>({});
 
   const weekDays = eachDayOfInterval({
