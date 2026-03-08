@@ -495,7 +495,7 @@ const TaskList: React.FC<TaskListProps> = ({
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
                   <p className="text-orange-800 text-sm flex items-center gap-2">
                     <Pause className="h-4 w-4" />
-                    This task is on hold because required limit phases are not yet completed.
+                    {t('tl_on_hold_message')}
                   </p>
                 </div>
               )}
