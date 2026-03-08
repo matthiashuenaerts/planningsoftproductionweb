@@ -413,10 +413,12 @@ const TruckLoadingCalendar = () => {
                         <div
                           key={`${assignment.project.id}-${index}`}
                           className={cn(
-                            "p-1 rounded text-xs border group relative",
-                            getProjectColor(assignment.project.status),
+                            "p-1 rounded text-xs border group relative cursor-pointer hover:shadow-sm transition-shadow",
+                            !assignment.project.team_color && getProjectColor(assignment.project.status),
                             isManuallyAdjusted && "border-orange-400 bg-orange-50"
                           )}
+                          style={!isManuallyAdjusted && assignment.project.team_color ? getTeamColorStyle(assignment.project.team_color) : undefined}
+                          onClick={() => handleProjectClick(assignment.project.id)}
                         >
                           <div className="font-medium leading-tight break-words">
                             {assignment.project.name}
