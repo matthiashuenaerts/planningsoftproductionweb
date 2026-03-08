@@ -423,16 +423,16 @@ const Login: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center p-2 sm:p-4 relative overflow-hidden">
       {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-[fade-in_2s_ease-out]"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-[fade-in_2s_ease-out_0.5s_both]"></div>
-        <div className="absolute top-40 left-40 w-60 h-60 bg-amber-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-[fade-in_2s_ease-out_1s_both]"></div>
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-20 -right-20 sm:-top-40 sm:-right-40 w-48 sm:w-80 h-48 sm:h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-[fade-in_2s_ease-out]"></div>
+        <div className="absolute -bottom-20 -left-20 sm:-bottom-40 sm:-left-40 w-48 sm:w-80 h-48 sm:h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-[fade-in_2s_ease-out_0.5s_both]"></div>
+        <div className="absolute top-20 left-20 sm:top-40 sm:left-40 w-36 sm:w-60 h-36 sm:h-60 bg-amber-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-[fade-in_2s_ease-out_1s_both]"></div>
       </div>
 
       <div
-        className={`w-full max-w-md space-y-8 relative z-10 transform transition-all duration-1000 ${
+        className={`w-full max-w-md space-y-6 sm:space-y-8 relative z-10 transform transition-all duration-1000 ${
           isVisible
             ? "translate-y-0 opacity-100"
             : "translate-y-8 opacity-0"
