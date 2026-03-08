@@ -1,7 +1,11 @@
 import React from "react";
 import { useMarketingLang } from "@/components/marketing/useMarketingLang";
 import { CheckCircle2 } from "lucide-react";
-import featuresImg from "@/assets/marketing/features-abstract.jpg";
+import heroDashboard from "@/assets/marketing/hero-dashboard.jpg";
+import featurePlanning from "@/assets/marketing/feature-planning.jpg";
+import featureLogistics from "@/assets/marketing/feature-logistics.jpg";
+import featureTeam from "@/assets/marketing/feature-team.jpg";
+import featureAnalytics from "@/assets/marketing/feature-analytics.jpg";
 
 interface FeatureBlock {
   titleKey: string;
@@ -25,19 +29,35 @@ const features: FeatureBlock[] = [
 const MarketingFeatures: React.FC = () => {
   const { t } = useMarketingLang();
 
+  // Showcase images mapped to specific feature indexes
+  const showcaseImages: Record<number, string> = {
+    1: featurePlanning,
+    4: featureLogistics,
+    5: featureTeam,
+    6: featureAnalytics,
+  };
+
   return (
     <>
       {/* Hero header */}
-      <section className="relative pt-28 pb-16 overflow-hidden">
+      <section className="relative pt-28 pb-20 overflow-hidden">
         <div className="absolute inset-0">
           <div className="absolute top-0 left-1/3 w-[500px] h-[500px] bg-[#195F85]/15 rounded-full blur-[150px]" />
+          <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-cyan-500/8 rounded-full blur-[120px]" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:80px_80px]" />
         </div>
         <div className="relative max-w-7xl mx-auto px-6 text-center">
           <span className="inline-block text-xs font-semibold uppercase tracking-[0.2em] text-blue-400/80 mb-4">Product</span>
           <h1 className="text-4xl md:text-6xl font-extrabold mb-5 leading-tight">{t("features_title")}</h1>
-          <p className="text-slate-400 text-lg max-w-2xl mx-auto mb-12">{t("features_subtitle")}</p>
-          <div className="max-w-4xl mx-auto rounded-2xl border border-white/10 overflow-hidden shadow-2xl shadow-blue-500/5">
-            <img src={featuresImg} alt="Features overview" className="w-full" loading="eager" />
+          <p className="text-slate-400 text-lg max-w-2xl mx-auto mb-14">{t("features_subtitle")}</p>
+          
+          {/* Hero showcase image */}
+          <div className="max-w-5xl mx-auto relative group">
+            <div className="absolute -inset-2 bg-gradient-to-r from-[#195F85]/20 to-cyan-500/20 rounded-2xl blur-xl opacity-50 group-hover:opacity-75 transition-opacity duration-500" />
+            <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-2xl shadow-blue-500/10">
+              <img src={heroDashboard} alt="Features overview" className="w-full" loading="eager" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120]/40 via-transparent to-transparent" />
+            </div>
           </div>
         </div>
       </section>
@@ -48,6 +68,7 @@ const MarketingFeatures: React.FC = () => {
           {features.map((f, i) => {
             const bullets = t(f.bulletsKey).split("|");
             const reversed = i % 2 === 1;
+            const imgSrc = showcaseImages[i] || f.image;
             return (
               <div
                 key={f.titleKey}
@@ -56,14 +77,15 @@ const MarketingFeatures: React.FC = () => {
                 {/* Image */}
                 <div className="lg:w-1/2">
                   <div className="relative group">
-                    <div className="absolute -inset-2 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-2xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                    <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-xl bg-white/[0.02]">
+                    <div className="absolute -inset-3 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-2xl bg-white/[0.02]">
                       <img
-                        src={f.image}
+                        src={imgSrc}
                         alt={t(f.titleKey)}
                         className="w-full transition-transform duration-700 group-hover:scale-[1.02]"
                         loading="lazy"
                       />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120]/20 via-transparent to-transparent" />
                     </div>
                   </div>
                 </div>
@@ -77,7 +99,9 @@ const MarketingFeatures: React.FC = () => {
                   <ul className="space-y-4">
                     {bullets.map((b, bi) => (
                       <li key={bi} className="flex items-start gap-3">
-                        <CheckCircle2 className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                        <div className="h-6 w-6 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <CheckCircle2 className="h-4 w-4 text-blue-400" />
+                        </div>
                         <span className="text-slate-300 text-sm leading-relaxed">{b.trim()}</span>
                       </li>
                     ))}

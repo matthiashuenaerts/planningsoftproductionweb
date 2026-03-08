@@ -1,7 +1,8 @@
 import React from "react";
 import { useMarketingLang } from "@/components/marketing/useMarketingLang";
 import { RefreshCw, Download, CheckCircle, Plug, Code } from "lucide-react";
-import integrationImg from "@/assets/marketing/integration-abstract.jpg";
+import integrationNetwork from "@/assets/marketing/integration-network.jpg";
+import heroDashboard from "@/assets/marketing/hero-dashboard.jpg";
 
 const MarketingIntegration: React.FC = () => {
   const { t } = useMarketingLang();
@@ -20,9 +21,11 @@ const MarketingIntegration: React.FC = () => {
 
   return (
     <>
-      {/* CrownBase Pro integration */}
+      {/* Hero with network image */}
       <section className="relative pt-28 pb-20 overflow-hidden">
         <div className="absolute inset-0">
+          <img src={integrationNetwork} alt="" className="w-full h-full object-cover opacity-30" />
+          <div className="absolute inset-0 bg-[#0B1120]/70" />
           <div className="absolute top-0 left-1/2 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[150px]" />
         </div>
         <div className="relative max-w-7xl mx-auto px-6">
@@ -34,18 +37,19 @@ const MarketingIntegration: React.FC = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-28">
             <div className="relative group">
-              <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500/10 to-blue-500/10 rounded-2xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-xl">
+              <div className="absolute -inset-3 bg-gradient-to-r from-emerald-500/10 to-blue-500/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
                 <img
-                  src={integrationImg}
+                  src={heroDashboard}
                   alt="CrownBase Pro Integration"
                   className="w-full"
                   loading="eager"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120]/30 via-transparent to-transparent" />
               </div>
             </div>
             <div className="space-y-8">
-              {integrations.map((item, i) => (
+              {integrations.map((item) => (
                 <div key={item.key} className="flex gap-5 group">
                   <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-500/15 to-cyan-500/10 flex items-center justify-center flex-shrink-0 group-hover:from-blue-500/25 group-hover:to-cyan-500/15 transition-all duration-300">
                     <item.Icon className="h-5 w-5 text-blue-400" />

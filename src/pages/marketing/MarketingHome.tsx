@@ -3,8 +3,11 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useMarketingLang } from "@/components/marketing/useMarketingLang";
 import thononLogo from "@/assets/thonon-logo.png";
-import heroImg from "@/assets/marketing/hero-abstract.jpg";
-import solutionsImg from "@/assets/marketing/solutions-abstract.jpg";
+import heroDashboard from "@/assets/marketing/hero-dashboard.jpg";
+import solutionsFactory from "@/assets/marketing/solutions-factory.jpg";
+import featureAnalytics from "@/assets/marketing/feature-analytics.jpg";
+import featureTeam from "@/assets/marketing/feature-team.jpg";
+import featurePlanning from "@/assets/marketing/feature-planning.jpg";
 import {
   ArrowRight,
   CheckCircle2,
@@ -18,7 +21,10 @@ import {
   Cog,
   AlertTriangle,
   Star,
-  Play,
+  Factory,
+  Calendar,
+  Truck,
+  ClipboardList,
 } from "lucide-react";
 
 const coreIcons = [Monitor, Zap, Cog, BarChart3, Layers, Globe, Shield, Users];
@@ -48,16 +54,20 @@ const MarketingHome: React.FC = () => {
     { value: "∞", label: t("stat_scalable") },
   ];
 
+  const showcaseFeatures = [
+    { icon: Factory, title: t("showcase_workstations") || "Workstation Management", desc: t("showcase_workstations_desc") || "Real-time production overview with task tracking", img: featureAnalytics },
+    { icon: Calendar, title: t("showcase_planning") || "Production Planning", desc: t("showcase_planning_desc") || "Gantt charts & drag-and-drop scheduling", img: featurePlanning },
+    { icon: Users, title: t("showcase_team") || "Team Coordination", desc: t("showcase_team_desc") || "Installation teams, holidays & time registration", img: featureTeam },
+  ];
+
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden min-h-[90vh] flex items-center">
-        {/* Animated background elements */}
+      <section className="relative overflow-hidden min-h-[92vh] flex items-center">
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-[#195F85]/20 rounded-full blur-[150px] animate-pulse" />
           <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[130px] animate-pulse" style={{ animationDelay: '1s' }} />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-600/5 rounded-full blur-[200px]" />
-          {/* Grid overlay */}
           <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
         </div>
 
@@ -110,11 +120,13 @@ const MarketingHome: React.FC = () => {
                 <div className="absolute -inset-4 bg-gradient-to-r from-[#195F85]/20 to-cyan-500/20 rounded-2xl blur-xl" />
                 <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-2xl shadow-blue-500/10 bg-white/5 backdrop-blur-sm">
                   <img
-                    src={heroImg}
-                    alt="AutoMattiOn Compass Production Planning"
+                    src={heroDashboard}
+                    alt="AutoMattiOn Compass Production Planning Dashboard"
                     className="w-full"
                     loading="eager"
                   />
+                  {/* Subtle overlay for polish */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120]/30 via-transparent to-transparent" />
                 </div>
               </div>
             </div>
@@ -138,21 +150,49 @@ const MarketingHome: React.FC = () => {
         </div>
       </section>
 
-      {/* App screenshot showcase */}
-      <section className="py-16">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-[#195F85]/30 to-cyan-500/30 rounded-2xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity duration-500" />
-            <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-2xl bg-[#0B1120]">
-              <img
-                src="/images/marketing/hero-overview.jpg"
-                alt="AutoMattiOn Compass Overview"
-                className="w-full"
-                loading="lazy"
-              />
-              {/* Reflection gradient */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120] via-transparent to-transparent opacity-40" />
-            </div>
+      {/* Showcase features with images */}
+      <section className="py-28 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/[0.01] to-transparent" />
+        <div className="relative max-w-7xl mx-auto px-6">
+          <div className="text-center mb-20">
+            <span className="inline-block text-xs font-semibold uppercase tracking-[0.2em] text-blue-400/80 mb-4">
+              {t("showcase_badge") || "Key modules"}
+            </span>
+            <h2 className="text-4xl md:text-5xl font-extrabold mb-5 leading-tight">
+              {t("showcase_title") || "Built for production teams"}
+            </h2>
+            <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+              {t("showcase_subtitle") || "Three pillars that transform how you manage your manufacturing floor."}
+            </p>
+          </div>
+
+          <div className="space-y-24">
+            {showcaseFeatures.map((f, i) => {
+              const reversed = i % 2 === 1;
+              return (
+                <div
+                  key={i}
+                  className={`flex flex-col ${reversed ? "lg:flex-row-reverse" : "lg:flex-row"} gap-12 lg:gap-20 items-center`}
+                >
+                  <div className="lg:w-1/2">
+                    <div className="relative group">
+                      <div className="absolute -inset-3 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                      <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+                        <img src={f.img} alt={f.title} className="w-full transition-transform duration-700 group-hover:scale-[1.02]" loading="lazy" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120]/40 via-transparent to-transparent" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="lg:w-1/2">
+                    <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/10 flex items-center justify-center mb-6">
+                      <f.icon className="h-6 w-6 text-blue-400" />
+                    </div>
+                    <h3 className="text-3xl md:text-4xl font-extrabold mb-4 leading-tight">{f.title}</h3>
+                    <p className="text-slate-400 text-lg leading-relaxed">{f.desc}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -171,7 +211,6 @@ const MarketingHome: React.FC = () => {
               <div
                 key={k}
                 className="group flex items-start gap-4 rounded-2xl border border-red-500/10 bg-red-500/[0.02] p-6 hover:bg-red-500/[0.05] hover:border-red-500/20 transition-all duration-300"
-                style={{ animationDelay: `${i * 0.05}s` }}
               >
                 <div className="h-9 w-9 rounded-xl bg-red-500/10 flex items-center justify-center flex-shrink-0">
                   <AlertTriangle className="h-4 w-4 text-red-400" />
@@ -179,6 +218,21 @@ const MarketingHome: React.FC = () => {
                 <span className="text-sm text-slate-300 leading-relaxed">{t(k)}</span>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Visual divider - factory image */}
+      <section className="py-20">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="relative rounded-3xl overflow-hidden group">
+            <img src={solutionsFactory} alt="Modern furniture manufacturing" className="w-full object-cover h-72 md:h-96 transition-transform duration-700 group-hover:scale-[1.02]" loading="lazy" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0B1120]/80 via-[#0B1120]/40 to-transparent flex items-center">
+              <div className="p-10 md:p-16 max-w-lg">
+                <h3 className="text-2xl md:text-4xl font-extrabold mb-4">{t("visual_title") || "Smart Production Flow"}</h3>
+                <p className="text-slate-300 text-base leading-relaxed">{t("visual_desc") || "Visualize your entire production chain from order intake to delivery."}</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -212,21 +266,6 @@ const MarketingHome: React.FC = () => {
         </div>
       </section>
 
-      {/* Visual divider with image */}
-      <section className="py-20">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="relative rounded-3xl overflow-hidden">
-            <img src={solutionsImg} alt="Production flow" className="w-full object-cover h-64 md:h-80" loading="lazy" />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#0B1120]/80 to-transparent flex items-center">
-              <div className="p-10 md:p-16 max-w-lg">
-                <h3 className="text-2xl md:text-3xl font-bold mb-3">{t("visual_title") || "Smart Production Flow"}</h3>
-                <p className="text-slate-300 text-sm leading-relaxed">{t("visual_desc") || "Visualize your entire production chain from order intake to delivery."}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* CTA to features */}
       <section className="py-12">
         <div className="max-w-3xl mx-auto px-6 text-center">
@@ -254,7 +293,7 @@ const MarketingHome: React.FC = () => {
             {t("contact_subtitle")}{" "}
           </p>
           <p className="mb-10">
-            <code className="text-blue-300 bg-blue-500/10 px-3 py-1 rounded-lg text-sm">yourcompany.automattion-compass.com</code>
+            <code className="text-blue-300 bg-blue-500/10 border border-blue-500/20 px-4 py-1.5 rounded-xl text-sm font-medium">yourcompany.automattion-compass.com</code>
           </p>
           <a href="mailto:info@automattion-compass.com">
             <Button
