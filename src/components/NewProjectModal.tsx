@@ -104,6 +104,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
   const { toast } = useToast();
   const { tenant } = useTenant();
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [syncing, setSyncing] = useState(false);
