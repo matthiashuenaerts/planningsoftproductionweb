@@ -234,18 +234,30 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
         <form onSubmit={handleSubmit} className={isMobile ? 'space-y-3' : 'space-y-4'}>
           <div className="space-y-1">
             <Label htmlFor="employee" className={isMobile ? 'text-xs' : ''}>{t("employee")}</Label>
-            <Select value={formData.employee_id} onValueChange={(value) => setFormData(prev => ({ ...prev, employee_id: value }))}>
-              <SelectTrigger className={isMobile ? 'h-9 text-sm' : ''}>
-                <SelectValue placeholder={t("select_employee")} />
-              </SelectTrigger>
-              <SelectContent className="bg-background border shadow-lg z-50">
-                {employees.map((employee) => (
-                  <SelectItem key={employee.id} value={employee.id}>
-                    {employee.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal", isMobile && "h-9 text-sm", !formData.employee_id && "text-muted-foreground")}>
+                  <span className="truncate">{formData.employee_id ? employees.find(e => e.id === formData.employee_id)?.name || t("select_employee") : t("select_employee")}</span>
+                  <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder={t("select_employee")} className={isMobile ? 'text-sm' : ''} />
+                  <CommandList>
+                    <CommandEmpty className="py-3 text-center text-sm text-muted-foreground">No results</CommandEmpty>
+                    <CommandGroup>
+                      {employees.map((employee) => (
+                        <CommandItem key={employee.id} value={employee.name} onSelect={() => setFormData(prev => ({ ...prev, employee_id: employee.id }))}>
+                          <Check className={cn("mr-2 h-3.5 w-3.5", formData.employee_id === employee.id ? "opacity-100" : "opacity-0")} />
+                          {employee.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="space-y-1">
