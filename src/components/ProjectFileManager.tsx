@@ -27,6 +27,7 @@ import { useNavigate } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import FilePreview from '@/components/FilePreview';
+import { generateAnnotatedPdf } from '@/services/pdfAnnotationExportService';
 
 interface ProjectFileManagerProps {
   projectId: string;
