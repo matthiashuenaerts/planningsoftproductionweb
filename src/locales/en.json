@@ -618,5 +618,22 @@
   "svc_route_unavailable": "Route optimization service unavailable. Using postal code fallback.",
   "svc_optimized_postal": "Optimized order for {{count}} service visits (postal code approximation)",
   "svc_service_visit_chat": "📋 Service visit scheduled for {{date}} ({{team}}):",
-  "svc_no_address_set": "No address set"
+  "svc_no_address_set": "No address set",
+
+  "dt_installation_calendar": "Installation Calendar",
+  "dt_gantt_chart": "Gantt Chart",
+  "dt_team_planner": "Team Planner",
+  "dt_truck_loading": "Truck Loading",
+  "dt_service_teams": "Service Teams",
+
+  "truck_todays_schedule": "TODAY'S LOADING SCHEDULE",
+  "truck_install": "Install",
+  "truck_loading_today": "Loading scheduled for today, installation starts tomorrow",
+  "truck_no_loading_today": "No Loading Scheduled Today",
+  "truck_all_ready": "All trucks are ready for tomorrow's installations",
+  "truck_weekly_schedule": "Weekly Loading Schedule",
+  "truck_upcoming_loading": "Upcoming Loading",
+  "truck_load": "Load",
+  "truck_more_assignments": "+{{count}} more assignments",
+  "truck_no_upcoming": "No upcoming loading scheduled"
 }

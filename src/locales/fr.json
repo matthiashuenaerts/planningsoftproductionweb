@@ -1099,5 +1099,22 @@
   "svc_route_unavailable": "Service d'optimisation d'itinéraire indisponible. Utilisation de l'approximation par code postal.",
   "svc_optimized_postal": "Ordre optimisé pour {{count}} visites de service (approximation par code postal)",
   "svc_service_visit_chat": "📋 Visite de service planifiée le {{date}} ({{team}}) :",
-  "svc_no_address_set": "Aucune adresse définie"
+  "svc_no_address_set": "Aucune adresse définie",
+
+  "dt_installation_calendar": "Calendrier d'Installation",
+  "dt_gantt_chart": "Diagramme de Gantt",
+  "dt_team_planner": "Planificateur d'Équipe",
+  "dt_truck_loading": "Chargement Camion",
+  "dt_service_teams": "Équipes de Service",
+
+  "truck_todays_schedule": "PROGRAMME DE CHARGEMENT AUJOURD'HUI",
+  "truck_install": "Installation",
+  "truck_loading_today": "Chargement prévu aujourd'hui, installation commence demain",
+  "truck_no_loading_today": "Aucun Chargement Prévu Aujourd'hui",
+  "truck_all_ready": "Tous les camions sont prêts pour les installations de demain",
+  "truck_weekly_schedule": "Programme de Chargement Hebdomadaire",
+  "truck_upcoming_loading": "Chargements à Venir",
+  "truck_load": "Chargement",
+  "truck_more_assignments": "+{{count}} affectations supplémentaires",
+  "truck_no_upcoming": "Aucun chargement à venir"
 }

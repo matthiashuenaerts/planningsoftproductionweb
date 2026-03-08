@@ -1099,5 +1099,22 @@
   "svc_route_unavailable": "Route-optimalisatieservice niet beschikbaar. Postcode-benadering wordt gebruikt.",
   "svc_optimized_postal": "Volgorde geoptimaliseerd voor {{count}} servicebezoeken (postcode-benadering)",
   "svc_service_visit_chat": "📋 Servicebezoek gepland op {{date}} ({{team}}):",
-  "svc_no_address_set": "Geen adres ingesteld"
+  "svc_no_address_set": "Geen adres ingesteld",
+
+  "dt_installation_calendar": "Installatiekalender",
+  "dt_gantt_chart": "Gantt Grafiek",
+  "dt_team_planner": "Teamplanner",
+  "dt_truck_loading": "Vrachtwagen Laden",
+  "dt_service_teams": "Serviceteams",
+
+  "truck_todays_schedule": "LAADSCHEMA VANDAAG",
+  "truck_install": "Installatie",
+  "truck_loading_today": "Laden gepland voor vandaag, installatie begint morgen",
+  "truck_no_loading_today": "Geen Laden Gepland Vandaag",
+  "truck_all_ready": "Alle vrachtwagens zijn klaar voor de installaties van morgen",
+  "truck_weekly_schedule": "Wekelijks Laadschema",
+  "truck_upcoming_loading": "Aankomend Laden",
+  "truck_load": "Laden",
+  "truck_more_assignments": "+{{count}} meer toewijzingen",
+  "truck_no_upcoming": "Geen aankomend laden gepland"
 }
