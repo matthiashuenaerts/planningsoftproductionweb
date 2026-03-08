@@ -912,6 +912,7 @@ const Dashboard: React.FC = () => {
             length: 7
           }, (_, i) => addDays(weekStartDate, i)).map((date, index) => {
             const dayAssignments = getAssignmentsForDate(date);
+            const dayServiceAssignments = getServiceAssignmentsForDate(date);
             const isCurrentDay = isToday(date);
             return <div key={index} className={cn("min-h-[120px] border rounded p-2", isCurrentDay ? "border-red-500 bg-red-50" : "border-gray-200")}>
                   <div className={cn("text-center text-sm font-medium mb-2", isCurrentDay ? "text-red-700" : "text-gray-700")}>
@@ -920,10 +921,10 @@ const Dashboard: React.FC = () => {
                   </div>
                   
                   <div className="space-y-1">
-                    {dayAssignments.map((assignment, index) => {
+                    {dayAssignments.map((assignment, idx) => {
                   const isManuallyAdjusted = manualOverrides[assignment.project.id] !== undefined;
                   const isCharged = assignment.orderStatus?.allCharged;
-                  return <div key={`${assignment.project.id}-${index}`} className={cn("p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity relative", getProjectColor(assignment.project.status), isManuallyAdjusted && "ring-2 ring-orange-400", isCharged && "opacity-50")} style={getTeamBackgroundStyle(assignment.teamColor)} onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}>
+                  return <div key={`${assignment.project.id}-${idx}`} className={cn("p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity relative", getProjectColor(assignment.project.status), isManuallyAdjusted && "ring-2 ring-orange-400", isCharged && "opacity-50")} style={getTeamBackgroundStyle(assignment.teamColor)} onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}>
                           {/* Order status indicator */}
                           {assignment.orderStatus && <div className={cn("absolute -top-1 -right-1 rounded-full text-xs font-bold text-white flex items-center justify-center min-w-[16px] h-4 px-1", isCharged ? "bg-green-600" : assignment.orderStatus.allDelivered ? "bg-green-500" : "bg-red-500")}>
                               {isCharged || assignment.orderStatus.allDelivered ? "✓" : assignment.orderStatus.undeliveredCount}
@@ -942,6 +943,30 @@ const Dashboard: React.FC = () => {
                           </div>
                         </div>;
                 })}
+
+                    {/* Service installations */}
+                    {dayServiceAssignments.map((sa) => (
+                      <div
+                        key={`service-${sa.id}`}
+                        className="p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity"
+                        style={{
+                          backgroundColor: `${sa.team_color}25`,
+                          borderColor: `${sa.team_color}80`,
+                          borderLeftWidth: '3px',
+                          borderLeftColor: sa.team_color,
+                        }}
+                        onClick={() => navigate(createLocalizedPath(`/projects/${sa.project_id}`))}
+                      >
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <Wrench className="h-3 w-3 shrink-0" style={{ color: sa.team_color }} />
+                          <span className="font-medium truncate">{sa.team_name}</span>
+                        </div>
+                        <div className="font-medium break-words whitespace-normal leading-tight">{sa.project_name}</div>
+                        {sa.service_hours && (
+                          <div className="text-xs text-muted-foreground">{sa.service_hours}h</div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>;
           })}
