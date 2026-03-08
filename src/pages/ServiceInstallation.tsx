@@ -468,7 +468,7 @@ const ServiceInstallation: React.FC = () => {
                 {routeData.totalDrivingMinutes != null && (
                   <Badge variant="outline" className="gap-1">
                     <Route className="h-3 w-3" />
-                    Driving: {Math.round(routeData.totalDrivingMinutes)}min
+                    {t('si_driving')}: {Math.round(routeData.totalDrivingMinutes)}min
                   </Badge>
                 )}
                 <Badge variant="secondary" className="gap-1 font-semibold">
