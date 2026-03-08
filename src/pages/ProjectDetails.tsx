@@ -1039,17 +1039,18 @@ const ProjectDetails = () => {
     }
   };
   const getStatusBadge = (status: string) => {
+    const base = "rounded-lg text-[11px] sm:text-xs font-semibold px-2.5 py-1";
     switch (status.toLowerCase()) {
       case 'planned':
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-300">{t('status_planned')}</Badge>;
+        return <Badge className={cn(base, "bg-blue-500/10 text-blue-700 border-blue-200 dark:text-blue-300 dark:border-blue-800")}>{t('status_planned')}</Badge>;
       case 'in_progress':
-        return <Badge className="bg-amber-100 text-amber-800 border-amber-300">{t('in_progress')}</Badge>;
+        return <Badge className={cn(base, "bg-amber-500/10 text-amber-700 border-amber-200 dark:text-amber-300 dark:border-amber-800")}>{t('in_progress')}</Badge>;
       case 'completed':
-        return <Badge className="bg-green-100 text-green-800 border-green-300">{t('completed')}</Badge>;
+        return <Badge className={cn(base, "bg-green-500/10 text-green-700 border-green-200 dark:text-green-300 dark:border-green-800")}>{t('completed')}</Badge>;
       case 'on_hold':
-        return <Badge className="bg-gray-100 text-gray-800 border-gray-300">{t('status_on_hold')}</Badge>;
+        return <Badge className={cn(base, "bg-muted text-muted-foreground border-border")}>{t('status_on_hold')}</Badge>;
       default:
-        return <Badge>{status}</Badge>;
+        return <Badge className={cn(base)}>{status}</Badge>;
     }
   };
   const getStatusColor = (status: string) => {
