@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Route, Loader2, Map } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Route, Loader2, Map, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -72,6 +73,8 @@ const ServiceTeamCalendar: React.FC = () => {
   const [selectedTeamId, setSelectedTeamId] = useState<string>('');
   const [assignProjectId, setAssignProjectId] = useState<string>('');
   const [assignHours, setAssignHours] = useState<number>(2);
+  const [assignDescription, setAssignDescription] = useState('');
+  const [assignTodos, setAssignTodos] = useState<string[]>(['']);
   const [optimizing, setOptimizing] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [mapWaypoints, setMapWaypoints] = useState<RouteWaypoint[]>([]);
@@ -160,7 +163,11 @@ const ServiceTeamCalendar: React.FC = () => {
     try {
       const team = serviceTeams.find(t => t.id === selectedTeamId);
       const existingForDay = getProjectsForTeamAndDate(selectedTeamId, selectedDate);
-      
+
+      // Build notes from description + todos
+      const todoLines = assignTodos.filter(t => t.trim()).map(t => `☐ ${t.trim()}`);
+      const notes = [assignDescription, todoLines.length > 0 ? '\nTodos:\n' + todoLines.join('\n') : ''].filter(Boolean).join('\n');
+
       const { error } = await supabase
         .from('project_team_assignments')
         .insert({
@@ -170,12 +177,30 @@ const ServiceTeamCalendar: React.FC = () => {
           start_date: selectedDate,
           duration: 1,
           service_hours: assignHours,
-          service_order: existingForDay.length + 1
+          service_order: existingForDay.length + 1,
+          service_notes: notes.trim() || null,
         } as any);
 
       if (error) throw error;
-      toast({ title: 'Success', description: 'Service scheduled successfully' });
+
+      // Post to project chat for record-keeping
+      const project = projects.find(p => p.id === assignProjectId);
+      if (notes.trim()) {
+        const { data: empData } = await supabase.from('employees').select('id').limit(1).single();
+        if (empData) {
+          await supabase.from('chat_messages').insert({
+            chat_room_id: assignProjectId,
+            employee_id: empData.id,
+            message: `📋 Service visit scheduled for ${format(new Date(selectedDate + 'T12:00:00'), 'dd/MM/yyyy')} (${team?.name || 'Service'}):\n${notes}`,
+          } as any);
+        }
+      }
+
+      toast({ title: 'Success', description: `Service scheduled for "${project?.name || 'project'}" on ${format(new Date(selectedDate + 'T12:00:00'), 'dd/MM/yyyy')}` });
       setIsAssignDialogOpen(false);
+      setAssignDescription('');
+      setAssignTodos(['']);
+      setAssignProjectId('');
       loadData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -699,10 +724,20 @@ const ServiceTeamCalendar: React.FC = () => {
       })}
 
       {/* Assign Project Dialog */}
-      <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={isAssignDialogOpen} onOpenChange={(open) => {
+        setIsAssignDialogOpen(open);
+        if (!open) {
+          setAssignDescription('');
+          setAssignTodos(['']);
+          setAssignProjectId('');
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Schedule Service Visit</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Add a new service installation assignment
+            </p>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
@@ -714,7 +749,7 @@ const ServiceTeamCalendar: React.FC = () => {
               <Input value={serviceTeams.find(t => t.id === selectedTeamId)?.name || ''} disabled />
             </div>
             <div className="space-y-2">
-              <Label>Project</Label>
+              <Label>Project *</Label>
               <Select value={assignProjectId} onValueChange={setAssignProjectId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a project" />
@@ -735,7 +770,7 @@ const ServiceTeamCalendar: React.FC = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Service Hours</Label>
+              <Label>Estimated Hours</Label>
               <Input
                 type="number"
                 min="0.5"
@@ -745,13 +780,46 @@ const ServiceTeamCalendar: React.FC = () => {
                 onChange={(e) => setAssignHours(parseFloat(e.target.value) || 2)}
               />
             </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Describe the service needed..."
+                value={assignDescription}
+                onChange={e => setAssignDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Todos</Label>
+              {assignTodos.map((todo, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    placeholder={`Todo item ${index + 1}...`}
+                    value={todo}
+                    onChange={e => {
+                      const updated = [...assignTodos];
+                      updated[index] = e.target.value;
+                      setAssignTodos(updated);
+                    }}
+                  />
+                  {assignTodos.length > 1 && (
+                    <Button variant="ghost" size="icon" onClick={() => setAssignTodos(assignTodos.filter((_, i) => i !== index))} className="flex-shrink-0">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={() => setAssignTodos([...assignTodos, ''])} className="w-full">
+                <Plus className="h-4 w-4 mr-1" /> Add Todo
+              </Button>
+            </div>
           </div>
           <div className="flex justify-end gap-2">
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
             <Button onClick={handleAssignProject} disabled={!assignProjectId}>
-              Schedule
+              Schedule Service
             </Button>
           </div>
         </DialogContent>
