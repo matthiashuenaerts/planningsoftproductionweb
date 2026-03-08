@@ -269,10 +269,10 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className={`max-h-[90vh] overflow-y-auto ${isMobile ? 'max-w-[95vw] p-3' : 'max-w-4xl'}`}>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Package className="h-5 w-5 shrink-0" />
+          <DialogTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base md:text-lg'}`}>
+            <Package className={`shrink-0 ${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
             <span className="truncate">
               {(t('ed_confirm_delivery') || '').replace('{{supplier}}', order.supplier)}
             </span>
@@ -280,35 +280,35 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
         </DialogHeader>
 
         {currentStep === 'confirm' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+          <div className={isMobile ? 'space-y-3' : 'space-y-6'}>
+            <div className={`grid grid-cols-2 gap-3 ${isMobile ? 'p-3 text-xs' : 'p-4'} bg-muted/50 rounded-lg`}>
               <div className="min-w-0">
-                <Label className="text-sm font-medium text-muted-foreground">{t('ed_order_id')}</Label>
-                <div className="text-sm truncate">{order.id}</div>
+                <Label className={`font-medium text-muted-foreground ${isMobile ? 'text-[10px]' : 'text-sm'}`}>{t('ed_order_id')}</Label>
+                <div className={`truncate ${isMobile ? 'text-[11px]' : 'text-sm'}`}>{order.id}</div>
               </div>
               <div>
-                <Label className="text-sm font-medium text-muted-foreground">{t('ed_status')}</Label>
+                <Label className={`font-medium text-muted-foreground ${isMobile ? 'text-[10px]' : 'text-sm'}`}>{t('ed_status')}</Label>
                 <div>
-                  <Badge className={getStatusColor(order.status)}>
+                  <Badge className={`${getStatusColor(order.status)} ${isMobile ? 'text-[10px] px-1.5 py-0' : ''}`}>
                     {order.status.replace('_', ' ').toUpperCase()}
                   </Badge>
                 </div>
               </div>
               <div>
-                <Label className="text-sm font-medium text-muted-foreground">{t('ed_expected_delivery')}</Label>
-                <div className="text-sm">{new Date(order.expected_delivery).toLocaleDateString()}</div>
+                <Label className={`font-medium text-muted-foreground ${isMobile ? 'text-[10px]' : 'text-sm'}`}>{t('ed_expected_delivery')}</Label>
+                <div className={isMobile ? 'text-[11px]' : 'text-sm'}>{new Date(order.expected_delivery).toLocaleDateString()}</div>
               </div>
               <div>
-                <Label className="text-sm font-medium text-muted-foreground">{t('ed_order_date')}</Label>
-                <div className="text-sm">{new Date(order.order_date).toLocaleDateString()}</div>
+                <Label className={`font-medium text-muted-foreground ${isMobile ? 'text-[10px]' : 'text-sm'}`}>{t('ed_order_date')}</Label>
+                <div className={isMobile ? 'text-[11px]' : 'text-sm'}>{new Date(order.order_date).toLocaleDateString()}</div>
               </div>
             </div>
 
             <div className="flex justify-between">
-              <Button variant="outline" onClick={handleClose}>
+              <Button variant="outline" onClick={handleClose} size={isMobile ? 'sm' : 'default'}>
                 {t('ed_cancel')}
               </Button>
-              <Button onClick={() => setCurrentStep('items')}>
+              <Button onClick={() => setCurrentStep('items')} size={isMobile ? 'sm' : 'default'}>
                 {t('ed_continue_items')}
               </Button>
             </div>
