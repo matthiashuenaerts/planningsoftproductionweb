@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/context/LanguageContext';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -64,6 +65,7 @@ interface ServiceAssignment {
 const ServiceTeamCalendar: React.FC = () => {
   const { tenant } = useTenant();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [serviceTeams, setServiceTeams] = useState<ServiceTeam[]>([]);
@@ -157,7 +159,7 @@ const ServiceTeamCalendar: React.FC = () => {
 
   const getProjectAddress = (project: ServiceProject) => {
     const parts = [project.address_street, project.address_number, project.address_postal_code, project.address_city].filter(Boolean);
-    return parts.length > 0 ? parts.join(' ') : 'No address';
+    return parts.length > 0 ? parts.join(' ') : t('svc_no_address');
   };
 
   const handleAssignProject = async () => {
@@ -193,19 +195,19 @@ const ServiceTeamCalendar: React.FC = () => {
           await supabase.from('chat_messages').insert({
             chat_room_id: assignProjectId,
             employee_id: empData.id,
-            message: `📋 Service visit scheduled for ${format(new Date(selectedDate + 'T12:00:00'), 'dd/MM/yyyy')} (${team?.name || 'Service'}):\n${notes}`,
+            message: `${t('svc_service_visit_chat', { date: format(new Date(selectedDate + 'T12:00:00'), 'dd/MM/yyyy'), team: team?.name || 'Service' })}\n${notes}`,
           } as any);
         }
       }
 
-      toast({ title: 'Success', description: `Service scheduled for "${project?.name || 'project'}" on ${format(new Date(selectedDate + 'T12:00:00'), 'dd/MM/yyyy')}` });
+      toast({ title: t('svc_success'), description: t('svc_service_scheduled', { project: project?.name || 'project', date: format(new Date(selectedDate + 'T12:00:00'), 'dd/MM/yyyy') }) });
       setIsAssignDialogOpen(false);
       setAssignDescription('');
       setAssignTodos(['']);
       setAssignProjectId('');
       loadData();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('svc_error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -233,7 +235,7 @@ const ServiceTeamCalendar: React.FC = () => {
       const dayProjects = getProjectsForTeamAndDate(teamId, dateStr);
       
       if (dayProjects.length < 2) {
-        toast({ title: 'Info', description: 'Need at least 2 projects to optimize route' });
+        toast({ title: t('svc_info'), description: t('svc_need_min_2') });
         setOptimizing(false);
         return;
       }
@@ -255,21 +257,21 @@ const ServiceTeamCalendar: React.FC = () => {
       const geocodedProjects = await Promise.all(
         dayProjects.map(async (p) => {
           const addr = getProjectAddress(p);
-          const coords = addr !== 'No address' ? await geocodeAddress(addr) : null;
+          const coords = addr !== t('svc_no_address') ? await geocodeAddress(addr) : null;
           return { ...p, coords, fullAddress: addr };
         })
       );
 
       const projectsWithCoords = geocodedProjects.filter(p => p.coords !== null);
       const unrecognizedAddresses = geocodedProjects
-        .filter(p => p.coords === null && p.fullAddress !== 'No address')
+        .filter(p => p.coords === null && p.fullAddress !== t('svc_no_address'))
         .map(p => `${p.name}: ${p.fullAddress}`);
       geocodedProjects
-        .filter(p => p.fullAddress === 'No address')
-        .forEach(p => unrecognizedAddresses.push(`${p.name}: No address set`));
+        .filter(p => p.fullAddress === t('svc_no_address'))
+        .forEach(p => unrecognizedAddresses.push(`${p.name}: ${t('svc_no_address_set')}`));
       
       if (projectsWithCoords.length < 2) {
-        toast({ title: 'Warning', description: 'Could not geocode enough addresses. Using postal code fallback.' });
+        toast({ title: t('svc_warning'), description: t('svc_geocode_fallback') });
         await fallbackPostalOptimize(team, dayProjects, teamId, dateStr);
         return;
       }
@@ -294,7 +296,7 @@ const ServiceTeamCalendar: React.FC = () => {
       const osrmData = await osrmResp.json();
 
       if (osrmData.code !== 'Ok' || !osrmData.trips || osrmData.trips.length === 0) {
-        toast({ title: 'Warning', description: 'Route optimization service unavailable. Using postal code fallback.' });
+        toast({ title: t('svc_warning'), description: t('svc_route_unavailable') });
         await fallbackPostalOptimize(team, dayProjects, teamId, dateStr);
         return;
       }
@@ -411,20 +413,20 @@ const ServiceTeamCalendar: React.FC = () => {
       const workEndTotalMin = workEndH * 60 + workEndM;
       const overtime = returnTotalMin > workEndTotalMin;
       const overtimeMsg = overtime 
-        ? ` ⚠️ Estimated return at ${returnTimeStr} exceeds end of workday (${workEndTime})` 
-        : ` Return by ${returnTimeStr}`;
+        ? ` ${t('svc_return_exceeds', { returnTime: returnTimeStr, endTime: workEndTime })}` 
+        : ` ${t('svc_return_by', { time: returnTimeStr })}`;
 
       const warningMsg = unrecognizedAddresses.length > 0 
-        ? ` (${unrecognizedAddresses.length} address(es) not recognized)` 
+        ? ` (${t('svc_addresses_not_recognized', { count: String(unrecognizedAddresses.length) })})` 
         : '';
       toast({ 
-        title: 'Route Optimized', 
-        description: `Depart ${departureTimeStr}, ${orderedProjects.length} stops.${overtimeMsg}${warningMsg}`,
+        title: t('svc_route_optimized'), 
+        description: `${t('svc_depart_stops', { time: departureTimeStr, count: String(orderedProjects.length) })}${overtimeMsg}${warningMsg}`,
         variant: overtime ? 'destructive' : 'default',
       });
       loadData();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('svc_error'), description: error.message, variant: 'destructive' });
     } finally {
       setOptimizing(false);
     }
@@ -468,7 +470,7 @@ const ServiceTeamCalendar: React.FC = () => {
         .eq('id', sorted[i].assignment.id);
     }
 
-    toast({ title: 'Route Optimized', description: `Optimized order for ${sorted.length} service visits (postal code approximation)` });
+    toast({ title: t('svc_route_optimized'), description: t('svc_optimized_postal', { count: String(sorted.length) }) });
     loadData();
   };
 
@@ -505,7 +507,7 @@ const ServiceTeamCalendar: React.FC = () => {
       if (error) throw error;
       loadData();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('svc_error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -518,7 +520,7 @@ const ServiceTeamCalendar: React.FC = () => {
       if (error) throw error;
       loadData();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('svc_error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -546,8 +548,8 @@ const ServiceTeamCalendar: React.FC = () => {
       <Card>
         <CardContent className="py-12 text-center">
           <MapPin className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Service Teams</h3>
-          <p className="text-muted-foreground">Create service teams in Settings → Installation Teams to use the service calendar.</p>
+          <h3 className="text-lg font-semibold mb-2">{t('svc_no_service_teams')}</h3>
+          <p className="text-muted-foreground">{t('svc_create_teams_hint')}</p>
         </CardContent>
       </Card>
     );
@@ -562,7 +564,7 @@ const ServiceTeamCalendar: React.FC = () => {
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="sm" onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}>
-            <Calendar className="h-4 w-4 mr-1" /> Today
+            <Calendar className="h-4 w-4 mr-1" /> {t('svc_today')}
           </Button>
           <Button variant="outline" size="sm" onClick={() => setCurrentWeekStart(addDays(currentWeekStart, 7))}>
             <ChevronRight className="h-4 w-4" />
@@ -584,12 +586,12 @@ const ServiceTeamCalendar: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: team.color }} />
                   <CardTitle className="text-lg">{team.name}</CardTitle>
-                  <Badge variant="secondary">Service</Badge>
+                  <Badge variant="secondary">{t('svc_service')}</Badge>
                 </div>
                 {teamStartAddr && (
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
                     <MapPin className="h-3 w-3" />
-                    Start: {teamStartAddr}
+                    {t('svc_start')}: {teamStartAddr}
                   </div>
                 )}
               </div>
@@ -670,7 +672,7 @@ const ServiceTeamCalendar: React.FC = () => {
                                 className="h-5 w-14 text-xs"
                                 onClick={(e) => e.stopPropagation()}
                               />
-                              <span className="text-muted-foreground">hrs</span>
+                              <span className="text-muted-foreground">{t('svc_hrs')}</span>
                             </div>
                           </div>
                         ))}
@@ -688,7 +690,7 @@ const ServiceTeamCalendar: React.FC = () => {
                             setIsAssignDialogOpen(true);
                           }}
                         >
-                          + Add Service
+                          {t('svc_add_service')}
                         </Button>
                         {dayProjects.length >= 2 && (
                           <>
@@ -700,7 +702,7 @@ const ServiceTeamCalendar: React.FC = () => {
                               onClick={() => handleOptimizeRoute(team.id, dateStr)}
                             >
                               {optimizing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Route className="h-3 w-3 mr-1" />}
-                              Optimize Route
+                              {t('svc_optimize_route')}
                             </Button>
                             {optimizedRoutes[`${team.id}_${dateStr}`] && (
                               <Button
@@ -710,7 +712,7 @@ const ServiceTeamCalendar: React.FC = () => {
                                 onClick={() => handleShowMap(team.id, dateStr, team.name)}
                               >
                                 <Map className="h-3 w-3 mr-1" />
-                                Show on Map
+                                {t('svc_show_on_map')}
                               </Button>
                             )}
                           </>
@@ -736,40 +738,40 @@ const ServiceTeamCalendar: React.FC = () => {
       }}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Schedule Service Visit</DialogTitle>
+            <DialogTitle>{t('svc_schedule_service_visit')}</DialogTitle>
             <p className="text-sm text-muted-foreground">
-              Add a new service installation assignment
+              {t('svc_add_service_assignment')}
             </p>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Date</Label>
+              <Label>{t('svc_date')}</Label>
               <Input value={selectedDate ? format(new Date(selectedDate + 'T12:00:00'), 'EEEE, MMM d yyyy') : ''} disabled />
             </div>
             <div className="space-y-2">
-              <Label>Team</Label>
+              <Label>{t('svc_team')}</Label>
               <Input value={serviceTeams.find(t => t.id === selectedTeamId)?.name || ''} disabled />
             </div>
             <div className="space-y-2">
-              <Label>Project *</Label>
+              <Label>{t('svc_project')} *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
                     {assignProjectId ? (
                       <span className="truncate">
-                        {projects.find(p => p.id === assignProjectId)?.name || 'Select a project'}
+                        {projects.find(p => p.id === assignProjectId)?.name || t('svc_select_project')}
                       </span>
                     ) : (
-                      <span className="text-muted-foreground">Search projects...</span>
+                      <span className="text-muted-foreground">{t('svc_search_projects')}</span>
                     )}
                     <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Search by name, client, address..." />
+                    <CommandInput placeholder={t('svc_search_placeholder')} />
                     <CommandList>
-                      <CommandEmpty>No projects found.</CommandEmpty>
+                      <CommandEmpty>{t('svc_no_projects_found')}</CommandEmpty>
                       <CommandGroup>
                         {projects
                           .filter(p => p.installation_date)
@@ -793,7 +795,7 @@ const ServiceTeamCalendar: React.FC = () => {
               </Popover>
             </div>
             <div className="space-y-2">
-              <Label>Estimated Hours</Label>
+              <Label>{t('svc_estimated_hours')}</Label>
               <Input
                 type="number"
                 min="0.5"
@@ -804,20 +806,20 @@ const ServiceTeamCalendar: React.FC = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{t('svc_description')}</Label>
               <Textarea
-                placeholder="Describe the service needed..."
+                placeholder={t('svc_describe_service')}
                 value={assignDescription}
                 onChange={e => setAssignDescription(e.target.value)}
                 rows={3}
               />
             </div>
             <div className="space-y-2">
-              <Label>Todos</Label>
+              <Label>{t('svc_todos')}</Label>
               {assignTodos.map((todo, index) => (
                 <div key={index} className="flex gap-2">
                   <Input
-                    placeholder={`Todo item ${index + 1}...`}
+                    placeholder={t('svc_todo_item', { index: String(index + 1) })}
                     value={todo}
                     onChange={e => {
                       const updated = [...assignTodos];
@@ -833,16 +835,16 @@ const ServiceTeamCalendar: React.FC = () => {
                 </div>
               ))}
               <Button variant="outline" size="sm" onClick={() => setAssignTodos([...assignTodos, ''])} className="w-full">
-                <Plus className="h-4 w-4 mr-1" /> Add Todo
+                <Plus className="h-4 w-4 mr-1" /> {t('svc_add_todo')}
               </Button>
             </div>
           </div>
           <div className="flex justify-end gap-2">
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline">{t('svc_cancel')}</Button>
             </DialogClose>
             <Button onClick={handleAssignProject} disabled={!assignProjectId}>
-              Schedule Service
+              {t('svc_schedule_service')}
             </Button>
           </div>
         </DialogContent>
