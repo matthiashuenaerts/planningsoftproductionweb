@@ -131,31 +131,31 @@ const TaskList: React.FC<TaskListProps> = ({
     if (isBefore(due, today)) {
       return {
         class: 'overdue',
-        label: 'Overdue',
+        label: t('urgency_overdue'),
         variant: 'destructive' as const
       };
     } else if (daysUntilDue <= 1) {
       return {
         class: 'critical',
-        label: 'Critical',
+        label: t('urgency_critical'),
         variant: 'destructive' as const
       };
     } else if (daysUntilDue <= 3) {
       return {
         class: 'urgent',
-        label: 'Urgent',
+        label: t('urgency_urgent'),
         variant: 'default' as const
       };
     } else if (daysUntilDue <= 7) {
       return {
         class: 'high',
-        label: 'High',
+        label: t('tl_urgency_high'),
         variant: 'secondary' as const
       };
     } else {
       return {
         class: 'normal',
-        label: 'Normal',
+        label: t('urgency_normal'),
         variant: 'outline' as const
       };
     }
