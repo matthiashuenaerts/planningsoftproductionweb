@@ -894,23 +894,23 @@ const Dashboard: React.FC = () => {
         <StatCard title={t('dashboard_truck_loading')} value={truckLoadingData.todayLoadings.length > 0 ? truckLoadingData.todayLoadings.length.toString() : truckLoadingData.daysToNext.toString()} footer={truckLoadingData.todayLoadings.length > 0 ? `${t('dashboard_loading_today')}: ${truckLoadingData.todayLoadings.map(l => l.project.name).join(', ')}` : truckLoadingData.daysToNext > 0 ? `${truckLoadingData.daysToNext} ${t('dashboard_days_to_next')}` : t('dashboard_no_upcoming')} icon={<Truck className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />} />
       </div>
       
-      {/* Weekly Loading Schedule */}
-      <Card className="mb-4 sm:mb-6">
+      {/* Weekly Truck Loading Schedule */}
+      <Card className="rounded-xl border-border/60 shadow-sm">
         <CardHeader className="pb-2 px-3 sm:px-6">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3">
             <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
+              <Truck className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />
               {t('dashboard_weekly_schedule')}
             </CardTitle>
-            <div className="flex items-center justify-between sm:justify-center space-x-2">
-              <Button variant="outline" size="icon" onClick={prevWeek} disabled={weekLoading} className="h-8 w-8 sm:h-9 sm:w-9">
+            <div className="flex items-center justify-between sm:justify-center bg-muted/50 rounded-lg px-1 py-0.5">
+              <Button variant="ghost" size="icon" onClick={prevWeek} disabled={weekLoading} className="h-7 w-7 sm:h-8 sm:w-8 rounded-md">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-xs font-medium min-w-[130px] text-center px-1">
                 {format(weekStartDate, 'MMM d')} - {format(addDays(weekStartDate, 6), 'MMM d, yyyy')}
-                {weekLoading && <span className="ml-1 text-xs text-muted-foreground">{t('dashboard_loading')}</span>}
+                {weekLoading && <span className="ml-1 text-xs text-muted-foreground animate-pulse">{t('dashboard_loading')}</span>}
               </span>
-              <Button variant="outline" size="icon" onClick={nextWeek} disabled={weekLoading} className="h-8 w-8 sm:h-9 sm:w-9">
+              <Button variant="ghost" size="icon" onClick={nextWeek} disabled={weekLoading} className="h-7 w-7 sm:h-8 sm:w-8 rounded-md">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
