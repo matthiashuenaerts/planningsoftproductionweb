@@ -1489,7 +1489,7 @@ export type Database = {
           password: string
           preferred_language: string | null
           role: string
-          tenant_id: string
+          tenant_id: string | null
           workstation: string | null
         }
         Insert: {
@@ -1503,7 +1503,7 @@ export type Database = {
           password: string
           preferred_language?: string | null
           role: string
-          tenant_id?: string
+          tenant_id?: string | null
           workstation?: string | null
         }
         Update: {
@@ -1517,7 +1517,7 @@ export type Database = {
           password?: string
           preferred_language?: string | null
           role?: string
-          tenant_id?: string
+          tenant_id?: string | null
           workstation?: string | null
         }
         Relationships: [

@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { name, email, password, role, logistics, workstation, preferred_language } = await req.json();
+    const { name, email, password, role, logistics, workstation, preferred_language, isDeveloper } = await req.json();
 
     if (!name || !password) {
       return new Response(
@@ -128,7 +128,10 @@ serve(async (req) => {
       auth_user_id: authUserId,
       preferred_language: preferred_language || 'nl'
     };
-    if (callerTenantId) {
+    // Developers have no tenant_id - they get context dynamically
+    if (isDeveloper) {
+      // Don't set tenant_id at all - it will be NULL
+    } else if (callerTenantId) {
       insertData.tenant_id = callerTenantId;
     }
 

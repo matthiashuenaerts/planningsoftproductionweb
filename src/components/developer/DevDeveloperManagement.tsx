@@ -49,18 +49,14 @@ const DevDeveloperManagement: React.FC = () => {
 
     setSaving(true);
     try {
-      // Create developer in the first available tenant (they can access all)
-      // We use a special approach - create in first tenant but mark as developer
-      const { data: tenants } = await supabase.from("tenants").select("id").limit(1).single();
-      if (!tenants) throw new Error("No tenants available");
-
+      // Create developer without tenant - they get tenant context dynamically
       const { data, error } = await supabase.functions.invoke('create-employee', {
         body: {
           name: name.trim(),
           email: email.trim(),
           password: password.trim(),
-          role: 'admin', // Base role for access
-          tenantId: tenants.id,
+          role: 'admin',
+          isDeveloper: true,
         }
       });
       if (error) throw error;
