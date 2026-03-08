@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock, FileText, HelpCircle, Receipt } from 'lucide-react';
+import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock, FileText, HelpCircle, Receipt, Wrench } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import UserMenu from './UserMenu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { HelpDialog } from '@/components/help/HelpDialog';
+import { supabase } from '@/integrations/supabase/client';
 const NavbarContent = ({
   onItemClick
 }: {
