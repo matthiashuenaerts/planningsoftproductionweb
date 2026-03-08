@@ -216,15 +216,15 @@ const BrokenPartsList: React.FC = () => {
 
   return (
     <>
-      <Card className="w-full overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
+       <Card className="w-full overflow-hidden">
+        <CardHeader className={`flex flex-row items-center justify-between ${isMobile ? 'px-3 py-3' : ''}`}>
+          <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : ''}`}>
+            <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />
             {t('broken_parts')}
           </CardTitle>
-          <Button asChild size={isMobile ? 'sm' : 'default'}>
+          <Button asChild size="sm" className={isMobile ? 'text-xs' : ''}>
             <Link to={createLocalizedPath("/broken-parts/new")}>
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
               {t('report_broken_part')}
             </Link>
           </Button>
@@ -355,16 +355,16 @@ const BrokenPartsList: React.FC = () => {
       </Card>
 
       <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-3xl w-[95vw] p-3 sm:p-6">
           <DialogHeader>
-            <DialogTitle>{t('broken_part_image') || 'Broken Part Image'}</DialogTitle>
+            <DialogTitle className="text-sm sm:text-lg">{t('broken_part_image') || 'Broken Part Image'}</DialogTitle>
           </DialogHeader>
           {selectedImage && (
-            <div className="overflow-hidden">
+            <div className="overflow-hidden rounded-md">
               <img 
                 src={selectedImage} 
                 alt={t('broken_parts') || 'Broken part full view'}
-                className="w-full object-contain max-h-[80vh]"
+                className="w-full object-contain max-h-[75vh]"
               />
             </div>
           )}
