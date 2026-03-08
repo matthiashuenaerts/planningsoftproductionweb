@@ -988,7 +988,7 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                           }
                         }}
                       >
-                        <SelectTrigger className="h-8 w-36">
+                        <SelectTrigger className="h-7 w-[110px] text-xs px-2">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
