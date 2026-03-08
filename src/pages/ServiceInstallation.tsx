@@ -387,8 +387,8 @@ const ServiceInstallation: React.FC = () => {
 
       queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
       toast({
-        title: 'Timer Started',
-        description: `Time registration started for ${stop.projectName}`,
+        title: t('si_timer_started'),
+        description: (t('si_timer_started_desc') || '').replace('{{name}}', stop.projectName),
       });
     } catch (error: any) {
       console.error('Error starting service time registration:', error);
