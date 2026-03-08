@@ -912,9 +912,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
               />
 
               {/* Project Code Display */}
-              <div className="rounded-lg border p-4 bg-muted/50">
-                <div className="text-sm font-medium text-muted-foreground mb-1">{t('npm_generated_code')}</div>
-                <div className="text-lg font-mono font-bold">
+              <div className={cn("rounded-lg border bg-muted/50", isMobile ? "p-3" : "p-4")}>
+                <div className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">{t('npm_generated_code')}</div>
+                <div className={cn("font-mono font-bold", isMobile ? "text-base" : "text-lg")}>
                   {isGeneratingCode ? (
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
