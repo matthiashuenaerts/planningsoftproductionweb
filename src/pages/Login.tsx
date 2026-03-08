@@ -439,24 +439,24 @@ const Login: React.FC = () => {
         }`}
       >
         {/* Logo Section */}
-        <div className="text-center space-y-6">
+        <div className="text-center space-y-3 sm:space-y-6">
           <div className="relative inline-block">
             <img
               src="https://static.wixstatic.com/media/99c033_5bb79e52130d4fa6bbae75d9a22b198d~mv2.png"
               alt="Company Logo"
-              className="relative w-32 h-auto mx-auto rounded-lg shadow-lg hover:scale-105 transition-transform duration-300"
+              className="relative w-20 sm:w-32 h-auto mx-auto rounded-lg shadow-lg hover:scale-105 transition-transform duration-300"
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1 sm:space-y-2">
             <div className="flex items-center justify-center space-x-2">
-              <h1 className="font-bold text-4xl text-[#195F85]">
+              <h1 className="font-bold text-2xl sm:text-4xl text-[#195F85]">
                 AutoMattiOn
               </h1>
-              <h1 className="font-bold text-4xl text-[#42A5DB]">Compass</h1>
+              <h1 className="font-bold text-2xl sm:text-4xl text-[#42A5DB]">Compass</h1>
             </div>
 
-            <p className="text-[#42A5DB] text-lg font-bold">
+            <p className="text-[#42A5DB] text-sm sm:text-lg font-bold">
               Guiding your production to perfection!
             </p>
           </div>
@@ -464,8 +464,8 @@ const Login: React.FC = () => {
 
         {/* Login Card */}
         <Card className="backdrop-blur-sm bg-white/80 border-0 shadow-2xl ring-1 ring-gray-200/50 hover:shadow-3xl transition-all duration-500">
-          <CardHeader className="space-y-1 text-center pb-8">
-            <CardTitle className="text-2xl font-semibold text-gray-800">
+          <CardHeader className="space-y-1 text-center pb-4 sm:pb-8 px-4 sm:px-6">
+            <CardTitle className="text-xl sm:text-2xl font-semibold text-gray-800">
               {isDeveloperPortal ? "Developer Sign in" : "Welcome Back"}
             </CardTitle>
             <CardDescription className="text-gray-600">
@@ -476,7 +476,7 @@ const Login: React.FC = () => {
           </CardHeader>
 
           <form onSubmit={handleLogin}>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
               <div className="space-y-2">
                 <Label
                   htmlFor="name"
@@ -497,7 +497,7 @@ const Login: React.FC = () => {
                         : "Enter your employee name"
                     }
                     disabled={loading}
-                    className="pl-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-colors duration-200"
+                    className="pl-10 h-10 sm:h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-colors duration-200 text-sm sm:text-base"
                   />
                 </div>
               </div>
@@ -518,15 +518,15 @@ const Login: React.FC = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     disabled={loading}
-                    className="pl-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-colors duration-200"
+                    className="pl-10 h-10 sm:h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-colors duration-200 text-sm sm:text-base"
                   />
                 </div>
               </div>
             </CardContent>
 
-            <CardFooter className="flex flex-col space-y-4 pt-6 pb-8">
+            <CardFooter className="flex flex-col space-y-3 sm:space-y-4 pt-4 sm:pt-6 pb-6 sm:pb-8 px-4 sm:px-6">
               <Button
-                className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                className="w-full h-10 sm:h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-sm sm:text-base"
                 type="submit"
                 disabled={loading}
               >
