@@ -665,6 +665,7 @@ const InstallationTeamCalendar = ({
   projects: Project[];
 }) => {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [truckAssignments, setTruckAssignments] = useState<TruckAssignment[]>([]);
