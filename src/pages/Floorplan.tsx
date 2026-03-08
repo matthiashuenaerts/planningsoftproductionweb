@@ -384,9 +384,19 @@ const Floorplan: React.FC = () => {
   const totalActiveUsers = workstationStatuses.reduce((sum, s) => sum + s.active_users_count, 0);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <div className="ml-64 relative w-[calc(100vw-16rem)] h-screen flex items-center justify-center overflow-hidden">
+    <div className={`${isFullscreen ? 'fixed inset-0 z-50' : 'min-h-screen'} bg-background`}>
+      {!isFullscreen && <Navbar />}
+      <div className={`${isFullscreen ? 'w-screen h-screen' : 'ml-64 relative w-[calc(100vw-16rem)] h-screen'} flex items-center justify-center overflow-hidden relative`}>
+        {/* Fullscreen toggle button */}
+        <Button
+          variant="outline"
+          size="icon"
+          className="absolute top-3 right-3 z-20 bg-background/80 backdrop-blur-sm"
+          onClick={() => setIsFullscreen(!isFullscreen)}
+        >
+          {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </Button>
+
         {/* Image Container */}
         <div className="relative w-full h-full flex items-center justify-center">
           <div className="relative inline-block">
