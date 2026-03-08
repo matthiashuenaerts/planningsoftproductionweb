@@ -409,7 +409,7 @@ const TaskList: React.FC<TaskListProps> = ({
                         <div className="mt-2 flex items-center gap-2 text-sm">
                           <Users className="h-4 w-4 text-blue-600" />
                           <span className="text-blue-600 font-medium">
-                            {activeUsers.length === 1 ? 'Active: ' : `${activeUsers.length} users active: `}
+                            {activeUsers.length === 1 ? t('tl_active_users_single') : t('tl_active_users_multi', { count: activeUsers.length })}
                             {activeUsers.map(u => u.name).join(', ')}
                           </span>
                         </div>
