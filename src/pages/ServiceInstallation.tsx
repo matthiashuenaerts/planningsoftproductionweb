@@ -551,8 +551,8 @@ const ServiceInstallation: React.FC = () => {
                               <Home className="h-3 w-3" />
                             </div>
                             <span className="truncate">
-                              Return to base
-                              {isOvertime && ` (exceeds ${routeData.workEndTime} end of day)`}
+                              {t('si_return_to_base')}
+                              {isOvertime && ` (${(t('si_exceeds_end_of_day') || '').replace('{{time}}', routeData.workEndTime || '')})`}
                             </span>
                           </div>
                         )}
