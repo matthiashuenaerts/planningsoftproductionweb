@@ -79,8 +79,8 @@ interface TableRow {
 // ─── REGEX PATTERNS ────────────────────────────────────────────────────────────
 
 const QUANTITY_PATTERNS = [
-  /(\d+(?:[,\.]\d+)?)\s*(st|stuk|stuks|pcs|pieces|x|qty|aantal|eenheden|mtr|m|lm|m2|m²|kg|ltr|rol|rollen|set|pak|doos|dozen|paar)\b/gi,
-  /(?:qty|quantity|aantal|hoeveelheid|besteld|geleverd)[:\s]*(\d+(?:[,\.]\d+)?)/gi,
+  /(\d+(?:[,\.]\d+)?)\s*(st|stuk|stuks|pcs|pieces|pièces|x|qty|aantal|eenheden|mtr|m|lm|m2|m²|kg|ltr|rol|rollen|set|pak|doos|dozen|paar|unité|unités)\b/gi,
+  /(?:qty|quantity|aantal|hoeveelheid|besteld|geleverd|quantité|qté)[:\s]*(\d+(?:[,\.]\d+)?)/gi,
   /^\s*(\d+(?:[,\.]\d+)?)\s+/,                                    // leading number
 ];
 
@@ -88,7 +88,7 @@ const ARTICLE_CODE_PATTERNS = [
   /\b([A-Z0-9]{2,}\/[^\s]{2,})\b/gi,                             // Codes with slashes
   /\b([A-Z]{1,5}[\-\.]\d{3,12}[A-Z0-9\-\.]*)\b/gi,              // XX-12345
   /\b(\d{6,13})\b/g,                                              // EAN / numeric (6-13 digits)
-  /(?:art[\.:]?\s*(?:nr|code|nummer)?|article|artikelcode|item\s*(?:no|nr))[:\s]*([A-Z0-9\-\.\/]+)/gi,
+  /(?:art[\.:]?\s*(?:nr|code|nummer)?|article|artikelcode|item\s*(?:no|nr)|réf(?:érence)?|n°\s*art)[:\s]*([A-Z0-9\-\.\/]+)/gi,
   /\b([A-Z0-9]{3,}\-[A-Z0-9\-]{2,})\b/g,                        // Code-with-dashes
   /\b([A-Z]{2}\d{2}[A-Z0-9]{2,})\b/g,                           // AB12CDE style
 ];
@@ -101,10 +101,10 @@ const PRICE_PATTERNS = [
   /EUR\s*(\d+(?:[,\.]\d{1,2}))/gi,                                // EUR 12,50
   /(\d{1,3}(?:\.\d{3})*(?:,\d{1,2}))\s*€/g,                      // 1.234,56 €
   /(\d+(?:,\d{1,2}))\s*€/g,                                       // 12,50 €
-  /(?:prijs|price|bedrag|amount|e\.?\s*prijs)[:\s]*€?\s*(\d{1,3}(?:[\.\s]\d{3})*(?:,\d{1,2}))/gi,
+  /(?:prijs|price|bedrag|amount|e\.?\s*prijs|prix|montant|p\.?\s*u\.?)[:\s]*€?\s*(\d{1,3}(?:[\.\s]\d{3})*(?:,\d{1,2}))/gi,
 ];
 
-const UNIT_PATTERNS = /\b(st|stuk|stuks|pcs|pieces|m|mtr|meter|m2|m²|m3|m³|kg|kilogram|ltr|liter|rol|rollen|set|pak|doos|dozen|paar|uur|hour)\b/gi;
+const UNIT_PATTERNS = /\b(st|stuk|stuks|pcs|pieces|pièces|m|mtr|meter|mètre|m2|m²|m3|m³|kg|kilogram|ltr|liter|litre|rol|rollen|rouleau|set|pak|doos|dozen|carton|paar|paire|uur|hour|heure|unité)\b/gi;
 
 // ─── TEXT EXTRACTION ──────────────────────────────────────────────────────────
 
