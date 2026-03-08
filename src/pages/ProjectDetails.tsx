@@ -1533,15 +1533,15 @@ const ProjectDetails = () => {
                                         {item.article_code && <div className={cn("text-[10px] sm:text-xs font-medium mt-0.5", order.status === 'delivered' ? 'text-green-700' : order.status === 'pending' ? 'text-orange-700' : order.status === 'delayed' ? 'text-red-700' : order.status === 'canceled' ? 'text-gray-700' : 'text-blue-700')}>
                                             Article: {item.article_code}
                                           </div>}
-                                        {order.status === 'delivered' && item.stock_location && <div className="text-xs font-semibold text-green-800 mt-0.5 flex items-center gap-1">
-                                            <MapPin className="h-3 w-3" />
+                                        {order.status === 'delivered' && item.stock_location && <div className="text-[10px] sm:text-xs font-semibold text-green-800 mt-0.5 flex items-center gap-1">
+                                            <MapPin className="h-2.5 w-2.5 sm:h-3 sm:w-3 flex-shrink-0" />
                                             Location: {item.stock_location}
                                           </div>}
-                                        {item.notes && <div className="text-xs text-gray-600 mt-0.5 italic">
+                                        {item.notes && <div className="text-[10px] sm:text-xs text-gray-600 mt-0.5 italic line-clamp-2">
                                             Note: {item.notes}
                                           </div>}
                                       </div>
-                                      <div className="flex items-center gap-1 ml-2">
+                                      <div className="flex items-center gap-1 flex-shrink-0">
                                         <Button
                                           variant="ghost"
                                           size="sm"
@@ -1554,7 +1554,7 @@ const ProjectDetails = () => {
                                         >
                                           <Printer className="h-3 w-3" />
                                         </Button>
-                                        <span className={cn("text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm", order.status === 'delivered' ? 'bg-gradient-to-r from-green-500 to-emerald-500' : order.status === 'pending' ? 'bg-gradient-to-r from-orange-500 to-amber-500' : order.status === 'delayed' ? 'bg-gradient-to-r from-red-500 to-rose-500' : order.status === 'canceled' ? 'bg-gradient-to-r from-gray-500 to-slate-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500')}>
+                                        <span className={cn("text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold shadow-sm whitespace-nowrap", order.status === 'delivered' ? 'bg-gradient-to-r from-green-500 to-emerald-500' : order.status === 'pending' ? 'bg-gradient-to-r from-orange-500 to-amber-500' : order.status === 'delayed' ? 'bg-gradient-to-r from-red-500 to-rose-500' : order.status === 'canceled' ? 'bg-gradient-to-r from-gray-500 to-slate-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500')}>
                                           {item.delivered_quantity || 0}/{item.quantity}
                                         </span>
                                       </div>
