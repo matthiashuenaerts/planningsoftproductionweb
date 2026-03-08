@@ -991,15 +991,18 @@ const ProjectDetails = () => {
     }
   };
   if (loading) {
-    return <div className="flex min-h-screen">
+    return <div className="flex min-h-screen bg-background">
         {!isMobile && (
           <div className="w-64 bg-sidebar fixed top-0 bottom-0">
             <Navbar />
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`w-full p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : 'pt-16'}`}>
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        <div className={`w-full flex justify-center items-center ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent"></div>
+            <p className="text-sm text-muted-foreground">{t('loading') || 'Loading...'}</p>
+          </div>
         </div>
       </div>;
   }
@@ -1036,17 +1039,18 @@ const ProjectDetails = () => {
     }
   };
   const getStatusBadge = (status: string) => {
+    const base = "rounded-lg text-[11px] sm:text-xs font-semibold px-2.5 py-1";
     switch (status.toLowerCase()) {
       case 'planned':
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-300">{t('status_planned')}</Badge>;
+        return <Badge className={cn(base, "bg-blue-500/10 text-blue-700 border-blue-200 dark:text-blue-300 dark:border-blue-800")}>{t('status_planned')}</Badge>;
       case 'in_progress':
-        return <Badge className="bg-amber-100 text-amber-800 border-amber-300">{t('in_progress')}</Badge>;
+        return <Badge className={cn(base, "bg-amber-500/10 text-amber-700 border-amber-200 dark:text-amber-300 dark:border-amber-800")}>{t('in_progress')}</Badge>;
       case 'completed':
-        return <Badge className="bg-green-100 text-green-800 border-green-300">{t('completed')}</Badge>;
+        return <Badge className={cn(base, "bg-green-500/10 text-green-700 border-green-200 dark:text-green-300 dark:border-green-800")}>{t('completed')}</Badge>;
       case 'on_hold':
-        return <Badge className="bg-gray-100 text-gray-800 border-gray-300">{t('status_on_hold')}</Badge>;
+        return <Badge className={cn(base, "bg-muted text-muted-foreground border-border")}>{t('status_on_hold')}</Badge>;
       default:
-        return <Badge>{status}</Badge>;
+        return <Badge className={cn(base)}>{status}</Badge>;
     }
   };
   const getStatusColor = (status: string) => {
@@ -1127,14 +1131,14 @@ const ProjectDetails = () => {
       <div className={`w-full ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-4 sm:mb-6">
-            <Button variant="outline" size="sm" onClick={() => navigate(createLocalizedPath('/projects'))} className="mb-3 sm:mb-4 h-8 text-xs sm:text-sm">
+            <Button variant="ghost" size="sm" onClick={() => navigate(createLocalizedPath('/projects'))} className="mb-3 sm:mb-4 h-8 text-xs sm:text-sm rounded-xl hover:bg-muted/60 -ml-2">
               <ArrowLeft className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" /> {t('back_to_projects')}
             </Button>
             
             <div className="flex flex-col gap-3 sm:gap-4">
               <div>
-                <h1 className={`font-bold tracking-tight ${isMobile ? 'text-lg leading-tight' : 'text-3xl'}`}>{project?.name}</h1>
-                <p className="text-muted-foreground text-xs sm:text-sm">{t('client_label')}: {project?.client}</p>
+                <h1 className={`font-bold tracking-tight ${isMobile ? 'text-lg leading-tight' : 'text-2xl'}`}>{project?.name}</h1>
+                <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">{t('client_label')}: {project?.client}</p>
               </div>
               
               <div className="flex flex-wrap gap-1 sm:gap-1.5 pb-1.5">
@@ -1183,31 +1187,20 @@ const ProjectDetails = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
-            <Card className="py-0">
-              <CardContent className="pt-4 sm:pt-6 py-2 sm:py-[10px] px-3 sm:px-6">
-                <div className="text-xl sm:text-2xl font-bold">{openTasks.length}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">{t('open_tasks')}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4 sm:pt-6 py-2 sm:py-[10px] px-3 sm:px-6">
-                <div className="text-xl sm:text-2xl font-bold">{getTaskCountByStatus('IN_PROGRESS')}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">{t('in_progress')}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4 sm:pt-6 py-2 sm:py-[10px] px-3 sm:px-6">
-                <div className="text-xl sm:text-2xl font-bold">{getTaskCountByStatus('COMPLETED')}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">{t('completed')}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4 sm:pt-6 py-2 sm:py-[10px] px-3 sm:px-6">
-                <div className="text-xl sm:text-2xl font-bold">{tasks.length}</div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">{t('total_tasks')}</p>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
+            {[
+              { value: openTasks.length, label: t('open_tasks'), accent: 'text-orange-600 dark:text-orange-400' },
+              { value: getTaskCountByStatus('IN_PROGRESS'), label: t('in_progress'), accent: 'text-blue-600 dark:text-blue-400' },
+              { value: getTaskCountByStatus('COMPLETED'), label: t('completed'), accent: 'text-green-600 dark:text-green-400' },
+              { value: tasks.length, label: t('total_tasks'), accent: 'text-foreground' },
+            ].map((stat, i) => (
+              <Card key={i} className="rounded-2xl border-border/60 py-0 overflow-hidden">
+                <CardContent className="pt-3 sm:pt-4 pb-2.5 sm:pb-3.5 px-3 sm:px-5">
+                  <div className={cn("text-xl sm:text-2xl font-bold tabular-nums", stat.accent)}>{stat.value}</div>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">{stat.label}</p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
           {activeTab === 'files' ? <ProjectFileManager projectId={projectId!} /> : activeTab === 'onedrive' ? <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} /> : activeTab === 'chat' ? <ProjectChatInline projectId={projectId!} projectName={project?.name || ''} onUnreadCountChange={setUnreadChatCount} /> : activeTab === 'parts' ? <div className="space-y-4">
@@ -1665,7 +1658,7 @@ const ProjectDetails = () => {
                 <CardHeader className="py-3 sm:py-[15px] px-3 sm:px-6">
                   <CardTitle className="text-base sm:text-2xl">{t('project_summary')}</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
+                <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-5">
                   {/* Status + Progress inline on mobile */}
                   <div className="flex items-center gap-3 sm:block sm:space-y-4">
                     <div className="flex-shrink-0">
@@ -1790,13 +1783,13 @@ const ProjectDetails = () => {
                 </CardContent>
               </Card>
               
-              <Card className="lg:col-span-2 overflow-hidden">
-                <CardHeader className="py-3 sm:py-[15px] px-3 sm:px-6">
-                  <CardTitle className="text-base sm:text-2xl">{t('project_tasks')}</CardTitle>
+              <Card className="lg:col-span-2 overflow-hidden rounded-2xl border-border/60">
+                <CardHeader className="py-3 sm:py-4 px-3 sm:px-5">
+                  <CardTitle className="text-sm sm:text-base font-semibold">{t('project_tasks')}</CardTitle>
                 </CardHeader>
-                <CardContent className="px-3 sm:px-6">
+                <CardContent className="px-3 sm:px-5">
                   <Tabs defaultValue="todo">
-                    <TabsList className="mb-3 sm:mb-4 w-full sm:w-auto">
+                    <TabsList className="mb-3 sm:mb-4 w-full sm:w-auto rounded-xl bg-muted/60 p-1">
                       <TabsTrigger value="todo" className="text-xs sm:text-sm flex-1 sm:flex-initial">{t('open_tasks_tab', {
                       count: openTasks.length.toString()
                     })}</TabsTrigger>
