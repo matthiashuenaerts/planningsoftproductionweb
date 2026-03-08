@@ -1629,18 +1629,18 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
           <Separator className="my-6" />
 
           {/* Sales Price and Profit */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <label className="text-sm font-medium w-48">{t('costing_sales_price')}</label>
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <label className="text-xs sm:text-sm font-medium sm:w-48">{t('costing_sales_price')}</label>
               <div className="relative flex-1 max-w-xs">
-                <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 <Input
                   type="number"
                   min="0"
                   step="0.01"
                   value={salesPrice || ''}
                   onChange={(e) => setSalesPrice(parseFloat(e.target.value) || 0)}
-                  className="pl-9 text-lg font-bold"
+                  className="pl-8 sm:pl-9 text-base sm:text-lg font-bold"
                   placeholder="0.00"
                 />
               </div>
