@@ -219,15 +219,15 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t("add_manual_time_registration")}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className={`${isMobile ? 'max-w-[calc(100vw-1.5rem)] w-[calc(100vw-1.5rem)] p-4 max-h-[90vh] overflow-y-auto' : 'max-w-md'}`}>
+        <DialogHeader className={isMobile ? 'space-y-1' : ''}>
+          <DialogTitle className={isMobile ? 'text-base' : ''}>{t("add_manual_time_registration")}</DialogTitle>
+          <DialogDescription className={isMobile ? 'text-xs' : ''}>
             {t("create_new_time_registration_manually")}
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className={isMobile ? 'space-y-3' : 'space-y-4'}>
           <div className="space-y-2">
             <Label htmlFor="employee">{t("employee")}</Label>
             <Select value={formData.employee_id} onValueChange={(value) => setFormData(prev => ({ ...prev, employee_id: value }))}>
