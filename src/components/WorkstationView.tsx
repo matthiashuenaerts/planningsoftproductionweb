@@ -215,7 +215,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
     queryFn: async () => {
       if (!actualWorkstationName) return [];
       
-      const regularTasks = await taskService.getByWorkstation(actualWorkstationName);
+      const regularTasks = await taskService.getByWorkstation(actualWorkstationName, tenant?.id);
       const activeTasks = regularTasks.filter(task => task.status === 'TODO' || task.status === 'IN_PROGRESS');
       
       const tasksWithProjectInfo = await Promise.all(activeTasks.map(async (task) => {
