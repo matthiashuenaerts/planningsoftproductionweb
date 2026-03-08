@@ -368,6 +368,7 @@ const ServiceTeamCalendar: React.FC = () => {
   };
 
   const [mapDrivingMinutes, setMapDrivingMinutes] = useState<number | undefined>();
+  const [mapUnrecognized, setMapUnrecognized] = useState<string[]>([]);
 
   const handleShowMap = (teamId: string, dateStr: string, teamName: string) => {
     const routeKey = `${teamId}_${dateStr}`;
@@ -378,6 +379,7 @@ const ServiceTeamCalendar: React.FC = () => {
     setMapRouteGeometry(route.geometry);
     setMapStartPoint(route.startPoint);
     setMapDrivingMinutes(route.totalDrivingMinutes);
+    setMapUnrecognized(route.unrecognizedAddresses || []);
     setMapTeamName(teamName);
     setMapDateLabel(format(new Date(dateStr + 'T12:00:00'), 'EEEE, MMM d yyyy'));
     setMapOpen(true);
