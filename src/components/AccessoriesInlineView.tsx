@@ -378,11 +378,11 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
 
   const getRowClassName = (status: string) => {
     switch (status) {
-      case 'delivered': return 'bg-green-50 border-green-200';
-      case 'in_stock': return 'bg-blue-50 border-blue-200';
-      case 'ordered': return 'bg-yellow-50 border-yellow-200';
-      case 'to_order': return 'bg-orange-50 border-orange-200';
-      case 'to_check': return 'bg-gray-50 border-gray-200';
+      case 'delivered': return 'bg-green-100 border-green-300';
+      case 'in_stock': return 'bg-blue-100 border-blue-300';
+      case 'ordered': return 'bg-yellow-100 border-yellow-300';
+      case 'to_order': return 'bg-orange-100 border-orange-300';
+      case 'to_check': return 'bg-gray-100 border-gray-300';
       default: return '';
     }
   };
