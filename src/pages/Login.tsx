@@ -192,6 +192,8 @@ const Login: React.FC = () => {
         await supabase.rpc("set_developer_active_tenant", {
           p_tenant_id: row.tenant_id,
         });
+        // Re-fetch employee data so AuthContext picks up the effective tenant_id
+        await refetchEmployee();
       }
 
       logLoginAttempt({
