@@ -828,7 +828,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                   'flex-shrink-0 text-center border-r border-accent-foreground/20',
                   isWeekStart && 'border-l-2 border-l-accent-foreground/40'
                 )}
-                style={{ width: `calc((100% - 16rem) / ${dateRange.length})` }}
+                style={{ width: `calc((100% - ${sideColWidth}) / ${dateRange.length})` }}
               >
                 <div className="text-xs font-medium text-accent-foreground py-1">
                   {format(date, 'd-MM', { locale: nl })}
