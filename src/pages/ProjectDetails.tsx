@@ -1524,7 +1524,7 @@ const ProjectDetails = () => {
                             {orderItems[order.id] && orderItems[order.id].length > 0 && <div className="mb-2">
                                 <div className="flex items-center gap-1 mb-1">
                                   <Package className="h-3 w-3 text-primary" />
-                                  <span className="text-xs font-medium">{t('order_items')} ({orderItems[order.id].length})</span>
+                                  <span className="text-[10px] sm:text-xs font-medium">{t('order_items')} ({orderItems[order.id].length})</span>
                                 </div>
                                 <div className={cn("border rounded-lg p-3 space-y-2", order.status === 'delivered' ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200' : order.status === 'pending' ? 'bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200' : order.status === 'delayed' ? 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200' : order.status === 'canceled' ? 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200' : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200')}>
                                   {orderItems[order.id].map((item: any) => <div key={item.id} className={cn("flex justify-between items-center bg-white/80 backdrop-blur-sm rounded-md p-2 shadow-sm border", order.status === 'delivered' ? 'border-green-100' : order.status === 'pending' ? 'border-orange-100' : order.status === 'delayed' ? 'border-red-100' : order.status === 'canceled' ? 'border-gray-100' : 'border-blue-100')}>
