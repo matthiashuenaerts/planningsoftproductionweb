@@ -690,7 +690,7 @@ const ServiceTeamCalendar: React.FC = () => {
                             setIsAssignDialogOpen(true);
                           }}
                         >
-                          + Add Service
+                          {t('svc_add_service')}
                         </Button>
                         {dayProjects.length >= 2 && (
                           <>
