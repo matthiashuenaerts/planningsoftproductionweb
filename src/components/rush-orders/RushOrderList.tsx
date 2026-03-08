@@ -50,6 +50,7 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
   const [selectedOrder, setSelectedOrder] = useState<RushOrder | null>(null);
   
   const isAdmin = currentEmployee?.role === 'admin';
+  const isMobile = useIsMobile();
   
   const { data: rushOrders, isLoading, error, refetch } = useQuery({
     queryKey: ['rushOrders', statusFilter, tenant?.id],
