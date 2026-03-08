@@ -3,17 +3,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Camera, Upload, X, Package, MapPin, Printer, ChevronDown } from 'lucide-react';
+import { Camera, Upload, X, Package, MapPin, ChevronDown } from 'lucide-react';
 import { Order, OrderItem } from '@/types/order';
 import { orderService } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { LabelPrintDialog } from './LabelPrintDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface EnhancedDeliveryConfirmationModalProps {
   order: Order;
@@ -38,6 +38,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
   onClose,
   onConfirmed
 }) => {
+  const { t } = useLanguage();
   const [currentStep, setCurrentStep] = useState<DeliveryStep>('confirm');
   const [itemDeliveries, setItemDeliveries] = useState<ItemDelivery[]>([]);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -49,19 +50,16 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
 
-  // Fetch order items
   const { data: orderItems = [], isLoading } = useQuery({
     queryKey: ['order-items', order.id],
     queryFn: () => orderService.getOrderItems(order.id),
     enabled: isOpen
   });
 
-  // Fetch location suggestions - prioritize project locations
   const fetchLocationSuggestions = async (itemId: string) => {
     if (!order.project_id || locationSuggestions[itemId]) return;
 
     try {
-      // First, check if this project already has articles with assigned locations
       const { data: projectLocations, error: projectError } = await supabase
         .from('order_items')
         .select(`
@@ -77,24 +75,11 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
       const projectLocationsList = [...new Set(projectLocations.map(item => item.stock_location).filter(Boolean))];
 
       if (projectLocationsList.length > 0) {
-        // Project has assigned locations - suggest those first
-        setLocationSuggestions(prev => ({
-          ...prev,
-          [itemId]: projectLocationsList
-        }));
+        setLocationSuggestions(prev => ({ ...prev, [itemId]: projectLocationsList }));
       } else {
-        // No locations assigned to this project yet - show free locations
         const [stockLocationsResult, usedLocationsResult] = await Promise.all([
-          supabase
-            .from('stock_locations')
-            .select('name')
-            .eq('is_active', true)
-            .order('display_order'),
-          supabase
-            .from('order_items')
-            .select('stock_location')
-            .not('stock_location', 'is', null)
-            .neq('stock_location', '')
+          supabase.from('stock_locations').select('name').eq('is_active', true).order('display_order'),
+          supabase.from('order_items').select('stock_location').not('stock_location', 'is', null).neq('stock_location', '')
         ]);
 
         if (stockLocationsResult.error) throw stockLocationsResult.error;
@@ -104,17 +89,13 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
         const usedLocations = new Set(usedLocationsResult.data.map(item => item.stock_location));
         const freeLocations = allLocations.filter(loc => !usedLocations.has(loc));
 
-        setLocationSuggestions(prev => ({
-          ...prev,
-          [itemId]: freeLocations
-        }));
+        setLocationSuggestions(prev => ({ ...prev, [itemId]: freeLocations }));
       }
     } catch (error) {
       console.error('Error fetching location suggestions:', error);
     }
   };
 
-  // Initialize item deliveries when order items are loaded
   useEffect(() => {
     if (orderItems.length > 0 && itemDeliveries.length === 0) {
       setItemDeliveries(
@@ -122,9 +103,9 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
           const remainingQuantity = item.quantity - (item.delivered_quantity || 0);
           return {
             itemId: item.id,
-            deliveredQuantity: 0, // Default to 0 - user must confirm
+            deliveredQuantity: 0,
             stockLocation: item.stock_location || '',
-            isFullyDelivered: false, // Default unchecked
+            isFullyDelivered: false,
             notDeliveredQuantity: remainingQuantity
           };
         })
@@ -134,58 +115,30 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
 
   const startCamera = async () => {
     try {
-      console.log('Starting camera with facingMode:', facingMode);
-      
-      // Stop any existing stream first
       stopCamera();
-      
-      const constraints = {
-        video: { 
-          facingMode,
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      };
-      
-      console.log('Requesting camera with constraints:', constraints);
+      const constraints = { video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } } };
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-      console.log('Camera stream obtained:', mediaStream);
-      
       setStream(mediaStream);
-      
-      // Wait a moment then set the video source
       setTimeout(() => {
         if (videoRef.current && mediaStream) {
-          console.log('Setting video srcObject');
           videoRef.current.srcObject = mediaStream;
           videoRef.current.onloadedmetadata = () => {
-            console.log('Video metadata loaded, attempting to play');
-            if (videoRef.current) {
-              videoRef.current.play()
-                .then(() => console.log('Video playing successfully'))
-                .catch(error => console.error('Error playing video:', error));
-            }
+            videoRef.current?.play().catch(error => console.error('Error playing video:', error));
           };
         }
       }, 100);
-      
-    } catch (error) {
-      console.error('Error accessing camera:', error);
+    } catch (error: any) {
       toast({
-        title: "Camera Error",
-        description: `Camera failed: ${error.message}. Please try again.`,
+        title: t('ed_camera_error'),
+        description: (t('ed_camera_error_desc') || '').replace('{{message}}', error.message),
         variant: "destructive"
       });
     }
   };
 
   const stopCamera = () => {
-    console.log('Stopping camera');
     if (stream) {
-      stream.getTracks().forEach(track => {
-        console.log('Stopping track:', track);
-        track.stop();
-      });
+      stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
     if (videoRef.current) {
@@ -198,10 +151,8 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
     if (videoRef.current && canvasRef.current) {
       const canvas = canvasRef.current;
       const video = videoRef.current;
-      
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      
       const context = canvas.getContext('2d');
       if (context) {
         context.drawImage(video, 0, 0);
@@ -218,14 +169,11 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
   const switchCamera = async () => {
     stopCamera();
     setFacingMode(facingMode === 'user' ? 'environment' : 'user');
-    // Wait a moment for the camera to fully release
-    setTimeout(() => {
-      startCamera();
-    }, 500);
+    setTimeout(() => startCamera(), 500);
   };
 
   const updateItemDelivery = (itemId: string, field: 'deliveredQuantity' | 'stockLocation' | 'isFullyDelivered', value: string | number | boolean) => {
-    setItemDeliveries(prev => 
+    setItemDeliveries(prev =>
       prev.map(item => {
         if (item.itemId === itemId) {
           if (field === 'isFullyDelivered') {
@@ -247,46 +195,38 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
 
   const confirmDelivery = async () => {
     setCurrentStep('uploading');
-    
     try {
-      // Upload captured images
       for (const imageData of capturedImages) {
         const blob = await fetch(imageData).then(r => r.blob());
         const file = new File([blob], `delivery-${Date.now()}.jpg`, { type: 'image/jpeg' });
         await orderService.uploadOrderAttachment(order.id, file);
       }
 
-      // Transform itemDeliveries to include cumulative delivered quantities
       const deliveryData = {
         itemDeliveries: itemDeliveries.map(delivery => {
           const orderItem = orderItems.find(item => item.id === delivery.itemId);
           const previouslyDelivered = orderItem?.delivered_quantity || 0;
-          const totalDelivered = previouslyDelivered + delivery.deliveredQuantity;
-          
           return {
             itemId: delivery.itemId,
-            deliveredQuantity: totalDelivered, // Total cumulative quantity
+            deliveredQuantity: previouslyDelivered + delivery.deliveredQuantity,
             stockLocation: delivery.stockLocation
           };
         })
       };
 
-      // Update order with delivery data
       await orderService.confirmDelivery(order.id, deliveryData);
 
       toast({
-        title: "Delivery Confirmed",
-        description: "Order delivery has been successfully confirmed.",
+        title: t('ed_delivery_confirmed'),
+        description: t('ed_delivery_confirmed_desc'),
       });
 
-      // Show label dialog immediately with delivery data
       setShowLabelDialog(true);
-
     } catch (error) {
       console.error('Error confirming delivery:', error);
       toast({
-        title: "Error",
-        description: "Failed to confirm delivery. Please try again.",
+        title: t('error'),
+        description: t('ed_delivery_error'),
         variant: "destructive"
       });
       setCurrentStep('camera');
@@ -311,11 +251,6 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
     }
   };
 
-  const allItemsFullyDelivered = itemDeliveries.every((delivery, index) => {
-    const item = orderItems[index];
-    return item && delivery.deliveredQuantity >= item.quantity;
-  });
-
   const someItemsDelivered = itemDeliveries.some((delivery) => delivery.deliveredQuantity > 0);
 
   if (isLoading) {
@@ -323,7 +258,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl">
           <div className="flex items-center justify-center p-8">
-            <div>Loading order items...</div>
+            <div>{t('ed_loading')}</div>
           </div>
         </DialogContent>
       </Dialog>
@@ -334,41 +269,45 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Confirm Delivery - {order.supplier}
+          <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
+            <Package className="h-5 w-5 shrink-0" />
+            <span className="truncate">
+              {(t('ed_confirm_delivery') || '').replace('{{supplier}}', order.supplier)}
+            </span>
           </DialogTitle>
         </DialogHeader>
 
         {currentStep === 'confirm' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-              <div>
-                <Label className="text-sm font-medium text-gray-600">Order ID</Label>
-                <div className="text-sm">{order.id}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+              <div className="min-w-0">
+                <Label className="text-sm font-medium text-muted-foreground">{t('ed_order_id')}</Label>
+                <div className="text-sm truncate">{order.id}</div>
               </div>
               <div>
-                <Label className="text-sm font-medium text-gray-600">Status</Label>
-                <Badge className={getStatusColor(order.status)}>
-                  {order.status.replace('_', ' ').toUpperCase()}
-                </Badge>
+                <Label className="text-sm font-medium text-muted-foreground">{t('ed_status')}</Label>
+                <div>
+                  <Badge className={getStatusColor(order.status)}>
+                    {order.status.replace('_', ' ').toUpperCase()}
+                  </Badge>
+                </div>
               </div>
               <div>
-                <Label className="text-sm font-medium text-gray-600">Expected Delivery</Label>
+                <Label className="text-sm font-medium text-muted-foreground">{t('ed_expected_delivery')}</Label>
                 <div className="text-sm">{new Date(order.expected_delivery).toLocaleDateString()}</div>
               </div>
               <div>
-                <Label className="text-sm font-medium text-gray-600">Order Date</Label>
+                <Label className="text-sm font-medium text-muted-foreground">{t('ed_order_date')}</Label>
                 <div className="text-sm">{new Date(order.order_date).toLocaleDateString()}</div>
               </div>
             </div>
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={handleClose}>
-                Cancel
+                {t('ed_cancel')}
               </Button>
               <Button onClick={() => setCurrentStep('items')}>
-                Continue to Items
+                {t('ed_continue_items')}
               </Button>
             </div>
           </div>
@@ -377,41 +316,40 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
         {currentStep === 'items' && (
           <div className="space-y-6">
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Delivery Details</h3>
+              <h3 className="text-lg font-semibold">{t('ed_delivery_details')}</h3>
               <div className="space-y-4 max-h-96 overflow-y-auto">
                 {orderItems.map((item, index) => {
                   const delivery = itemDeliveries[index];
                   if (!delivery) return null;
-
                   const remainingQuantity = item.quantity - (item.delivered_quantity || 0);
 
                   return (
-                    <div key={item.id} className="p-6 border rounded-lg">
-                      <div className="flex items-start justify-between gap-6">
-                        <div className="flex-1 space-y-3">
+                    <div key={item.id} className="p-4 md:p-6 border rounded-lg">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                        <div className="flex-1 space-y-3 min-w-0">
                           <div>
-                            <h4 className="text-lg font-semibold">{item.description}</h4>
-                            <p className="text-base text-muted-foreground">Article: {item.article_code}</p>
+                            <h4 className="text-base md:text-lg font-semibold truncate">{item.description}</h4>
+                            <p className="text-sm text-muted-foreground truncate">{t('ed_article')}: {item.article_code}</p>
                           </div>
-                          
-                          <div className="grid grid-cols-2 gap-4 text-sm">
+
+                          <div className="grid grid-cols-2 gap-2 text-sm">
                             <div>
-                              <span className="font-medium">Ordered:</span> {item.quantity}
+                              <span className="font-medium">{t('ed_ordered')}:</span> {item.quantity}
                             </div>
                             {item.delivered_quantity > 0 && (
                               <div>
-                                <span className="font-medium text-blue-600">Previously delivered:</span> {item.delivered_quantity}
+                                <span className="font-medium text-blue-600">{t('ed_previously_delivered')}:</span> {item.delivered_quantity}
                               </div>
                             )}
                             <div>
-                              <span className="font-medium text-green-600">Remaining:</span> {remainingQuantity}
+                              <span className="font-medium text-green-600">{t('ed_remaining')}:</span> {remainingQuantity}
                             </div>
                           </div>
 
                           {!delivery.isFullyDelivered && (
                             <div className="space-y-2">
                               <Label htmlFor={`delivered-${item.id}`} className="text-sm font-medium text-green-600">
-                                How many items are being delivered now?
+                                {t('ed_how_many_delivered')}
                               </Label>
                               <Input
                                 id={`delivered-${item.id}`}
@@ -424,7 +362,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                                 placeholder="0"
                               />
                               <p className="text-xs text-muted-foreground">
-                                Out of {remainingQuantity} remaining items
+                                {(t('ed_out_of_remaining') || '').replace('{{count}}', String(remainingQuantity))}
                               </p>
                             </div>
                           )}
@@ -433,7 +371,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                             <div>
                               <Label htmlFor={`location-${item.id}`} className="text-sm font-medium flex items-center gap-1">
                                 <MapPin className="h-4 w-4" />
-                                Stock Location
+                                {t('ed_stock_location')}
                               </Label>
                               <div className="flex gap-2 mt-1">
                                 <Input
@@ -441,7 +379,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                                   type="text"
                                   value={delivery.stockLocation}
                                   onChange={(e) => updateItemDelivery(item.id, 'stockLocation', e.target.value)}
-                                  placeholder="e.g., A1-B2, Warehouse 1"
+                                  placeholder={t('ed_location_placeholder')}
                                   className="flex-1"
                                 />
                                 {order.project_id && (
@@ -454,15 +392,15 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                                         className="px-3"
                                       >
                                         <ChevronDown className="h-4 w-4" />
-                                        Suggestions
+                                        <span className="hidden sm:inline ml-1">{t('ed_suggestions')}</span>
                                       </Button>
                                     </PopoverTrigger>
-                                     <PopoverContent className="w-60 p-0">
+                                    <PopoverContent className="w-60 p-0">
                                       <div className="p-2">
                                         <div className="text-sm font-medium mb-2 text-muted-foreground">
-                                          {locationSuggestions[item.id]?.some(loc => 
+                                          {locationSuggestions[item.id]?.some(loc =>
                                             orderItems.some(oi => oi.stock_location === loc)
-                                          ) ? 'Project locations:' : 'Available free locations:'}
+                                          ) ? t('ed_project_locations') : t('ed_free_locations')}
                                         </div>
                                         {locationSuggestions[item.id]?.length > 0 ? (
                                           <div className="space-y-1">
@@ -472,9 +410,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                                                 variant="ghost"
                                                 size="sm"
                                                 className="w-full justify-start text-left"
-                                                onClick={() => {
-                                                  updateItemDelivery(item.id, 'stockLocation', location);
-                                                }}
+                                                onClick={() => updateItemDelivery(item.id, 'stockLocation', location)}
                                               >
                                                 <MapPin className="h-3 w-3 mr-2" />
                                                 {location}
@@ -483,7 +419,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                                           </div>
                                         ) : (
                                           <div className="text-sm text-muted-foreground py-2">
-                                            No previous locations found for this project
+                                            {t('ed_no_locations')}
                                           </div>
                                         )}
                                       </div>
@@ -494,21 +430,20 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                             </div>
                           )}
                         </div>
-                        
-                        <div className="flex flex-col items-center space-y-3">
-                          <div className="flex flex-col items-center space-y-2">
-                            <Label className="text-sm font-medium text-center">All articles received</Label>
-                            <Checkbox
-                              id={`full-delivery-${item.id}`}
-                              checked={delivery.isFullyDelivered}
-                              onCheckedChange={(checked) => updateItemDelivery(item.id, 'isFullyDelivered', checked)}
-                              className="w-8 h-8 rounded-md"
-                            />
-                          </div>
-                          
+
+                        <div className="flex flex-row sm:flex-col items-center gap-3">
+                          <Label className="text-sm font-medium text-center">{t('ed_all_received')}</Label>
+                          <Checkbox
+                            id={`full-delivery-${item.id}`}
+                            checked={delivery.isFullyDelivered}
+                            onCheckedChange={(checked) => updateItemDelivery(item.id, 'isFullyDelivered', checked)}
+                            className="w-8 h-8 rounded-md"
+                          />
                           {delivery.isFullyDelivered && (
                             <div className="text-center">
-                              <div className="text-sm font-medium text-green-600">✓ All {remainingQuantity} items</div>
+                              <div className="text-sm font-medium text-green-600">
+                                ✓ {(t('ed_all_items') || '').replace('{{count}}', String(remainingQuantity))}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -521,13 +456,13 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setCurrentStep('confirm')}>
-                Back
+                {t('ed_back')}
               </Button>
-              <Button 
+              <Button
                 onClick={() => setCurrentStep('camera')}
                 disabled={!someItemsDelivered}
               >
-                Continue to Photo
+                {t('ed_continue_photo')}
               </Button>
             </div>
           </div>
@@ -536,9 +471,9 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
         {currentStep === 'camera' && (
           <div className="space-y-6">
             <div className="text-center">
-              <h3 className="text-lg font-semibold mb-2">Take Delivery Photos</h3>
-              <p className="text-sm text-gray-600">
-                Take photos of the delivery note and delivered items
+              <h3 className="text-lg font-semibold mb-2">{t('ed_take_photos')}</h3>
+              <p className="text-sm text-muted-foreground">
+                {t('ed_photos_description')}
               </p>
             </div>
 
@@ -550,41 +485,33 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-80 object-cover"
+                    className="w-full h-60 sm:h-80 object-cover"
                     style={{ background: '#000' }}
-                    onLoadedData={() => {
-                      console.log('Video data loaded');
-                      if (videoRef.current) {
-                        console.log('Video dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
-                      }
-                    }}
-                    onPlay={() => console.log('Video started playing')}
-                    onError={(e) => console.error('Video error:', e)}
                   />
                 ) : (
-                  <div className="w-full h-80 flex items-center justify-center text-white">
+                  <div className="w-full h-60 sm:h-80 flex items-center justify-center text-white">
                     <div className="text-center">
                       <Camera className="h-12 w-12 mx-auto mb-2" />
-                      <p>Camera not started</p>
+                      <p>{t('ed_camera_not_started')}</p>
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="flex justify-center gap-2">
+              <div className="flex flex-wrap justify-center gap-2">
                 {!stream ? (
-                  <Button onClick={startCamera}>
+                  <Button onClick={startCamera} size="sm">
                     <Camera className="h-4 w-4 mr-2" />
-                    Start Camera
+                    {t('ed_start_camera')}
                   </Button>
                 ) : (
                   <>
-                    <Button onClick={captureImage}>
+                    <Button onClick={captureImage} size="sm">
                       <Camera className="h-4 w-4 mr-2" />
-                      Capture Photo
+                      {t('ed_capture_photo')}
                     </Button>
-                    <Button variant="outline" onClick={switchCamera}>
-                      Switch Camera
+                    <Button variant="outline" size="sm" onClick={switchCamera}>
+                      {t('ed_switch_camera')}
                     </Button>
                   </>
                 )}
@@ -592,11 +519,13 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
 
               {capturedImages.length > 0 && (
                 <div>
-                  <h4 className="font-medium mb-2">Captured Images ({capturedImages.length})</h4>
+                  <h4 className="font-medium mb-2">
+                    {(t('ed_captured_images') || '').replace('{{count}}', String(capturedImages.length))}
+                  </h4>
                   <div className="grid grid-cols-3 gap-2">
                     {capturedImages.map((image, index) => (
                       <div key={index} className="relative">
-                        <img src={image} alt={`Captured ${index + 1}`} className="w-full h-32 object-cover rounded border" />
+                        <img src={image} alt={`Captured ${index + 1}`} className="w-full h-24 sm:h-32 object-cover rounded border" />
                         <Button
                           size="sm"
                           variant="destructive"
@@ -614,14 +543,15 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setCurrentStep('items')}>
-                Back
+                {t('ed_back')}
               </Button>
-              <Button 
+              <Button
                 onClick={confirmDelivery}
                 disabled={capturedImages.length === 0}
+                size="sm"
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Confirm Delivery
+                {t('ed_confirm_delivery_btn')}
               </Button>
             </div>
           </div>
@@ -631,8 +561,8 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
           <div className="text-center space-y-4 py-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
             <div>
-              <h3 className="text-lg font-semibold">Processing Delivery</h3>
-              <p className="text-sm text-gray-600">Uploading photos and updating order status...</p>
+              <h3 className="text-lg font-semibold">{t('ed_processing')}</h3>
+              <p className="text-sm text-muted-foreground">{t('ed_processing_desc')}</p>
             </div>
           </div>
         )}
