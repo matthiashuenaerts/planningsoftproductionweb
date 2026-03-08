@@ -95,6 +95,7 @@ const MarketingHome: React.FC = () => {
 
   return (
     <>
+      <SEOHead title={seo.title} description={seo.desc} path="/site" lang={lang} />
       {/* ── HERO ── */}
       <section className="relative overflow-hidden min-h-[92vh] flex items-center">
         <div className="absolute inset-0">

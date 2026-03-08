@@ -23,11 +23,19 @@ const features: FeatureBlock[] = [
   { titleKey: "feat_hr_title", descKey: "feat_hr_desc", bulletsKey: "feat_hr_bullets", image: "/images/marketing/dashboards.jpg" },
 ];
 
+const seoMeta: Record<string, { title: string; desc: string }> = {
+  nl: { title: "Functionaliteiten | AutoMattiOn Compass Productieplanning", desc: "Ontdek alle functionaliteiten: projectbeheer, Gantt planning, logistiek, spoedbestellingen, tijdsregistratie en meer." },
+  en: { title: "Features | AutoMattiOn Compass Production Planning", desc: "Discover all features: project management, Gantt planning, logistics, rush orders, time registration and more." },
+  fr: { title: "Fonctionnalités | AutoMattiOn Compass Planification", desc: "Découvrez toutes les fonctionnalités : gestion de projets, Gantt, logistique, commandes urgentes et plus." },
+};
+
 const MarketingFeatures: React.FC = () => {
-  const { t } = useMarketingLang();
+  const { lang, t } = useMarketingLang();
+  const seo = seoMeta[lang] || seoMeta.nl;
 
   return (
     <>
+      <SEOHead title={seo.title} description={seo.desc} path="/site/features" lang={lang} />
       {/* Hero header */}
       <section className="relative pt-28 pb-20 overflow-hidden">
         <div className="absolute inset-0">

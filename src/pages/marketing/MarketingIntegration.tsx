@@ -5,8 +5,15 @@ import integrationNetwork from "@/assets/marketing/integration-network.jpg";
 import heroDashboard from "@/assets/marketing/hero-dashboard.jpg";
 import SEOHead from "@/components/marketing/SEOHead";
 
+const seoMeta: Record<string, { title: string; desc: string }> = {
+  nl: { title: "Integratie | AutoMattiOn Compass & CrownBase Pro", desc: "Naadloze koppeling met CrownBase Pro: automatische synchronisatie, orderimport en open API architectuur." },
+  en: { title: "Integration | AutoMattiOn Compass & CrownBase Pro", desc: "Seamless CrownBase Pro integration: automatic sync, order import and open API architecture." },
+  fr: { title: "Intégration | AutoMattiOn Compass & CrownBase Pro", desc: "Intégration CrownBase Pro : synchronisation automatique, import de commandes et architecture API ouverte." },
+};
+
 const MarketingIntegration: React.FC = () => {
-  const { t } = useMarketingLang();
+  const { lang, t } = useMarketingLang();
+  const seo = seoMeta[lang] || seoMeta.nl;
 
   const integrations = [
     { key: "integration_sync", desc: "integration_sync_desc", Icon: RefreshCw },
@@ -22,6 +29,7 @@ const MarketingIntegration: React.FC = () => {
 
   return (
     <>
+      <SEOHead title={seo.title} description={seo.desc} path="/site/integration" lang={lang} />
       {/* Hero with network image */}
       <section className="relative pt-28 pb-20 overflow-hidden">
         <div className="absolute inset-0">
