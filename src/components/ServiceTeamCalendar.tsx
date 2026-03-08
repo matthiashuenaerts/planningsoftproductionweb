@@ -752,24 +752,45 @@ const ServiceTeamCalendar: React.FC = () => {
             </div>
             <div className="space-y-2">
               <Label>Project *</Label>
-              <Select value={assignProjectId} onValueChange={setAssignProjectId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a project" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects
-                    .filter(p => p.installation_date)
-                    .slice(0, 50)
-                    .map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        <div className="flex flex-col">
-                          <span>{p.name}</span>
-                          <span className="text-xs text-muted-foreground">{p.client} — {getProjectAddress(p)}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                    {assignProjectId ? (
+                      <span className="truncate">
+                        {projects.find(p => p.id === assignProjectId)?.name || 'Select a project'}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Search projects...</span>
+                    )}
+                    <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search by name, client, address..." />
+                    <CommandList>
+                      <CommandEmpty>No projects found.</CommandEmpty>
+                      <CommandGroup>
+                        {projects
+                          .filter(p => p.installation_date)
+                          .map(p => (
+                            <CommandItem
+                              key={p.id}
+                              value={`${p.name} ${p.client || ''} ${getProjectAddress(p)}`}
+                              onSelect={() => setAssignProjectId(p.id)}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", assignProjectId === p.id ? "opacity-100" : "opacity-0")} />
+                              <div className="flex flex-col">
+                                <span>{p.name}</span>
+                                <span className="text-xs text-muted-foreground">{p.client} — {getProjectAddress(p)}</span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <Label>Estimated Hours</Label>
