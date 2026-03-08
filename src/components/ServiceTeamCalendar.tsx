@@ -745,7 +745,7 @@ const ServiceTeamCalendar: React.FC = () => {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Date</Label>
+              <Label>{t('svc_date')}</Label>
               <Input value={selectedDate ? format(new Date(selectedDate + 'T12:00:00'), 'EEEE, MMM d yyyy') : ''} disabled />
             </div>
             <div className="space-y-2">
