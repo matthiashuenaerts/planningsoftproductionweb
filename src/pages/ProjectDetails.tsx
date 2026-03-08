@@ -1416,17 +1416,17 @@ const ProjectDetails = () => {
                     </div>
                   </CardContent>
                 </Card>}
-            </div> : activeTab === 'orders' ? <Card>
-              <CardHeader>
+            </div> : activeTab === 'orders' ? <Card className="overflow-hidden">
+              <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
                 <div className="flex items-center justify-between">
-                  <CardTitle>{t('orders')}</CardTitle>
-                  <Button onClick={() => setShowNewOrderModal(true)} size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
+                  <CardTitle className="text-base sm:text-2xl">{t('orders')}</CardTitle>
+                  <Button onClick={() => setShowNewOrderModal(true)} size="sm" className="h-8 text-xs sm:text-sm">
+                    <Plus className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     {t('add_order')}
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
                 <div className="space-y-4">
                   {orders.length === 0 ? <div className="text-center py-8">
                       <p className="text-muted-foreground">{t('no_orders_found')}</p>
@@ -1439,23 +1439,22 @@ const ProjectDetails = () => {
                   if (!orderAttachments[order.id]) {
                     loadOrderAttachments(order.id);
                   }
-                  return <div key={order.id} className={cn("border rounded-lg p-3 transition-all duration-200", order.status === 'delivered' ? 'bg-green-50 border-green-200' : order.status === 'delayed' ? 'bg-red-50 border-red-200' : order.status === 'pending' ? 'bg-orange-50 border-orange-200' : order.status === 'charged' ? 'bg-purple-50 border-purple-200' : 'bg-card border-border')}>
+                  return <div key={order.id} className={cn("border rounded-lg p-2.5 sm:p-3 transition-all duration-200", order.status === 'delivered' ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800' : order.status === 'delayed' ? 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800' : order.status === 'pending' ? 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800' : order.status === 'charged' ? 'bg-purple-50 border-purple-200 dark:bg-purple-950/20 dark:border-purple-800' : 'bg-card border-border')}>
                             {/* Compact Order Header */}
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-semibold text-base">{order.supplier}</h4>
-                                <div className="flex items-center gap-1">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2 mb-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <h4 className="font-semibold text-sm sm:text-base truncate">{order.supplier}</h4>
+                                <div className="flex items-center gap-1 flex-shrink-0">
                                   {getStatusIcon(order.status)}
-                                  <Badge className={cn("text-xs", getStatusColor(order.status))}>
+                                  <Badge className={cn("text-[10px] sm:text-xs h-5", getStatusColor(order.status))}>
                                     {order.status}
                                   </Badge>
                                 </div>
                               </div>
                               
-                              <div className="flex items-center gap-1">
-                                {/* Manual Status Editor */}
+                              <div className="flex flex-wrap items-center gap-1">
                                 <Select value={order.status} onValueChange={value => handleStatusChange(order.id, value)}>
-                                  <SelectTrigger className="w-28 h-7 text-xs bg-background border z-50">
+                                  <SelectTrigger className="w-24 sm:w-28 h-7 text-[10px] sm:text-xs bg-background border z-50">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent className="bg-background border z-50">
@@ -1467,19 +1466,17 @@ const ProjectDetails = () => {
                                   </SelectContent>
                                 </Select>
 
-                                {/* Charged in Truck Button */}
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleChargeInTruck(order.id)}
-                                  className="h-7 px-2 text-xs hover:bg-purple-50"
-                                  title="Charge in truck and clear locations"
+                                  className="h-7 px-1.5 sm:px-2 text-[10px] sm:text-xs hover:bg-purple-50"
+                                  title="Charge in truck"
                                 >
-                                  <Package className="h-3 w-3 mr-1" />
-                                  Charged in Truck
+                                  <Package className="h-3 w-3 sm:mr-1" />
+                                  <span className="hidden sm:inline">Charged in Truck</span>
                                 </Button>
 
-                                {/* Action Buttons */}
                                 <Button size="sm" variant="outline" onClick={() => handleEditOrder(order.id)} className="h-7 w-7 p-0 hover:bg-blue-50" title="Edit order">
                                   <Edit3 className="h-3 w-3" />
                                 </Button>
@@ -1491,7 +1488,7 @@ const ProjectDetails = () => {
                             </div>
 
                             {/* Compact Order Info with Enhanced Delivery Date */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs mb-2">
+                            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-[10px] sm:text-xs mb-2">
                               <div className={cn("flex items-center gap-1 p-2 rounded border", order.status === 'delivered' ? 'bg-green-50 border-green-200' : order.status === 'pending' ? 'bg-orange-50 border-orange-200' : order.status === 'delayed' ? 'bg-red-50 border-red-200' : order.status === 'canceled' ? 'bg-gray-50 border-gray-200' : order.status === 'charged' ? 'bg-purple-50 border-purple-200' : 'bg-blue-50 border-blue-200')}>
                                 <Calendar className={cn("h-3 w-3", order.status === 'delivered' ? 'text-green-600' : order.status === 'pending' ? 'text-orange-600' : order.status === 'delayed' ? 'text-red-600' : order.status === 'canceled' ? 'text-gray-600' : order.status === 'charged' ? 'text-purple-600' : 'text-blue-600')} />
                                 <div>
@@ -1527,24 +1524,24 @@ const ProjectDetails = () => {
                             {orderItems[order.id] && orderItems[order.id].length > 0 && <div className="mb-2">
                                 <div className="flex items-center gap-1 mb-1">
                                   <Package className="h-3 w-3 text-primary" />
-                                  <span className="text-xs font-medium">{t('order_items')} ({orderItems[order.id].length})</span>
+                                  <span className="text-[10px] sm:text-xs font-medium">{t('order_items')} ({orderItems[order.id].length})</span>
                                 </div>
-                                <div className={cn("border rounded-lg p-3 space-y-2", order.status === 'delivered' ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200' : order.status === 'pending' ? 'bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200' : order.status === 'delayed' ? 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200' : order.status === 'canceled' ? 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200' : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200')}>
-                                  {orderItems[order.id].map((item: any) => <div key={item.id} className={cn("flex justify-between items-center bg-white/80 backdrop-blur-sm rounded-md p-2 shadow-sm border", order.status === 'delivered' ? 'border-green-100' : order.status === 'pending' ? 'border-orange-100' : order.status === 'delayed' ? 'border-red-100' : order.status === 'canceled' ? 'border-gray-100' : 'border-blue-100')}>
+                                <div className={cn("border rounded-lg p-2 sm:p-3 space-y-1.5 sm:space-y-2", order.status === 'delivered' ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200' : order.status === 'pending' ? 'bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200' : order.status === 'delayed' ? 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200' : order.status === 'canceled' ? 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200' : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200')}>
+                                  {orderItems[order.id].map((item: any) => <div key={item.id} className={cn("flex justify-between items-start sm:items-center bg-white/80 backdrop-blur-sm rounded-md p-2 shadow-sm border gap-2", order.status === 'delivered' ? 'border-green-100' : order.status === 'pending' ? 'border-orange-100' : order.status === 'delayed' ? 'border-red-100' : order.status === 'canceled' ? 'border-gray-100' : 'border-blue-100')}>
                                       <div className="flex-1 min-w-0">
-                                        <span className="font-semibold text-sm text-gray-800">{item.description}</span>
-                                        {item.article_code && <div className={cn("text-xs font-medium mt-0.5", order.status === 'delivered' ? 'text-green-700' : order.status === 'pending' ? 'text-orange-700' : order.status === 'delayed' ? 'text-red-700' : order.status === 'canceled' ? 'text-gray-700' : 'text-blue-700')}>
+                                        <span className="font-semibold text-xs sm:text-sm text-gray-800 line-clamp-2">{item.description}</span>
+                                        {item.article_code && <div className={cn("text-[10px] sm:text-xs font-medium mt-0.5", order.status === 'delivered' ? 'text-green-700' : order.status === 'pending' ? 'text-orange-700' : order.status === 'delayed' ? 'text-red-700' : order.status === 'canceled' ? 'text-gray-700' : 'text-blue-700')}>
                                             Article: {item.article_code}
                                           </div>}
-                                        {order.status === 'delivered' && item.stock_location && <div className="text-xs font-semibold text-green-800 mt-0.5 flex items-center gap-1">
-                                            <MapPin className="h-3 w-3" />
+                                        {order.status === 'delivered' && item.stock_location && <div className="text-[10px] sm:text-xs font-semibold text-green-800 mt-0.5 flex items-center gap-1">
+                                            <MapPin className="h-2.5 w-2.5 sm:h-3 sm:w-3 flex-shrink-0" />
                                             Location: {item.stock_location}
                                           </div>}
-                                        {item.notes && <div className="text-xs text-gray-600 mt-0.5 italic">
+                                        {item.notes && <div className="text-[10px] sm:text-xs text-gray-600 mt-0.5 italic line-clamp-2">
                                             Note: {item.notes}
                                           </div>}
                                       </div>
-                                      <div className="flex items-center gap-1 ml-2">
+                                      <div className="flex items-center gap-1 flex-shrink-0">
                                         <Button
                                           variant="ghost"
                                           size="sm"
@@ -1557,7 +1554,7 @@ const ProjectDetails = () => {
                                         >
                                           <Printer className="h-3 w-3" />
                                         </Button>
-                                        <span className={cn("text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm", order.status === 'delivered' ? 'bg-gradient-to-r from-green-500 to-emerald-500' : order.status === 'pending' ? 'bg-gradient-to-r from-orange-500 to-amber-500' : order.status === 'delayed' ? 'bg-gradient-to-r from-red-500 to-rose-500' : order.status === 'canceled' ? 'bg-gradient-to-r from-gray-500 to-slate-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500')}>
+                                        <span className={cn("text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold shadow-sm whitespace-nowrap", order.status === 'delivered' ? 'bg-gradient-to-r from-green-500 to-emerald-500' : order.status === 'pending' ? 'bg-gradient-to-r from-orange-500 to-amber-500' : order.status === 'delayed' ? 'bg-gradient-to-r from-red-500 to-rose-500' : order.status === 'canceled' ? 'bg-gradient-to-r from-gray-500 to-slate-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500')}>
                                           {item.delivered_quantity || 0}/{item.quantity}
                                         </span>
                                       </div>
