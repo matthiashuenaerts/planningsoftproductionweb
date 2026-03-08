@@ -128,6 +128,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setSession(session);
       setUser(session?.user ?? null);
 
+      // Don't fetch employee data or trigger redirects during password recovery
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsLoading(false);
+        return;
+      }
+
       if (session?.user) {
         setTimeout(() => {
           fetchEmployeeData(session.user.id);
