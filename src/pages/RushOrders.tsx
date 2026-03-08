@@ -28,83 +28,77 @@ const RushOrders = () => {
   const isMobile = useIsMobile();
   const { tenant } = useTenant();
   
-  // Allow all authenticated roles to create rush orders
   const canCreateRushOrder = !!currentEmployee;
   
   const handleCreateSuccess = () => {
     setIsCreateDialogOpen(false);
-    // Refresh the rush orders list
     queryClient.invalidateQueries({ queryKey: ['rushOrders'] });
   };
 
-  // Fetch all rush orders to get counts - with more frequent refetching
   const { data: allRushOrders } = useQuery({
     queryKey: ['rushOrders', 'all', tenant?.id],
     queryFn: () => rushOrderService.getAllRushOrders(tenant?.id),
-    refetchInterval: 15000, // Refetch every 15 seconds
+    refetchInterval: 15000,
   });
 
-  // Count orders by status
   const pendingCount = allRushOrders?.filter(order => order.status === 'pending').length || 0;
   const inProgressCount = allRushOrders?.filter(order => order.status === 'in_progress').length || 0;
   const completedCount = allRushOrders?.filter(order => order.status === 'completed').length || 0;
   
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-background">
       {!isMobile && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold">{t('rush_orders')}</h1>
-            
-            {/* Only show add button to users with permission */}
-            {canCreateRushOrder && (
-              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-red-600 hover:bg-red-700">
-                    <Plus className="mr-1 h-4 w-4" /> {t('new_rush_order')}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
-                  <DialogHeader>
-                    <DialogTitle>{t('create_new_rush_order')}</DialogTitle>
-                    <DialogDescription>
-                      {t('create_new_rush_order_desc')}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <NewRushOrderForm onSuccess={handleCreateSuccess} />
-                </DialogContent>
-              </Dialog>
-            )}
-          </div>
+      {isMobile && <Navbar />}
+      <div className={`flex-1 min-w-0 p-4 md:p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">{t('rush_orders')}</h1>
           
-          <Tabs defaultValue="pending" className="mb-6">
-            <TabsList>
-              <TabsTrigger value="pending">
-                {t('pending')} ({pendingCount})
-              </TabsTrigger>
-              <TabsTrigger value="in_progress">
-                {t('in_progress')} ({inProgressCount})
-              </TabsTrigger>
-              <TabsTrigger value="completed">
-                {t('completed')} ({completedCount})
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="pending" className="mt-6">
-              <RushOrderList statusFilter="pending" />
-            </TabsContent>
-            <TabsContent value="in_progress" className="mt-6">
-              <RushOrderList statusFilter="in_progress" />
-            </TabsContent>
-            <TabsContent value="completed" className="mt-6">
-              <RushOrderList statusFilter="completed" />
-            </TabsContent>
-          </Tabs>
+          {canCreateRushOrder && (
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-red-600 hover:bg-red-700 shrink-0" size={isMobile ? "sm" : "default"}>
+                  <Plus className="mr-1 h-4 w-4" /> {t('new_rush_order')}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+                <DialogHeader>
+                  <DialogTitle>{t('create_new_rush_order')}</DialogTitle>
+                  <DialogDescription>
+                    {t('create_new_rush_order_desc')}
+                  </DialogDescription>
+                </DialogHeader>
+                <NewRushOrderForm onSuccess={handleCreateSuccess} />
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
+        
+        <Tabs defaultValue="pending" className="mb-6">
+          <TabsList className="flex-wrap h-auto">
+            <TabsTrigger value="pending" className="text-xs sm:text-sm">
+              {t('pending')} ({pendingCount})
+            </TabsTrigger>
+            <TabsTrigger value="in_progress" className="text-xs sm:text-sm">
+              {t('in_progress')} ({inProgressCount})
+            </TabsTrigger>
+            <TabsTrigger value="completed" className="text-xs sm:text-sm">
+              {t('completed')} ({completedCount})
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="pending" className="mt-4 md:mt-6">
+            <RushOrderList statusFilter="pending" />
+          </TabsContent>
+          <TabsContent value="in_progress" className="mt-4 md:mt-6">
+            <RushOrderList statusFilter="in_progress" />
+          </TabsContent>
+          <TabsContent value="completed" className="mt-4 md:mt-6">
+            <RushOrderList statusFilter="completed" />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
