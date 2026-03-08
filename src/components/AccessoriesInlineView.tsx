@@ -533,10 +533,10 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
   return (
     <div className="space-y-4 min-w-0 w-full overflow-hidden">
       <Card className="min-w-0 overflow-hidden">
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>Accessories</CardTitle>
-            <div className="flex flex-wrap gap-2">
+        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <CardTitle className="text-sm sm:text-lg">Accessories</CardTitle>
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
               <ProductSelector 
                 onProductSelect={handleProductSelect} 
                 onGroupSelect={handleGroupSelect}
@@ -546,45 +546,53 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                 onClick={() => setShowForm(!showForm)}
                 size="sm"
                 variant="outline"
+                className="h-7 sm:h-8 text-xs sm:text-sm"
               >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Custom Accessory
+                <Plus className="mr-1 sm:mr-2 h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Add Custom Accessory</span>
+                <span className="sm:hidden">Custom</span>
               </Button>
               <Button
                 onClick={() => setShowCsvImporter(!showCsvImporter)}
                 size="sm"
                 variant="outline"
+                className="h-7 sm:h-8 text-xs sm:text-sm"
               >
-                <Upload className="mr-2 h-4 w-4" />
-                Import CSV
+                <Upload className="mr-1 sm:mr-2 h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Import CSV</span>
+                <span className="sm:hidden">CSV</span>
               </Button>
               {selectedAccessories.length > 0 && (
                 <Button
                   onClick={handleCreateOrderFromAccessories}
                   size="sm"
+                  className="h-7 sm:h-8 text-xs sm:text-sm"
                 >
-                  <ShoppingCart className="mr-2 h-4 w-4" />
-                  Create Order ({selectedAccessories.length})
+                  <ShoppingCart className="mr-1 h-3.5 w-3.5" />
+                  Order ({selectedAccessories.length})
                 </Button>
               )}
               <Button
                 onClick={handleOpenQrDialog}
                 size="sm"
                 variant="outline"
+                className="h-7 sm:h-8 text-xs sm:text-sm"
               >
-                <QrCode className="mr-2 h-4 w-4" />
-                QR Codes
+                <QrCode className="mr-1 sm:mr-2 h-3.5 w-3.5" />
+                <span className="hidden sm:inline">QR Codes</span>
+                <span className="sm:hidden">QR</span>
               </Button>
               {processingArticleCount > 0 && (
                 <Button
                   onClick={() => setShowProcessingArticles(!showProcessingArticles)}
                   size="sm"
                   variant={showProcessingArticles ? "default" : "outline"}
+                  className="h-7 sm:h-8 text-xs sm:text-sm"
                 >
                   {showProcessingArticles ? (
-                    <EyeOff className="mr-2 h-4 w-4" />
+                    <EyeOff className="mr-1 h-3.5 w-3.5" />
                   ) : (
-                    <Eye className="mr-2 h-4 w-4" />
+                    <Eye className="mr-1 h-3.5 w-3.5" />
                   )}
                   Processing ({processingArticleCount})
                 </Button>
