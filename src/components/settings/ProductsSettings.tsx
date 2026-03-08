@@ -937,8 +937,9 @@ const ProductsSettings: React.FC = () => {
                       />
                       {editingProduct?.image_path && !imageFile && (
                         <div className="mt-2">
-                          <img
-                            src={getImageUrl(editingProduct.image_path) || ''}
+                          <SignedStorageImage
+                            bucket="product-images"
+                            path={editingProduct.image_path}
                             alt="Current product"
                             className="h-20 w-20 object-cover rounded"
                           />
