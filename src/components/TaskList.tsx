@@ -447,10 +447,10 @@ const TaskList: React.FC<TaskListProps> = ({
                             <TrendingDown className="h-4 w-4 text-red-600" />
                           )}
                           <span className={`font-medium ${task.efficiency_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {task.efficiency_percentage >= 0 ? '+' : ''}{task.efficiency_percentage}% efficiency
+                            {task.efficiency_percentage >= 0 ? '+' : ''}{t('tl_efficiency', { value: task.efficiency_percentage })}
                           </span>
-                          <span className="text-xs text-gray-500">
-                            ({task.efficiency_percentage >= 0 ? 'faster' : 'slower'} than expected)
+                          <span className="text-xs text-muted-foreground">
+                            ({task.efficiency_percentage >= 0 ? t('tl_faster_than_expected') : t('tl_slower_than_expected')})
                           </span>
                         </div>
                       )}
