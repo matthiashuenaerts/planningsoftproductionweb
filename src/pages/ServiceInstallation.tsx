@@ -437,14 +437,14 @@ const ServiceInstallation: React.FC = () => {
 
           {loading ? (
             <div className="flex justify-center items-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <Loader2 className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} animate-spin text-muted-foreground`} />
             </div>
           ) : !routeData || routeData.stops.length === 0 ? (
             <Card>
-              <CardContent className="py-12 text-center">
-                <Navigation className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">{t('si_no_stops_today')}</h3>
-                <p className="text-muted-foreground">{t('si_no_stops_desc')}</p>
+              <CardContent className={`${isMobile ? 'py-8' : 'py-12'} text-center`}>
+                <Navigation className={`mx-auto ${isMobile ? 'h-10 w-10 mb-3' : 'h-12 w-12 mb-4'} text-muted-foreground`} />
+                <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold mb-1.5`}>{t('si_no_stops_today')}</h3>
+                <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>{t('si_no_stops_desc')}</p>
               </CardContent>
             </Card>
           ) : (
