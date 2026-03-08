@@ -924,8 +924,8 @@ const Dashboard: React.FC = () => {
             const dayAssignments = getAssignmentsForDate(date);
             const dayServiceAssignments = getServiceAssignmentsForDate(date);
             const isCurrentDay = isToday(date);
-            return <div key={index} className={cn("min-h-[80px] sm:min-h-[120px] border rounded-lg p-1.5 sm:p-2", isCurrentDay ? "border-red-500 bg-red-50" : "border-border")}>
-                  <div className={cn("text-center text-xs sm:text-sm font-medium mb-1 sm:mb-2", isCurrentDay ? "text-red-700" : "text-muted-foreground")}>
+            return <div key={index} className={cn("min-h-[80px] sm:min-h-[120px] border rounded-xl p-1.5 sm:p-2 transition-colors", isCurrentDay ? "border-primary/50 bg-primary/5 shadow-sm" : "border-border/60 hover:border-border")}>
+                  <div className={cn("text-center text-xs sm:text-sm font-medium mb-1 sm:mb-2", isCurrentDay ? "text-primary" : "text-muted-foreground")}>
                     <div className="text-[10px] sm:text-xs uppercase tracking-wide">{format(date, 'EEE')}</div>
                     <div className="text-sm sm:text-lg font-bold">{format(date, 'd')}</div>
                   </div>
