@@ -504,7 +504,7 @@ const TaskList: React.FC<TaskListProps> = ({
                 <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
                   <div className="flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
-                    <span>Due: {new Date(task.due_date).toLocaleDateString()}</span>
+                    <span>{t('tl_due_label', { date: new Date(task.due_date).toLocaleDateString() })}</span>
                   </div>
                   {task.status === 'IN_PROGRESS' && task.assignee_name && (
                     <div className="flex items-center gap-1">
