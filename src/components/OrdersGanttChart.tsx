@@ -818,7 +818,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
 
         {/* Day headers */}
         <div className="flex bg-accent">
-          <div className="w-64 flex-shrink-0" /> {/* Spacer for team names */}
+          <div className={`${sideColClass} flex-shrink-0`} /> {/* Spacer for team names */}
           {dateRange.map((date, idx) => {
             const isWeekStart = date.getDay() === 1;
             return (
