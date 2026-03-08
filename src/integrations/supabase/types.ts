@@ -2059,6 +2059,57 @@ export type Database = {
           },
         ]
       }
+      login_logs: {
+        Row: {
+          created_at: string
+          employee_id: string | null
+          employee_name: string
+          error_message: string | null
+          id: string
+          ip_address: string | null
+          login_method: string
+          success: boolean
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id?: string | null
+          employee_name: string
+          error_message?: string | null
+          id?: string
+          ip_address?: string | null
+          login_method?: string
+          success?: boolean
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string | null
+          employee_name?: string
+          error_message?: string | null
+          id?: string
+          ip_address?: string | null
+          login_method?: string
+          success?: boolean
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "login_logs_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "login_logs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -6172,6 +6223,7 @@ export type Database = {
         Args: { required_roles: string[]; user_id: string }
         Returns: boolean
       }
+      cleanup_old_login_logs: { Args: never; Returns: undefined }
       clear_developer_active_tenant: { Args: never; Returns: undefined }
       create_storage_policy: {
         Args: {
