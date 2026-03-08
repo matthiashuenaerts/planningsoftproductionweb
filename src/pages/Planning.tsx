@@ -2109,7 +2109,7 @@ const Planning = () => {
                 </Button>
                 
                 {isAdmin && (
-                  <div className="flex space-x-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       onClick={() => setShowStandardTaskAssignment(true)}
                       variant="outline"
