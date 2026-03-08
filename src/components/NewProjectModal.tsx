@@ -835,12 +835,12 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[700px] max-h-[90vh] p-4 sm:p-6">
+      <DialogContent className="w-[calc(100vw-1rem)] sm:w-[95vw] max-w-[700px] max-h-[85vh] sm:max-h-[90vh] p-3 sm:p-6 rounded-lg">
         <DialogHeader>
-          <DialogTitle>{t('npm_create_new_project')}</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg">{t('npm_create_new_project')}</DialogTitle>
         </DialogHeader>
         
-        <ScrollArea className="max-h-[70vh] pr-4">
+        <ScrollArea className="max-h-[65vh] sm:max-h-[70vh] pr-2 sm:pr-4">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
               
