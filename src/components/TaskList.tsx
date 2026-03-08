@@ -569,7 +569,7 @@ const TaskList: React.FC<TaskListProps> = ({
                           onClick={() => handleStatusChange(task, 'COMPLETED')}
                           className="bg-green-600 hover:bg-green-700 relative"
                           disabled={isLoading || !canComplete}
-                          title={!canComplete ? 'Multiple users are working on this task' : ''}
+                          title={!canComplete ? t('tl_multiple_users_tooltip') : ''}
                         >
                           {isLoading ? (
                             <>
