@@ -1658,7 +1658,7 @@ const ProjectDetails = () => {
                 <CardHeader className="py-3 sm:py-[15px] px-3 sm:px-6">
                   <CardTitle className="text-base sm:text-2xl">{t('project_summary')}</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
+                <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-5">
                   {/* Status + Progress inline on mobile */}
                   <div className="flex items-center gap-3 sm:block sm:space-y-4">
                     <div className="flex-shrink-0">
