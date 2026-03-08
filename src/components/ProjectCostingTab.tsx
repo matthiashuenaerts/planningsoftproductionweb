@@ -928,76 +928,76 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
   const profitMargin = calculateProfitMargin();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header with Export Button */}
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          <Calculator className="h-5 w-5" />
+        <h2 className="text-base sm:text-xl font-semibold flex items-center gap-1.5 sm:gap-2">
+          <Calculator className="h-4 w-4 sm:h-5 sm:w-5" />
           {t('costing_title')}
         </h2>
-        <Button onClick={exportToPdf} variant="outline" className="gap-2">
-          <Download className="h-4 w-4" />
+        <Button onClick={exportToPdf} variant="outline" className="gap-1.5 sm:gap-2 h-8 sm:h-9 text-xs sm:text-sm">
+          <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           {t('costing_export_pdf')}
         </Button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              <div>
-                <p className="text-sm text-muted-foreground">{t('costing_total_labor_time')}</p>
-                <p className="text-2xl font-bold">{formatTime(costingSummary.totalLaborMinutes)}</p>
+          <CardContent className="pt-3 sm:pt-6 px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-sm text-muted-foreground truncate">{t('costing_total_labor_time')}</p>
+                <p className="text-lg sm:text-2xl font-bold">{formatTime(costingSummary.totalLaborMinutes)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-blue-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">{t('costing_labor_cost')}</p>
-                <p className="text-xl font-bold">{formatCurrency(costingSummary.totalLaborCost)}</p>
+          <CardContent className="pt-3 sm:pt-6 px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-sm text-muted-foreground truncate">{t('costing_labor_cost')}</p>
+                <p className="text-base sm:text-xl font-bold truncate">{formatCurrency(costingSummary.totalLaborCost)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5 text-orange-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">{t('costing_order_materials')}</p>
-                <p className="text-xl font-bold">{formatCurrency(costingSummary.totalOrderCost)}</p>
+          <CardContent className="pt-3 sm:pt-6 px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-sm text-muted-foreground truncate">{t('costing_order_materials')}</p>
+                <p className="text-base sm:text-xl font-bold truncate">{formatCurrency(costingSummary.totalOrderCost)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <Wrench className="h-5 w-5 text-purple-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">{t('accessories')}</p>
-                <p className="text-xl font-bold">{formatCurrency(costingSummary.totalAccessoryCost)}</p>
+          <CardContent className="pt-3 sm:pt-6 px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <Wrench className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-sm text-muted-foreground truncate">{t('accessories')}</p>
+                <p className="text-base sm:text-xl font-bold truncate">{formatCurrency(costingSummary.totalAccessoryCost)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-primary/5 border-primary">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              <div>
-                <p className="text-sm text-muted-foreground">{t('costing_total_cost')}</p>
-                <p className="text-xl font-bold text-primary">{formatCurrency(totalCost)}</p>
+        <Card className="bg-primary/5 border-primary col-span-2 sm:col-span-1">
+          <CardContent className="pt-3 sm:pt-6 px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-sm text-muted-foreground truncate">{t('costing_total_cost')}</p>
+                <p className="text-base sm:text-xl font-bold text-primary truncate">{formatCurrency(totalCost)}</p>
               </div>
             </div>
           </CardContent>
@@ -1006,16 +1006,16 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
 
       {/* Labor Breakdown */}
       <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center flex-wrap gap-4">
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
+        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-4">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
               {t('costing_labor_breakdown')}
             </CardTitle>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Marge:</span>
-                <div className="relative w-20">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="text-xs sm:text-sm text-muted-foreground">Marge:</span>
+                <div className="relative w-16 sm:w-20">
                   <Input
                     type="number"
                     min="0"
@@ -1023,33 +1023,35 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     step="1"
                     value={margins.labor}
                     onChange={(e) => setMargins(prev => ({ ...prev, labor: parseFloat(e.target.value) || 0 }))}
-                    className="h-8 pr-6 text-right text-sm"
+                    className="h-7 sm:h-8 pr-5 sm:pr-6 text-right text-xs sm:text-sm"
                   />
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                  <span className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs sm:text-sm">%</span>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1 sm:gap-2">
                 <Button 
                   variant={viewMode === 'employee' ? 'default' : 'outline'} 
                   size="sm"
                   onClick={() => setViewMode('employee')}
+                  className="h-7 sm:h-8 text-[10px] sm:text-sm px-2 sm:px-3"
                 >
-                  <Users className="h-4 w-4 mr-1" />
+                  <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
                   {t('costing_by_employee')}
                 </Button>
                 <Button 
                   variant={viewMode === 'task' ? 'default' : 'outline'} 
                   size="sm"
                   onClick={() => setViewMode('task')}
+                  className="h-7 sm:h-8 text-[10px] sm:text-sm px-2 sm:px-3"
                 >
-                  <FileText className="h-4 w-4 mr-1" />
+                  <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
                   {t('costing_by_task')}
                 </Button>
               </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
           {viewMode === 'employee' ? (
             costingSummary.employeeCosts.length > 0 ? (
               <div className="space-y-2">
@@ -1059,17 +1061,17 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                       onClick={() => toggleEmployee(emp.employeeId)}
                       className="w-full"
                     >
-                      <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
-                        <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-between p-2.5 sm:p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                           {expandedEmployees.has(emp.employeeId) ? (
-                            <ChevronDown className="h-4 w-4" />
+                            <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                           ) : (
-                            <ChevronRight className="h-4 w-4" />
+                            <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                           )}
-                          <span className="font-medium">{emp.employeeName}</span>
-                          <Badge variant="secondary">{emp.taskCount} {t('tasks')}</Badge>
+                          <span className="font-medium text-xs sm:text-sm truncate">{emp.employeeName}</span>
+                          <Badge variant="secondary" className="text-[10px] sm:text-xs flex-shrink-0">{emp.taskCount} {t('tasks')}</Badge>
                         </div>
-                        <div className="flex items-center gap-6 text-sm">
+                        <div className="flex items-center gap-3 sm:gap-6 text-[10px] sm:text-sm flex-shrink-0">
                           <span className="text-muted-foreground">{formatTime(emp.totalMinutes)}</span>
                           <span className="font-medium">{formatCurrency(emp.totalCost)}</span>
                         </div>
@@ -1101,9 +1103,9 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     </CollapsibleContent>
                   </Collapsible>
                 ))}
-                <div className="flex justify-between p-3 bg-primary/10 rounded-lg font-bold">
+                <div className="flex justify-between p-2.5 sm:p-3 bg-primary/10 rounded-lg font-bold text-xs sm:text-sm">
                   <span>{t('total')} (+{margins.labor}%)</span>
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-3 sm:gap-6">
                     <span>{formatTime(costingSummary.totalLaborMinutes)}</span>
                     <span className="text-primary">{formatCurrency(costingSummary.totalLaborCost * (1 + margins.labor / 100))}</span>
                   </div>
@@ -1121,23 +1123,23 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                       onClick={() => toggleTask(task.taskId)}
                       className="w-full"
                     >
-                      <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
-                        <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-between p-2.5 sm:p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                           {expandedTasks.has(task.taskId) ? (
-                            <ChevronDown className="h-4 w-4" />
+                            <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                           ) : (
-                            <ChevronRight className="h-4 w-4" />
+                            <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                           )}
-                          <div>
-                            <span className="font-medium">{task.taskTitle}</span>
-                            <Badge variant="outline" className="ml-2">{task.phaseName}</Badge>
+                          <div className="min-w-0">
+                            <span className="font-medium text-xs sm:text-sm truncate block">{task.taskTitle}</span>
+                            <Badge variant="outline" className="text-[10px] sm:text-xs mt-0.5">{task.phaseName}</Badge>
                           </div>
                         </div>
-                        <div className="flex items-center gap-6 text-sm">
+                        <div className="flex items-center gap-3 sm:gap-6 text-[10px] sm:text-sm flex-shrink-0">
                           <span className="text-muted-foreground">
                             {formatTime(task.actualMinutes)}
                             {task.estimatedMinutes > 0 && (
-                              <span className="text-xs ml-1">
+                              <span className="hidden sm:inline text-xs ml-1">
                                 / {formatTime(task.estimatedMinutes)}
                               </span>
                             )}
@@ -1192,15 +1194,15 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
 
       {/* Order Materials */}
       <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center flex-wrap gap-4">
-            <CardTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
+        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-4">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+              <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
               {t('costing_order_materials')}
             </CardTitle>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Marge:</span>
-              <div className="relative w-20">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="text-xs sm:text-sm text-muted-foreground">Marge:</span>
+              <div className="relative w-16 sm:w-20">
                 <Input
                   type="number"
                   min="0"
@@ -1208,65 +1210,109 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                   step="1"
                   value={margins.orderMaterials}
                   onChange={(e) => setMargins(prev => ({ ...prev, orderMaterials: parseFloat(e.target.value) || 0 }))}
-                  className="h-8 pr-6 text-right text-sm"
+                  className="h-7 sm:h-8 pr-5 sm:pr-6 text-right text-xs sm:text-sm"
                 />
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                <span className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs sm:text-sm">%</span>
               </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
           {costingSummary.orderItems.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('supplier')}</TableHead>
-                  <TableHead>{t('article_code')}</TableHead>
-                  <TableHead>{t('description')}</TableHead>
-                  <TableHead className="text-right">{t('quantity')}</TableHead>
-                  <TableHead className="text-right">{t('costing_unit_price')}</TableHead>
-                  <TableHead className="text-right">{t('total')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Mobile card layout */}
+              <div className="sm:hidden space-y-2">
                 {costingSummary.orderItems.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <Badge variant="outline">{item.supplier}</Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{item.articleCode || '-'}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{item.description}</TableCell>
-                    <TableCell className="text-right">{item.quantity}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="relative w-24 ml-auto">
-                        <Euro className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                  <div key={item.id} className="p-2.5 border rounded-lg bg-muted/30">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="min-w-0 flex-1">
+                        <Badge variant="outline" className="text-[10px] mb-1">{item.supplier}</Badge>
+                        <p className="text-xs font-medium line-clamp-2">{item.description}</p>
+                        {item.articleCode && <p className="text-[10px] text-muted-foreground mt-0.5">{item.articleCode}</p>}
+                      </div>
+                      <span className="text-xs font-bold flex-shrink-0">{formatCurrency(item.totalPrice)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[10px] text-muted-foreground">×{item.quantity}</span>
+                      <div className="relative w-20 ml-auto">
+                        <Euro className="absolute left-1.5 top-1/2 -translate-y-1/2 h-2.5 w-2.5 text-muted-foreground" />
                         <Input
                           type="number"
                           min="0"
                           step="0.01"
                           value={item.unitPrice || ''}
                           onChange={(e) => updateOrderItemPrice(item.id, parseFloat(e.target.value) || 0)}
-                          className="h-8 pl-6 text-right text-sm"
+                          className="h-6 pl-5 text-right text-[10px]"
                           placeholder="0.00"
                         />
                       </div>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(item.totalPrice)}</TableCell>
-                  </TableRow>
-                ))}
-                <TableRow className="bg-muted/50 font-bold">
-                  <TableCell colSpan={5}>{t('costing_total_materials')}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex flex-col items-end">
-                      <span>{formatCurrency(costingSummary.totalOrderCost)}</span>
-                      <span className="text-xs text-muted-foreground font-normal">
-                        + {margins.orderMaterials}% = {formatCurrency(costingSummary.totalOrderCost * (1 + margins.orderMaterials / 100))}
-                      </span>
                     </div>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+                  </div>
+                ))}
+                <div className="p-2.5 bg-muted/50 rounded-lg font-bold text-xs flex justify-between">
+                  <span>{t('costing_total_materials')}</span>
+                  <div className="text-right">
+                    <span>{formatCurrency(costingSummary.totalOrderCost)}</span>
+                    <span className="block text-[10px] text-muted-foreground font-normal">
+                      +{margins.orderMaterials}% = {formatCurrency(costingSummary.totalOrderCost * (1 + margins.orderMaterials / 100))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {/* Desktop table */}
+              <div className="hidden sm:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t('supplier')}</TableHead>
+                      <TableHead>{t('article_code')}</TableHead>
+                      <TableHead>{t('description')}</TableHead>
+                      <TableHead className="text-right">{t('quantity')}</TableHead>
+                      <TableHead className="text-right">{t('costing_unit_price')}</TableHead>
+                      <TableHead className="text-right">{t('total')}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {costingSummary.orderItems.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <Badge variant="outline">{item.supplier}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{item.articleCode || '-'}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{item.description}</TableCell>
+                        <TableCell className="text-right">{item.quantity}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="relative w-24 ml-auto">
+                            <Euro className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.unitPrice || ''}
+                              onChange={(e) => updateOrderItemPrice(item.id, parseFloat(e.target.value) || 0)}
+                              className="h-8 pl-6 text-right text-sm"
+                              placeholder="0.00"
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(item.totalPrice)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-muted/50 font-bold">
+                      <TableCell colSpan={5}>{t('costing_total_materials')}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-col items-end">
+                          <span>{formatCurrency(costingSummary.totalOrderCost)}</span>
+                          <span className="text-xs text-muted-foreground font-normal">
+                            + {margins.orderMaterials}% = {formatCurrency(costingSummary.totalOrderCost * (1 + margins.orderMaterials / 100))}
+                          </span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           ) : (
             <p className="text-muted-foreground text-center py-4">{t('costing_no_orders')}</p>
           )}
@@ -1276,18 +1322,18 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
       {/* Accessories */}
       {costingSummary.accessories.length > 0 && (
         <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center flex-wrap gap-4">
-              <CardTitle className="flex items-center gap-2">
-                <Wrench className="h-5 w-5" />
+          <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-4">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+                <Wrench className="h-4 w-4 sm:h-5 sm:w-5" />
                 {t('accessories')}
-                <Badge variant="secondary" className="ml-2">
+                <Badge variant="secondary" className="ml-1 sm:ml-2 text-[10px] sm:text-xs">
                   {formatCurrency(costingSummary.totalAccessoryCost)}
                 </Badge>
               </CardTitle>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Marge:</span>
-                <div className="relative w-20">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="text-xs sm:text-sm text-muted-foreground">Marge:</span>
+                <div className="relative w-16 sm:w-20">
                   <Input
                     type="number"
                     min="0"
@@ -1295,14 +1341,65 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     step="1"
                     value={margins.accessories}
                     onChange={(e) => setMargins(prev => ({ ...prev, accessories: parseFloat(e.target.value) || 0 }))}
-                    className="h-8 pr-6 text-right text-sm"
+                    className="h-7 sm:h-8 pr-5 sm:pr-6 text-right text-xs sm:text-sm"
                   />
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                  <span className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs sm:text-sm">%</span>
                 </div>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+            {/* Mobile card layout */}
+            <div className="sm:hidden space-y-2">
+              {costingSummary.accessories.map((acc) => (
+                <div key={acc.id} className={`p-2.5 border rounded-lg ${acc.orderId ? "bg-destructive/10 border-destructive/30" : "bg-muted/30"}`}>
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium line-clamp-2">{acc.articleName}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {acc.articleCode && <span className="text-[10px] text-muted-foreground">{acc.articleCode}</span>}
+                        {acc.supplier && <Badge variant="outline" className="text-[10px]">{acc.supplier}</Badge>}
+                      </div>
+                    </div>
+                    <Badge variant={
+                      acc.status === 'delivered' ? 'default' :
+                      acc.status === 'in_stock' ? 'secondary' :
+                      acc.status === 'ordered' ? 'outline' :
+                      'destructive'
+                    } className="text-[10px] flex-shrink-0">
+                      {t(acc.status) || acc.status}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className="text-[10px] text-muted-foreground">×{acc.quantity}</span>
+                    <div className="relative w-20 ml-auto">
+                      <Euro className="absolute left-1.5 top-1/2 -translate-y-1/2 h-2.5 w-2.5 text-muted-foreground" />
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={acc.unitPrice || ''}
+                        onChange={(e) => updateAccessoryPrice(acc.id, parseFloat(e.target.value) || 0)}
+                        className="h-6 pl-5 text-right text-[10px]"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <span className="text-xs font-bold flex-shrink-0">{formatCurrency(acc.unitPrice * acc.quantity)}</span>
+                  </div>
+                </div>
+              ))}
+              <div className="p-2.5 bg-muted/50 rounded-lg font-bold text-xs flex justify-between">
+                <span>{t('costing_total_accessories')}</span>
+                <div className="text-right">
+                  <span>{formatCurrency(costingSummary.totalAccessoryCost)}</span>
+                  <span className="block text-[10px] text-muted-foreground font-normal">
+                    +{margins.accessories}% = {formatCurrency(costingSummary.totalAccessoryCost * (1 + margins.accessories / 100))}
+                  </span>
+                </div>
+              </div>
+            </div>
+            {/* Desktop table */}
+            <div className="hidden sm:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1367,20 +1464,21 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                 </TableRow>
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}
 
       {/* Additional Costs Input */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Plus className="h-5 w-5" />
+        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+            <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
             {t('costing_additional_costs')}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <Package className="h-4 w-4 text-muted-foreground" />
@@ -1474,13 +1572,13 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
 
       {/* Final Cost Summary */}
       <Card className="border-primary">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
+        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+            <Calculator className="h-4 w-4 sm:h-5 sm:w-5" />
             {t('costing_final_summary')}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
           <Table>
             <TableBody>
               <TableRow>
@@ -1531,35 +1629,35 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
           <Separator className="my-6" />
 
           {/* Sales Price and Profit */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <label className="text-sm font-medium w-48">{t('costing_sales_price')}</label>
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <label className="text-xs sm:text-sm font-medium sm:w-48">{t('costing_sales_price')}</label>
               <div className="relative flex-1 max-w-xs">
-                <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 <Input
                   type="number"
                   min="0"
                   step="0.01"
                   value={salesPrice || ''}
                   onChange={(e) => setSalesPrice(parseFloat(e.target.value) || 0)}
-                  className="pl-9 text-lg font-bold"
+                  className="pl-8 sm:pl-9 text-base sm:text-lg font-bold"
                   placeholder="0.00"
                 />
               </div>
             </div>
 
             {salesPrice > 0 && (
-              <div className={`p-4 rounded-lg ${profit >= 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+              <div className={`p-3 sm:p-4 rounded-lg ${profit >= 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-sm text-muted-foreground">{t('costing_profit')}</p>
-                    <p className={`text-2xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className="text-[10px] sm:text-sm text-muted-foreground">{t('costing_profit')}</p>
+                    <p className={`text-lg sm:text-2xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {formatCurrency(profit)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-muted-foreground">{t('costing_profit_margin')}</p>
-                    <p className={`text-2xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className="text-[10px] sm:text-sm text-muted-foreground">{t('costing_profit_margin')}</p>
+                    <p className={`text-lg sm:text-2xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {profitMargin.toFixed(1)}%
                     </p>
                   </div>
