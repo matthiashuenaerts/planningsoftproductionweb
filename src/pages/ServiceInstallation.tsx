@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTenant } from '@/context/TenantContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/context/LanguageContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { workingHoursService } from '@/services/workingHoursService';
@@ -47,6 +48,7 @@ const ServiceInstallation: React.FC = () => {
   const { currentEmployee } = useAuth();
   const { tenant } = useTenant();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
 
   const [loading, setLoading] = useState(true);
@@ -385,8 +387,8 @@ const ServiceInstallation: React.FC = () => {
 
       queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
       toast({
-        title: 'Timer Started',
-        description: `Time registration started for ${stop.projectName}`,
+        title: t('si_timer_started'),
+        description: (t('si_timer_started_desc') || '').replace('{{name}}', stop.projectName),
       });
     } catch (error: any) {
       console.error('Error starting service time registration:', error);
@@ -419,7 +421,7 @@ const ServiceInstallation: React.FC = () => {
         <div className="p-4 md:p-6 max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold">Service Installation</h1>
+              <h1 className="text-2xl font-bold">{t('si_title')}</h1>
               <p className="text-muted-foreground text-sm">
                 {teamName && (
                   <span className="inline-flex items-center gap-1.5">
@@ -441,8 +443,8 @@ const ServiceInstallation: React.FC = () => {
             <Card>
               <CardContent className="py-12 text-center">
                 <Navigation className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Service Stops Today</h3>
-                <p className="text-muted-foreground">You have no service installations scheduled for today.</p>
+                <h3 className="text-lg font-semibold mb-2">{t('si_no_stops_today')}</h3>
+                <p className="text-muted-foreground">{t('si_no_stops_desc')}</p>
               </CardContent>
             </Card>
           ) : (
@@ -451,31 +453,31 @@ const ServiceInstallation: React.FC = () => {
               <div className="flex flex-wrap items-center gap-2">
                 {routeData.departureTime && (
                   <Badge variant="default" className="gap-1 font-semibold">
-                    🚗 Depart: {routeData.departureTime}
+                    🚗 {t('si_depart')}: {routeData.departureTime}
                   </Badge>
                 )}
                 {routeData.workStartTime && (
                   <Badge variant="outline" className="gap-1">
-                    🏁 First stop: {routeData.workStartTime}
+                    🏁 {t('si_first_stop')}: {routeData.workStartTime}
                   </Badge>
                 )}
                 <Badge variant="outline" className="gap-1">
                   <Clock className="h-3 w-3" />
-                  Service: {totalServiceHours.toFixed(1)}h
+                  {t('si_service')}: {totalServiceHours.toFixed(1)}h
                 </Badge>
                 {routeData.totalDrivingMinutes != null && (
                   <Badge variant="outline" className="gap-1">
                     <Route className="h-3 w-3" />
-                    Driving: {Math.round(routeData.totalDrivingMinutes)}min
+                    {t('si_driving')}: {Math.round(routeData.totalDrivingMinutes)}min
                   </Badge>
                 )}
                 <Badge variant="secondary" className="gap-1 font-semibold">
-                  ≈ {(totalServiceHours + drivingHours).toFixed(1)}h total
+                  ≈ {(totalServiceHours + drivingHours).toFixed(1)}h {t('si_total')}
                 </Badge>
                 {routeData.returnTime && (
                   <Badge variant={isOvertime ? 'destructive' : 'outline'} className="gap-1 font-semibold">
                     <Home className="h-3 w-3" />
-                    Return: {routeData.returnTime}
+                    {t('si_return')}: {routeData.returnTime}
                     {isOvertime && ' ⚠️'}
                   </Badge>
                 )}
@@ -487,7 +489,7 @@ const ServiceInstallation: React.FC = () => {
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base flex items-center gap-2">
                       <Route className="h-4 w-4" />
-                      Optimized Route
+                      {t('si_optimized_route')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0 pb-0">
@@ -506,7 +508,7 @@ const ServiceInstallation: React.FC = () => {
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base flex items-center gap-2">
                         <Clock className="h-4 w-4" />
-                        Route Schedule
+                        {t('si_route_schedule')}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -516,7 +518,7 @@ const ServiceInstallation: React.FC = () => {
                           <div className="flex items-center gap-3 text-muted-foreground">
                             <span className="font-mono text-xs w-12 text-right">{routeData.departureTime}</span>
                             <div className="w-6 h-6 rounded-full bg-green-500 text-white text-xs flex items-center justify-center font-bold shrink-0">S</div>
-                            <span className="truncate">Depart from {routeData.startPoint.address}</span>
+                            <span className="truncate">{(t('si_depart_from') || '').replace('{{address}}', routeData.startPoint.address)}</span>
                           </div>
                         )}
 
@@ -549,8 +551,8 @@ const ServiceInstallation: React.FC = () => {
                               <Home className="h-3 w-3" />
                             </div>
                             <span className="truncate">
-                              Return to base
-                              {isOvertime && ` (exceeds ${routeData.workEndTime} end of day)`}
+                              {t('si_return_to_base')}
+                              {isOvertime && ` (${(t('si_exceeds_end_of_day') || '').replace('{{time}}', routeData.workEndTime || '')})`}
                             </span>
                           </div>
                         )}
@@ -563,7 +565,7 @@ const ServiceInstallation: React.FC = () => {
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base flex items-center gap-2">
                         <MapPin className="h-4 w-4" />
-                        Service Stops ({routeData.stops.length})
+                        {(t('si_service_stops') || '').replace('{{count}}', String(routeData.stops.length))}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -597,7 +599,7 @@ const ServiceInstallation: React.FC = () => {
 
                                   <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                                     <Clock className="h-3 w-3 flex-shrink-0" />
-                                    <span>{stop.serviceHours}h estimated</span>
+                                    <span>{stop.serviceHours}h {t('si_estimated')}</span>
                                   </div>
 
                                   {stop.serviceNotes && (
@@ -617,7 +619,7 @@ const ServiceInstallation: React.FC = () => {
                                     ) : (
                                       <Play className="h-4 w-4 mr-1" />
                                     )}
-                                    Start Time Registration
+                                    {t('start_time_registration')}
                                   </Button>
                                 </div>
                               </div>

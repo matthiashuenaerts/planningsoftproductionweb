@@ -892,5 +892,25 @@
   "nt_share_remove_failed": "Failed to remove share",
   "nt_no_employees": "No employees available to share with",
   "nt_shared_with_all": "This item is shared with all available employees",
-  "nt_done": "Done"
+  "nt_done": "Done",
+
+  "si_title": "Service Installation",
+  "si_no_stops_today": "No Service Stops Today",
+  "si_no_stops_desc": "You have no service installations scheduled for today.",
+  "si_depart": "Depart",
+  "si_first_stop": "First stop",
+  "si_service": "Service",
+  "si_driving": "Driving",
+  "si_total": "total",
+  "si_return": "Return",
+  "si_optimized_route": "Optimized Route",
+  "si_route_schedule": "Route Schedule",
+  "si_depart_from": "Depart from {{address}}",
+  "si_return_to_base": "Return to base",
+  "si_exceeds_end_of_day": "exceeds {{time}} end of day",
+  "si_service_stops": "Service Stops ({{count}})",
+  "si_estimated": "estimated",
+  "si_timer_started": "Timer Started",
+  "si_timer_started_desc": "Time registration started for {{name}}",
+  "si_start_return": "Start / Return"
 }

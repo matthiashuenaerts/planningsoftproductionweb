@@ -1370,5 +1370,25 @@
   "nt_share_remove_failed": "Delen verwijderen mislukt",
   "nt_no_employees": "Geen medewerkers beschikbaar om mee te delen",
   "nt_shared_with_all": "Dit item is gedeeld met alle beschikbare medewerkers",
-  "nt_done": "Klaar"
+  "nt_done": "Klaar",
+
+  "si_title": "Service Installatie",
+  "si_no_stops_today": "Geen Servicestops Vandaag",
+  "si_no_stops_desc": "U heeft vandaag geen service-installaties gepland.",
+  "si_depart": "Vertrek",
+  "si_first_stop": "Eerste stop",
+  "si_service": "Service",
+  "si_driving": "Rijden",
+  "si_total": "totaal",
+  "si_return": "Terugkeer",
+  "si_optimized_route": "Geoptimaliseerde Route",
+  "si_route_schedule": "Route Planning",
+  "si_depart_from": "Vertrek van {{address}}",
+  "si_return_to_base": "Terugkeer naar basis",
+  "si_exceeds_end_of_day": "overschrijdt {{time}} einde werkdag",
+  "si_service_stops": "Servicestops ({{count}})",
+  "si_estimated": "geschat",
+  "si_timer_started": "Timer Gestart",
+  "si_timer_started_desc": "Tijdregistratie gestart voor {{name}}",
+  "si_start_return": "Start / Terugkeer"
 }
