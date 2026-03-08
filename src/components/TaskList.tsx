@@ -435,8 +435,8 @@ const TaskList: React.FC<TaskListProps> = ({
                       <div className="flex items-center gap-2 text-sm">
                         <Clock className="h-4 w-4 text-gray-500" />
                         <span className="text-gray-600">
-                          {task.estimated_duration ? `Estimated: ${formatDuration(task.estimated_duration)} / ` : ''}
-                          Actual: {formatDuration(task.actual_duration_minutes)}
+                          {task.estimated_duration ? `${t('tl_estimated', { duration: formatDuration(task.estimated_duration) })} / ` : ''}
+                          {t('tl_actual', { duration: formatDuration(task.actual_duration_minutes) })}
                         </span>
                       </div>
                       {task.efficiency_percentage !== undefined && (
