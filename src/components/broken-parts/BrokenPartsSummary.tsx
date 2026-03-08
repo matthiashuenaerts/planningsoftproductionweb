@@ -205,20 +205,20 @@ const BrokenPartsSummary: React.FC = () => {
 
       <Tabs defaultValue="charts" className="w-full">
         <TabsList>
-          <TabsTrigger value="charts">Charts</TabsTrigger>
-          <TabsTrigger value="table">Table</TabsTrigger>
+          <TabsTrigger value="charts" className="text-xs sm:text-sm">Charts</TabsTrigger>
+          <TabsTrigger value="table" className="text-xs sm:text-sm">Table</TabsTrigger>
         </TabsList>
-        <TabsContent value="charts" className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-6">
+        <TabsContent value="charts" className="space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Broken Parts by {groupBy === 'project' ? 'Project' : groupBy === 'workstation' ? 'Workstation' : 'Employee'}</CardTitle>
-                <CardDescription>Distribution of broken parts in the selected time period</CardDescription>
+              <CardHeader className="p-3 sm:p-6">
+                <CardTitle className="text-sm sm:text-base">Broken Parts by {groupBy === 'project' ? 'Project' : groupBy === 'workstation' ? 'Workstation' : 'Employee'}</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Distribution of broken parts in the selected time period</CardDescription>
               </CardHeader>
-              <CardContent className="pt-2">
-                <ChartContainer config={{}} className="h-80">
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-2">
+                <ChartContainer config={{}} className="h-60 sm:h-80">
                   <PieChart>
-                    <Pie data={groupedData} cx="50%" cy="50%" labelLine={false} outerRadius={80} fill="#8884d8" dataKey="value" label={({
+                    <Pie data={groupedData} cx="50%" cy="50%" labelLine={false} outerRadius={60} fill="#8884d8" dataKey="value" label={({
                     name,
                     percent
                   }) => `${name}: ${(percent * 100).toFixed(0)}%`}>
@@ -232,16 +232,16 @@ const BrokenPartsSummary: React.FC = () => {
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Broken Parts Trend (Last 7 Days)</CardTitle>
-                <CardDescription>Number of reports per day</CardDescription>
+              <CardHeader className="p-3 sm:p-6">
+                <CardTitle className="text-sm sm:text-base">Broken Parts Trend (Last 7 Days)</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Number of reports per day</CardDescription>
               </CardHeader>
-              <CardContent className="pt-2">
-                <ChartContainer config={{}} className="h-80">
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-2">
+                <ChartContainer config={{}} className="h-60 sm:h-80">
                   <BarChart data={timeBasedData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis allowDecimals={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                     <Tooltip content={<ChartTooltipContent />} />
                     <Legend />
                     <Bar dataKey="count" name="Reports" fill="#3B82F6" />
