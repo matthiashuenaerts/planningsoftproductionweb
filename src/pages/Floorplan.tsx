@@ -45,6 +45,7 @@ const Floorplan: React.FC = () => {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [floorplanProjects, setFloorplanProjects] = useState<FloorplanProject[]>([]);
   const [hoveredBufferWorkstation, setHoveredBufferWorkstation] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
