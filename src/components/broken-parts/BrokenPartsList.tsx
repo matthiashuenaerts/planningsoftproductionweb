@@ -295,11 +295,11 @@ const BrokenPartsList: React.FC = () => {
                                       <AlertTriangle className="h-6 w-6 text-amber-500" />
                                     </div>
                                   ) : (
-                                    <img
-                                      src={getImageUrl(part.image_path)!}
+                                    <SignedStorageImage
+                                      bucket="broken_parts"
+                                      path={part.image_path}
                                       alt={t('broken_parts') || 'Broken part'}
                                       className="object-cover w-full h-full"
-                                      onError={() => handleImageError(part.id)}
                                     />
                                   )}
                                 </AspectRatio>
