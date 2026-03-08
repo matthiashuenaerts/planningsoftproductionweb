@@ -41,6 +41,7 @@ import WorkstationControl from "./pages/WorkstationControl";
 import TruckLoadingView from "./pages/TruckLoadingView";
 import ServiceInstallation from "./pages/ServiceInstallation";
 import PDFEditorFullscreen from "./pages/PDFEditorFullscreen";
+import OneDriveCallback from "./pages/OneDriveCallback";
 import EditProject from "@/pages/EditProject";
 import ProjectCalculation from "@/pages/ProjectCalculation";
 import GlobalComponents from "./components/GlobalComponents";
@@ -125,6 +126,7 @@ function App() {
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/pdf-editor" element={<P><PDFEditorFullscreen /></P>} />
+                  <Route path="/onedrive-callback" element={<OneDriveCallback />} />
                   <Route path="/migrate-auth" element={<P><MigrateAuth /></P>} />
 
                   {/* ── Tenant routes: /:tenant/... ────── */}

@@ -102,71 +102,16 @@ async function generatePKCE() {
   return { codeVerifier, codeChallenge };
 }
 
-  // Handle OAuth callback
+  // Check if tokens were set by the callback page
   useEffect(() => {
-    const handleCallback = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
-      const state = params.get('state');
-      
-      if (code && state) {
-        try {
-          const savedState = sessionStorage.getItem('onedrive_oauth_state');
-          if (state !== savedState) {
-            throw new Error('Invalid state');
-          }
-
-          const redirectUri = `${window.location.origin}${window.location.pathname}`;
-          
-const codeVerifier = sessionStorage.getItem('onedrive_code_verifier');
-
-if (!codeVerifier) {
-  throw new Error('Missing PKCE code verifier');
-}
-
-const { data, error } = await supabase.functions.invoke(
-  'onedrive-auth?action=exchange-code',
-  {
-    body: { code, redirectUri, codeVerifier },
-  }
-);
-
-if (error) throw error;
-
-sessionStorage.removeItem('onedrive_code_verifier');
-
-          if (error) throw error;
-
-          const tokens: OneDriveTokens = {
-            access_token: data.access_token,
-            refresh_token: data.refresh_token,
-            expires_at: Date.now() + (data.expires_in * 1000),
-          };
-
-          localStorage.setItem(TOKENS_STORAGE_KEY, JSON.stringify(tokens));
-          setIsAuthenticated(true);
-          sessionStorage.removeItem('onedrive_oauth_state');
-
-          // Clean URL
-          window.history.replaceState({}, '', window.location.pathname);
-
-          toast({
-            title: 'Succes',
-            description: 'Verbonden met OneDrive',
-          });
-        } catch (error) {
-          console.error('OAuth callback error:', error);
-          toast({
-            title: 'Fout',
-            description: 'Authenticatie mislukt',
-            variant: 'destructive',
-          });
-        }
+    const tokens = localStorage.getItem(TOKENS_STORAGE_KEY);
+    if (tokens) {
+      const parsed = JSON.parse(tokens) as OneDriveTokens;
+      if (parsed.expires_at > Date.now()) {
+        setIsAuthenticated(true);
       }
-    };
-
-    handleCallback();
-  }, [toast]);
+    }
+  }, []);
 
   const refreshAccessToken = async (refreshToken: string) => {
     try {
@@ -274,7 +219,11 @@ const { data, error } = await supabase.functions.invoke(
     // ✅ Store verifier for later
     sessionStorage.setItem('onedrive_code_verifier', codeVerifier);
 
-    const redirectUri = `${window.location.origin}${window.location.pathname}`;
+    // ✅ Save current path to return after callback
+    sessionStorage.setItem('onedrive_return_path', window.location.pathname + window.location.search);
+
+    // ✅ Use fixed redirect URI
+    const redirectUri = `${window.location.origin}/onedrive-callback`;
 
     const { data, error } = await supabase.functions.invoke(
       'onedrive-auth?action=get-auth-url',
