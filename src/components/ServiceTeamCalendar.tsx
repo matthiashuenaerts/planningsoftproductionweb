@@ -759,7 +759,7 @@ const ServiceTeamCalendar: React.FC = () => {
                   <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
                     {assignProjectId ? (
                       <span className="truncate">
-                        {projects.find(p => p.id === assignProjectId)?.name || 'Select a project'}
+                        {projects.find(p => p.id === assignProjectId)?.name || t('svc_select_project')}
                       </span>
                     ) : (
                       <span className="text-muted-foreground">Search projects...</span>
