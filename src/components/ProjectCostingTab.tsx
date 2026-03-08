@@ -928,76 +928,76 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
   const profitMargin = calculateProfitMargin();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header with Export Button */}
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          <Calculator className="h-5 w-5" />
+        <h2 className="text-base sm:text-xl font-semibold flex items-center gap-1.5 sm:gap-2">
+          <Calculator className="h-4 w-4 sm:h-5 sm:w-5" />
           {t('costing_title')}
         </h2>
-        <Button onClick={exportToPdf} variant="outline" className="gap-2">
-          <Download className="h-4 w-4" />
+        <Button onClick={exportToPdf} variant="outline" className="gap-1.5 sm:gap-2 h-8 sm:h-9 text-xs sm:text-sm">
+          <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           {t('costing_export_pdf')}
         </Button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              <div>
-                <p className="text-sm text-muted-foreground">{t('costing_total_labor_time')}</p>
-                <p className="text-2xl font-bold">{formatTime(costingSummary.totalLaborMinutes)}</p>
+          <CardContent className="pt-3 sm:pt-6 px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-sm text-muted-foreground truncate">{t('costing_total_labor_time')}</p>
+                <p className="text-lg sm:text-2xl font-bold">{formatTime(costingSummary.totalLaborMinutes)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-blue-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">{t('costing_labor_cost')}</p>
-                <p className="text-xl font-bold">{formatCurrency(costingSummary.totalLaborCost)}</p>
+          <CardContent className="pt-3 sm:pt-6 px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-sm text-muted-foreground truncate">{t('costing_labor_cost')}</p>
+                <p className="text-base sm:text-xl font-bold truncate">{formatCurrency(costingSummary.totalLaborCost)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5 text-orange-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">{t('costing_order_materials')}</p>
-                <p className="text-xl font-bold">{formatCurrency(costingSummary.totalOrderCost)}</p>
+          <CardContent className="pt-3 sm:pt-6 px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-sm text-muted-foreground truncate">{t('costing_order_materials')}</p>
+                <p className="text-base sm:text-xl font-bold truncate">{formatCurrency(costingSummary.totalOrderCost)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <Wrench className="h-5 w-5 text-purple-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">{t('accessories')}</p>
-                <p className="text-xl font-bold">{formatCurrency(costingSummary.totalAccessoryCost)}</p>
+          <CardContent className="pt-3 sm:pt-6 px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <Wrench className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-sm text-muted-foreground truncate">{t('accessories')}</p>
+                <p className="text-base sm:text-xl font-bold truncate">{formatCurrency(costingSummary.totalAccessoryCost)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-primary/5 border-primary">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              <div>
-                <p className="text-sm text-muted-foreground">{t('costing_total_cost')}</p>
-                <p className="text-xl font-bold text-primary">{formatCurrency(totalCost)}</p>
+        <Card className="bg-primary/5 border-primary col-span-2 sm:col-span-1">
+          <CardContent className="pt-3 sm:pt-6 px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-sm text-muted-foreground truncate">{t('costing_total_cost')}</p>
+                <p className="text-base sm:text-xl font-bold text-primary truncate">{formatCurrency(totalCost)}</p>
               </div>
             </div>
           </CardContent>
