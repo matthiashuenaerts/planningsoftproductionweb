@@ -421,7 +421,7 @@ const ServiceInstallation: React.FC = () => {
         <div className="p-4 md:p-6 max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold">Service Installation</h1>
+              <h1 className="text-2xl font-bold">{t('si_title')}</h1>
               <p className="text-muted-foreground text-sm">
                 {teamName && (
                   <span className="inline-flex items-center gap-1.5">
