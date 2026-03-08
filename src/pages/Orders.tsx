@@ -439,13 +439,13 @@ const Orders: React.FC = () => {
           </div>
           
           <Card>
-            <CardHeader className="pb-2">
+            <CardHeader className={`pb-2 ${isMobile ? 'px-3 py-2' : ''}`}>
               <div className="flex justify-between items-center">
-                <CardTitle className="text-base md:text-lg">{t('ord_all_orders')}</CardTitle>
-                <span className="text-sm text-muted-foreground">{t('ord_orders_count', { count: String(filteredOrders.length) })}</span>
+                <CardTitle className={`${isMobile ? 'text-sm' : 'text-lg'}`}>{t('ord_all_orders')}</CardTitle>
+                <span className={`text-muted-foreground ${isMobile ? 'text-[11px]' : 'text-sm'}`}>{t('ord_orders_count', { count: String(filteredOrders.length) })}</span>
               </div>
             </CardHeader>
-            <CardContent className="px-2 md:px-6">
+            <CardContent className={`${isMobile ? 'px-2 pb-2' : 'px-6'}`}>
               {displayedOrders.length > 0 ? (
                 <>
                   {/* Desktop table view */}
