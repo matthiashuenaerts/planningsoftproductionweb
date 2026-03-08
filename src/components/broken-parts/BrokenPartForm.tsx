@@ -335,10 +335,10 @@ const BrokenPartForm = () => {
 
   return (
     <Card className="w-full">
-      <CardContent className="pt-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="project">Project</Label>
+      <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
+        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="project" className="text-xs sm:text-sm">Project</Label>
             <Select
               value={formData.project_id}
               onValueChange={(value) => setFormData({...formData, project_id: value})}
@@ -356,8 +356,8 @@ const BrokenPartForm = () => {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="workstation">Workstation</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="workstation" className="text-xs sm:text-sm">Workstation</Label>
             <Select
               value={formData.workstation_id}
               onValueChange={(value) => setFormData({...formData, workstation_id: value})}
@@ -375,47 +375,50 @@ const BrokenPartForm = () => {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="description" className="text-xs sm:text-sm">Description</Label>
             <Textarea
               id="description"
               placeholder="Describe the broken part"
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
               required
-              className="min-h-32"
+              className="min-h-24 sm:min-h-32 text-sm"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Image</Label>
-            <div className="flex gap-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs sm:text-sm">Image</Label>
+            <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={startCamera}
-                className="flex items-center gap-2"
+                className="flex items-center gap-1.5 text-xs sm:text-sm"
               >
-                <Camera className="h-4 w-4" />
+                <Camera className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 Take Photo
               </Button>
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2"
+                className="flex items-center gap-1.5 text-xs sm:text-sm"
               >
-                <Image className="h-4 w-4" />
+                <Image className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 Choose File
               </Button>
               {(imagePreview || selectedImage) && (
                 <Button
                   type="button"
                   variant="outline"
+                  size="sm"
                   onClick={clearImage}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-1.5 text-xs sm:text-sm"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   Clear
                 </Button>
               )}
@@ -440,7 +443,7 @@ const BrokenPartForm = () => {
             )}
           </div>
 
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <Button type="submit" className="w-full text-sm" size="sm" disabled={isSubmitting}>
             {isSubmitting ? "Submitting..." : "Report Broken Part"}
           </Button>
         </form>

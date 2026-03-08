@@ -12,16 +12,16 @@ const NewBrokenPart: React.FC = () => {
   const isMobile = useIsMobile();
   
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background overflow-hidden">
       {!isMobile && (
-        <div className="w-64 h-full">
+        <div className="w-64 h-full flex-shrink-0">
           <Navbar />
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`flex-1 overflow-auto ${!isMobile ? '' : ''}`}>
-        <div className="container mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold mb-6">{t('report_broken_part')}</h1>
+      <div className={`flex-1 overflow-auto min-w-0 ${isMobile ? 'pt-16' : ''}`}>
+        <div className={`${isMobile ? 'px-3 py-4' : 'container mx-auto px-4 py-6'}`}>
+          <h1 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold mb-4 sm:mb-6`}>{t('report_broken_part')}</h1>
           <BrokenPartForm />
         </div>
       </div>
