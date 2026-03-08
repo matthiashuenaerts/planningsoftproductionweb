@@ -76,10 +76,11 @@ const BrokenPartsList: React.FC = () => {
     setVisibleCount(PAGE_SIZE);
   }, [tenant?.id]);
 
-  const getImageUrl = (path: string) => {
+  // Use signed URLs for private bucket access
+  const getSignedImageUrl = async (path: string): Promise<string | null> => {
     if (!path) return null;
-    const { data } = supabase.storage.from('broken_parts').getPublicUrl(path);
-    return data.publicUrl;
+    const { createSignedUrl } = await import('@/lib/storageUtils');
+    return await createSignedUrl('broken_parts', path);
   };
 
   const openImageDialog = (imagePath: string) => {
