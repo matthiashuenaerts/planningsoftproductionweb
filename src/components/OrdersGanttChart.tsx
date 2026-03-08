@@ -78,8 +78,13 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const [teams, setTeams] = useState<PlacementTeam[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
-  const [weeksToShow, setWeeksToShow] = useState(isMobile ? 1 : 4);
+  const [weeksToShow, setWeeksToShow] = useState(4);
   const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(new Set());
+
+  // Default to 1 week on mobile once hook resolves
+  useEffect(() => {
+    if (isMobile) setWeeksToShow(1);
+  }, [isMobile]);
   const [loading, setLoading] = useState(true);
   const [draggedProject, setDraggedProject] = useState<{ project: Project; teamId: string } | null>(null);
   const [resizingProject, setResizingProject] = useState<{
@@ -914,27 +919,28 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                               }}
                             >
                               <div className="truncate">
-                                {project.truck && (
+                                {project.truck && !isMobile && (
                                   <div className="text-xs font-semibold text-foreground mb-0.5 flex items-center gap-1">
                                     <span className="text-primary">🚛 T{project.truck.truck_number}</span>
                                   </div>
                                 )}
                                 {project.employees && project.employees.length > 0 ? (
-                                  <div className="text-xs text-muted-foreground truncate">
+                                  <div className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-muted-foreground truncate`}>
                                     {project.employees.map((emp, empIdx) => {
                                       const isOnHoliday = project.employeesOnHoliday?.has(emp.id);
+                                      const displayName = isMobile ? emp.name.split(' ')[0] : emp.name;
                                       return (
                                         <React.Fragment key={emp.id}>
                                           {empIdx > 0 && ', '}
                                           <span className={isOnHoliday ? 'text-destructive font-semibold' : ''}>
-                                            {emp.name}
+                                            {displayName}
                                           </span>
                                         </React.Fragment>
                                       );
                                     })}
                                   </div>
                                 ) : (
-                                  <div className="text-xs text-muted-foreground/50 italic">No employees assigned</div>
+                                  <div className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-muted-foreground/50 italic`}>—</div>
                                 )}
                               </div>
                             </div>
