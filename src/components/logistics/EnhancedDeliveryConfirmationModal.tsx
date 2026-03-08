@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Camera, Upload, X, Package, MapPin, ChevronDown } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Order, OrderItem } from '@/types/order';
 import { orderService } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
