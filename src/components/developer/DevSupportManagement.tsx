@@ -123,6 +123,16 @@ const DevSupportManagement: React.FC = () => {
                         {['open', 'in_progress', 'resolved', 'closed'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-slate-400 hover:text-red-400"
+                      title="Delete ticket"
+                      disabled={deleting === ticket.id}
+                      onClick={(e) => handleDelete(e, ticket.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                     <ChevronRight className="h-4 w-4 text-slate-400" />
                   </div>
                 </div>
