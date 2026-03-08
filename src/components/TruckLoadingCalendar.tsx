@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/LanguageContext';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Truck, Calendar, AlertTriangle, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,6 +20,7 @@ interface Project {
   client: string;
   status: string;
   installation_date: string;
+  team_color?: string;
 }
 
 interface LoadingAssignment {
@@ -29,7 +31,8 @@ interface LoadingAssignment {
 
 const TruckLoadingCalendar = () => {
   const { tenant } = useTenant();
-  const { t } = useLanguage();
+  const { t, createLocalizedPath } = useLanguage();
+  const navigate = useNavigate();
   const [weekStartDate, setWeekStartDate] = useState(() => {
     const today = new Date();
     return startOfWeek(today, { weekStartsOn: 1 });
@@ -91,24 +94,33 @@ const TruckLoadingCalendar = () => {
         });
         setManualOverrides(overridesMap);
         
-        // Fetch all projects with installation dates
+        // Fetch all projects with installation dates and team assignments
         let projectsQuery = supabase
           .from('projects')
-          .select('id, name, client, status, installation_date')
+          .select('id, name, client, status, installation_date, project_team_assignments(team_id)')
           .not('installation_date', 'is', null)
           .order('installation_date');
         projectsQuery = applyTenantFilter(projectsQuery, tenant?.id);
         const { data: projectsData, error: projectsError } = await projectsQuery;
           
         if (projectsError) throw projectsError;
+
+        // Fetch all placement teams for colors
+        let teamsQuery = supabase.from('placement_teams').select('id, color');
+        teamsQuery = applyTenantFilter(teamsQuery, tenant?.id);
+        const { data: teamsData } = await teamsQuery;
+        const teamColorMap: Record<string, string> = {};
+        (teamsData || []).forEach((team: any) => { teamColorMap[team.id] = team.color; });
         
         // Calculate loading dates for each project
-        const loadingAssignments: LoadingAssignment[] = (projectsData || []).map(project => {
+        const loadingAssignments: LoadingAssignment[] = (projectsData || []).map((project: any) => {
           const installationDate = new Date(project.installation_date);
           const loadingDate = getPreviousWorkday(installationDate, holidaysData);
+          const firstAssignment = project.project_team_assignments?.[0];
+          const teamColor = firstAssignment ? teamColorMap[firstAssignment.team_id] : undefined;
           
           return {
-            project,
+            project: { ...project, team_color: teamColor },
             loading_date: format(loadingDate, 'yyyy-MM-dd'),
           };
         });
@@ -253,7 +265,16 @@ const TruckLoadingCalendar = () => {
     }
   };
 
-  // Get project color for visual distinction
+  // Get team color styling using hex with translucent bg (45%) and border (99%)
+  const getTeamColorStyle = (teamColor?: string) => {
+    if (!teamColor) return {};
+    return {
+      backgroundColor: `${teamColor}45`,
+      borderColor: `${teamColor}99`,
+    };
+  };
+
+  // Get project color for visual distinction (fallback when no team color)
   const getProjectColor = (status: string) => {
     switch (status) {
       case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-300';
@@ -261,6 +282,10 @@ const TruckLoadingCalendar = () => {
       case 'completed': return 'bg-gray-100 text-gray-800 border-gray-300';
       default: return 'bg-orange-100 text-orange-800 border-orange-300';
     }
+  };
+
+  const handleProjectClick = (projectId: string) => {
+    navigate(createLocalizedPath(`/projects/${projectId}`));
   };
 
   // Get priority styling for loading dates
@@ -302,21 +327,25 @@ const TruckLoadingCalendar = () => {
                 <div
                   key={`${assignment.project.id}-${index}`}
                   className={cn(
-                    "p-4 rounded-lg border-2",
-                    getProjectColor(assignment.project.status)
+                    "p-4 rounded-lg border-2 cursor-pointer hover:shadow-md transition-shadow",
+                    !assignment.project.team_color && getProjectColor(assignment.project.status)
                   )}
+                  style={assignment.project.team_color ? getTeamColorStyle(assignment.project.team_color) : undefined}
+                  onClick={() => handleProjectClick(assignment.project.id)}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <Badge className={cn("text-lg px-3 py-1", getProjectColor(assignment.project.status))}>
+                    <Badge className={cn("text-lg px-3 py-1", !assignment.project.team_color && getProjectColor(assignment.project.status))}
+                      style={assignment.project.team_color ? { backgroundColor: `${assignment.project.team_color}30`, color: assignment.project.team_color, borderColor: assignment.project.team_color } : undefined}
+                    >
                       {assignment.project.status.replace('_', ' ').toUpperCase()}
                     </Badge>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-muted-foreground">
                       {t('truck_install')}: {format(new Date(assignment.project.installation_date), 'MMM d')}
                     </div>
                   </div>
                   <h3 className="font-bold text-lg mb-1">{assignment.project.name}</h3>
-                  <p className="text-gray-600 mb-2">{assignment.project.client}</p>
-                  <div className="text-sm text-gray-500">
+                  <p className="text-muted-foreground mb-2">{assignment.project.client}</p>
+                  <div className="text-sm text-muted-foreground">
                     {t('truck_loading_today')}
                   </div>
                 </div>
@@ -384,10 +413,12 @@ const TruckLoadingCalendar = () => {
                         <div
                           key={`${assignment.project.id}-${index}`}
                           className={cn(
-                            "p-1 rounded text-xs border group relative",
-                            getProjectColor(assignment.project.status),
+                            "p-1 rounded text-xs border group relative cursor-pointer hover:shadow-sm transition-shadow",
+                            !assignment.project.team_color && getProjectColor(assignment.project.status),
                             isManuallyAdjusted && "border-orange-400 bg-orange-50"
                           )}
+                          style={!isManuallyAdjusted && assignment.project.team_color ? getTeamColorStyle(assignment.project.team_color) : undefined}
+                          onClick={() => handleProjectClick(assignment.project.id)}
                         >
                           <div className="font-medium leading-tight break-words">
                             {assignment.project.name}
@@ -397,7 +428,7 @@ const TruckLoadingCalendar = () => {
                           </div>
                           <div className="flex items-center justify-between mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                              onClick={() => adjustLoadingDate(assignment.project.id, 'left')}
+                              onClick={(e) => { e.stopPropagation(); adjustLoadingDate(assignment.project.id, 'left'); }}
                               className="text-xs text-blue-600 hover:text-blue-800"
                             >
                               ←
@@ -406,7 +437,7 @@ const TruckLoadingCalendar = () => {
                               {format(new Date(effectiveLoadingDate), 'MMM d')}
                             </span>
                             <button
-                              onClick={() => adjustLoadingDate(assignment.project.id, 'right')}
+                              onClick={(e) => { e.stopPropagation(); adjustLoadingDate(assignment.project.id, 'right'); }}
                               className="text-xs text-blue-600 hover:text-blue-800"
                             >
                               →
@@ -442,20 +473,24 @@ const TruckLoadingCalendar = () => {
                   <div
                     key={`${assignment.project.id}-${index}`}
                     className={cn(
-                      "p-3 rounded-lg border-l-4 bg-white border group",
-                      getLoadingPriority(effectiveLoadingDate),
+                      "p-3 rounded-lg border-l-4 border group cursor-pointer hover:shadow-md transition-shadow",
+                      !assignment.project.team_color && getLoadingPriority(effectiveLoadingDate),
                       isManuallyAdjusted && "border-orange-400 bg-orange-50"
                     )}
+                    style={!isManuallyAdjusted && assignment.project.team_color ? { ...getTeamColorStyle(assignment.project.team_color), borderLeftColor: assignment.project.team_color } : undefined}
+                    onClick={() => handleProjectClick(assignment.project.id)}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <Badge className={getProjectColor(assignment.project.status)}>
+                          <Badge className={!assignment.project.team_color ? getProjectColor(assignment.project.status) : ''}
+                            style={assignment.project.team_color ? { backgroundColor: `${assignment.project.team_color}30`, color: assignment.project.team_color, borderColor: assignment.project.team_color } : undefined}
+                          >
                             {assignment.project.status.replace('_', ' ').toUpperCase()}
                           </Badge>
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={() => adjustLoadingDate(assignment.project.id, 'left')}
+                              onClick={(e) => { e.stopPropagation(); adjustLoadingDate(assignment.project.id, 'left'); }}
                               className="text-sm text-blue-600 hover:text-blue-800 opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                               ←
@@ -465,7 +500,7 @@ const TruckLoadingCalendar = () => {
                               {isManuallyAdjusted && <span className="text-orange-600 ml-1">*</span>}
                             </span>
                             <button
-                              onClick={() => adjustLoadingDate(assignment.project.id, 'right')}
+                              onClick={(e) => { e.stopPropagation(); adjustLoadingDate(assignment.project.id, 'right'); }}
                               className="text-sm text-blue-600 hover:text-blue-800 opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                               →
