@@ -109,6 +109,7 @@ const AfterSalesServiceDialog: React.FC<AfterSalesServiceDialogProps> = ({
           duration: 1,
           service_hours: serviceHours,
           service_order: maxOrder + 1,
+          service_notes: notes.trim() || null,
         } as any);
 
       if (error) throw error;
