@@ -289,7 +289,7 @@ const TruckLoadingCalendar = () => {
         <CardHeader className="bg-red-500 text-white">
           <CardTitle className="text-2xl flex items-center gap-3">
             <Truck className="h-8 w-8" />
-            TODAY'S LOADING SCHEDULE
+            {t('truck_todays_schedule')}
             <Badge className="bg-white text-red-500 text-lg px-3 py-1">
               {format(new Date(), 'EEEE, MMMM d')}
             </Badge>
