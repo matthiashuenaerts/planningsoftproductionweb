@@ -499,21 +499,22 @@ const { data, error } = await supabase.functions.invoke(
                       : config.folder_name}
                   </span>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
                   <Button 
                     variant="ghost" 
                     size="sm"
                     onClick={() => window.open(config.folder_url, '_blank')}
+                    className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                   >
-                    <ExternalLink className="h-4 w-4" />
+                    <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                   <Button 
                     variant="ghost" 
                     size="sm"
                     onClick={handleDisconnect}
-                    className="text-destructive hover:text-destructive"
+                    className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-destructive hover:text-destructive"
                   >
-                    <Unlink className="h-4 w-4" />
+                    <Unlink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                 </div>
               </div>
