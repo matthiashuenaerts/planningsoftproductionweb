@@ -27,7 +27,7 @@ export const PartsListDialog: React.FC<PartsListDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-hidden p-3 sm:p-6">
         <DialogHeader>
           <DialogTitle>Parts Lists Management</DialogTitle>
         </DialogHeader>
