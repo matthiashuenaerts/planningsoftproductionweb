@@ -885,28 +885,28 @@ const Dashboard: React.FC = () => {
       </div>
       
       {/* Weekly Loading Schedule */}
-      <Card className="mb-6">
-        <CardHeader className="pb-2">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+      <Card className="mb-4 sm:mb-6">
+        <CardHeader className="pb-2 px-3 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
               {t('dashboard_weekly_schedule')}
             </CardTitle>
-            <div className="flex items-center justify-between md:justify-center space-x-2">
-              <Button variant="outline" size="icon" onClick={prevWeek} disabled={weekLoading} className="h-9 w-9">
+            <div className="flex items-center justify-between sm:justify-center space-x-2">
+              <Button variant="outline" size="icon" onClick={prevWeek} disabled={weekLoading} className="h-8 w-8 sm:h-9 sm:w-9">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-xs md:text-sm font-medium min-w-[140px] md:min-w-[200px] text-center px-2">
+              <span className="text-xs font-medium min-w-[130px] text-center px-1">
                 {format(weekStartDate, 'MMM d')} - {format(addDays(weekStartDate, 6), 'MMM d, yyyy')}
-                {weekLoading && <span className="ml-2 text-xs text-gray-500">{t('dashboard_loading')}</span>}
+                {weekLoading && <span className="ml-1 text-xs text-muted-foreground">{t('dashboard_loading')}</span>}
               </span>
-              <Button variant="outline" size="icon" onClick={nextWeek} disabled={weekLoading} className="h-9 w-9">
+              <Button variant="outline" size="icon" onClick={nextWeek} disabled={weekLoading} className="h-8 w-8 sm:h-9 sm:w-9">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
             {Array.from({
             length: 7
