@@ -81,6 +81,7 @@ const Dashboard: React.FC = () => {
   const [manualOverrides, setManualOverrides] = useState<Record<string, string>>({});
   const [teamAssignmentOverrides, setTeamAssignmentOverrides] = useState<any[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
+  const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([]);
   
   // Workstation stats state
   const [workstationStats, setWorkstationStats] = useState<Array<{
