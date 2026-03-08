@@ -1,14 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MICROSOFT_CLIENT_ID = Deno.env.get("MICROSOFT_CLIENT_ID");
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+// Fallback to env var if no client ID provided in request
+const FALLBACK_CLIENT_ID = Deno.env.get("MICROSOFT_CLIENT_ID");
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -19,19 +17,20 @@ serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
-    if (!MICROSOFT_CLIENT_ID) {
-      return new Response(
-        JSON.stringify({ error: "Microsoft Client ID not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // Generate auth URL for OAuth PKCE flow (public client, no secret needed)
     if (action === "get-auth-url") {
-      const { redirectUri, state, codeChallenge } = await req.json();
+      const { redirectUri, state, codeChallenge, clientId } = await req.json();
       
+      const microsoftClientId = clientId || FALLBACK_CLIENT_ID;
+      if (!microsoftClientId) {
+        return new Response(
+          JSON.stringify({ error: "Microsoft Client ID not configured for this tenant" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       const authUrl = new URL("https://login.microsoftonline.com/common/oauth2/v2.0/authorize");
-      authUrl.searchParams.set("client_id", MICROSOFT_CLIENT_ID);
+      authUrl.searchParams.set("client_id", microsoftClientId);
       authUrl.searchParams.set("response_type", "code");
       authUrl.searchParams.set("redirect_uri", redirectUri);
       authUrl.searchParams.set("scope", "Files.Read Files.Read.All Files.ReadWrite Files.ReadWrite.All offline_access");
@@ -48,13 +47,21 @@ serve(async (req) => {
 
     // Exchange code for tokens (PKCE flow - no client_secret)
     if (action === "exchange-code") {
-      const { code, redirectUri, codeVerifier } = await req.json();
+      const { code, redirectUri, codeVerifier, clientId } = await req.json();
+      
+      const microsoftClientId = clientId || FALLBACK_CLIENT_ID;
+      if (!microsoftClientId) {
+        return new Response(
+          JSON.stringify({ error: "Microsoft Client ID not configured" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       const tokenResponse = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          client_id: MICROSOFT_CLIENT_ID,
+          client_id: microsoftClientId,
           code,
           redirect_uri: redirectUri,
           grant_type: "authorization_code",
@@ -83,13 +90,21 @@ serve(async (req) => {
 
     // Refresh access token (PKCE flow - no client_secret)
     if (action === "refresh-token") {
-      const { refreshToken } = await req.json();
+      const { refreshToken, clientId } = await req.json();
+      
+      const microsoftClientId = clientId || FALLBACK_CLIENT_ID;
+      if (!microsoftClientId) {
+        return new Response(
+          JSON.stringify({ error: "Microsoft Client ID not configured" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       const tokenResponse = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          client_id: MICROSOFT_CLIENT_ID,
+          client_id: microsoftClientId,
           refresh_token: refreshToken,
           grant_type: "refresh_token",
         }),

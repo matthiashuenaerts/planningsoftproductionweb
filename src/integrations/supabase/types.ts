@@ -5419,6 +5419,44 @@ export type Database = {
           },
         ]
       }
+      tenant_onedrive_settings: {
+        Row: {
+          created_at: string
+          id: string
+          microsoft_client_id: string
+          notes: string | null
+          tenant_directory_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          microsoft_client_id: string
+          notes?: string | null
+          tenant_directory_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          microsoft_client_id?: string
+          notes?: string | null
+          tenant_directory_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_onedrive_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           created_at: string
