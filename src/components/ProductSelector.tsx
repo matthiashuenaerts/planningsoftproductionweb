@@ -459,7 +459,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                   <TableRow key={product.id}>
                     <TableCell>
                       {product.image_path ? (
-                        <img src={getImageUrl(product.image_path) || ''} alt={product.name} className="h-10 w-10 object-cover rounded" />
+                        <SignedStorageImage bucket="product-images" path={product.image_path} alt={product.name} className="h-10 w-10 object-cover rounded" />
                       ) : (
                         <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
                           <Package className="h-4 w-4 text-muted-foreground" />
