@@ -175,16 +175,16 @@ const FilePreview: React.FC<FilePreviewProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-7xl w-[95vw] max-h-[95vh] p-0 overflow-hidden">
-        <DialogHeader className="p-4 pb-0">
-          <DialogTitle className="flex items-center gap-2">
-            {getFileIcon()} {fileName}
+      <DialogContent className="max-w-7xl w-[98vw] sm:w-[95vw] max-h-[95vh] p-0 overflow-hidden">
+        <DialogHeader className="px-3 sm:px-4 pt-3 sm:pt-4 pb-0">
+          <DialogTitle className="flex items-center gap-2 text-xs sm:text-base">
+            {getFileIcon()} <span className="truncate">{fileName}</span>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-[10px] sm:text-sm">
             {isPDF() ? 'PDF Viewer - Click "Edit PDF" to annotate' : 'File Preview'}
           </DialogDescription>
         </DialogHeader>
-        <div className="overflow-auto max-h-[calc(95vh-80px)]">
+        <div className="overflow-auto max-h-[calc(95vh-60px)] sm:max-h-[calc(95vh-80px)]">
           {renderPreview()}
         </div>
       </DialogContent>
