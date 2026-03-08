@@ -311,7 +311,7 @@ const TruckLoadingCalendar = () => {
                       {assignment.project.status.replace('_', ' ').toUpperCase()}
                     </Badge>
                     <div className="text-sm text-gray-600">
-                      Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
+                      {t('truck_install')}: {format(new Date(assignment.project.installation_date), 'MMM d')}
                     </div>
                   </div>
                   <h3 className="font-bold text-lg mb-1">{assignment.project.name}</h3>
