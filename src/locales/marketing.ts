@@ -436,10 +436,16 @@ const marketing: Record<string, Record<string, string>> = {
     contact_email: "info@automattion-compass.com",
     contact_or: "ou envoyez un email directement à",
 
+    stat_modules: "Modules",
+    stat_languages: "Langues",
+    stat_uptime: "Disponibilité",
+    stat_scalable: "Évolutif",
+
     footer_rights: "Tous droits réservés.",
     footer_developer: "Accès Développeur",
     footer_privacy: "Confidentialité",
     footer_terms: "Conditions",
+    footer_company: "Entreprise",
   },
 };
 
