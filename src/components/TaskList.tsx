@@ -131,31 +131,31 @@ const TaskList: React.FC<TaskListProps> = ({
     if (isBefore(due, today)) {
       return {
         class: 'overdue',
-        label: 'Overdue',
+        label: t('urgency_overdue'),
         variant: 'destructive' as const
       };
     } else if (daysUntilDue <= 1) {
       return {
         class: 'critical',
-        label: 'Critical',
+        label: t('urgency_critical'),
         variant: 'destructive' as const
       };
     } else if (daysUntilDue <= 3) {
       return {
         class: 'urgent',
-        label: 'Urgent',
+        label: t('urgency_urgent'),
         variant: 'default' as const
       };
     } else if (daysUntilDue <= 7) {
       return {
         class: 'high',
-        label: 'High',
+        label: t('tl_urgency_high'),
         variant: 'secondary' as const
       };
     } else {
       return {
         class: 'normal',
-        label: 'Normal',
+        label: t('urgency_normal'),
         variant: 'outline' as const
       };
     }
@@ -194,7 +194,7 @@ const TaskList: React.FC<TaskListProps> = ({
     if (!currentEmployee) {
       toast({
         title: t('error'),
-        description: 'Please log in to join a task',
+        description: t('tl_no_tasks_found'),
         variant: 'destructive'
       });
       return;
@@ -236,8 +236,8 @@ const TaskList: React.FC<TaskListProps> = ({
       const activeUsers = activeUsersPerTask.get(task.id) || [];
       if (activeUsers.length > 1) {
         toast({
-          title: 'Cannot Complete Task',
-          description: `${activeUsers.length} users are currently working on this task. Only one user can complete it.`,
+          title: t('tl_cannot_complete_task'),
+          description: t('tl_multiple_users_working', { count: String(activeUsers.length) }),
           variant: 'destructive'
         });
         return;
@@ -246,8 +246,8 @@ const TaskList: React.FC<TaskListProps> = ({
       // Check if current user is the only active user
       if (activeUsers.length === 1 && currentEmployee && activeUsers[0].id !== currentEmployee.id) {
         toast({
-          title: 'Cannot Complete Task',
-          description: `Only ${activeUsers[0].name} can complete this task as they are currently working on it.`,
+          title: t('tl_cannot_complete_task'),
+          description: t('tl_only_active_user_can_complete', { name: activeUsers[0].name }),
           variant: 'destructive'
         });
         return;
@@ -365,8 +365,8 @@ const TaskList: React.FC<TaskListProps> = ({
 
   if (tasks.length === 0) {
     return (
-      <div className="text-center text-gray-500 py-8">
-        No tasks found
+      <div className="text-center text-muted-foreground py-8">
+        {t('tl_no_tasks_found')}
       </div>
     );
   }
@@ -409,7 +409,7 @@ const TaskList: React.FC<TaskListProps> = ({
                         <div className="mt-2 flex items-center gap-2 text-sm">
                           <Users className="h-4 w-4 text-blue-600" />
                           <span className="text-blue-600 font-medium">
-                            {activeUsers.length === 1 ? 'Active: ' : `${activeUsers.length} users active: `}
+                            {activeUsers.length === 1 ? t('tl_active_users_single') : t('tl_active_users_multi', { count: String(activeUsers.length) })}
                             {activeUsers.map(u => u.name).join(', ')}
                           </span>
                         </div>
@@ -423,7 +423,7 @@ const TaskList: React.FC<TaskListProps> = ({
                     <div className={`mt-2 flex items-center gap-2 text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-blue-600'}`}>
                       <Timer className="h-4 w-4" />
                       <span className={task.isOvertime ? 'font-bold' : ''}>
-                        {task.isOvertime ? 'OVERTIME: ' : 'Time remaining: '}
+                        {task.isOvertime ? t('tl_overtime') : t('tl_time_remaining')}
                         {task.timeRemaining}
                       </span>
                     </div>
@@ -435,8 +435,8 @@ const TaskList: React.FC<TaskListProps> = ({
                       <div className="flex items-center gap-2 text-sm">
                         <Clock className="h-4 w-4 text-gray-500" />
                         <span className="text-gray-600">
-                          {task.estimated_duration ? `Estimated: ${formatDuration(task.estimated_duration)} / ` : ''}
-                          Actual: {formatDuration(task.actual_duration_minutes)}
+                          {task.estimated_duration ? `${t('tl_estimated', { duration: formatDuration(task.estimated_duration) })} / ` : ''}
+                          {t('tl_actual', { duration: formatDuration(task.actual_duration_minutes) })}
                         </span>
                       </div>
                       {task.efficiency_percentage !== undefined && (
@@ -447,10 +447,10 @@ const TaskList: React.FC<TaskListProps> = ({
                             <TrendingDown className="h-4 w-4 text-red-600" />
                           )}
                           <span className={`font-medium ${task.efficiency_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {task.efficiency_percentage >= 0 ? '+' : ''}{task.efficiency_percentage}% efficiency
+                            {task.efficiency_percentage >= 0 ? '+' : ''}{t('tl_efficiency', { value: String(task.efficiency_percentage) })}
                           </span>
-                          <span className="text-xs text-gray-500">
-                            ({task.efficiency_percentage >= 0 ? 'faster' : 'slower'} than expected)
+                          <span className="text-xs text-muted-foreground">
+                            ({task.efficiency_percentage >= 0 ? t('tl_faster_than_expected') : t('tl_slower_than_expected')})
                           </span>
                         </div>
                       )}
@@ -461,7 +461,7 @@ const TaskList: React.FC<TaskListProps> = ({
                   {task.is_rush_order && showRushOrderBadge && (
                     <Badge variant="destructive" className="flex items-center gap-1">
                       <Zap className="h-3 w-3" />
-                      Rush Order
+                      {t('tl_rush_order')}
                     </Badge>
                   )}
                   {task.due_date && (() => {
@@ -477,7 +477,7 @@ const TaskList: React.FC<TaskListProps> = ({
                     className={`${getStatusColor(task.status)} text-white flex items-center gap-1`}
                   >
                     {getStatusIcon(task.status)}
-                    {task.status === 'HOLD' ? 'On Hold' : task.status.replace('_', ' ')}
+                    {task.status === 'HOLD' ? t('tl_on_hold_status') : task.status.replace('_', ' ')}
                   </Badge>
                 </div>
               </div>
@@ -485,7 +485,7 @@ const TaskList: React.FC<TaskListProps> = ({
             <CardContent>
               {!compact && (
                 <p className="text-muted-foreground mb-4">
-                  {task.estimated_duration && `Duration: ${task.estimated_duration} minutes`}
+                  {task.estimated_duration && t('tl_duration_label', { duration: String(task.estimated_duration) })}
                   {task.estimated_duration && task.description && '\n'}
                   {task.description}
                 </p>
@@ -495,7 +495,7 @@ const TaskList: React.FC<TaskListProps> = ({
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
                   <p className="text-orange-800 text-sm flex items-center gap-2">
                     <Pause className="h-4 w-4" />
-                    This task is on hold because required limit phases are not yet completed.
+                    {t('tl_on_hold_message')}
                   </p>
                 </div>
               )}
@@ -504,18 +504,18 @@ const TaskList: React.FC<TaskListProps> = ({
                 <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
                   <div className="flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
-                    <span>Due: {new Date(task.due_date).toLocaleDateString()}</span>
+                    <span>{t('tl_due_label', { date: new Date(task.due_date).toLocaleDateString() })}</span>
                   </div>
                   {task.status === 'IN_PROGRESS' && task.assignee_name && (
                     <div className="flex items-center gap-1">
                       <User className="h-4 w-4" />
-                      <span>Started by: {task.assignee_name}</span>
+                      <span>{t('tl_started_by', { name: task.assignee_name })}</span>
                     </div>
                   )}
                   {task.total_duration && (
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      <span>Duration: {task.total_duration}min</span>
+                      <span>{t('tl_duration_short', { duration: String(task.total_duration) })}</span>
                     </div>
                   )}
                 </div>
@@ -529,7 +529,7 @@ const TaskList: React.FC<TaskListProps> = ({
                         size="sm" 
                         onClick={() => handleStatusChange(task, 'IN_PROGRESS')}
                       >
-                        Start Task
+                        {t('tl_start_task')}
                       </Button>
                       {showCompleteButton && (
                         <Button 
@@ -541,10 +541,10 @@ const TaskList: React.FC<TaskListProps> = ({
                           {isLoading ? (
                             <>
                               <Loader className="h-4 w-4 animate-spin mr-2" />
-                              Processing...
+                              {t('tl_processing')}
                             </>
                           ) : (
-                            'Complete'
+                            t('tl_complete')
                           )}
                         </Button>
                       )}
@@ -569,15 +569,15 @@ const TaskList: React.FC<TaskListProps> = ({
                           onClick={() => handleStatusChange(task, 'COMPLETED')}
                           className="bg-green-600 hover:bg-green-700 relative"
                           disabled={isLoading || !canComplete}
-                          title={!canComplete ? 'Multiple users are working on this task' : ''}
+                          title={!canComplete ? t('tl_multiple_users_tooltip') : ''}
                         >
                           {isLoading ? (
                             <>
                               <Loader className="h-4 w-4 animate-spin mr-2" />
-                              Processing...
+                              {t('tl_processing')}
                             </>
                           ) : (
-                            'Complete'
+                            t('tl_complete')
                           )}
                         </Button>
                         <Button 
@@ -585,7 +585,7 @@ const TaskList: React.FC<TaskListProps> = ({
                           variant="outline"
                           onClick={() => handleStatusChange(task, 'TODO')}
                         >
-                          Back to Todo
+                          {t('tl_back_to_todo')}
                         </Button>
                       </>
                     );
@@ -593,9 +593,9 @@ const TaskList: React.FC<TaskListProps> = ({
                   {task.status === 'COMPLETED' && task.completed_at && (
                     <div className="flex items-center gap-2">
                       <div className="text-sm text-gray-500">
-                        Completed: {new Date(task.completed_at).toLocaleString()}
+                        {t('tl_completed_at', { date: new Date(task.completed_at).toLocaleString() })}
                         {task.completed_by_employee?.name && (
-                          <span className="ml-1">by {task.completed_by_employee.name}</span>
+                          <span className="ml-1">{t('tl_completed_by', { name: task.completed_by_employee.name })}</span>
                         )}
                       </div>
                       <Button 
@@ -603,7 +603,7 @@ const TaskList: React.FC<TaskListProps> = ({
                         variant="outline"
                         onClick={() => handleStatusChange(task, 'TODO')}
                       >
-                        Back to Todo
+                        {t('tl_back_to_todo')}
                       </Button>
                     </div>
                   )}
@@ -615,7 +615,7 @@ const TaskList: React.FC<TaskListProps> = ({
                         disabled
                         className="opacity-50"
                       >
-                        Waiting for Limit Phases
+                        {t('tl_waiting_for_limit_phases')}
                       </Button>
                       <Button 
                         size="sm" 
@@ -625,7 +625,7 @@ const TaskList: React.FC<TaskListProps> = ({
                         }}
                         className="bg-blue-500 hover:bg-blue-600"
                       >
-                        Start Task
+                        {t('tl_start_task')}
                       </Button>
                     </div>
                   )}
