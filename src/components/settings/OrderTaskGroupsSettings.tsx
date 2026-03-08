@@ -122,43 +122,50 @@ const OrderTaskGroupsSettings: React.FC = () => {
         const linkedTaskIds = getLinkedTasks(group.id);
         return (
           <Card key={group.id}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Link className="h-4 w-4 text-primary" />
-                    {group.name}
-                    <Badge variant="secondary" className="ml-2">{linkedTaskIds.length} tasks</Badge>
-                  </CardTitle>
-                  {group.description && <CardDescription className="mt-1">{group.description}</CardDescription>}
+            <Collapsible>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CollapsibleTrigger className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Link className="h-4 w-4 text-primary" />
+                      {group.name}
+                      <Badge variant="secondary" className="ml-2">{linkedTaskIds.length} tasks</Badge>
+                    </CardTitle>
+                  </CollapsibleTrigger>
+                  <div className="flex items-center gap-1">
+                    {group.description && <span className="text-xs text-muted-foreground mr-2">{group.description}</span>}
+                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteGroup(group)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteGroup(group)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Label className="text-xs text-muted-foreground mb-2 block">Select standard tasks that should wait for orders in this group:</Label>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                {standardTasks.map(task => {
-                  const isLinked = linkedTaskIds.includes(task.id);
-                  return (
-                    <label
-                      key={task.id}
-                      className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
-                        isLinked ? 'bg-primary/10 border-primary/30' : 'bg-card border-border hover:bg-muted/50'
-                      }`}
-                    >
-                      <Checkbox checked={isLinked} onCheckedChange={() => handleToggleLink(group.id, task.id)} />
-                      <span className="text-sm">
-                        <span className="font-medium text-muted-foreground">{task.task_number}</span>{' '}
-                        {task.task_name}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </CardContent>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent>
+                  <Label className="text-xs text-muted-foreground mb-2 block">Select standard tasks that should wait for orders in this group:</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {standardTasks.map(task => {
+                      const isLinked = linkedTaskIds.includes(task.id);
+                      return (
+                        <label
+                          key={task.id}
+                          className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                            isLinked ? 'bg-primary/10 border-primary/30' : 'bg-card border-border hover:bg-muted/50'
+                          }`}
+                        >
+                          <Checkbox checked={isLinked} onCheckedChange={() => handleToggleLink(group.id, task.id)} />
+                          <span className="text-sm">
+                            <span className="font-medium text-muted-foreground">{task.task_number}</span>{' '}
+                            {task.task_name}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
           </Card>
         );
       })}
