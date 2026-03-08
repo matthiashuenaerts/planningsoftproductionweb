@@ -201,11 +201,8 @@ export const helpService = {
 
     if (uploadError) throw uploadError;
 
-    const { data } = supabase.storage
-      .from('help-media')
-      .getPublicUrl(fileName);
-
-    return data.publicUrl;
+    // Return the storage path (not URL) - signed URLs will be generated when displaying
+    return fileName;
   },
 
   async deleteHelpMedia(url: string): Promise<void> {

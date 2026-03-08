@@ -369,16 +369,12 @@ export const orderService = {
 
     if (uploadError) throw uploadError;
 
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('order-attachments')
-      .getPublicUrl(fileName);
-
+    // Store the path, not full URL - signed URLs will be generated when displaying
     // Create attachment record
     return this.createOrderAttachment({
       order_id: orderId,
       file_name: file.name,
-      file_path: publicUrl,
+      file_path: fileName,
       file_type: file.type,
       file_size: file.size
     });

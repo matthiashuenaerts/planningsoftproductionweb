@@ -264,8 +264,8 @@ const WorkstationSettings: React.FC = () => {
         contentType: uploadIconFile.type,
       });
       if (uploadError) throw uploadError;
-      const { data: pub } = supabase.storage.from('product-images').getPublicUrl(path);
-      await workstationService.update(selectedWorkstation.id, { icon_path: pub.publicUrl });
+      // Store path, not full URL - signed URLs will be generated when displaying
+      await workstationService.update(selectedWorkstation.id, { icon_path: path });
       toast({ title: 'Success', description: 'Icon uploaded successfully' });
       setShowIconDialog(false);
       setUploadIconFile(null);
