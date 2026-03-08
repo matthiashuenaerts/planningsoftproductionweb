@@ -1127,7 +1127,9 @@ class AutomaticSchedulingService {
             effectiveStart = deliveryDate;
           }
         }
-        const taskSlots = this.scheduleTask(task, employees, effectiveStart);
+        const taskSlots = task.is_multi_user 
+          ? this.scheduleMultiUserTask(task, employees, effectiveStart)
+          : this.scheduleTask(task, employees, effectiveStart);
         schedules.push(...taskSlots);
         
         if (taskSlots.length > 0 && task.standard_task_id === lastProductionStepId) {
