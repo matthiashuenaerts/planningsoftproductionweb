@@ -161,7 +161,11 @@ const ServiceTeamCalendar: React.FC = () => {
     try {
       const team = serviceTeams.find(t => t.id === selectedTeamId);
       const existingForDay = getProjectsForTeamAndDate(selectedTeamId, selectedDate);
-      
+
+      // Build notes from description + todos
+      const todoLines = assignTodos.filter(t => t.trim()).map(t => `☐ ${t.trim()}`);
+      const notes = [assignDescription, todoLines.length > 0 ? '\nTodos:\n' + todoLines.join('\n') : ''].filter(Boolean).join('\n');
+
       const { error } = await supabase
         .from('project_team_assignments')
         .insert({
@@ -171,12 +175,30 @@ const ServiceTeamCalendar: React.FC = () => {
           start_date: selectedDate,
           duration: 1,
           service_hours: assignHours,
-          service_order: existingForDay.length + 1
+          service_order: existingForDay.length + 1,
+          service_notes: notes.trim() || null,
         } as any);
 
       if (error) throw error;
-      toast({ title: 'Success', description: 'Service scheduled successfully' });
+
+      // Post to project chat for record-keeping
+      const project = projects.find(p => p.id === assignProjectId);
+      if (notes.trim()) {
+        const { data: empData } = await supabase.from('employees').select('id').limit(1).single();
+        if (empData) {
+          await supabase.from('chat_messages').insert({
+            chat_room_id: assignProjectId,
+            employee_id: empData.id,
+            message: `📋 Service visit scheduled for ${format(new Date(selectedDate + 'T12:00:00'), 'dd/MM/yyyy')} (${team?.name || 'Service'}):\n${notes}`,
+          } as any);
+        }
+      }
+
+      toast({ title: 'Success', description: `Service scheduled for "${project?.name || 'project'}" on ${format(new Date(selectedDate + 'T12:00:00'), 'dd/MM/yyyy')}` });
       setIsAssignDialogOpen(false);
+      setAssignDescription('');
+      setAssignTodos(['']);
+      setAssignProjectId('');
       loadData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
