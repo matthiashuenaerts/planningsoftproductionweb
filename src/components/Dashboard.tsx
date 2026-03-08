@@ -907,17 +907,17 @@ const Dashboard: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent className="px-3 sm:px-6">
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-1.5 sm:gap-2">
             {Array.from({
             length: 7
           }, (_, i) => addDays(weekStartDate, i)).map((date, index) => {
             const dayAssignments = getAssignmentsForDate(date);
             const dayServiceAssignments = getServiceAssignmentsForDate(date);
             const isCurrentDay = isToday(date);
-            return <div key={index} className={cn("min-h-[120px] border rounded p-2", isCurrentDay ? "border-red-500 bg-red-50" : "border-gray-200")}>
-                  <div className={cn("text-center text-sm font-medium mb-2", isCurrentDay ? "text-red-700" : "text-gray-700")}>
-                    <div>{format(date, 'EEE')}</div>
-                    <div className="text-lg">{format(date, 'd')}</div>
+            return <div key={index} className={cn("min-h-[80px] sm:min-h-[120px] border rounded-lg p-1.5 sm:p-2", isCurrentDay ? "border-red-500 bg-red-50" : "border-border")}>
+                  <div className={cn("text-center text-xs sm:text-sm font-medium mb-1 sm:mb-2", isCurrentDay ? "text-red-700" : "text-muted-foreground")}>
+                    <div className="text-[10px] sm:text-xs uppercase tracking-wide">{format(date, 'EEE')}</div>
+                    <div className="text-sm sm:text-lg font-bold">{format(date, 'd')}</div>
                   </div>
                   
                   <div className="space-y-1">
