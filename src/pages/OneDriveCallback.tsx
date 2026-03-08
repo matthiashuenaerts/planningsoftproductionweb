@@ -54,6 +54,7 @@ const OneDriveCallback: React.FC = () => {
         localStorage.setItem(TOKENS_STORAGE_KEY, JSON.stringify(tokens));
         sessionStorage.removeItem('onedrive_oauth_state');
         sessionStorage.removeItem('onedrive_code_verifier');
+        sessionStorage.removeItem('onedrive_client_id');
 
         // Navigate back to the original page
         const returnPath = sessionStorage.getItem('onedrive_return_path');
