@@ -591,7 +591,7 @@ const ServiceTeamCalendar: React.FC = () => {
                 {teamStartAddr && (
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
                     <MapPin className="h-3 w-3" />
-                    Start: {teamStartAddr}
+                    {t('svc_start')}: {teamStartAddr}
                   </div>
                 )}
               </div>
