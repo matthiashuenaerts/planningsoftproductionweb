@@ -845,7 +845,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         {todayPosition !== null && (
           <div
             className="absolute top-0 bg-destructive text-destructive-foreground text-[10px] px-2 py-0.5 rounded-b whitespace-nowrap z-20"
-            style={{ left: `calc(16rem + ${todayPosition}% - 20px)` }}
+            style={{ left: `calc(${sideColWidth} + ${todayPosition}% - 20px)` }}
           >
             Vandaag
           </div>
