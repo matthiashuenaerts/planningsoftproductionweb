@@ -9,10 +9,12 @@ import { ArrowLeft, Mail } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 
 const ForgotPassword: React.FC = () => {
+  const { tenant } = useParams<{ tenant: string }>();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const { toast } = useToast();
+  const loginPath = tenant ? `/${tenant}/login` : '/login';
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
