@@ -815,7 +815,7 @@ const ServiceTeamCalendar: React.FC = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label>Todos</Label>
+              <Label>{t('svc_todos')}</Label>
               {assignTodos.map((todo, index) => (
                 <div key={index} className="flex gap-2">
                   <Input
