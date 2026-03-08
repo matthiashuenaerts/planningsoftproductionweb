@@ -83,6 +83,7 @@ const ServiceTeamCalendar: React.FC = () => {
     waypoints: RouteWaypoint[];
     geometry: [number, number][];
     startPoint?: { lat: number; lng: number; address: string };
+    totalDrivingMinutes?: number;
   }>>({});
 
   const weekDays = eachDayOfInterval({
@@ -288,6 +289,7 @@ const ServiceTeamCalendar: React.FC = () => {
 
       const routeKey = `${teamId}_${dateStr}`;
       const startPt = startCoords ? { ...startCoords, address: teamStartAddress } : undefined;
+      const totalDrivingMinutes = trip.duration ? trip.duration / 60 : undefined;
       
       setOptimizedRoutes(prev => ({
         ...prev,
@@ -295,6 +297,7 @@ const ServiceTeamCalendar: React.FC = () => {
           waypoints: mapWps,
           geometry: routeGeometry,
           startPoint: startPt,
+          totalDrivingMinutes,
         }
       }));
 
@@ -349,6 +352,8 @@ const ServiceTeamCalendar: React.FC = () => {
     loadData();
   };
 
+  const [mapDrivingMinutes, setMapDrivingMinutes] = useState<number | undefined>();
+
   const handleShowMap = (teamId: string, dateStr: string, teamName: string) => {
     const routeKey = `${teamId}_${dateStr}`;
     const route = optimizedRoutes[routeKey];
@@ -357,6 +362,7 @@ const ServiceTeamCalendar: React.FC = () => {
     setMapWaypoints(route.waypoints);
     setMapRouteGeometry(route.geometry);
     setMapStartPoint(route.startPoint);
+    setMapDrivingMinutes(route.totalDrivingMinutes);
     setMapTeamName(teamName);
     setMapDateLabel(format(new Date(dateStr + 'T12:00:00'), 'EEEE, MMM d yyyy'));
     setMapOpen(true);
@@ -467,6 +473,9 @@ const ServiceTeamCalendar: React.FC = () => {
                   const isToday = isSameDay(day, new Date());
                   const dayProjects = getProjectsForTeamAndDate(team.id, dateStr);
                   const totalHours = dayProjects.reduce((sum, p) => sum + (p.assignment.service_hours || 0), 0);
+                  const routeData = optimizedRoutes[`${team.id}_${dateStr}`];
+                  const drivingMin = routeData?.totalDrivingMinutes;
+                  const grandTotal = drivingMin != null ? totalHours + drivingMin / 60 : totalHours;
 
                   return (
                     <div
@@ -484,8 +493,8 @@ const ServiceTeamCalendar: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-1">
                           {totalHours > 0 && (
-                            <Badge variant="outline" className="text-xs">
-                              <Clock className="h-3 w-3 mr-1" />{totalHours}h
+                            <Badge variant="outline" className="text-xs" title={drivingMin != null ? `Service: ${totalHours}h + Driving: ${Math.round(drivingMin)}min` : `Service: ${totalHours}h`}>
+                              <Clock className="h-3 w-3 mr-1" />{grandTotal.toFixed(1)}h
                             </Badge>
                           )}
                         </div>
@@ -656,6 +665,7 @@ const ServiceTeamCalendar: React.FC = () => {
         teamName={mapTeamName}
         dateLabel={mapDateLabel}
         startPoint={mapStartPoint}
+        totalDrivingMinutes={mapDrivingMinutes}
       />
     </div>
   );
