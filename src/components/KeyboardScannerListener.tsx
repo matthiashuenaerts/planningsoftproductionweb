@@ -479,16 +479,16 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
               </Button>
             )}
 
-            {supportsSerial && (
+            {supportsSerial && !relayEnabled && (
               !serialConnected ? (
                 <Button onClick={connectSerialPort} variant="outline" className="gap-2">
                   <Usb className="h-4 w-4" />
-                  Bron COM
+                  COM Poort
                 </Button>
               ) : (
                 <Button onClick={disconnectSerialPort} variant="outline" className="gap-2 border-green-500 text-green-600">
                   <Usb className="h-4 w-4" />
-                  Bron ✓
+                  COM ✓
                 </Button>
               )
             )}
@@ -505,7 +505,7 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
 
           {/* Relay/Bypass controls */}
           {supportsSerial && (
-            <div className="p-3 rounded-lg border bg-muted/10 space-y-2">
+            <div className="p-3 rounded-lg border bg-muted/10 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <RefreshCw className="h-4 w-4 text-muted-foreground" />
@@ -514,41 +514,84 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
                 <Switch checked={relayEnabled} onCheckedChange={setRelayEnabled} />
               </div>
               {relayEnabled && (
-                <div className="space-y-2 pt-1">
+                <div className="space-y-3 pt-1">
                   <p className="text-xs text-muted-foreground">
-                    Lees scan van bron poort → verwerk in app → stuur door naar relay poort.
-                    Zo kan een ander programma de scanner ook gebruiken.
+                    Selecteer de bron poort (scanner) en de bypass poort (doorsturen naar ander programma).
                   </p>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <Label className="text-xs">Relay baud rate</Label>
-                      <Select value={String(relayBaudRate)} onValueChange={v => setRelayBaudRate(parseInt(v))}>
-                        <SelectTrigger className="h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {BAUD_RATES.map(rate => (
-                            <SelectItem key={rate} value={String(rate)}>{rate}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+
+                  {/* Read / Source port */}
+                  <div className="p-2 rounded border bg-background space-y-2">
+                    <Label className="text-xs font-semibold flex items-center gap-1">
+                      <Usb className="h-3 w-3" /> Lees Poort (bron / scanner)
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <Select value={String(selectedBaudRate)} onValueChange={v => setSelectedBaudRate(parseInt(v))}>
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue placeholder="Baud rate" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {BAUD_RATES.map(rate => (
+                              <SelectItem key={rate} value={String(rate)}>{rate} baud</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {!serialConnected ? (
+                        <Button onClick={connectSerialPort} variant="outline" size="sm" className="gap-1">
+                          <Usb className="h-3 w-3" />
+                          Selecteer Poort
+                        </Button>
+                      ) : (
+                        <Button onClick={disconnectSerialPort} variant="outline" size="sm" className="gap-1 border-green-500 text-green-600">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Verbonden
+                        </Button>
+                      )}
                     </div>
-                    {!relayConnected ? (
-                      <Button onClick={connectRelayPort} variant="outline" size="sm" className="gap-1 mt-4">
-                        <ArrowRight className="h-3 w-3" />
-                        Relay Poort
-                      </Button>
-                    ) : (
-                      <Button onClick={disconnectRelayPort} variant="outline" size="sm" className="gap-1 mt-4 border-green-500 text-green-600">
-                        <ArrowRight className="h-3 w-3" />
-                        Relay ✓
-                      </Button>
-                    )}
                   </div>
+
+                  {/* Relay / Bypass port */}
+                  <div className="flex items-center justify-center">
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+
+                  <div className="p-2 rounded border bg-background space-y-2">
+                    <Label className="text-xs font-semibold flex items-center gap-1">
+                      <ArrowRight className="h-3 w-3" /> Bypass Poort (doorsturen)
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <Select value={String(relayBaudRate)} onValueChange={v => setRelayBaudRate(parseInt(v))}>
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue placeholder="Baud rate" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {BAUD_RATES.map(rate => (
+                              <SelectItem key={rate} value={String(rate)}>{rate} baud</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {!relayConnected ? (
+                        <Button onClick={connectRelayPort} variant="outline" size="sm" className="gap-1">
+                          <Usb className="h-3 w-3" />
+                          Selecteer Poort
+                        </Button>
+                      ) : (
+                        <Button onClick={disconnectRelayPort} variant="outline" size="sm" className="gap-1 border-green-500 text-green-600">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Verbonden
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Status */}
                   {serialConnected && relayConnected && (
-                    <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                    <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 justify-center">
                       <CheckCircle2 className="h-3 w-3" />
-                      Bron COM → App → Relay COM actief
+                      Lees Poort → App → Bypass Poort actief
                     </div>
                   )}
                 </div>
