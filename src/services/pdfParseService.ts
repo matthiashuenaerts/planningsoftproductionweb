@@ -322,6 +322,32 @@ function extractArticleCodeFromLine(line: string): string {
   return '';
 }
 
+/** Extract an article code embedded at the start of a description, e.g. "11731 Stekkerdoos..." → { code: "11731", remaining: "Stekkerdoos..." } */
+function extractEmbeddedArticleCode(description: string): { code: string; remainingDescription: string } | null {
+  if (!description) return null;
+  const trimmed = description.trim();
+  
+  // Pattern 1: Number at the start (e.g., "11731 Stekkerdoos...", "500438 SC FIS-CT...", "2608669278 Starlock...")
+  const leadingNumMatch = trimmed.match(/^(\d{4,10})\s+(.+)/);
+  if (leadingNumMatch) {
+    return { code: leadingNumMatch[1], remainingDescription: leadingNumMatch[2].trim() };
+  }
+  
+  // Pattern 2: Alphanumeric code at start (e.g., "AB-1234 Description...")
+  const leadingCodeMatch = trimmed.match(/^([A-Z0-9]{2,}[\-\.\/][A-Z0-9\-\.\/]+)\s+(.+)/i);
+  if (leadingCodeMatch && leadingCodeMatch[1].length <= 20) {
+    return { code: leadingCodeMatch[1], remainingDescription: leadingCodeMatch[2].trim() };
+  }
+  
+  // Pattern 3: Code with letters and numbers mixed (e.g., "FIS123 Description...")
+  const mixedMatch = trimmed.match(/^([A-Z]{1,5}\d{3,10}[A-Z0-9]*)\s+(.+)/i);
+  if (mixedMatch) {
+    return { code: mixedMatch[1], remainingDescription: mixedMatch[2].trim() };
+  }
+  
+  return null;
+}
+
 // ─── TABLE EXTRACTION ────────────────────────────────────────────────────────
 
 function extractTableData(rows: TableRow[], columnPositions: Map<string, number>, headerRowIndex: number): Record<string, string>[] {
