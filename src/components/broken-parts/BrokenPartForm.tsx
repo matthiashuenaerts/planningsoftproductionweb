@@ -356,8 +356,8 @@ const BrokenPartForm = () => {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="workstation">Workstation</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="workstation" className="text-xs sm:text-sm">Workstation</Label>
             <Select
               value={formData.workstation_id}
               onValueChange={(value) => setFormData({...formData, workstation_id: value})}
