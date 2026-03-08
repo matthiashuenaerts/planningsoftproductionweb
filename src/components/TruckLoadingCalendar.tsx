@@ -20,6 +20,7 @@ interface Project {
   client: string;
   status: string;
   installation_date: string;
+  team_color?: string;
 }
 
 interface LoadingAssignment {
