@@ -19,6 +19,8 @@ export interface RouteWaypoint {
   lng: number;
   order: number;
   serviceHours?: number;
+  estimatedArrival?: string;   // HH:MM
+  estimatedDeparture?: string; // HH:MM
 }
 
 interface RouteMapDialogProps {
