@@ -325,8 +325,8 @@ const TruckLoadingCalendar = () => {
           ) : (
             <div className="text-center py-8">
               <Truck className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-              <h3 className="text-xl font-medium text-gray-600 mb-2">No Loading Scheduled Today</h3>
-              <p className="text-gray-500">All trucks are ready for tomorrow's installations</p>
+              <h3 className="text-xl font-medium text-gray-600 mb-2">{t('truck_no_loading_today')}</h3>
+              <p className="text-gray-500">{t('truck_all_ready')}</p>
             </div>
           )}
         </CardContent>
