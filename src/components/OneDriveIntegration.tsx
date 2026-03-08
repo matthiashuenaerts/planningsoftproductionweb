@@ -471,9 +471,9 @@ const { data, error } = await supabase.functions.invoke(
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2">
-                  <div className="bg-muted p-4 rounded-lg text-sm space-y-2">
+                   <div className="bg-muted p-3 sm:p-4 rounded-lg text-xs sm:text-sm space-y-2">
                     <p className="font-medium">Om OneDrive te gebruiken:</p>
-                    <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                    <ol className="list-decimal list-inside space-y-1 text-muted-foreground text-[11px] sm:text-sm">
                       <li>Registreer een Azure AD app (gratis)</li>
                       <li>Configureer MICROSOFT_CLIENT_ID en MICROSOFT_CLIENT_SECRET</li>
                       <li>Log in met je Microsoft account</li>
