@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { User, Lock, Shield, RefreshCw } from "lucide-react";
+import { User, Lock, Shield, RefreshCw, ArrowRight } from "lucide-react";
 import { logLoginAttempt } from "@/services/loginLogService";
 import {
   InputOTP,
@@ -49,7 +49,6 @@ const Login: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Redirect if already authenticated (but not if waiting for OTP)
   useEffect(() => {
     if (!isAuthenticated || otpStep || otpPendingRef.current) return;
 
@@ -69,7 +68,6 @@ const Login: React.FC = () => {
     }
   }, [isAuthenticated, isDeveloper, navigate, tenant, otpStep]);
 
-  // Global Enter key handler
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === "Enter" && !loading && !verifyingOtp) {
@@ -104,7 +102,6 @@ const Login: React.FC = () => {
     try {
       setLoading(true);
 
-      // Developer portal login with 2FA
       if (isDeveloperPortal) {
         const { data: devData, error: devError } = await supabase.rpc(
           "authenticate_developer_by_name",
@@ -118,17 +115,14 @@ const Login: React.FC = () => {
           throw new Error("Invalid developer credentials");
         }
 
-        // Mark OTP pending BEFORE login to prevent redirect race condition
         otpPendingRef.current = true;
 
-        // Authenticate with Supabase Auth first
         const loginResult = await login(devRow.email, password);
         if (loginResult.error) {
           otpPendingRef.current = false;
           throw new Error(loginResult.error);
         }
 
-        // Send OTP for 2FA
         try {
           const { data: otpResult, error: otpError } = await supabase.functions.invoke(
             "developer-otp",
@@ -151,7 +145,6 @@ const Login: React.FC = () => {
             description: "Could not send verification email. Please try again.",
             variant: "destructive",
           });
-          // Sign out since 2FA failed
           otpPendingRef.current = false;
           await supabase.auth.signOut();
         }
@@ -159,7 +152,6 @@ const Login: React.FC = () => {
         return;
       }
 
-      // Tenant portal login
       if (!tenant) {
         throw new Error("No tenant specified in URL");
       }
@@ -189,8 +181,6 @@ const Login: React.FC = () => {
       const loginResult = await login(row.email, password);
       if (loginResult.error) throw new Error(loginResult.error);
 
-      // If user is a developer logging into a tenant, activate that tenant context
-      // We need to check roles - use a quick query
       const { data: devRoleCheck } = await supabase
         .from("user_roles")
         .select("role")
@@ -199,13 +189,11 @@ const Login: React.FC = () => {
         .maybeSingle();
 
       if (devRoleCheck) {
-        // Developer logging into a tenant - set active tenant
         await supabase.rpc("set_developer_active_tenant", {
           p_tenant_id: row.tenant_id,
         });
       }
 
-      // Log successful login
       logLoginAttempt({
         tenantId: row.tenant_id,
         employeeId: row.employee_id,
@@ -230,9 +218,7 @@ const Login: React.FC = () => {
     } catch (error: any) {
       console.error("Login error:", error);
 
-      // Log failed login attempt (best effort - tenant may not be resolved)
       if (tenant) {
-        // Try to resolve tenant id for logging
         const { data: tenantData } = await supabase.rpc("resolve_tenant", { p_slug: tenant, p_domain: null });
         const resolvedTenant = Array.isArray(tenantData) ? tenantData[0] : tenantData;
         if (resolvedTenant?.id) {
@@ -275,7 +261,6 @@ const Login: React.FC = () => {
       if (error) throw error;
 
       if (data?.verified) {
-        // Clear developer active tenant for dev portal access
         await supabase.rpc("clear_developer_active_tenant");
 
         toast({
@@ -328,17 +313,17 @@ const Login: React.FC = () => {
     }
   };
 
-  // OTP verification screen for developer 2FA
+  // OTP verification screen
   if (otpStep) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
         <div
           className={`w-full max-w-md space-y-8 transform transition-all duration-700 ${
             isVisible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
           }`}
         >
           <div className="text-center space-y-4">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/20">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-500/20 backdrop-blur-sm">
               <Shield className="h-8 w-8 text-blue-400" />
             </div>
             <div>
@@ -347,12 +332,12 @@ const Login: React.FC = () => {
               </h1>
               <p className="text-slate-400 mt-2">
                 A verification code has been sent to{" "}
-                <span className="text-blue-400">{otpEmail}</span>
+                <span className="text-blue-400 font-medium">{otpEmail}</span>
               </p>
             </div>
           </div>
 
-          <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
+          <Card className="bg-white/[0.03] border-white/[0.08] backdrop-blur-xl shadow-2xl">
             <CardContent className="pt-6 space-y-6">
               <div className="flex justify-center">
                 <InputOTP
@@ -361,18 +346,15 @@ const Login: React.FC = () => {
                   onChange={(value) => setOtpCode(value)}
                 >
                   <InputOTPGroup>
-                    <InputOTPSlot index={0} className="bg-white/10 border-white/20 text-white text-lg w-12 h-14" />
-                    <InputOTPSlot index={1} className="bg-white/10 border-white/20 text-white text-lg w-12 h-14" />
-                    <InputOTPSlot index={2} className="bg-white/10 border-white/20 text-white text-lg w-12 h-14" />
-                    <InputOTPSlot index={3} className="bg-white/10 border-white/20 text-white text-lg w-12 h-14" />
-                    <InputOTPSlot index={4} className="bg-white/10 border-white/20 text-white text-lg w-12 h-14" />
-                    <InputOTPSlot index={5} className="bg-white/10 border-white/20 text-white text-lg w-12 h-14" />
+                    {[0, 1, 2, 3, 4, 5].map((i) => (
+                      <InputOTPSlot key={i} index={i} className="bg-white/[0.06] border-white/[0.12] text-white text-lg w-12 h-14 rounded-xl" />
+                    ))}
                   </InputOTPGroup>
                 </InputOTP>
               </div>
 
               <Button
-                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                className="w-full h-12 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-600/20"
                 onClick={handleVerifyOtp}
                 disabled={verifyingOtp || otpCode.length !== 6}
               >
@@ -382,7 +364,7 @@ const Login: React.FC = () => {
                     <span>Verifying...</span>
                   </div>
                 ) : (
-                  "Verify & Continue"
+                  <span className="flex items-center gap-2">Verify & Continue <ArrowRight className="h-4 w-4" /></span>
                 )}
               </Button>
 
@@ -414,7 +396,7 @@ const Login: React.FC = () => {
             </CardContent>
           </Card>
 
-          <p className="text-center text-xs text-slate-500">
+          <p className="text-center text-xs text-slate-600">
             Code expires in 5 minutes
           </p>
         </div>
@@ -423,52 +405,59 @@ const Login: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center p-2 sm:p-4 relative overflow-hidden">
-      {/* Animated background elements */}
+    <div className="min-h-screen w-full flex items-center justify-center p-3 sm:p-4 relative overflow-hidden bg-[#0f1729]">
+      {/* Ambient glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-20 -right-20 sm:-top-40 sm:-right-40 w-48 sm:w-80 h-48 sm:h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-[fade-in_2s_ease-out]"></div>
-        <div className="absolute -bottom-20 -left-20 sm:-bottom-40 sm:-left-40 w-48 sm:w-80 h-48 sm:h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-[fade-in_2s_ease-out_0.5s_both]"></div>
-        <div className="absolute top-20 left-20 sm:top-40 sm:left-40 w-36 sm:w-60 h-36 sm:h-60 bg-amber-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-[fade-in_2s_ease-out_1s_both]"></div>
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-[#1a6b96]/20 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-[#42A5DB]/15 rounded-full blur-[100px]" />
+        <div className="absolute top-[40%] right-[20%] w-[30%] h-[30%] bg-violet-500/10 rounded-full blur-[80px]" />
       </div>
 
+      {/* Grid pattern overlay */}
       <div
-        className={`w-full max-w-md space-y-6 sm:space-y-8 relative z-10 transform transition-all duration-1000 ${
-          isVisible
-            ? "translate-y-0 opacity-100"
-            : "translate-y-8 opacity-0"
+        className="absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: `linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)`,
+          backgroundSize: '60px 60px',
+        }}
+      />
+
+      <div
+        className={`w-full max-w-[420px] relative z-10 transform transition-all duration-700 ${
+          isVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
         }`}
       >
         {/* Logo Section */}
-        <div className="text-center space-y-3 sm:space-y-6">
-          <div className="relative inline-block">
+        <div className="text-center mb-8 sm:mb-10">
+          <div className="relative inline-block mb-5">
+            <div className="absolute inset-0 bg-[#42A5DB]/20 blur-2xl rounded-full scale-150" />
             <img
               src="https://static.wixstatic.com/media/99c033_5bb79e52130d4fa6bbae75d9a22b198d~mv2.png"
               alt="Company Logo"
-              className="relative w-20 sm:w-32 h-auto mx-auto rounded-lg shadow-lg hover:scale-105 transition-transform duration-300"
+              className="relative w-16 sm:w-20 h-auto mx-auto rounded-2xl shadow-2xl shadow-black/30"
             />
           </div>
 
-          <div className="space-y-1 sm:space-y-2">
-            <div className="flex items-center justify-center space-x-2">
-              <h1 className="font-bold text-2xl sm:text-4xl text-[#195F85]">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-center gap-1.5">
+              <h1 className="font-extrabold text-2xl sm:text-3xl text-white tracking-tight">
                 AutoMattiOn
               </h1>
-              <h1 className="font-bold text-2xl sm:text-4xl text-[#42A5DB]">Compass</h1>
+              <h1 className="font-extrabold text-2xl sm:text-3xl text-[#42A5DB] tracking-tight">Compass</h1>
             </div>
-
-            <p className="text-[#42A5DB] text-sm sm:text-lg font-bold">
-              Guiding your production to perfection!
+            <p className="text-[#42A5DB]/70 text-xs sm:text-sm font-medium tracking-wide">
+              Guiding your production to perfection
             </p>
           </div>
         </div>
 
         {/* Login Card */}
-        <Card className="backdrop-blur-sm bg-white/80 border-0 shadow-2xl ring-1 ring-gray-200/50 hover:shadow-3xl transition-all duration-500">
-          <CardHeader className="space-y-1 text-center pb-4 sm:pb-8 px-4 sm:px-6">
-            <CardTitle className="text-xl sm:text-2xl font-semibold text-gray-800">
+        <Card className="bg-white/[0.04] border-white/[0.08] backdrop-blur-xl shadow-2xl shadow-black/20 rounded-2xl">
+          <CardHeader className="space-y-1 text-center pb-2 pt-6 sm:pt-8 px-5 sm:px-8">
+            <CardTitle className="text-xl sm:text-2xl font-bold text-white">
               {isDeveloperPortal ? "Developer Sign in" : "Welcome Back"}
             </CardTitle>
-            <CardDescription className="text-gray-600">
+            <CardDescription className="text-slate-400 text-sm">
               {isDeveloperPortal
                 ? "Sign in to manage tenants"
                 : `Sign in to ${tenant || "your workspace"}`}
@@ -476,16 +465,13 @@ const Login: React.FC = () => {
           </CardHeader>
 
           <form onSubmit={handleLogin}>
-            <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
+            <CardContent className="space-y-4 sm:space-y-5 px-5 sm:px-8 pt-4">
               <div className="space-y-2">
-                <Label
-                  htmlFor="name"
-                  className="text-sm font-medium text-gray-700"
-                >
+                <Label htmlFor="name" className="text-xs font-medium text-slate-300 uppercase tracking-wider">
                   {isDeveloperPortal ? "Developer Name" : "Gebruikersnaam"}
                 </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <User className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-500" />
                   <Input
                     id="name"
                     type="text"
@@ -497,20 +483,17 @@ const Login: React.FC = () => {
                         : "Enter your employee name"
                     }
                     disabled={loading}
-                    className="pl-10 h-10 sm:h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-colors duration-200 text-sm sm:text-base"
+                    className="pl-11 h-11 sm:h-12 bg-white/[0.04] border-white/[0.1] text-white placeholder:text-slate-500 focus:border-[#42A5DB]/50 focus:ring-[#42A5DB]/20 rounded-xl transition-all text-sm sm:text-base"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label
-                  htmlFor="password"
-                  className="text-sm font-medium text-gray-700"
-                >
+                <Label htmlFor="password" className="text-xs font-medium text-slate-300 uppercase tracking-wider">
                   Paswoord
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Lock className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-500" />
                   <Input
                     id="password"
                     type="password"
@@ -518,32 +501,35 @@ const Login: React.FC = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     disabled={loading}
-                    className="pl-10 h-10 sm:h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-colors duration-200 text-sm sm:text-base"
+                    className="pl-11 h-11 sm:h-12 bg-white/[0.04] border-white/[0.1] text-white placeholder:text-slate-500 focus:border-[#42A5DB]/50 focus:ring-[#42A5DB]/20 rounded-xl transition-all text-sm sm:text-base"
                   />
                 </div>
               </div>
             </CardContent>
 
-            <CardFooter className="flex flex-col space-y-3 sm:space-y-4 pt-4 sm:pt-6 pb-6 sm:pb-8 px-4 sm:px-6">
+            <CardFooter className="flex flex-col space-y-3 sm:space-y-4 pt-2 pb-6 sm:pb-8 px-5 sm:px-8">
               <Button
-                className="w-full h-10 sm:h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-sm sm:text-base"
+                className="w-full h-11 sm:h-12 bg-gradient-to-r from-[#1a6b96] to-[#42A5DB] hover:from-[#195f85] hover:to-[#3994c4] text-white font-semibold rounded-xl shadow-lg shadow-[#1a6b96]/30 hover:shadow-xl hover:shadow-[#1a6b96]/40 transform hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-sm sm:text-base"
                 type="submit"
                 disabled={loading}
               >
                 {loading ? (
                   <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
                     <span>Signing in...</span>
                   </div>
                 ) : (
-                  "Sign in"
+                  <span className="flex items-center gap-2">
+                    Sign in
+                    <ArrowRight className="h-4 w-4" />
+                  </span>
                 )}
               </Button>
 
               {!isDeveloperPortal && tenant && (
                 <Link
                   to={`/${tenant}/forgot-password`}
-                  className="text-sm text-center text-blue-600 hover:text-blue-700 hover:underline"
+                  className="text-xs text-center text-slate-400 hover:text-[#42A5DB] transition-colors"
                 >
                   Forgot your password?
                 </Link>
@@ -553,9 +539,9 @@ const Login: React.FC = () => {
         </Card>
 
         {/* Footer */}
-        <div className="text-center text-sm text-gray-500">
-          <p>Secure access to your production planning system</p>
-        </div>
+        <p className="text-center text-[11px] text-slate-600 mt-6">
+          Secure access to your production planning system
+        </p>
       </div>
     </div>
   );
