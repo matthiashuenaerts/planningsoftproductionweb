@@ -362,10 +362,10 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
   }
   
   return (
-    <form onSubmit={formHandleSubmit(onSubmit)} className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-        <div className="space-y-4 md:space-y-6 min-w-0">
-          <div className="space-y-2">
+    <form onSubmit={formHandleSubmit(onSubmit)} className={`${isMobile ? 'space-y-4' : 'space-y-6'}`}>
+      <div className={`grid grid-cols-1 ${isMobile ? 'gap-4' : 'md:grid-cols-2 gap-4 md:gap-6'}`}>
+        <div className={`${isMobile ? 'space-y-3' : 'space-y-4 md:space-y-6'} min-w-0`}>
+          <div className="space-y-1.5">
             <label htmlFor="title" className="block text-sm font-medium">{t('ro_title')}</label>
             <Input
               id="title"
