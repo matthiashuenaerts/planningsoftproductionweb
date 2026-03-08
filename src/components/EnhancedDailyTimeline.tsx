@@ -302,7 +302,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                     </div>
                   </CardHeader>
                   
-                  <CardContent className={`relative z-10 space-y-3 ${isSmallTask ? 'py-2 pt-0' : 'pt-0'}`}>
+                  <CardContent className={`relative z-10 space-y-2 sm:space-y-3 ${isSmallTask ? 'py-1.5 sm:py-2 pt-0' : 'pt-0'} ${isMobile ? 'px-3' : ''}`}>
                     {/* Badges */}
                     <div className="flex flex-wrap gap-2">
                       {getStatusBadge(task.status)}
