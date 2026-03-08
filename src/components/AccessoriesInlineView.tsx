@@ -880,60 +880,25 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                     {accessory.stock_location && <span>📍{accessory.stock_location}</span>}
                   </div>
                   <div className="flex items-center gap-2 mt-1.5 ml-6">
-                    {editingStatusAccessoryId === accessory.id ? (
-                      <div className="flex items-center gap-1.5">
-                        <Select
-                          value={statusUpdateInfo.status}
-                          onValueChange={(value: Accessory['status']) => 
-                            setStatusUpdateInfo(prev => ({ ...prev, status: value }))
-                          }
-                        >
-                          <SelectTrigger className="h-7 text-[10px] w-28">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {statuses.map(status => (
-                              <SelectItem key={status} value={status}>
-                                {status.replace('_', ' ').toUpperCase()}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {statusUpdateInfo.status === 'to_order' && (
-                          <Input
-                            type="number"
-                            min="1"
-                            max={accessory.quantity}
-                            value={statusUpdateInfo.quantity}
-                            onChange={(e) => 
-                              setStatusUpdateInfo(prev => ({ 
-                                ...prev, 
-                                quantity: Math.min(parseInt(e.target.value) || 1, accessory.quantity) 
-                              }))
-                            }
-                            className="h-7 w-14 text-[10px]"
-                          />
-                        )}
-                        <Button size="sm" className="h-7 text-[10px] px-2" onClick={() => handleStatusUpdate(accessory.id, statusUpdateInfo.status, statusUpdateInfo.quantity)} disabled={loading}>
-                          ✓
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-7 text-[10px] px-1.5" onClick={() => setEditingStatusAccessoryId(null)}>
-                          ✕
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 text-[10px] px-2"
-                        onClick={() => {
-                          setEditingStatusAccessoryId(accessory.id);
-                          setStatusUpdateInfo({ status: accessory.status, quantity: accessory.quantity });
-                        }}
-                      >
-                        {accessory.status.replace('_', ' ').toUpperCase()}
-                      </Button>
-                    )}
+                    <Select
+                      value={accessory.status}
+                      onValueChange={(value: Accessory['status']) => {
+                        if (value !== accessory.status) {
+                          handleStatusUpdate(accessory.id, value, accessory.quantity);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-6 text-[10px] w-28 px-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statuses.map(status => (
+                          <SelectItem key={status} value={status}>
+                            {status.replace('_', ' ').toUpperCase()}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     {accessory.order_id && (() => {
                       const orderInfo = getOrderInfo(accessory.order_id);
                       return orderInfo ? (
