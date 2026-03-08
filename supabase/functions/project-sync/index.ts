@@ -262,7 +262,19 @@ async function syncProject(
     }
 
     return {
-      detail: { project_name: project.name, project_link_id: project.project_link_id, status: 'updated', old_date: normalizedCurrent, new_date: normalizedExternal },
+      detail: {
+        project_name: project.name,
+        project_link_id: project.project_link_id,
+        status: 'updated',
+        changes,
+        old_date: normalizedCurrent,
+        new_date: normalizedExternal,
+        old_team_id: currentTeamId,
+        new_team_id: newTeamId,
+        new_team_name: matchedTeam?.name || externalTeamName,
+        old_duration: currentDuration,
+        new_duration: newDuration,
+      },
       synced: true
     };
 
