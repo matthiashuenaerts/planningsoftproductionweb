@@ -237,7 +237,7 @@ const RushOrderDetail: React.FC<RushOrderDetailProps> = ({ rushOrderId, onStatus
               <div className="flex items-center">
                 <Clock className="h-4 w-4 text-red-500 mr-2" />
                 <p className="text-red-600 font-medium">
-                  {format(parseISO(rushOrder.deadline), 'MMMM d, yyyy HH:mm')}
+                  {format(new Date(rushOrder.deadline), 'MMMM d, yyyy HH:mm')}
                 </p>
               </div>
             </div>
