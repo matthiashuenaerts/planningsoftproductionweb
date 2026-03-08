@@ -1,7 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { X, Radio, Usb, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { X, Radio, Usb, CheckCircle2, AlertCircle, Loader2, Settings2, Keyboard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { qrCodeService } from '@/services/qrCodeService';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,16 +20,17 @@ interface KeyboardScannerListenerProps {
 
 interface ScanResult {
   code: string;
+  rawCode: string;
   status: 'success' | 'not_found' | 'error';
   message: string;
   partsCompleted?: number;
   timestamp: number;
 }
 
-const MAX_KEY_INTERVAL_MS = 80; // USB scanners type faster than humans
-const MIN_CODE_LENGTH = 3;
-const RESULT_DISPLAY_MS = 2000;
-const MAX_HISTORY = 20;
+const MAX_HISTORY = 50;
+
+// Common baud rates for serial scanners
+const BAUD_RATES = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200];
 
 export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = ({
   isOpen,
@@ -40,34 +45,89 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
   const [processing, setProcessing] = useState(false);
   const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
   const [currentBuffer, setCurrentBuffer] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Configurable settings
+  const [maxKeyInterval, setMaxKeyInterval] = useState(150); // ms between keys to detect scanner vs human
+  const [minCodeLength, setMinCodeLength] = useState(1); // minimum code length to accept
+  const [stripPrefix, setStripPrefix] = useState(true); // remove first character
+  const [stripSuffix, setStripSuffix] = useState(false); // remove last character
+  const [selectedBaudRate, setSelectedBaudRate] = useState(9600);
+  const [terminator, setTerminator] = useState<'enter' | 'tab' | 'both'>('both'); // what ends a scan
+  const [acceptAllInput, setAcceptAllInput] = useState(true); // accept even slow typed input
+  const [manualInput, setManualInput] = useState(''); // for manual code entry
 
   const bufferRef = useRef('');
   const lastKeyTimeRef = useRef(0);
   const serialPortRef = useRef<any>(null);
   const serialReaderRef = useRef<any>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const flushTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Process a scanned code
   const processCode = useCallback(async (rawCode: string) => {
-    const code = rawCode.trim();
-    if (code.length < MIN_CODE_LENGTH || processing) return;
+    let code = rawCode.trim();
+    if (code.length < minCodeLength) return;
+    if (processing) return;
 
-    // Remove first character (barcode prefix) — same logic as QRCodeScanner
-    const processedCode = code.length > 1 ? code.substring(1) : code;
+    const originalCode = code;
+
+    // Apply prefix/suffix stripping
+    if (stripPrefix && code.length > 1) {
+      code = code.substring(1);
+    }
+    if (stripSuffix && code.length > 1) {
+      code = code.substring(0, code.length - 1);
+    }
 
     setProcessing(true);
 
     try {
-      const part = await qrCodeService.findPartByQRCode(processedCode);
+      const part = await qrCodeService.findPartByQRCode(code);
 
       if (!part) {
-        const result: ScanResult = {
-          code: processedCode,
-          status: 'not_found',
-          message: `"${processedCode}" niet gevonden`,
-          timestamp: Date.now(),
-        };
-        setScanHistory(prev => [result, ...prev].slice(0, MAX_HISTORY));
+        // Try without stripping as fallback
+        let fallbackPart = null;
+        if (stripPrefix || stripSuffix) {
+          fallbackPart = await qrCodeService.findPartByQRCode(originalCode);
+        }
+
+        if (fallbackPart) {
+          // Fallback found with original code
+          await qrCodeService.updatePartWorkstationStatus(fallbackPart.id, workstationName);
+
+          let partsCompleted = 0;
+          if (workstationId) {
+            const { data, error } = await supabase
+              .from('part_workstation_tracking')
+              .update({ status: 'completed', completed_at: new Date().toISOString() })
+              .eq('part_id', fallbackPart.id)
+              .eq('workstation_id', workstationId)
+              .eq('status', 'pending')
+              .select();
+            if (!error && data) partsCompleted = data.length;
+          }
+
+          const result: ScanResult = {
+            code: originalCode,
+            rawCode: rawCode,
+            status: 'success',
+            message: `✓ ${originalCode} (origineel)`,
+            partsCompleted,
+            timestamp: Date.now(),
+          };
+          setScanHistory(prev => [result, ...prev].slice(0, MAX_HISTORY));
+          onCodeDetected(originalCode);
+        } else {
+          const result: ScanResult = {
+            code,
+            rawCode: rawCode,
+            status: 'not_found',
+            message: `"${code}" niet gevonden`,
+            timestamp: Date.now(),
+          };
+          setScanHistory(prev => [result, ...prev].slice(0, MAX_HISTORY));
+        }
         setProcessing(false);
         return;
       }
@@ -85,24 +145,23 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
           .eq('workstation_id', workstationId)
           .eq('status', 'pending')
           .select();
-
-        if (!error && data) {
-          partsCompleted = data.length;
-        }
+        if (!error && data) partsCompleted = data.length;
       }
 
       const result: ScanResult = {
-        code: processedCode,
+        code,
+        rawCode: rawCode,
         status: 'success',
-        message: `✓ ${processedCode}`,
+        message: `✓ ${code}`,
         partsCompleted,
         timestamp: Date.now(),
       };
       setScanHistory(prev => [result, ...prev].slice(0, MAX_HISTORY));
-      onCodeDetected(processedCode);
+      onCodeDetected(code);
     } catch (error: any) {
       const result: ScanResult = {
-        code: processedCode,
+        code,
+        rawCode: rawCode,
         status: 'error',
         message: `Fout: ${error.message}`,
         timestamp: Date.now(),
@@ -111,42 +170,76 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
     } finally {
       setProcessing(false);
     }
-  }, [workstationName, workstationId, onCodeDetected, processing]);
+  }, [workstationName, workstationId, onCodeDetected, processing, minCodeLength, stripPrefix, stripSuffix]);
 
   // Keyboard listener for HID scanners
   useEffect(() => {
     if (!isOpen || !listening) return;
 
+    const isTerminator = (key: string) => {
+      if (terminator === 'enter') return key === 'Enter';
+      if (terminator === 'tab') return key === 'Tab';
+      return key === 'Enter' || key === 'Tab';
+    };
+
+    const flushBuffer = () => {
+      if (bufferRef.current.length >= minCodeLength) {
+        const code = bufferRef.current;
+        bufferRef.current = '';
+        setCurrentBuffer('');
+        processCode(code);
+      }
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't capture if user is typing in the manual input or settings
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+        return;
+      }
+
       const now = Date.now();
 
-      // If too much time passed, reset buffer (user is typing, not scanner)
-      if (now - lastKeyTimeRef.current > MAX_KEY_INTERVAL_MS && bufferRef.current.length > 0) {
+      // If not accepting all input, reset buffer on slow typing
+      if (!acceptAllInput && now - lastKeyTimeRef.current > maxKeyInterval && bufferRef.current.length > 0) {
         bufferRef.current = '';
+        setCurrentBuffer('');
       }
       lastKeyTimeRef.current = now;
 
-      if (e.key === 'Enter') {
-        if (bufferRef.current.length >= MIN_CODE_LENGTH) {
-          e.preventDefault();
-          const code = bufferRef.current;
-          bufferRef.current = '';
-          setCurrentBuffer('');
-          processCode(code);
-        } else {
-          bufferRef.current = '';
-          setCurrentBuffer('');
-        }
+      // Clear any pending flush timer
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+
+      if (isTerminator(e.key)) {
+        e.preventDefault();
+        e.stopPropagation();
+        flushBuffer();
       } else if (e.key.length === 1) {
-        // Only single printable characters
         bufferRef.current += e.key;
         setCurrentBuffer(bufferRef.current);
+
+        // Auto-flush after timeout (for scanners that don't send Enter/Tab)
+        if (acceptAllInput) {
+          flushTimerRef.current = setTimeout(() => {
+            if (bufferRef.current.length >= minCodeLength) {
+              flushBuffer();
+            }
+          }, 500);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown, { capture: true });
-    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [isOpen, listening, processCode]);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+      }
+    };
+  }, [isOpen, listening, processCode, maxKeyInterval, minCodeLength, terminator, acceptAllInput]);
 
   // WebSerial COM port connection
   const connectSerialPort = async () => {
@@ -160,25 +253,31 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
     }
 
     try {
-      const port = await (navigator as any).serial.requestPort();
-      await port.open({ baudRate: 9600 });
+      // Request port with no filters — accept ANY device
+      const port = await (navigator as any).serial.requestPort({ filters: [] });
+      await port.open({
+        baudRate: selectedBaudRate,
+        dataBits: 8,
+        stopBits: 1,
+        parity: 'none',
+        flowControl: 'none',
+      });
       serialPortRef.current = port;
       setSerialConnected(true);
 
-      // Start reading
       abortControllerRef.current = new AbortController();
       readSerialPort(port);
 
       toast({
         title: 'COM poort verbonden',
-        description: 'Scanner is verbonden via seriële poort.',
+        description: `Scanner verbonden (${selectedBaudRate} baud).`,
       });
     } catch (error: any) {
       if (error.name !== 'NotFoundError') {
         console.error('Serial port error:', error);
         toast({
           title: 'Verbindingsfout',
-          description: error.message || 'Kon geen verbinding maken met de seriële poort.',
+          description: error.message || 'Kon geen verbinding maken.',
           variant: 'destructive',
         });
       }
@@ -187,9 +286,9 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
 
   const readSerialPort = async (port: any) => {
     const decoder = new TextDecoderStream();
-    const readableStreamClosed = port.readable.pipeTo(decoder.writable, {
+    port.readable.pipeTo(decoder.writable, {
       signal: abortControllerRef.current?.signal,
-    });
+    }).catch(() => {});
 
     const reader = decoder.readable.getReader();
     serialReaderRef.current = reader;
@@ -201,13 +300,14 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
         if (done) break;
         if (value) {
           for (const char of value) {
-            if (char === '\n' || char === '\r') {
-              if (serialBuffer.length >= MIN_CODE_LENGTH) {
+            if (char === '\n' || char === '\r' || char === '\t') {
+              if (serialBuffer.length >= minCodeLength) {
                 processCode(serialBuffer);
               }
               serialBuffer = '';
             } else {
               serialBuffer += char;
+              setCurrentBuffer(serialBuffer);
             }
           }
         }
@@ -215,9 +315,15 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error('Serial read error:', error);
+        toast({
+          title: 'Leesfout',
+          description: 'Verbinding met seriële poort verloren.',
+          variant: 'destructive',
+        });
       }
     } finally {
       reader.releaseLock();
+      setSerialConnected(false);
     }
   };
 
@@ -250,6 +356,14 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
     setCurrentBuffer('');
   };
 
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (manualInput.trim().length >= minCodeLength) {
+      processCode(manualInput.trim());
+      setManualInput('');
+    }
+  };
+
   const handleClose = async () => {
     stopListening();
     await disconnectSerialPort();
@@ -257,27 +371,27 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
     onClose();
   };
 
-  const supportsSerial = 'serial' in navigator;
+  const supportsSerial = typeof navigator !== 'undefined' && 'serial' in navigator;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Radio className="h-5 w-5" />
             Scanner Listener - {workstationName}
           </DialogTitle>
           <DialogDescription>
-            Luister naar input van een aangesloten USB/COM barcode scanner
+            Luister naar input van een USB scanner, COM poort, of voer handmatig in
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 flex-1 min-h-0">
+        <div className="space-y-3 flex-1 min-h-0 overflow-y-auto">
           {/* Controls */}
           <div className="flex flex-wrap gap-2">
             {!listening ? (
               <Button onClick={startListening} className="gap-2">
-                <Radio className="h-4 w-4" />
+                <Keyboard className="h-4 w-4" />
                 Start Luisteren
               </Button>
             ) : (
@@ -291,28 +405,116 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
               !serialConnected ? (
                 <Button onClick={connectSerialPort} variant="outline" className="gap-2">
                   <Usb className="h-4 w-4" />
-                  COM Poort Verbinden
+                  COM Poort
                 </Button>
               ) : (
                 <Button onClick={disconnectSerialPort} variant="outline" className="gap-2 border-green-500 text-green-600">
                   <Usb className="h-4 w-4" />
-                  COM Verbonden ✓
+                  COM ✓ ({selectedBaudRate})
                 </Button>
               )
             )}
+
+            <Button
+              onClick={() => setShowSettings(!showSettings)}
+              variant="ghost"
+              size="icon"
+              className={showSettings ? 'bg-muted' : ''}
+            >
+              <Settings2 className="h-4 w-4" />
+            </Button>
           </div>
 
+          {/* Settings panel */}
+          {showSettings && (
+            <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
+              <h4 className="text-sm font-medium">Scanner Instellingen</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Max toets interval (ms)</Label>
+                  <Input
+                    type="number"
+                    min={20}
+                    max={1000}
+                    value={maxKeyInterval}
+                    onChange={e => setMaxKeyInterval(parseInt(e.target.value) || 150)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Min. code lengte</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={minCodeLength}
+                    onChange={e => setMinCodeLength(parseInt(e.target.value) || 1)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Terminator</Label>
+                  <Select value={terminator} onValueChange={(v: any) => setTerminator(v)}>
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="enter">Enter</SelectItem>
+                      <SelectItem value="tab">Tab</SelectItem>
+                      <SelectItem value="both">Enter + Tab</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Baud rate (COM)</Label>
+                  <Select value={String(selectedBaudRate)} onValueChange={v => setSelectedBaudRate(parseInt(v))}>
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BAUD_RATES.map(rate => (
+                        <SelectItem key={rate} value={String(rate)}>{rate}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-4">
+                <div className="flex items-center gap-2">
+                  <Switch checked={stripPrefix} onCheckedChange={setStripPrefix} id="strip-prefix" />
+                  <Label htmlFor="strip-prefix" className="text-xs">Eerste karakter verwijderen</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={stripSuffix} onCheckedChange={setStripSuffix} id="strip-suffix" />
+                  <Label htmlFor="strip-suffix" className="text-xs">Laatste karakter verwijderen</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={acceptAllInput} onCheckedChange={setAcceptAllInput} id="accept-all" />
+                  <Label htmlFor="accept-all" className="text-xs">Alle input accepteren (ook traag)</Label>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Status indicator */}
-          <div className={`flex items-center gap-3 p-4 rounded-lg border ${
-            listening ? 'border-green-300 bg-green-50 dark:bg-green-950/20' : 'border-border bg-muted/30'
+          <div className={`flex items-center gap-3 p-3 rounded-lg border ${
+            listening || serialConnected ? 'border-green-300 bg-green-50 dark:bg-green-950/20' : 'border-border bg-muted/30'
           }`}>
-            <div className={`h-3 w-3 rounded-full ${listening ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/30'}`} />
-            <div className="flex-1">
+            <div className={`h-3 w-3 rounded-full flex-shrink-0 ${
+              listening || serialConnected ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/30'
+            }`} />
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium">
-                {listening ? 'Luistert naar scanner input...' : 'Scanner listener gestopt'}
+                {listening && serialConnected
+                  ? 'Luistert via keyboard + COM poort...'
+                  : listening
+                  ? 'Luistert naar keyboard input...'
+                  : serialConnected
+                  ? 'Luistert via COM poort...'
+                  : 'Niet actief'}
               </p>
-              {listening && currentBuffer && (
-                <p className="text-xs text-muted-foreground font-mono mt-1">
+              {(listening || serialConnected) && currentBuffer && (
+                <p className="text-xs text-muted-foreground font-mono mt-1 truncate">
                   Buffer: {currentBuffer}
                 </p>
               )}
@@ -323,19 +525,49 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
                 </div>
               )}
             </div>
-            {serialConnected && (
-              <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 px-2 py-1 rounded-full">
-                COM
-              </span>
-            )}
+            <div className="flex gap-1 flex-shrink-0">
+              {listening && (
+                <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 px-1.5 py-0.5 rounded">
+                  HID
+                </span>
+              )}
+              {serialConnected && (
+                <span className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 px-1.5 py-0.5 rounded">
+                  COM
+                </span>
+              )}
+            </div>
           </div>
+
+          {/* Manual input */}
+          <form onSubmit={handleManualSubmit} className="flex gap-2">
+            <Input
+              value={manualInput}
+              onChange={e => setManualInput(e.target.value)}
+              placeholder="Handmatig code invoeren..."
+              className="h-9 text-sm"
+            />
+            <Button type="submit" size="sm" variant="outline" disabled={manualInput.trim().length < minCodeLength || processing}>
+              Verwerk
+            </Button>
+          </form>
 
           {/* Scan history */}
           {scanHistory.length > 0 && (
             <div className="flex-1 min-h-0">
-              <h4 className="text-sm font-medium mb-2">Scan Geschiedenis ({scanHistory.length})</h4>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium">Geschiedenis ({scanHistory.length})</h4>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={() => setScanHistory([])}
+                >
+                  Wissen
+                </Button>
+              </div>
               <div className="space-y-1 max-h-[200px] overflow-y-auto">
-                {scanHistory.map((result, idx) => (
+                {scanHistory.map((result) => (
                   <div
                     key={`${result.code}-${result.timestamp}`}
                     className={`flex items-center gap-2 px-3 py-2 rounded text-sm ${
