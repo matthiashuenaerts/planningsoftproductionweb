@@ -16,6 +16,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useLanguage } from '@/context/LanguageContext';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Project {
   id: string;
@@ -325,6 +326,7 @@ const DayCell = ({
   onRefreshData
 }) => {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [{
     isOver
   }, drop] = useDrop(() => ({
@@ -387,20 +389,25 @@ const DayCell = ({
   }).filter(Boolean);
   
   return <div ref={drop} className={cn(
-      "min-h-[120px] border border-gray-200 p-1",
-      !isCurrentMonthDay && "bg-gray-50 text-gray-400",
-      isWeekend && isCurrentMonthDay && "bg-blue-50",
+      isMobile ? "min-h-[60px] border border-border p-0.5" : "min-h-[120px] border border-border p-1",
+      !isCurrentMonthDay && "bg-muted/50 text-muted-foreground",
+      isWeekend && isCurrentMonthDay && "bg-accent/30",
       isToday && isCurrentMonthDay && "bg-yellow-100 border-yellow-400 border-2",
       isOver && isCurrentMonthDay ? "bg-green-50 border-green-300" : "",
-      isCurrentMonthDay ? "bg-white" : ""
+      isCurrentMonthDay ? "bg-background" : ""
     )} data-today={isToday ? "true" : undefined}>
-      <div className={cn("text-center text-sm font-medium mb-1", !isCurrentMonthDay && "text-gray-400", isToday && "text-yellow-800 font-bold")}>
-        <div className="text-xs">{format(date, 'EEE')}</div>
-        <div className="text-lg">{format(date, 'd')}</div>
-        {isToday && <div className="text-xs font-bold">{t('itc_today')}</div>}
+      <div className={cn(
+        "text-center font-medium mb-0.5",
+        isMobile ? "text-[10px]" : "text-sm",
+        !isCurrentMonthDay && "text-muted-foreground",
+        isToday && "text-yellow-800 font-bold"
+      )}>
+        {!isMobile && <div className="text-xs">{format(date, 'EEE')}</div>}
+        <div className={isMobile ? "text-xs" : "text-lg"}>{format(date, 'd')}</div>
+        {isToday && !isMobile && <div className="text-xs font-bold">{t('itc_today')}</div>}
       </div>
       
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {projectsForDay.map(({
         project,
         assignment,
@@ -434,6 +441,7 @@ const TeamCalendar = ({
   setIsCollapsed
 }) => {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const getTeamColor = (teamName: string) => {
     if (teamName?.toLowerCase().includes('groen') || teamName?.toLowerCase().includes('green')) return getColorClasses('green');
     if (teamName?.toLowerCase().includes('blauw') || teamName?.toLowerCase().includes('blue')) return getColorClasses('blue');
@@ -512,15 +520,15 @@ const TeamCalendar = ({
   return <Collapsible open={!isCollapsed} onOpenChange={(open) => setIsCollapsed(!open)} className="mb-6">
       <div className={cn("rounded-lg border", teamColor.border)}>
         <CollapsibleTrigger asChild>
-          <div className={cn("p-3 rounded-t-lg cursor-pointer flex items-center justify-between hover:opacity-80 transition-opacity", teamColor.header)}>
-            <h3 className="text-lg font-medium">{team}</h3>
-            {isCollapsed ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
+          <div className={cn("p-2 sm:p-3 rounded-t-lg cursor-pointer flex items-center justify-between hover:opacity-80 transition-opacity", teamColor.header)}>
+            <h3 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium`}>{team}</h3>
+            {isCollapsed ? <ChevronDown className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} /> : <ChevronUp className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} />}
           </div>
         </CollapsibleTrigger>
         
         <CollapsibleContent>
           <div className={cn("rounded-b-lg border-b border-x", teamColor.border)}>
-            <ScrollArea className="h-[800px]" ref={scrollAreaRef}>
+            <ScrollArea className={isMobile ? 'h-[400px]' : 'h-[800px]'} ref={scrollAreaRef}>
               {calendarMonths.map((month, monthIndex) => {
                 const monthDays = generateMonthDays(month);
                 const weeks = [];
@@ -531,16 +539,16 @@ const TeamCalendar = ({
                 const isCurrentMonth = isSameMonth(month, new Date());
 
                 return (
-                  <div key={monthIndex} className="mb-4" data-current-month={isCurrentMonth}>
-                    <div className="sticky top-0 bg-gray-100 p-2 text-center font-medium border-b z-10">
+                  <div key={monthIndex} className={isMobile ? 'mb-2' : 'mb-4'} data-current-month={isCurrentMonth}>
+                    <div className={`sticky top-0 bg-muted ${isMobile ? 'p-1.5 text-xs' : 'p-2 text-sm'} text-center font-medium border-b z-10`}>
                       {format(month, 'MMMM yyyy')}
-                      {isCurrentMonth && <span className="ml-2 text-xs bg-blue-500 text-white px-2 py-1 rounded">{t('itc_current')}</span>}
+                      {isCurrentMonth && <span className="ml-2 text-[10px] sm:text-xs bg-primary text-primary-foreground px-1.5 py-0.5 rounded">{t('itc_current')}</span>}
                     </div>
                     
                     <div className="grid grid-cols-7 border-b">
                       {dayHeaders.map(day => (
-                        <div key={day} className="p-2 text-center font-medium text-sm bg-gray-50">
-                          {day}
+                        <div key={day} className={`${isMobile ? 'p-0.5 text-[10px]' : 'p-2 text-sm'} text-center font-medium bg-muted/50`}>
+                          {isMobile ? day.charAt(0) : day}
                         </div>
                       ))}
                     </div>
@@ -615,13 +623,15 @@ const UnassignedProjects = ({
   
   const unassignedProjects = projects.filter(project => !assignments.some(a => a.project_id === project.id));
   
-  return <div className="mb-6">
-      <div className={cn("p-3 rounded-t-lg", getColorClasses('unassigned').header)}>
-        <h3 className="text-lg font-medium">{t('itc_unassigned_projects', { count: String(unassignedProjects.length) })}</h3>
+  const isMobile = useIsMobile();
+
+  return <div className={isMobile ? 'mb-3' : 'mb-6'}>
+      <div className={cn("p-2 sm:p-3 rounded-t-lg", getColorClasses('unassigned').header)}>
+        <h3 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium`}>{t('itc_unassigned_projects', { count: String(unassignedProjects.length) })}</h3>
       </div>
       
-      <div ref={drop} className={cn("p-2 rounded-b-lg border-b border-x border-gray-300 bg-white min-h-[100px]", isOver ? "bg-gray-100" : "")}>
-        {unassignedProjects.length === 0 ? <p className="text-center text-gray-500 p-4">{t('itc_no_unassigned')}</p> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+      <div ref={drop} className={cn("p-2 rounded-b-lg border-b border-x border-border bg-background min-h-[60px] sm:min-h-[100px]", isOver ? "bg-muted" : "")}>
+        {unassignedProjects.length === 0 ? <p className={`text-center text-muted-foreground ${isMobile ? 'p-2 text-xs' : 'p-4'}`}>{t('itc_no_unassigned')}</p> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
             {unassignedProjects.map(project => {
           const truckAssignment = truckAssignments.find(ta => ta.project_id === project.id);
           const hasTeamAssignment = assignments.some(a => a.project_id === project.id);
@@ -655,6 +665,7 @@ const InstallationTeamCalendar = ({
   projects: Project[];
 }) => {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [truckAssignments, setTruckAssignments] = useState<TruckAssignment[]>([]);
@@ -1094,18 +1105,20 @@ const InstallationTeamCalendar = ({
   
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-center">
-          <CardTitle className="flex items-center gap-2">
-            <CalendarDays className="h-5 w-5" />
+      <CardHeader className={isMobile ? 'px-3 py-2' : 'pb-2'}>
+        <div className={`flex ${isMobile ? 'flex-col gap-1' : 'justify-between items-center'}`}>
+          <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : ''}`}>
+            <CalendarDays className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} />
             {t('itc_title')}
           </CardTitle>
-          <div className="text-sm text-gray-600">
-            {t('itc_description')}
-          </div>
+          {!isMobile && (
+            <div className="text-sm text-muted-foreground">
+              {t('itc_description')}
+            </div>
+          )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className={isMobile ? 'px-2 pb-2' : ''}>
         <UnassignedProjects projects={projects} assignments={assignments} truckAssignments={truckAssignments} onTruckAssign={handleTruckAssign} onDropProject={handleDropProject} />
         
         {teams.map(team => {
