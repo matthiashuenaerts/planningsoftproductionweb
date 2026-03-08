@@ -696,6 +696,7 @@ const PersonalTasks = () => {
               >
                 Today
               </Button>
+              </Button>
               <Button
                 variant={!isViewingToday ? "default" : "outline"}
                 onClick={() => handleDateNavigation('next')}

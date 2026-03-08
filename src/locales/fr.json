@@ -339,6 +339,12 @@
   "time_remaining": "Temps restant",
   "daily_timeline": "Chronologie quotidienne",
   "daily_timeline_description": "Vos tâches programmées pour aujourd'hui",
+  "pt_today": "Aujourd'hui",
+  "pt_tomorrow": "Demain",
+  "pt_future_date": "Date future",
+  "pt_next_workday": "Prochain jour ouvrable",
+  "pt_plan_next_workday": "Planifier le prochain jour ouvrable",
+  "pt_viewing_planning_for": "Vous consultez la planification pour le {{date}}",
 
   "time_registrations_title": "Enregistrements de temps",
   "time_registrations_description": "Aperçu de vos enregistrements de temps",

@@ -339,6 +339,12 @@
   "time_remaining": "Resterende tijd",
   "daily_timeline": "Dagelijkse Tijdlijn",
   "daily_timeline_description": "Uw geplande taken voor vandaag",
+  "pt_today": "Vandaag",
+  "pt_tomorrow": "Morgen",
+  "pt_future_date": "Toekomstige datum",
+  "pt_next_workday": "Volgende werkdag",
+  "pt_plan_next_workday": "Volgende werkdag plannen",
+  "pt_viewing_planning_for": "U bekijkt de planning voor {{date}}",
 
   "time_registrations_title": "Tijdregistraties",
   "time_registrations_description": "Overzicht van uw tijdregistraties",
