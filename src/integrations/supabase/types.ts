@@ -4073,6 +4073,7 @@ export type Database = {
           id: string
           project_id: string
           service_hours: number | null
+          service_notes: string | null
           service_order: number | null
           start_date: string
           team: string
@@ -4086,6 +4087,7 @@ export type Database = {
           id?: string
           project_id: string
           service_hours?: number | null
+          service_notes?: string | null
           service_order?: number | null
           start_date: string
           team: string
@@ -4099,6 +4101,7 @@ export type Database = {
           id?: string
           project_id?: string
           service_hours?: number | null
+          service_notes?: string | null
           service_order?: number | null
           start_date?: string
           team?: string
