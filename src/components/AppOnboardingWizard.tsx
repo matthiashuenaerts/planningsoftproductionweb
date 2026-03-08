@@ -863,7 +863,7 @@ const AppOnboardingWizard: React.FC<AppOnboardingWizardProps> = ({ children }) =
                 {!isFirst && (
                   <Button variant="outline" size="sm" className="text-slate-300 border-slate-600 hover:bg-slate-800"
                     onClick={handleTourBack}>
-                    <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back
+                    <ArrowLeft className="h-3.5 w-3.5 mr-1" /> {ui.back}
                   </Button>
                 )}
                 <Button size="sm" className={`ml-auto ${isLast ? "bg-emerald-600 hover:bg-emerald-700" : "bg-blue-600 hover:bg-blue-700"}`}
