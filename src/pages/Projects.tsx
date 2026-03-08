@@ -565,6 +565,13 @@ const Projects = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AfterSalesServiceDialog
+        isOpen={!!afterSalesProject}
+        onClose={() => setAfterSalesProject(null)}
+        projectId={afterSalesProject?.id || ''}
+        projectName={afterSalesProject?.name || ''}
+      />
     </div>
   );
 };
