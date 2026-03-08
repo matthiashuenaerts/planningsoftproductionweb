@@ -393,7 +393,7 @@ const TruckLoadingCalendar = () => {
                             {assignment.project.name}
                           </div>
                           <div className="text-xs text-gray-500">
-                            Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
+                            {t('truck_install')}: {format(new Date(assignment.project.installation_date), 'MMM d')}
                           </div>
                           <div className="flex items-center justify-between mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
