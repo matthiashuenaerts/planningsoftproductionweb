@@ -237,7 +237,7 @@ const TaskList: React.FC<TaskListProps> = ({
       if (activeUsers.length > 1) {
         toast({
           title: t('tl_cannot_complete_task'),
-          description: t('tl_multiple_users_working', { count: activeUsers.length }),
+          description: t('tl_multiple_users_working', { count: String(activeUsers.length) }),
           variant: 'destructive'
         });
         return;
