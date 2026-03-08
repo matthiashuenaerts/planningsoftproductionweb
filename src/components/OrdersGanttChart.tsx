@@ -882,7 +882,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                           !isCollapsed && 'rotate-90'
                         )}
                       />
-                      <span className="text-sm font-semibold text-foreground">{team.name}</span>
+                      <span className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold text-foreground`}>{team.name}</span>
                     </div>
                     <div className="flex-1" />
                   </div>
