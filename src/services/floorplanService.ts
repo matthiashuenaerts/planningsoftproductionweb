@@ -65,7 +65,7 @@ export const floorplanService = {
         workstation_id: workstationId,
         x_position: x,
         y_position: y,
-      });
+      }, { onConflict: 'workstation_id' });
     
     if (error) throw error;
   },
