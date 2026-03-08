@@ -427,23 +427,23 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
         <div className={`space-y-${isMobile ? '3' : '4'}`}>
           <h2 className={`font-bold ${isMobile ? 'text-lg leading-tight' : 'text-xl'}`}>{selectedArticle.title}</h2>
 
-          {selectedArticle.video_url && (
+          {signedVideoUrl && (
             <div className="aspect-video bg-muted rounded-xl overflow-hidden">
               <video
                 controls
                 className="w-full h-full"
-                poster={selectedArticle.image_url}
+                poster={signedImageUrl || undefined}
               >
-                <source src={selectedArticle.video_url} type="video/mp4" />
+                <source src={signedVideoUrl} type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
             </div>
           )}
 
-          {selectedArticle.image_url && !selectedArticle.video_url && (
+          {signedImageUrl && !selectedArticle.video_url && (
             <div className="rounded-xl overflow-hidden">
               <img
-                src={selectedArticle.image_url}
+                src={signedImageUrl}
                 alt={selectedArticle.title}
                 className={`w-full object-cover ${isMobile ? 'max-h-48' : 'max-h-64'}`}
               />
