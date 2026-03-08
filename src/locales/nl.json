@@ -1573,5 +1573,6 @@
   "inv_status_sent": "Verzonden",
   "inv_status_paid": "Betaald",
   "inv_status_overdue": "Achterstallig",
-  "inv_status_cancelled": "Geannuleerd"
+  "inv_status_cancelled": "Geannuleerd",
+  "service_installation": "Service Installatie"
 }
