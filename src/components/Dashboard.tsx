@@ -1130,15 +1130,16 @@ const Dashboard: React.FC = () => {
         </div>
         
         {workstationStats.length === 0 && (
-          <Card>
+          <Card className="rounded-xl border-border/60">
             <CardContent className="p-8 text-center text-muted-foreground">
-              <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p>{t('dashboard_no_workstations')}</p>
             </CardContent>
           </Card>
         )}
       </div>
-    </div>;
+    </div>
+  );
 };
 interface StatCardProps {
   title: string;
