@@ -439,24 +439,24 @@ const Login: React.FC = () => {
         }`}
       >
         {/* Logo Section */}
-        <div className="text-center space-y-6">
+        <div className="text-center space-y-3 sm:space-y-6">
           <div className="relative inline-block">
             <img
               src="https://static.wixstatic.com/media/99c033_5bb79e52130d4fa6bbae75d9a22b198d~mv2.png"
               alt="Company Logo"
-              className="relative w-32 h-auto mx-auto rounded-lg shadow-lg hover:scale-105 transition-transform duration-300"
+              className="relative w-20 sm:w-32 h-auto mx-auto rounded-lg shadow-lg hover:scale-105 transition-transform duration-300"
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1 sm:space-y-2">
             <div className="flex items-center justify-center space-x-2">
-              <h1 className="font-bold text-4xl text-[#195F85]">
+              <h1 className="font-bold text-2xl sm:text-4xl text-[#195F85]">
                 AutoMattiOn
               </h1>
-              <h1 className="font-bold text-4xl text-[#42A5DB]">Compass</h1>
+              <h1 className="font-bold text-2xl sm:text-4xl text-[#42A5DB]">Compass</h1>
             </div>
 
-            <p className="text-[#42A5DB] text-lg font-bold">
+            <p className="text-[#42A5DB] text-sm sm:text-lg font-bold">
               Guiding your production to perfection!
             </p>
           </div>
