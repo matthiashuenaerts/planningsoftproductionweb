@@ -285,6 +285,7 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
           description: item.description,
           quantity: item.quantity,
           article_code: item.article_code,
+          ean: item.ean || '',
           notes: item.notes || '',
           unit_price: item.unit_price,
           source: 'pdf' as const
