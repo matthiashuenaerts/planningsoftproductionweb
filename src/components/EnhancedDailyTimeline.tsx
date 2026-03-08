@@ -339,54 +339,28 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                         </div>
                       )}
 
-                      {/* Task control buttons */}
                       <div className="flex gap-1 ml-auto">
                         {(task.status === 'todo' || task.status === 'scheduled') && !task.isActive && (
-                          <Button
-                            size="sm"
-                            className="h-7 px-3 text-xs"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              console.log('Start button clicked for task:', task.id);
-                              handleStartTask(task.id);
-                            }}
-                          >
-                            <Play className="h-3 w-3 mr-1" />
-                            Start
+                          <Button size="sm" className="h-6 sm:h-7 px-2 sm:px-3 text-[10px] sm:text-xs"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleStartTask(task.id); }}>
+                            <Play className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
+                            {t('start') || 'Start'}
                           </Button>
                         )}
                         
                         {task.isActive && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-3 text-xs"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              console.log('Pause button clicked for task:', task.id);
-                              handlePauseTask(task.id);
-                            }}
-                          >
-                            <Square className="h-3 w-3 mr-1" />
-                            Pause
+                          <Button size="sm" variant="outline" className="h-6 sm:h-7 px-2 sm:px-3 text-[10px] sm:text-xs"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePauseTask(task.id); }}>
+                            <Square className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
+                            {t('pause') || 'Pause'}
                           </Button>
                         )}
                         
                         {task.canComplete && (
-                          <Button
-                            size="sm"
-                            className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              console.log('Complete button clicked for task:', task.id);
-                              handleCompleteTask(task.id);
-                            }}
-                          >
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Complete
+                          <Button size="sm" className="h-6 sm:h-7 px-2 sm:px-3 text-[10px] sm:text-xs bg-green-600 hover:bg-green-700"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleCompleteTask(task.id); }}>
+                            <CheckCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
+                            {t('complete') || 'Complete'}
                           </Button>
                         )}
                       </div>
