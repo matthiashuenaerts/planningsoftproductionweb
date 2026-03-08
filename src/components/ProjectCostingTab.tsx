@@ -1471,21 +1471,21 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
 
       {/* Additional Costs Input */}
       <Card>
-        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+        <CardHeader className="px-3 sm:px-6 py-2.5 sm:py-6">
           <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
             <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
             {t('costing_additional_costs')}
           </CardTitle>
         </CardHeader>
         <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Package className="h-4 w-4 text-muted-foreground" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2">
+                <Package className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 {t('costing_additional_materials')}
               </label>
               <div className="relative">
-                <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Euro className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 <Input
                   type="number"
                   min="0"
@@ -1495,19 +1495,19 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     ...prev,
                     materialCost: parseFloat(e.target.value) || 0
                   }))}
-                  className="pl-9"
+                  className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm"
                   placeholder="0.00"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Building className="h-4 w-4 text-muted-foreground" />
+            <div className="space-y-1.5 sm:space-y-2">
+              <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2">
+                <Building className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 {t('costing_office_preparation')}
               </label>
               <div className="relative">
-                <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Euro className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 <Input
                   type="number"
                   min="0"
@@ -1517,19 +1517,19 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     ...prev,
                     officePreparationCost: parseFloat(e.target.value) || 0
                   }))}
-                  className="pl-9"
+                  className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm"
                   placeholder="0.00"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Truck className="h-4 w-4 text-muted-foreground" />
+            <div className="space-y-1.5 sm:space-y-2">
+              <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2">
+                <Truck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 {t('costing_transport_installation')}
               </label>
               <div className="relative">
-                <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Euro className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 <Input
                   type="number"
                   min="0"
@@ -1539,19 +1539,19 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     ...prev,
                     transportInstallationCost: parseFloat(e.target.value) || 0
                   }))}
-                  className="pl-9"
+                  className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm"
                   placeholder="0.00"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <div className="space-y-1.5 sm:space-y-2">
+              <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2">
+                <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 {t('costing_other_costs')}
               </label>
               <div className="relative">
-                <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Euro className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 <Input
                   type="number"
                   min="0"
@@ -1561,7 +1561,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     ...prev,
                     otherCost: parseFloat(e.target.value) || 0
                   }))}
-                  className="pl-9"
+                  className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm"
                   placeholder="0.00"
                 />
               </div>
@@ -1572,13 +1572,61 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
 
       {/* Final Cost Summary */}
       <Card className="border-primary">
-        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+        <CardHeader className="px-3 sm:px-6 py-2.5 sm:py-6">
           <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
             <Calculator className="h-4 w-4 sm:h-5 sm:w-5" />
             {t('costing_final_summary')}
           </CardTitle>
         </CardHeader>
         <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+          {/* Mobile card layout */}
+          <div className="sm:hidden space-y-2">
+            <div className="flex justify-between items-center py-2 border-b">
+              <span className="text-xs font-medium">{t('costing_labor_cost')} ({margins.labor}%)</span>
+              <span className="text-xs font-semibold">{formatCurrency(costingSummary.totalLaborCost * (1 + margins.labor / 100))}</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b">
+              <span className="text-xs font-medium">{t('costing_order_materials')} ({margins.orderMaterials}%)</span>
+              <span className="text-xs font-semibold">{formatCurrency(costingSummary.totalOrderCost * (1 + margins.orderMaterials / 100))}</span>
+            </div>
+            {costingSummary.totalAccessoryCost > 0 && (
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-xs font-medium">{t('accessories')} ({margins.accessories}%)</span>
+                <span className="text-xs font-semibold">{formatCurrency(costingSummary.totalAccessoryCost * (1 + margins.accessories / 100))}</span>
+              </div>
+            )}
+            {additionalCosts.materialCost > 0 && (
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-xs font-medium">{t('costing_additional_materials')}</span>
+                <span className="text-xs font-semibold">{formatCurrency(additionalCosts.materialCost)}</span>
+              </div>
+            )}
+            {additionalCosts.officePreparationCost > 0 && (
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-xs font-medium">{t('costing_office_preparation')}</span>
+                <span className="text-xs font-semibold">{formatCurrency(additionalCosts.officePreparationCost)}</span>
+              </div>
+            )}
+            {additionalCosts.transportInstallationCost > 0 && (
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-xs font-medium">{t('costing_transport_installation')}</span>
+                <span className="text-xs font-semibold">{formatCurrency(additionalCosts.transportInstallationCost)}</span>
+              </div>
+            )}
+            {additionalCosts.otherCost > 0 && (
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-xs font-medium">{t('costing_other_costs')}</span>
+                <span className="text-xs font-semibold">{formatCurrency(additionalCosts.otherCost)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center py-3 bg-primary/10 rounded-lg px-3 mt-1">
+              <span className="text-sm font-bold">{t('costing_total_cost')}</span>
+              <span className="text-sm font-bold text-primary">{formatCurrency(totalCost)}</span>
+            </div>
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden sm:block">
           <Table>
             <TableBody>
               <TableRow>
@@ -1625,39 +1673,40 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
               </TableRow>
             </TableBody>
           </Table>
+          </div>
 
-          <Separator className="my-6" />
+          <Separator className="my-4 sm:my-6" />
 
           {/* Sales Price and Profit */}
           <div className="space-y-3 sm:space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4">
               <label className="text-xs sm:text-sm font-medium sm:w-48">{t('costing_sales_price')}</label>
               <div className="relative flex-1 max-w-xs">
-                <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+                <Euro className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 <Input
                   type="number"
                   min="0"
                   step="0.01"
                   value={salesPrice || ''}
                   onChange={(e) => setSalesPrice(parseFloat(e.target.value) || 0)}
-                  className="pl-8 sm:pl-9 text-base sm:text-lg font-bold"
+                  className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm sm:text-lg font-bold"
                   placeholder="0.00"
                 />
               </div>
             </div>
 
             {salesPrice > 0 && (
-              <div className={`p-3 sm:p-4 rounded-lg ${profit >= 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+              <div className={`p-2.5 sm:p-4 rounded-lg ${profit >= 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="text-[10px] sm:text-sm text-muted-foreground">{t('costing_profit')}</p>
-                    <p className={`text-lg sm:text-2xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className={`text-base sm:text-2xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {formatCurrency(profit)}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] sm:text-sm text-muted-foreground">{t('costing_profit_margin')}</p>
-                    <p className={`text-lg sm:text-2xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className={`text-base sm:text-2xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {profitMargin.toFixed(1)}%
                     </p>
                   </div>
