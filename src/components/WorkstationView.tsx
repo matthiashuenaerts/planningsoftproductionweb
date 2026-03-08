@@ -524,7 +524,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
     };
     
     resolveWorkstationName();
-  }, [workstationName, workstationId, t]);
+  }, [workstationName, workstationId]);
   
   const checkAndUpdateLimitPhases = async (completedTask: ExtendedTask) => {
     try {
