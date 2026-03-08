@@ -372,8 +372,8 @@ const TaskList: React.FC<TaskListProps> = ({
   }
 
   return (
-    <div className="space-y-4">
-      {title && <h3 className="text-lg font-semibold">{title}</h3>}
+    <div className="space-y-3 sm:space-y-4">
+      {title && <h3 className="text-base sm:text-lg font-semibold">{title}</h3>}
       {tasks.map((task) => {
         const isLoading = loadingTasks.has(task.id);
         const isCompleting = completingTasks.has(task.id);
@@ -386,18 +386,18 @@ const TaskList: React.FC<TaskListProps> = ({
               ${task.status === 'HOLD' ? 'border-orange-300' : ''} 
               ${compact ? 'p-2' : ''}
               ${isCompleting ? 'animate-pulse bg-green-50 border-green-300' : ''}
-              transition-all duration-300
+              transition-all duration-300 overflow-hidden
             `}
           >
-            <CardHeader className={compact ? "pb-2" : "pb-3"}>
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
+            <CardHeader className={`${compact ? "pb-2" : "pb-2 sm:pb-3"} px-3 sm:px-6 pt-3 sm:pt-6`}>
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                <div className="flex-1 min-w-0">
                   {task.project_name && (
-                    <CardTitle className={`${compact ? "text-lg" : "text-xl"} text-primary font-bold mb-1`}>
+                    <CardTitle className={`${compact ? "text-base" : "text-base sm:text-xl"} text-primary font-bold mb-0.5 sm:mb-1 truncate`}>
                       {task.project_name}
                     </CardTitle>
                   )}
-                  <h4 className={`${compact ? "text-sm" : "text-base"} font-medium text-gray-700`}>
+                  <h4 className={`${compact ? "text-xs sm:text-sm" : "text-sm sm:text-base"} font-medium text-gray-700 dark:text-gray-300`}>
                     {task.title}
                   </h4>
                   
@@ -406,9 +406,9 @@ const TaskList: React.FC<TaskListProps> = ({
                     const activeUsers = activeUsersPerTask.get(task.id) || [];
                     if (activeUsers.length > 0) {
                       return (
-                        <div className="mt-2 flex items-center gap-2 text-sm">
-                          <Users className="h-4 w-4 text-blue-600" />
-                          <span className="text-blue-600 font-medium">
+                        <div className="mt-1.5 flex items-center gap-1.5 text-xs sm:text-sm">
+                          <Users className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />
+                          <span className="text-blue-600 font-medium truncate">
                             {activeUsers.length === 1 ? t('tl_active_users_single') : t('tl_active_users_multi', { count: String(activeUsers.length) })}
                             {activeUsers.map(u => u.name).join(', ')}
                           </span>
@@ -420,8 +420,8 @@ const TaskList: React.FC<TaskListProps> = ({
 
                   {/* Countdown Timer for IN_PROGRESS tasks */}
                   {task.status === 'IN_PROGRESS' && task.timeRemaining && task.total_duration && (
-                    <div className={`mt-2 flex items-center gap-2 text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-blue-600'}`}>
-                      <Timer className="h-4 w-4" />
+                    <div className={`mt-1.5 flex items-center gap-1.5 text-xs sm:text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-blue-600'}`}>
+                      <Timer className="h-3.5 w-3.5 flex-shrink-0" />
                       <span className={task.isOvertime ? 'font-bold' : ''}>
                         {task.isOvertime ? t('tl_overtime') : t('tl_time_remaining')}
                         {task.timeRemaining}
@@ -431,25 +431,25 @@ const TaskList: React.FC<TaskListProps> = ({
 
                   {/* Efficiency data for completed tasks */}
                   {showEfficiencyData && task.status === 'COMPLETED' && task.actual_duration_minutes !== undefined && (
-                    <div className="mt-2 space-y-1">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="h-4 w-4 text-gray-500" />
-                        <span className="text-gray-600">
+                    <div className="mt-1.5 space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs sm:text-sm">
+                        <Clock className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
+                        <span className="text-gray-600 dark:text-gray-400">
                           {task.estimated_duration ? `${t('tl_estimated', { duration: formatDuration(task.estimated_duration) })} / ` : ''}
                           {t('tl_actual', { duration: formatDuration(task.actual_duration_minutes) })}
                         </span>
                       </div>
                       {task.efficiency_percentage !== undefined && (
-                        <div className="flex items-center gap-2 text-sm">
+                        <div className="flex items-center gap-1.5 text-xs sm:text-sm">
                           {task.efficiency_percentage >= 0 ? (
-                            <TrendingUp className="h-4 w-4 text-green-600" />
+                            <TrendingUp className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
                           ) : (
-                            <TrendingDown className="h-4 w-4 text-red-600" />
+                            <TrendingDown className="h-3.5 w-3.5 text-red-600 flex-shrink-0" />
                           )}
                           <span className={`font-medium ${task.efficiency_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {task.efficiency_percentage >= 0 ? '+' : ''}{t('tl_efficiency', { value: String(task.efficiency_percentage) })}
                           </span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">
                             ({task.efficiency_percentage >= 0 ? t('tl_faster_than_expected') : t('tl_slower_than_expected')})
                           </span>
                         </div>
@@ -457,24 +457,25 @@ const TaskList: React.FC<TaskListProps> = ({
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2">
+                {/* Badges - horizontal scroll on mobile */}
+                <div className="flex flex-wrap gap-1.5 sm:gap-2 sm:flex-nowrap">
                   {task.is_rush_order && showRushOrderBadge && (
-                    <Badge variant="destructive" className="flex items-center gap-1">
-                      <Zap className="h-3 w-3" />
+                    <Badge variant="destructive" className="flex items-center gap-1 text-[10px] sm:text-xs h-5 sm:h-auto">
+                      <Zap className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                       {t('tl_rush_order')}
                     </Badge>
                   )}
                   {task.due_date && (() => {
                     const urgency = getUrgencyClass(task.due_date);
                     return (
-                      <Badge variant={urgency.variant} className="flex items-center gap-1">
-                        {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3" />}
+                      <Badge variant={urgency.variant} className="flex items-center gap-1 text-[10px] sm:text-xs h-5 sm:h-auto">
+                        {urgency.class === 'overdue' && <AlertTriangle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />}
                         {urgency.label}
                       </Badge>
                     );
                   })()}
                   <Badge 
-                    className={`${getStatusColor(task.status)} text-white flex items-center gap-1`}
+                    className={`${getStatusColor(task.status)} text-white flex items-center gap-1 text-[10px] sm:text-xs h-5 sm:h-auto`}
                   >
                     {getStatusIcon(task.status)}
                     {task.status === 'HOLD' ? t('tl_on_hold_status') : task.status.replace('_', ' ')}
@@ -482,9 +483,9 @@ const TaskList: React.FC<TaskListProps> = ({
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
               {!compact && (
-                <p className="text-muted-foreground mb-4">
+                <p className="text-muted-foreground text-xs sm:text-sm mb-2 sm:mb-4">
                   {task.estimated_duration && t('tl_duration_label', { duration: String(task.estimated_duration) })}
                   {task.estimated_duration && task.description && '\n'}
                   {task.description}
@@ -492,29 +493,29 @@ const TaskList: React.FC<TaskListProps> = ({
               )}
               
               {task.status === 'HOLD' && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
-                  <p className="text-orange-800 text-sm flex items-center gap-2">
-                    <Pause className="h-4 w-4" />
+                <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg p-2 sm:p-3 mb-2 sm:mb-4">
+                  <p className="text-orange-800 dark:text-orange-300 text-xs sm:text-sm flex items-center gap-1.5">
+                    <Pause className="h-3.5 w-3.5 flex-shrink-0" />
                     {t('tl_on_hold_message')}
                   </p>
                 </div>
               )}
               
               {!compact && (
-                <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 mb-2 sm:mb-4">
                   <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
+                    <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
                     <span>{t('tl_due_label', { date: new Date(task.due_date).toLocaleDateString() })}</span>
                   </div>
                   {task.status === 'IN_PROGRESS' && task.assignee_name && (
                     <div className="flex items-center gap-1">
-                      <User className="h-4 w-4" />
+                      <User className="h-3.5 w-3.5 flex-shrink-0" />
                       <span>{t('tl_started_by', { name: task.assignee_name })}</span>
                     </div>
                   )}
                   {task.total_duration && (
                     <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
+                      <Clock className="h-3.5 w-3.5 flex-shrink-0" />
                       <span>{t('tl_duration_short', { duration: String(task.total_duration) })}</span>
                     </div>
                   )}
@@ -522,12 +523,13 @@ const TaskList: React.FC<TaskListProps> = ({
               )}
               
               {(onTaskUpdate || onTaskStatusChange) && (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
                   {task.status === 'TODO' && (
                     <>
                       <Button 
                         size="sm" 
                         onClick={() => handleStatusChange(task, 'IN_PROGRESS')}
+                        className="h-8 text-xs sm:text-sm flex-1 sm:flex-initial"
                       >
                         {t('tl_start_task')}
                       </Button>
@@ -535,12 +537,12 @@ const TaskList: React.FC<TaskListProps> = ({
                         <Button 
                           size="sm" 
                           onClick={() => handleStatusChange(task, 'COMPLETED')}
-                          className="bg-green-600 hover:bg-green-700 relative"
+                          className="bg-green-600 hover:bg-green-700 relative h-8 text-xs sm:text-sm flex-1 sm:flex-initial"
                           disabled={isLoading}
                         >
                           {isLoading ? (
                             <>
-                              <Loader className="h-4 w-4 animate-spin mr-2" />
+                              <Loader className="h-3.5 w-3.5 animate-spin mr-1.5" />
                               {t('tl_processing')}
                             </>
                           ) : (
@@ -560,20 +562,20 @@ const TaskList: React.FC<TaskListProps> = ({
                         <Button 
                           size="sm" 
                           onClick={() => handleJoinTask(task.id)}
-                          className="bg-blue-500 hover:bg-blue-600"
+                          className="bg-blue-500 hover:bg-blue-600 h-8 text-xs sm:text-sm flex-1 sm:flex-initial"
                         >
                           {t('join_task')}
                         </Button>
                         <Button 
                           size="sm" 
                           onClick={() => handleStatusChange(task, 'COMPLETED')}
-                          className="bg-green-600 hover:bg-green-700 relative"
+                          className="bg-green-600 hover:bg-green-700 relative h-8 text-xs sm:text-sm flex-1 sm:flex-initial"
                           disabled={isLoading || !canComplete}
                           title={!canComplete ? t('tl_multiple_users_tooltip') : ''}
                         >
                           {isLoading ? (
                             <>
-                              <Loader className="h-4 w-4 animate-spin mr-2" />
+                              <Loader className="h-3.5 w-3.5 animate-spin mr-1.5" />
                               {t('tl_processing')}
                             </>
                           ) : (
@@ -584,6 +586,7 @@ const TaskList: React.FC<TaskListProps> = ({
                           size="sm" 
                           variant="outline"
                           onClick={() => handleStatusChange(task, 'TODO')}
+                          className="h-8 text-xs sm:text-sm"
                         >
                           {t('tl_back_to_todo')}
                         </Button>
@@ -591,8 +594,8 @@ const TaskList: React.FC<TaskListProps> = ({
                     );
                   })()}
                   {task.status === 'COMPLETED' && task.completed_at && (
-                    <div className="flex items-center gap-2">
-                      <div className="text-sm text-gray-500">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+                      <div className="text-xs sm:text-sm text-gray-500">
                         {t('tl_completed_at', { date: new Date(task.completed_at).toLocaleString() })}
                         {task.completed_by_employee?.name && (
                           <span className="ml-1">{t('tl_completed_by', { name: task.completed_by_employee.name })}</span>
@@ -602,18 +605,19 @@ const TaskList: React.FC<TaskListProps> = ({
                         size="sm" 
                         variant="outline"
                         onClick={() => handleStatusChange(task, 'TODO')}
+                        className="h-8 text-xs sm:text-sm"
                       >
                         {t('tl_back_to_todo')}
                       </Button>
                     </div>
                   )}
                   {task.status === 'HOLD' && (
-                    <div className="flex gap-2 items-center">
+                    <div className="flex gap-1.5 sm:gap-2 items-center w-full">
                       <Button 
                         size="sm" 
                         variant="outline"
                         disabled
-                        className="opacity-50"
+                        className="opacity-50 h-8 text-xs sm:text-sm flex-1 sm:flex-initial"
                       >
                         {t('tl_waiting_for_limit_phases')}
                       </Button>
@@ -623,7 +627,7 @@ const TaskList: React.FC<TaskListProps> = ({
                           await handleStatusChange(task, 'IN_PROGRESS');
                           await handleJoinTask(task.id);
                         }}
-                        className="bg-blue-500 hover:bg-blue-600"
+                        className="bg-blue-500 hover:bg-blue-600 h-8 text-xs sm:text-sm flex-1 sm:flex-initial"
                       >
                         {t('tl_start_task')}
                       </Button>
