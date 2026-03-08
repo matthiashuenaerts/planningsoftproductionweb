@@ -12,6 +12,8 @@ import {
   getDay,
 } from 'date-fns';
 import { nl } from 'date-fns/locale';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { workstationService, Workstation } from '@/services/workstationService';
 import { workingHoursService, WorkingHours } from '@/services/workingHoursService';
