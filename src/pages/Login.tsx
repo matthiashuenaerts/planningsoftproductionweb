@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { User, Lock, Shield, RefreshCw } from "lucide-react";
+import { logLoginAttempt } from "@/services/loginLogService";
 import {
   InputOTP,
   InputOTPGroup,
