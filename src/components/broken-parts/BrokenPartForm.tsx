@@ -375,15 +375,15 @@ const BrokenPartForm = () => {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="description" className="text-xs sm:text-sm">Description</Label>
             <Textarea
               id="description"
               placeholder="Describe the broken part"
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
               required
-              className="min-h-32"
+              className="min-h-24 sm:min-h-32 text-sm"
             />
           </div>
 
