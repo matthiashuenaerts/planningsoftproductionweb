@@ -496,26 +496,59 @@ const Floorplan: React.FC = () => {
                 );
               })}
 
-              {/* Buffer hover zones - invisible areas to trigger hover */}
+              {/* Buffer hover zones - draggable in edit mode */}
               {workstations.map((ws) => {
                 const bufferPos = getBufferPosition(ws.id);
                 const hasBufferedProjects = floorplanProjects.some(p => p.workstation_id === ws.id && !p.is_active);
-                if (!hasBufferedProjects) return null;
+                // Show in edit mode always, otherwise only when there are buffered projects
+                if (!isEditing && !hasBufferedProjects) return null;
                 return (
                   <div
                     key={`buffer-zone-${ws.id}`}
-                    className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${
+                      isEditing ? 'cursor-move' : ''
+                    }`}
                     style={{
                       left: `${bufferPos.x}%`,
                       top: `${bufferPos.y}%`,
-                      width: '40px',
-                      height: '40px',
-                      zIndex: 4,
+                      width: isEditing ? '24px' : '40px',
+                      height: isEditing ? '24px' : '40px',
+                      zIndex: isEditing ? 12 : 4,
                     }}
-                    onMouseEnter={() => setHoveredBufferWorkstation(ws.id)}
-                    onMouseLeave={() => setHoveredBufferWorkstation(null)}
+                    onMouseEnter={() => !isEditing && setHoveredBufferWorkstation(ws.id)}
+                    onMouseLeave={() => !isEditing && setHoveredBufferWorkstation(null)}
+                    onMouseDown={(e) => {
+                      if (!isEditing) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      const handleMouseMove = (moveE: MouseEvent) => {
+                        if (!imageRef.current) return;
+                        const rect = imageRef.current.getBoundingClientRect();
+                        const x = Math.max(0, Math.min(100, ((moveE.clientX - rect.left) / rect.width) * 100));
+                        const y = Math.max(0, Math.min(100, ((moveE.clientY - rect.top) / rect.height) * 100));
+                        handleBufferPositionChange(ws.id, x, y);
+                      };
+                      
+                      const handleMouseUp = () => {
+                        document.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                      };
+                      
+                      document.addEventListener('mousemove', handleMouseMove);
+                      document.addEventListener('mouseup', handleMouseUp);
+                    }}
                   >
-                    <div className="w-2 h-2 rounded-sm bg-muted-foreground/30 mx-auto mt-[16px]" />
+                    {isEditing ? (
+                      <div className="w-3 h-3 rounded-sm bg-amber-500/70 border border-amber-400 mx-auto mt-[6px]" />
+                    ) : (
+                      <div className="w-2 h-2 rounded-sm bg-muted-foreground/30 mx-auto mt-[16px]" />
+                    )}
+                    {isEditing && (
+                      <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-amber-500/90 text-white rounded px-1.5 py-0.5 text-[9px] whitespace-nowrap shadow">
+                        Buffer: {ws.name}
+                      </div>
+                    )}
                   </div>
                 );
               })}
