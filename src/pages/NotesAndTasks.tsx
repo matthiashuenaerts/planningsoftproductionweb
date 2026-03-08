@@ -47,6 +47,7 @@ export interface PersonalItem {
 const NotesAndTasks = () => {
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
