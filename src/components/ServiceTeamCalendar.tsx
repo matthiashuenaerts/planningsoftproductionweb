@@ -289,6 +289,7 @@ const ServiceTeamCalendar: React.FC = () => {
 
       const routeKey = `${teamId}_${dateStr}`;
       const startPt = startCoords ? { ...startCoords, address: teamStartAddress } : undefined;
+      const totalDrivingMinutes = trip.duration ? trip.duration / 60 : undefined;
       
       setOptimizedRoutes(prev => ({
         ...prev,
@@ -296,6 +297,7 @@ const ServiceTeamCalendar: React.FC = () => {
           waypoints: mapWps,
           geometry: routeGeometry,
           startPoint: startPt,
+          totalDrivingMinutes,
         }
       }));
 
