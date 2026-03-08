@@ -127,6 +127,9 @@ const DeveloperPortal: React.FC = () => {
             <TabsTrigger value="help" className="data-[state=active]:bg-white/20 text-white">
               <HelpCircle className="h-4 w-4 mr-1" /> Help
             </TabsTrigger>
+            <TabsTrigger value="messages" className="data-[state=active]:bg-white/20 text-white">
+              <Megaphone className="h-4 w-4 mr-1" /> Messages
+            </TabsTrigger>
           </TabsList>
 
           {/* Dashboard Tab */}
