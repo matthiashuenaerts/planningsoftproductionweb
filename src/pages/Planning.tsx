@@ -2066,26 +2066,30 @@ const Planning = () => {
           style={{ height: '100vh' }}
         >
           <div className="w-full max-w-full">
-            <div className="flex flex-col gap-4 mb-6">
+            <div className={cn("flex flex-col mb-4", isMobile ? "gap-2" : "gap-4 mb-6")}>
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold">{t('planning_title')}</h1>
-                <p className="text-muted-foreground mt-1 text-sm md:text-base">
-                  {t('planning_description')}
-                </p>
+                <h1 className={cn("font-bold", isMobile ? "text-lg" : "text-2xl md:text-3xl")}>{t('planning_title')}</h1>
+                {!isMobile && (
+                  <p className="text-muted-foreground mt-1 text-sm md:text-base">
+                    {t('planning_description')}
+                  </p>
+                )}
               </div>
               
-              <div className="flex flex-wrap items-center gap-2">
+              <div className={cn("flex flex-wrap items-center", isMobile ? "gap-1.5" : "gap-2")}>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
+                      size={isMobile ? "sm" : "default"}
                       className={cn(
                         "justify-start text-left font-normal",
+                        isMobile && "text-xs h-8",
                         !selectedDate && "text-muted-foreground"
                       )}
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "PPP") : <span>{t('planning_pick_date')}</span>}
+                      <CalendarIcon className={cn("mr-1.5", isMobile ? "h-3 w-3" : "h-4 w-4 mr-2")} />
+                      {selectedDate ? format(selectedDate, isMobile ? "MMM d" : "PPP") : <span>{t('planning_pick_date')}</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="end">
@@ -2103,41 +2107,44 @@ const Planning = () => {
                   onClick={fetchAllData}
                   variant="outline"
                   size="sm"
+                  className={isMobile ? "h-8 text-xs px-2" : ""}
                 >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  {t('planning_refresh')}
+                  <RefreshCw className={cn(isMobile ? "h-3 w-3" : "h-4 w-4 mr-2")} />
+                  {!isMobile && t('planning_refresh')}
                 </Button>
                 
                 {isAdmin && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className={cn("flex flex-wrap", isMobile ? "gap-1.5" : "gap-2")}>
                     <Button
                       onClick={() => setShowStandardTaskAssignment(true)}
                       variant="outline"
                       size="sm"
-                      className="whitespace-nowrap"
+                      className={cn("whitespace-nowrap", isMobile && "h-8 text-xs px-2")}
                     >
-                      <Settings className="mr-2 h-4 w-4" />
-                      {t('planning_add_standard_task')}
+                      <Settings className={cn(isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2")} />
+                      {isMobile ? t('planning_add_standard_task').split(' ').slice(0, 2).join(' ') : t('planning_add_standard_task')}
                     </Button>
                     <Button
                       onClick={() => setShowSchedulingMethodDialog(true)}
                       disabled={generatingSchedule || isSelectedDateHoliday()}
                       size="sm"
-                      className="whitespace-nowrap"
+                      className={cn("whitespace-nowrap", isMobile && "h-8 text-xs px-2")}
                     >
-                      <Zap className="mr-2 h-4 w-4" />
-                      {generatingSchedule ? t('planning_generating') : t('planning_generate_all')}
+                      <Zap className={cn(isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2")} />
+                      {generatingSchedule ? t('planning_generating') : (isMobile ? t('planning_generate_all').split(' ').slice(0, 2).join(' ') : t('planning_generate_all'))}
                     </Button>
-                    <Button
-                      onClick={generateTomorrowSchedule}
-                      disabled={generatingSchedule || !checkTodayHasSchedules() || !isNextWorkingDay()}
-                      variant="secondary"
-                      size="sm"
-                      className="whitespace-nowrap"
-                    >
-                      <ArrowRight className="mr-2 h-4 w-4" />
-                      {generatingSchedule ? t('planning_generating') : t('planning_generate_next_day')}
-                    </Button>
+                    {!isMobile && (
+                      <Button
+                        onClick={generateTomorrowSchedule}
+                        disabled={generatingSchedule || !checkTodayHasSchedules() || !isNextWorkingDay()}
+                        variant="secondary"
+                        size="sm"
+                        className="whitespace-nowrap"
+                      >
+                        <ArrowRight className="mr-2 h-4 w-4" />
+                        {generatingSchedule ? t('planning_generating') : t('planning_generate_next_day')}
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -2166,31 +2173,34 @@ const Planning = () => {
             )}
 
             {/* View Toggle */}
-            <div className="mb-6">
-              <div className="flex flex-wrap gap-2">
+            <div className={cn(isMobile ? "mb-3" : "mb-6")}>
+              <div className="flex flex-wrap gap-1.5">
                 <Button
                   onClick={() => setActiveView('worker')}
                   variant={activeView === 'worker' ? "default" : "outline"}
                   size="sm"
+                  className={isMobile ? "h-7 text-xs px-2" : ""}
                 >
-                  <Users className="mr-2 h-4 w-4" />
-                  {t('planning_worker_schedules')}
+                  <Users className={cn(isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2")} />
+                  {isMobile ? t('planning_worker_schedules').split(' ')[0] : t('planning_worker_schedules')}
                 </Button>
                 <Button
                   onClick={() => setActiveView('workstation')}
                   variant={activeView === 'workstation' ? "default" : "outline"}
                   size="sm"
+                  className={isMobile ? "h-7 text-xs px-2" : ""}
                 >
-                  <Settings className="mr-2 h-4 w-4" />
-                  {t('planning_workstation_schedules')}
+                  <Settings className={cn(isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2")} />
+                  {isMobile ? t('planning_workstation_schedules').split(' ')[0] : t('planning_workstation_schedules')}
                 </Button>
                 <Button
                   onClick={() => setActiveView('gantt')}
                   variant={activeView === 'gantt' ? "default" : "outline"}
                   size="sm"
+                  className={isMobile ? "h-7 text-xs px-2" : ""}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {t('planning_gantt_chart')}
+                  <CalendarIcon className={cn(isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2")} />
+                  {isMobile ? 'Gantt' : t('planning_gantt_chart')}
                 </Button>
               </div>
             </div>
@@ -2234,10 +2244,10 @@ const Planning = () => {
                 ) : (
                   <div className="space-y-6">
                     {/* Worker Selection */}
-                    <div className="flex items-center justify-between">
-                      <div className="w-64">
+                    <div className={cn("flex items-center", isMobile ? "flex-col gap-2" : "justify-between")}>
+                      <div className={isMobile ? "w-full" : "w-64"}>
                         <Select value={selectedWorker || ''} onValueChange={setSelectedWorker}>
-                          <SelectTrigger>
+                          <SelectTrigger className={isMobile ? "h-9 text-sm" : ""}>
                             <SelectValue placeholder={t('planning_select_worker')} />
                           </SelectTrigger>
                           <SelectContent>
@@ -2258,19 +2268,23 @@ const Planning = () => {
                       </div>
 
                       {isAdmin && selectedWorker && (
-                        <div className="flex space-x-2">
+                        <div className={cn("flex", isMobile ? "w-full gap-1.5" : "space-x-2")}>
                           <Button
                             onClick={() => generateDailySchedule(selectedWorker)}
                             disabled={generatingSchedule || isSelectedDateHoliday()}
                             variant="outline"
+                            size={isMobile ? "sm" : "default"}
+                            className={cn(isMobile && "flex-1 h-8 text-xs")}
                           >
-                            <Zap className="mr-2 h-4 w-4" />
-                            {t('planning_generate_schedule')}
+                            <Zap className={cn(isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2")} />
+                            {isMobile ? t('planning_generate_schedule').split(' ').slice(0, 2).join(' ') : t('planning_generate_schedule')}
                           </Button>
                           <Button
                             onClick={() => setShowTaskManager(true)}
+                            size={isMobile ? "sm" : "default"}
+                            className={cn(isMobile && "flex-1 h-8 text-xs")}
                           >
-                            <Plus className="mr-2 h-4 w-4" />
+                            <Plus className={cn(isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2")} />
                             {t('planning_add_task')}
                           </Button>
                         </div>
@@ -2279,64 +2293,64 @@ const Planning = () => {
 
                     {/* Worker Overview */}
                     {selectedWorkerSchedule && (
-                      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                      <div className={cn("grid gap-2", isMobile ? "grid-cols-3" : "grid-cols-1 md:grid-cols-6 gap-4")}>
                         <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">{t('planning_todo_tasks')}</CardTitle>
+                          <CardHeader className="pb-1 p-3">
+                            <CardTitle className={cn("font-medium", isMobile ? "text-[10px]" : "text-sm")}>{t('planning_todo_tasks')}</CardTitle>
                           </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{selectedWorkerSchedule.tasks.length}</div>
-                            <p className="text-xs text-muted-foreground">{t('planning_ready_to_schedule')}</p>
+                          <CardContent className="p-3 pt-0">
+                            <div className={cn("font-bold", isMobile ? "text-lg" : "text-2xl")}>{selectedWorkerSchedule.tasks.length}</div>
+                            <p className={cn("text-muted-foreground", isMobile ? "text-[9px]" : "text-xs")}>{t('planning_ready_to_schedule')}</p>
                           </CardContent>
                         </Card>
                         
                         <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Workstations</CardTitle>
+                          <CardHeader className="pb-1 p-3">
+                            <CardTitle className={cn("font-medium", isMobile ? "text-[10px]" : "text-sm")}>Workstations</CardTitle>
                           </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{selectedWorkerSchedule.assignedWorkstations.length}</div>
-                            <p className="text-xs text-muted-foreground">{selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None assigned'}</p>
+                          <CardContent className="p-3 pt-0">
+                            <div className={cn("font-bold", isMobile ? "text-lg" : "text-2xl")}>{selectedWorkerSchedule.assignedWorkstations.length}</div>
+                            <p className={cn("text-muted-foreground truncate", isMobile ? "text-[9px]" : "text-xs")}>{selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None assigned'}</p>
                           </CardContent>
                         </Card>
                         
                         <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">{t('planning_total_duration')}</CardTitle>
+                          <CardHeader className="pb-1 p-3">
+                            <CardTitle className={cn("font-medium", isMobile ? "text-[10px]" : "text-sm")}>{t('planning_total_duration')}</CardTitle>
                           </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{Math.round(selectedWorkerSchedule.totalDuration / 60)}h</div>
-                            <p className="text-xs text-muted-foreground">{t('planning_of_todo_tasks')}</p>
+                          <CardContent className="p-3 pt-0">
+                            <div className={cn("font-bold", isMobile ? "text-lg" : "text-2xl")}>{Math.round(selectedWorkerSchedule.totalDuration / 60)}h</div>
+                            <p className={cn("text-muted-foreground", isMobile ? "text-[9px]" : "text-xs")}>{t('planning_of_todo_tasks')}</p>
                           </CardContent>
                         </Card>
                         
                         <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">{t('planning_working_hours')}</CardTitle>
+                          <CardHeader className="pb-1 p-3">
+                            <CardTitle className={cn("font-medium", isMobile ? "text-[10px]" : "text-sm")}>{t('planning_working_hours')}</CardTitle>
                           </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{Math.round(totalWorkingMinutes / 60)}h</div>
-                            <p className="text-xs text-muted-foreground">{t('planning_daily_capacity')}</p>
+                          <CardContent className="p-3 pt-0">
+                            <div className={cn("font-bold", isMobile ? "text-lg" : "text-2xl")}>{Math.round(totalWorkingMinutes / 60)}h</div>
+                            <p className={cn("text-muted-foreground", isMobile ? "text-[9px]" : "text-xs")}>{t('planning_daily_capacity')}</p>
                           </CardContent>
                         </Card>
                         
                         <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">{t('planning_scheduled_items')}</CardTitle>
+                          <CardHeader className="pb-1 p-3">
+                            <CardTitle className={cn("font-medium", isMobile ? "text-[10px]" : "text-sm")}>{t('planning_scheduled_items')}</CardTitle>
                           </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{selectedWorkerSchedule.schedule.length}</div>
-                            <p className="text-xs text-muted-foreground">{t('planning_todays_schedule')}</p>
+                          <CardContent className="p-3 pt-0">
+                            <div className={cn("font-bold", isMobile ? "text-lg" : "text-2xl")}>{selectedWorkerSchedule.schedule.length}</div>
+                            <p className={cn("text-muted-foreground", isMobile ? "text-[9px]" : "text-xs")}>{t('planning_todays_schedule')}</p>
                           </CardContent>
                         </Card>
 
                         <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">{t('planning_efficiency')}</CardTitle>
+                          <CardHeader className="pb-1 p-3">
+                            <CardTitle className={cn("font-medium", isMobile ? "text-[10px]" : "text-sm")}>{t('planning_efficiency')}</CardTitle>
                           </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{calculateScheduleEfficiency(selectedWorkerSchedule.schedule)}%</div>
-                            <p className="text-xs text-muted-foreground">{t('planning_time_utilization')}</p>
+                          <CardContent className="p-3 pt-0">
+                            <div className={cn("font-bold", isMobile ? "text-lg" : "text-2xl")}>{calculateScheduleEfficiency(selectedWorkerSchedule.schedule)}%</div>
+                            <p className={cn("text-muted-foreground", isMobile ? "text-[9px]" : "text-xs")}>{t('planning_time_utilization')}</p>
                           </CardContent>
                         </Card>
                       </div>
@@ -2345,20 +2359,20 @@ const Planning = () => {
                     {/* Worker Schedule */}
                     {selectedWorkerSchedule && (
                       <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center justify-between">
+                        <CardHeader className={isMobile ? "p-3 pb-2" : ""}>
+                          <CardTitle className={cn("flex items-center", isMobile ? "flex-col gap-1 items-start text-sm" : "justify-between")}>
                             <div className="flex items-center">
-                              <Users className="h-5 w-5 mr-2" />
+                              <Users className={cn(isMobile ? "h-4 w-4 mr-1.5" : "h-5 w-5 mr-2")} />
                               {selectedWorkerSchedule.employee.name} - {t('planning_daily_schedule')}
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className={cn("flex items-center", isMobile ? "gap-1 flex-wrap" : "space-x-2")}>
                               {selectedWorkerSchedule.assignedWorkstations.map(ws => (
-                                <Badge key={ws} variant="outline">{ws}</Badge>
+                                <Badge key={ws} variant="outline" className={isMobile ? "text-[10px] px-1.5 py-0" : ""}>{ws}</Badge>
                               ))}
                             </div>
                           </CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className={isMobile ? "p-2" : ""}>
                           {selectedWorkerSchedule.schedule.length > 0 ? (
                             <div className="flex">
                               {/* Timeline Axis */}
@@ -2514,48 +2528,48 @@ const Planning = () => {
                     {/* Available Tasks */}
                     {selectedWorkerSchedule && selectedWorkerSchedule.tasks.length > 0 && (
                       <Card>
-                        <CardHeader>
-                          <CardTitle>Available TODO Tasks for {selectedWorkerSchedule.employee.name}</CardTitle>
-                          <p className="text-sm text-gray-600">
+                        <CardHeader className={isMobile ? "p-3 pb-2" : ""}>
+                          <CardTitle className={isMobile ? "text-sm" : ""}>Available TODO Tasks for {selectedWorkerSchedule.employee.name}</CardTitle>
+                          <p className={cn("text-muted-foreground", isMobile ? "text-xs" : "text-sm")}>
                             Tasks from assigned workstations: {selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None'}
                           </p>
                         </CardHeader>
-                        <CardContent>
-                          <div className="space-y-3">
-                            {selectedWorkerSchedule.tasks.slice(0, 10).map((task) => (
-                              <div key={task.id} className="flex items-center justify-between p-3 border rounded">
-                                <div className="flex-1">
-                                  <h5 className="font-medium">{task.title}</h5>
+                        <CardContent className={isMobile ? "p-2" : ""}>
+                          <div className={cn(isMobile ? "space-y-2" : "space-y-3")}>
+                            {selectedWorkerSchedule.tasks.slice(0, isMobile ? 5 : 10).map((task) => (
+                              <div key={task.id} className={cn("border rounded", isMobile ? "p-2" : "p-3 flex items-center justify-between")}>
+                                <div className="flex-1 min-w-0">
+                                  <h5 className={cn("font-medium truncate", isMobile && "text-sm")}>{task.title}</h5>
                                   {task.phases && (
-                                    <p className="text-sm text-blue-600">Project: {task.phases.projects.name}</p>
+                                    <p className={cn("text-primary truncate", isMobile ? "text-xs" : "text-sm")}>Project: {task.phases.projects.name}</p>
                                   )}
-                                  {task.description && (
-                                    <p className="text-sm text-gray-600">{task.description}</p>
+                                  {!isMobile && task.description && (
+                                    <p className="text-sm text-muted-foreground">{task.description}</p>
                                   )}
-                                  <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                                  <div className={cn("flex flex-wrap items-center text-muted-foreground mt-1", isMobile ? "gap-x-2 gap-y-0.5 text-[10px]" : "space-x-4 text-sm")}>
                                     <span>Duration: {task.duration || 60} min</span>
                                     <span>Due: {format(new Date(task.due_date), 'MMM dd')}</span>
-                                    <span>Workstations: {task.workstations?.map(ws => ws.name).join(', ') || 'None'}</span>
+                                    {!isMobile && <span>Workstations: {task.workstations?.map(ws => ws.name).join(', ') || 'None'}</span>}
                                     {task.assignee_id === selectedWorkerSchedule.employee.id && (
-                                      <Badge variant="secondary">Directly Assigned</Badge>
+                                      <Badge variant="secondary" className={isMobile ? "text-[10px] px-1 py-0" : ""}>Directly Assigned</Badge>
                                     )}
                                   </div>
                                 </div>
                                 
-                                <div className="flex items-center space-x-2">
-                                  <Badge className={getPriorityColor(task.priority)}>
+                                <div className={cn("flex items-center", isMobile ? "gap-1 mt-1" : "space-x-2")}>
+                                  <Badge className={cn(getPriorityColor(task.priority), isMobile && "text-[10px] px-1.5 py-0")}>
                                     {task.priority}
                                   </Badge>
-                                  <Badge variant="outline">
+                                  <Badge variant="outline" className={isMobile ? "text-[10px] px-1.5 py-0" : ""}>
                                     {task.status}
                                   </Badge>
                                 </div>
                               </div>
                             ))}
                             
-                            {selectedWorkerSchedule.tasks.length > 10 && (
-                              <div className="text-center py-4 text-sm text-gray-500">
-                                ... and {selectedWorkerSchedule.tasks.length - 10} more TODO tasks
+                            {selectedWorkerSchedule.tasks.length > (isMobile ? 5 : 10) && (
+                              <div className="text-center py-2 text-sm text-muted-foreground">
+                                ... and {selectedWorkerSchedule.tasks.length - (isMobile ? 5 : 10)} more TODO tasks
                               </div>
                             )}
                           </div>
