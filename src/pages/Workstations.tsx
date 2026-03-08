@@ -260,72 +260,76 @@ const Workstations: React.FC = () => {
   const isMobile = useIsMobile();
 
   if (loading) {
-    return <div className="flex min-h-screen">
+    return <div className="flex min-h-screen bg-background">
         {!isMobile && (
           <div className="w-64 bg-sidebar fixed top-0 bottom-0">
             <Navbar />
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`w-full p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : 'pt-14'}`}>
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        <div className={`w-full flex justify-center items-center ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent"></div>
+            <p className="text-sm text-muted-foreground">{t('workstations_title')}...</p>
+          </div>
         </div>
       </div>;
   }
   const selectedWorkstationForTasks = workstations.find(ws => ws.id === showWorkstationTasks);
-  return <div className="flex min-h-screen">
+  return <div className="flex min-h-screen bg-background">
       {!isMobile && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`w-full ${!isMobile ? 'ml-64' : 'pt-14'}`}>
+      <div className={`w-full ${!isMobile ? 'ml-64' : 'pt-16'}`}>
         <ScrollArea className="h-screen">
-          <div className={isMobile ? 'p-3' : 'p-6'}>
+          <div className={isMobile ? 'p-4' : 'p-8'}>
             <div className="max-w-7xl mx-auto">
               {selectedWorkstation ? <div>
-                  <Button variant="outline" className="mb-4" size={isMobile ? 'sm' : 'default'} onClick={() => setSelectedWorkstation(null)}>
+                  <Button variant="outline" className="mb-4 rounded-xl" size={isMobile ? 'sm' : 'default'} onClick={() => setSelectedWorkstation(null)}>
                     <ArrowLeft className="mr-2 h-4 w-4" /> {t('back_to_workstations')}
                   </Button>
                   <WorkstationView workstationId={selectedWorkstation} onBack={() => setSelectedWorkstation(null)} />
                 </div> : (() => {
-                  // Get unique production lines and check if we need tabs
                   const productionLines = [...new Set(workstations.map(ws => ws.production_line))].sort((a, b) => a - b);
                   const hasMultipleLines = productionLines.length > 1;
-                  
-                  // Set default selected line if not set
                   const activeProductionLine = selectedProductionLine ?? productionLines[0] ?? 1;
-                  
-                  // Filter workstations by production line if multiple lines exist
                   const filteredWorkstations = hasMultipleLines 
                     ? workstations.filter(ws => ws.production_line === activeProductionLine)
                     : workstations;
                   
                   return (
-                  <div>
-                    <div className={`flex items-center justify-between ${isMobile ? 'mb-3' : 'mb-6'}`}>
-                      <h1 className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{t('workstations_title')}</h1>
+                  <div className="space-y-5">
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h1 className={`font-bold tracking-tight ${isMobile ? 'text-xl' : 'text-3xl'}`}>{t('workstations_title')}</h1>
+                        <p className="text-muted-foreground text-sm mt-0.5">
+                          {filteredWorkstations.length} {isMobile ? 'stations' : 'werkstations beschikbaar'}
+                        </p>
+                      </div>
                       <Button 
                         variant="outline" 
-                        size={isMobile ? 'sm' : 'default'}
+                        size={isMobile ? 'icon' : 'default'}
                         onClick={() => navigate(createLocalizedPath('/floorplan'))}
-                        className="flex items-center gap-2"
+                        className="rounded-xl gap-2"
                       >
                         <Map className="h-4 w-4" />
                         {!isMobile && 'Floorplan'}
                       </Button>
                     </div>
                     
-                    {/* Production Line Tabs - only show if more than 1 production line */}
+                    {/* Production Line Tabs */}
                     {hasMultipleLines && (
-                      <div className={`flex gap-1.5 ${isMobile ? 'mb-3 overflow-x-auto pb-1' : 'mb-6'} border-b`}>
+                      <div className={`flex gap-2 ${isMobile ? 'overflow-x-auto pb-1 -mx-1 px-1' : ''}`}>
                         {productionLines.map(line => (
                           <Button
                             key={line}
-                            variant={activeProductionLine === line ? "default" : "ghost"}
-                            size={isMobile ? 'sm' : 'default'}
-                            className="rounded-b-none whitespace-nowrap"
+                            variant={activeProductionLine === line ? "default" : "secondary"}
+                            size="sm"
+                            className="rounded-full whitespace-nowrap px-4"
                             onClick={() => setSelectedProductionLine(line)}
                           >
                             {isMobile ? `Lijn ${line}` : `Productielijn ${line}`}
@@ -334,70 +338,76 @@ const Workstations: React.FC = () => {
                       </div>
                     )}
                     
-                    <div className={`grid gap-3 ${isMobile ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4'}`}>
-                      {filteredWorkstations.map((workstation, index) => <Card key={workstation.id} className="hover:shadow-md transition-shadow cursor-pointer relative active:scale-[0.98]">
-                          <div className="absolute top-1.5 left-1.5 z-10">
-                            <Badge variant="secondary" className={`font-mono ${isMobile ? 'text-[10px] px-1.5 py-0' : 'text-xs'}`}>
+                    {/* Workstation Grid */}
+                    <div className={`grid ${isMobile ? 'grid-cols-2 gap-3' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4'}`}>
+                      {filteredWorkstations.map((workstation) => (
+                        <Card 
+                          key={workstation.id} 
+                          className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-lg hover:border-primary/20 transition-all duration-300 cursor-pointer active:scale-[0.97]"
+                        >
+                          {/* Sort order badge */}
+                          <div className="absolute top-2.5 left-2.5 z-10">
+                            <span className={`inline-flex items-center justify-center rounded-lg bg-foreground/5 backdrop-blur-sm font-mono font-semibold text-muted-foreground ${isMobile ? 'text-[10px] h-5 w-7' : 'text-xs h-6 w-8'}`}>
                               {String(workstation.sort_order).padStart(2, '0')}
-                            </Badge>
+                            </span>
                           </div>
-                          <div className="absolute top-1.5 right-1.5 z-10">
+
+                          {/* Menu */}
+                          <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className={isMobile ? 'h-7 w-7' : 'h-8 w-8'} onClick={e => e.stopPropagation()}>
-                                  <MoreVertical className="h-4 w-4" />
+                                <Button variant="secondary" size="icon" className={`rounded-xl shadow-sm ${isMobile ? 'h-7 w-7 opacity-100' : 'h-8 w-8'}`} onClick={e => e.stopPropagation()}>
+                                  <MoreVertical className="h-3.5 w-3.5" />
                                 </Button>
                               </DropdownMenuTrigger>
-                               <DropdownMenuContent align="end">
-                                 <DropdownMenuItem onClick={e => {
-                          e.stopPropagation();
-                          handleShowWorkstationTasks(workstation.id);
-                        }}>
-                                   <CheckCircle className="mr-2 h-4 w-4" />
-                                   {t('workstation_tasks')}
-                                 </DropdownMenuItem>
-                                 <DropdownMenuItem onClick={e => {
-                          e.stopPropagation();
-                          setShowQRScanner(workstation.id);
-                        }}>
-                                   <QrCode className="mr-2 h-4 w-4" />
-                                   Scan QR-code
-                                 </DropdownMenuItem>
-                                 <DropdownMenuItem onClick={e => {
-                          e.stopPropagation();
-                          setShowKeyboardScanner(workstation.id);
-                        }}>
-                                   <Radio className="mr-2 h-4 w-4" />
-                                   Listen for Scan
-                                 </DropdownMenuItem>
-                                 <DropdownMenuItem onClick={e => {
-                          e.stopPropagation();
-                          setShowErrorDialog(workstation.id);
-                        }}>
-                                   <AlertTriangle className="mr-2 h-4 w-4" />
-                                   Foutmelding Toevoegen
-                                 </DropdownMenuItem>
-                               </DropdownMenuContent>
+                              <DropdownMenuContent align="end" className="rounded-xl">
+                                <DropdownMenuItem onClick={e => { e.stopPropagation(); handleShowWorkstationTasks(workstation.id); }}>
+                                  <CheckCircle className="mr-2 h-4 w-4" />
+                                  {t('workstation_tasks')}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={e => { e.stopPropagation(); setShowQRScanner(workstation.id); }}>
+                                  <QrCode className="mr-2 h-4 w-4" />
+                                  Scan QR-code
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={e => { e.stopPropagation(); setShowKeyboardScanner(workstation.id); }}>
+                                  <Radio className="mr-2 h-4 w-4" />
+                                  Listen for Scan
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={e => { e.stopPropagation(); setShowErrorDialog(workstation.id); }}>
+                                  <AlertTriangle className="mr-2 h-4 w-4" />
+                                  Foutmelding Toevoegen
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
-                          <CardContent className={`flex flex-col items-center text-center ${isMobile ? 'p-3 pt-8' : 'p-6'}`} onClick={() => setSelectedWorkstation(workstation.id)}>
-                            <div className={`bg-primary/10 rounded-full ${isMobile ? 'p-2.5 mb-2' : 'p-4 mb-4'}`}>
+
+                          {/* Card body */}
+                          <CardContent 
+                            className={`flex flex-col items-center text-center ${isMobile ? 'px-3 pt-10 pb-4' : 'px-4 pt-12 pb-5'}`} 
+                            onClick={() => setSelectedWorkstation(workstation.id)}
+                          >
+                            <div className={`rounded-2xl bg-primary/8 group-hover:bg-primary/15 transition-colors ${isMobile ? 'p-3 mb-2.5' : 'p-4 mb-3'}`}>
                               {workstation.icon_path ? (
                                 <img 
                                   src={workstation.icon_path} 
                                   alt={workstation.name} 
-                                  className={isMobile ? 'h-6 w-6 object-contain' : 'h-8 w-8 object-contain'}
+                                  className={`object-contain text-primary ${isMobile ? 'h-6 w-6' : 'h-7 w-7'}`}
                                 />
                               ) : (
-                                <div className={isMobile ? '[&>svg]:h-6 [&>svg]:w-6' : ''}>
+                                <div className={`text-primary ${isMobile ? '[&>svg]:h-5 [&>svg]:w-5' : '[&>svg]:h-7 [&>svg]:w-7'}`}>
                                   {workstation.icon}
                                 </div>
                               )}
                             </div>
-                            <h3 className={`font-medium mb-0.5 ${isMobile ? 'text-xs leading-tight' : 'text-lg mb-1'}`}>{workstation.name}</h3>
-                            {workstation.description && !isMobile && <p className="text-sm text-muted-foreground">{workstation.description}</p>}
+                            <h3 className={`font-semibold leading-tight ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                              {workstation.name}
+                            </h3>
+                            {workstation.description && !isMobile && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{workstation.description}</p>
+                            )}
                           </CardContent>
-                        </Card>)}
+                        </Card>
+                      ))}
                     </div>
                   </div>
                   );
