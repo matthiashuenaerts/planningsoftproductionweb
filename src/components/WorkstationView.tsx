@@ -26,6 +26,7 @@ import TaskCompletionChecklistDialog from '@/components/TaskCompletionChecklistD
 import TaskExtraTimeDialog from '@/components/TaskExtraTimeDialog';
 import { useLanguage } from '@/context/LanguageContext';
 import { partTrackingService } from '@/services/partTrackingService';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface WorkstationViewProps {
   workstationName?: string;
