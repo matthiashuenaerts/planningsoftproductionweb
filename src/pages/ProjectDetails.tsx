@@ -1492,7 +1492,7 @@ const ProjectDetails = () => {
                             </div>
 
                             {/* Compact Order Info with Enhanced Delivery Date */}
-                            <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs mb-2">
                               <div className={cn("flex items-center gap-1 p-2 rounded border", order.status === 'delivered' ? 'bg-green-50 border-green-200' : order.status === 'pending' ? 'bg-orange-50 border-orange-200' : order.status === 'delayed' ? 'bg-red-50 border-red-200' : order.status === 'canceled' ? 'bg-gray-50 border-gray-200' : order.status === 'charged' ? 'bg-purple-50 border-purple-200' : 'bg-blue-50 border-blue-200')}>
                                 <Calendar className={cn("h-3 w-3", order.status === 'delivered' ? 'text-green-600' : order.status === 'pending' ? 'text-orange-600' : order.status === 'delayed' ? 'text-red-600' : order.status === 'canceled' ? 'text-gray-600' : order.status === 'charged' ? 'text-purple-600' : 'text-blue-600')} />
                                 <div>
