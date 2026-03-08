@@ -461,7 +461,7 @@ const TaskList: React.FC<TaskListProps> = ({
                   {task.is_rush_order && showRushOrderBadge && (
                     <Badge variant="destructive" className="flex items-center gap-1">
                       <Zap className="h-3 w-3" />
-                      Rush Order
+                      {t('tl_rush_order')}
                     </Badge>
                   )}
                   {task.due_date && (() => {
