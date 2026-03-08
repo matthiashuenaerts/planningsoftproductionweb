@@ -89,31 +89,51 @@ const DailyTasks: React.FC = () => {
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+      <div className={`w-full ${isMobile ? 'px-2 py-3 pt-16' : 'p-6 ml-64'}`}>
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold">{t('dt_installation_calendar')}</h1>
+          <div className={`flex ${isMobile ? 'flex-col gap-2' : 'flex-row items-center justify-between'} mb-4 sm:mb-6`}>
+            <h1 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-foreground`}>{t('dt_installation_calendar')}</h1>
             
-            <div className="flex mt-4 md:mt-0 space-x-2">
-              <Button variant={displayMode === 'gantt' ? 'default' : 'outline'} onClick={() => setDisplayMode('gantt')}>
+            <div className={`flex ${isMobile ? 'flex-wrap gap-1.5' : 'space-x-2'}`}>
+              <Button
+                size={isMobile ? 'sm' : 'default'}
+                className={isMobile ? 'flex-1 text-xs px-2' : ''}
+                variant={displayMode === 'gantt' ? 'default' : 'outline'}
+                onClick={() => setDisplayMode('gantt')}
+              >
                 {t('dt_gantt_chart')}
               </Button>
-              <Button variant={displayMode === 'teams' ? 'default' : 'outline'} onClick={() => setDisplayMode('teams')}>
+              <Button
+                size={isMobile ? 'sm' : 'default'}
+                className={isMobile ? 'flex-1 text-xs px-2' : ''}
+                variant={displayMode === 'teams' ? 'default' : 'outline'}
+                onClick={() => setDisplayMode('teams')}
+              >
                 {t('dt_team_planner')}
               </Button>
-              <Button variant={displayMode === 'trucks' ? 'default' : 'outline'} onClick={() => setDisplayMode('trucks')}>
-                <Truck className="h-4 w-4 mr-2" />
+              <Button
+                size={isMobile ? 'sm' : 'default'}
+                className={isMobile ? 'flex-1 text-xs px-2' : ''}
+                variant={displayMode === 'trucks' ? 'default' : 'outline'}
+                onClick={() => setDisplayMode('trucks')}
+              >
+                <Truck className={`${isMobile ? 'h-3 w-3 mr-1' : 'h-4 w-4 mr-2'}`} />
                 {t('dt_truck_loading')}
               </Button>
-              <Button variant={displayMode === 'service' ? 'default' : 'outline'} onClick={() => setDisplayMode('service')}>
-                <Wrench className="h-4 w-4 mr-2" />
+              <Button
+                size={isMobile ? 'sm' : 'default'}
+                className={isMobile ? 'flex-1 text-xs px-2' : ''}
+                variant={displayMode === 'service' ? 'default' : 'outline'}
+                onClick={() => setDisplayMode('service')}
+              >
+                <Wrench className={`${isMobile ? 'h-3 w-3 mr-1' : 'h-4 w-4 mr-2'}`} />
                 {t('dt_service_teams')}
               </Button>
             </div>
           </div>
           
           {displayMode === 'gantt' ? (
-            <OrdersGanttChart className="h-[calc(100vh-200px)]" />
+            <OrdersGanttChart className={isMobile ? 'h-[calc(100vh-140px)]' : 'h-[calc(100vh-200px)]'} />
           ) : displayMode === 'teams' ? (
             <InstallationTeamCalendar projects={allProjects} key={projectsRefreshKey} />
           ) : displayMode === 'service' ? (
