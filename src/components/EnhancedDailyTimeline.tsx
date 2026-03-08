@@ -256,7 +256,7 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
               </div>
               
               {/* Task card */}
-              <div className="flex-1 ml-4">
+              <div className={`flex-1 ${isMobile ? 'ml-2.5' : 'ml-4'}`}>
                 <Card className={`relative overflow-hidden transition-all hover:shadow-md ${
                   task.isActive ? 'ring-2 ring-green-500 ring-opacity-50' : ''
                 } ${isSmallTask ? 'py-2' : ''}`}>
