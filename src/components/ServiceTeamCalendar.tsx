@@ -548,8 +548,8 @@ const ServiceTeamCalendar: React.FC = () => {
       <Card>
         <CardContent className="py-12 text-center">
           <MapPin className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Service Teams</h3>
-          <p className="text-muted-foreground">Create service teams in Settings → Installation Teams to use the service calendar.</p>
+          <h3 className="text-lg font-semibold mb-2">{t('svc_no_service_teams')}</h3>
+          <p className="text-muted-foreground">{t('svc_create_teams_hint')}</p>
         </CardContent>
       </Card>
     );
