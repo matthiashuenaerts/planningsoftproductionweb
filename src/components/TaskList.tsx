@@ -574,10 +574,10 @@ const TaskList: React.FC<TaskListProps> = ({
                           {isLoading ? (
                             <>
                               <Loader className="h-4 w-4 animate-spin mr-2" />
-                              Processing...
+                              {t('tl_processing')}
                             </>
                           ) : (
-                            'Complete'
+                            t('tl_complete')
                           )}
                         </Button>
                         <Button 
