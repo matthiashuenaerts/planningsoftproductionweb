@@ -150,7 +150,7 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
             Optimized driving route with return to start
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="space-y-3 flex-1 flex flex-col min-h-0">
           {/* Unrecognized addresses warning */}
           {unrecognizedAddresses && unrecognizedAddresses.length > 0 && (
             <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
