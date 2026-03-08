@@ -416,13 +416,13 @@ const { data, error } = await supabase.functions.invoke(
   if (loading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Folder className="h-5 w-5" />
+        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+            <Folder className="h-4 w-4 sm:h-5 sm:w-5" />
             OneDrive Integratie
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
           <div className="flex justify-center items-center py-4">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
           </div>
