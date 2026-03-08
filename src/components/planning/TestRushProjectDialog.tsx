@@ -16,6 +16,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useToast } from '@/hooks/use-toast';
 import { productionRouteService, ProductionRoute } from '@/services/productionRouteService';
 import { standardTasksService, StandardTask } from '@/services/standardTasksService';
 import { workstationService } from '@/services/workstationService';
@@ -64,6 +66,8 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
   currentCompletions,
 }) => {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
+  const { toast } = useToast();
   const [routes, setRoutes] = useState<ProductionRoute[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState('');
   const [simulating, setSimulating] = useState(false);
@@ -106,7 +110,9 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
     let tempProjectId: string | null = null;
 
     try {
-      // Step 1: Count existing projects to get the right count
+      toast({ title: t('timeline_simulating') || 'Simulatie starten...', description: t('timeline_test_project_desc') || 'Even geduld...' });
+
+      // Step 1: Count existing projects
       const { count, error: countError } = await supabase
         .from('projects')
         .select('*', { count: 'exact', head: true })
@@ -114,7 +120,7 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
       
       if (countError) throw countError;
       const existingCount = count || 0;
-      const projectCount = existingCount + 1; // +1 for the test project
+      const projectCount = existingCount + 1;
 
       // Step 2: Create temporary project
       const { data: tempProject, error: projectError } = await supabase
@@ -191,7 +197,6 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
 
         if (tasksError) throw tasksError;
 
-        // Create task_workstation_links
         if (createdTasks) {
           const linkInserts: { task_id: string; workstation_id: string }[] = [];
           for (const task of createdTasks) {
@@ -208,14 +213,14 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
         }
       }
 
-      // Step 6: Run the scheduling engine with the test project included
+      // Step 6: Run the scheduling engine
       console.log(`Running simulation with ${projectCount} projects...`);
       const { completions: simulatedCompletions } = 
         await automaticSchedulingService.generateSchedule(projectCount, new Date());
 
       console.log(`Simulation returned ${simulatedCompletions.length} completions`);
 
-      // Step 7: Compare results with current completions
+      // Step 7: Compare results
       const originalMap = new Map(
         currentCompletions.map(c => [c.projectId, c])
       );
@@ -227,8 +232,6 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
           if (!original) return null;
 
           const daysDiff = (original.daysRemaining || 0) - (sim.daysRemaining || 0);
-          
-          // Show if status changed or days shifted
           if (original.status === sim.status && Math.abs(daysDiff) < 1) return null;
 
           return {
@@ -253,20 +256,26 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
         totalScheduleSlots: simulatedCompletions.length,
       });
 
-      // Step 8: Cleanup - remove the temporary project (cascades)
+      // Step 8: Cleanup
       await supabase.from('projects').delete().eq('id', tempProject.id);
       tempProjectId = null;
 
-      // Step 9: Restore original schedule by re-running without test project
+      // Step 9: Restore original schedule
       console.log(`Restoring original schedule with ${existingCount} projects...`);
       const { schedules: restoredSchedules } = 
         await automaticSchedulingService.generateSchedule(existingCount, new Date());
       await automaticSchedulingService.saveSchedulesToDatabase(restoredSchedules);
       console.log('Original schedule restored');
 
+      toast({ title: '✅ Simulatie voltooid', description: `${impactedProjects.length} projecten beïnvloed` });
+
     } catch (error: any) {
       console.error('Simulation error:', error);
-      // Cleanup on error
+      toast({ 
+        title: '❌ Simulatie mislukt', 
+        description: error?.message || 'Er is een fout opgetreden bij de simulatie.',
+        variant: 'destructive',
+      });
       if (tempProjectId) {
         try {
           await supabase.from('projects').delete().eq('id', tempProjectId);
@@ -279,50 +288,45 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'on_track': return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-      case 'at_risk': return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
-      case 'overdue': return <Clock className="h-4 w-4 text-red-600" />;
-      default: return <Clock className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'on_track': return <Badge className="bg-green-100 text-green-800">OK</Badge>;
-      case 'at_risk': return <Badge className="bg-yellow-100 text-yellow-800">{t('timeline_at_risk')}</Badge>;
-      case 'overdue': return <Badge className="bg-red-100 text-red-800">{t('timeline_overdue')}</Badge>;
-      default: return <Badge variant="secondary">?</Badge>;
+      case 'on_track': return <Badge className="bg-green-100 text-green-800 text-[10px]">OK</Badge>;
+      case 'at_risk': return <Badge className="bg-yellow-100 text-yellow-800 text-[10px]">{t('timeline_at_risk')}</Badge>;
+      case 'overdue': return <Badge className="bg-red-100 text-red-800 text-[10px]">{t('timeline_overdue')}</Badge>;
+      default: return <Badge variant="secondary" className="text-[10px]">?</Badge>;
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <TrendingDown className="h-5 w-5" />
+      <DialogContent className={cn(
+        "flex flex-col",
+        isMobile ? "max-w-[98vw] h-[95vh] p-3 gap-2" : "max-w-2xl gap-4"
+      )}>
+        <DialogHeader className={cn(isMobile && "space-y-0.5")}>
+          <DialogTitle className={cn("flex items-center gap-2", isMobile && "text-base")}>
+            <TrendingDown className={cn(isMobile ? "h-4 w-4" : "h-5 w-5")} />
             {t('timeline_test_project')}
           </DialogTitle>
-          <DialogDescription>
-            {t('timeline_test_project_desc')}
-          </DialogDescription>
+          {!isMobile && (
+            <DialogDescription>
+              {t('timeline_test_project_desc')}
+            </DialogDescription>
+          )}
         </DialogHeader>
 
-        <ScrollArea className="max-h-[60vh]">
-          <div className="space-y-4 p-1">
-            {/* Form */}
+        <ScrollArea className={cn("flex-1 min-h-0", isMobile ? "max-h-[calc(95vh-120px)]" : "max-h-[60vh]")}>
+          <div className={cn("space-y-3", isMobile ? "p-0.5" : "p-1 space-y-4")}>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(runSimulation)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={form.handleSubmit(runSimulation)} className={cn("space-y-3", !isMobile && "space-y-4")}>
+                <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-2 gap-4")}>
                   <FormField
                     control={form.control}
                     name="project_name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t('timeline_project_name')}</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
+                        <FormLabel className={cn(isMobile && "text-xs")}>{t('timeline_project_name')}</FormLabel>
+                        <FormControl><Input {...field} className={cn(isMobile && "h-9 text-sm")} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -332,26 +336,30 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
                     name="client"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t('timeline_client')}</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
+                        <FormLabel className={cn(isMobile && "text-xs")}>{t('timeline_client')}</FormLabel>
+                        <FormControl><Input {...field} className={cn(isMobile && "h-9 text-sm")} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "grid-cols-2 gap-4")}>
                   <FormField
                     control={form.control}
                     name="start_date"
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
-                        <FormLabel>{t('timeline_start_date')}</FormLabel>
+                        <FormLabel className={cn(isMobile && "text-xs")}>{t('timeline_start_date')}</FormLabel>
                         <Popover>
                           <PopoverTrigger asChild>
                             <FormControl>
-                              <Button variant="outline" className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                {field.value ? format(field.value, 'PPP') : t('timeline_pick_date')}
+                              <Button variant="outline" className={cn(
+                                "pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground",
+                                isMobile && "h-9 text-sm"
+                              )}>
+                                {field.value ? format(field.value, isMobile ? 'dd/MM/yy' : 'PPP') : t('timeline_pick_date')}
                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                               </Button>
                             </FormControl>
@@ -369,12 +377,16 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
                     name="installation_date"
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
-                        <FormLabel>{t('timeline_end_date')}</FormLabel>
+                        <FormLabel className={cn(isMobile && "text-xs")}>{t('timeline_end_date')}</FormLabel>
                         <Popover>
                           <PopoverTrigger asChild>
                             <FormControl>
-                              <Button variant="outline" className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                {field.value ? format(field.value, 'PPP') : t('timeline_pick_date')}
+                              <Button variant="outline" className={cn(
+                                "pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground",
+                                isMobile && "h-9 text-sm"
+                              )}>
+                                {field.value ? format(field.value, isMobile ? 'dd/MM/yy' : 'PPP') : t('timeline_pick_date')}
                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                               </Button>
                             </FormControl>
@@ -391,9 +403,9 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
 
                 {/* Route selection */}
                 <div>
-                  <FormLabel>{t('timeline_route')}</FormLabel>
+                  <FormLabel className={cn(isMobile && "text-xs")}>{t('timeline_route')}</FormLabel>
                   <Select value={selectedRouteId} onValueChange={setSelectedRouteId}>
-                    <SelectTrigger>
+                    <SelectTrigger className={cn(isMobile && "h-9 text-sm")}>
                       <SelectValue placeholder={t('timeline_select_route')} />
                     </SelectTrigger>
                     <SelectContent>
@@ -410,7 +422,7 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
                   name="project_value"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('timeline_complexity_factor')}: {field.value}</FormLabel>
+                      <FormLabel className={cn(isMobile && "text-xs")}>{t('timeline_complexity_factor')}: {field.value}</FormLabel>
                       <FormControl>
                         <Slider
                           min={1}
@@ -425,7 +437,7 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
                   )}
                 />
 
-                <Button type="submit" disabled={simulating || !selectedRouteId} className="w-full">
+                <Button type="submit" disabled={simulating || !selectedRouteId} className={cn("w-full", isMobile && "h-10")}>
                   {simulating ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -440,21 +452,23 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
 
             {/* Results */}
             {simulationResult && (
-              <div className="space-y-4 border-t pt-4">
-                <h3 className="font-semibold text-lg">{t('timeline_simulation_results')}</h3>
+              <div className={cn("space-y-3 border-t pt-3", !isMobile && "space-y-4 pt-4")}>
+                <h3 className={cn("font-semibold", isMobile ? "text-sm" : "text-lg")}>{t('timeline_simulation_results')}</h3>
 
                 {/* New project status */}
                 {simulationResult.newProjectCompletion && (
-                  <div className="p-3 rounded-lg border bg-muted/50">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="font-medium">{simulationResult.newProjectCompletion.projectName}</span>
-                        <span className="text-sm text-muted-foreground ml-2">({t('timeline_new_project')})</span>
+                  <div className={cn("rounded-lg border bg-muted/50", isMobile ? "p-2" : "p-3")}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className={cn("font-medium truncate block", isMobile && "text-sm")}>
+                          {simulationResult.newProjectCompletion.projectName}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">({t('timeline_new_project')})</span>
                       </div>
                       {getStatusBadge(simulationResult.newProjectCompletion.status)}
                     </div>
                     {simulationResult.newProjectCompletion.lastProductionStepEnd && (
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className={cn("text-muted-foreground mt-1", isMobile ? "text-[11px]" : "text-sm")}>
                         {t('timeline_production_ready')}: {format(simulationResult.newProjectCompletion.lastProductionStepEnd, 'dd/MM/yyyy HH:mm')}
                       </p>
                     )}
@@ -464,26 +478,28 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
                 {/* Impacted projects */}
                 {simulationResult.impactedProjects.length > 0 ? (
                   <div className="space-y-2">
-                    <h4 className="font-medium text-sm flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    <h4 className={cn("font-medium flex items-center gap-1.5", isMobile ? "text-xs" : "text-sm")}>
+                      <AlertTriangle className="h-3.5 w-3.5 text-yellow-600" />
                       {t('timeline_impacted_projects')} ({simulationResult.impactedProjects.length})
                     </h4>
                     {simulationResult.impactedProjects.map((project, idx) => (
-                      <div key={idx} className="p-3 rounded-lg border text-sm space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{project.projectName}</span>
-                          <div className="flex items-center gap-2">
+                      <div key={idx} className={cn("rounded-lg border space-y-1", isMobile ? "p-2 text-xs" : "p-3 text-sm")}>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-medium truncate">{project.projectName}</span>
+                          <div className="flex items-center gap-1 shrink-0">
                             {getStatusBadge(project.originalStatus)}
-                            <span>→</span>
+                            <span className="text-[10px]">→</span>
                             {getStatusBadge(project.newStatus)}
                           </div>
                         </div>
-                        <div className="text-muted-foreground">
-                          {t('timeline_client')}: {project.client}
-                        </div>
+                        {!isMobile && (
+                          <div className="text-muted-foreground">
+                            {t('timeline_client')}: {project.client}
+                          </div>
+                        )}
                         {project.daysDifference !== 0 && (
                           <div className={cn(
-                            "font-medium",
+                            "font-medium text-xs",
                             project.daysDifference > 0 ? "text-red-600" : "text-green-600"
                           )}>
                             {project.daysDifference > 0 
@@ -496,8 +512,11 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
                     ))}
                   </div>
                 ) : (
-                  <div className="p-3 rounded-lg border bg-green-50 text-green-800 flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4" />
+                  <div className={cn(
+                    "rounded-lg border bg-green-50 text-green-800 flex items-center gap-2",
+                    isMobile ? "p-2 text-xs" : "p-3"
+                  )}>
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
                     {t('timeline_no_impact')}
                   </div>
                 )}
@@ -506,8 +525,8 @@ const TestRushProjectDialog: React.FC<TestRushProjectDialogProps> = ({
           </div>
         </ScrollArea>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className={cn(isMobile && "pt-1")}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className={cn(isMobile && "h-9 text-sm w-full")}>
             {t('close') || 'Sluiten'}
           </Button>
         </DialogFooter>
