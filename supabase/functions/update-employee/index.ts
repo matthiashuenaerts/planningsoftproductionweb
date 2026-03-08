@@ -51,7 +51,18 @@ serve(async (req) => {
     const employeeUpdateData: Record<string, any> = {};
     if (name !== undefined) employeeUpdateData.name = name;
     if (email !== undefined) employeeUpdateData.email = email;
-    if (password !== undefined && password !== '') employeeUpdateData.password = password;
+    if (password !== undefined && password !== '') {
+      // Hash the password before storing
+      const { data: hashResult, error: hashError } = await supabaseAdmin.rpc('hash_password', { p_password: password });
+      if (hashError) {
+        console.error('Password hashing error:', hashError);
+        return new Response(
+          JSON.stringify({ error: `Failed to hash password: ${hashError.message}` }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+        );
+      }
+      employeeUpdateData.password = hashResult;
+    }
     if (role !== undefined) employeeUpdateData.role = role;
     if (logistics !== undefined) employeeUpdateData.logistics = logistics;
     if (workstation !== undefined) employeeUpdateData.workstation = workstation;

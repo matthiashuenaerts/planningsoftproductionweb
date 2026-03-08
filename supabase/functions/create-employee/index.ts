@@ -107,11 +107,21 @@ serve(async (req) => {
     }
     console.log(`Resolved caller tenant_id: ${callerTenantId}`);
 
+    // Hash the password before storing in the employees table
+    const { data: hashResult, error: hashError } = await supabaseAdmin.rpc('hash_password', { p_password: password });
+    if (hashError) {
+      console.error('Password hashing error:', hashError);
+      return new Response(
+        JSON.stringify({ error: `Failed to hash password: ${hashError.message}` }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
+
     // Create employee record with auth_user_id and correct tenant
     const insertData: Record<string, any> = {
       name,
       email: userEmail,
-      password,
+      password: hashResult,
       role: role || 'worker',
       logistics: logistics || false,
       workstation: workstation || null,
