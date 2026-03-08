@@ -436,10 +436,10 @@ function extractAllDatesWithContext(text: string): Array<{ date: string; context
     
     const lower = line.toLowerCase();
     let label: string | undefined;
-    if (/order\s*(?:date|datum)|besteldatum|bestelingsdatum/i.test(lower)) label = 'orderDate';
-    else if (/delivery|levering|lever\s*datum|aflever|bezorg/i.test(lower)) label = 'deliveryDate';
-    else if (/invoice\s*date|factuur\s*datum/i.test(lower)) label = 'invoiceDate';
-    else if (/vervaldatum|due\s*date|betaal\s*datum/i.test(lower)) label = 'dueDate';
+    if (/order\s*(?:date|datum)|besteldatum|bestelingsdatum|date\s*(?:de\s*)?commande/i.test(lower)) label = 'orderDate';
+    else if (/delivery|levering|lever\s*datum|aflever|bezorg|livraison|date\s*(?:de\s*)?livraison/i.test(lower)) label = 'deliveryDate';
+    else if (/invoice\s*date|factuur\s*datum|date\s*(?:de\s*)?facture/i.test(lower)) label = 'invoiceDate';
+    else if (/vervaldatum|due\s*date|betaal\s*datum|date\s*d'échéance|échéance/i.test(lower)) label = 'dueDate';
     
     results.push({ date: parsed, context: line.trim(), label });
   }
