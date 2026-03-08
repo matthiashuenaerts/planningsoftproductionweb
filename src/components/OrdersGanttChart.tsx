@@ -4,6 +4,7 @@ import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Calendar, GripVertical } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ProjectAssignmentDialog } from './ProjectAssignmentDialog';
@@ -70,7 +71,10 @@ const mapTeamToCategory = (teamName: string, placementTeams: any[]): string => {
 };
 
 const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React.ReactNode => {
+  const isMobile = useIsMobile();
   const { tenant } = useTenant();
+  const sideColWidth = isMobile ? '8rem' : '16rem';
+  const sideColClass = isMobile ? 'w-32' : 'w-64';
   const [teams, setTeams] = useState<PlacementTeam[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
@@ -762,35 +766,35 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   return (
     <div className={cn('flex flex-col bg-background h-full', className)}>
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b bg-card sticky top-0 z-20">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goToPreviousWeek}>
-              <ChevronLeft className="h-5 w-5" />
+      <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'} ${isMobile ? 'px-3 py-2' : 'px-6 py-4'} border-b bg-card sticky top-0 z-20`}>
+        <div className={`flex items-center ${isMobile ? 'justify-between' : 'gap-4'}`}>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className={isMobile ? 'h-8 w-8' : ''} onClick={goToPreviousWeek}>
+              <ChevronLeft className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} />
             </Button>
-            <div className="text-2xl font-semibold min-w-[250px] text-center">
+            <div className={`${isMobile ? 'text-sm' : 'text-2xl'} font-semibold ${isMobile ? 'min-w-[140px]' : 'min-w-[250px]'} text-center`}>
               {format(dateRange[0], 'd', { locale: nl })} - {format(dateRange[dateRange.length - 1], 'd MMM yyyy', { locale: nl })}
             </div>
-            <Button variant="ghost" size="icon" onClick={goToNextWeek}>
-              <ChevronRight className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className={isMobile ? 'h-8 w-8' : ''} onClick={goToNextWeek}>
+              <ChevronRight className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} />
             </Button>
           </div>
 
-          <Button variant="outline" size="sm" onClick={goToToday}>
-            <Calendar className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" className={isMobile ? 'h-7 text-xs px-2' : ''} onClick={goToToday}>
+            <Calendar className={`${isMobile ? 'h-3 w-3 mr-1' : 'h-4 w-4 mr-2'}`} />
             Vandaag
           </Button>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">{weeksToShow} weken</span>
+          <span className={`${isMobile ? 'text-xs' : 'text-sm'} text-muted-foreground`}>{weeksToShow} weken</span>
           <input
             type="range"
             min="1"
             max="8"
             value={weeksToShow}
             onChange={(e) => setWeeksToShow(Number(e.target.value))}
-            className="w-32"
+            className={isMobile ? 'w-20' : 'w-32'}
           />
         </div>
       </div>
@@ -800,12 +804,12 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
       <div className="sticky top-0 z-10 bg-background border-b relative">
         {/* Week headers */}
         <div className="flex border-b bg-primary">
-          <div className="w-64 flex-shrink-0" /> {/* Spacer for team names */}
+          <div className={`${sideColClass} flex-shrink-0`} /> {/* Spacer for team names */}
           {weekGroups.map((week) => (
             <div
               key={week.weekNumber}
               className="flex-shrink-0 px-2 py-2 text-xs font-semibold text-primary-foreground border-r border-primary-foreground/20"
-              style={{ width: `calc((100% - 16rem) * ${week.days.length / dateRange.length})` }}
+              style={{ width: `calc((100% - ${sideColWidth}) * ${week.days.length / dateRange.length})` }}
             >
               Week {week.weekNumber}
             </div>
@@ -814,7 +818,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
 
         {/* Day headers */}
         <div className="flex bg-accent">
-          <div className="w-64 flex-shrink-0" /> {/* Spacer for team names */}
+          <div className={`${sideColClass} flex-shrink-0`} /> {/* Spacer for team names */}
           {dateRange.map((date, idx) => {
             const isWeekStart = date.getDay() === 1;
             return (
@@ -824,7 +828,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                   'flex-shrink-0 text-center border-r border-accent-foreground/20',
                   isWeekStart && 'border-l-2 border-l-accent-foreground/40'
                 )}
-                style={{ width: `calc((100% - 16rem) / ${dateRange.length})` }}
+                style={{ width: `calc((100% - ${sideColWidth}) / ${dateRange.length})` }}
               >
                 <div className="text-xs font-medium text-accent-foreground py-1">
                   {format(date, 'd-MM', { locale: nl })}
@@ -841,7 +845,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         {todayPosition !== null && (
           <div
             className="absolute top-0 bg-destructive text-destructive-foreground text-[10px] px-2 py-0.5 rounded-b whitespace-nowrap z-20"
-            style={{ left: `calc(16rem + ${todayPosition}% - 20px)` }}
+            style={{ left: `calc(${sideColWidth} + ${todayPosition}% - 20px)` }}
           >
             Vandaag
           </div>
@@ -856,7 +860,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
             {todayPosition !== null && (
               <div
                 className="absolute top-0 bottom-0 w-0.5 bg-destructive z-10 pointer-events-none"
-                style={{ left: `calc(16rem + ${todayPosition}%)` }}
+                style={{ left: `calc(${sideColWidth} + ${todayPosition}%)` }}
               />
             )}
 
@@ -871,14 +875,14 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                     className="flex items-center cursor-pointer hover:bg-muted/50 sticky left-0 z-10 bg-card border-t transition-colors"
                     onClick={() => toggleTeam(team.id)}
                   >
-                    <div className="w-64 flex-shrink-0 px-4 py-3 font-medium flex items-center gap-2 border-r border-border">
+                    <div className={`${sideColClass} flex-shrink-0 ${isMobile ? 'px-2 py-2' : 'px-4 py-3'} font-medium flex items-center gap-2 border-r border-border`}>
                       <ChevronRight
                         className={cn(
                           'h-4 w-4 transition-transform text-muted-foreground',
                           !isCollapsed && 'rotate-90'
                         )}
                       />
-                      <span className="text-sm font-semibold text-foreground">{team.name}</span>
+                      <span className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold text-foreground`}>{team.name}</span>
                     </div>
                     <div className="flex-1" />
                   </div>
@@ -894,7 +898,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                       data-timeline
                     >
                       <div className="flex absolute inset-0">
-                        <div className="w-64 flex-shrink-0 border-r border-border bg-muted/30 py-2">
+                        <div className={`${sideColClass} flex-shrink-0 border-r border-border bg-muted/30 py-2`}>
                           {/* Team members in left column */}
                           {teamProjects.map((project, idx) => (
                             <div
@@ -906,7 +910,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                 height: '28px',
                                 display: 'flex',
                                 alignItems: 'center',
-                                width: '256px'
+                                width: isMobile ? '128px' : '256px'
                               }}
                             >
                               <div className="truncate">
@@ -949,7 +953,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                 isWeekStart && 'border-l-2 border-l-border',
                                 isToday && 'bg-accent/10'
                               )}
-                              style={{ width: `calc((100% - 16rem) / ${dateRange.length})` }}
+                              style={{ width: `calc((100% - ${sideColWidth}) / ${dateRange.length})` }}
                               onDrop={(e) => {
                                 e.preventDefault();
                                 handleDrop(team.id, date);
@@ -966,7 +970,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                       )}
 
                       {/* Project bars - positioned in calendar grid only */}
-                      <div className="absolute left-64 right-0 top-0 z-10 py-2 pointer-events-none">
+                      <div className={`absolute ${isMobile ? 'left-32' : 'left-64'} right-0 top-0 z-10 py-2 pointer-events-none`}>
                           {teamProjects.map((project, idx) => {
                             const position = getProjectPosition(project, team.name, team.id);
                             
