@@ -1416,17 +1416,17 @@ const ProjectDetails = () => {
                     </div>
                   </CardContent>
                 </Card>}
-            </div> : activeTab === 'orders' ? <Card>
-              <CardHeader>
+            </div> : activeTab === 'orders' ? <Card className="overflow-hidden">
+              <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
                 <div className="flex items-center justify-between">
-                  <CardTitle>{t('orders')}</CardTitle>
-                  <Button onClick={() => setShowNewOrderModal(true)} size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
+                  <CardTitle className="text-base sm:text-2xl">{t('orders')}</CardTitle>
+                  <Button onClick={() => setShowNewOrderModal(true)} size="sm" className="h-8 text-xs sm:text-sm">
+                    <Plus className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     {t('add_order')}
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
                 <div className="space-y-4">
                   {orders.length === 0 ? <div className="text-center py-8">
                       <p className="text-muted-foreground">{t('no_orders_found')}</p>
