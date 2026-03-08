@@ -1594,7 +1594,7 @@ const ProjectDetails = () => {
                     </div>}
                 </div>
               </CardContent>
-            </Card> : activeTab === 'accessories' ? <AccessoriesInlineView projectId={projectId!} /> : activeTab === 'costing' ? <ProjectCostingTab projectId={projectId!} /> : <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            </Card> : activeTab === 'accessories' ? <AccessoriesInlineView projectId={projectId!} /> : activeTab === 'costing' ? <ProjectCostingTab projectId={projectId!} /> : <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6">
               <Card className="lg:col-span-1">
                 <CardHeader className="py-[15px]">
                   <CardTitle>{t('project_summary')}</CardTitle>
