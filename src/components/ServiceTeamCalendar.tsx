@@ -195,7 +195,7 @@ const ServiceTeamCalendar: React.FC = () => {
           await supabase.from('chat_messages').insert({
             chat_room_id: assignProjectId,
             employee_id: empData.id,
-            message: `📋 Service visit scheduled for ${format(new Date(selectedDate + 'T12:00:00'), 'dd/MM/yyyy')} (${team?.name || 'Service'}):\n${notes}`,
+            message: `${t('svc_service_visit_chat', { date: format(new Date(selectedDate + 'T12:00:00'), 'dd/MM/yyyy'), team: team?.name || 'Service' })}\n${notes}`,
           } as any);
         }
       }
