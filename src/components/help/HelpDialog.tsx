@@ -12,10 +12,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, ArrowLeft, Play, ExternalLink, Tag, Plus, Edit, Trash2, Upload, Video, Image, Settings } from 'lucide-react';
+import { Search, ArrowLeft, Play, ExternalLink, Tag, Plus, Edit, Trash2, Upload, Video, Image, Settings, ChevronRight, BookOpen } from 'lucide-react';
 import { helpService, HelpCategory, HelpArticleWithCategory } from '@/services/helpService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface HelpDialogProps {
   open: boolean;
@@ -34,6 +35,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
   const [editingArticle, setEditingArticle] = useState<HelpArticleWithCategory | null>(null);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (open) {
@@ -253,7 +255,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
   };
 
   const renderCategories = () => (
-    <div className="space-y-4">
+    <div className={`space-y-${isMobile ? '3' : '4'}`}>
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -262,92 +264,144 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            className="pl-10"
+            className={`pl-10 ${isMobile ? 'h-10 text-sm' : ''}`}
           />
         </div>
-        <Button onClick={handleSearch} variant="outline">
+        <Button onClick={handleSearch} variant="outline" className={isMobile ? 'h-10 w-10 p-0' : ''}>
           <Search className="h-4 w-4" />
         </Button>
       </div>
 
-      <div className="grid gap-3">
-        {categories.map((category) => (
-          <Card
-            key={category.id}
-            className="cursor-pointer hover:bg-accent transition-colors"
-            onClick={() => handleCategorySelect(category)}
-          >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">{category.name}</CardTitle>
-              {category.description && (
-                <CardDescription className="text-sm">
-                  {category.description}
-                </CardDescription>
-              )}
-            </CardHeader>
-          </Card>
+      <div className={`grid gap-${isMobile ? '2' : '3'}`}>
+        {categories.map((category, index) => (
+          isMobile ? (
+            <div
+              key={category.id}
+              className="flex items-center gap-3 p-3.5 bg-card border border-border rounded-xl active:scale-[0.98] transition-all cursor-pointer"
+              onClick={() => handleCategorySelect(category)}
+            >
+              <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary/10 text-primary shrink-0">
+                <span className="text-xs font-bold">{String(index + 1).padStart(2, '0')}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm">{category.name}</p>
+                {category.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{category.description}</p>
+                )}
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            </div>
+          ) : (
+            <Card
+              key={category.id}
+              className="cursor-pointer hover:bg-accent transition-colors"
+              onClick={() => handleCategorySelect(category)}
+            >
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">{category.name}</CardTitle>
+                {category.description && (
+                  <CardDescription className="text-sm">
+                    {category.description}
+                  </CardDescription>
+                )}
+              </CardHeader>
+            </Card>
+          )
         ))}
       </div>
     </div>
   );
 
   const renderArticlesList = () => (
-    <div className="space-y-4">
+    <div className={`space-y-${isMobile ? '3' : '4'}`}>
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={handleBack}>
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
+        <Button variant="ghost" size="sm" onClick={handleBack} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+          <ArrowLeft className="h-4 w-4" />
+          {!isMobile && <span className="ml-1">Back</span>}
         </Button>
-        <h3 className="text-lg font-semibold">
+        <h3 className={`font-semibold truncate ${isMobile ? 'text-base' : 'text-lg'}`}>
           {selectedCategory ? selectedCategory.name : 'Search Results'}
         </h3>
       </div>
 
-      <div className="space-y-3">
+      <div className={`space-y-${isMobile ? '2' : '3'}`}>
         {articles.map((article) => (
-          <Card
-            key={article.id}
-            className="cursor-pointer hover:bg-accent transition-colors"
-            onClick={() => setSelectedArticle(article)}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <CardTitle className="text-base">{article.title}</CardTitle>
-                  {!selectedCategory && (
-                    <Badge variant="secondary" className="mt-1">
-                      {article.category.name}
-                    </Badge>
-                  )}
-                </div>
-                {article.video_url && (
-                  <Play className="h-4 w-4 text-muted-foreground" />
+          isMobile ? (
+            <div
+              key={article.id}
+              className="flex items-center gap-3 p-3.5 bg-card border border-border rounded-xl active:scale-[0.98] transition-all cursor-pointer"
+              onClick={() => setSelectedArticle(article)}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm line-clamp-2">{article.title}</p>
+                {!selectedCategory && (
+                  <Badge variant="secondary" className="mt-1 text-[10px] px-1.5 py-0 h-4">
+                    {article.category.name}
+                  </Badge>
                 )}
-              </div>
-              {article.tags.length > 0 && (
-                <div className="flex items-center gap-1 mt-2">
-                  <Tag className="h-3 w-3 text-muted-foreground" />
-                  <div className="flex gap-1">
-                    {article.tags.slice(0, 3).map((tag, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
+                {article.tags.length > 0 && (
+                  <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                    {article.tags.slice(0, 2).map((tag, index) => (
+                      <Badge key={index} variant="outline" className="text-[10px] px-1.5 py-0 h-4">
                         {tag}
                       </Badge>
                     ))}
-                    {article.tags.length > 3 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{article.tags.length - 3}
+                    {article.tags.length > 2 && (
+                      <span className="text-[10px] text-muted-foreground">+{article.tags.length - 2}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {article.video_url && <Play className="h-3.5 w-3.5 text-muted-foreground" />}
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+          ) : (
+            <Card
+              key={article.id}
+              className="cursor-pointer hover:bg-accent transition-colors"
+              onClick={() => setSelectedArticle(article)}
+            >
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="text-base">{article.title}</CardTitle>
+                    {!selectedCategory && (
+                      <Badge variant="secondary" className="mt-1">
+                        {article.category.name}
                       </Badge>
                     )}
                   </div>
+                  {article.video_url && (
+                    <Play className="h-4 w-4 text-muted-foreground" />
+                  )}
                 </div>
-              )}
-            </CardHeader>
-          </Card>
+                {article.tags.length > 0 && (
+                  <div className="flex items-center gap-1 mt-2">
+                    <Tag className="h-3 w-3 text-muted-foreground" />
+                    <div className="flex gap-1">
+                      {article.tags.slice(0, 3).map((tag, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                      {article.tags.length > 3 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{article.tags.length - 3}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardHeader>
+            </Card>
+          )
         ))}
       </div>
 
       {articles.length === 0 && !loading && (
-        <div className="text-center py-8 text-muted-foreground">
+        <div className={`text-center text-muted-foreground ${isMobile ? 'py-6 text-sm' : 'py-8'}`}>
           {searchQuery ? 'No articles found for your search.' : 'No articles in this category.'}
         </div>
       )}
@@ -358,20 +412,22 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
     if (!selectedArticle) return null;
 
     return (
-      <div className="space-y-4">
+      <div className={`space-y-${isMobile ? '3' : '4'}`}>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={handleBack}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
+          <Button variant="ghost" size="sm" onClick={handleBack} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+            <ArrowLeft className="h-4 w-4" />
+            {!isMobile && <span className="ml-1">Back</span>}
           </Button>
-          <Badge variant="secondary">{selectedArticle.category.name}</Badge>
+          <Badge variant="secondary" className={isMobile ? 'text-[10px] px-1.5 py-0 h-5' : ''}>
+            {selectedArticle.category.name}
+          </Badge>
         </div>
 
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold">{selectedArticle.title}</h2>
+        <div className={`space-y-${isMobile ? '3' : '4'}`}>
+          <h2 className={`font-bold ${isMobile ? 'text-lg leading-tight' : 'text-xl'}`}>{selectedArticle.title}</h2>
 
           {selectedArticle.video_url && (
-            <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+            <div className="aspect-video bg-muted rounded-xl overflow-hidden">
               <video
                 controls
                 className="w-full h-full"
@@ -384,16 +440,16 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
           )}
 
           {selectedArticle.image_url && !selectedArticle.video_url && (
-            <div className="rounded-lg overflow-hidden">
+            <div className="rounded-xl overflow-hidden">
               <img
                 src={selectedArticle.image_url}
                 alt={selectedArticle.title}
-                className="w-full max-h-64 object-cover"
+                className={`w-full object-cover ${isMobile ? 'max-h-48' : 'max-h-64'}`}
               />
             </div>
           )}
 
-          <div className="prose prose-sm max-w-none">
+          <div className={`prose prose-sm max-w-none ${isMobile ? 'text-sm leading-relaxed' : ''}`}>
             <div
               dangerouslySetInnerHTML={{
                 __html: DOMPurify.sanitize(
@@ -406,10 +462,10 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
 
           {selectedArticle.tags.length > 0 && (
             <div>
-              <h4 className="font-medium mb-2">Tags</h4>
+              <h4 className={`font-medium mb-2 ${isMobile ? 'text-sm' : ''}`}>Tags</h4>
               <div className="flex flex-wrap gap-1">
                 {selectedArticle.tags.map((tag, index) => (
-                  <Badge key={index} variant="outline">
+                  <Badge key={index} variant="outline" className={isMobile ? 'text-xs' : ''}>
                     {tag}
                   </Badge>
                 ))}
@@ -422,26 +478,27 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
   };
 
   const renderManagement = () => (
-    <div className="space-y-4">
+    <div className={`space-y-${isMobile ? '3' : '4'}`}>
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={handleBack}>
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
+        <Button variant="ghost" size="sm" onClick={handleBack} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+          <ArrowLeft className="h-4 w-4" />
+          {!isMobile && <span className="ml-1">Back</span>}
         </Button>
-        <h3 className="text-lg font-semibold">Help Management</h3>
+        <h3 className={`font-semibold ${isMobile ? 'text-base' : 'text-lg'}`}>Help Management</h3>
       </div>
 
-      <Tabs defaultValue="categories" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger value="articles">Articles</TabsTrigger>
+      <Tabs defaultValue="categories" className={`space-y-${isMobile ? '3' : '4'}`}>
+        <TabsList className={isMobile ? 'w-full' : ''}>
+          <TabsTrigger value="categories" className={isMobile ? 'flex-1 text-xs' : ''}>Categories</TabsTrigger>
+          <TabsTrigger value="articles" className={isMobile ? 'flex-1 text-xs' : ''}>Articles</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="categories" className="space-y-4">
-          <div className="flex justify-between items-center">
+        <TabsContent value="categories" className={`space-y-${isMobile ? '3' : '4'}`}>
+          <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'}`}>
             <h4 className="font-medium">Categories</h4>
             <Button
               size="sm"
+              className={isMobile ? 'w-full h-10' : ''}
               onClick={() => setEditingCategory({
                 id: '',
                 name: '',
@@ -458,33 +515,34 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
             </Button>
           </div>
 
-          <div className="space-y-2 max-h-48 overflow-y-auto">
+          <div className={`space-y-2 ${isMobile ? 'max-h-[40vh]' : 'max-h-48'} overflow-y-auto`}>
             {categories.map((category) => (
-              <Card key={category.id} className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h5 className="font-medium">{category.name}</h5>
-                    <p className="text-sm text-muted-foreground">{category.description}</p>
+              <div key={category.id} className={`bg-card border border-border rounded-xl ${isMobile ? 'p-3' : 'p-3'}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h5 className={`font-medium ${isMobile ? 'text-sm' : ''}`}>{category.name}</h5>
+                    <p className={`text-muted-foreground line-clamp-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>{category.description}</p>
                   </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => setEditingCategory(category)}>
-                      <Edit className="h-3 w-3" />
+                  <div className="flex gap-1 shrink-0">
+                    <Button variant="ghost" size="sm" onClick={() => setEditingCategory(category)} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+                      <Edit className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(category.id)}>
-                      <Trash2 className="h-3 w-3" />
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(category.id)} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>
-              </Card>
+              </div>
             ))}
           </div>
         </TabsContent>
 
-        <TabsContent value="articles" className="space-y-4">
-          <div className="flex justify-between items-center">
+        <TabsContent value="articles" className={`space-y-${isMobile ? '3' : '4'}`}>
+          <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'}`}>
             <h4 className="font-medium">Articles</h4>
             <Button
               size="sm"
+              className={isMobile ? 'w-full h-10' : ''}
               onClick={() => setEditingArticle({
                 id: '',
                 category_id: '',
@@ -507,24 +565,24 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
             </Button>
           </div>
 
-          <div className="space-y-2 max-h-48 overflow-y-auto">
+          <div className={`space-y-2 ${isMobile ? 'max-h-[40vh]' : 'max-h-48'} overflow-y-auto`}>
             {articles.map((article) => (
-              <Card key={article.id} className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h5 className="font-medium">{article.title}</h5>
-                    <p className="text-sm text-muted-foreground">{article.category.name}</p>
+              <div key={article.id} className={`bg-card border border-border rounded-xl ${isMobile ? 'p-3' : 'p-3'}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h5 className={`font-medium ${isMobile ? 'text-sm' : ''}`}>{article.title}</h5>
+                    <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>{article.category.name}</p>
                   </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => setEditingArticle(article)}>
-                      <Edit className="h-3 w-3" />
+                  <div className="flex gap-1 shrink-0">
+                    <Button variant="ghost" size="sm" onClick={() => setEditingArticle(article)} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+                      <Edit className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleDeleteArticle(article.id)}>
-                      <Trash2 className="h-3 w-3" />
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteArticle(article.id)} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>
-              </Card>
+              </div>
             ))}
           </div>
         </TabsContent>
@@ -533,42 +591,45 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
   );
 
   const renderCategoryForm = () => (
-    <div className="space-y-4">
+    <div className={`space-y-${isMobile ? '3' : '4'}`}>
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={handleBack}>
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
+        <Button variant="ghost" size="sm" onClick={handleBack} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+          <ArrowLeft className="h-4 w-4" />
+          {!isMobile && <span className="ml-1">Back</span>}
         </Button>
-        <h3 className="text-lg font-semibold">
+        <h3 className={`font-semibold ${isMobile ? 'text-base' : 'text-lg'}`}>
           {editingCategory?.id ? 'Edit Category' : 'Create Category'}
         </h3>
       </div>
 
-      <form onSubmit={handleCategorySubmit} className="space-y-4">
+      <form onSubmit={handleCategorySubmit} className={`space-y-${isMobile ? '3' : '4'}`}>
         <div>
-          <Label htmlFor="name">Name</Label>
+          <Label htmlFor="name" className={isMobile ? 'text-sm' : ''}>Name</Label>
           <Input
             id="name"
             name="name"
             defaultValue={editingCategory?.name}
             required
+            className={isMobile ? 'h-10 text-sm mt-1' : ''}
           />
         </div>
         <div>
-          <Label htmlFor="description">Description</Label>
+          <Label htmlFor="description" className={isMobile ? 'text-sm' : ''}>Description</Label>
           <Textarea
             id="description"
             name="description"
             defaultValue={editingCategory?.description}
+            className={isMobile ? 'text-sm mt-1' : ''}
           />
         </div>
         <div>
-          <Label htmlFor="display_order">Display Order</Label>
+          <Label htmlFor="display_order" className={isMobile ? 'text-sm' : ''}>Display Order</Label>
           <Input
             id="display_order"
             name="display_order"
             type="number"
             defaultValue={editingCategory?.display_order || 0}
+            className={isMobile ? 'h-10 text-sm mt-1' : ''}
           />
         </div>
         <div className="flex items-center space-x-2">
@@ -577,13 +638,13 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
             name="is_active"
             defaultChecked={editingCategory?.is_active ?? true}
           />
-          <Label htmlFor="is_active">Active</Label>
+          <Label htmlFor="is_active" className={isMobile ? 'text-sm' : ''}>Active</Label>
         </div>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={handleBack}>
+        <div className={`flex gap-2 ${isMobile ? 'flex-col pt-2' : 'justify-end'}`}>
+          <Button type="button" variant="outline" onClick={handleBack} className={isMobile ? 'w-full h-10' : ''}>
             Cancel
           </Button>
-          <Button type="submit">
+          <Button type="submit" className={isMobile ? 'w-full h-10' : ''}>
             {editingCategory?.id ? 'Update' : 'Create'}
           </Button>
         </div>
@@ -615,22 +676,22 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
     };
 
     return (
-      <div className="space-y-4">
+      <div className={`space-y-${isMobile ? '3' : '4'}`}>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={handleBack}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
+          <Button variant="ghost" size="sm" onClick={handleBack} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+            <ArrowLeft className="h-4 w-4" />
+            {!isMobile && <span className="ml-1">Back</span>}
           </Button>
-          <h3 className="text-lg font-semibold">
+          <h3 className={`font-semibold ${isMobile ? 'text-base' : 'text-lg'}`}>
             {editingArticle?.id ? 'Edit Article' : 'Create Article'}
           </h3>
         </div>
 
-        <form onSubmit={handleArticleSubmit} className="space-y-4">
+        <form onSubmit={handleArticleSubmit} className={`space-y-${isMobile ? '3' : '4'}`}>
           <div>
-            <Label htmlFor="category_id">Category</Label>
+            <Label htmlFor="category_id" className={isMobile ? 'text-sm' : ''}>Category</Label>
             <Select name="category_id" defaultValue={editingArticle?.category_id} required>
-              <SelectTrigger>
+              <SelectTrigger className={isMobile ? 'h-10 text-sm mt-1' : ''}>
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
@@ -643,34 +704,37 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
             </Select>
           </div>
           <div>
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="title" className={isMobile ? 'text-sm' : ''}>Title</Label>
             <Input
               id="title"
               name="title"
               defaultValue={editingArticle?.title}
               required
+              className={isMobile ? 'h-10 text-sm mt-1' : ''}
             />
           </div>
           <div>
-            <Label htmlFor="content">Content (Instructions)</Label>
+            <Label htmlFor="content" className={isMobile ? 'text-sm' : ''}>Content (Instructions)</Label>
             <Textarea
               id="content"
               name="content"
               defaultValue={editingArticle?.content}
-              rows={6}
+              rows={isMobile ? 4 : 6}
               placeholder="Write detailed instructions here..."
               required
+              className={isMobile ? 'text-sm mt-1' : ''}
             />
           </div>
           <div>
-            <Label>Video</Label>
-            <div className="flex gap-2">
+            <Label className={isMobile ? 'text-sm' : ''}>Video</Label>
+            <div className={`${isMobile ? 'flex flex-col gap-2 mt-1' : 'flex gap-2'}`}>
               <Input
                 id="video_url"
                 name="video_url"
                 type="url"
                 defaultValue={editingArticle?.video_url}
                 placeholder="Video URL or upload below"
+                className={isMobile ? 'h-10 text-sm' : ''}
               />
               <div>
                 <input
@@ -683,6 +747,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
                 <Button
                   type="button"
                   variant="outline"
+                  className={isMobile ? 'w-full h-10 text-sm' : ''}
                   onClick={() => document.getElementById('video-upload')?.click()}
                 >
                   <Upload className="h-4 w-4 mr-1" />
@@ -692,14 +757,15 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
             </div>
           </div>
           <div>
-            <Label>Image</Label>
-            <div className="flex gap-2">
+            <Label className={isMobile ? 'text-sm' : ''}>Image</Label>
+            <div className={`${isMobile ? 'flex flex-col gap-2 mt-1' : 'flex gap-2'}`}>
               <Input
                 id="image_url"
                 name="image_url"
                 type="url"
                 defaultValue={editingArticle?.image_url}
                 placeholder="Image URL or upload below"
+                className={isMobile ? 'h-10 text-sm' : ''}
               />
               <div>
                 <input
@@ -712,6 +778,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
                 <Button
                   type="button"
                   variant="outline"
+                  className={isMobile ? 'w-full h-10 text-sm' : ''}
                   onClick={() => document.getElementById('image-upload')?.click()}
                 >
                   <Upload className="h-4 w-4 mr-1" />
@@ -721,21 +788,23 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
             </div>
           </div>
           <div>
-            <Label htmlFor="tags">Tags (comma-separated)</Label>
+            <Label htmlFor="tags" className={isMobile ? 'text-sm' : ''}>Tags (comma-separated)</Label>
             <Input
               id="tags"
               name="tags"
               defaultValue={editingArticle?.tags.join(', ')}
               placeholder="tag1, tag2, tag3"
+              className={isMobile ? 'h-10 text-sm mt-1' : ''}
             />
           </div>
           <div>
-            <Label htmlFor="display_order">Display Order</Label>
+            <Label htmlFor="display_order" className={isMobile ? 'text-sm' : ''}>Display Order</Label>
             <Input
               id="display_order"
               name="display_order"
               type="number"
               defaultValue={editingArticle?.display_order || 0}
+              className={isMobile ? 'h-10 text-sm mt-1' : ''}
             />
           </div>
           <div className="flex items-center space-x-2">
@@ -744,13 +813,13 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
               name="is_published"
               defaultChecked={editingArticle?.is_published ?? true}
             />
-            <Label htmlFor="is_published">Published</Label>
+            <Label htmlFor="is_published" className={isMobile ? 'text-sm' : ''}>Published</Label>
           </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={handleBack}>
+          <div className={`flex gap-2 ${isMobile ? 'flex-col pt-2' : 'justify-end'}`}>
+            <Button type="button" variant="outline" onClick={handleBack} className={isMobile ? 'w-full h-10' : ''}>
               Cancel
             </Button>
-            <Button type="submit">
+            <Button type="submit" className={isMobile ? 'w-full h-10' : ''}>
               {editingArticle?.id ? 'Update' : 'Create'}
             </Button>
           </div>
@@ -759,43 +828,51 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
     );
   };
 
+  const dialogClass = isMobile
+    ? 'max-w-[calc(100vw-1.5rem)] w-[calc(100vw-1.5rem)] p-4 max-h-[90vh] overflow-hidden flex flex-col'
+    : 'max-w-4xl max-h-[80vh]';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh]">
+      <DialogContent className={dialogClass}>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className={`flex items-center gap-2 ${isMobile ? 'text-base' : ''}`}>
+            <BookOpen className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} />
             Help & Documentation
             {currentEmployee?.role === 'admin' && !managementMode && !editingCategory && !editingArticle && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleManageClick}
+                className={isMobile ? 'h-7 text-xs px-2 ml-auto' : ''}
               >
-                <Settings className="h-4 w-4 mr-1" />
+                <Settings className="h-3.5 w-3.5 mr-1" />
                 Manage
               </Button>
             )}
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[60vh]">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : editingCategory ? (
-            renderCategoryForm()
-          ) : editingArticle ? (
-            renderArticleForm()
-          ) : managementMode ? (
-            renderManagement()
-          ) : selectedArticle ? (
-            renderArticleDetail()
-          ) : selectedCategory || searchQuery ? (
-            renderArticlesList()
-          ) : (
-            renderCategories()
-          )}
+        <ScrollArea className={isMobile ? 'flex-1 min-h-0' : 'max-h-[60vh]'}>
+          <div className={isMobile ? 'pr-1' : ''}>
+            {loading ? (
+              <div className={`flex items-center justify-center ${isMobile ? 'py-6' : 'py-8'}`}>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : editingCategory ? (
+              renderCategoryForm()
+            ) : editingArticle ? (
+              renderArticleForm()
+            ) : managementMode ? (
+              renderManagement()
+            ) : selectedArticle ? (
+              renderArticleDetail()
+            ) : selectedCategory || searchQuery ? (
+              renderArticlesList()
+            ) : (
+              renderCategories()
+            )}
+          </div>
         </ScrollArea>
       </DialogContent>
     </Dialog>
