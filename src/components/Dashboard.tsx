@@ -42,6 +42,18 @@ interface LoadingAssignment {
     name: string;
   };
 }
+
+interface ServiceAssignment {
+  id: string;
+  project_id: string;
+  project_name: string;
+  team_name: string;
+  team_color: string;
+  start_date: string;
+  service_hours: number | null;
+  service_notes: string | null;
+}
+
 const Dashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
