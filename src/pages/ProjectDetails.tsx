@@ -1789,7 +1789,7 @@ const ProjectDetails = () => {
                 </CardHeader>
                 <CardContent className="px-3 sm:px-5">
                   <Tabs defaultValue="todo">
-                    <TabsList className="mb-3 sm:mb-4 w-full sm:w-auto">
+                    <TabsList className="mb-3 sm:mb-4 w-full sm:w-auto rounded-xl bg-muted/60 p-1">
                       <TabsTrigger value="todo" className="text-xs sm:text-sm flex-1 sm:flex-initial">{t('open_tasks_tab', {
                       count: openTasks.length.toString()
                     })}</TabsTrigger>
