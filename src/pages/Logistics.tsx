@@ -349,6 +349,12 @@ const Logistics = () => {
           onClose={() => setIsScannerOpen(false)}
           onEanDetected={handleEanDetected}
         />
+
+        <BatchReceiptsScanner
+          isOpen={isBatchOpen}
+          onClose={() => setIsBatchOpen(false)}
+          onReceiptsConfirmed={handleDeliveryConfirmed}
+        />
       </div>
     </div>
   );
