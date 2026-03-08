@@ -55,6 +55,7 @@ interface OneDriveTokens {
 const TOKENS_STORAGE_KEY = 'onedrive_tokens';
 
 const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, projectName }) => {
+  const { tenant } = useTenant();
   const [config, setConfig] = useState<ProjectOneDriveConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -67,7 +68,24 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderStack, setFolderStack] = useState<{ id: string; name: string }[]>([]);
+  const [tenantClientId, setTenantClientId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Fetch tenant-specific Microsoft Client ID
+  useEffect(() => {
+    if (!tenant?.id) return;
+    const fetchClientId = async () => {
+      const { data } = await supabase
+        .from('tenant_onedrive_settings' as any)
+        .select('microsoft_client_id')
+        .eq('tenant_id', tenant.id)
+        .maybeSingle();
+      if (data) {
+        setTenantClientId((data as any).microsoft_client_id);
+      }
+    };
+    fetchClientId();
+  }, [tenant?.id]);
 
   // Check for stored tokens
   useEffect(() => {
