@@ -443,7 +443,7 @@ const BrokenPartForm = () => {
             )}
           </div>
 
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <Button type="submit" className="w-full text-sm" size="sm" disabled={isSubmitting}>
             {isSubmitting ? "Submitting..." : "Report Broken Part"}
           </Button>
         </form>
