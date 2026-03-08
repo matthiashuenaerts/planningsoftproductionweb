@@ -549,17 +549,21 @@ const Floorplan: React.FC = () => {
                       e.preventDefault();
                       e.stopPropagation();
                       
+                      let lastBufX = 0, lastBufY = 0;
                       const handleMouseMove = (moveE: MouseEvent) => {
                         if (!imageRef.current) return;
                         const rect = imageRef.current.getBoundingClientRect();
-                        const x = Math.max(0, Math.min(100, ((moveE.clientX - rect.left) / rect.width) * 100));
-                        const y = Math.max(0, Math.min(100, ((moveE.clientY - rect.top) / rect.height) * 100));
-                        handleBufferPositionChange(ws.id, x, y);
+                        lastBufX = Math.max(0, Math.min(100, ((moveE.clientX - rect.left) / rect.width) * 100));
+                        lastBufY = Math.max(0, Math.min(100, ((moveE.clientY - rect.top) / rect.height) * 100));
+                        handleBufferPositionChange(ws.id, lastBufX, lastBufY);
                       };
                       
                       const handleMouseUp = () => {
                         document.removeEventListener('mousemove', handleMouseMove);
                         document.removeEventListener('mouseup', handleMouseUp);
+                        if (lastBufX && lastBufY) {
+                          saveBufferPosition(ws.id, lastBufX, lastBufY);
+                        }
                       };
                       
                       document.addEventListener('mousemove', handleMouseMove);
