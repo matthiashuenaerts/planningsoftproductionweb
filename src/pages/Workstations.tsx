@@ -477,30 +477,34 @@ const Workstations: React.FC = () => {
       />
 
       <Dialog open={!!showErrorDialog} onOpenChange={() => setShowErrorDialog(null)}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] w-[95vw] p-3 sm:p-6">
           <DialogHeader>
-            <DialogTitle>Foutmelding Toevoegen</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="flex items-center gap-2 text-sm sm:text-lg leading-tight">
+              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 shrink-0 text-destructive" />
+              Foutmelding Toevoegen
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
               Maak een nieuwe foutmelding aan voor {workstations.find(ws => ws.id === showErrorDialog)?.name}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="errorMessage">Foutmelding *</Label>
+          <div className="space-y-3 sm:space-y-4 py-2 sm:py-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="errorMessage" className="text-xs sm:text-sm">Foutmelding *</Label>
               <Input
                 id="errorMessage"
                 value={newErrorMessage}
                 onChange={(e) => setNewErrorMessage(e.target.value)}
                 placeholder="Beschrijf de fout..."
+                className="text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="errorType">Type</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="errorType" className="text-xs sm:text-sm">Type</Label>
               <select
                 id="errorType"
                 value={newErrorType}
                 onChange={(e) => setNewErrorType(e.target.value)}
-                className="w-full p-2 rounded-md border border-input bg-background"
+                className="w-full p-2 text-sm rounded-md border border-input bg-background"
               >
                 <option value="general">Algemeen</option>
                 <option value="mechanical">Mechanisch</option>
@@ -509,35 +513,38 @@ const Workstations: React.FC = () => {
                 <option value="material">Materiaal</option>
               </select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="errorNotes">Notities (optioneel)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="errorNotes" className="text-xs sm:text-sm">Notities (optioneel)</Label>
               <Textarea
                 id="errorNotes"
                 value={newErrorNotes}
                 onChange={(e) => setNewErrorNotes(e.target.value)}
                 placeholder="Extra informatie..."
                 rows={3}
+                className="text-sm"
               />
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button 
               onClick={handleCreateError} 
-              className="flex-1"
+              className="flex-1 text-xs sm:text-sm"
+              size="sm"
               disabled={!newErrorMessage.trim()}
             >
-              <AlertTriangle className="mr-2 h-4 w-4" />
+              <AlertTriangle className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
               Foutmelding Aanmaken
             </Button>
             <Button 
               variant="outline" 
+              size="sm"
               onClick={() => {
                 setShowErrorDialog(null);
                 setNewErrorMessage('');
                 setNewErrorType('general');
                 setNewErrorNotes('');
               }} 
-              className="flex-1"
+              className="flex-1 text-xs sm:text-sm"
             >
               Annuleren
             </Button>
