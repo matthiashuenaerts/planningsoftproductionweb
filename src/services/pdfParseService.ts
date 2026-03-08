@@ -486,8 +486,8 @@ function extractOrderNumber(text: string): string | undefined {
 
 function extractInvoiceNumber(text: string): string | undefined {
   const patterns = [
-    /(?:invoice\s*(?:no|nr|number|nummer)|factuur\s*(?:no|nr|nummer)|factuurnummer)[:\s#]*([A-Z0-9\-\/]+)/gi,
-    /(?:bill\s*(?:no|nr))[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:invoice\s*(?:no|nr|number|nummer)|factuur\s*(?:no|nr|nummer)|factuurnummer|facture\s*(?:n°|no|nr)|n°\s*(?:de\s*)?facture)[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:bill\s*(?:no|nr)|bon\s*(?:de\s*)?commande)[:\s#]*([A-Z0-9\-\/]+)/gi,
   ];
   for (const p of patterns) {
     p.lastIndex = 0;
