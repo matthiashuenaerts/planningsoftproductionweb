@@ -1061,17 +1061,17 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                       onClick={() => toggleEmployee(emp.employeeId)}
                       className="w-full"
                     >
-                      <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
-                        <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-between p-2.5 sm:p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                           {expandedEmployees.has(emp.employeeId) ? (
-                            <ChevronDown className="h-4 w-4" />
+                            <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                           ) : (
-                            <ChevronRight className="h-4 w-4" />
+                            <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                           )}
-                          <span className="font-medium">{emp.employeeName}</span>
-                          <Badge variant="secondary">{emp.taskCount} {t('tasks')}</Badge>
+                          <span className="font-medium text-xs sm:text-sm truncate">{emp.employeeName}</span>
+                          <Badge variant="secondary" className="text-[10px] sm:text-xs flex-shrink-0">{emp.taskCount} {t('tasks')}</Badge>
                         </div>
-                        <div className="flex items-center gap-6 text-sm">
+                        <div className="flex items-center gap-3 sm:gap-6 text-[10px] sm:text-sm flex-shrink-0">
                           <span className="text-muted-foreground">{formatTime(emp.totalMinutes)}</span>
                           <span className="font-medium">{formatCurrency(emp.totalCost)}</span>
                         </div>
