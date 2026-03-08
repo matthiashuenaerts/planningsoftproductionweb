@@ -721,7 +721,7 @@ const PersonalTasks = () => {
                 <div className="flex items-center gap-2 text-orange-800">
                   <Calendar className="h-4 w-4" />
                   <span className="text-sm font-medium">
-                    You are viewing the planning for {format(selectedDate, 'EEEE, MMMM dd, yyyy')}
+                    {(t('pt_viewing_planning_for') || 'You are viewing the planning for {{date}}').replace('{{date}}', format(selectedDate, 'EEEE, MMMM dd, yyyy'))}
                   </span>
                 </div>
               </CardContent>
