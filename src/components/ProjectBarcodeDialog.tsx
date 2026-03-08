@@ -74,44 +74,44 @@ export const ProjectBarcodeDialog: React.FC<ProjectBarcodeDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl w-[95vw] p-3 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <BarcodeIcon className="h-5 w-5" />
+          <DialogTitle className="flex items-center gap-2 text-sm sm:text-lg leading-tight break-words">
+            <BarcodeIcon className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
             Project Barcode - {projectName}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Barcode</CardTitle>
+            <CardHeader className="px-3 py-2 sm:px-6 sm:py-4">
+              <CardTitle className="text-base sm:text-lg">Barcode</CardTitle>
             </CardHeader>
-            <CardContent className="text-center">
-              <div ref={barcodeContainerRef} className="border border-gray-200 rounded mx-auto inline-block p-4 bg-white">
+            <CardContent className="text-center px-2 sm:px-6">
+              <div ref={barcodeContainerRef} className="border border-gray-200 rounded mx-auto inline-block p-2 sm:p-4 bg-white overflow-x-auto max-w-full">
                 <Barcode
                   value={barcodeData}
                   format="CODE39"
                   renderer="canvas"
-                  width={2}
-                  height={60}
+                  width={1.5}
+                  height={50}
                   displayValue={true}
                   font="monospace"
-                  fontSize={16}
+                  fontSize={12}
                   textAlign="center"
                   textMargin={2}
-                  margin={10}
+                  margin={6}
                   background="#ffffff"
                   lineColor="#000000"
                 />
               </div>
-              <div className="mt-4 flex gap-2 justify-center">
-                <Button onClick={handleCopyData} variant="outline">
-                  <Copy className="h-4 w-4 mr-2" />
+              <div className="mt-3 sm:mt-4 flex gap-2 justify-center flex-wrap">
+                <Button onClick={handleCopyData} variant="outline" size="sm" className="text-xs sm:text-sm">
+                  <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
                   Kopieer Data
                 </Button>
-                <Button onClick={handleDownload}>
-                  <Download className="h-4 w-4 mr-2" />
+                <Button onClick={handleDownload} size="sm" className="text-xs sm:text-sm">
+                  <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
                   Download PNG
                 </Button>
               </div>
