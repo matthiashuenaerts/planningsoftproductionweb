@@ -944,8 +944,8 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
               />
 
               {/* Address Fields */}
-              <div className="border rounded-md p-3 space-y-3">
-                <Label className="text-sm font-medium">Project Address</Label>
+              <div className={cn("border rounded-lg space-y-2", isMobile ? "p-2.5" : "p-3 space-y-3")}>
+                <Label className="text-xs sm:text-sm font-medium">Project Address</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <FormField
                     control={form.control}
@@ -953,7 +953,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="Street" {...field} />
+                          <Input placeholder="Street" className={cn(isMobile && "h-9 text-sm")} {...field} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -964,7 +964,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="Number" {...field} />
+                          <Input placeholder="Number" className={cn(isMobile && "h-9 text-sm")} {...field} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -975,7 +975,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="Postal Code" {...field} />
+                          <Input placeholder="Postal Code" className={cn(isMobile && "h-9 text-sm")} {...field} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -986,7 +986,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="City" {...field} />
+                          <Input placeholder="City" className={cn(isMobile && "h-9 text-sm")} {...field} />
                         </FormControl>
                       </FormItem>
                     )}
