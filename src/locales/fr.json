@@ -1430,5 +1430,31 @@
   "br_no_pending": "Aucune réception en attente à confirmer",
   "br_article_received": "Article reçu pour la commande de {{supplier}}",
   "br_scan_barcode": "Scanner le code-barres",
-  "br_pending": "En attente"
+  "br_pending": "En attente",
+
+  "ud_upcoming_deliveries_title": "Livraisons à venir ({{count}})",
+  "ud_no_upcoming": "Aucune livraison à venir",
+  "ud_no_upcoming_desc": "Aucune commande prévue pour une livraison future.",
+  "ud_planned": "Planifié",
+  "ud_to_plan": "À planifier",
+
+  "td_todays_deliveries_title": "Livraisons du jour ({{count}})",
+  "td_no_deliveries": "Aucune livraison aujourd'hui",
+  "td_no_deliveries_desc": "Aucune commande attendue pour livraison aujourd'hui.",
+
+  "lo_order_from": "Commande de {{supplier}}",
+  "lo_project": "Projet",
+  "lo_order_date": "Date de commande",
+  "lo_expected_delivery": "Livraison prévue",
+  "lo_show_items": "Afficher les articles",
+  "lo_hide_items": "Masquer les articles",
+  "lo_confirm_delivery": "Confirmer la livraison",
+  "lo_loading_items": "Chargement des articles...",
+  "lo_no_items": "Aucun article trouvé pour cette commande.",
+  "lo_description": "Description",
+  "lo_ordered": "Commandé",
+  "lo_delivered": "Livré",
+  "lo_article_code": "Code article",
+  "lo_ean": "EAN",
+  "lo_location": "Emplacement"
 }
