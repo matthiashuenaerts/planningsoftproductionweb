@@ -1006,16 +1006,16 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
 
       {/* Labor Breakdown */}
       <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center flex-wrap gap-4">
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
+        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-4">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
               {t('costing_labor_breakdown')}
             </CardTitle>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Marge:</span>
-                <div className="relative w-20">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="text-xs sm:text-sm text-muted-foreground">Marge:</span>
+                <div className="relative w-16 sm:w-20">
                   <Input
                     type="number"
                     min="0"
@@ -1023,33 +1023,35 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     step="1"
                     value={margins.labor}
                     onChange={(e) => setMargins(prev => ({ ...prev, labor: parseFloat(e.target.value) || 0 }))}
-                    className="h-8 pr-6 text-right text-sm"
+                    className="h-7 sm:h-8 pr-5 sm:pr-6 text-right text-xs sm:text-sm"
                   />
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                  <span className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs sm:text-sm">%</span>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1 sm:gap-2">
                 <Button 
                   variant={viewMode === 'employee' ? 'default' : 'outline'} 
                   size="sm"
                   onClick={() => setViewMode('employee')}
+                  className="h-7 sm:h-8 text-[10px] sm:text-sm px-2 sm:px-3"
                 >
-                  <Users className="h-4 w-4 mr-1" />
+                  <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
                   {t('costing_by_employee')}
                 </Button>
                 <Button 
                   variant={viewMode === 'task' ? 'default' : 'outline'} 
                   size="sm"
                   onClick={() => setViewMode('task')}
+                  className="h-7 sm:h-8 text-[10px] sm:text-sm px-2 sm:px-3"
                 >
-                  <FileText className="h-4 w-4 mr-1" />
+                  <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
                   {t('costing_by_task')}
                 </Button>
               </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
           {viewMode === 'employee' ? (
             costingSummary.employeeCosts.length > 0 ? (
               <div className="space-y-2">
