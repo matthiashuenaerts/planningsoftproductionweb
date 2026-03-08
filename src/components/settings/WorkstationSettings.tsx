@@ -238,8 +238,8 @@ const WorkstationSettings: React.FC = () => {
         contentType: uploadFile.type,
       });
       if (uploadError) throw uploadError;
-      const { data: pub } = supabase.storage.from('product-images').getPublicUrl(path);
-      await workstationService.update(selectedWorkstation.id, { image_path: pub.publicUrl });
+      // Store path, not full URL - signed URLs will be generated when displaying
+      await workstationService.update(selectedWorkstation.id, { image_path: path });
       toast({ title: 'Success', description: 'Image uploaded successfully' });
       setShowImageDialog(false);
       setUploadFile(null);
