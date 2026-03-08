@@ -207,7 +207,7 @@ const ServiceTeamCalendar: React.FC = () => {
       setAssignProjectId('');
       loadData();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('svc_error'), description: error.message, variant: 'destructive' });
     }
   };
 
