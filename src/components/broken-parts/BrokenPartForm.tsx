@@ -387,35 +387,38 @@ const BrokenPartForm = () => {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Image</Label>
-            <div className="flex gap-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs sm:text-sm">Image</Label>
+            <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={startCamera}
-                className="flex items-center gap-2"
+                className="flex items-center gap-1.5 text-xs sm:text-sm"
               >
-                <Camera className="h-4 w-4" />
+                <Camera className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 Take Photo
               </Button>
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2"
+                className="flex items-center gap-1.5 text-xs sm:text-sm"
               >
-                <Image className="h-4 w-4" />
+                <Image className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 Choose File
               </Button>
               {(imagePreview || selectedImage) && (
                 <Button
                   type="button"
                   variant="outline"
+                  size="sm"
                   onClick={clearImage}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-1.5 text-xs sm:text-sm"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   Clear
                 </Button>
               )}
