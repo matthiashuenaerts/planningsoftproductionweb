@@ -355,16 +355,16 @@ const BrokenPartsList: React.FC = () => {
       </Card>
 
       <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-3xl w-[95vw] p-3 sm:p-6">
           <DialogHeader>
-            <DialogTitle>{t('broken_part_image') || 'Broken Part Image'}</DialogTitle>
+            <DialogTitle className="text-sm sm:text-lg">{t('broken_part_image') || 'Broken Part Image'}</DialogTitle>
           </DialogHeader>
           {selectedImage && (
-            <div className="overflow-hidden">
+            <div className="overflow-hidden rounded-md">
               <img 
                 src={selectedImage} 
                 alt={t('broken_parts') || 'Broken part full view'}
-                className="w-full object-contain max-h-[80vh]"
+                className="w-full object-contain max-h-[75vh]"
               />
             </div>
           )}
