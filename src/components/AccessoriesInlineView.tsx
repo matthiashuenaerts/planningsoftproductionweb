@@ -836,21 +836,21 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
             <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">
+                  <TableHead className="w-10">
                     <Checkbox
                       checked={selectedAccessories.length > 0 && selectedAccessories.length === filteredAccessories.filter(acc => acc.status === 'to_order' && !acc.order_id).length}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
-                  <TableHead>Article</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Qty</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Order</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="w-[25%] min-w-[120px]">Article</TableHead>
+                  <TableHead className="w-[12%] min-w-[80px]">Code</TableHead>
+                  <TableHead className="w-[5%] min-w-[40px]">Qty</TableHead>
+                  <TableHead className="w-[10%] min-w-[70px]">Supplier</TableHead>
+                  <TableHead className="w-[8%] min-w-[60px]">Location</TableHead>
+                  <TableHead className="w-[10%] min-w-[70px]">Status</TableHead>
+                  <TableHead className="w-[10%] min-w-[70px]">Order</TableHead>
+                  <TableHead className="w-[8%] min-w-[60px]">Created</TableHead>
+                  <TableHead className="w-[8%] min-w-[60px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
