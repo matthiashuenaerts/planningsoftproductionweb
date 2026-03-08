@@ -75,28 +75,28 @@ const MobileOrderCard = ({
   const navigate = useNavigate();
 
   return (
-    <div className="border rounded-lg bg-card overflow-hidden">
-      <div className="p-4 cursor-pointer" onClick={onToggle}>
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex-1 min-w-0 mr-2">
-            <p className="font-semibold text-sm truncate">{order.project_name}</p>
-            <p className="text-xs text-muted-foreground truncate">{order.supplier}</p>
+    <div className="border rounded-lg bg-card overflow-hidden shadow-sm">
+      <div className="p-3 cursor-pointer active:bg-muted/30 transition-colors" onClick={onToggle}>
+        <div className="flex items-start justify-between gap-2 mb-1.5">
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-[13px] truncate leading-tight">{order.project_name}</p>
+            <p className="text-[11px] text-muted-foreground truncate mt-0.5">{order.supplier}</p>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {getStatusBadge(order.status)}
-            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
           </div>
         </div>
-        <div className="flex gap-4 text-xs text-muted-foreground">
+        <div className="flex gap-3 text-[10px] text-muted-foreground">
           <span>{t('ord_ordered')}: {formatDate(order.order_date)}</span>
           <span>{t('ord_due')}: {formatDate(order.expected_delivery)}</span>
         </div>
       </div>
 
-      <div className="flex border-t divide-x">
+      <div className="flex border-t divide-x bg-muted/20">
         {order.status === 'pending' && (
           <button
-            className="flex-1 py-2 text-xs text-green-600 hover:bg-muted/50 flex items-center justify-center gap-1"
+            className="flex-1 py-2 text-[11px] text-green-600 hover:bg-muted/50 active:bg-muted flex items-center justify-center gap-1 font-medium"
             onClick={(e) => { e.stopPropagation(); onConfirmDelivery(order); }}
           >
             <Camera className="h-3 w-3" /> {t('ord_confirm')}
@@ -104,14 +104,14 @@ const MobileOrderCard = ({
         )}
         {order.project_id && (
           <button
-            className="flex-1 py-2 text-xs text-primary hover:bg-muted/50 flex items-center justify-center gap-1"
+            className="flex-1 py-2 text-[11px] text-primary hover:bg-muted/50 active:bg-muted flex items-center justify-center gap-1 font-medium"
             onClick={(e) => { e.stopPropagation(); onViewProjectOrders(order.project_id); }}
           >
             <FileText className="h-3 w-3" /> {t('ord_project')}
           </button>
         )}
         <button
-          className="flex-1 py-2 text-xs text-primary hover:bg-muted/50 flex items-center justify-center gap-1"
+          className="flex-1 py-2 text-[11px] text-primary hover:bg-muted/50 active:bg-muted flex items-center justify-center gap-1 font-medium"
           onClick={(e) => { e.stopPropagation(); navigate(createLocalizedPath(`/projects/${order.project_id}`)); }}
         >
           <ExternalLink className="h-3 w-3" /> {t('ord_details')}
@@ -121,7 +121,7 @@ const MobileOrderCard = ({
             <select
               value={order.status}
               onChange={(e) => { e.stopPropagation(); onUpdateStatus(order.id, e.target.value); }}
-              className="text-xs border-0 bg-transparent w-full text-center py-2"
+              className="text-[11px] border-0 bg-transparent w-full text-center py-2 font-medium"
             >
               <option value="pending">{t('ord_pending')}</option>
               <option value="delivered">{t('ord_delivered')}</option>
@@ -387,33 +387,35 @@ const Orders: React.FC = () => {
       {isMobile && <Navbar />}
       <div className={`w-full ${isMobile ? 'p-3 pt-16' : 'p-6 ml-64'} overflow-x-hidden`}>
         <div className="w-full max-w-full">
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-3">
-            <h1 className="text-xl md:text-2xl font-bold">{t('ord_all_orders')}</h1>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative">
+          <div className={`flex flex-col gap-2 mb-4 ${isMobile ? '' : 'md:flex-row md:items-center md:justify-between md:gap-3'}`}>
+            <h1 className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{t('ord_all_orders')}</h1>
+            <div className={`flex gap-2 ${isMobile ? 'flex-col' : 'flex-row'}`}>
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                   placeholder={t('ord_search_placeholder')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 w-full"
+                  className={`pl-9 w-full ${isMobile ? 'h-9 text-sm' : ''}`}
                 />
               </div>
-              <Button onClick={handleImportStockOrder} variant="outline" size={isMobile ? "sm" : "default"}>
-                <Package className="mr-2 h-4 w-4" />
-                {t('ord_import_stock')}
+              <Button onClick={handleImportStockOrder} variant="outline" size={isMobile ? "sm" : "default"} className={isMobile ? "h-9 text-xs" : ""}>
+                <Package className={`mr-1.5 ${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
+                {isMobile ? 'STOCK Import' : t('ord_import_stock')}
               </Button>
             </div>
           </div>
           
           {/* Filters */}
-          <div className="flex flex-wrap gap-3 mb-4">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{t('ord_filters')}</span>
-            </div>
+          <div className={`flex flex-wrap gap-2 mb-3 ${isMobile ? 'items-stretch' : 'items-center gap-3 mb-4'}`}>
+            {!isMobile && (
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{t('ord_filters')}</span>
+              </div>
+            )}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32 md:w-40 h-9">
+              <SelectTrigger className={`h-8 ${isMobile ? 'flex-1 min-w-0 text-xs' : 'w-40 h-9'}`}>
                 <SelectValue placeholder={t('ord_all_status')} />
               </SelectTrigger>
               <SelectContent>
@@ -425,7 +427,7 @@ const Orders: React.FC = () => {
               </SelectContent>
             </Select>
             <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
-              <SelectTrigger className="w-32 md:w-40 h-9">
+              <SelectTrigger className={`h-8 ${isMobile ? 'flex-1 min-w-0 text-xs' : 'w-40 h-9'}`}>
                 <SelectValue placeholder={t('ord_all_types')} />
               </SelectTrigger>
               <SelectContent>
@@ -437,13 +439,13 @@ const Orders: React.FC = () => {
           </div>
           
           <Card>
-            <CardHeader className="pb-2">
+            <CardHeader className={`pb-2 ${isMobile ? 'px-3 py-2' : ''}`}>
               <div className="flex justify-between items-center">
-                <CardTitle className="text-base md:text-lg">{t('ord_all_orders')}</CardTitle>
-                <span className="text-sm text-muted-foreground">{t('ord_orders_count', { count: String(filteredOrders.length) })}</span>
+                <CardTitle className={`${isMobile ? 'text-sm' : 'text-lg'}`}>{t('ord_all_orders')}</CardTitle>
+                <span className={`text-muted-foreground ${isMobile ? 'text-[11px]' : 'text-sm'}`}>{t('ord_orders_count', { count: String(filteredOrders.length) })}</span>
               </div>
             </CardHeader>
-            <CardContent className="px-2 md:px-6">
+            <CardContent className={`${isMobile ? 'px-2 pb-2' : 'px-6'}`}>
               {displayedOrders.length > 0 ? (
                 <>
                   {/* Desktop table view */}
