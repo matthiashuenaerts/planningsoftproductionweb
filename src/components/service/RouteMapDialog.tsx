@@ -141,7 +141,7 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh]">
+      <DialogContent className="sm:max-w-4xl h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
             Route — {teamName} — {dateLabel}
