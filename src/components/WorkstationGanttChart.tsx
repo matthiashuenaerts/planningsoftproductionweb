@@ -12,6 +12,8 @@ import {
   getDay,
 } from 'date-fns';
 import { nl } from 'date-fns/locale';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { workstationService, Workstation } from '@/services/workstationService';
 import { workingHoursService, WorkingHours } from '@/services/workingHoursService';
@@ -98,6 +100,7 @@ export interface WorkstationGanttChartRef {
 const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGanttChartProps>(({ selectedDate, onDateChange, onPlanningGenerated }, ref) => {
   const navigate = useNavigate();
   const { t, createLocalizedPath } = useLanguage();
+  const isMobile = useIsMobile();
   const [workstations, setWorkstations] = useState<Workstation[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [workingHours, setWorkingHours] = useState<WorkingHours[]>([]);
@@ -120,9 +123,9 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const scrollRef = useRef<HTMLDivElement>(null);
   const realtimeChannelRef = useRef<any>(null);
 
-  const rowHeight = 60;
-  const headerHeight = 80;
-  const workstationLabelWidth = 250;
+  const rowHeight = isMobile ? 48 : 60;
+  const headerHeight = isMobile ? 50 : 80;
+  const workstationLabelWidth = isMobile ? 100 : 250;
 
   // Day-based scale
   const scale = useMemo(() => {
@@ -615,61 +618,63 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   return (
     <>
     <Card>
-      <CardHeader>
-        <div className="flex flex-col gap-4">
+      <CardHeader className={isMobile ? "p-3" : ""}>
+        <div className={cn("flex flex-col", isMobile ? "gap-2" : "gap-4")}>
           {/* Title and Day Navigation Row */}
-          <div className="flex justify-between items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-4">
-              <CardTitle>{t('planning_gantt_chart')}</CardTitle>
+          <div className={cn("flex items-center gap-2 flex-wrap", isMobile ? "flex-col items-stretch" : "justify-between gap-4")}>
+            <div className={cn("flex items-center", isMobile ? "flex-col gap-2" : "gap-4")}>
+              <CardTitle className={isMobile ? "text-sm" : ""}>{t('planning_gantt_chart')}</CardTitle>
               
-              <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
-                <Button onClick={handlePreviousDay} variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <div className={cn("flex items-center gap-1 bg-muted rounded-lg p-1", isMobile && "w-full justify-center")}>
+                <Button onClick={handlePreviousDay} variant="ghost" size="sm" className="h-7 w-7 p-0">
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 
-                <div className="flex items-center gap-2 px-3 py-1 min-w-[180px] justify-center">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-semibold">
-                    {format(selectedDate, 'EEEE d MMMM yyyy', { locale: nl })}
+                <div className={cn("flex items-center gap-1.5 px-2 py-1 justify-center", isMobile ? "min-w-0 flex-1" : "min-w-[180px]")}>
+                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className={cn("font-semibold", isMobile ? "text-xs truncate" : "")}>
+                    {format(selectedDate, isMobile ? 'EEE d MMM' : 'EEEE d MMMM yyyy', { locale: nl })}
                   </span>
                 </div>
                 
-                <Button onClick={handleNextDay} variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Button onClick={handleNextDay} variant="ghost" size="sm" className="h-7 w-7 p-0">
                   <ChevronRight className="h-4 w-4" />
                 </Button>
                 
-                <Button onClick={handleToday} variant="outline" size="sm" className="ml-2">
+                <Button onClick={handleToday} variant="outline" size="sm" className={cn("ml-1", isMobile && "h-7 text-xs px-2")}>
                   {t('timeline_today')}
                 </Button>
               </div>
             </div>
             
             {/* Action Buttons */}
-            <div className="flex gap-2 items-center flex-wrap">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder={t('search_projects_placeholder')}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 w-64"
-                />
-              </div>
-              <Button onClick={() => setZoom((z) => Math.max(0.25, z / 1.5))} variant="outline" size="sm">
+            <div className={cn("flex gap-1.5 items-center flex-wrap", isMobile && "justify-between")}>
+              {!isMobile && (
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder={t('search_projects_placeholder')}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8 w-64"
+                  />
+                </div>
+              )}
+              <Button onClick={() => setZoom((z) => Math.max(0.25, z / 1.5))} variant="outline" size="sm" className={isMobile ? "h-7 w-7 p-0" : ""}>
                 <ZoomOut className="w-4 h-4" />
               </Button>
-              <Button onClick={() => setZoom((z) => Math.min(6, z * 1.5))} variant="outline" size="sm">
+              <Button onClick={() => setZoom((z) => Math.min(6, z * 1.5))} variant="outline" size="sm" className={isMobile ? "h-7 w-7 p-0" : ""}>
                 <ZoomIn className="w-4 h-4" />
               </Button>
             </div>
           </div>
           
           {/* Project Counter and Optimize Button */}
-          <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg border">
-            <div className="flex flex-col gap-2 flex-1 max-w-md">
+          <div className={cn("flex items-center bg-muted/50 rounded-lg border", isMobile ? "flex-col gap-2 p-2" : "gap-4 p-4")}>
+            <div className={cn("flex flex-col gap-2", isMobile ? "w-full" : "flex-1 max-w-md")}>
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">{t('planning_projects_to_plan')}:</label>
-                <span className="text-lg font-bold text-primary">{projectCount}</span>
+                <label className={cn("font-medium", isMobile ? "text-xs" : "text-sm")}>{t('planning_projects_to_plan')}:</label>
+                <span className={cn("font-bold text-primary", isMobile ? "text-sm" : "text-lg")}>{projectCount}</span>
               </div>
               <Slider
                 value={[projectCount]}
@@ -685,95 +690,99 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
               </div>
             </div>
             
-            <Button
-              onClick={handleOptimizeSchedule}
-              disabled={optimizing}
-              className="h-12 px-6"
-              variant="default"
-            >
-              {optimizing ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  {t('planning_optimizing')}
-                </>
-              ) : (
-                <>
-                  <Wand2 className="w-4 h-4 mr-2" />
-                  {t('planning_optimize')}
-                </>
-              )}
-            </Button>
+            <div className={cn("flex gap-2", isMobile && "w-full")}>
+              <Button
+                onClick={handleOptimizeSchedule}
+                disabled={optimizing}
+                className={cn(isMobile ? "flex-1 h-9 text-xs" : "h-12 px-6")}
+                variant="default"
+              >
+                {optimizing ? (
+                  <>
+                    <RefreshCw className={cn("animate-spin", isMobile ? "w-3 h-3 mr-1" : "w-4 h-4 mr-2")} />
+                    {t('planning_optimizing')}
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className={cn(isMobile ? "w-3 h-3 mr-1" : "w-4 h-4 mr-2")} />
+                    {t('planning_optimize')}
+                  </>
+                )}
+              </Button>
 
-            <Button
-              onClick={() => setShowRecurringDialog(true)}
-              variant="outline"
-              className="h-12 px-4"
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              {t('planning_recurring_tasks')}
-            </Button>
+              <Button
+                onClick={() => setShowRecurringDialog(true)}
+                variant="outline"
+                className={cn(isMobile ? "flex-1 h-9 text-xs" : "h-12 px-4")}
+              >
+                <Settings className={cn(isMobile ? "w-3 h-3 mr-1" : "w-4 h-4 mr-2")} />
+                {t('planning_recurring_tasks')}
+              </Button>
+            </div>
           </div>
           
           {/* Completion Timeline Summary */}
           {completionInfo.length > 0 && (
-            <div className="flex items-center gap-4 p-3 bg-background rounded-lg border">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">{t('planning_deadline_status')}:</span>
+            <div className={cn("flex items-center bg-background rounded-lg border", isMobile ? "flex-wrap gap-2 p-2 text-xs" : "gap-4 p-3")}>
+              <div className="flex items-center gap-1.5">
+                <Clock className={cn(isMobile ? "w-3 h-3" : "w-4 h-4", "text-muted-foreground")} />
+                <span className={cn("font-medium", isMobile && "text-xs")}>{t('planning_deadline_status')}:</span>
               </div>
-              <div className="flex gap-3">
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle className="w-4 h-4 text-primary" />
-                  <span className="text-sm">{completionInfo.filter(c => c.status === 'on_track').length} {t('timeline_on_track')}</span>
+              <div className={cn("flex", isMobile ? "gap-2" : "gap-3")}>
+                <div className="flex items-center gap-1">
+                  <CheckCircle className={cn(isMobile ? "w-3 h-3" : "w-4 h-4", "text-primary")} />
+                  <span className={isMobile ? "text-[10px]" : "text-sm"}>{completionInfo.filter(c => c.status === 'on_track').length} {t('timeline_on_track')}</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-warning" />
-                  <span className="text-sm">{completionInfo.filter(c => c.status === 'at_risk').length} {t('timeline_at_risk')}</span>
+                <div className="flex items-center gap-1">
+                  <AlertTriangle className={cn(isMobile ? "w-3 h-3" : "w-4 h-4", "text-warning")} />
+                  <span className={isMobile ? "text-[10px]" : "text-sm"}>{completionInfo.filter(c => c.status === 'at_risk').length} {t('timeline_at_risk')}</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-destructive" />
-                  <span className="text-sm">{completionInfo.filter(c => c.status === 'overdue').length} {t('timeline_overdue')}</span>
+                <div className="flex items-center gap-1">
+                  <AlertTriangle className={cn(isMobile ? "w-3 h-3" : "w-4 h-4", "text-destructive")} />
+                  <span className={isMobile ? "text-[10px]" : "text-sm"}>{completionInfo.filter(c => c.status === 'overdue').length} {t('timeline_overdue')}</span>
                 </div>
               </div>
             </div>
           )}
           
-          {/* Status Indicators */}
-          <div className="flex gap-4 text-xs text-muted-foreground flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-destructive"></div>
-              <span>🔴 {t('gantt_legend_urgent')}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-primary"></div>
-              <span>🟢 {t('gantt_legend_active')}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-warning"></div>
-              <span>🟠 {t('gantt_legend_hold')}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-muted-foreground/30"></div>
-              <span>⚪ {t('gantt_legend_future')}</span>
-            </div>
-            
-            {savedSchedules.length > 0 && (
-              <div className="flex items-center gap-1.5 ml-4 text-primary">
-                <Save className="w-3 h-3" />
-                <span>{savedSchedules.length} {t('gantt_tasks_loaded')}</span>
+          {/* Status Indicators - hidden on mobile */}
+          {!isMobile && (
+            <div className="flex gap-4 text-xs text-muted-foreground flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-destructive"></div>
+                <span>🔴 {t('gantt_legend_urgent')}</span>
               </div>
-            )}
-          </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-primary"></div>
+                <span>🟢 {t('gantt_legend_active')}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-warning"></div>
+                <span>🟠 {t('gantt_legend_hold')}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-muted-foreground/30"></div>
+                <span>⚪ {t('gantt_legend_future')}</span>
+              </div>
+              
+              {savedSchedules.length > 0 && (
+                <div className="flex items-center gap-1.5 ml-4 text-primary">
+                  <Save className="w-3 h-3" />
+                  <span>{savedSchedules.length} {t('gantt_tasks_loaded')}</span>
+                </div>
+              )}
+            </div>
+          )}
           
           {computedDailyAssignments.length > 0 && (
-            <div className="p-2 bg-accent border border-border rounded text-xs">
+            <div className={cn("bg-accent border border-border rounded text-xs", isMobile ? "p-1.5" : "p-2")}>
               ✅ <strong>{new Set(computedDailyAssignments.map(a => a.employeeId)).size}</strong> {t('gantt_employees_assigned')}{' '}
               <strong>{format(selectedDate, 'd MMMM', { locale: nl })}</strong> {t('gantt_optimal_distribution')}
             </div>
           )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className={isMobile ? "p-1.5" : ""}>
         <div ref={scrollRef} className="overflow-auto border rounded-lg" style={{ maxHeight: 600 }}>
           {/* header */}
           <div
@@ -784,10 +793,10 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             }}
           >
             <div 
-              className="sticky left-0 z-20 bg-muted border-r flex items-center justify-center font-medium"
+              className={cn("sticky left-0 z-20 bg-muted border-r flex items-center justify-center font-medium", isMobile && "text-[10px] px-1")}
               style={{ width: workstationLabelWidth, minWidth: workstationLabelWidth }}
             >
-              {format(selectedDate, 'EEEE d MMMM', { locale: nl })}
+              {format(selectedDate, isMobile ? 'EEE d MMM' : 'EEEE d MMMM', { locale: nl })}
             </div>
             <div className="flex">
               {timeline.map((t, i) => (
@@ -826,9 +835,9 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                   className="sticky left-0 z-10 flex flex-col border-r bg-muted"
                   style={{ width: workstationLabelWidth, minWidth: workstationLabelWidth }}
                 >
-                  <div className="px-3 py-2 border-b flex items-center justify-between">
-                    <span className="font-medium">{ws.name}</span>
-                    <span className="text-xs text-muted-foreground">{laneCount}</span>
+                  <div className={cn("border-b flex items-center justify-between", isMobile ? "px-1.5 py-1" : "px-3 py-2")}>
+                    <span className={cn("font-medium truncate", isMobile && "text-[10px]")}>{ws.name}</span>
+                    <span className={cn("text-muted-foreground shrink-0", isMobile ? "text-[9px]" : "text-xs")}>{laneCount}</span>
                   </div>
                   
                   {/* Show employee lane labels */}
@@ -837,26 +846,28 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                       lanes.map((lane) => (
                         <div
                           key={lane.laneIndex}
-                          className="px-3 py-1 text-xs flex items-center"
+                          className={cn("flex items-center", isMobile ? "px-1.5 py-0.5 text-[9px]" : "px-3 py-1 text-xs")}
                           style={{ 
                             height: rowHeight,
                             borderTop: lane.laneIndex > 0 ? '1px dashed hsl(var(--border) / 0.3)' : undefined
                           }}
                         >
-                          <span className="text-muted-foreground">
-                            Werker {lane.laneIndex + 1}: 
-                          </span>
-                          <span className="ml-1 font-medium truncate">
-                            {lane.employeeName}
-                          </span>
+                          {isMobile ? (
+                            <span className="font-medium truncate">{lane.employeeName.split(' ')[0]}</span>
+                          ) : (
+                            <>
+                              <span className="text-muted-foreground">Werker {lane.laneIndex + 1}: </span>
+                              <span className="ml-1 font-medium truncate">{lane.employeeName}</span>
+                            </>
+                          )}
                         </div>
                       ))
                     ) : (
                       <div
-                        className="px-3 py-1 text-xs flex items-center"
+                        className={cn("flex items-center", isMobile ? "px-1.5 py-0.5 text-[9px]" : "px-3 py-1 text-xs")}
                         style={{ height: rowHeight }}
                       >
-                        <span className="text-muted-foreground">Geen taken gepland</span>
+                        <span className="text-muted-foreground">{isMobile ? '—' : 'Geen taken gepland'}</span>
                       </div>
                     )
                   )}
