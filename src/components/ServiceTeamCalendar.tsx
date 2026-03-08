@@ -421,7 +421,7 @@ const ServiceTeamCalendar: React.FC = () => {
         : '';
       toast({ 
         title: t('svc_route_optimized'), 
-        description: `${t('svc_depart_stops', { time: departureTimeStr, count: orderedProjects.length })}${overtimeMsg}${warningMsg}`,
+        description: `${t('svc_depart_stops', { time: departureTimeStr, count: String(orderedProjects.length) })}${overtimeMsg}${warningMsg}`,
         variant: overtime ? 'destructive' : 'default',
       });
       loadData();
