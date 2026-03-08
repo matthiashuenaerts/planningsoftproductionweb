@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Users, Globe, Plus, Trash2, ExternalLink, Rocket,
-  UserPlus, FileText, Upload, Building2, LogIn,
+  UserPlus, FileText, Upload, Building2, LogIn, CloudCog, Save,
 } from "lucide-react";
 import { format } from "date-fns";
 
