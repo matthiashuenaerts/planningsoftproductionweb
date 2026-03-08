@@ -804,7 +804,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
       <div className="sticky top-0 z-10 bg-background border-b relative">
         {/* Week headers */}
         <div className="flex border-b bg-primary">
-          <div className="w-64 flex-shrink-0" /> {/* Spacer for team names */}
+          <div className={`${sideColClass} flex-shrink-0`} /> {/* Spacer for team names */}
           {weekGroups.map((week) => (
             <div
               key={week.weekNumber}
