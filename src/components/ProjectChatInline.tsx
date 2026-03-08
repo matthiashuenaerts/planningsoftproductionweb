@@ -336,7 +336,7 @@ export const ProjectChatInline: React.FC<ProjectChatInlineProps> = ({
       </CardHeader>
       
       <CardContent className="flex-1 flex flex-col min-h-0 p-2.5 sm:p-4 pt-0 sm:pt-0">
-        <ScrollArea className="flex-1 pr-4">
+        <ScrollArea className="flex-1 pr-2 sm:pr-4">
           {isLoading ? (
             <div className="flex items-center justify-center h-32">
               <div className="text-muted-foreground">Loading messages...</div>
