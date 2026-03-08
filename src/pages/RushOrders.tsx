@@ -53,21 +53,22 @@ const RushOrders = () => {
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`flex-1 min-w-0 p-4 md:p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">{t('rush_orders')}</h1>
+      <div className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-4 md:p-6'}`}>
+        <div className={`flex items-center justify-between gap-2 ${isMobile ? 'mb-3' : 'mb-6'}`}>
+          <h1 className={`font-bold text-foreground ${isMobile ? 'text-xl' : 'text-2xl md:text-3xl'}`}>{t('rush_orders')}</h1>
           
           {canCreateRushOrder && (
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-red-600 hover:bg-red-700 shrink-0" size={isMobile ? "sm" : "default"}>
-                  <Plus className="mr-1 h-4 w-4" /> {t('new_rush_order')}
+                <Button className="bg-red-600 hover:bg-red-700 shrink-0" size="sm">
+                  <Plus className={`mr-1 ${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
+                  {isMobile ? t('new_rush_order') : t('new_rush_order')}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+              <DialogContent className={`max-h-[90vh] overflow-auto ${isMobile ? 'max-w-[calc(100vw-1rem)] p-3' : 'max-w-4xl'}`}>
                 <DialogHeader>
-                  <DialogTitle>{t('create_new_rush_order')}</DialogTitle>
-                  <DialogDescription>
+                  <DialogTitle className={isMobile ? 'text-sm' : ''}>{t('create_new_rush_order')}</DialogTitle>
+                  <DialogDescription className={isMobile ? 'text-xs' : ''}>
                     {t('create_new_rush_order_desc')}
                   </DialogDescription>
                 </DialogHeader>
@@ -77,25 +78,25 @@ const RushOrders = () => {
           )}
         </div>
         
-        <Tabs defaultValue="pending" className="mb-6">
-          <TabsList className="flex-wrap h-auto">
-            <TabsTrigger value="pending" className="text-xs sm:text-sm">
+        <Tabs defaultValue="pending" className={isMobile ? 'mb-3' : 'mb-6'}>
+          <TabsList className={isMobile ? 'w-full grid grid-cols-3 h-9 gap-0.5' : 'flex-wrap h-auto'}>
+            <TabsTrigger value="pending" className={isMobile ? 'text-[9px] px-1 leading-tight' : 'text-xs sm:text-sm'}>
               {t('pending')} ({pendingCount})
             </TabsTrigger>
-            <TabsTrigger value="in_progress" className="text-xs sm:text-sm">
+            <TabsTrigger value="in_progress" className={isMobile ? 'text-[9px] px-1 leading-tight' : 'text-xs sm:text-sm'}>
               {t('in_progress')} ({inProgressCount})
             </TabsTrigger>
-            <TabsTrigger value="completed" className="text-xs sm:text-sm">
+            <TabsTrigger value="completed" className={isMobile ? 'text-[9px] px-1 leading-tight' : 'text-xs sm:text-sm'}>
               {t('completed')} ({completedCount})
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="pending" className="mt-4 md:mt-6">
+          <TabsContent value="pending" className={isMobile ? 'mt-2' : 'mt-4 md:mt-6'}>
             <RushOrderList statusFilter="pending" />
           </TabsContent>
-          <TabsContent value="in_progress" className="mt-4 md:mt-6">
+          <TabsContent value="in_progress" className={isMobile ? 'mt-2' : 'mt-4 md:mt-6'}>
             <RushOrderList statusFilter="in_progress" />
           </TabsContent>
-          <TabsContent value="completed" className="mt-4 md:mt-6">
+          <TabsContent value="completed" className={isMobile ? 'mt-2' : 'mt-4 md:mt-6'}>
             <RushOrderList statusFilter="completed" />
           </TabsContent>
         </Tabs>
