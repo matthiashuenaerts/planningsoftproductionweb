@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/context/LanguageContext';
 import PersonalItemCard from '@/components/personal-items/PersonalItemCard';
 import CreatePersonalItemDialog from '@/components/personal-items/CreatePersonalItemDialog';
 import EditPersonalItemDialog from '@/components/personal-items/EditPersonalItemDialog';
