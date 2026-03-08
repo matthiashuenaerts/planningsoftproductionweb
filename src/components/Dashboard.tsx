@@ -877,47 +877,47 @@ const Dashboard: React.FC = () => {
           <SeedDataButton />
         </div>}
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title={t('dashboard_total_projects')} value={totalProjects.toString()} footer={t('dashboard_projects_managed')} icon={<Calendar className="h-5 w-5 text-blue-500" />} />
-        <StatCard title={t('dashboard_completed_today')} value={todayCompletedCount.toString()} footer={t('dashboard_tasks_fulfilled')} icon={<CheckCircle2 className="h-5 w-5 text-green-600" />} />
-        {upcomingEvents.length > 0 && <StatCard title={t('dashboard_logistics_out')} value={upcomingEvents.length.toString()} valueSubtext={upcomingEvents[0] ? `${t('dashboard_next')}: ${format(new Date(upcomingEvents[0].date), 'dd/MM')}` : ''} footer={upcomingEvents.slice(0, 2).map(event => `<span style="color: ${event.type === 'return' ? '#22c55e' : '#3b82f6'}">${format(new Date(event.date), 'dd/MM')} - ${event.project_name}</span>`).join('<br>')} icon={<Users className="h-5 w-5 text-purple-500" />} onClick={() => navigate(createLocalizedPath('/logistics-out'))} />}
-        <StatCard title={t('dashboard_truck_loading')} value={truckLoadingData.todayLoadings.length > 0 ? truckLoadingData.todayLoadings.length.toString() : truckLoadingData.daysToNext.toString()} footer={truckLoadingData.todayLoadings.length > 0 ? `${t('dashboard_loading_today')}: ${truckLoadingData.todayLoadings.map(l => l.project.name).join(', ')}` : truckLoadingData.daysToNext > 0 ? `${truckLoadingData.daysToNext} ${t('dashboard_days_to_next')}` : t('dashboard_no_upcoming')} icon={<Truck className="h-5 w-5 text-orange-500" />} />
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
+        <StatCard title={t('dashboard_total_projects')} value={totalProjects.toString()} footer={t('dashboard_projects_managed')} icon={<Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />} />
+        <StatCard title={t('dashboard_completed_today')} value={todayCompletedCount.toString()} footer={t('dashboard_tasks_fulfilled')} icon={<CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />} />
+        {upcomingEvents.length > 0 && <StatCard title={t('dashboard_logistics_out')} value={upcomingEvents.length.toString()} valueSubtext={upcomingEvents[0] ? `${t('dashboard_next')}: ${format(new Date(upcomingEvents[0].date), 'dd/MM')}` : ''} footer={upcomingEvents.slice(0, 2).map(event => `<span style="color: ${event.type === 'return' ? '#22c55e' : '#3b82f6'}">${format(new Date(event.date), 'dd/MM')} - ${event.project_name}</span>`).join('<br>')} icon={<Users className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />} onClick={() => navigate(createLocalizedPath('/logistics-out'))} />}
+        <StatCard title={t('dashboard_truck_loading')} value={truckLoadingData.todayLoadings.length > 0 ? truckLoadingData.todayLoadings.length.toString() : truckLoadingData.daysToNext.toString()} footer={truckLoadingData.todayLoadings.length > 0 ? `${t('dashboard_loading_today')}: ${truckLoadingData.todayLoadings.map(l => l.project.name).join(', ')}` : truckLoadingData.daysToNext > 0 ? `${truckLoadingData.daysToNext} ${t('dashboard_days_to_next')}` : t('dashboard_no_upcoming')} icon={<Truck className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />} />
       </div>
       
       {/* Weekly Loading Schedule */}
-      <Card className="mb-6">
-        <CardHeader className="pb-2">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+      <Card className="mb-4 sm:mb-6">
+        <CardHeader className="pb-2 px-3 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
               {t('dashboard_weekly_schedule')}
             </CardTitle>
-            <div className="flex items-center justify-between md:justify-center space-x-2">
-              <Button variant="outline" size="icon" onClick={prevWeek} disabled={weekLoading} className="h-9 w-9">
+            <div className="flex items-center justify-between sm:justify-center space-x-2">
+              <Button variant="outline" size="icon" onClick={prevWeek} disabled={weekLoading} className="h-8 w-8 sm:h-9 sm:w-9">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-xs md:text-sm font-medium min-w-[140px] md:min-w-[200px] text-center px-2">
+              <span className="text-xs font-medium min-w-[130px] text-center px-1">
                 {format(weekStartDate, 'MMM d')} - {format(addDays(weekStartDate, 6), 'MMM d, yyyy')}
-                {weekLoading && <span className="ml-2 text-xs text-gray-500">{t('dashboard_loading')}</span>}
+                {weekLoading && <span className="ml-1 text-xs text-muted-foreground">{t('dashboard_loading')}</span>}
               </span>
-              <Button variant="outline" size="icon" onClick={nextWeek} disabled={weekLoading} className="h-9 w-9">
+              <Button variant="outline" size="icon" onClick={nextWeek} disabled={weekLoading} className="h-8 w-8 sm:h-9 sm:w-9">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
+        <CardContent className="px-3 sm:px-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-1.5 sm:gap-2">
             {Array.from({
             length: 7
           }, (_, i) => addDays(weekStartDate, i)).map((date, index) => {
             const dayAssignments = getAssignmentsForDate(date);
             const dayServiceAssignments = getServiceAssignmentsForDate(date);
             const isCurrentDay = isToday(date);
-            return <div key={index} className={cn("min-h-[120px] border rounded p-2", isCurrentDay ? "border-red-500 bg-red-50" : "border-gray-200")}>
-                  <div className={cn("text-center text-sm font-medium mb-2", isCurrentDay ? "text-red-700" : "text-gray-700")}>
-                    <div>{format(date, 'EEE')}</div>
-                    <div className="text-lg">{format(date, 'd')}</div>
+            return <div key={index} className={cn("min-h-[80px] sm:min-h-[120px] border rounded-lg p-1.5 sm:p-2", isCurrentDay ? "border-red-500 bg-red-50" : "border-border")}>
+                  <div className={cn("text-center text-xs sm:text-sm font-medium mb-1 sm:mb-2", isCurrentDay ? "text-red-700" : "text-muted-foreground")}>
+                    <div className="text-[10px] sm:text-xs uppercase tracking-wide">{format(date, 'EEE')}</div>
+                    <div className="text-sm sm:text-lg font-bold">{format(date, 'd')}</div>
                   </div>
                   
                   <div className="space-y-1">
@@ -975,18 +975,18 @@ const Dashboard: React.FC = () => {
       </Card>
       
       {/* Charts Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
         {/* Task Completion Trend */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-blue-500" />
+          <CardHeader className="px-3 sm:px-6 pb-2">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
               {t('dashboard_task_completion_trend')}
             </CardTitle>
-            <CardDescription>{t('dashboard_tasks_last_7_days')}</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">{t('dashboard_tasks_last_7_days')}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-80">
+          <CardContent className="px-2 sm:px-6">
+            <div className="h-48 sm:h-80">
               <ChartContainer config={{
               completed: {
                 label: t('dashboard_completed'),
@@ -1014,18 +1014,18 @@ const Dashboard: React.FC = () => {
         
         {/* Tasks by Status Pie Chart */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ListTodo className="h-5 w-5 text-blue-500" />
+          <CardHeader className="px-3 sm:px-6 pb-2">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <ListTodo className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
               {t('dashboard_tasks_by_status')}
             </CardTitle>
-            <CardDescription>{t('dashboard_status_distribution')}</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">{t('dashboard_status_distribution')}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-80">
+          <CardContent className="px-2 sm:px-6">
+            <div className="h-48 sm:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={tasksByStatus} cx="50%" cy="50%" labelLine={false} outerRadius={100} dataKey="value" label={({
+                  <Pie data={tasksByStatus} cx="50%" cy="50%" labelLine={false} outerRadius={typeof window !== 'undefined' && window.innerWidth < 640 ? 60 : 100} dataKey="value" label={({
                   name,
                   percent
                 }) => `${name}: ${(percent * 100).toFixed(0)}%`}>
@@ -1041,12 +1041,12 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Workstation Stats Section */}
-      <div className="mt-8">
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <Factory className="h-6 w-6" />
+      <div className="mt-6 sm:mt-8">
+        <h2 className="text-lg sm:text-2xl font-bold mb-3 sm:mb-4 flex items-center gap-2">
+          <Factory className="h-5 w-5 sm:h-6 sm:w-6" />
           {t('dashboard_workstation_overview')}
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {workstationStats.map(ws => (
             <Card key={ws.id} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
@@ -1148,24 +1148,24 @@ const StatCard: React.FC<StatCardProps> = ({
   onClick,
   valueSubtext
 }) => {
-  return <Card className={onClick ? "cursor-pointer hover:bg-accent/50 transition-colors" : ""} onClick={onClick}>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+  return <Card className={cn("overflow-hidden", onClick ? "cursor-pointer hover:bg-accent/50 transition-colors active:scale-[0.98]" : "")} onClick={onClick}>
+      <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+        <CardTitle className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 sm:gap-2">
           {icon}
-          {title}
+          <span className="truncate">{title}</span>
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="flex items-baseline gap-2">
-          <div className="text-2xl font-bold">{value}</div>
-          {valueSubtext && <div className="text-xs text-muted-foreground">{valueSubtext}</div>}
+      <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+        <div className="flex items-baseline gap-1 sm:gap-2">
+          <div className="text-xl sm:text-2xl font-bold">{value}</div>
+          {valueSubtext && <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{valueSubtext}</div>}
         </div>
-        <div className="text-xs text-muted-foreground mt-1 space-y-1">
-          {footer.split('\n').map((line, index) => <p key={index} className="break-words" dangerouslySetInnerHTML={{
+        <div className="text-[10px] sm:text-xs text-muted-foreground mt-1 space-y-0.5 sm:space-y-1">
+          {footer.split('\n').map((line, index) => <p key={index} className="break-words leading-tight" dangerouslySetInnerHTML={{
           __html: DOMPurify.sanitize(line, { ALLOWED_TAGS: ['b', 'i', 'u', 'a', 'strong', 'em', 'span', 'br'], ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style'] })
         }}></p>)}
         </div>
-        {subtitle && <p className="text-xs text-muted-foreground mt-1 break-words font-medium">{subtitle}</p>}
+        {subtitle && <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 break-words font-medium">{subtitle}</p>}
       </CardContent>
     </Card>;
 };
