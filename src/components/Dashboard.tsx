@@ -719,6 +719,67 @@ const Dashboard: React.FC = () => {
         return updatedAssignments;
       });
 
+      // Fetch service team assignments for this week
+      try {
+        const weekEndStr = format(weekEnd, 'yyyy-MM-dd');
+        const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+        
+        // Get service teams
+        let serviceTeamsQuery = supabase
+          .from('placement_teams')
+          .select('id, name, color')
+          .eq('is_active', true)
+          .eq('team_type', 'service');
+        if (tenant?.id) serviceTeamsQuery = serviceTeamsQuery.eq('tenant_id', tenant.id);
+        const { data: serviceTeamsData } = await serviceTeamsQuery;
+        
+        if (serviceTeamsData && serviceTeamsData.length > 0) {
+          const serviceTeamIds = serviceTeamsData.map(t => t.id);
+          const serviceTeamMap = new Map(serviceTeamsData.map(t => [t.id, t]));
+          
+          let serviceQuery = supabase
+            .from('project_team_assignments')
+            .select('id, project_id, team_id, start_date, service_hours, service_notes, duration')
+            .in('team_id', serviceTeamIds)
+            .gte('start_date', weekStartStr)
+            .lte('start_date', weekEndStr);
+          if (tenant?.id) serviceQuery = serviceQuery.eq('tenant_id', tenant.id);
+          const { data: serviceData } = await serviceQuery;
+          
+          if (serviceData && serviceData.length > 0) {
+            // Fetch project names for service assignments
+            const serviceProjectIds = [...new Set(serviceData.map(s => s.project_id))];
+            const { data: serviceProjectsData } = await supabase
+              .from('projects')
+              .select('id, name')
+              .in('id', serviceProjectIds);
+            const projectNameMap = new Map((serviceProjectsData || []).map(p => [p.id, p.name]));
+            
+            const newServiceAssignments: ServiceAssignment[] = serviceData.map(s => {
+              const team = serviceTeamMap.get(s.team_id || '');
+              return {
+                id: s.id,
+                project_id: s.project_id,
+                project_name: projectNameMap.get(s.project_id) || 'Unknown',
+                team_name: team?.name || '',
+                team_color: team?.color || '#6b7280',
+                start_date: s.start_date,
+                service_hours: s.service_hours,
+                service_notes: s.service_notes,
+              };
+            });
+            
+            setServiceAssignments(prev => {
+              const existingIds = new Set(prev.map(a => a.id));
+              const toAdd = newServiceAssignments.filter(a => !existingIds.has(a.id));
+              return [...prev, ...toAdd];
+            });
+          }
+        }
+      } catch (serviceError) {
+        console.error('Error fetching service assignments:', serviceError);
+      }
+
       // Mark week as loaded
       setLoadedWeeks(prev => new Set([...prev, weekKey]));
     } catch (error) {
