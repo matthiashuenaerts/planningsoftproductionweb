@@ -16,6 +16,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { orderService } from '@/services/orderService';
 import { Order, OrderItem, OrderStep } from '@/types/order';
 import { Accessory } from '@/services/accessoriesService';
+import { cn } from '@/lib/utils';
 import { addBusinessDays, subBusinessDays, format, parseISO, isAfter } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { parsePDFForOrder, ParsedOrderData } from '@/services/pdfParseService';
@@ -318,18 +319,21 @@ const NewOrderModal = ({
   const removeOrderStep = (index: number) => setOrderSteps(prev => prev.filter((_, i) => i !== index));
 
   const modalContent = (
-    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-auto">
+    <DialogContent className={cn(
+      "max-h-[90vh] overflow-y-auto",
+      isMobile ? "max-w-[calc(100vw-1.5rem)] w-[calc(100vw-1.5rem)] p-4" : "max-w-4xl"
+    )}>
       <DialogHeader>
-        <DialogTitle>{t('create_new_order')}</DialogTitle>
-        <DialogDescription>{t('create_new_order_desc')}</DialogDescription>
+        <DialogTitle className={isMobile ? "text-base" : ""}>{t('create_new_order')}</DialogTitle>
+        <DialogDescription className={isMobile ? "text-xs" : ""}>{t('create_new_order_desc')}</DialogDescription>
       </DialogHeader>
 
-      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-3">
         {/* Order Type */}
         <div>
-          <Label>{t('order_type')}</Label>
+          <Label className="text-xs font-medium text-muted-foreground">{t('order_type')}</Label>
           <Select value={orderType} onValueChange={(value: 'standard' | 'semi-finished') => setOrderType(value)}>
-            <SelectTrigger>
+            <SelectTrigger className="h-9 rounded-lg mt-0.5">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -340,19 +344,20 @@ const NewOrderModal = ({
         </div>
 
         {/* Supplier + Order Reference */}
-        <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+        <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
           <div>
-            <Label>{isProcessingOnly ? `${t('order_name')} *` : `${t('supplier')} *`}</Label>
+            <Label className="text-xs font-medium text-muted-foreground">{isProcessingOnly ? `${t('order_name')} *` : `${t('supplier')} *`}</Label>
             {isProcessingOnly ? (
               <Input
                 value={formData.supplier}
                 onChange={e => setFormData(prev => ({ ...prev, supplier: e.target.value }))}
                 placeholder="e.g., External Powder Coating Job"
                 required
+                className="h-9 rounded-lg mt-0.5"
               />
             ) : (
               <Select value={formData.supplier} onValueChange={value => setFormData(prev => ({ ...prev, supplier: value }))}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9 rounded-lg mt-0.5">
                   <SelectValue placeholder={t('select_supplier')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -364,25 +369,26 @@ const NewOrderModal = ({
             )}
           </div>
           <div>
-            <Label>{t('order_reference')}</Label>
+            <Label className="text-xs font-medium text-muted-foreground">{t('order_reference')}</Label>
             <Input
               value={formData.order_reference}
               onChange={e => setFormData(prev => ({ ...prev, order_reference: e.target.value }))}
               placeholder={t('order_reference_placeholder')}
+              className="h-9 rounded-lg mt-0.5"
             />
           </div>
         </div>
 
         {/* Delivery + Status */}
-        <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+        <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
           <div>
-            <Label>{isProcessingOnly ? `${t('processing_start')} *` : `${t('material_delivery')} *`}</Label>
-            <Input type="date" value={formData.expected_delivery} onChange={e => setFormData(prev => ({ ...prev, expected_delivery: e.target.value }))} required />
+            <Label className="text-xs font-medium text-muted-foreground">{isProcessingOnly ? `${t('processing_start')} *` : `${t('material_delivery')} *`}</Label>
+            <Input type="date" value={formData.expected_delivery} onChange={e => setFormData(prev => ({ ...prev, expected_delivery: e.target.value }))} required className="h-9 rounded-lg mt-0.5" />
           </div>
           <div>
-            <Label>{t('status')}</Label>
+            <Label className="text-xs font-medium text-muted-foreground">{t('status')}</Label>
             <Select value={formData.status} onValueChange={(value: Order['status']) => setFormData(prev => ({ ...prev, status: value }))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9 rounded-lg mt-0.5"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="pending">{t('status_pending')}</SelectItem>
                 <SelectItem value="delivered">{t('status_delivered')}</SelectItem>
@@ -393,15 +399,15 @@ const NewOrderModal = ({
           </div>
           {taskGroups.length > 0 && (
             <div>
-              <Label>{t('task_dependency_group')}</Label>
+              <Label className="text-xs font-medium text-muted-foreground">{t('task_dependency_group')}</Label>
               <Select value={formData.task_group_id} onValueChange={value => setFormData(prev => ({ ...prev, task_group_id: value === '_none_' ? '' : value }))}>
-                <SelectTrigger><SelectValue placeholder={t('task_dependency_none')} /></SelectTrigger>
+                <SelectTrigger className="h-9 rounded-lg mt-0.5"><SelectValue placeholder={t('task_dependency_none')} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_none_">{t('task_dependency_none')}</SelectItem>
                   {taskGroups.map(g => (<SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground mt-1">{t('task_dependency_hint')}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{t('task_dependency_hint')}</p>
             </div>
           )}
         </div>
@@ -409,29 +415,29 @@ const NewOrderModal = ({
         {/* Internal processing for semi-finished */}
         {orderType === 'semi-finished' && (
           <div>
-            <Label>{t('internal_processing_duration')}</Label>
-            <Input type="number" min="0" value={internalProcessingDays} onChange={e => setInternalProcessingDays(parseInt(e.target.value) || 0)} placeholder={t('internal_processing_placeholder')} />
+            <Label className="text-xs font-medium text-muted-foreground">{t('internal_processing_duration')}</Label>
+            <Input type="number" min="0" value={internalProcessingDays} onChange={e => setInternalProcessingDays(parseInt(e.target.value) || 0)} placeholder={t('internal_processing_placeholder')} className="h-9 rounded-lg mt-0.5" />
           </div>
         )}
 
         {/* Notes */}
         <div>
-          <Label>{t('notes')}</Label>
-          <Textarea value={formData.notes} onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))} placeholder={t('notes_placeholder')} />
+          <Label className="text-xs font-medium text-muted-foreground">{t('notes')}</Label>
+          <Textarea value={formData.notes} onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))} placeholder={t('notes_placeholder')} className="rounded-lg mt-0.5 min-h-[48px]" rows={2} />
         </div>
 
         {/* Schedule warning */}
         {scheduleWarning && (
-          <div className={`p-3 border-l-4 rounded ${isScheduleInvalid ? 'bg-destructive/10 border-destructive text-destructive' : 'bg-yellow-100 border-yellow-500 text-yellow-700'}`}>
-            <p className="font-bold">{isScheduleInvalid ? t('schedule_error') : t('schedule_warning')}</p>
-            <p className="text-sm">{scheduleWarning}</p>
+          <div className={`p-2.5 border-l-4 rounded-lg text-sm ${isScheduleInvalid ? 'bg-destructive/10 border-destructive text-destructive' : 'bg-yellow-100 border-yellow-500 text-yellow-700'}`}>
+            <p className="font-semibold text-xs">{isScheduleInvalid ? t('schedule_error') : t('schedule_warning')}</p>
+            <p className="text-xs mt-0.5">{scheduleWarning}</p>
           </div>
         )}
 
         {/* PDF confidence badge */}
         {parsedPdfData && (
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <Badge variant={parsedPdfData.extractionConfidence === 'high' ? 'default' : parsedPdfData.extractionConfidence === 'medium' ? 'secondary' : 'outline'}>
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <Badge variant={parsedPdfData.extractionConfidence === 'high' ? 'default' : parsedPdfData.extractionConfidence === 'medium' ? 'secondary' : 'outline'} className="text-[10px]">
               {t(`pdf_confidence_${parsedPdfData.extractionConfidence}`)}
             </Badge>
             {parsedPdfData.supplier && <span className="text-muted-foreground">{t('pdf_detected_supplier', { name: parsedPdfData.supplier })}</span>}
@@ -441,46 +447,46 @@ const NewOrderModal = ({
 
         {/* External processing steps */}
         {orderType === 'semi-finished' && (
-          <Card>
-            <CardHeader className="p-4 sm:p-6">
+          <Card className="rounded-lg border-border/50">
+            <CardHeader className="p-3">
               <div className="flex justify-between items-center">
-                <CardTitle className="text-base">{t('external_processing_steps')}</CardTitle>
-                <Button type="button" onClick={addOrderStep} variant="outline" size="sm">
-                  <Plus className="mr-1 h-4 w-4" /> {t('add_step')}
+                <CardTitle className="text-sm">{t('external_processing_steps')}</CardTitle>
+                <Button type="button" onClick={addOrderStep} variant="outline" size="sm" className="h-7 text-xs rounded-lg">
+                  <Plus className="mr-1 h-3 w-3" /> {t('add_step')}
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+            <CardContent className="p-3 pt-0">
               {orderSteps.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4 text-sm">{t('define_external_steps')}</p>
+                <p className="text-muted-foreground text-center py-3 text-xs">{t('define_external_steps')}</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {orderSteps.map((step, index) => (
-                    <div key={index} className="flex gap-2 items-end p-2 border rounded">
+                    <div key={index} className="flex gap-2 items-end p-2 border rounded-lg">
                       <div className="flex-1 space-y-2">
-                        <div className={`grid gap-2 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                        <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <Label className="text-xs">{t('step_name')} *</Label>
-                            <Input value={step.name} onChange={e => updateOrderStep(index, 'name', e.target.value)} placeholder={t('step_name_placeholder')} required />
+                            <Label className="text-[11px] text-muted-foreground">{t('step_name')} *</Label>
+                            <Input value={step.name} onChange={e => updateOrderStep(index, 'name', e.target.value)} placeholder={t('step_name_placeholder')} required className="h-8 text-sm rounded-lg mt-0.5" />
                           </div>
                           <div>
-                            <Label className="text-xs">{t('step_supplier')}</Label>
-                            <Input value={step.supplier || ''} onChange={e => updateOrderStep(index, 'supplier', e.target.value)} placeholder={t('step_supplier_placeholder')} />
+                            <Label className="text-[11px] text-muted-foreground">{t('step_supplier')}</Label>
+                            <Input value={step.supplier || ''} onChange={e => updateOrderStep(index, 'supplier', e.target.value)} placeholder={t('step_supplier_placeholder')} className="h-8 text-sm rounded-lg mt-0.5" />
                           </div>
                         </div>
-                        <div className={`grid gap-2 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                        <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <Label className="text-xs">{t('start_date')}</Label>
-                            <Input type="date" value={step.start_date || ''} readOnly />
+                            <Label className="text-[11px] text-muted-foreground">{t('start_date')}</Label>
+                            <Input type="date" value={step.start_date || ''} readOnly className="h-8 text-sm rounded-lg mt-0.5" />
                           </div>
                           <div>
-                            <Label className="text-xs">{t('expected_duration_days')}</Label>
-                            <Input type="number" min="1" value={step.expected_duration_days || ''} onChange={e => updateOrderStep(index, 'expected_duration_days', parseInt(e.target.value))} />
+                            <Label className="text-[11px] text-muted-foreground">{t('expected_duration_days')}</Label>
+                            <Input type="number" min="1" value={step.expected_duration_days || ''} onChange={e => updateOrderStep(index, 'expected_duration_days', parseInt(e.target.value))} className="h-8 text-sm rounded-lg mt-0.5" />
                           </div>
                         </div>
                       </div>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeOrderStep(index)}>
-                        <Trash2 className="h-4 w-4" />
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => removeOrderStep(index)}>
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   ))}
@@ -491,63 +497,60 @@ const NewOrderModal = ({
         )}
 
         {/* Order Items */}
-        <Card>
-          <CardHeader className="p-4 sm:p-6">
+        <Card className="rounded-lg border-border/50">
+          <CardHeader className="p-3">
             <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'}`}>
-              <CardTitle className="text-base">{t('order_items')}</CardTitle>
-              <div className="flex gap-2 flex-wrap">
-                {/* PDF Import button */}
+              <CardTitle className="text-sm">{t('order_items')}</CardTitle>
+              <div className="flex gap-1.5 flex-wrap">
                 <input ref={pdfInputRef} type="file" accept=".pdf" className="hidden" onChange={handlePdfUpload} />
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button type="button" variant="outline" size="sm" onClick={() => pdfInputRef.current?.click()} disabled={pdfLoading}>
-                        {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-                        <span className="ml-1 hidden sm:inline">{pdfLoading ? t('pdf_parsing') : t('import_pdf')}</span>
+                      <Button type="button" variant="outline" size="sm" onClick={() => pdfInputRef.current?.click()} disabled={pdfLoading} className="h-7 text-xs rounded-lg">
+                        {pdfLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5" />}
+                        <span className="ml-1">{pdfLoading ? t('pdf_parsing') : t('import_pdf')}</span>
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>{t('import_pdf_tooltip')}</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
                 <ProductSelector onProductSelect={handleProductSelect} onGroupSelect={handleGroupSelect} buttonText={t('add_from_products')} />
-                <Button type="button" onClick={addOrderItem} variant="outline" size="sm">
-                  <Plus className="mr-1 h-4 w-4" />
+                <Button type="button" onClick={addOrderItem} variant="outline" size="sm" className="h-7 text-xs rounded-lg">
+                  <Plus className="mr-0.5 h-3.5 w-3.5" />
                   <span className="hidden sm:inline">{t('add_custom_item')}</span>
                   <span className="sm:hidden">+</span>
                 </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+          <CardContent className="p-3 pt-0">
             {orderItems.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4 text-sm">
+              <p className="text-muted-foreground text-center py-4 text-xs">
                 {isProcessingOnly ? t('processing_only_hint') : t('no_items_hint')}
               </p>
             ) : isMobile ? (
-              /* Mobile: card-based layout */
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {orderItems.map((item, index) => (
-                  <div key={index} className="border rounded-lg p-3 space-y-2">
-                    <div className="flex justify-between items-start">
-                      <Label className="text-xs text-muted-foreground">{t('article_code')}</Label>
+                  <div key={index} className="border rounded-lg p-2.5 space-y-1.5 bg-muted/20">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-[11px] text-muted-foreground">{t('article_code')}</Label>
                       <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeOrderItem(index)}>
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
-                    <Input value={item.article_code || ''} onChange={e => updateOrderItem(index, 'article_code', e.target.value)} placeholder={t('article_code')} className="h-8 text-sm" />
+                    <Input value={item.article_code || ''} onChange={e => updateOrderItem(index, 'article_code', e.target.value)} placeholder={t('article_code')} className="h-8 text-sm rounded-lg" />
                     <div>
-                      <Label className="text-xs text-muted-foreground">{t('description')}</Label>
-                      <Input value={item.description || ''} onChange={e => updateOrderItem(index, 'description', e.target.value)} placeholder={t('description')} required className="h-8 text-sm" />
+                      <Label className="text-[11px] text-muted-foreground">{t('description')}</Label>
+                      <Input value={item.description || ''} onChange={e => updateOrderItem(index, 'description', e.target.value)} placeholder={t('description')} required className="h-8 text-sm rounded-lg" />
                     </div>
                     <div>
-                      <Label className="text-xs text-muted-foreground">{t('quantity')}</Label>
-                      <Input type="number" min="1" value={item.quantity} onChange={e => updateOrderItem(index, 'quantity', parseInt(e.target.value) || 1)} required className="h-8 text-sm w-24" />
+                      <Label className="text-[11px] text-muted-foreground">{t('quantity')}</Label>
+                      <Input type="number" min="1" value={item.quantity} onChange={e => updateOrderItem(index, 'quantity', parseInt(e.target.value) || 1)} required className="h-8 text-sm rounded-lg w-20" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              /* Desktop: table layout */
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -583,11 +586,11 @@ const NewOrderModal = ({
         </Card>
 
         {/* Actions */}
-        <div className="flex gap-2">
-          <Button type="submit" disabled={loading || isScheduleInvalid}>
+        <div className="flex gap-2 pt-1">
+          <Button type="submit" disabled={loading || isScheduleInvalid} className={cn("h-9 rounded-lg active:scale-[0.98] transition-transform", isMobile && "flex-1")}>
             {loading ? t('creating_order') : t('create_order')}
           </Button>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className={cn("h-9 rounded-lg active:scale-[0.98] transition-transform", isMobile && "flex-1")}>
             {t('cancel')}
           </Button>
         </div>
