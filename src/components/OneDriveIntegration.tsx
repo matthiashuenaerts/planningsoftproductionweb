@@ -569,7 +569,6 @@ const { data, error } = await supabase.functions.invoke(
                             <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                           )}
                         </div>
-                        </div>
                       </div>
                     ))}
                   </div>
