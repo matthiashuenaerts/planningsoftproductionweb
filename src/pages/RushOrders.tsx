@@ -54,15 +54,15 @@ const RushOrders = () => {
       )}
       {isMobile && <Navbar />}
       <div className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-4 pb-4' : 'ml-64 p-4 md:p-6'}`}>
-        <div className={`flex items-center justify-between gap-3 ${isMobile ? 'mb-4' : 'mb-6'}`}>
-          <h1 className={`font-bold text-foreground ${isMobile ? 'text-2xl' : 'text-2xl md:text-3xl'}`}>{t('rush_orders')}</h1>
+        <div className={`flex items-center justify-between gap-2 ${isMobile ? 'mb-4' : 'mb-6'}`}>
+          <h1 className={`font-bold text-foreground min-w-0 truncate ${isMobile ? 'text-xl' : 'text-2xl md:text-3xl'}`}>{t('rush_orders')}</h1>
           
           {canCreateRushOrder && (
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-red-600 hover:bg-red-700 shrink-0" size={isMobile ? "default" : "sm"}>
-                  <Plus className="mr-1.5 h-4 w-4" />
-                  {t('new_rush_order')}
+                <Button className="bg-red-600 hover:bg-red-700 shrink-0" size={isMobile ? "sm" : "sm"}>
+                  <Plus className={`${isMobile ? 'h-4 w-4' : 'mr-1.5 h-4 w-4'}`} />
+                  {!isMobile && t('new_rush_order')}
                 </Button>
               </DialogTrigger>
               <DialogContent className={`max-h-[90vh] overflow-auto ${isMobile ? 'max-w-[calc(100vw-2rem)] w-[calc(100vw-2rem)] p-4' : 'max-w-4xl'}`}>
