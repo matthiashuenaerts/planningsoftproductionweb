@@ -477,7 +477,7 @@ const ServiceInstallation: React.FC = () => {
                 {routeData.returnTime && (
                   <Badge variant={isOvertime ? 'destructive' : 'outline'} className="gap-1 font-semibold">
                     <Home className="h-3 w-3" />
-                    Return: {routeData.returnTime}
+                    {t('si_return')}: {routeData.returnTime}
                     {isOvertime && ' ⚠️'}
                   </Badge>
                 )}
