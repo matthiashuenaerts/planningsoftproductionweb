@@ -975,18 +975,18 @@ const Dashboard: React.FC = () => {
       </Card>
       
       {/* Charts Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
         {/* Task Completion Trend */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-blue-500" />
+          <CardHeader className="px-3 sm:px-6 pb-2">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
               {t('dashboard_task_completion_trend')}
             </CardTitle>
-            <CardDescription>{t('dashboard_tasks_last_7_days')}</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">{t('dashboard_tasks_last_7_days')}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-80">
+          <CardContent className="px-2 sm:px-6">
+            <div className="h-48 sm:h-80">
               <ChartContainer config={{
               completed: {
                 label: t('dashboard_completed'),
