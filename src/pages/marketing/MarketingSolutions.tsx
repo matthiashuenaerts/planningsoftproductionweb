@@ -2,8 +2,6 @@ import React from "react";
 import { useMarketingLang } from "@/components/marketing/useMarketingLang";
 import { TrendingUp, Truck, RefreshCw, MessageCircle } from "lucide-react";
 import solutionsFactory from "@/assets/marketing/solutions-factory.jpg";
-import featureLogistics from "@/assets/marketing/feature-logistics.jpg";
-import featureTeam from "@/assets/marketing/feature-team.jpg";
 
 const solutions = [
   { titleKey: "sol_efficiency_title", problemKey: "sol_efficiency_problem", solutionKey: "sol_efficiency_solution", Icon: TrendingUp },
@@ -36,32 +34,6 @@ const MarketingSolutions: React.FC = () => {
                 <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
                   <img src={solutionsFactory} alt="Solutions" className="w-full" loading="eager" />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120]/30 via-transparent to-transparent" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Image showcase row */}
-      <section className="pb-16">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="relative group rounded-2xl border border-white/10 overflow-hidden">
-              <img src={featureLogistics} alt="Logistics" className="w-full h-64 object-cover transition-transform duration-700 group-hover:scale-[1.03]" loading="lazy" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120]/80 to-transparent flex items-end p-8">
-                <div>
-                  <h3 className="text-xl font-bold mb-1">{t("sol_logistics_title")}</h3>
-                  <p className="text-sm text-slate-400">{t("sol_logistics_solution")}</p>
-                </div>
-              </div>
-            </div>
-            <div className="relative group rounded-2xl border border-white/10 overflow-hidden">
-              <img src={featureTeam} alt="Team" className="w-full h-64 object-cover transition-transform duration-700 group-hover:scale-[1.03]" loading="lazy" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120]/80 to-transparent flex items-end p-8">
-                <div>
-                  <h3 className="text-xl font-bold mb-1">{t("sol_communication_title")}</h3>
-                  <p className="text-sm text-slate-400">{t("sol_communication_solution")}</p>
                 </div>
               </div>
             </div>

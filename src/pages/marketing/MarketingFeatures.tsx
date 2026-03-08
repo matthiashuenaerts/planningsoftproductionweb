@@ -2,10 +2,6 @@ import React from "react";
 import { useMarketingLang } from "@/components/marketing/useMarketingLang";
 import { CheckCircle2 } from "lucide-react";
 import heroDashboard from "@/assets/marketing/hero-dashboard.jpg";
-import featurePlanning from "@/assets/marketing/feature-planning.jpg";
-import featureLogistics from "@/assets/marketing/feature-logistics.jpg";
-import featureTeam from "@/assets/marketing/feature-team.jpg";
-import featureAnalytics from "@/assets/marketing/feature-analytics.jpg";
 
 interface FeatureBlock {
   titleKey: string;
@@ -29,21 +25,12 @@ const features: FeatureBlock[] = [
 const MarketingFeatures: React.FC = () => {
   const { t } = useMarketingLang();
 
-  // Showcase images mapped to specific feature indexes
-  const showcaseImages: Record<number, string> = {
-    1: featurePlanning,
-    4: featureLogistics,
-    5: featureTeam,
-    6: featureAnalytics,
-  };
-
   return (
     <>
       {/* Hero header */}
       <section className="relative pt-28 pb-20 overflow-hidden">
         <div className="absolute inset-0">
           <div className="absolute top-0 left-1/3 w-[500px] h-[500px] bg-[#195F85]/15 rounded-full blur-[150px]" />
-          <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-cyan-500/8 rounded-full blur-[120px]" />
           <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:80px_80px]" />
         </div>
         <div className="relative max-w-7xl mx-auto px-6 text-center">
@@ -68,7 +55,6 @@ const MarketingFeatures: React.FC = () => {
           {features.map((f, i) => {
             const bullets = t(f.bulletsKey).split("|");
             const reversed = i % 2 === 1;
-            const imgSrc = showcaseImages[i] || f.image;
             return (
               <div
                 key={f.titleKey}
@@ -80,7 +66,7 @@ const MarketingFeatures: React.FC = () => {
                     <div className="absolute -inset-3 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-2xl bg-white/[0.02]">
                       <img
-                        src={imgSrc}
+                        src={f.image}
                         alt={t(f.titleKey)}
                         className="w-full transition-transform duration-700 group-hover:scale-[1.02]"
                         loading="lazy"

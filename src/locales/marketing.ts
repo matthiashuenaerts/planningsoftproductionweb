@@ -17,7 +17,23 @@ const marketing: Record<string, Record<string, string>> = {
     hero_cta: "Demo Aanvragen",
     hero_portal: "Thonon Portaal",
 
+    // Showcase
+    showcase_badge: "Kernmodules",
+    showcase_title: "Gebouwd voor productieteams",
+    showcase_subtitle: "Drie pijlers die de manier waarop u uw productievloer beheert transformeren.",
+    showcase_workstations: "Werkstationbeheer",
+    showcase_workstations_desc: "Realtime productieoverzicht met taaktoewijzing en voortgangsregistratie per werkstation.",
+    showcase_planning: "Productieplanning",
+    showcase_planning_desc: "Gantt-diagrammen, drag-and-drop scheduling en automatische capaciteitsoptimalisatie.",
+    showcase_team: "Teamcoördinatie",
+    showcase_team_desc: "Installatieploegen, vakantieplannen, tijdsregistratie en personeelsbeheer.",
+
+    // Visual divider
+    visual_title: "Slimme productieflow",
+    visual_desc: "Visualiseer uw volledige productieketen van orderinname tot levering.",
+
     // Pain points
+    pain_badge: "Veelvoorkomende uitdagingen",
     pain_title: "Herken je dit?",
     pain_subtitle: "Veel productiebedrijven worstelen dagelijks met deze uitdagingen.",
     pain_1: "Planning voelt als gokken",
@@ -29,6 +45,7 @@ const marketing: Record<string, Record<string, string>> = {
     pain_7: "We werken in vijf tools die niets delen",
 
     // Core values
+    core_badge: "Waarom wij",
     core_title: "Kernwaarden van de software",
     core_subtitle: "Gebouwd op moderne technologie, ontworpen voor de productieindustrie.",
     core_web: "Webapplicatie",
@@ -80,7 +97,7 @@ const marketing: Record<string, Record<string, string>> = {
     feat_dashboard_desc: "Real-time productie dashboards met werkstation overzicht, actieve medewerkers, spoedbestellingen en productieflow visualisatie.",
     feat_dashboard_bullets: "Werkstation controlepaneel|Production flow overzicht|Actieve machines & workers|Taak timeline per werkpost",
 
-    feat_broken_title: "Broken Parts",
+    feat_broken_title: "Beschadigde Onderdelen",
     feat_broken_desc: "Registreer beschadigde onderdelen per werkpost en project. Voeg afbeeldingen toe en bekijk samenvattingen met grafieken. Omzetten naar spoedopdracht.",
     feat_broken_bullets: "Werkpost- en projectgebonden|Afbeeldingen toevoegen|Samenvatting met grafieken|Omzetten naar spoedopdracht",
 
@@ -136,11 +153,14 @@ const marketing: Record<string, Record<string, string>> = {
     tech_mail_detail: "Wekelijkse projectstatus mail & verlofaanvragen",
 
     // Contact
+    contact_badge: "Start vandaag nog",
     contact_title: "Klaar om uw productie te stroomlijnen?",
     contact_subtitle: "Krijg uw eigen dedicated omgeving op",
     contact_cta: "Contacteer Ons",
     contact_email: "info@automattion-compass.com",
     contact_or: "of mail rechtstreeks naar",
+    contact_location: "België",
+    contact_hours: "Ma-Vr, 9:00 - 17:00 CET",
 
     // Stats
     stat_modules: "Modules",
@@ -172,6 +192,20 @@ const marketing: Record<string, Record<string, string>> = {
     hero_cta: "Request a Demo",
     hero_portal: "Thonon Portal",
 
+    showcase_badge: "Key modules",
+    showcase_title: "Built for production teams",
+    showcase_subtitle: "Three pillars that transform how you manage your manufacturing floor.",
+    showcase_workstations: "Workstation Management",
+    showcase_workstations_desc: "Real-time production overview with task assignment and progress tracking per workstation.",
+    showcase_planning: "Production Planning",
+    showcase_planning_desc: "Gantt charts, drag-and-drop scheduling and automatic capacity optimization.",
+    showcase_team: "Team Coordination",
+    showcase_team_desc: "Installation teams, holiday planning, time registration and personnel management.",
+
+    visual_title: "Smart Production Flow",
+    visual_desc: "Visualize your entire production chain from order intake to delivery.",
+
+    pain_badge: "Common challenges",
     pain_title: "Sound familiar?",
     pain_subtitle: "Many production companies struggle with these challenges daily.",
     pain_1: "Planning feels like guessing",
@@ -182,6 +216,7 @@ const marketing: Record<string, Record<string, string>> = {
     pain_6: "Knowledge is in people's heads, not in systems",
     pain_7: "We work in five tools that share nothing",
 
+    core_badge: "Why choose us",
     core_title: "Core Values",
     core_subtitle: "Built on modern technology, designed for the production industry.",
     core_web: "Web Application",
@@ -284,11 +319,14 @@ const marketing: Record<string, Record<string, string>> = {
     tech_resend: "Automatic emails via ReSend",
     tech_mail_detail: "Weekly project status email & holiday requests",
 
+    contact_badge: "Get started today",
     contact_title: "Ready to streamline your production?",
     contact_subtitle: "Get your own dedicated environment at",
     contact_cta: "Contact Us",
     contact_email: "info@automattion-compass.com",
     contact_or: "or email directly to",
+    contact_location: "Belgium",
+    contact_hours: "Mon-Fri, 9:00 - 17:00 CET",
 
     stat_modules: "Modules",
     stat_languages: "Languages",
@@ -318,6 +356,20 @@ const marketing: Record<string, Record<string, string>> = {
     hero_cta: "Demander une Démo",
     hero_portal: "Portail Thonon",
 
+    showcase_badge: "Modules clés",
+    showcase_title: "Conçu pour les équipes de production",
+    showcase_subtitle: "Trois piliers qui transforment la gestion de votre atelier de fabrication.",
+    showcase_workstations: "Gestion des postes de travail",
+    showcase_workstations_desc: "Vue d'ensemble de production en temps réel avec attribution de tâches et suivi de progression par poste.",
+    showcase_planning: "Planification de production",
+    showcase_planning_desc: "Diagrammes de Gantt, planification par glisser-déposer et optimisation automatique des capacités.",
+    showcase_team: "Coordination d'équipe",
+    showcase_team_desc: "Équipes d'installation, planification des congés, enregistrement du temps et gestion du personnel.",
+
+    visual_title: "Flux de production intelligent",
+    visual_desc: "Visualisez l'ensemble de votre chaîne de production, de la prise de commande à la livraison.",
+
+    pain_badge: "Défis courants",
     pain_title: "Vous reconnaissez ceci ?",
     pain_subtitle: "De nombreuses entreprises de production luttent quotidiennement avec ces défis.",
     pain_1: "La planification ressemble à un jeu de devinettes",
@@ -328,6 +380,7 @@ const marketing: Record<string, Record<string, string>> = {
     pain_6: "Le savoir est dans les têtes, pas dans les systèmes",
     pain_7: "Nous travaillons avec cinq outils qui ne partagent rien",
 
+    core_badge: "Pourquoi nous choisir",
     core_title: "Valeurs Fondamentales",
     core_subtitle: "Construit sur des technologies modernes, conçu pour l'industrie de la production.",
     core_web: "Application Web",
@@ -430,11 +483,14 @@ const marketing: Record<string, Record<string, string>> = {
     tech_resend: "Emails automatiques via ReSend",
     tech_mail_detail: "Email hebdomadaire statut projet & demandes de congé",
 
+    contact_badge: "Commencez aujourd'hui",
     contact_title: "Prêt à optimiser votre production ?",
     contact_subtitle: "Obtenez votre propre environnement dédié sur",
     contact_cta: "Contactez-Nous",
     contact_email: "info@automattion-compass.com",
     contact_or: "ou envoyez un email directement à",
+    contact_location: "Belgique",
+    contact_hours: "Lun-Ven, 9h00 - 17h00 CET",
 
     stat_modules: "Modules",
     stat_languages: "Langues",
