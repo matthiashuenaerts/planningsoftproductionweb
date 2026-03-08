@@ -294,13 +294,13 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
           )}
 
           {formData.task_type === 'workstation' && (
-            <div className="space-y-2">
-              <Label htmlFor="workstation-task">{t("workstation_task")}</Label>
+            <div className="space-y-1">
+              <Label htmlFor="workstation-task" className={isMobile ? 'text-xs' : ''}>{t("workstation_task")}</Label>
               <Select value={formData.workstation_task_id} onValueChange={(value) => setFormData(prev => ({ ...prev, workstation_task_id: value }))}>
-              <SelectTrigger>
+              <SelectTrigger className={isMobile ? 'h-9 text-sm' : ''}>
                 <SelectValue placeholder={t("select_workstation_task")} />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg z-50">
+              <SelectContent className="bg-background border shadow-lg z-50">
                 {workstationTasks.map((task) => (
                   <SelectItem key={task.id} value={task.id}>
                     {task.task_number} - {task.task_name}
