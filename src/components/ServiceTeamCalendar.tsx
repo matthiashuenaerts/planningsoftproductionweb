@@ -665,6 +665,7 @@ const ServiceTeamCalendar: React.FC = () => {
         teamName={mapTeamName}
         dateLabel={mapDateLabel}
         startPoint={mapStartPoint}
+        totalDrivingMinutes={mapDrivingMinutes}
       />
     </div>
   );
