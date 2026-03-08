@@ -835,7 +835,7 @@ const ServiceTeamCalendar: React.FC = () => {
                 </div>
               ))}
               <Button variant="outline" size="sm" onClick={() => setAssignTodos([...assignTodos, ''])} className="w-full">
-                <Plus className="h-4 w-4 mr-1" /> Add Todo
+                <Plus className="h-4 w-4 mr-1" /> {t('svc_add_todo')}
               </Button>
             </div>
           </div>
