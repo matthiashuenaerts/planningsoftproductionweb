@@ -1039,6 +1039,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                         type="number" 
                         min="1" 
                         max="100" 
+                        className={cn(isMobile && "h-9 text-sm")}
                         {...field} 
                         onChange={e => field.onChange(parseInt(e.target.value))}
                       />
