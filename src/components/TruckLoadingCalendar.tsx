@@ -490,7 +490,7 @@ const TruckLoadingCalendar = () => {
                           </Badge>
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={() => adjustLoadingDate(assignment.project.id, 'left')}
+                              onClick={(e) => { e.stopPropagation(); adjustLoadingDate(assignment.project.id, 'left'); }}
                               className="text-sm text-blue-600 hover:text-blue-800 opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                               ←
