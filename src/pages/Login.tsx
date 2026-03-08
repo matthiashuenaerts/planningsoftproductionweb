@@ -38,7 +38,7 @@ const Login: React.FC = () => {
 
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { login, isAuthenticated, isDeveloper } = useAuth();
+  const { login, isAuthenticated, isDeveloper, refetchEmployee } = useAuth();
   const location = useLocation();
   const { tenant } = useParams<{ tenant: string }>();
 
