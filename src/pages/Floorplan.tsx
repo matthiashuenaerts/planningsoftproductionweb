@@ -274,6 +274,18 @@ const Floorplan: React.FC = () => {
   }, []);
 
   const handleWorkstationPositionChange = async (workstationId: string, x: number, y: number) => {
+    // Optimistically update local state so the dot moves visually
+    setWorkstationPositions(prev => {
+      const existing = prev.find(p => p.workstation_id === workstationId);
+      if (existing) {
+        return prev.map(p => p.workstation_id === workstationId ? { ...p, x_position: x, y_position: y } : p);
+      }
+      return [...prev, { id: workstationId, workstation_id: workstationId, x_position: x, y_position: y, buffer_x_position: x + 3, buffer_y_position: y + 5, created_at: '', updated_at: '' }];
+    });
+  };
+
+  // Save to DB only on mouse up (debounced)
+  const saveWorkstationPosition = async (workstationId: string, x: number, y: number) => {
     try {
       await floorplanService.updateWorkstationPosition(workstationId, x, y);
     } catch (error) {
@@ -283,6 +295,17 @@ const Floorplan: React.FC = () => {
   };
 
   const handleBufferPositionChange = async (workstationId: string, x: number, y: number) => {
+    // Optimistically update local state
+    setWorkstationPositions(prev => {
+      const existing = prev.find(p => p.workstation_id === workstationId);
+      if (existing) {
+        return prev.map(p => p.workstation_id === workstationId ? { ...p, buffer_x_position: x, buffer_y_position: y } : p);
+      }
+      return prev;
+    });
+  };
+
+  const saveBufferPosition = async (workstationId: string, x: number, y: number) => {
     try {
       await floorplanService.updateBufferPosition(workstationId, x, y);
     } catch (error) {
@@ -450,6 +473,7 @@ const Floorplan: React.FC = () => {
                       e.preventDefault();
                       e.stopPropagation();
                       
+                      let lastX = 0, lastY = 0;
                       const handleMouseMove = (moveE: MouseEvent) => {
                         if (!imageRef.current) return;
                         
@@ -457,15 +481,18 @@ const Floorplan: React.FC = () => {
                         const x = ((moveE.clientX - imageRect.left) / imageRect.width) * 100;
                         const y = ((moveE.clientY - imageRect.top) / imageRect.height) * 100;
                         
-                        const clampedX = Math.max(0, Math.min(100, x));
-                        const clampedY = Math.max(0, Math.min(100, y));
+                        lastX = Math.max(0, Math.min(100, x));
+                        lastY = Math.max(0, Math.min(100, y));
                         
-                        handleWorkstationPositionChange(workstation.id, clampedX, clampedY);
+                        handleWorkstationPositionChange(workstation.id, lastX, lastY);
                       };
                       
                       const handleMouseUp = () => {
                         document.removeEventListener('mousemove', handleMouseMove);
                         document.removeEventListener('mouseup', handleMouseUp);
+                        if (lastX && lastY) {
+                          saveWorkstationPosition(workstation.id, lastX, lastY);
+                        }
                       };
                       
                       document.addEventListener('mousemove', handleMouseMove);
@@ -522,17 +549,21 @@ const Floorplan: React.FC = () => {
                       e.preventDefault();
                       e.stopPropagation();
                       
+                      let lastBufX = 0, lastBufY = 0;
                       const handleMouseMove = (moveE: MouseEvent) => {
                         if (!imageRef.current) return;
                         const rect = imageRef.current.getBoundingClientRect();
-                        const x = Math.max(0, Math.min(100, ((moveE.clientX - rect.left) / rect.width) * 100));
-                        const y = Math.max(0, Math.min(100, ((moveE.clientY - rect.top) / rect.height) * 100));
-                        handleBufferPositionChange(ws.id, x, y);
+                        lastBufX = Math.max(0, Math.min(100, ((moveE.clientX - rect.left) / rect.width) * 100));
+                        lastBufY = Math.max(0, Math.min(100, ((moveE.clientY - rect.top) / rect.height) * 100));
+                        handleBufferPositionChange(ws.id, lastBufX, lastBufY);
                       };
                       
                       const handleMouseUp = () => {
                         document.removeEventListener('mousemove', handleMouseMove);
                         document.removeEventListener('mouseup', handleMouseUp);
+                        if (lastBufX && lastBufY) {
+                          saveBufferPosition(ws.id, lastBufX, lastBufY);
+                        }
                       };
                       
                       document.addEventListener('mousemove', handleMouseMove);
