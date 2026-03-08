@@ -75,7 +75,7 @@ const DevDashboard: React.FC = () => {
     queryFn: async () => {
       const { data } = await supabase
         .from("support_tickets")
-        .select("id, title, status, priority, created_at, tenant_id")
+        .select("id, subject, status, priority, created_at, tenant_id")
         .not("status", "in", '("resolved","closed")')
         .order("created_at", { ascending: false });
       return data ?? [];
