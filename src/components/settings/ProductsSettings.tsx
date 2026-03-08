@@ -675,17 +675,7 @@ const ProductsSettings: React.FC = () => {
     }
   };
 
-  const getImageUrl = (imagePath: string | null) => {
-    if (!imagePath) return null;
-    // If it's already a full URL, return as-is
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return imagePath;
-    }
-    const { data } = supabase.storage
-      .from('product-images')
-      .getPublicUrl(imagePath);
-    return data.publicUrl;
-  };
+  // Images are rendered via SignedStorageImage component for private bucket access
 
   // Only show initial loading state when there are no products yet
   if (loading && products.length === 0 && !searchTerm) {

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, Package, ExternalLink, Layers, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import SignedStorageImage from '@/components/SignedStorageImage';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -181,16 +182,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
     setSearchTerm('');
   };
 
-  const getImageUrl = (imagePath: string | null) => {
-    if (!imagePath) return null;
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return imagePath;
-    }
-    const { data } = supabase.storage
-      .from('product-images')
-      .getPublicUrl(imagePath);
-    return data.publicUrl;
-  };
+  // Images are rendered via SignedStorageImage component for private bucket access
 
   // ── Mobile product card ──
   const ProductCard = ({ product }: { product: Product }) => (
@@ -199,8 +191,9 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
       onClick={() => handleProductSelect(product)}
     >
       {product.image_path ? (
-        <img
-          src={getImageUrl(product.image_path) || ''}
+        <SignedStorageImage
+          bucket="product-images"
+          path={product.image_path}
           alt={product.name}
           className="h-12 w-12 object-cover rounded-lg flex-shrink-0"
         />
@@ -245,8 +238,9 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
       onClick={() => handleGroupSelect(group)}
     >
       {group.image_path ? (
-        <img
-          src={getImageUrl(group.image_path) || ''}
+        <SignedStorageImage
+          bucket="product-images"
+          path={group.image_path}
           alt={group.name}
           className="h-12 w-12 object-cover rounded-lg flex-shrink-0"
         />
@@ -341,7 +335,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                     <TableRow key={product.id}>
                       <TableCell>
                         {product.image_path ? (
-                          <img src={getImageUrl(product.image_path) || ''} alt={product.name} className="h-10 w-10 object-cover rounded" />
+                          <SignedStorageImage bucket="product-images" path={product.image_path} alt={product.name} className="h-10 w-10 object-cover rounded" />
                         ) : (
                           <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
                             <Package className="h-4 w-4 text-muted-foreground" />
@@ -405,7 +399,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                     <TableRow key={group.id}>
                       <TableCell>
                         {group.image_path ? (
-                          <img src={getImageUrl(group.image_path) || ''} alt={group.name} className="h-10 w-10 object-cover rounded" />
+                          <SignedStorageImage bucket="product-images" path={group.image_path} alt={group.name} className="h-10 w-10 object-cover rounded" />
                         ) : (
                           <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
                             <Layers className="h-4 w-4 text-muted-foreground" />
@@ -465,7 +459,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                   <TableRow key={product.id}>
                     <TableCell>
                       {product.image_path ? (
-                        <img src={getImageUrl(product.image_path) || ''} alt={product.name} className="h-10 w-10 object-cover rounded" />
+                        <SignedStorageImage bucket="product-images" path={product.image_path} alt={product.name} className="h-10 w-10 object-cover rounded" />
                       ) : (
                         <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
                           <Package className="h-4 w-4 text-muted-foreground" />

@@ -128,13 +128,13 @@ export const brokenPartsService = {
     }
   },
   
-  // Get image URL from path
-  getImageUrl(path: string | null): string | null {
+  // Get image URL from path - now uses signed URLs for private buckets
+  async getImageUrl(path: string | null): Promise<string | null> {
     if (!path) return null;
     
     try {
-      const { data } = supabase.storage.from('broken_parts').getPublicUrl(path);
-      return data.publicUrl;
+      const { createSignedUrl } = await import('@/lib/storageUtils');
+      return await createSignedUrl('broken_parts', path);
     } catch (error) {
       console.error('Error getting image URL:', error);
       return null;

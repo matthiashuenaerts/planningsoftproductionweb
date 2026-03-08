@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Trash2, Package, Search, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import SignedStorageImage from '@/components/SignedStorageImage';
 
 interface Product {
   id: string;
@@ -292,17 +293,7 @@ const GroupProductDialog: React.FC<GroupProductDialogProps> = ({
     }
   };
 
-  const getImageUrl = (imagePath: string | null) => {
-    if (!imagePath) return null;
-    // If it's already a full URL, return as-is
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return imagePath;
-    }
-    const { data } = supabase.storage
-      .from('product-images')
-      .getPublicUrl(imagePath);
-    return data.publicUrl;
-  };
+  // Images are rendered via SignedStorageImage component for private bucket access
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -353,11 +344,7 @@ const GroupProductDialog: React.FC<GroupProductDialogProps> = ({
               className="mt-1"
             />
             {editingGroup?.image_path && !imageFile && (
-              <img
-                src={getImageUrl(editingGroup.image_path) || ''}
-                alt="Current"
-                className="h-16 w-16 object-cover rounded mt-2"
-              />
+              <SignedStorageImage bucket="product-images" path={editingGroup.image_path} alt="Current" className="h-16 w-16 object-cover rounded mt-2" />
             )}
           </div>
 
@@ -396,11 +383,7 @@ const GroupProductDialog: React.FC<GroupProductDialogProps> = ({
                       >
                         <div className="flex items-center gap-2">
                           {product.image_path && (
-                            <img
-                              src={getImageUrl(product.image_path) || ''}
-                              alt={product.name}
-                              className="h-8 w-8 object-cover rounded"
-                            />
+                            <SignedStorageImage bucket="product-images" path={product.image_path} alt={product.name} className="h-8 w-8 object-cover rounded" />
                           )}
                           <div>
                             <div className="font-medium">{product.name}</div>
@@ -454,11 +437,7 @@ const GroupProductDialog: React.FC<GroupProductDialogProps> = ({
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {product?.image_path && (
-                              <img
-                                src={getImageUrl(product.image_path) || ''}
-                                alt={product?.name}
-                                className="h-8 w-8 object-cover rounded"
-                              />
+                              <SignedStorageImage bucket="product-images" path={product.image_path} alt={product?.name || ''} className="h-8 w-8 object-cover rounded" />
                             )}
                             <span>{product?.name}</span>
                           </div>

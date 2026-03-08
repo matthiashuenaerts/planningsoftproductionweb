@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Plus, AlertTriangle, X, Eye, MoreVertical, Trash, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { supabase } from '@/integrations/supabase/client';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { useLanguage } from '@/context/LanguageContext';
@@ -24,6 +23,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useTenant } from '@/context/TenantContext';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import SignedStorageImage from '@/components/SignedStorageImage';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,15 +77,17 @@ const BrokenPartsList: React.FC = () => {
     setVisibleCount(PAGE_SIZE);
   }, [tenant?.id]);
 
-  const getImageUrl = (path: string) => {
+  // Use signed URLs for private bucket access
+  const getSignedImageUrl = async (path: string): Promise<string | null> => {
     if (!path) return null;
-    const { data } = supabase.storage.from('broken_parts').getPublicUrl(path);
-    return data.publicUrl;
+    const { createSignedUrl } = await import('@/lib/storageUtils');
+    return await createSignedUrl('broken_parts', path);
   };
 
-  const openImageDialog = (imagePath: string) => {
+  const openImageDialog = async (imagePath: string) => {
     if (!imagePath) return;
-    setSelectedImage(getImageUrl(imagePath));
+    const signedUrl = await getSignedImageUrl(imagePath);
+    setSelectedImage(signedUrl);
   };
 
   const handleImageError = (id: string) => {
@@ -157,11 +160,11 @@ const BrokenPartsList: React.FC = () => {
                   openImageDialog(part.image_path);
                 }}
               >
-                <img
-                  src={getImageUrl(part.image_path)!}
+                <SignedStorageImage
+                  bucket="broken_parts"
+                  path={part.image_path}
                   alt={t('broken_parts') || 'Broken part'}
                   className="object-cover w-full h-full"
-                  onError={() => handleImageError(part.id)}
                 />
               </div>
             ) : (
@@ -292,11 +295,11 @@ const BrokenPartsList: React.FC = () => {
                                       <AlertTriangle className="h-6 w-6 text-amber-500" />
                                     </div>
                                   ) : (
-                                    <img
-                                      src={getImageUrl(part.image_path)!}
+                                    <SignedStorageImage
+                                      bucket="broken_parts"
+                                      path={part.image_path}
                                       alt={t('broken_parts') || 'Broken part'}
                                       className="object-cover w-full h-full"
-                                      onError={() => handleImageError(part.id)}
                                     />
                                   )}
                                 </AspectRatio>

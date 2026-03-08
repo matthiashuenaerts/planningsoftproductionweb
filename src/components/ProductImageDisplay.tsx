@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Image as ImageIcon } from 'lucide-react';
 import { ImageModal } from '@/components/ui/image-modal';
 import { supabase } from '@/integrations/supabase/client';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 
 interface ProductImageDisplayProps {
   articleCode: string;
@@ -45,17 +46,7 @@ export const ProductImageDisplay: React.FC<ProductImageDisplayProps> = ({ articl
     fetchProduct();
   }, [articleCode]);
 
-  const getImageUrl = (imagePath: string | null) => {
-    if (!imagePath) return null;
-    // If it's already a full URL, return as-is
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return imagePath;
-    }
-    const { data } = supabase.storage
-      .from('product-images')
-      .getPublicUrl(imagePath);
-    return data.publicUrl;
-  };
+  const imageUrl = useSignedUrl('product-images', product?.image_path);
 
   if (loading) {
     return (
@@ -70,7 +61,6 @@ export const ProductImageDisplay: React.FC<ProductImageDisplayProps> = ({ articl
     return null;
   }
 
-  const imageUrl = getImageUrl(product.image_path);
   if (!imageUrl) return null;
 
   return (

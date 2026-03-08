@@ -41,11 +41,21 @@ export const BrokenPartDetailDialog: React.FC<BrokenPartDetailDialogProps> = ({
   const { t } = useLanguage();
   const isMobile = useIsMobile();
 
-  const getImageUrl = (path: string) => {
-    if (!path) return null;
-    const { data } = supabase.storage.from('broken_parts').getPublicUrl(path);
-    return data.publicUrl;
-  };
+  // Use signed URLs for private bucket access
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const loadImageUrl = async () => {
+      if (brokenPart?.image_path) {
+        const { createSignedUrl } = await import('@/lib/storageUtils');
+        const url = await createSignedUrl('broken_parts', brokenPart.image_path);
+        setImageUrl(url);
+      } else {
+        setImageUrl(null);
+      }
+    };
+    loadImageUrl();
+  }, [brokenPart?.image_path]);
 
   const handleOpenRushOrderForm = async () => {
     setShowRushOrderForm(true);
@@ -69,15 +79,12 @@ export const BrokenPartDetailDialog: React.FC<BrokenPartDetailDialogProps> = ({
     const prepareInitialValues = async () => {
       let attachmentFile: File | undefined = undefined;
       
-      if (brokenPart.image_path) {
+      if (brokenPart.image_path && imageUrl) {
         try {
-          const imageUrl = getImageUrl(brokenPart.image_path);
-          if (imageUrl) {
-            const response = await fetch(imageUrl);
-            const blob = await response.blob();
-            const fileName = brokenPart.image_path.split('/').pop() || 'broken-part-image.jpg';
-            attachmentFile = new File([blob], fileName, { type: blob.type });
-          }
+          const response = await fetch(imageUrl);
+          const blob = await response.blob();
+          const fileName = brokenPart.image_path.split('/').pop() || 'broken-part-image.jpg';
+          attachmentFile = new File([blob], fileName, { type: blob.type });
         } catch (error) {
           console.error('Error loading image:', error);
         }
@@ -106,7 +113,7 @@ This is an urgent repair request for a broken part that is blocking production.`
 
   if (!brokenPart) return null;
 
-  const imageUrl = getImageUrl(brokenPart.image_path);
+  // imageUrl is already computed from useEffect above
 
   const content = (
     <div className={`flex flex-col gap-4 ${isMobile ? '' : 'grid grid-cols-2 gap-6'}`}>
