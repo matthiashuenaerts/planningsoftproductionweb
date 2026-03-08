@@ -23,9 +23,9 @@ const Index = () => {
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+      <div className={`w-full ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6">{t('dashboard')}</h1>
+          <h1 className={`font-bold mb-4 sm:mb-6 ${isMobile ? 'text-xl' : 'text-3xl'}`}>{t('dashboard')}</h1>
           <Dashboard />
         </div>
       </div>
