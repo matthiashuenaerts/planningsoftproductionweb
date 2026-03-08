@@ -100,6 +100,7 @@ export interface WorkstationGanttChartRef {
 const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGanttChartProps>(({ selectedDate, onDateChange, onPlanningGenerated }, ref) => {
   const navigate = useNavigate();
   const { t, createLocalizedPath } = useLanguage();
+  const isMobile = useIsMobile();
   const [workstations, setWorkstations] = useState<Workstation[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [workingHours, setWorkingHours] = useState<WorkingHours[]>([]);
