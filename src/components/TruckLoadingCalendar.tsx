@@ -493,7 +493,7 @@ const TruckLoadingCalendar = () => {
           ) : (
             <div className="text-center py-6 text-gray-500">
               <Clock className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-              <p>No upcoming loading scheduled</p>
+              <p>{t('truck_no_upcoming')}</p>
             </div>
           )}
         </CardContent>
