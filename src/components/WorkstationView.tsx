@@ -1201,18 +1201,18 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                       }}
                     >
                       {/* Task Info Section */}
-                      <div className={`${isMobile ? 'space-y-1 mb-2' : 'space-y-2 mb-4'}`}>
-                        <h3 className="font-semibold text-base sm:text-lg leading-tight text-foreground">{task.project_name}</h3>
-                        <p className="text-sm text-muted-foreground">{task.title}</p>
+                      <div className={`${isMobile ? 'space-y-0.5 mb-2' : 'space-y-2 mb-4'}`}>
+                        <h3 className={`font-semibold leading-tight text-foreground ${isMobile ? 'text-sm' : 'text-base sm:text-lg'}`}>{task.project_name}</h3>
+                        <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>{task.title}</p>
                         
                         {task.due_date && (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
                               {t('due_date_label', { date: format(new Date(task.due_date), 'MMM dd, yyyy') })}
                             </p>
                             {urgency && (
-                              <Badge variant={urgency.variant} className="text-xs">
-                                {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-1" />}
+                              <Badge variant={urgency.variant} className={isMobile ? 'text-[10px] px-1.5 py-0' : 'text-xs'}>
+                                {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-0.5" />}
                                 {urgency.label}
                               </Badge>
                             )}
