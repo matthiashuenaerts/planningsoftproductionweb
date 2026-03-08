@@ -495,10 +495,11 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
                 tags: [],
                 display_order: 0,
                 is_published: true,
+                is_global: false,
                 created_by: '',
                 created_at: '',
                 updated_at: '',
-                category: categories[0] || { id: '', name: '', description: '', display_order: 0, is_active: true, created_at: '', updated_at: '' }
+                category: categories[0] || { id: '', name: '', description: '', display_order: 0, is_active: true, is_global: false, created_at: '', updated_at: '' }
               })}
             >
               <Plus className="h-4 w-4 mr-1" />
