@@ -322,10 +322,10 @@ const Logistics = () => {
         </div>
 
         <Tabs defaultValue="today" className={isMobile ? 'space-y-2' : 'space-y-4'}>
-          <TabsList className={isMobile ? 'w-full grid grid-cols-3 h-9' : ''}>
-            <TabsTrigger value="today" className={isMobile ? 'text-[11px] px-1' : ''}>{isMobile ? t("todays_deliveries") : t("todays_deliveries")}</TabsTrigger>
-            <TabsTrigger value="upcoming" className={isMobile ? 'text-[11px] px-1' : ''}>{isMobile ? t("upcoming_deliveries") : t("upcoming_deliveries")}</TabsTrigger>
-            <TabsTrigger value="backorders" className={isMobile ? 'text-[11px] px-1' : ''}>{isMobile ? t("backorder_deliveries") : t("backorder_deliveries")}</TabsTrigger>
+          <TabsList className={isMobile ? 'w-full grid grid-cols-3 h-9 gap-0.5' : ''}>
+            <TabsTrigger value="today" className={isMobile ? 'text-[9px] px-0.5 leading-tight truncate' : ''}>{t("todays_deliveries")}</TabsTrigger>
+            <TabsTrigger value="upcoming" className={isMobile ? 'text-[9px] px-0.5 leading-tight truncate' : ''}>{t("upcoming_deliveries")}</TabsTrigger>
+            <TabsTrigger value="backorders" className={isMobile ? 'text-[9px] px-0.5 leading-tight truncate' : ''}>{t("backorder_deliveries")}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="today" className="space-y-4">
