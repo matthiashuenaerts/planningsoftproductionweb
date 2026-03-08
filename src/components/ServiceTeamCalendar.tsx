@@ -86,6 +86,9 @@ const ServiceTeamCalendar: React.FC = () => {
     startPoint?: { lat: number; lng: number; address: string };
     totalDrivingMinutes?: number;
     unrecognizedAddresses?: string[];
+    departureTime?: string;
+    workStartTime?: string;
+    workEndTime?: string;
   }>>({});
 
   const weekDays = eachDayOfInterval({
