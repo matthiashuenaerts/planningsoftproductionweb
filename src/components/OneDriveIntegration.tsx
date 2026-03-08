@@ -137,7 +137,7 @@ async function generatePKCE() {
 const { data, error } = await supabase.functions.invoke(
   'onedrive-auth?action=refresh-token',
   {
-    body: { refreshToken },
+    body: { refreshToken, clientId: tenantClientId },
   }
 );
 
