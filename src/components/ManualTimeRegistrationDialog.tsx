@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,7 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { tenant } = useTenant();
+  const isMobile = useIsMobile();
 
   const [formData, setFormData] = useState({
     employee_id: '',
@@ -217,22 +219,22 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t("add_manual_time_registration")}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className={`${isMobile ? 'max-w-[calc(100vw-1.5rem)] w-[calc(100vw-1.5rem)] p-4 max-h-[90vh] overflow-y-auto' : 'max-w-md'}`}>
+        <DialogHeader className={isMobile ? 'space-y-1' : ''}>
+          <DialogTitle className={isMobile ? 'text-base' : ''}>{t("add_manual_time_registration")}</DialogTitle>
+          <DialogDescription className={isMobile ? 'text-xs' : ''}>
             {t("create_new_time_registration_manually")}
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="employee">{t("employee")}</Label>
+        <form onSubmit={handleSubmit} className={isMobile ? 'space-y-3' : 'space-y-4'}>
+          <div className="space-y-1">
+            <Label htmlFor="employee" className={isMobile ? 'text-xs' : ''}>{t("employee")}</Label>
             <Select value={formData.employee_id} onValueChange={(value) => setFormData(prev => ({ ...prev, employee_id: value }))}>
-              <SelectTrigger>
+              <SelectTrigger className={isMobile ? 'h-9 text-sm' : ''}>
                 <SelectValue placeholder={t("select_employee")} />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg z-50">
+              <SelectContent className="bg-background border shadow-lg z-50">
                 {employees.map((employee) => (
                   <SelectItem key={employee.id} value={employee.id}>
                     {employee.name}
@@ -242,13 +244,13 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="task-type">{t("task_type")}</Label>
+          <div className="space-y-1">
+            <Label htmlFor="task-type" className={isMobile ? 'text-xs' : ''}>{t("task_type")}</Label>
             <Select value={formData.task_type} onValueChange={(value) => setFormData(prev => ({ ...prev, task_type: value, project_id: '', task_id: '', workstation_task_id: '' }))}>
-              <SelectTrigger>
+              <SelectTrigger className={isMobile ? 'h-9 text-sm' : ''}>
                 <SelectValue placeholder={t("select_task_type")} />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg z-50">
+              <SelectContent className="bg-background border shadow-lg z-50">
                 <SelectItem value="project">{t("project_task")}</SelectItem>
                 <SelectItem value="workstation">{t("workstation_task")}</SelectItem>
               </SelectContent>
@@ -257,13 +259,13 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
 
           {formData.task_type === 'project' && (
             <>
-              <div className="space-y-2">
-                <Label htmlFor="project">{t("project")}</Label>
+              <div className="space-y-1">
+                <Label htmlFor="project" className={isMobile ? 'text-xs' : ''}>{t("project")}</Label>
                 <Select value={formData.project_id} onValueChange={(value) => setFormData(prev => ({ ...prev, project_id: value, task_id: '' }))}>
-                  <SelectTrigger>
+                  <SelectTrigger className={isMobile ? 'h-9 text-sm' : ''}>
                     <SelectValue placeholder={t("select_project")} />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg z-50">
+                  <SelectContent className="bg-background border shadow-lg z-50">
                     {projects.map((project) => (
                       <SelectItem key={project.id} value={project.id}>
                         {project.name}
@@ -273,13 +275,13 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="task">{t("task")}</Label>
+              <div className="space-y-1">
+                <Label htmlFor="task" className={isMobile ? 'text-xs' : ''}>{t("task")}</Label>
                 <Select value={formData.task_id} onValueChange={(value) => setFormData(prev => ({ ...prev, task_id: value }))} disabled={!formData.project_id}>
-                  <SelectTrigger>
+                  <SelectTrigger className={isMobile ? 'h-9 text-sm' : ''}>
                     <SelectValue placeholder={formData.project_id ? t("select_task") : t("select_project_first")} />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg z-50">
+                  <SelectContent className="bg-background border shadow-lg z-50">
                     {projectTasks.map((task) => (
                       <SelectItem key={task.id} value={task.id}>
                         {task.phases?.name} - {task.title}
@@ -292,13 +294,13 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
           )}
 
           {formData.task_type === 'workstation' && (
-            <div className="space-y-2">
-              <Label htmlFor="workstation-task">{t("workstation_task")}</Label>
+            <div className="space-y-1">
+              <Label htmlFor="workstation-task" className={isMobile ? 'text-xs' : ''}>{t("workstation_task")}</Label>
               <Select value={formData.workstation_task_id} onValueChange={(value) => setFormData(prev => ({ ...prev, workstation_task_id: value }))}>
-              <SelectTrigger>
+              <SelectTrigger className={isMobile ? 'h-9 text-sm' : ''}>
                 <SelectValue placeholder={t("select_workstation_task")} />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg z-50">
+              <SelectContent className="bg-background border shadow-lg z-50">
                 {workstationTasks.map((task) => (
                   <SelectItem key={task.id} value={task.id}>
                     {task.task_number} - {task.task_name}
@@ -309,29 +311,33 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
           </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="start-time">{t("start_time")}</Label>
-            <Input
-              id="start-time"
-              type="datetime-local"
-              value={formData.start_time}
-              onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
-              required
-            />
+          <div className={isMobile ? 'grid grid-cols-2 gap-2' : 'space-y-4'}>
+            <div className="space-y-1">
+              <Label htmlFor="start-time" className={isMobile ? 'text-xs' : ''}>{t("start_time")}</Label>
+              <Input
+                id="start-time"
+                type="datetime-local"
+                value={formData.start_time}
+                onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
+                required
+                className={isMobile ? 'h-9 text-sm' : ''}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="end-time" className={isMobile ? 'text-xs' : ''}>{t("end_time")}</Label>
+              <Input
+                id="end-time"
+                type="datetime-local"
+                value={formData.end_time}
+                onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
+                className={isMobile ? 'h-9 text-sm' : ''}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="end-time">{t("end_time")}</Label>
-            <Input
-              id="end-time"
-              type="datetime-local"
-              value={formData.end_time}
-              onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="duration">{t("duration_minutes")}</Label>
+          <div className="space-y-1">
+            <Label htmlFor="duration" className={isMobile ? 'text-xs' : ''}>{t("duration_minutes")}</Label>
             <Input
               id="duration"
               type="number"
@@ -339,14 +345,15 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
               value={formData.duration_minutes}
               onChange={(e) => setFormData(prev => ({ ...prev, duration_minutes: e.target.value }))}
               placeholder={t("enter_duration_minutes")}
+              className={isMobile ? 'h-9 text-sm' : ''}
             />
           </div>
 
-          <div className="flex gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className={`flex gap-2 ${isMobile ? 'pt-2' : 'pt-4'}`}>
+            <Button type="button" variant="outline" size={isMobile ? 'sm' : 'default'} onClick={() => onOpenChange(false)} className={isMobile ? 'flex-1' : ''}>
               {t("cancel")}
             </Button>
-            <Button type="submit" disabled={createTimeRegistrationMutation.isPending}>
+            <Button type="submit" size={isMobile ? 'sm' : 'default'} disabled={createTimeRegistrationMutation.isPending} className={isMobile ? 'flex-1' : ''}>
               {createTimeRegistrationMutation.isPending ? t("creating") : t("create")}
             </Button>
           </div>
