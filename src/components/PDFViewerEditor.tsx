@@ -1874,44 +1874,46 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   return (
     <div className={`flex flex-col bg-background ${fullscreen ? 'h-full' : 'min-h-[70vh] h-[80vh]'}`} ref={containerRef}>
       {/* Header Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 p-3 border-b bg-card">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
-            Page {currentVisiblePage} of {totalPages}
+      <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 sm:py-3 border-b bg-card">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="text-[10px] sm:text-sm text-muted-foreground whitespace-nowrap">
+            Page {currentVisiblePage}/{totalPages}
           </span>
           
-          <div className="flex items-center gap-1 ml-4">
+          <div className="flex items-center gap-0.5 sm:gap-1 ml-1 sm:ml-4">
             <Button
               onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
               size="sm"
               variant="outline"
               disabled={scale <= 0.5}
+              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
             >
-              <ZoomOut className="h-4 w-4" />
+              <ZoomOut className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <span className="text-sm w-16 text-center">{Math.round(scale * 100)}%</span>
+            <span className="text-[10px] sm:text-sm w-10 sm:w-16 text-center">{Math.round(scale * 100)}%</span>
             <Button
               onClick={() => setScale(s => Math.min(3, s + 0.25))}
               size="sm"
               variant="outline"
               disabled={scale >= 3}
+              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
             >
-              <ZoomIn className="h-4 w-4" />
+              <ZoomIn className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {lastSaved && (
-            <span className="text-xs text-muted-foreground">
+            <span className="hidden sm:inline text-xs text-muted-foreground">
               Saved {lastSaved.toLocaleTimeString()}
             </span>
           )}
           
           {isEditMode && (
-            <Button onClick={saveToPDF} size="sm" variant="default" disabled={saving}>
-              <Save className="h-4 w-4 mr-1" />
-              {saving ? 'Saving...' : 'Save'}
+            <Button onClick={saveToPDF} size="sm" variant="default" disabled={saving} className="h-7 sm:h-8 text-[10px] sm:text-sm px-2 sm:px-3">
+              <Save className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
+              {saving ? '...' : 'Save'}
             </Button>
           )}
           
@@ -1919,35 +1921,36 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             onClick={toggleEditMode}
             size="sm"
             variant={isEditMode ? "secondary" : "default"}
-            className={isEditMode ? "bg-blue-500 hover:bg-blue-600 text-white" : ""}
+            className={`h-7 sm:h-8 text-[10px] sm:text-sm px-2 sm:px-3 ${isEditMode ? "bg-blue-500 hover:bg-blue-600 text-white" : ""}`}
           >
             {isEditMode ? (
               <>
-                <Eye className="h-4 w-4 mr-1" />
-                Preview
+                <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
+                <span className="hidden sm:inline">Preview</span>
               </>
             ) : (
               <>
-                <Edit3 className="h-4 w-4 mr-1" />
-                Edit PDF
+                <Edit3 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
+                <span className="hidden sm:inline">Edit PDF</span>
+                <span className="sm:hidden">Edit</span>
               </>
             )}
           </Button>
           
           {isEditMode && (
-            <Button onClick={cancelEdits} size="sm" variant="outline">
-              <X className="h-4 w-4 mr-1" />
-              Cancel
+            <Button onClick={cancelEdits} size="sm" variant="outline" className="h-7 sm:h-8 p-0 w-7 sm:w-auto sm:px-3">
+              <X className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Cancel</span>
             </Button>
           )}
           
-          <Button onClick={downloadPDF} size="sm" variant="outline">
-            <Download className="h-4 w-4" />
+          <Button onClick={downloadPDF} size="sm" variant="outline" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+            <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           </Button>
           
           {!fullscreen && (
-            <Button onClick={openInNewTab} size="sm" variant="outline" title="Open in new tab">
-              <ExternalLink className="h-4 w-4" />
+            <Button onClick={openInNewTab} size="sm" variant="outline" title="Open in new tab" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           )}
         </div>
@@ -1955,78 +1958,42 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
       {/* Edit Tools */}
       {isEditMode && (
-        <div className="flex flex-wrap items-center gap-3 p-3 border-b bg-muted/30">
-          <div className="flex items-center gap-1 border-r pr-3">
-            <Button
-              onClick={() => handleToolChange('cursor')}
-              size="sm"
-              variant={activeTool === 'cursor' ? 'default' : 'ghost'}
-              title="Pan / Scroll (pen still draws)"
-            >
-              <Hand className="h-4 w-4" />
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-3 border-b bg-muted/30">
+          <div className="flex items-center gap-0.5 sm:gap-1 border-r pr-1.5 sm:pr-3">
+            <Button onClick={() => handleToolChange('cursor')} size="sm" variant={activeTool === 'cursor' ? 'default' : 'ghost'} title="Pan" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Hand className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button
-              onClick={() => handleToolChange('select')}
-              size="sm"
-              variant={activeTool === 'select' ? 'default' : 'ghost'}
-              title="Select"
-            >
-              <Move className="h-4 w-4" />
+            <Button onClick={() => handleToolChange('select')} size="sm" variant={activeTool === 'select' ? 'default' : 'ghost'} title="Select" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Move className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button
-              onClick={() => handleToolChange('draw')}
-              size="sm"
-              variant={activeTool === 'draw' ? 'default' : 'ghost'}
-              title="Draw / Pencil"
-              className={activeTool === 'draw' ? 'bg-primary text-primary-foreground ring-2 ring-primary' : ''}
-            >
-              <Pencil className="h-4 w-4" />
+            <Button onClick={() => handleToolChange('draw')} size="sm" variant={activeTool === 'draw' ? 'default' : 'ghost'} title="Draw" className={`h-7 w-7 sm:h-8 sm:w-8 p-0 ${activeTool === 'draw' ? 'bg-primary text-primary-foreground ring-2 ring-primary' : ''}`}>
+              <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button
-              onClick={() => handleToolChange('text')}
-              size="sm"
-              variant={activeTool === 'text' ? 'default' : 'ghost'}
-              title="Add Text"
-            >
-              <Type className="h-4 w-4" />
+            <Button onClick={() => handleToolChange('text')} size="sm" variant={activeTool === 'text' ? 'default' : 'ghost'} title="Text" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Type className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button
-              onClick={() => handleToolChange('rectangle')}
-              size="sm"
-              variant={activeTool === 'rectangle' ? 'default' : 'ghost'}
-              title="Add Rectangle"
-            >
-              <Square className="h-4 w-4" />
+            <Button onClick={() => handleToolChange('rectangle')} size="sm" variant={activeTool === 'rectangle' ? 'default' : 'ghost'} title="Rectangle" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Square className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button
-              onClick={() => handleToolChange('circle')}
-              size="sm"
-              variant={activeTool === 'circle' ? 'default' : 'ghost'}
-              title="Add Circle"
-            >
-              <Circle className="h-4 w-4" />
+            <Button onClick={() => handleToolChange('circle')} size="sm" variant={activeTool === 'circle' ? 'default' : 'ghost'} title="Circle" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Circle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button
-              onClick={() => handleToolChange('erase')}
-              size="sm"
-              variant={activeTool === 'erase' ? 'default' : 'ghost'}
-              title="Erase"
-            >
-              <Eraser className="h-4 w-4" />
+            <Button onClick={() => handleToolChange('erase')} size="sm" variant={activeTool === 'erase' ? 'default' : 'ghost'} title="Erase" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Eraser className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           </div>
 
-          <div className="flex items-center gap-2 border-r pr-3">
-            <label className="text-sm text-muted-foreground">Color:</label>
+          <div className="flex items-center gap-1.5 sm:gap-2 border-r pr-1.5 sm:pr-3">
+            <label className="hidden sm:inline text-sm text-muted-foreground">Color:</label>
             <Input
               type="color"
               value={drawingColor}
               onChange={(e) => setDrawingColor(e.target.value)}
-              className="w-10 h-8 p-1 cursor-pointer"
+              className="w-7 h-7 sm:w-10 sm:h-8 p-0.5 sm:p-1 cursor-pointer"
             />
           </div>
 
-          <div className="flex items-center gap-2 border-r pr-3">
+          <div className="hidden sm:flex items-center gap-2 border-r pr-3">
             <label className="text-sm text-muted-foreground">Size:</label>
             <div className="w-24">
               <Slider
@@ -2040,7 +2007,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             <span className="text-sm w-6">{strokeWidth}</span>
           </div>
 
-          <div className="flex items-center gap-2 border-r pr-3">
+          <div className="hidden sm:flex items-center gap-2 border-r pr-3">
             <label className="text-sm text-muted-foreground">Font:</label>
             <Select value={fontFamily} onValueChange={setFontFamily}>
               <SelectTrigger className="w-28 h-8">
@@ -2063,31 +2030,31 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             />
           </div>
 
-          <div className="flex items-center gap-1 border-r pr-3">
-            <Button onClick={undo} size="sm" variant="ghost" disabled={currentHistoryIndex <= 0} title="Undo">
-              <Undo className="h-4 w-4" />
+          <div className="flex items-center gap-0.5 sm:gap-1 border-r pr-1.5 sm:pr-3">
+            <Button onClick={undo} size="sm" variant="ghost" disabled={currentHistoryIndex <= 0} title="Undo" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Undo className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button onClick={redo} size="sm" variant="ghost" disabled={currentHistoryIndex >= currentHistory.length - 1} title="Redo">
-              <Redo className="h-4 w-4" />
+            <Button onClick={redo} size="sm" variant="ghost" disabled={currentHistoryIndex >= currentHistory.length - 1} title="Redo" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Redo className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button onClick={deleteSelected} size="sm" variant="ghost" title="Delete Selected">
-              <Trash2 className="h-4 w-4" />
+            <Button onClick={deleteSelected} size="sm" variant="ghost" title="Delete" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button onClick={clearAnnotations} size="sm" variant="ghost" title="Clear All">
-              <RotateCcw className="h-4 w-4" />
+            <Button onClick={clearAnnotations} size="sm" variant="ghost" title="Clear All" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <Button
               onClick={() => setLineSnapEnabled(!lineSnapEnabled)}
               size="sm"
               variant={lineSnapEnabled ? 'default' : 'ghost'}
               title={lineSnapEnabled ? 'Line snap enabled' : 'Line snap disabled'}
-              className={lineSnapEnabled ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+              className={`h-7 sm:h-8 px-1.5 sm:px-2 ${lineSnapEnabled ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
             >
-              <Ruler className="h-4 w-4 mr-1" />
-              <span className="text-xs">Snap</span>
+              <Ruler className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-1" />
+              <span className="hidden sm:inline text-xs">Snap</span>
             </Button>
           </div>
         </div>
@@ -2096,7 +2063,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       {/* Scrollable PDF Container */}
       <div
         ref={canvasContainerRef}
-        className="flex-1 min-h-0 overflow-auto bg-muted/50 p-4"
+        className="flex-1 min-h-0 overflow-auto bg-muted/50 p-2 sm:p-4"
         style={{ 
           overflowX: 'auto', 
           overflowY: 'auto',
