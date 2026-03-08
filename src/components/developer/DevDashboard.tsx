@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Activity, AlertTriangle, Users, Building2, FolderOpen, 
   Clock, Server, Wifi, WifiOff, BarChart3, RefreshCw, ChevronDown, ChevronUp,
-  CheckCircle2, XCircle, ArrowRightLeft,
+  CheckCircle2, XCircle, ArrowRightLeft, Zap, Mail, CalendarClock,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
