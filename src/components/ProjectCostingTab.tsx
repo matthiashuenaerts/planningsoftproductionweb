@@ -1349,6 +1349,57 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
             </div>
           </CardHeader>
           <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+            {/* Mobile card layout */}
+            <div className="sm:hidden space-y-2">
+              {costingSummary.accessories.map((acc) => (
+                <div key={acc.id} className={`p-2.5 border rounded-lg ${acc.orderId ? "bg-destructive/10 border-destructive/30" : "bg-muted/30"}`}>
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium line-clamp-2">{acc.articleName}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {acc.articleCode && <span className="text-[10px] text-muted-foreground">{acc.articleCode}</span>}
+                        {acc.supplier && <Badge variant="outline" className="text-[10px]">{acc.supplier}</Badge>}
+                      </div>
+                    </div>
+                    <Badge variant={
+                      acc.status === 'delivered' ? 'default' :
+                      acc.status === 'in_stock' ? 'secondary' :
+                      acc.status === 'ordered' ? 'outline' :
+                      'destructive'
+                    } className="text-[10px] flex-shrink-0">
+                      {t(acc.status) || acc.status}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className="text-[10px] text-muted-foreground">×{acc.quantity}</span>
+                    <div className="relative w-20 ml-auto">
+                      <Euro className="absolute left-1.5 top-1/2 -translate-y-1/2 h-2.5 w-2.5 text-muted-foreground" />
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={acc.unitPrice || ''}
+                        onChange={(e) => updateAccessoryPrice(acc.id, parseFloat(e.target.value) || 0)}
+                        className="h-6 pl-5 text-right text-[10px]"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <span className="text-xs font-bold flex-shrink-0">{formatCurrency(acc.unitPrice * acc.quantity)}</span>
+                  </div>
+                </div>
+              ))}
+              <div className="p-2.5 bg-muted/50 rounded-lg font-bold text-xs flex justify-between">
+                <span>{t('costing_total_accessories')}</span>
+                <div className="text-right">
+                  <span>{formatCurrency(costingSummary.totalAccessoryCost)}</span>
+                  <span className="block text-[10px] text-muted-foreground font-normal">
+                    +{margins.accessories}% = {formatCurrency(costingSummary.totalAccessoryCost * (1 + margins.accessories / 100))}
+                  </span>
+                </div>
+              </div>
+            </div>
+            {/* Desktop table */}
+            <div className="hidden sm:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1413,6 +1464,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                 </TableRow>
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}
