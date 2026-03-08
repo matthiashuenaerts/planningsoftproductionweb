@@ -694,8 +694,7 @@ const PersonalTasks = () => {
                 onClick={() => handleDateNavigation('today')}
                 className="flex items-center gap-2"
               >
-                Today
-              </Button>
+                {t('pt_today')}
               </Button>
               <Button
                 variant={!isViewingToday ? "default" : "outline"}
@@ -703,7 +702,7 @@ const PersonalTasks = () => {
                 className="flex items-center gap-2"
               >
                 <ChevronRight className="h-4 w-4" />
-                Next Workday
+                {t('pt_next_workday')}
               </Button>
               <Button
                 variant="outline"
@@ -711,7 +710,7 @@ const PersonalTasks = () => {
                 className="flex items-center gap-2"
               >
                 <Calendar className="h-4 w-4" />
-                Plan Next Workday
+                {t('pt_plan_next_workday')}
               </Button>
             </div>
           </div>
