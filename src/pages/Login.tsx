@@ -465,7 +465,7 @@ const Login: React.FC = () => {
         {/* Login Card */}
         <Card className="backdrop-blur-sm bg-white/80 border-0 shadow-2xl ring-1 ring-gray-200/50 hover:shadow-3xl transition-all duration-500">
           <CardHeader className="space-y-1 text-center pb-4 sm:pb-8 px-4 sm:px-6">
-            <CardTitle className="text-2xl font-semibold text-gray-800">
+            <CardTitle className="text-xl sm:text-2xl font-semibold text-gray-800">
               {isDeveloperPortal ? "Developer Sign in" : "Welcome Back"}
             </CardTitle>
             <CardDescription className="text-gray-600">
