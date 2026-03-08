@@ -844,7 +844,7 @@ const ServiceTeamCalendar: React.FC = () => {
               <Button variant="outline">{t('svc_cancel')}</Button>
             </DialogClose>
             <Button onClick={handleAssignProject} disabled={!assignProjectId}>
-              Schedule Service
+              {t('svc_schedule_service')}
             </Button>
           </div>
         </DialogContent>
