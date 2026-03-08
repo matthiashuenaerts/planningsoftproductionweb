@@ -271,7 +271,7 @@ const ServiceTeamCalendar: React.FC = () => {
         .forEach(p => unrecognizedAddresses.push(`${p.name}: ${t('svc_no_address_set')}`));
       
       if (projectsWithCoords.length < 2) {
-        toast({ title: 'Warning', description: 'Could not geocode enough addresses. Using postal code fallback.' });
+        toast({ title: t('svc_warning'), description: t('svc_geocode_fallback') });
         await fallbackPostalOptimize(team, dayProjects, teamId, dateStr);
         return;
       }
