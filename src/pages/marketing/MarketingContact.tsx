@@ -3,9 +3,17 @@ import { Button } from "@/components/ui/button";
 import { useMarketingLang } from "@/components/marketing/useMarketingLang";
 import { ArrowRight, Mail, Sparkles, Phone, MapPin, Clock } from "lucide-react";
 import contactBg from "@/assets/marketing/contact-bg.jpg";
+import SEOHead from "@/components/marketing/SEOHead";
+
+const seoMeta: Record<string, { title: string; desc: string }> = {
+  nl: { title: "Contact | AutoMattiOn Compass - Demo Aanvragen", desc: "Neem contact op voor een demo van AutoMattiOn Compass. Productieplanning software op maat voor meubelfabrikanten in België." },
+  en: { title: "Contact | AutoMattiOn Compass - Request a Demo", desc: "Get in touch for a demo of AutoMattiOn Compass. Custom production planning software for furniture manufacturers in Belgium." },
+  fr: { title: "Contact | AutoMattiOn Compass - Demander une Démo", desc: "Contactez-nous pour une démo d'AutoMattiOn Compass. Logiciel de planification sur mesure pour fabricants de meubles en Belgique." },
+};
 
 const MarketingContact: React.FC = () => {
-  const { t } = useMarketingLang();
+  const { lang, t } = useMarketingLang();
+  const seo = seoMeta[lang] || seoMeta.nl;
 
   const contactDetails = [
     { icon: Mail, label: "info@automattion-compass.com", href: "mailto:info@automattion-compass.com" },
@@ -15,6 +23,7 @@ const MarketingContact: React.FC = () => {
 
   return (
     <>
+      <SEOHead title={seo.title} description={seo.desc} path="/site/contact" lang={lang} />
       {/* Hero contact */}
       <section className="relative py-40 overflow-hidden">
         <div className="absolute inset-0">

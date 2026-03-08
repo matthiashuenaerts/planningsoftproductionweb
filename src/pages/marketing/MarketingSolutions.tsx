@@ -2,6 +2,7 @@ import React from "react";
 import { useMarketingLang } from "@/components/marketing/useMarketingLang";
 import { TrendingUp, Truck, RefreshCw, MessageCircle } from "lucide-react";
 import solutionsFactory from "@/assets/marketing/solutions-factory.jpg";
+import SEOHead from "@/components/marketing/SEOHead";
 
 const solutions = [
   { titleKey: "sol_efficiency_title", problemKey: "sol_efficiency_problem", solutionKey: "sol_efficiency_solution", Icon: TrendingUp },
@@ -10,11 +11,19 @@ const solutions = [
   { titleKey: "sol_communication_title", problemKey: "sol_communication_problem", solutionKey: "sol_communication_solution", Icon: MessageCircle },
 ];
 
+const seoMeta: Record<string, { title: string; desc: string }> = {
+  nl: { title: "Oplossingen | AutoMattiOn Compass Productiesoftware", desc: "Ontdek welke productie-uitdagingen AutoMattiOn Compass oplost: efficiëntie, logistiek, communicatie en flexibiliteit." },
+  en: { title: "Solutions | AutoMattiOn Compass Production Software", desc: "Discover which production challenges AutoMattiOn Compass solves: efficiency, logistics, communication and flexibility." },
+  fr: { title: "Solutions | AutoMattiOn Compass Logiciel de Production", desc: "Découvrez quels défis de production AutoMattiOn Compass résout : efficacité, logistique, communication et flexibilité." },
+};
+
 const MarketingSolutions: React.FC = () => {
-  const { t } = useMarketingLang();
+  const { lang, t } = useMarketingLang();
+  const seo = seoMeta[lang] || seoMeta.nl;
 
   return (
     <>
+      <SEOHead title={seo.title} description={seo.desc} path="/site/solutions" lang={lang} />
       {/* Hero */}
       <section className="relative pt-28 pb-20 overflow-hidden">
         <div className="absolute inset-0">

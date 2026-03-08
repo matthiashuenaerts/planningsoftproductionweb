@@ -12,3 +12,13 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /dev
+Disallow: /dev/
+Disallow: /*/login
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /migrate-auth
+Disallow: /pdf-editor
+Disallow: /onedrive-callback
+
+Sitemap: https://www.automattion-compass.com/sitemap.xml

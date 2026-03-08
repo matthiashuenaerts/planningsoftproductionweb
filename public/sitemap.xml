@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <!-- Home -->
+  <url>
+    <loc>https://www.automattion-compass.com/site</loc>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://www.automattion-compass.com/site?lang=nl"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.automattion-compass.com/site?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.automattion-compass.com/site?lang=fr"/>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- Features -->
+  <url>
+    <loc>https://www.automattion-compass.com/site/features</loc>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://www.automattion-compass.com/site/features?lang=nl"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.automattion-compass.com/site/features?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.automattion-compass.com/site/features?lang=fr"/>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Solutions -->
+  <url>
+    <loc>https://www.automattion-compass.com/site/solutions</loc>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://www.automattion-compass.com/site/solutions?lang=nl"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.automattion-compass.com/site/solutions?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.automattion-compass.com/site/solutions?lang=fr"/>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Integration -->
+  <url>
+    <loc>https://www.automattion-compass.com/site/integration</loc>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://www.automattion-compass.com/site/integration?lang=nl"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.automattion-compass.com/site/integration?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.automattion-compass.com/site/integration?lang=fr"/>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <!-- Contact -->
+  <url>
+    <loc>https://www.automattion-compass.com/site/contact</loc>
+    <xhtml:link rel="alternate" hreflang="nl" href="https://www.automattion-compass.com/site/contact?lang=nl"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.automattion-compass.com/site/contact?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.automattion-compass.com/site/contact?lang=fr"/>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+</urlset>
