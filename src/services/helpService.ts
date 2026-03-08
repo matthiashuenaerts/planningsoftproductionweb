@@ -99,7 +99,21 @@ export const helpService = {
       .order('display_order', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as HelpArticleWithCategory[];
+  },
+
+  async getGlobalArticles(): Promise<HelpArticleWithCategory[]> {
+    const { data, error } = await supabase
+      .from('help_articles')
+      .select(`
+        *,
+        category:help_categories(*)
+      `)
+      .eq('is_global', true)
+      .order('display_order', { ascending: true });
+
+    if (error) throw error;
+    return (data || []) as unknown as HelpArticleWithCategory[];
   },
 
   async getArticlesByCategory(categoryId: string): Promise<HelpArticle[]> {
