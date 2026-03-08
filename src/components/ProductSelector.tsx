@@ -181,16 +181,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
     setSearchTerm('');
   };
 
-  const getImageUrl = (imagePath: string | null) => {
-    if (!imagePath) return null;
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return imagePath;
-    }
-    const { data } = supabase.storage
-      .from('product-images')
-      .getPublicUrl(imagePath);
-    return data.publicUrl;
-  };
+  // Images are rendered via SignedStorageImage component for private bucket access
 
   // ── Mobile product card ──
   const ProductCard = ({ product }: { product: Product }) => (
