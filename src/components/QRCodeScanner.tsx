@@ -1,163 +1,149 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import QrScanner from 'qr-scanner';
-import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { X, Camera, RotateCcw, Play } from 'lucide-react';
+import { X, Camera, RotateCcw, Play, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { qrCodeService } from '@/services/qrCodeService';
+import { partTrackingService } from '@/services/partTrackingService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface QRCodeScannerProps {
   isOpen: boolean;
   onClose: () => void;
   onQRCodeDetected: (qrCode: string) => void;
   workstationName: string;
+  workstationId?: string;
 }
+
+interface ScanResult {
+  code: string;
+  status: 'success' | 'not_found' | 'error';
+  message: string;
+  partsCompleted?: number;
+}
+
+const SCAN_COOLDOWN_MS = 1500;
+const SUCCESS_DISPLAY_MS = 1200;
 
 export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
   isOpen,
   onClose,
   onQRCodeDetected,
-  workstationName
+  workstationName,
+  workstationId,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
-  const zxingReaderRef = useRef<BrowserMultiFormatReader | null>(null);
-  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastScannedRef = useRef<string>('');
+  const cooldownRef = useRef<number>(0);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [scanning, setScanning] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
   const [currentCamera, setCurrentCamera] = useState<'environment' | 'user'>('environment');
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [lastResult, setLastResult] = useState<ScanResult | null>(null);
+  const [scanCount, setScanCount] = useState(0);
   const [processing, setProcessing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    return () => {
+    if (!isOpen) {
       cleanup();
-    };
+    }
+    return () => cleanup();
   }, [isOpen]);
 
-  // Function to try DataMatrix scanning with ZXing
-  const tryDataMatrixScan = async () => {
-    if (!videoRef.current || processing) return;
-    
-    try {
-      if (!zxingReaderRef.current) {
-        zxingReaderRef.current = new BrowserMultiFormatReader();
-        console.log('ZXing DataMatrix reader initialized');
-      }
-      
-      const result = await zxingReaderRef.current.decodeOnceFromVideoDevice(undefined, videoRef.current);
-      if (result) {
-        console.log('DataMatrix detected:', result.getText());
-        
-        // Remove first character from detected code
-        const code = result.getText();
-        const processedCode = code.length > 1 ? code.substring(1) : code;
-        console.log('DataMatrix code after removing first character:', processedCode);
-        
-        await handleQRCodeDetected(processedCode);
-      }
-    } catch (error) {
-      if (!(error instanceof NotFoundException)) {
-        console.log('DataMatrix scan attempt failed:', error);
-      }
-    }
-  };
+  const processQRCode = useCallback(async (rawCode: string) => {
+    // Remove first character (barcode prefix)
+    const code = rawCode.length > 1 ? rawCode.substring(1) : rawCode;
 
-  const startCamera = async () => {
-    if (!videoRef.current) {
-      console.log('Video ref not available');
+    // Cooldown: ignore same code scanned within SCAN_COOLDOWN_MS
+    const now = Date.now();
+    if (code === lastScannedRef.current && now - cooldownRef.current < SCAN_COOLDOWN_MS) {
       return;
     }
+    if (processing) return;
+
+    lastScannedRef.current = code;
+    cooldownRef.current = now;
+    setProcessing(true);
 
     try {
-      console.log('Starting camera with facing mode:', currentCamera);
-      
-      // First request camera permissions explicitly
-      try {
-        await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            facingMode: currentCamera,
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          } 
-        });
-        console.log('Camera permissions granted');
-        setHasPermission(true);
-      } catch (permError) {
-        console.error('Camera permission error:', permError);
-        setHasPermission(false);
-        toast({
-          title: 'Camera toegang geweigerd',
-          description: 'Geef toestemming voor camera toegang om QR codes te scannen.',
-          variant: 'destructive'
-        });
+      // 1. Find the part
+      const part = await qrCodeService.findPartByQRCode(code);
+
+      if (!part) {
+        setLastResult({ code, status: 'not_found', message: `"${code}" niet gevonden` });
+        setProcessing(false);
+        // Auto-clear after a moment
+        setTimeout(() => setLastResult(null), SUCCESS_DISPLAY_MS);
         return;
       }
 
-      // Check if camera is available
-      const hasCamera = await QrScanner.hasCamera();
-      console.log('Has camera:', hasCamera);
-      
-      if (!hasCamera) {
-        toast({
-          title: 'Camera niet beschikbaar',
-          description: 'Geen camera gevonden op dit apparaat.',
-          variant: 'destructive'
-        });
-        return;
+      // 2. Update workstation_name_status on the part
+      await qrCodeService.updatePartWorkstationStatus(part.id, workstationName);
+
+      // 3. Complete part_workstation_tracking for this workstation
+      let partsCompleted = 0;
+      if (workstationId) {
+        const { data, error } = await supabase
+          .from('part_workstation_tracking')
+          .update({ status: 'completed', completed_at: new Date().toISOString() })
+          .eq('part_id', part.id)
+          .eq('workstation_id', workstationId)
+          .eq('status', 'pending')
+          .select();
+
+        if (!error && data) {
+          partsCompleted = data.length;
+        }
       }
 
-      // Clean up existing scanner
+      setScanCount(prev => prev + 1);
+      setLastResult({
+        code,
+        status: 'success',
+        message: `✓ ${code}`,
+        partsCompleted,
+      });
+
+      onQRCodeDetected(code);
+
+      // Auto-clear result after brief display
+      setTimeout(() => setLastResult(null), SUCCESS_DISPLAY_MS);
+    } catch (error: any) {
+      console.error('Error processing QR code:', error);
+      setLastResult({ code, status: 'error', message: 'Verwerkingsfout' });
+      setTimeout(() => setLastResult(null), SUCCESS_DISPLAY_MS);
+    } finally {
+      setProcessing(false);
+    }
+  }, [workstationName, workstationId, onQRCodeDetected, processing]);
+
+  const startCamera = useCallback(async () => {
+    if (!videoRef.current) return;
+
+    try {
+      // Request permission
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: currentCamera, width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      // Stop the test stream — QrScanner will open its own
+      stream.getTracks().forEach(t => t.stop());
+      setHasPermission(true);
+
+      // Clean up existing
       if (scannerRef.current) {
         scannerRef.current.stop();
         scannerRef.current.destroy();
+        scannerRef.current = null;
       }
 
-      // Initialize the scanner with DataMatrix support
-      console.log('Creating QR/DataMatrix scanner instance...');
       const scanner = new QrScanner(
         videoRef.current,
-        async (result: any) => {
-          console.log('QR code detected - Raw result:', result);
-          console.log('Result type:', typeof result);
-          
-          // Handle both string results and detailed scan results
-          let qrData = '';
-          if (typeof result === 'string') {
-            qrData = result.trim();
-            console.log('String result:', qrData);
-          } else if (result && typeof result === 'object' && 'data' in result) {
-            qrData = String(result.data).trim();
-            console.log('Object result data:', qrData);
-          }
-          
-          console.log('Final QR data to process:', qrData);
-          console.log('Current states - scanning:', scanning, 'processing:', processing);
-          
-          if (qrData && !processing) {
-            console.log('Processing QR code:', qrData);
-            
-            // Remove first character from QR code
-            const processedQrData = qrData.length > 1 ? qrData.substring(1) : qrData;
-            console.log('QR code after removing first character:', processedQrData);
-            
-            // Capture image from video
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            if (ctx && videoRef.current) {
-              canvas.width = videoRef.current.videoWidth;
-              canvas.height = videoRef.current.videoHeight;
-              ctx.drawImage(videoRef.current, 0, 0);
-              console.log('Image captured from video');
-            }
-            
-            await handleQRCodeDetected(processedQrData);
-          } else {
-            console.log('QR detection skipped - processing:', processing, 'data:', !!qrData);
+        (result) => {
+          const qrData = typeof result === 'string' ? result.trim() : String(result.data).trim();
+          if (qrData) {
+            processQRCode(qrData);
           }
         },
         {
@@ -165,123 +151,46 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
           highlightScanRegion: true,
           highlightCodeOutline: true,
           preferredCamera: currentCamera,
-          maxScansPerSecond: 2,
-          calculateScanRegion: (video) => {
-            // Use full area for better DataMatrix detection
-            return { x: 0, y: 0, width: video.videoWidth, height: video.videoHeight };
-          }
-        }
+          maxScansPerSecond: 5,
+          calculateScanRegion: (video) => ({
+            x: 0,
+            y: 0,
+            width: video.videoWidth,
+            height: video.videoHeight,
+          }),
+        },
       );
 
-      // Enable inversion mode for better DataMatrix detection
       scanner.setInversionMode('both');
-
       scannerRef.current = scanner;
-      console.log('Starting QR scanner...');
       await scanner.start();
-      console.log('QR scanner started successfully');
-      
-      setScanning(true);
       setCameraStarted(true);
-
-      // Start periodic DataMatrix scanning
-      scanIntervalRef.current = setInterval(tryDataMatrixScan, 1000);
-      console.log('DataMatrix scanning interval started');
-
     } catch (error: any) {
-      console.error('Failed to start camera:', error);
-      console.error('Error details:', error.message, error.name);
-      
+      console.error('Camera error:', error);
       if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
         setHasPermission(false);
-        toast({
-          title: 'Camera toegang geweigerd',
-          description: 'Geef toestemming voor camera toegang om QR codes te scannen.',
-          variant: 'destructive'
-        });
-      } else if (error.name === 'NotFoundError') {
-        toast({
-          title: 'Camera niet gevonden',
-          description: 'Geen camera gevonden op dit apparaat.',
-          variant: 'destructive'
-        });
-      } else {
-        toast({
-          title: 'Scanner fout',
-          description: `Kon de QR scanner niet initialiseren: ${error.message}`,
-          variant: 'destructive'
-        });
       }
+      toast({
+        title: 'Camera fout',
+        description: error.message || 'Kon camera niet starten',
+        variant: 'destructive',
+      });
     }
-  };
+  }, [currentCamera, processQRCode, toast]);
 
   const switchCamera = async () => {
-    const newCamera = currentCamera === 'environment' ? 'user' : 'environment';
-    setCurrentCamera(newCamera);
-    
+    const next = currentCamera === 'environment' ? 'user' : 'environment';
+    setCurrentCamera(next);
     if (cameraStarted) {
-      // Restart camera with new facing mode
-      await startCamera();
-    }
-  };
-
-  const handleQRCodeDetected = async (qrCode: string) => {
-    if (!processing) {
-      console.log('Starting QR code processing for:', qrCode);
-      setScanning(false);
-      setProcessing(true);
-      
-      // Show green success screen for 2 seconds
-      setSuccessMessage(`QR Code gevonden: ${qrCode}`);
-      setShowSuccess(true);
-      
-      setTimeout(async () => {
-        try {
-          console.log('Searching for part with QR code:', qrCode);
-          // Search for the QR code in parts list
-          const part = await qrCodeService.findPartByQRCode(qrCode);
-          console.log('Search result:', part);
-          
-          if (part) {
-            // Update the workstation status
-            await qrCodeService.updatePartWorkstationStatus(part.id, workstationName);
-            console.log('Part status updated successfully');
-            
-            toast({
-              title: 'Succes!',
-              description: `Onderdeel "${qrCode}" toegewezen aan workstation "${workstationName}"`,
-            });
-            
-            onQRCodeDetected(qrCode);
-          } else {
-            console.log('Part not found for QR code:', qrCode);
-            toast({
-              title: 'Onderdeel niet gevonden',
-              description: `"${qrCode}" werd niet gevonden in de onderdelenlijst`,
-              variant: 'destructive'
-            });
-          }
-        } catch (error) {
-          console.error('Error processing QR code:', error);
-          toast({
-            title: 'Fout bij verwerken',
-            description: 'Er is een fout opgetreden bij het verwerken van de QR code',
-            variant: 'destructive'
-          });
-        } finally {
-          setShowSuccess(false);
-          setProcessing(false);
-          // Don't close the scanner, restart it for continuous scanning
-          setTimeout(() => {
-            if (scannerRef.current && cameraStarted) {
-              scannerRef.current.start();
-              setScanning(true);
-            }
-          }, 500);
-        }
-      }, 2000);
-    } else {
-      console.log('QR code processing already in progress, skipping');
+      // Will restart with new camera on next render
+      if (scannerRef.current) {
+        scannerRef.current.stop();
+        scannerRef.current.destroy();
+        scannerRef.current = null;
+      }
+      setCameraStarted(false);
+      // Small delay then restart
+      setTimeout(() => startCamera(), 200);
     }
   };
 
@@ -291,40 +200,17 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
       scannerRef.current.destroy();
       scannerRef.current = null;
     }
-    
-    if (zxingReaderRef.current) {
-      zxingReaderRef.current.reset();
-      zxingReaderRef.current = null;
-    }
-    
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current);
-      scanIntervalRef.current = null;
-    }
-    
-    setScanning(false);
     setCameraStarted(false);
     setHasPermission(null);
-    setShowSuccess(false);
+    setLastResult(null);
     setProcessing(false);
+    setScanCount(0);
+    lastScannedRef.current = '';
   };
 
   const handleClose = () => {
     cleanup();
     onClose();
-  };
-
-  const requestPermission = async () => {
-    try {
-      await navigator.mediaDevices.getUserMedia({ video: true });
-      await startCamera();
-    } catch (error) {
-      toast({
-        title: 'Camera toegang geweigerd',
-        description: 'Geef toestemming voor camera toegang in uw browser instellingen.',
-        variant: 'destructive'
-      });
-    }
   };
 
   return (
@@ -333,11 +219,14 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Camera className="h-5 w-5" />
-            QR Code Scanner - {workstationName}
+            QR Scanner - {workstationName}
           </DialogTitle>
+          <DialogDescription>
+            Scan onderdelen om ze te registreren op dit werkstation
+          </DialogDescription>
         </DialogHeader>
-        
-        <div className="space-y-4">
+
+        <div className="space-y-3">
           {hasPermission === false ? (
             <div className="text-center space-y-4 py-8">
               <Camera className="h-16 w-16 mx-auto text-muted-foreground" />
@@ -347,73 +236,83 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                   Geef toestemming voor camera toegang om QR codes te scannen.
                 </p>
               </div>
-              <Button onClick={requestPermission}>
-                Camera toegang verlenen
-              </Button>
+              <Button onClick={startCamera}>Camera toegang verlenen</Button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="relative">
                 <video
                   ref={videoRef}
                   className="w-full rounded-lg bg-black"
-                  style={{ aspectRatio: '1 / 1' }}
+                  style={{ aspectRatio: '4 / 3' }}
                   playsInline
                   muted
                 />
-                {!cameraStarted && !showSuccess && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
+
+                {/* Start overlay */}
+                {!cameraStarted && !lastResult && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg">
                     <div className="text-white text-center">
                       <Camera className="h-12 w-12 mx-auto mb-4" />
-                      <p className="text-sm mb-4">Klik op "Start Camera" om te beginnen</p>
-                      <Button onClick={startCamera} variant="outline" className="text-white border-white hover:bg-white hover:text-black">
+                      <p className="text-sm mb-4">Klik om te beginnen</p>
+                      <Button
+                        onClick={startCamera}
+                        variant="outline"
+                        className="text-white border-white hover:bg-white hover:text-black"
+                      >
                         <Play className="h-4 w-4 mr-2" />
                         Start Camera
                       </Button>
                     </div>
                   </div>
                 )}
-                {showSuccess && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-green-500/90 rounded-lg">
-                    <div className="text-white text-center">
-                      <div className="animate-pulse">
-                        <div className="h-12 w-12 mx-auto mb-4 bg-white rounded-full flex items-center justify-center">
-                          <div className="h-6 w-6 bg-green-500 rounded-full"></div>
-                        </div>
-                        <p className="text-lg font-semibold">{successMessage}</p>
-                        <p className="text-sm mt-2">Verwerken...</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {scanning && !showSuccess && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg">
-                    <div className="text-white text-center">
-                      <div className="animate-pulse">
-                        <Camera className="h-8 w-8 mx-auto mb-2" />
-                        <p className="text-sm">Richt de camera op een QR code</p>
-                      </div>
+
+                {/* Scan result overlay */}
+                {lastResult && (
+                  <div
+                    className={`absolute inset-0 flex items-center justify-center rounded-lg transition-opacity duration-200 ${
+                      lastResult.status === 'success'
+                        ? 'bg-green-500/80'
+                        : lastResult.status === 'not_found'
+                        ? 'bg-orange-500/80'
+                        : 'bg-red-500/80'
+                    }`}
+                  >
+                    <div className="text-white text-center px-4">
+                      {lastResult.status === 'success' ? (
+                        <CheckCircle2 className="h-12 w-12 mx-auto mb-2" />
+                      ) : (
+                        <AlertCircle className="h-12 w-12 mx-auto mb-2" />
+                      )}
+                      <p className="text-lg font-semibold">{lastResult.message}</p>
+                      {lastResult.partsCompleted != null && lastResult.partsCompleted > 0 && (
+                        <p className="text-sm mt-1 opacity-90">
+                          {lastResult.partsCompleted} tracking record(s) afgerond
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
-              
-              {cameraStarted && (
-                <div className="flex gap-2 justify-center">
-                  <Button onClick={switchCamera} variant="outline" size="sm">
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    {currentCamera === 'environment' ? 'Voorcamera' : 'Achtercamera'}
-                  </Button>
-                  <Button onClick={startCamera} variant="outline" size="sm">
-                    <Play className="h-4 w-4 mr-2" />
-                    Herstart Camera
-                  </Button>
-                </div>
-              )}
+
+              {/* Scan counter & controls */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  {scanCount > 0 ? `${scanCount} gescand` : 'Klaar om te scannen'}
+                </span>
+                {cameraStarted && (
+                  <div className="flex gap-2">
+                    <Button onClick={switchCamera} variant="outline" size="sm">
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      {currentCamera === 'environment' ? 'Voorcamera' : 'Achtercamera'}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
-          
-          <div className="flex justify-end gap-2">
+
+          <div className="flex justify-end">
             <Button variant="outline" onClick={handleClose}>
               <X className="h-4 w-4 mr-1" />
               Sluiten
