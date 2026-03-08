@@ -483,7 +483,9 @@ const TruckLoadingCalendar = () => {
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <Badge className={getProjectColor(assignment.project.status)}>
+                          <Badge className={!assignment.project.team_color ? getProjectColor(assignment.project.status) : ''}
+                            style={assignment.project.team_color ? { backgroundColor: `${assignment.project.team_color}30`, color: assignment.project.team_color, borderColor: assignment.project.team_color } : undefined}
+                          >
                             {assignment.project.status.replace('_', ' ').toUpperCase()}
                           </Badge>
                           <div className="flex items-center gap-1">
