@@ -2132,6 +2132,7 @@ const Planning = () => {
                       onClick={generateTomorrowSchedule}
                       disabled={generatingSchedule || !checkTodayHasSchedules() || !isNextWorkingDay()}
                       variant="secondary"
+                      size="sm"
                       className="whitespace-nowrap"
                     >
                       <ArrowRight className="mr-2 h-4 w-4" />
