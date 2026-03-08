@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Route, Loader2, Map, Plus, X, Search, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -67,6 +68,7 @@ const ServiceTeamCalendar: React.FC = () => {
   const { toast } = useToast();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [serviceTeams, setServiceTeams] = useState<ServiceTeam[]>([]);
   const [projects, setProjects] = useState<ServiceProject[]>([]);
@@ -556,20 +558,20 @@ const ServiceTeamCalendar: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className={cn("space-y-4", isMobile && "space-y-3")}>
       {/* Week Navigation */}
-      <div className="flex items-center justify-between">
+      <div className={cn("flex items-center", isMobile ? "flex-col gap-2" : "justify-between")}>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setCurrentWeekStart(addDays(currentWeekStart, -7))}>
+          <Button variant="outline" size="sm" className={isMobile ? "h-7 w-7 p-0" : ""} onClick={() => setCurrentWeekStart(addDays(currentWeekStart, -7))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}>
+          <Button variant="outline" size="sm" className={isMobile ? "h-7 text-xs px-2" : ""} onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}>
             <Calendar className="h-4 w-4 mr-1" /> {t('svc_today')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setCurrentWeekStart(addDays(currentWeekStart, 7))}>
+          <Button variant="outline" size="sm" className={isMobile ? "h-7 w-7 p-0" : ""} onClick={() => setCurrentWeekStart(addDays(currentWeekStart, 7))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <span className="text-sm font-medium text-muted-foreground ml-2">
+          <span className={cn("font-medium text-muted-foreground", isMobile ? "text-xs ml-1" : "text-sm ml-2")}>
             {format(weekDays[0], 'MMM d')} - {format(weekDays[weekDays.length - 1], 'MMM d, yyyy')}
           </span>
         </div>
@@ -581,26 +583,26 @@ const ServiceTeamCalendar: React.FC = () => {
         
         return (
           <Card key={team.id}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: team.color }} />
-                  <CardTitle className="text-lg">{team.name}</CardTitle>
-                  <Badge variant="secondary">{t('svc_service')}</Badge>
+            <CardHeader className={cn("pb-3", isMobile && "p-3 pb-2")}>
+              <div className={cn("flex items-center", isMobile ? "flex-col gap-1 items-start" : "justify-between")}>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full border shrink-0" style={{ backgroundColor: team.color }} />
+                  <CardTitle className={isMobile ? "text-sm" : "text-lg"}>{team.name}</CardTitle>
+                  <Badge variant="secondary" className={isMobile ? "text-[10px] px-1.5 py-0" : ""}>{t('svc_service')}</Badge>
                 </div>
                 {teamStartAddr && (
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <MapPin className="h-3 w-3" />
+                  <div className={cn("flex items-center gap-1 text-muted-foreground", isMobile ? "text-[10px]" : "text-sm")}>
+                    <MapPin className="h-3 w-3 shrink-0" />
                     {t('svc_start')}: {teamStartAddr}
                   </div>
                 )}
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-5 gap-2">
+            <CardContent className={isMobile ? "p-2 pt-0" : ""}>
+              <div className={cn(isMobile ? "space-y-2" : "grid grid-cols-5 gap-2")}>
                 {weekDays.map(day => {
                   const dateStr = format(day, 'yyyy-MM-dd');
-                  const isToday = isSameDay(day, new Date());
+                  const isDayToday = isSameDay(day, new Date());
                   const dayProjects = getProjectsForTeamAndDate(team.id, dateStr);
                   const totalHours = dayProjects.reduce((sum, p) => sum + (p.assignment.service_hours || 0), 0);
                   const routeData = optimizedRoutes[`${team.id}_${dateStr}`];
@@ -611,35 +613,45 @@ const ServiceTeamCalendar: React.FC = () => {
                     <div
                       key={dateStr}
                       className={cn(
-                        'border rounded-lg p-2 min-h-[200px]',
-                        isToday ? 'border-primary bg-primary/5' : 'border-border'
+                        'border rounded-lg',
+                        isMobile ? 'p-2' : 'p-2 min-h-[200px]',
+                        isDayToday ? 'border-primary bg-primary/5' : 'border-border'
                       )}
                     >
                       {/* Day Header */}
-                      <div className="flex items-center justify-between mb-2">
-                        <div className={cn('text-sm font-medium', isToday && 'text-primary')}>
-                          <div className="text-xs text-muted-foreground">{format(day, 'EEE')}</div>
-                          <div className="text-lg">{format(day, 'd')}</div>
+                      <div className={cn("flex items-center justify-between", isMobile ? "mb-1.5" : "mb-2")}>
+                        <div className={cn('font-medium', isDayToday && 'text-primary')}>
+                          {isMobile ? (
+                            <span className="text-sm">{format(day, 'EEE d')}</span>
+                          ) : (
+                            <>
+                              <div className="text-xs text-muted-foreground">{format(day, 'EEE')}</div>
+                              <div className="text-lg">{format(day, 'd')}</div>
+                            </>
+                          )}
                         </div>
                         <div className="flex items-center gap-1">
                           {totalHours > 0 && (
-                            <Badge variant="outline" className="text-xs" title={drivingMin != null ? `Service: ${totalHours}h + Driving: ${Math.round(drivingMin)}min` : `Service: ${totalHours}h`}>
-                              <Clock className="h-3 w-3 mr-1" />{grandTotal.toFixed(1)}h
+                            <Badge variant="outline" className={cn("text-xs", isMobile && "text-[10px] px-1.5 py-0")} title={drivingMin != null ? `Service: ${totalHours}h + Driving: ${Math.round(drivingMin)}min` : `Service: ${totalHours}h`}>
+                              <Clock className="h-3 w-3 mr-0.5" />{grandTotal.toFixed(1)}h
                             </Badge>
                           )}
                         </div>
                       </div>
 
                       {/* Projects for this day */}
-                      <div className="space-y-1">
+                      <div className={cn("space-y-1", isMobile && dayProjects.length === 0 && "hidden")}>
                         {dayProjects.map((project, idx) => (
                           <div
                             key={project.id}
-                            className="border rounded p-2 text-xs cursor-pointer hover:bg-accent/50 transition-colors"
+                            className={cn(
+                              "border rounded cursor-pointer hover:bg-accent/50 transition-colors",
+                              isMobile ? "p-1.5 text-[11px]" : "p-2 text-xs"
+                            )}
                             style={{ borderLeftColor: team.color, borderLeftWidth: '3px' }}
                             onClick={() => navigate(`/projects/${project.id}`)}
                           >
-                            <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center justify-between mb-0.5">
                               <span className="font-medium truncate flex-1">
                                 {project.assignment.service_order && (
                                   <Badge variant="secondary" className="mr-1 text-[10px] px-1">
@@ -652,15 +664,15 @@ const ServiceTeamCalendar: React.FC = () => {
                                 className="text-destructive hover:text-destructive/80 ml-1"
                                 onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(project.assignment.id); }}
                               >
-                                ×
+                                <X className="h-3 w-3" />
                               </button>
                             </div>
                             <div className="text-muted-foreground truncate">{project.client}</div>
-                            <div className="flex items-center gap-1 text-muted-foreground mt-1">
+                            <div className="flex items-center gap-1 text-muted-foreground mt-0.5">
                               <MapPin className="h-3 w-3 shrink-0" />
                               <span className="truncate">{getProjectAddress(project)}</span>
                             </div>
-                            <div className="flex items-center gap-1 mt-1">
+                            <div className="flex items-center gap-1 mt-0.5">
                               <Clock className="h-3 w-3 text-muted-foreground" />
                               <Input
                                 type="number"
@@ -669,7 +681,7 @@ const ServiceTeamCalendar: React.FC = () => {
                                 step="0.5"
                                 value={project.assignment.service_hours || 2}
                                 onChange={(e) => { e.stopPropagation(); handleUpdateHours(project.assignment.id, parseFloat(e.target.value) || 2); }}
-                                className="h-5 w-14 text-xs"
+                                className={cn("h-5 text-xs", isMobile ? "w-12" : "w-14")}
                                 onClick={(e) => e.stopPropagation()}
                               />
                               <span className="text-muted-foreground">{t('svc_hrs')}</span>
@@ -679,39 +691,40 @@ const ServiceTeamCalendar: React.FC = () => {
                       </div>
 
                       {/* Action buttons */}
-                      <div className="mt-2 space-y-1">
+                      <div className={cn("mt-1.5 space-y-1", isMobile && "flex gap-1 space-y-0 flex-wrap")}>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="w-full h-6 text-xs"
+                          className={cn("h-6 text-xs", isMobile ? "flex-1 px-1" : "w-full")}
                           onClick={() => {
                             setSelectedDate(dateStr);
                             setSelectedTeamId(team.id);
                             setIsAssignDialogOpen(true);
                           }}
                         >
-                          {t('svc_add_service')}
+                          <Plus className="h-3 w-3 mr-0.5" />
+                          {isMobile ? t('svc_service') : t('svc_add_service')}
                         </Button>
                         {dayProjects.length >= 2 && (
                           <>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="w-full h-6 text-xs"
+                              className={cn("h-6 text-xs", isMobile ? "flex-1 px-1" : "w-full")}
                               disabled={optimizing}
                               onClick={() => handleOptimizeRoute(team.id, dateStr)}
                             >
-                              {optimizing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Route className="h-3 w-3 mr-1" />}
+                              {optimizing ? <Loader2 className="h-3 w-3 animate-spin mr-0.5" /> : <Route className="h-3 w-3 mr-0.5" />}
                               {t('svc_optimize_route')}
                             </Button>
                             {optimizedRoutes[`${team.id}_${dateStr}`] && (
                               <Button
                                 variant="default"
                                 size="sm"
-                                className="w-full h-6 text-xs"
+                                className={cn("h-6 text-xs", isMobile ? "flex-1 px-1" : "w-full")}
                                 onClick={() => handleShowMap(team.id, dateStr, team.name)}
                               >
-                                <Map className="h-3 w-3 mr-1" />
+                                <Map className="h-3 w-3 mr-0.5" />
                                 {t('svc_show_on_map')}
                               </Button>
                             )}
