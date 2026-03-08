@@ -6212,6 +6212,7 @@ export type Database = {
           max_workers: number | null
           name: string
           production_line: number | null
+          scanner_config: Json | null
           sort_order: number | null
           tenant_id: string
           updated_at: string
@@ -6227,6 +6228,7 @@ export type Database = {
           max_workers?: number | null
           name: string
           production_line?: number | null
+          scanner_config?: Json | null
           sort_order?: number | null
           tenant_id?: string
           updated_at?: string
@@ -6242,6 +6244,7 @@ export type Database = {
           max_workers?: number | null
           name?: string
           production_line?: number | null
+          scanner_config?: Json | null
           sort_order?: number | null
           tenant_id?: string
           updated_at?: string

@@ -41,6 +41,7 @@ import WorkstationControl from "./pages/WorkstationControl";
 import TruckLoadingView from "./pages/TruckLoadingView";
 import ServiceInstallation from "./pages/ServiceInstallation";
 import PDFEditorFullscreen from "./pages/PDFEditorFullscreen";
+import ScannerPage from "./pages/ScannerPage";
 import OneDriveCallback from "./pages/OneDriveCallback";
 import EditProject from "@/pages/EditProject";
 import ProjectCalculation from "@/pages/ProjectCalculation";
@@ -172,6 +173,7 @@ function App() {
                     <Route path=":lang/control-panel/:workstationId" element={<R roles={['admin', 'manager', 'teamleader']}><WorkstationControl /></R>} />
                     <Route path=":lang/truck-loading" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader']}><TruckLoadingView /></R>} />
                     <Route path=":lang/service-installation" element={<P><ServiceInstallation /></P>} />
+                    <Route path=":lang/scanner/:workstationId" element={<P><ScannerPage /></P>} />
                   </Route>
                 </Routes>
                 <Toaster />

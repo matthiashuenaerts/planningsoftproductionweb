@@ -1,0 +1,1 @@
+ALTER TABLE public.workstations ADD COLUMN IF NOT EXISTS scanner_config JSONB DEFAULT '{}'::jsonb;
