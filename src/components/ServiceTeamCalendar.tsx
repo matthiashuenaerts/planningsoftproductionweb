@@ -806,9 +806,9 @@ const ServiceTeamCalendar: React.FC = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{t('svc_description')}</Label>
               <Textarea
-                placeholder="Describe the service needed..."
+                placeholder={t('svc_describe_service')}
                 value={assignDescription}
                 onChange={e => setAssignDescription(e.target.value)}
                 rows={3}
