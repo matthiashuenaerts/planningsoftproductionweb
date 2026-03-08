@@ -835,9 +835,9 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                   className="sticky left-0 z-10 flex flex-col border-r bg-muted"
                   style={{ width: workstationLabelWidth, minWidth: workstationLabelWidth }}
                 >
-                  <div className="px-3 py-2 border-b flex items-center justify-between">
-                    <span className="font-medium">{ws.name}</span>
-                    <span className="text-xs text-muted-foreground">{laneCount}</span>
+                  <div className={cn("border-b flex items-center justify-between", isMobile ? "px-1.5 py-1" : "px-3 py-2")}>
+                    <span className={cn("font-medium truncate", isMobile && "text-[10px]")}>{ws.name}</span>
+                    <span className={cn("text-muted-foreground shrink-0", isMobile ? "text-[9px]" : "text-xs")}>{laneCount}</span>
                   </div>
                   
                   {/* Show employee lane labels */}
