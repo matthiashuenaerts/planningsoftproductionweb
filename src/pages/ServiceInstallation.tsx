@@ -443,8 +443,8 @@ const ServiceInstallation: React.FC = () => {
             <Card>
               <CardContent className="py-12 text-center">
                 <Navigation className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Service Stops Today</h3>
-                <p className="text-muted-foreground">You have no service installations scheduled for today.</p>
+                <h3 className="text-lg font-semibold mb-2">{t('si_no_stops_today')}</h3>
+                <p className="text-muted-foreground">{t('si_no_stops_desc')}</p>
               </CardContent>
             </Card>
           ) : (
