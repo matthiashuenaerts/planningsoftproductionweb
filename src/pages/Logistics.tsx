@@ -282,9 +282,9 @@ const Logistics = () => {
         </div>
 
         <div className="mb-6">
-          <div className="flex gap-2 max-w-2xl">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <div className="flex flex-wrap gap-2 mb-6">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 type="text"
                 placeholder="Search by project, supplier, article code, EAN..."
@@ -295,16 +295,28 @@ const Logistics = () => {
             </div>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setIsScannerOpen(true)}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 whitespace-nowrap"
             >
               <Scan className="h-4 w-4" />
-              Scan Barcode
+              {t('br_scan_barcode')}
             </Button>
             <Button
+              variant="default"
+              size="sm"
+              onClick={() => setIsBatchOpen(true)}
+              className="flex items-center gap-2 whitespace-nowrap"
+            >
+              <PackageCheck className="h-4 w-4" />
+              {t('br_batch_receipts')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               onClick={handleStartTimeRegistration}
               disabled={isStartingRegistration}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 whitespace-nowrap"
             >
               <Clock className="h-4 w-4" />
               {t("start_time_registration")}
