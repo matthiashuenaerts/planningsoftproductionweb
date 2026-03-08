@@ -465,8 +465,8 @@ const { data, error } = await supabase.functions.invoke(
               
               <Collapsible open={helpOpen} onOpenChange={setHelpOpen}>
                 <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-muted-foreground">
-                    <HelpCircle className="h-4 w-4 mr-2" />
+                  <Button variant="ghost" size="sm" className="text-muted-foreground h-7 sm:h-8 text-xs sm:text-sm">
+                    <HelpCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                     Setup instructies
                   </Button>
                 </CollapsibleTrigger>
