@@ -505,26 +505,26 @@ const Projects = () => {
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent>
-                      {project.description && <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+                    <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+                      {project.description && <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mb-3 sm:mb-4">
                           {project.description}
                         </p>}
-                      <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+                      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-1.5 sm:gap-x-6 sm:gap-y-2 text-xs sm:text-sm text-muted-foreground">
                         <div className="flex items-center">
-                          <Clock className="mr-1 h-4 w-4" />
+                          <Clock className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                           <span>
                             {t('start_date')}: {new Date(project.start_date).toLocaleDateString()}
                           </span>
                         </div>
                         <div className="flex items-center">
-                          <CalendarDays className="mr-1 h-4 w-4" />
+                          <CalendarDays className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                           <span>
                             {t('installation_date')}: {new Date(project.installation_date).toLocaleDateString()}
                           </span>
                         </div>
                         {serviceDates[project.id] && serviceDates[project.id].length > 0 && (
                           <div className="flex items-center">
-                            <Wrench className="mr-1 h-4 w-4 text-orange-500" />
+                            <Wrench className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4 text-orange-500 flex-shrink-0" />
                             <span>
                               Service: {serviceDates[project.id].map(d => new Date(d).toLocaleDateString()).join(', ')}
                             </span>
