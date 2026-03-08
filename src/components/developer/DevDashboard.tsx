@@ -213,7 +213,7 @@ const DevDashboard: React.FC = () => {
             {(recentTickets ?? []).map((t: any) => (
               <div key={t.id} className="flex items-center justify-between bg-white/5 rounded-md px-3 py-2">
                 <div>
-                  <p className="text-sm text-white">{t.title}</p>
+                  <p className="text-sm text-white">{t.subject}</p>
                   <p className="text-xs text-slate-400">
                     {getTenantName(t.tenant_id)} · {formatDistanceToNow(new Date(t.created_at), { addSuffix: true })}
                   </p>
