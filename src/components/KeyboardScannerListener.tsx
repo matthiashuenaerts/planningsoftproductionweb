@@ -301,14 +301,8 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
 
   // Connect relay/bypass COM port (output)
   const connectRelayPort = async () => {
-    if (!('serial' in navigator)) {
-      toast({
-        title: 'WebSerial niet ondersteund',
-        description: 'Gebruik Chrome of Edge.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    const allowed = await checkSerialAccess();
+    if (!allowed) return;
 
     try {
       toast({
