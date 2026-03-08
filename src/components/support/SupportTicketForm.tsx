@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface SupportTicketFormProps {
   onCancel: () => void;
@@ -21,6 +22,7 @@ const SupportTicketForm: React.FC<SupportTicketFormProps> = ({ onCancel, onCreat
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
+  const isMobile = useIsMobile();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +44,6 @@ const SupportTicketForm: React.FC<SupportTicketFormProps> = ({ onCancel, onCreat
 
       if (error) throw error;
 
-      // Send notification email
       await supabase.functions.invoke('send-support-notification', {
         body: { ticketId: ticket.id, type: 'new_ticket' },
       });
@@ -58,51 +59,80 @@ const SupportTicketForm: React.FC<SupportTicketFormProps> = ({ onCancel, onCreat
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+      <Button type="button" variant="ghost" size="sm" onClick={onCancel} className={isMobile ? 'h-9 px-2' : ''}>
         <ArrowLeft className="h-4 w-4 mr-1" /> Back
       </Button>
 
-      <div className="space-y-2">
-        <Label>Subject</Label>
+      <div className="space-y-1.5">
+        <Label className={isMobile ? 'text-sm' : ''}>Subject</Label>
         <Input
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
           placeholder="Brief description of the issue"
           required
+          className={isMobile ? 'h-10 text-sm' : ''}
         />
       </div>
 
-      <div className="space-y-2">
-        <Label>Priority</Label>
+      <div className="space-y-1.5">
+        <Label className={isMobile ? 'text-sm' : ''}>Priority</Label>
         <Select value={priority} onValueChange={setPriority}>
-          <SelectTrigger>
+          <SelectTrigger className={isMobile ? 'h-10 text-sm' : ''}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="low">Low</SelectItem>
             <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="critical">Critical</SelectItem>
+            <SelectItem value="high">
+              <span className="flex items-center gap-1.5">
+                <AlertTriangle className="h-3 w-3 text-orange-500" /> High
+              </span>
+            </SelectItem>
+            <SelectItem value="critical">
+              <span className="flex items-center gap-1.5">
+                <AlertTriangle className="h-3 w-3 text-red-500" /> Critical
+              </span>
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      <div className="space-y-2">
-        <Label>Description</Label>
+      <div className="space-y-1.5">
+        <Label className={isMobile ? 'text-sm' : ''}>Description</Label>
         <Textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Describe the problem in detail..."
-          rows={6}
+          rows={isMobile ? 4 : 6}
           required
+          className={`resize-none ${isMobile ? 'text-sm' : ''}`}
         />
+        <p className="text-xs text-muted-foreground">{description.length}/1000</p>
       </div>
 
-      <div className="flex gap-2 justify-end">
-        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button type="submit" disabled={saving}>
-          {saving ? 'Submitting...' : 'Submit Ticket'}
-        </Button>
+      <div className={`flex gap-2 pt-3 border-t border-border ${isMobile ? 'flex-col' : 'justify-end'}`}>
+        {isMobile ? (
+          <>
+            <Button type="submit" disabled={saving} className="h-10">
+              {saving ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                  Submitting...
+                </div>
+              ) : 'Submit Ticket'}
+            </Button>
+            <Button type="button" variant="outline" onClick={onCancel} className="h-10">
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Submitting...' : 'Submit Ticket'}
+            </Button>
+          </>
+        )}
       </div>
     </form>
   );
