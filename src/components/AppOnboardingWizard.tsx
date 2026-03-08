@@ -870,11 +870,11 @@ const AppOnboardingWizard: React.FC<AppOnboardingWizardProps> = ({ children }) =
                   onClick={handleTourNext}>
                   {isLast ? (
                     <>
-                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Get Started!
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> {ui.getStarted}
                     </>
                   ) : (
                     <>
-                      Next Page <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                      {ui.nextPage} <ArrowRight className="h-3.5 w-3.5 ml-1" />
                     </>
                   )}
                 </Button>
