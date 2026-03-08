@@ -2293,64 +2293,64 @@ const Planning = () => {
 
                     {/* Worker Overview */}
                     {selectedWorkerSchedule && (
-                      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                      <div className={cn("grid gap-2", isMobile ? "grid-cols-3" : "grid-cols-1 md:grid-cols-6 gap-4")}>
                         <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">{t('planning_todo_tasks')}</CardTitle>
+                          <CardHeader className="pb-1 p-3">
+                            <CardTitle className={cn("font-medium", isMobile ? "text-[10px]" : "text-sm")}>{t('planning_todo_tasks')}</CardTitle>
                           </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{selectedWorkerSchedule.tasks.length}</div>
-                            <p className="text-xs text-muted-foreground">{t('planning_ready_to_schedule')}</p>
+                          <CardContent className="p-3 pt-0">
+                            <div className={cn("font-bold", isMobile ? "text-lg" : "text-2xl")}>{selectedWorkerSchedule.tasks.length}</div>
+                            <p className={cn("text-muted-foreground", isMobile ? "text-[9px]" : "text-xs")}>{t('planning_ready_to_schedule')}</p>
                           </CardContent>
                         </Card>
                         
                         <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Workstations</CardTitle>
+                          <CardHeader className="pb-1 p-3">
+                            <CardTitle className={cn("font-medium", isMobile ? "text-[10px]" : "text-sm")}>Workstations</CardTitle>
                           </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{selectedWorkerSchedule.assignedWorkstations.length}</div>
-                            <p className="text-xs text-muted-foreground">{selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None assigned'}</p>
+                          <CardContent className="p-3 pt-0">
+                            <div className={cn("font-bold", isMobile ? "text-lg" : "text-2xl")}>{selectedWorkerSchedule.assignedWorkstations.length}</div>
+                            <p className={cn("text-muted-foreground truncate", isMobile ? "text-[9px]" : "text-xs")}>{selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None assigned'}</p>
                           </CardContent>
                         </Card>
                         
                         <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">{t('planning_total_duration')}</CardTitle>
+                          <CardHeader className="pb-1 p-3">
+                            <CardTitle className={cn("font-medium", isMobile ? "text-[10px]" : "text-sm")}>{t('planning_total_duration')}</CardTitle>
                           </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{Math.round(selectedWorkerSchedule.totalDuration / 60)}h</div>
-                            <p className="text-xs text-muted-foreground">{t('planning_of_todo_tasks')}</p>
+                          <CardContent className="p-3 pt-0">
+                            <div className={cn("font-bold", isMobile ? "text-lg" : "text-2xl")}>{Math.round(selectedWorkerSchedule.totalDuration / 60)}h</div>
+                            <p className={cn("text-muted-foreground", isMobile ? "text-[9px]" : "text-xs")}>{t('planning_of_todo_tasks')}</p>
                           </CardContent>
                         </Card>
                         
                         <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">{t('planning_working_hours')}</CardTitle>
+                          <CardHeader className="pb-1 p-3">
+                            <CardTitle className={cn("font-medium", isMobile ? "text-[10px]" : "text-sm")}>{t('planning_working_hours')}</CardTitle>
                           </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{Math.round(totalWorkingMinutes / 60)}h</div>
-                            <p className="text-xs text-muted-foreground">{t('planning_daily_capacity')}</p>
+                          <CardContent className="p-3 pt-0">
+                            <div className={cn("font-bold", isMobile ? "text-lg" : "text-2xl")}>{Math.round(totalWorkingMinutes / 60)}h</div>
+                            <p className={cn("text-muted-foreground", isMobile ? "text-[9px]" : "text-xs")}>{t('planning_daily_capacity')}</p>
                           </CardContent>
                         </Card>
                         
                         <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">{t('planning_scheduled_items')}</CardTitle>
+                          <CardHeader className="pb-1 p-3">
+                            <CardTitle className={cn("font-medium", isMobile ? "text-[10px]" : "text-sm")}>{t('planning_scheduled_items')}</CardTitle>
                           </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{selectedWorkerSchedule.schedule.length}</div>
-                            <p className="text-xs text-muted-foreground">{t('planning_todays_schedule')}</p>
+                          <CardContent className="p-3 pt-0">
+                            <div className={cn("font-bold", isMobile ? "text-lg" : "text-2xl")}>{selectedWorkerSchedule.schedule.length}</div>
+                            <p className={cn("text-muted-foreground", isMobile ? "text-[9px]" : "text-xs")}>{t('planning_todays_schedule')}</p>
                           </CardContent>
                         </Card>
 
                         <Card>
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">{t('planning_efficiency')}</CardTitle>
+                          <CardHeader className="pb-1 p-3">
+                            <CardTitle className={cn("font-medium", isMobile ? "text-[10px]" : "text-sm")}>{t('planning_efficiency')}</CardTitle>
                           </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">{calculateScheduleEfficiency(selectedWorkerSchedule.schedule)}%</div>
-                            <p className="text-xs text-muted-foreground">{t('planning_time_utilization')}</p>
+                          <CardContent className="p-3 pt-0">
+                            <div className={cn("font-bold", isMobile ? "text-lg" : "text-2xl")}>{calculateScheduleEfficiency(selectedWorkerSchedule.schedule)}%</div>
+                            <p className={cn("text-muted-foreground", isMobile ? "text-[9px]" : "text-xs")}>{t('planning_time_utilization')}</p>
                           </CardContent>
                         </Card>
                       </div>
