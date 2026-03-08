@@ -524,9 +524,9 @@ const Login: React.FC = () => {
               </div>
             </CardContent>
 
-            <CardFooter className="flex flex-col space-y-4 pt-6 pb-8">
+            <CardFooter className="flex flex-col space-y-3 sm:space-y-4 pt-4 sm:pt-6 pb-6 sm:pb-8 px-4 sm:px-6">
               <Button
-                className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                className="w-full h-10 sm:h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-sm sm:text-base"
                 type="submit"
                 disabled={loading}
               >
