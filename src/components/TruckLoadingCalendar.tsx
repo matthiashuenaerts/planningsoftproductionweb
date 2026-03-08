@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { holidayService, Holiday } from '@/services/holidayService';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Project {
   id: string;
