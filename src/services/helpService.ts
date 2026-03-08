@@ -41,7 +41,18 @@ export const helpService = {
       .order('display_order', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as HelpCategory[];
+  },
+
+  async getGlobalCategories(): Promise<HelpCategory[]> {
+    const { data, error } = await supabase
+      .from('help_categories')
+      .select('*')
+      .eq('is_global', true)
+      .order('display_order', { ascending: true });
+
+    if (error) throw error;
+    return (data || []) as unknown as HelpCategory[];
   },
 
   async createCategory(category: Omit<HelpCategory, 'id' | 'created_at' | 'updated_at'>): Promise<HelpCategory> {
