@@ -414,7 +414,7 @@ export const ProjectChatInline: React.FC<ProjectChatInlineProps> = ({
             </div>
           )}
           
-          <form onSubmit={handleSendMessage} className="flex gap-2">
+          <form onSubmit={handleSendMessage} className="flex gap-1.5 sm:gap-2">
             <Input
               ref={fileInputRef}
               type="file"
