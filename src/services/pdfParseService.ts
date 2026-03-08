@@ -499,7 +499,7 @@ function extractInvoiceNumber(text: string): string | undefined {
 
 function extractCustomerNumber(text: string): string | undefined {
   const patterns = [
-    /(?:klant(?:en)?(?:\s*nr|nummer)|customer\s*(?:no|nr|number|id)|debiteurnummer|debiteur\s*(?:nr|nummer))[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:klant(?:en)?(?:\s*nr|nummer)|customer\s*(?:no|nr|number|id)|debiteurnummer|debiteur\s*(?:nr|nummer)|n°\s*client|client\s*(?:n°|no|nr))[:\s#]*([A-Z0-9\-\/]+)/gi,
   ];
   for (const p of patterns) {
     p.lastIndex = 0;
