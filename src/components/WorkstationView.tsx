@@ -313,7 +313,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                       .from('tasks')
                       .select('*')
                       .eq('id', taskLink.standard_task_id)
-                      .single();
+                      .maybeSingle();
                     
                     if (taskError) throw taskError;
                     
