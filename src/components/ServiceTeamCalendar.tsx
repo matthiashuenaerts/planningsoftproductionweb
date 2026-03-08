@@ -470,7 +470,7 @@ const ServiceTeamCalendar: React.FC = () => {
         .eq('id', sorted[i].assignment.id);
     }
 
-    toast({ title: t('svc_route_optimized'), description: t('svc_optimized_postal', { count: sorted.length }) });
+    toast({ title: t('svc_route_optimized'), description: t('svc_optimized_postal', { count: String(sorted.length) }) });
     loadData();
   };
 
