@@ -2457,7 +2457,7 @@ const Planning = () => {
                                       >
                                         <div className={cn(
                                             "relative h-full overflow-hidden rounded border p-2",
-                                            getPriorityColor(item.task?.priority || '')
+                                            getScheduleItemColor(item)
                                           )}>
                                           <div className="flex justify-between h-full">
                                             <div className="flex-1 pr-2 overflow-hidden">
