@@ -959,69 +959,25 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                     <TableCell>{accessory.supplier || '-'}</TableCell>
                     <TableCell>{accessory.stock_location || '-'}</TableCell>
                     <TableCell>
-                      {editingStatusAccessoryId === accessory.id ? (
-                        <div className="flex items-center gap-2">
-                          <Select
-                            value={statusUpdateInfo.status}
-                            onValueChange={(value: Accessory['status']) => 
-                              setStatusUpdateInfo(prev => ({ ...prev, status: value }))
-                            }
-                          >
-                            <SelectTrigger className="h-8 w-36">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {statuses.map(status => (
-                                <SelectItem key={status} value={status}>
-                                  {status.replace('_', ' ').toUpperCase()}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {statusUpdateInfo.status === 'to_order' && (
-                            <Input
-                              type="number"
-                              min="1"
-                              max={accessory.quantity}
-                              value={statusUpdateInfo.quantity}
-                              onChange={(e) => 
-                                setStatusUpdateInfo(prev => ({ 
-                                  ...prev, 
-                                  quantity: Math.min(parseInt(e.target.value) || 1, accessory.quantity) 
-                                }))
-                              }
-                              className="h-8 w-16"
-                            />
-                          )}
-                          <Button
-                            size="sm"
-                            className="h-8 px-2"
-                            onClick={() => handleStatusUpdate(accessory.id, statusUpdateInfo.status, statusUpdateInfo.quantity)}
-                            disabled={loading}
-                          >
-                            ✓
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 px-2"
-                            onClick={() => setEditingStatusAccessoryId(null)}
-                          >
-                            ✕
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditingStatusAccessoryId(accessory.id);
-                            setStatusUpdateInfo({ status: accessory.status, quantity: accessory.quantity });
-                          }}
-                        >
-                          {accessory.status.replace('_', ' ').toUpperCase()}
-                        </Button>
-                      )}
+                      <Select
+                        value={accessory.status}
+                        onValueChange={(value: Accessory['status']) => {
+                          if (value !== accessory.status) {
+                            handleStatusUpdate(accessory.id, value, accessory.quantity);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-8 w-36">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statuses.map(status => (
+                            <SelectItem key={status} value={status}>
+                              {status.replace('_', ' ').toUpperCase()}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>
                       {accessory.order_id ? (
