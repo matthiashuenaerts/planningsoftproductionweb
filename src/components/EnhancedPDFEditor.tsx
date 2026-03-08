@@ -354,6 +354,9 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
                 borderWidth: (annotation.strokeWidth || 1) * scaleX,
               });
               break;
+            case 'path':
+              drawPathOnPage(page, annotation, scaleX, scaleY, height);
+              break;
           }
         }
       }
@@ -955,6 +958,9 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
                 borderWidth: (annotation.strokeWidth || 1) * scaleX,
               });
               break;
+            case 'path':
+              drawPathOnPage(page, annotation, scaleX, scaleY, height);
+              break;
           }
         }
       }
@@ -999,6 +1005,112 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
       g: parseInt(result[2], 16),
       b: parseInt(result[3], 16)
     } : { r: 0, g: 0, b: 0 };
+  };
+
+  // Convert Fabric.js path data array to SVG path string, applying scale and PDF coordinate flip
+  const fabricPathToSvgString = (pathData: any[], sX: number, sY: number, pageHeight: number): string => {
+    if (!Array.isArray(pathData)) return '';
+    return pathData.map((segment: any) => {
+      if (!Array.isArray(segment)) return '';
+      const [command, ...coords] = segment;
+      // Scale coordinates and flip Y for PDF (bottom-up)
+      const transformed = coords.map((c: any, i: number) => {
+        if (typeof c !== 'number') return c;
+        // Even indices = X, odd indices = Y
+        return i % 2 === 0 ? c * sX : pageHeight - (c * sY);
+      });
+      return command + transformed.join(' ');
+    }).join(' ');
+  };
+
+  // Draw path annotation on a PDF page
+  const drawPathOnPage = (page: any, annotation: any, scaleX: number, scaleY: number, pageHeight: number) => {
+    if (!annotation.path || !Array.isArray(annotation.path)) return;
+    
+    const pathColorArray = hexToRgb(annotation.stroke || '#ff0000');
+    const borderWidth = (annotation.strokeWidth || 2) * scaleX;
+    
+    // Convert path segments to individual line draws for maximum compatibility
+    // This avoids SVG path parsing issues in pdf-lib and works perfectly in Adobe
+    const scaledSegments = annotation.path.map((segment: any) => {
+      if (!Array.isArray(segment)) return null;
+      const [command, ...coords] = segment;
+      const transformed = coords.map((c: any, i: number) => {
+        if (typeof c !== 'number') return c;
+        return i % 2 === 0 ? c * scaleX : c * scaleY;
+      });
+      return [command, ...transformed];
+    }).filter(Boolean);
+
+    // Draw as connected lines for Adobe compatibility
+    let lastX = 0, lastY = 0;
+    for (const segment of scaledSegments) {
+      const [command, ...coords] = segment;
+      
+      switch (command) {
+        case 'M': // Move to
+          lastX = coords[0];
+          lastY = coords[1];
+          break;
+        case 'L': // Line to
+          page.drawLine({
+            start: { x: lastX, y: pageHeight - lastY },
+            end: { x: coords[0], y: pageHeight - coords[1] },
+            thickness: borderWidth,
+            color: rgb(pathColorArray.r / 255, pathColorArray.g / 255, pathColorArray.b / 255),
+          });
+          lastX = coords[0];
+          lastY = coords[1];
+          break;
+        case 'Q': // Quadratic curve - approximate with line to endpoint
+          // coords: [cpx, cpy, x, y]
+          if (coords.length >= 4) {
+            // Draw multiple line segments to approximate the curve
+            const steps = 8;
+            const startX = lastX, startY = lastY;
+            const cpx = coords[0], cpy = coords[1];
+            const endX = coords[2], endY = coords[3];
+            for (let t = 1; t <= steps; t++) {
+              const tt = t / steps;
+              const invT = 1 - tt;
+              const px = invT * invT * startX + 2 * invT * tt * cpx + tt * tt * endX;
+              const py = invT * invT * startY + 2 * invT * tt * cpy + tt * tt * endY;
+              page.drawLine({
+                start: { x: lastX, y: pageHeight - lastY },
+                end: { x: px, y: pageHeight - py },
+                thickness: borderWidth,
+                color: rgb(pathColorArray.r / 255, pathColorArray.g / 255, pathColorArray.b / 255),
+              });
+              lastX = px;
+              lastY = py;
+            }
+          }
+          break;
+        case 'C': // Cubic bezier - approximate with line segments
+          if (coords.length >= 6) {
+            const steps = 10;
+            const startX = lastX, startY = lastY;
+            const cp1x = coords[0], cp1y = coords[1];
+            const cp2x = coords[2], cp2y = coords[3];
+            const endX = coords[4], endY = coords[5];
+            for (let t = 1; t <= steps; t++) {
+              const tt = t / steps;
+              const invT = 1 - tt;
+              const px = invT**3 * startX + 3 * invT**2 * tt * cp1x + 3 * invT * tt**2 * cp2x + tt**3 * endX;
+              const py = invT**3 * startY + 3 * invT**2 * tt * cp1y + 3 * invT * tt**2 * cp2y + tt**3 * endY;
+              page.drawLine({
+                start: { x: lastX, y: pageHeight - lastY },
+                end: { x: px, y: pageHeight - py },
+                thickness: borderWidth,
+                color: rgb(pathColorArray.r / 255, pathColorArray.g / 255, pathColorArray.b / 255),
+              });
+              lastX = px;
+              lastY = py;
+            }
+          }
+          break;
+      }
+    }
   };
 
   const changePage = (newPage: number) => {
