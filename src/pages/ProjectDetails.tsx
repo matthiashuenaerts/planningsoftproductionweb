@@ -1131,24 +1131,24 @@ const ProjectDetails = () => {
                 <p className="text-muted-foreground text-xs sm:text-sm">{t('client_label')}: {project?.client}</p>
               </div>
               
-              <div className="flex gap-1 sm:gap-1.5 overflow-x-auto pb-1.5 -mx-1 px-1 scrollbar-hide md:overflow-visible md:flex-wrap snap-x snap-mandatory">
-                <Button size="sm" variant={activeTab === 'home' ? 'default' : 'ghost'} onClick={() => setActiveTab('home')} className={cn("flex-shrink-0 snap-start h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'home' && 'text-muted-foreground hover:text-foreground')}>
+              <div className="flex flex-wrap gap-1 sm:gap-1.5 pb-1.5">
+                <Button size="sm" variant={activeTab === 'home' ? 'default' : 'ghost'} onClick={() => setActiveTab('home')} className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'home' && 'text-muted-foreground hover:text-foreground')}>
                   <Home className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> {t('home')}
                 </Button>
-                <Button size="sm" variant={activeTab === 'orders' ? 'default' : 'ghost'} onClick={() => setActiveTab('orders')} className={cn("flex-shrink-0 snap-start h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab === 'orders' ? '' : undeliveredItemsCount > 0 ? "bg-red-500/10 text-red-600 hover:bg-red-500/20 dark:text-red-400" : allOrdersDelivered ? "bg-green-500/10 text-green-600 hover:bg-green-500/20 dark:text-green-400" : "text-muted-foreground hover:text-foreground")}>
+                <Button size="sm" variant={activeTab === 'orders' ? 'default' : 'ghost'} onClick={() => setActiveTab('orders')} className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab === 'orders' ? '' : undeliveredItemsCount > 0 ? "bg-red-500/10 text-red-600 hover:bg-red-500/20 dark:text-red-400" : allOrdersDelivered ? "bg-green-500/10 text-green-600 hover:bg-green-500/20 dark:text-green-400" : "text-muted-foreground hover:text-foreground")}>
                   <Package className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> 
                   {t('orders')}
                   {undeliveredItemsCount > 0 && <span className="ml-1 bg-red-500 text-white px-1 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold leading-none min-w-[16px] text-center">
                       {undeliveredItemsCount}
                     </span>}
                 </Button>
-                <Button size="sm" variant={activeTab === 'parts' ? 'default' : 'ghost'} onClick={() => setActiveTab('parts')} className={cn("flex-shrink-0 snap-start h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'parts' && 'text-muted-foreground hover:text-foreground')}>
+                <Button size="sm" variant={activeTab === 'parts' ? 'default' : 'ghost'} onClick={() => setActiveTab('parts')} className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'parts' && 'text-muted-foreground hover:text-foreground')}>
                   <List className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> {t('parts_list')}
                 </Button>
-                <Button size="sm" variant={activeTab === 'accessories' ? 'default' : 'ghost'} onClick={() => setActiveTab('accessories')} className={cn("flex-shrink-0 snap-start h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'accessories' && 'text-muted-foreground hover:text-foreground')}>
+                <Button size="sm" variant={activeTab === 'accessories' ? 'default' : 'ghost'} onClick={() => setActiveTab('accessories')} className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'accessories' && 'text-muted-foreground hover:text-foreground')}>
                   <Settings className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> {t('accessories')}
                 </Button>
-                <Button size="sm" variant={activeTab === 'chat' ? 'default' : 'ghost'} onClick={() => setActiveTab('chat')} className={cn("relative flex-shrink-0 snap-start h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'chat' && 'text-muted-foreground hover:text-foreground')}>
+                <Button size="sm" variant={activeTab === 'chat' ? 'default' : 'ghost'} onClick={() => setActiveTab('chat')} className={cn("relative h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'chat' && 'text-muted-foreground hover:text-foreground')}>
                   <MessageCircle className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> 
                   Chat
                   {unreadChatCount > 0 && (
@@ -1157,10 +1157,10 @@ const ProjectDetails = () => {
                     </span>
                   )}
                 </Button>
-                <Button size="sm" variant={activeTab === 'files' ? 'default' : 'ghost'} onClick={() => setActiveTab('files')} className={cn("flex-shrink-0 snap-start h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'files' && 'text-muted-foreground hover:text-foreground')}>
+                <Button size="sm" variant={activeTab === 'files' ? 'default' : 'ghost'} onClick={() => setActiveTab('files')} className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'files' && 'text-muted-foreground hover:text-foreground')}>
                   <FileText className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> {t('files')}
                 </Button>
-                <Button size="sm" variant={activeTab === 'onedrive' ? 'default' : 'ghost'} onClick={() => setActiveTab('onedrive')} className={cn("flex-shrink-0 snap-start h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'onedrive' && 'text-muted-foreground hover:text-foreground')}>
+                <Button size="sm" variant={activeTab === 'onedrive' ? 'default' : 'ghost'} onClick={() => setActiveTab('onedrive')} className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'onedrive' && 'text-muted-foreground hover:text-foreground')}>
                   <Folder className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> {t('onedrive')}
                 </Button>
                   {['admin', 'manager', 'calculator'].includes(currentEmployee?.role) && (
@@ -1168,7 +1168,7 @@ const ProjectDetails = () => {
                       size="sm"
                       variant={activeTab === 'costing' ? 'default' : 'ghost'}
                       onClick={() => setActiveTab('costing')}
-                      className={cn("flex-shrink-0 snap-start h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'costing' && 'text-muted-foreground hover:text-foreground')}
+                      className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'costing' && 'text-muted-foreground hover:text-foreground')}
                     >
                       <DollarSign className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> Costing
                     </Button>
