@@ -6,6 +6,7 @@ import { Clock, User, Calendar, Play, Square, CheckCircle, FileText, Package2, Q
 import { format, parseISO } from 'date-fns';
 import { useLanguage } from '@/context/LanguageContext';
 import { useNavigate } from 'react-router-dom';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface EnhancedTimelineTask {
   id: string;
