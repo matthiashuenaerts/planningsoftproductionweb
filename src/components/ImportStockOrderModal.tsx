@@ -714,12 +714,104 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
                           <span>Analyzing PDF...</span>
                         </div>
                       ) : parsedData && (
-                        <div className="text-sm text-left bg-muted p-3 rounded-lg">
-                          <p><strong>Supplier:</strong> {parsedData.supplier || 'Not detected'}</p>
-                          <p><strong>Order Date:</strong> {parsedData.orderDate || 'Not detected'}</p>
-                          <p><strong>Delivery Date:</strong> {parsedData.expectedDelivery || 'Not detected'}</p>
-                          <p><strong>Items Found:</strong> {parsedData.items.length}</p>
-                          <div className="pt-3">
+                        <div className="text-sm text-left space-y-3">
+                          {/* Confidence indicator */}
+                          <div className="flex items-center gap-2">
+                            <Badge variant={
+                              parsedData.extractionConfidence === 'high' ? 'default' :
+                              parsedData.extractionConfidence === 'medium' ? 'secondary' : 'destructive'
+                            }>
+                              {parsedData.extractionConfidence === 'high' ? '✓ High confidence' :
+                               parsedData.extractionConfidence === 'medium' ? '~ Medium confidence' : '⚠ Low confidence'}
+                            </Badge>
+                            {parsedData.currency && <Badge variant="outline">{parsedData.currency}</Badge>}
+                          </div>
+
+                          {/* Warnings */}
+                          {parsedData.warnings.length > 0 && (
+                            <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-md p-2 text-xs space-y-1">
+                              {parsedData.warnings.map((w, i) => <p key={i}>⚠ {w}</p>)}
+                            </div>
+                          )}
+
+                          {/* Core info */}
+                          <div className="bg-muted p-3 rounded-lg grid grid-cols-2 gap-x-4 gap-y-1">
+                            <p><strong>Supplier:</strong> {parsedData.supplier || '—'}</p>
+                            <p><strong>Order #:</strong> {parsedData.orderNumber || '—'}</p>
+                            <p><strong>Invoice #:</strong> {parsedData.invoiceNumber || '—'}</p>
+                            <p><strong>Customer #:</strong> {parsedData.customerNumber || '—'}</p>
+                            <p><strong>Order Date:</strong> {parsedData.orderDate || '—'}</p>
+                            <p><strong>Delivery Date:</strong> {parsedData.expectedDelivery || '—'}</p>
+                          </div>
+
+                          {/* Financial summary */}
+                          {(parsedData.subtotal || parsedData.totalAmount || parsedData.vatAmount || parsedData.discount) && (
+                            <div className="bg-muted p-3 rounded-lg space-y-1">
+                              <p className="font-medium text-xs uppercase text-muted-foreground">Financial Summary</p>
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                {parsedData.subtotal !== undefined && <p><strong>Subtotal:</strong> €{parsedData.subtotal.toFixed(2)}</p>}
+                                {parsedData.discount !== undefined && <p><strong>Discount:</strong> -€{parsedData.discount.toFixed(2)}</p>}
+                                {parsedData.vatAmount !== undefined && (
+                                  <p><strong>VAT{parsedData.vatPercentage ? ` (${parsedData.vatPercentage}%)` : ''}:</strong> €{parsedData.vatAmount.toFixed(2)}</p>
+                                )}
+                                {parsedData.shippingCost !== undefined && <p><strong>Shipping:</strong> €{parsedData.shippingCost.toFixed(2)}</p>}
+                                {parsedData.totalAmount !== undefined && <p className="font-bold"><strong>Total:</strong> €{parsedData.totalAmount.toFixed(2)}</p>}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Contact & delivery */}
+                          {(parsedData.contactPerson || parsedData.contactEmail || parsedData.deliveryAddress || parsedData.paymentTerms) && (
+                            <div className="bg-muted p-3 rounded-lg space-y-1">
+                              <p className="font-medium text-xs uppercase text-muted-foreground">Additional Info</p>
+                              {parsedData.contactPerson && <p><strong>Contact:</strong> {parsedData.contactPerson}</p>}
+                              {parsedData.contactPhone && <p><strong>Phone:</strong> {parsedData.contactPhone}</p>}
+                              {parsedData.contactEmail && <p><strong>Email:</strong> {parsedData.contactEmail}</p>}
+                              {parsedData.deliveryAddress && <p><strong>Delivery:</strong> {parsedData.deliveryAddress}</p>}
+                              {parsedData.paymentTerms && <p><strong>Payment:</strong> {parsedData.paymentTerms}</p>}
+                            </div>
+                          )}
+
+                          {/* Items summary */}
+                          <div className="bg-muted p-3 rounded-lg space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium">{parsedData.items.length} items found</p>
+                              <div className="flex gap-1">
+                                {parsedData.items.filter(i => i.matchConfidence === 'exact').length > 0 && (
+                                  <Badge className="bg-emerald-600/80 text-xs">{parsedData.items.filter(i => i.matchConfidence === 'exact').length} matched</Badge>
+                                )}
+                                {parsedData.items.filter(i => i.matchConfidence === 'none').length > 0 && (
+                                  <Badge variant="outline" className="text-xs">{parsedData.items.filter(i => i.matchConfidence === 'none').length} unmatched</Badge>
+                                )}
+                              </div>
+                            </div>
+                            {parsedData.items.length > 0 && (
+                              <ScrollArea className="max-h-[120px]">
+                                <div className="space-y-1">
+                                  {parsedData.items.slice(0, 20).map((item, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs py-0.5 border-b border-border/50">
+                                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                          item.matchConfidence === 'exact' ? 'bg-emerald-500' :
+                                          item.matchConfidence === 'partial' ? 'bg-amber-500' : 'bg-muted-foreground'
+                                        }`} />
+                                        <span className="truncate">{item.description || item.article_code}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2 flex-shrink-0 text-muted-foreground ml-2">
+                                        <span>{item.quantity}{item.unit ? ` ${item.unit}` : 'x'}</span>
+                                        {item.unit_price !== undefined && <span>€{item.unit_price.toFixed(2)}</span>}
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {parsedData.items.length > 20 && (
+                                    <p className="text-xs text-muted-foreground py-1">+ {parsedData.items.length - 20} more items...</p>
+                                  )}
+                                </div>
+                              </ScrollArea>
+                            )}
+                          </div>
+
+                          <div className="pt-1">
                             <Button type="button" size="sm" onClick={() => setActiveTab('manual')}>
                               Review & edit in form
                             </Button>
