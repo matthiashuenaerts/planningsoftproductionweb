@@ -78,11 +78,11 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
   const [configLoaded, setConfigLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Relay/bypass state
+  // Bypass state (BroadcastChannel-based in-app relay)
   const [relayEnabled, setRelayEnabled] = useState(false);
-  const [relayConnected, setRelayConnected] = useState(false);
-  const relayPortRef = useRef<any>(null);
-  const relayWriterRef = useRef<any>(null);
+  const [relayListening, setRelayListening] = useState(false);
+  const [relayReceiveCount, setRelayReceiveCount] = useState(0);
+  const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
 
   // Configurable settings
   const [maxKeyInterval, setMaxKeyInterval] = useState(150);
