@@ -2076,18 +2076,20 @@ const Planning = () => {
                 )}
               </div>
               
-              <div className="flex flex-wrap items-center gap-2">
+              <div className={cn("flex flex-wrap items-center", isMobile ? "gap-1.5" : "gap-2")}>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
+                      size={isMobile ? "sm" : "default"}
                       className={cn(
                         "justify-start text-left font-normal",
+                        isMobile && "text-xs h-8",
                         !selectedDate && "text-muted-foreground"
                       )}
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "PPP") : <span>{t('planning_pick_date')}</span>}
+                      <CalendarIcon className={cn("mr-1.5", isMobile ? "h-3 w-3" : "h-4 w-4 mr-2")} />
+                      {selectedDate ? format(selectedDate, isMobile ? "MMM d" : "PPP") : <span>{t('planning_pick_date')}</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="end">
@@ -2105,41 +2107,44 @@ const Planning = () => {
                   onClick={fetchAllData}
                   variant="outline"
                   size="sm"
+                  className={isMobile ? "h-8 text-xs px-2" : ""}
                 >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  {t('planning_refresh')}
+                  <RefreshCw className={cn(isMobile ? "h-3 w-3" : "h-4 w-4 mr-2")} />
+                  {!isMobile && t('planning_refresh')}
                 </Button>
                 
                 {isAdmin && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className={cn("flex flex-wrap", isMobile ? "gap-1.5" : "gap-2")}>
                     <Button
                       onClick={() => setShowStandardTaskAssignment(true)}
                       variant="outline"
                       size="sm"
-                      className="whitespace-nowrap"
+                      className={cn("whitespace-nowrap", isMobile && "h-8 text-xs px-2")}
                     >
-                      <Settings className="mr-2 h-4 w-4" />
-                      {t('planning_add_standard_task')}
+                      <Settings className={cn(isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2")} />
+                      {isMobile ? t('planning_add_standard_task').split(' ').slice(0, 2).join(' ') : t('planning_add_standard_task')}
                     </Button>
                     <Button
                       onClick={() => setShowSchedulingMethodDialog(true)}
                       disabled={generatingSchedule || isSelectedDateHoliday()}
                       size="sm"
-                      className="whitespace-nowrap"
+                      className={cn("whitespace-nowrap", isMobile && "h-8 text-xs px-2")}
                     >
-                      <Zap className="mr-2 h-4 w-4" />
-                      {generatingSchedule ? t('planning_generating') : t('planning_generate_all')}
+                      <Zap className={cn(isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2")} />
+                      {generatingSchedule ? t('planning_generating') : (isMobile ? t('planning_generate_all').split(' ').slice(0, 2).join(' ') : t('planning_generate_all'))}
                     </Button>
-                    <Button
-                      onClick={generateTomorrowSchedule}
-                      disabled={generatingSchedule || !checkTodayHasSchedules() || !isNextWorkingDay()}
-                      variant="secondary"
-                      size="sm"
-                      className="whitespace-nowrap"
-                    >
-                      <ArrowRight className="mr-2 h-4 w-4" />
-                      {generatingSchedule ? t('planning_generating') : t('planning_generate_next_day')}
-                    </Button>
+                    {!isMobile && (
+                      <Button
+                        onClick={generateTomorrowSchedule}
+                        disabled={generatingSchedule || !checkTodayHasSchedules() || !isNextWorkingDay()}
+                        variant="secondary"
+                        size="sm"
+                        className="whitespace-nowrap"
+                      >
+                        <ArrowRight className="mr-2 h-4 w-4" />
+                        {generatingSchedule ? t('planning_generating') : t('planning_generate_next_day')}
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
