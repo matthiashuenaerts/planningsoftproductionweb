@@ -37,6 +37,8 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const isMobile = useIsMobile();
+  const signedVideoUrl = useSignedUrl('help-media', selectedArticle?.video_url);
+  const signedImageUrl = useSignedUrl('help-media', selectedArticle?.image_url);
 
   useEffect(() => {
     if (open) {
