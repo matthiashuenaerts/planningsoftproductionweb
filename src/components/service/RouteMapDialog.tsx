@@ -200,8 +200,8 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
           {/* Map container */}
           <div
             ref={mapContainerRef}
-            className="w-full rounded-lg border border-border"
-            style={{ height: '500px', zIndex: 0, position: 'relative' }}
+            className="w-full rounded-lg border border-border flex-1 min-h-0"
+            style={{ zIndex: 0, position: 'relative' }}
           />
         </div>
       </DialogContent>
