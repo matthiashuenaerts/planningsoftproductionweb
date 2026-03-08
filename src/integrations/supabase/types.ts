@@ -6278,6 +6278,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      employee_password_hidden: {
+        Args: { emp: Database["public"]["Tables"]["employees"]["Row"] }
+        Returns: string
+      }
       get_buffered_part_count_with_todo: {
         Args: { p_workstation_id: string }
         Returns: number
