@@ -344,11 +344,7 @@ const GroupProductDialog: React.FC<GroupProductDialogProps> = ({
               className="mt-1"
             />
             {editingGroup?.image_path && !imageFile && (
-              <img
-                src={getImageUrl(editingGroup.image_path) || ''}
-                alt="Current"
-                className="h-16 w-16 object-cover rounded mt-2"
-              />
+              <SignedStorageImage bucket="product-images" path={editingGroup.image_path} alt="Current" className="h-16 w-16 object-cover rounded mt-2" />
             )}
           </div>
 
