@@ -21,6 +21,7 @@ import DevDeveloperManagement from "@/components/developer/DevDeveloperManagemen
 import DevDashboard from "@/components/developer/DevDashboard";
 import DevSupportManagement from "@/components/developer/DevSupportManagement";
 import DevHelpManagement from "@/components/developer/DevHelpManagement";
+import DevGeneralMessages from "@/components/developer/DevGeneralMessages";
 
 type TenantRow = {
   id: string;
