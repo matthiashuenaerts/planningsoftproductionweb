@@ -229,6 +229,23 @@ const Login: React.FC = () => {
       }
     } catch (error: any) {
       console.error("Login error:", error);
+
+      // Log failed login attempt (best effort - tenant may not be resolved)
+      if (tenant) {
+        // Try to resolve tenant id for logging
+        const { data: tenantData } = await supabase.rpc("resolve_tenant", { p_slug: tenant, p_domain: null });
+        const resolvedTenant = Array.isArray(tenantData) ? tenantData[0] : tenantData;
+        if (resolvedTenant?.id) {
+          logLoginAttempt({
+            tenantId: resolvedTenant.id,
+            employeeName: nameOrEmail,
+            loginMethod: "password",
+            success: false,
+            errorMessage: error.message || "Login failed",
+          });
+        }
+      }
+
       toast({
         title: "Login failed",
         description: error.message || "An error occurred during login",
