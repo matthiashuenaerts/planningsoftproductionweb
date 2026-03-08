@@ -729,11 +729,49 @@ Deno.serve(async (req) => {
 
     console.log('✅ Auto-generation complete:', result)
 
+    // Log success to automation_logs
+    try {
+      await supabase.from('automation_logs').insert({
+        action_type: 'midnight_scheduler',
+        status: 'success',
+        summary: `Scheduled ${projects.length} projects, ${schedules.length} gantt entries`,
+        details: result,
+      })
+    } catch (logErr) {
+      console.error('Failed to log automation result:', logErr)
+    }
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
     console.error('Error in auto-generate-schedule:', error)
+
+    // Log error to automation_logs and send alert
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      const errorSupabase = createClient(supabaseUrl, serviceRoleKey)
+      
+      await errorSupabase.from('automation_logs').insert({
+        action_type: 'midnight_scheduler',
+        status: 'error',
+        summary: 'Midnight scheduler failed',
+        error_message: error.message,
+      })
+
+      // Send error alert
+      await errorSupabase.functions.invoke('send-error-alert', {
+        body: {
+          action_type: 'midnight_scheduler',
+          error_message: error.message,
+          summary: 'Midnight scheduler failed completely',
+        }
+      })
+    } catch (alertErr) {
+      console.error('Failed to send error alert:', alertErr)
+    }
+
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

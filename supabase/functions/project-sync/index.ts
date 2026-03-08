@@ -401,6 +401,35 @@ serve(async (req) => {
       console.error('Failed to log sync results:', logErr);
     }
 
+    // Log to automation_logs
+    try {
+      await supabase.from('automation_logs').insert({
+        action_type: 'project_sync',
+        status: totalErrors > 0 ? 'partial' : 'success',
+        summary: `${totalSynced} synced, ${totalErrors} errors (${automated ? 'automated' : 'manual'})`,
+        error_message: totalErrors > 0 ? allErrorDetails.join('; ') : null,
+        details: { totalProjects, totalSynced, totalErrors, automated },
+      });
+    } catch (logErr) {
+      console.error('Failed to log automation result:', logErr);
+    }
+
+    // Send error alert if there were errors
+    if (totalErrors > 0) {
+      try {
+        await supabase.functions.invoke('send-error-alert', {
+          body: {
+            action_type: 'project_sync',
+            error_message: allErrorDetails.join('\n'),
+            summary: `Project sync: ${totalErrors} errors out of ${totalProjects} projects`,
+            details: { totalSynced, totalErrors, automated },
+          }
+        });
+      } catch (alertErr) {
+        console.error('Failed to send error alert:', alertErr);
+      }
+    }
+
     const result = {
       success: true,
       message: `${automated ? 'Automated' : 'Manual'} sync completed: ${totalSynced} projects updated, ${totalErrors} errors`,
@@ -420,6 +449,31 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Sync process failed:', error);
+
+    // Log critical error and send alert
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const errorSupabase = createClient(supabaseUrl, supabaseServiceKey);
+      
+      await errorSupabase.from('automation_logs').insert({
+        action_type: 'project_sync',
+        status: 'error',
+        summary: 'Project sync failed completely',
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+      });
+
+      await errorSupabase.functions.invoke('send-error-alert', {
+        body: {
+          action_type: 'project_sync',
+          error_message: error instanceof Error ? error.message : 'Unknown error',
+          summary: 'Project sync failed completely',
+        }
+      });
+    } catch (alertErr) {
+      console.error('Failed to send error alert:', alertErr);
+    }
+
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error', timestamp: new Date().toISOString() }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }

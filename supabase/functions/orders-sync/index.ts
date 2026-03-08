@@ -325,6 +325,35 @@ serve(async (req) => {
       console.error('Failed to log sync results:', logErr);
     }
 
+    // Log to automation_logs
+    try {
+      await supabase.from('automation_logs').insert({
+        action_type: 'order_sync',
+        status: totalErrorCount > 0 ? 'partial' : 'success',
+        summary: `${totalSyncedCount} synced, ${totalErrorCount} errors (${automated ? 'automated' : 'manual'})`,
+        error_message: totalErrorCount > 0 ? allErrors.join('; ') : null,
+        details: { totalSyncedCount, totalErrorCount, automated },
+      });
+    } catch (logErr) {
+      console.error('Failed to log automation result:', logErr);
+    }
+
+    // Send error alert if there were errors
+    if (totalErrorCount > 0) {
+      try {
+        await supabase.functions.invoke('send-error-alert', {
+          body: {
+            action_type: 'order_sync',
+            error_message: allErrors.join('\n'),
+            summary: `Order sync: ${totalErrorCount} errors`,
+            details: { totalSyncedCount, totalErrorCount, automated },
+          }
+        });
+      } catch (alertErr) {
+        console.error('Failed to send error alert:', alertErr);
+      }
+    }
+
     console.log('Orders sync process completed:', syncResult);
 
     return new Response(JSON.stringify(syncResult), {
@@ -333,6 +362,31 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('Error in orders sync function:', error);
+
+    // Log critical error and send alert
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const errorSupabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      await errorSupabase.from('automation_logs').insert({
+        action_type: 'order_sync',
+        status: 'error',
+        summary: 'Order sync failed completely',
+        error_message: error.message,
+      });
+
+      await errorSupabase.functions.invoke('send-error-alert', {
+        body: {
+          action_type: 'order_sync',
+          error_message: error.message,
+          summary: 'Order sync failed completely',
+        }
+      });
+    } catch (alertErr) {
+      console.error('Failed to send error alert:', alertErr);
+    }
+
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
