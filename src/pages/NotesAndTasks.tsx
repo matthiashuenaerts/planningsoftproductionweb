@@ -368,7 +368,7 @@ const NotesAndTasks = () => {
 
           {filteredItems.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-gray-500">No items found. Create your first note or task!</p>
+              <p className="text-gray-500">{t('nt_no_items')}</p>
             </div>
           )}
 

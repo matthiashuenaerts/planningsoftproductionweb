@@ -22,6 +22,7 @@ import { PersonalItem } from '@/pages/NotesAndTasks';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { ImageModal } from '@/components/ui/image-modal';
 
 interface PersonalItemCardProps {
@@ -43,10 +44,10 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
 }) => {
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
+  const { t } = useLanguage();
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<{ src: string; alt: string } | null>(null);
 
-  // Check if current user is the owner
   const isOwner = item.user_id === currentEmployee?.id;
 
   const getPriorityColor = (priority: string) => {
@@ -55,6 +56,24 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
       case 'medium': return 'bg-yellow-100 text-yellow-800';
       case 'low': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case 'high': return t('nt_high');
+      case 'medium': return t('nt_medium');
+      case 'low': return t('nt_low');
+      default: return priority;
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'active': return t('nt_active');
+      case 'completed': return t('nt_completed');
+      case 'archived': return t('nt_archived');
+      default: return status;
     }
   };
 
@@ -110,14 +129,14 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
       URL.revokeObjectURL(url);
 
       toast({
-        title: "Success",
-        description: "File downloaded successfully",
+        title: t('success') || "Success",
+        description: t('nt_file_downloaded'),
       });
     } catch (error) {
       console.error('Error downloading file:', error);
       toast({
-        title: "Error",
-        description: "Failed to download file",
+        title: t('error') || "Error",
+        description: t('nt_download_failed'),
         variant: "destructive",
       });
     } finally {
@@ -125,7 +144,6 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
     }
   };
 
-  // Get image attachments for preview
   const imageAttachments = item.attachments?.filter(att => isImageFile(att.file_name)) || [];
 
   return (
@@ -161,20 +179,20 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
           
           <div className="flex gap-2 flex-wrap">
             <Badge className={getPriorityColor(item.priority)}>
-              {item.priority}
+              {getPriorityLabel(item.priority)}
             </Badge>
             <Badge className={getStatusColor(item.status)}>
-              {item.status}
+              {getStatusLabel(item.status)}
             </Badge>
             {item.is_shared && (
               <Badge variant="outline">
                 <Users className="h-3 w-3 mr-1" />
-                Shared
+                {t('nt_shared')}
               </Badge>
             )}
             {!isOwner && (
               <Badge variant="secondary">
-                Shared with you
+                {t('nt_shared_with_you')}
               </Badge>
             )}
           </div>
@@ -190,16 +208,15 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
           {item.due_date && (
             <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
               <Calendar className="h-3 w-3" />
-              <span>Due: {format(new Date(item.due_date), 'MMM d, yyyy')}</span>
+              <span>{t('nt_due')}: {format(new Date(item.due_date), 'MMM d, yyyy')}</span>
             </div>
           )}
 
-          {/* Image attachments preview */}
           {imageAttachments.length > 0 && (
             <div className="mb-3">
               <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
                 <Paperclip className="h-3 w-3" />
-                <span>Images ({imageAttachments.length})</span>
+                <span>{t('nt_images')} ({imageAttachments.length})</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {imageAttachments.slice(0, 4).map((attachment) => (
@@ -211,7 +228,7 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
                 ))}
                 {imageAttachments.length > 4 && (
                   <div className="bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500 aspect-square">
-                    +{imageAttachments.length - 4} more
+                    {(t('nt_more') || '+{{count}} more').replace('{{count}}', String(imageAttachments.length - 4))}
                   </div>
                 )}
               </div>
@@ -222,7 +239,7 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
             <div className="mb-3">
               <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
                 <Paperclip className="h-3 w-3" />
-                <span>{item.attachments.length} attachment(s)</span>
+                <span>{(t('nt_attachments_count') || '{{count}} attachment(s)').replace('{{count}}', String(item.attachments.length))}</span>
               </div>
               <div className="space-y-1">
                 {item.attachments.map((attachment) => (
@@ -247,7 +264,7 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
             <div className="mb-3">
               <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
                 <Users className="h-3 w-3" />
-                <span>Shared with:</span>
+                <span>{t('nt_shared_with')}</span>
               </div>
               <div className="text-xs text-gray-600">
                 {item.shares.map(share => share.employee_name).join(', ')}
@@ -261,7 +278,6 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
             </span>
             
             <div className="flex gap-1">
-              {/* Only show edit button for owners or shared items with edit permission */}
               {(isOwner || item.shares?.some(share => 
                 share.shared_with_user_id === currentEmployee?.id && share.can_edit
               )) && (
@@ -270,20 +286,18 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
                 </Button>
               )}
               
-              {/* Only show share button for owners */}
               {isOwner && (
                 <Button variant="ghost" size="sm" onClick={onShare} className="p-1 h-6 w-6">
                   <Share2 className="h-3 w-3" />
                 </Button>
               )}
               
-              {/* Delete/Remove button with different icons and tooltips */}
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={onDelete} 
                 className="p-1 h-6 w-6 text-red-600"
-                title={isOwner ? "Delete item permanently" : "Remove from my shared items"}
+                title={isOwner ? t('nt_delete_permanently') : t('nt_remove_shared')}
               >
                 {isOwner ? (
                   <Trash2 className="h-3 w-3" />
