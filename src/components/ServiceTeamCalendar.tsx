@@ -819,7 +819,7 @@ const ServiceTeamCalendar: React.FC = () => {
               {assignTodos.map((todo, index) => (
                 <div key={index} className="flex gap-2">
                   <Input
-                    placeholder={`Todo item ${index + 1}...`}
+                    placeholder={t('svc_todo_item', { index: String(index + 1) })}
                     value={todo}
                     onChange={e => {
                       const updated = [...assignTodos];
