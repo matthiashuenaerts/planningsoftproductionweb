@@ -518,7 +518,7 @@ const ServiceInstallation: React.FC = () => {
                           <div className="flex items-center gap-3 text-muted-foreground">
                             <span className="font-mono text-xs w-12 text-right">{routeData.departureTime}</span>
                             <div className="w-6 h-6 rounded-full bg-green-500 text-white text-xs flex items-center justify-center font-bold shrink-0">S</div>
-                            <span className="truncate">Depart from {routeData.startPoint.address}</span>
+                            <span className="truncate">{(t('si_depart_from') || '').replace('{{address}}', routeData.startPoint.address)}</span>
                           </div>
                         )}
 
