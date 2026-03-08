@@ -217,13 +217,13 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
   })));
 
   return (
-    <div className="space-y-3">
-      <h2 className="text-xl font-semibold mb-4">Daily Timeline</h2>
+    <div className="space-y-2 sm:space-y-3">
+      <h2 className="text-base sm:text-xl font-semibold mb-2 sm:mb-4">{t('daily_timeline') || 'Daily Timeline'}</h2>
       
       {/* Timeline container with time markers */}
       <div className="relative">
         {/* Time line */}
-        <div className="absolute left-16 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+        <div className={`absolute ${isMobile ? 'left-10' : 'left-16'} top-0 bottom-0 w-0.5 bg-border`}></div>
         
         {sortedTasks.map((task, index) => {
           const duration = calculateDuration(task.start_time, task.end_time);
@@ -231,13 +231,13 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
           const timeProgress = calculateTimeProgress(task.start_time, task.end_time);
           
           return (
-            <div key={task.id} className="relative flex items-start mb-4">
+            <div key={task.id} className={`relative flex items-start ${isMobile ? 'mb-2.5' : 'mb-4'}`}>
               {/* Time marker */}
-              <div className="flex-shrink-0 w-14 text-right pr-4">
-                <div className="text-sm font-medium text-gray-600">
+              <div className={`flex-shrink-0 ${isMobile ? 'w-9' : 'w-14'} text-right pr-2 sm:pr-4`}>
+                <div className={`${isMobile ? 'text-[10px]' : 'text-sm'} font-medium text-muted-foreground`}>
                   {formatTime(task.start_time)}
                 </div>
-                <div className="text-xs text-gray-400">
+                <div className={`${isMobile ? 'text-[9px]' : 'text-xs'} text-muted-foreground/60`}>
                   {duration}
                 </div>
               </div>
