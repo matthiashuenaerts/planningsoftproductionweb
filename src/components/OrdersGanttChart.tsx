@@ -875,7 +875,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                     className="flex items-center cursor-pointer hover:bg-muted/50 sticky left-0 z-10 bg-card border-t transition-colors"
                     onClick={() => toggleTeam(team.id)}
                   >
-                    <div className="w-64 flex-shrink-0 px-4 py-3 font-medium flex items-center gap-2 border-r border-border">
+                    <div className={`${sideColClass} flex-shrink-0 ${isMobile ? 'px-2 py-2' : 'px-4 py-3'} font-medium flex items-center gap-2 border-r border-border`}>
                       <ChevronRight
                         className={cn(
                           'h-4 w-4 transition-transform text-muted-foreground',
