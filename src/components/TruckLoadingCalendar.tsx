@@ -437,7 +437,7 @@ const TruckLoadingCalendar = () => {
                               {format(new Date(effectiveLoadingDate), 'MMM d')}
                             </span>
                             <button
-                              onClick={() => adjustLoadingDate(assignment.project.id, 'right')}
+                              onClick={(e) => { e.stopPropagation(); adjustLoadingDate(assignment.project.id, 'right'); }}
                               className="text-xs text-blue-600 hover:text-blue-800"
                             >
                               →
