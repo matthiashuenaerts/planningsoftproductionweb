@@ -531,12 +531,12 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
+    <div className="space-y-4 min-w-0 w-full overflow-hidden">
+      <Card className="min-w-0 overflow-hidden">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle>Accessories</CardTitle>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <ProductSelector 
                 onProductSelect={handleProductSelect} 
                 onGroupSelect={handleGroupSelect}
@@ -832,25 +832,25 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
             </Card>
           )}
 
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="overflow-x-auto max-w-full">
+            <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">
+                  <TableHead className="w-10">
                     <Checkbox
                       checked={selectedAccessories.length > 0 && selectedAccessories.length === filteredAccessories.filter(acc => acc.status === 'to_order' && !acc.order_id).length}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
-                  <TableHead>Article</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Qty</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Order</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="w-[25%] min-w-[120px]">Article</TableHead>
+                  <TableHead className="w-[12%] min-w-[80px]">Code</TableHead>
+                  <TableHead className="w-[5%] min-w-[40px]">Qty</TableHead>
+                  <TableHead className="w-[10%] min-w-[70px]">Supplier</TableHead>
+                  <TableHead className="w-[8%] min-w-[60px]">Location</TableHead>
+                  <TableHead className="w-[10%] min-w-[70px]">Status</TableHead>
+                  <TableHead className="w-[10%] min-w-[70px]">Order</TableHead>
+                  <TableHead className="w-[8%] min-w-[60px]">Created</TableHead>
+                  <TableHead className="w-[8%] min-w-[60px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -863,11 +863,11 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                         disabled={accessory.status !== 'to_order' || !!accessory.order_id}
                       />
                     </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{accessory.article_name}</div>
+                    <TableCell className="max-w-0">
+                      <div className="truncate">
+                        <div className="font-medium truncate">{accessory.article_name}</div>
                         {accessory.article_description && (
-                          <div className="text-sm text-muted-foreground">{accessory.article_description}</div>
+                          <div className="text-sm text-muted-foreground truncate">{accessory.article_description}</div>
                         )}
                       </div>
                     </TableCell>
