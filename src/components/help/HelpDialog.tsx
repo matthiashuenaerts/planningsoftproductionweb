@@ -448,6 +448,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
                 description: '',
                 display_order: 0,
                 is_active: true,
+                is_global: false,
                 created_at: '',
                 updated_at: ''
               })}
