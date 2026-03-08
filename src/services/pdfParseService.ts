@@ -79,8 +79,8 @@ interface TableRow {
 // ─── REGEX PATTERNS ────────────────────────────────────────────────────────────
 
 const QUANTITY_PATTERNS = [
-  /(\d+(?:[,\.]\d+)?)\s*(st|stuk|stuks|pcs|pieces|x|qty|aantal|eenheden|mtr|m|lm|m2|m²|kg|ltr|rol|rollen|set|pak|doos|dozen|paar)\b/gi,
-  /(?:qty|quantity|aantal|hoeveelheid|besteld|geleverd)[:\s]*(\d+(?:[,\.]\d+)?)/gi,
+  /(\d+(?:[,\.]\d+)?)\s*(st|stuk|stuks|pcs|pieces|pièces|x|qty|aantal|eenheden|mtr|m|lm|m2|m²|kg|ltr|rol|rollen|set|pak|doos|dozen|paar|unité|unités)\b/gi,
+  /(?:qty|quantity|aantal|hoeveelheid|besteld|geleverd|quantité|qté)[:\s]*(\d+(?:[,\.]\d+)?)/gi,
   /^\s*(\d+(?:[,\.]\d+)?)\s+/,                                    // leading number
 ];
 
@@ -88,7 +88,7 @@ const ARTICLE_CODE_PATTERNS = [
   /\b([A-Z0-9]{2,}\/[^\s]{2,})\b/gi,                             // Codes with slashes
   /\b([A-Z]{1,5}[\-\.]\d{3,12}[A-Z0-9\-\.]*)\b/gi,              // XX-12345
   /\b(\d{6,13})\b/g,                                              // EAN / numeric (6-13 digits)
-  /(?:art[\.:]?\s*(?:nr|code|nummer)?|article|artikelcode|item\s*(?:no|nr))[:\s]*([A-Z0-9\-\.\/]+)/gi,
+  /(?:art[\.:]?\s*(?:nr|code|nummer)?|article|artikelcode|item\s*(?:no|nr)|réf(?:érence)?|n°\s*art)[:\s]*([A-Z0-9\-\.\/]+)/gi,
   /\b([A-Z0-9]{3,}\-[A-Z0-9\-]{2,})\b/g,                        // Code-with-dashes
   /\b([A-Z]{2}\d{2}[A-Z0-9]{2,})\b/g,                           // AB12CDE style
 ];
@@ -101,10 +101,10 @@ const PRICE_PATTERNS = [
   /EUR\s*(\d+(?:[,\.]\d{1,2}))/gi,                                // EUR 12,50
   /(\d{1,3}(?:\.\d{3})*(?:,\d{1,2}))\s*€/g,                      // 1.234,56 €
   /(\d+(?:,\d{1,2}))\s*€/g,                                       // 12,50 €
-  /(?:prijs|price|bedrag|amount|e\.?\s*prijs)[:\s]*€?\s*(\d{1,3}(?:[\.\s]\d{3})*(?:,\d{1,2}))/gi,
+  /(?:prijs|price|bedrag|amount|e\.?\s*prijs|prix|montant|p\.?\s*u\.?)[:\s]*€?\s*(\d{1,3}(?:[\.\s]\d{3})*(?:,\d{1,2}))/gi,
 ];
 
-const UNIT_PATTERNS = /\b(st|stuk|stuks|pcs|pieces|m|mtr|meter|m2|m²|m3|m³|kg|kilogram|ltr|liter|rol|rollen|set|pak|doos|dozen|paar|uur|hour)\b/gi;
+const UNIT_PATTERNS = /\b(st|stuk|stuks|pcs|pieces|pièces|m|mtr|meter|mètre|m2|m²|m3|m³|kg|kilogram|ltr|liter|litre|rol|rollen|rouleau|set|pak|doos|dozen|carton|paar|paire|uur|hour|heure|unité)\b/gi;
 
 // ─── TEXT EXTRACTION ──────────────────────────────────────────────────────────
 
@@ -200,13 +200,13 @@ function mergeMultiLineRows(rows: TableRow[], maxGap: number = 12): TableRow[] {
 }
 
 const COLUMN_HEADER_PATTERNS: Record<string, RegExp> = {
-  'article_code': /^(art|article|code|artikelcode|artikel\s*code|artnr|art[\.\s]*nr|item\s*(?:no|nr)?|sku|ean|product\s*code|bestelnr|materiaal|mat[\.\s]*nr)/i,
-  'description': /^(description|omschrijving|desc|naam|name|product|benaming|artikel\s*naam|item\s*desc|tekst|material)/i,
-  'quantity': /^(qty|quantity|aantal|hoeveelheid|stuks|pcs|aant|besteld|geleverd|hoeveelh|order\s*qty|aant\.?)/i,
-  'unit': /^(unit|eenheid|enh|uom|me|vpe)/i,
-  'price': /^(price|prijs|unit\s*price|eenheid|e\.?\s*prijs|stukprijs|netto\s*prijs|prijs\/eenheid|prijs\s*per|per\s*stuk)/i,
-  'total': /^(total|totaal|bedrag|amount|netto\s*bedrag|regel\s*bedrag|line\s*total|subtotaal)/i,
-  'discount': /^(discount|korting|remise|rabat)/i,
+  'article_code': /^(art|article|code|artikelcode|artikel\s*code|artnr|art[\.\s]*nr|item\s*(?:no|nr)?|sku|ean|product\s*code|bestelnr|materiaal|mat[\.\s]*nr|réf(?:érence)?|n°\s*art|code\s*art)/i,
+  'description': /^(description|omschrijving|desc|naam|name|product|benaming|artikel\s*naam|item\s*desc|tekst|material|désignation|libellé|intitulé)/i,
+  'quantity': /^(qty|quantity|aantal|hoeveelheid|stuks|pcs|aant|besteld|geleverd|hoeveelh|order\s*qty|aant\.?|quantité|qté|qte)/i,
+  'unit': /^(unit|eenheid|enh|uom|me|vpe|unité)/i,
+  'price': /^(price|prijs|unit\s*price|eenheid|e\.?\s*prijs|stukprijs|netto\s*prijs|prijs\/eenheid|prijs\s*per|per\s*stuk|prix|p\.?\s*u\.?|prix\s*unit)/i,
+  'total': /^(total|totaal|bedrag|amount|netto\s*bedrag|regel\s*bedrag|line\s*total|subtotaal|montant|total\s*ligne)/i,
+  'discount': /^(discount|korting|remise|rabat|réduction)/i,
 };
 
 function detectColumns(rows: TableRow[]): { columns: Map<string, number>; headerRowIndex: number } {
@@ -436,10 +436,10 @@ function extractAllDatesWithContext(text: string): Array<{ date: string; context
     
     const lower = line.toLowerCase();
     let label: string | undefined;
-    if (/order\s*(?:date|datum)|besteldatum|bestelingsdatum/i.test(lower)) label = 'orderDate';
-    else if (/delivery|levering|lever\s*datum|aflever|bezorg/i.test(lower)) label = 'deliveryDate';
-    else if (/invoice\s*date|factuur\s*datum/i.test(lower)) label = 'invoiceDate';
-    else if (/vervaldatum|due\s*date|betaal\s*datum/i.test(lower)) label = 'dueDate';
+    if (/order\s*(?:date|datum)|besteldatum|bestelingsdatum|date\s*(?:de\s*)?commande/i.test(lower)) label = 'orderDate';
+    else if (/delivery|levering|lever\s*datum|aflever|bezorg|livraison|date\s*(?:de\s*)?livraison/i.test(lower)) label = 'deliveryDate';
+    else if (/invoice\s*date|factuur\s*datum|date\s*(?:de\s*)?facture/i.test(lower)) label = 'invoiceDate';
+    else if (/vervaldatum|due\s*date|betaal\s*datum|date\s*d'échéance|échéance/i.test(lower)) label = 'dueDate';
     
     results.push({ date: parsed, context: line.trim(), label });
   }
@@ -449,9 +449,9 @@ function extractAllDatesWithContext(text: string): Array<{ date: string; context
 
 function extractSupplier(text: string): string | undefined {
   const patterns = [
-    /(?:supplier|leverancier|vendor|geleverd\s*door)[:\s]*([^\n]+)/gi,
-    /(?:from|van|afzender|verzender)[:\s]*([^\n]+)/gi,
-    /(?:company|bedrijf|firma)[:\s]*([^\n]+)/gi,
+    /(?:supplier|leverancier|vendor|geleverd\s*door|fournisseur|vendeur)[:\s]*([^\n]+)/gi,
+    /(?:from|van|afzender|verzender|de\s*la\s*part\s*de|expéditeur)[:\s]*([^\n]+)/gi,
+    /(?:company|bedrijf|firma|société|entreprise)[:\s]*([^\n]+)/gi,
     /(?:verkoper|seller)[:\s]*([^\n]+)/gi,
   ];
   for (const p of patterns) {
@@ -462,7 +462,7 @@ function extractSupplier(text: string): string | undefined {
   // Try company name in first lines
   const lines = text.split('\n').slice(0, 10);
   for (const line of lines) {
-    const cm = line.match(/^([A-Z][A-Za-z\s&]+(?:B\.?V\.?|N\.?V\.?|BV|NV|GmbH|Inc|Ltd|LLC|S\.?A\.?|BVBA)?)\s*$/);
+    const cm = line.match(/^([A-Z][A-Za-z\s&àâéèêëïîôùûüçÀÂÉÈÊËÏÎÔÙÛÜÇ]+(?:B\.?V\.?|N\.?V\.?|BV|NV|GmbH|Inc|Ltd|LLC|S\.?A\.?|BVBA|SAS|SARL|SPRL)?)\s*$/);
     if (cm && cm[1].trim().length > 3 && cm[1].trim().length < 60) return cm[1].trim();
   }
   return undefined;
@@ -470,11 +470,11 @@ function extractSupplier(text: string): string | undefined {
 
 function extractOrderNumber(text: string): string | undefined {
   const patterns = [
-    /(?:order\s*(?:no|nr|number|nummer)|bestelnummer|bestellnummer|bestelling)[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:order\s*(?:no|nr|number|nummer)|bestelnummer|bestellnummer|bestelling|n°\s*(?:de\s*)?commande|commande\s*n°)[:\s#]*([A-Z0-9\-\/]+)/gi,
     /(?:po|p\.o\.)\s*[:\s#]*([A-Z0-9\-\/]+)/gi,
-    /(?:reference|referentie|ref)\s*[:\s#]*([A-Z0-9\-\/]+)/gi,
-    /(?:document\s*(?:no|nr|nummer))[:\s#]*([A-Z0-9\-\/]+)/gi,
-    /(?:onze\s*ref|uw\s*ref|your\s*ref|our\s*ref)[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:reference|referentie|ref|référence|réf)[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:document\s*(?:no|nr|nummer|n°))[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:onze\s*ref|uw\s*ref|your\s*ref|our\s*ref|notre\s*réf|votre\s*réf)[:\s#]*([A-Z0-9\-\/]+)/gi,
   ];
   for (const p of patterns) {
     p.lastIndex = 0;
@@ -486,8 +486,8 @@ function extractOrderNumber(text: string): string | undefined {
 
 function extractInvoiceNumber(text: string): string | undefined {
   const patterns = [
-    /(?:invoice\s*(?:no|nr|number|nummer)|factuur\s*(?:no|nr|nummer)|factuurnummer)[:\s#]*([A-Z0-9\-\/]+)/gi,
-    /(?:bill\s*(?:no|nr))[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:invoice\s*(?:no|nr|number|nummer)|factuur\s*(?:no|nr|nummer)|factuurnummer|facture\s*(?:n°|no|nr)|n°\s*(?:de\s*)?facture)[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:bill\s*(?:no|nr)|bon\s*(?:de\s*)?commande)[:\s#]*([A-Z0-9\-\/]+)/gi,
   ];
   for (const p of patterns) {
     p.lastIndex = 0;
@@ -499,7 +499,7 @@ function extractInvoiceNumber(text: string): string | undefined {
 
 function extractCustomerNumber(text: string): string | undefined {
   const patterns = [
-    /(?:klant(?:en)?(?:\s*nr|nummer)|customer\s*(?:no|nr|number|id)|debiteurnummer|debiteur\s*(?:nr|nummer))[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:klant(?:en)?(?:\s*nr|nummer)|customer\s*(?:no|nr|number|id)|debiteurnummer|debiteur\s*(?:nr|nummer)|n°\s*client|client\s*(?:n°|no|nr))[:\s#]*([A-Z0-9\-\/]+)/gi,
   ];
   for (const p of patterns) {
     p.lastIndex = 0;
@@ -520,10 +520,10 @@ function extractTotals(text: string): { subtotal?: number; vatAmount?: number; v
   const result: ReturnType<typeof extractTotals> = {};
 
   // Subtotal
-  const subMatch = text.match(/(?:subtotaal|subtotal|netto\s*bedrag|net\s*amount)[:\s]*€?\s*([\d.,]+)/i);
+  const subMatch = text.match(/(?:subtotaal|subtotal|netto\s*bedrag|net\s*amount|sous[\-\s]?total|montant\s*h\.?t\.?)[:\s]*€?\s*([\d.,]+)/i);
   if (subMatch) result.subtotal = parseEuropeanNumber(subMatch[1]);
 
-  // VAT / BTW
+  // VAT / BTW / TVA
   const vatMatch = text.match(/(?:btw|vat|tva|mwst|tax)[:\s]*€?\s*([\d.,]+)/i);
   if (vatMatch) result.vatAmount = parseEuropeanNumber(vatMatch[1]);
   
@@ -531,16 +531,16 @@ function extractTotals(text: string): { subtotal?: number; vatAmount?: number; v
   if (vatPctMatch) result.vatPercentage = parseInt(vatPctMatch[1], 10);
 
   // Discount
-  const discMatch = text.match(/(?:korting|discount|remise|rabat)[:\s]*-?\s*€?\s*([\d.,]+)/i);
+  const discMatch = text.match(/(?:korting|discount|remise|rabat|réduction)[:\s]*-?\s*€?\s*([\d.,]+)/i);
   if (discMatch) result.discount = parseEuropeanNumber(discMatch[1]);
 
   // Shipping
-  const shipMatch = text.match(/(?:verzend(?:kosten)?|shipping|transport|bezorg(?:kosten)?|franco|vracht)[:\s]*€?\s*([\d.,]+)/i);
+  const shipMatch = text.match(/(?:verzend(?:kosten)?|shipping|transport|bezorg(?:kosten)?|franco|vracht|frais\s*(?:de\s*)?(?:port|livraison|expédition))[:\s]*€?\s*([\d.,]+)/i);
   if (shipMatch) result.shippingCost = parseEuropeanNumber(shipMatch[1]);
 
   // Grand total
   const totalPatterns = [
-    /(?:totaal\s*(?:bedrag|incl|inc)|total\s*(?:amount|incl)|grand\s*total|te\s*betalen|totaal\s*€)[:\s]*€?\s*([\d.,]+)/i,
+    /(?:totaal\s*(?:bedrag|incl|inc)|total\s*(?:amount|incl)|grand\s*total|te\s*betalen|totaal\s*€|total\s*t\.?t\.?c\.?|montant\s*t\.?t\.?c\.?|net\s*à\s*payer)[:\s]*€?\s*([\d.,]+)/i,
     /(?:^|\n)\s*(?:totaal|total)\s*€?\s*([\d.,]+)\s*(?:$|\n)/im,
   ];
   for (const p of totalPatterns) {
@@ -553,8 +553,8 @@ function extractTotals(text: string): { subtotal?: number; vatAmount?: number; v
 
 function extractPaymentTerms(text: string): string | undefined {
   const patterns = [
-    /(?:betaal(?:termijn|conditie|voorwaarden)|payment\s*(?:terms?|conditions?)|betalingsvoorwaarden)[:\s]*([^\n]+)/gi,
-    /(?:betaling\s*binnen|payment\s*within|net\s*)\s*(\d+)\s*(?:dagen|days)/gi,
+    /(?:betaal(?:termijn|conditie|voorwaarden)|payment\s*(?:terms?|conditions?)|betalingsvoorwaarden|conditions?\s*de\s*paiement|modalités?\s*de\s*paiement)[:\s]*([^\n]+)/gi,
+    /(?:betaling\s*binnen|payment\s*within|net\s*|paiement\s*(?:à|sous)\s*)\s*(\d+)\s*(?:dagen|days|jours)/gi,
   ];
   for (const p of patterns) {
     p.lastIndex = 0;
@@ -566,7 +566,7 @@ function extractPaymentTerms(text: string): string | undefined {
 
 function extractDeliveryAddress(text: string): string | undefined {
   const patterns = [
-    /(?:aflever\s*adres|delivery\s*address|bezorg\s*adres|ship\s*to|levering\s*aan)[:\s]*\n?((?:[^\n]+\n?){1,4})/gi,
+    /(?:aflever\s*adres|delivery\s*address|bezorg\s*adres|ship\s*to|levering\s*aan|adresse\s*(?:de\s*)?livraison|livrer\s*à)[:\s]*\n?((?:[^\n]+\n?){1,4})/gi,
   ];
   for (const p of patterns) {
     p.lastIndex = 0;
