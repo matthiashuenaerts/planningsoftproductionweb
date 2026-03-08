@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+// leaflet CSS is imported globally in index.css
 import {
   Dialog,
   DialogContent,
