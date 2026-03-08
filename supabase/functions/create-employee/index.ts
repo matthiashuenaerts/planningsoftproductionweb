@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { name, email, password, role, logistics, workstation, preferred_language } = await req.json();
+    const { name, email, password, role, logistics, workstation, preferred_language, isDeveloper } = await req.json();
 
     if (!name || !password) {
       return new Response(
