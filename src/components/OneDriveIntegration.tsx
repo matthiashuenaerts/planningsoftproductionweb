@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { oneDriveService, ProjectOneDriveConfig } from '@/services/oneDriveService';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/context/TenantContext';
 import { 
   ExternalLink, Folder, Link2, Unlink, RefreshCw, HelpCircle, 
   File, FileText, FileImage, FileVideo, FileAudio, ChevronRight,
