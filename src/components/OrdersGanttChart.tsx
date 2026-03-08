@@ -751,7 +751,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     const today = new Date();
     const todayIndex = dateRange.findIndex((date) => isSameDay(date, today));
     if (todayIndex === -1) return null;
-    return (todayIndex / dateRange.length) * 100;
+    // Center the line in the middle of today's column
+    return ((todayIndex + 0.5) / dateRange.length) * 100;
   }, [dateRange]);
 
   if (loading) {
