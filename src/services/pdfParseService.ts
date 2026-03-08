@@ -329,13 +329,21 @@ function extractTableData(rows: TableRow[], columnPositions: Map<string, number>
   const columns = Array.from(columnPositions.entries()).sort((a, b) => a[1] - b[1]);
   if (columns.length === 0) return result;
 
+  // Calculate adaptive max distance based on average column spacing
+  const colXValues = columns.map(c => c[1]).sort((a, b) => a - b);
+  let maxDistance = 150; // generous default
+  if (colXValues.length >= 2) {
+    const avgSpacing = (colXValues[colXValues.length - 1] - colXValues[0]) / (colXValues.length - 1);
+    maxDistance = Math.max(avgSpacing * 0.6, 80);
+  }
+
   const dataRows = rows.slice(headerRowIndex + 1);
 
   for (const row of dataRows) {
     const totalText = row.items.map(i => i.str).join('').trim();
     if (totalText.length < 2) continue;
-    // Stop at summary rows
-    if (/^(totaal|total|subtotal|sub\s*totaal|btw|vat|netto|bruto)\b/i.test(totalText)) break;
+    // Stop at summary rows (but not "subtotal" column values that are numbers)
+    if (/^(totaal|total|sub\s*totaal|btw|vat|netto|bruto)\b/i.test(totalText) && !/^\d/.test(totalText)) break;
 
     const record: Record<string, string> = {};
 
@@ -344,7 +352,7 @@ function extractTableData(rows: TableRow[], columnPositions: Map<string, number>
       let minDistance = Infinity;
       for (const [colName, colX] of columns) {
         const distance = Math.abs(item.x - colX);
-        if (distance < minDistance && distance < 120) {
+        if (distance < minDistance && distance < maxDistance) {
           minDistance = distance;
           bestColumn = colName;
         }
@@ -354,7 +362,7 @@ function extractTableData(rows: TableRow[], columnPositions: Map<string, number>
       }
     }
 
-    if (record['description'] || record['article_code']) {
+    if (record['description'] || record['article_code'] || record['ean']) {
       result.push(record);
     }
   }
