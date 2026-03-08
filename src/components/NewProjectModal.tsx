@@ -837,14 +837,17 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-1rem)] sm:w-[95vw] max-w-[700px] max-h-[85vh] sm:max-h-[90vh] p-3 sm:p-6 rounded-lg">
+      <DialogContent className={cn(
+        "max-h-[90vh] overflow-y-auto rounded-lg",
+        isMobile ? "w-[calc(100vw-1rem)] p-3" : "w-[95vw] max-w-[700px] p-6"
+      )}>
         <DialogHeader>
           <DialogTitle className="text-base sm:text-lg">{t('npm_create_new_project')}</DialogTitle>
         </DialogHeader>
         
-        <ScrollArea className="max-h-[65vh] sm:max-h-[70vh] pr-2 sm:pr-4">
+        <ScrollArea className={cn("pr-2", isMobile ? "max-h-[70vh]" : "max-h-[72vh] pr-4")}>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className={cn("mt-2", isMobile ? "space-y-3" : "space-y-4 mt-4")}>
               
               {/* Project Link ID + Sync Button - at the top */}
               <FormField
