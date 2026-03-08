@@ -6265,6 +6265,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      hash_password: { Args: { p_password: string }; Returns: string }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_developer: { Args: { p_user_id: string }; Returns: boolean }
       is_employee_on_holiday: {
