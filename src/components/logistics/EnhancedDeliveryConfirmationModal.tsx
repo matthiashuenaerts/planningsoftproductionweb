@@ -465,15 +465,15 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
         )}
 
         {currentStep === 'camera' && (
-          <div className="space-y-6">
+          <div className={isMobile ? 'space-y-3' : 'space-y-6'}>
             <div className="text-center">
-              <h3 className="text-lg font-semibold mb-2">{t('ed_take_photos')}</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className={`font-semibold ${isMobile ? 'text-sm mb-1' : 'text-lg mb-2'}`}>{t('ed_take_photos')}</h3>
+              <p className={`text-muted-foreground ${isMobile ? 'text-[11px]' : 'text-sm'}`}>
                 {t('ed_photos_description')}
               </p>
             </div>
 
-            <div className="space-y-4">
+            <div className={isMobile ? 'space-y-2' : 'space-y-4'}>
               <div className="relative bg-black rounded-lg overflow-hidden">
                 {stream ? (
                   <video
@@ -481,14 +481,14 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-60 sm:h-80 object-cover"
+                    className={`w-full object-cover ${isMobile ? 'h-48' : 'h-60 sm:h-80'}`}
                     style={{ background: '#000' }}
                   />
                 ) : (
-                  <div className="w-full h-60 sm:h-80 flex items-center justify-center text-white">
+                  <div className={`w-full flex items-center justify-center text-white ${isMobile ? 'h-48' : 'h-60 sm:h-80'}`}>
                     <div className="text-center">
-                      <Camera className="h-12 w-12 mx-auto mb-2" />
-                      <p>{t('ed_camera_not_started')}</p>
+                      <Camera className={`mx-auto mb-2 ${isMobile ? 'h-8 w-8' : 'h-12 w-12'}`} />
+                      <p className={isMobile ? 'text-xs' : ''}>{t('ed_camera_not_started')}</p>
                     </div>
                   </div>
                 )}
@@ -497,14 +497,14 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
               <div className="flex flex-wrap justify-center gap-2">
                 {!stream ? (
                   <Button onClick={startCamera} size="sm">
-                    <Camera className="h-4 w-4 mr-2" />
+                    <Camera className="h-4 w-4 mr-1" />
                     {t('ed_start_camera')}
                   </Button>
                 ) : (
                   <>
                     <Button onClick={captureImage} size="sm">
-                      <Camera className="h-4 w-4 mr-2" />
-                      {t('ed_capture_photo')}
+                      <Camera className="h-4 w-4 mr-1" />
+                      {isMobile ? t('ed_capture_photo') : t('ed_capture_photo')}
                     </Button>
                     <Button variant="outline" size="sm" onClick={switchCamera}>
                       {t('ed_switch_camera')}
@@ -515,20 +515,20 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
 
               {capturedImages.length > 0 && (
                 <div>
-                  <h4 className="font-medium mb-2">
+                  <h4 className={`font-medium mb-1.5 ${isMobile ? 'text-xs' : ''}`}>
                     {(t('ed_captured_images') || '').replace('{{count}}', String(capturedImages.length))}
                   </h4>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className={`grid gap-2 ${isMobile ? 'grid-cols-4' : 'grid-cols-3'}`}>
                     {capturedImages.map((image, index) => (
                       <div key={index} className="relative">
-                        <img src={image} alt={`Captured ${index + 1}`} className="w-full h-24 sm:h-32 object-cover rounded border" />
+                        <img src={image} alt={`Captured ${index + 1}`} className={`w-full object-cover rounded border ${isMobile ? 'h-16' : 'h-24 sm:h-32'}`} />
                         <Button
                           size="sm"
                           variant="destructive"
-                          className="absolute top-1 right-1 h-6 w-6 p-0"
+                          className="absolute top-0.5 right-0.5 h-5 w-5 p-0"
                           onClick={() => removeImage(index)}
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-2.5 w-2.5" />
                         </Button>
                       </div>
                     ))}
@@ -538,7 +538,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
             </div>
 
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setCurrentStep('items')}>
+              <Button variant="outline" onClick={() => setCurrentStep('items')} size={isMobile ? 'sm' : 'default'}>
                 {t('ed_back')}
               </Button>
               <Button
@@ -546,7 +546,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                 disabled={capturedImages.length === 0}
                 size="sm"
               >
-                <Upload className="h-4 w-4 mr-2" />
+                <Upload className="h-4 w-4 mr-1" />
                 {t('ed_confirm_delivery_btn')}
               </Button>
             </div>
