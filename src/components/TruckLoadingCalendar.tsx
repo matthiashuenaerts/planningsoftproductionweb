@@ -476,7 +476,7 @@ const TruckLoadingCalendar = () => {
                         <p className="text-sm text-gray-600">{assignment.project.client}</p>
                       </div>
                       <div className="text-xs text-gray-500 text-right">
-                        <div>Install:</div>
+                        <div>{t('truck_install')}:</div>
                         <div>{format(new Date(assignment.project.installation_date), 'MMM d')}</div>
                       </div>
                     </div>
