@@ -113,12 +113,17 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
     }
   });
 
+  const toISOWithTimezone = (localDateTimeStr: string): string => {
+    const date = new Date(localDateTimeStr);
+    return date.toISOString();
+  };
+
   const createTimeRegistrationMutation = useMutation({
     mutationFn: async (data: any) => {
       const registrationData: any = {
         employee_id: data.employee_id,
-        start_time: data.start_time,
-        end_time: data.end_time,
+        start_time: toISOWithTimezone(data.start_time),
+        end_time: data.end_time ? toISOWithTimezone(data.end_time) : null,
         duration_minutes: data.duration_minutes ? parseInt(data.duration_minutes) : null,
         is_active: false
       };
