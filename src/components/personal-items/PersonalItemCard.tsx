@@ -93,9 +93,11 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
   };
 
   const getSignedImageUrl = async (filePath: string) => {
+    const storagePath = extractStoragePath('personal-attachments', filePath);
+    if (!storagePath) return '';
     const { data, error } = await supabase.storage
       .from('personal-attachments')
-      .createSignedUrl(filePath, 3600);
+      .createSignedUrl(storagePath, 3600);
     if (error) {
       console.error('Error creating signed URL:', error);
       return '';
