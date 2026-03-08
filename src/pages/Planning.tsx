@@ -1825,6 +1825,13 @@ const Planning = () => {
     }
   };
 
+  const getScheduleItemColor = (item: any) => {
+    const status = item.task?.status;
+    if (status === 'IN_PROGRESS') return 'bg-blue-100 text-blue-800 border-blue-400';
+    if (status === 'HOLD') return 'bg-purple-100 text-purple-800 border-purple-400';
+    return getPriorityColor(item.task?.priority || '');
+  };
+
   const formatTime = (timeStr: string | Date) => {
     return format(new Date(timeStr), 'HH:mm');
   };
@@ -2450,7 +2457,7 @@ const Planning = () => {
                                       >
                                         <div className={cn(
                                             "relative h-full overflow-hidden rounded border p-2",
-                                            getPriorityColor(item.task?.priority || '')
+                                            getScheduleItemColor(item)
                                           )}>
                                           <div className="flex justify-between h-full">
                                             <div className="flex-1 pr-2 overflow-hidden">
