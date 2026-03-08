@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download, Cog, Wrench, Hammer, Scissors, PaintBucket, Truck, Drill, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download, Cog, Wrench, Hammer, Scissors, PaintBucket, Truck, Drill, ChevronDown, ChevronUp, HeadphonesIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, taskService, Project, Task } from '@/services/dataService';
 import { workstationService, Workstation } from '@/services/workstationService';
@@ -18,6 +18,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
+import AfterSalesServiceDialog from '@/components/AfterSalesServiceDialog';
 
 const Projects = () => {
   const navigate = useNavigate();
@@ -37,6 +38,7 @@ const Projects = () => {
   const [projectProgress, setProjectProgress] = useState<Record<string, { earliestIncomplete: string | null, farthestTodo: string | null }>>({});
   const isAdmin = ['admin', 'teamleader', 'preparater', 'manager'].includes(currentEmployee?.role);
   const { tenant } = useTenant();
+  const [afterSalesProject, setAfterSalesProject] = useState<{ id: string; name: string } | null>(null);
 
 
   useEffect(() => {
@@ -448,8 +450,15 @@ const Projects = () => {
                                   <Package className="mr-2 h-4 w-4" />
                                   {t('orders')}
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onClick={e => {
+                                  e.stopPropagation();
+                                  setAfterSalesProject({ id: project.id, name: project.name });
+                                }}>
+                                  <HeadphonesIcon className="mr-2 h-4 w-4" />
+                                  After Sales Service
+                                </DropdownMenuItem>
                                 <DropdownMenuItem 
-                                  className="text-red-600 focus:text-red-600" 
+                                  className="text-destructive focus:text-destructive" 
                                   onClick={e => {
                                     e.stopPropagation();
                                     setProjectToDelete(project.id);
@@ -556,6 +565,13 @@ const Projects = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AfterSalesServiceDialog
+        isOpen={!!afterSalesProject}
+        onClose={() => setAfterSalesProject(null)}
+        projectId={afterSalesProject?.id || ''}
+        projectName={afterSalesProject?.name || ''}
+      />
     </div>
   );
 };
