@@ -463,7 +463,7 @@ const ServiceInstallation: React.FC = () => {
                 )}
                 <Badge variant="outline" className="gap-1">
                   <Clock className="h-3 w-3" />
-                  Service: {totalServiceHours.toFixed(1)}h
+                  {t('si_service')}: {totalServiceHours.toFixed(1)}h
                 </Badge>
                 {routeData.totalDrivingMinutes != null && (
                   <Badge variant="outline" className="gap-1">
