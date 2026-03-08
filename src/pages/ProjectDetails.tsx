@@ -1208,37 +1208,35 @@ const ProjectDetails = () => {
               {partsLists.length > 0 ? <div className="space-y-4">
                   {/* Parts List Management Header */}
                   <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="flex items-center gap-2">
-                          <Package className="h-5 w-5" />
-                          Parts List - {partsLists[0].file_name}
+                    <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+                          <Package className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                          <span className="truncate">{partsLists[0].file_name}</span>
                         </CardTitle>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleDeletePartsList(partsLists[0].id)} className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                            Delete
-                          </Button>
-                        </div>
+                        <Button variant="outline" size="sm" onClick={() => handleDeletePartsList(partsLists[0].id)} className="text-destructive hover:text-destructive h-7 sm:h-8 text-xs self-end sm:self-auto">
+                          <Trash2 className="h-3.5 w-3.5 mr-1" />
+                          Delete
+                        </Button>
                       </div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="flex gap-4 text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-gray-50 border border-gray-200 rounded"></div>
-                          <span>Unprocessed: {getStatusCounts().none}</span>
+                    <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6 pt-0">
+                      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
+                        <div className="flex items-center gap-1.5 p-1.5 sm:p-0 rounded-md bg-muted/50 sm:bg-transparent">
+                          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-muted border border-border rounded flex-shrink-0"></div>
+                          <span className="text-muted-foreground">Unprocessed: <span className="font-semibold text-foreground">{getStatusCounts().none}</span></span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
-                          <span>Complete: {getStatusCounts().green}</span>
+                        <div className="flex items-center gap-1.5 p-1.5 sm:p-0 rounded-md bg-green-500/5 sm:bg-transparent">
+                          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-green-100 border border-green-300 rounded flex-shrink-0"></div>
+                          <span className="text-muted-foreground">Complete: <span className="font-semibold text-green-700">{getStatusCounts().green}</span></span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-orange-100 border border-orange-300 rounded"></div>
-                          <span>In Progress: {getStatusCounts().orange}</span>
+                        <div className="flex items-center gap-1.5 p-1.5 sm:p-0 rounded-md bg-orange-500/5 sm:bg-transparent">
+                          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-orange-100 border border-orange-300 rounded flex-shrink-0"></div>
+                          <span className="text-muted-foreground">In Progress: <span className="font-semibold text-orange-700">{getStatusCounts().orange}</span></span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
-                          <span>Issues: {getStatusCounts().red}</span>
+                        <div className="flex items-center gap-1.5 p-1.5 sm:p-0 rounded-md bg-red-500/5 sm:bg-transparent">
+                          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-100 border border-red-300 rounded flex-shrink-0"></div>
+                          <span className="text-muted-foreground">Issues: <span className="font-semibold text-red-700">{getStatusCounts().red}</span></span>
                         </div>
                       </div>
                     </CardContent>
