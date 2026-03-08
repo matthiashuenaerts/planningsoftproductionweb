@@ -1115,8 +1115,9 @@ const ProductsSettings: React.FC = () => {
                   <TableRow key={group.id}>
                     <TableCell>
                       {group.image_path ? (
-                        <img
-                          src={getImageUrl(group.image_path) || ''}
+                        <SignedStorageImage
+                          bucket="product-images"
+                          path={group.image_path}
                           alt={group.name}
                           className="h-10 w-10 object-cover rounded"
                         />
