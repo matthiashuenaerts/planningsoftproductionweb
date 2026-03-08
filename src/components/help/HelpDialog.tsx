@@ -146,7 +146,8 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
       name: formData.get('name') as string,
       description: formData.get('description') as string,
       display_order: parseInt(formData.get('display_order') as string) || 0,
-      is_active: formData.get('is_active') === 'on'
+      is_active: formData.get('is_active') === 'on',
+      is_global: false
     };
 
     try {
