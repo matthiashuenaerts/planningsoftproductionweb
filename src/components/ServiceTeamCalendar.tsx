@@ -257,7 +257,7 @@ const ServiceTeamCalendar: React.FC = () => {
       const geocodedProjects = await Promise.all(
         dayProjects.map(async (p) => {
           const addr = getProjectAddress(p);
-          const coords = addr !== 'No address' ? await geocodeAddress(addr) : null;
+          const coords = addr !== t('svc_no_address') ? await geocodeAddress(addr) : null;
           return { ...p, coords, fullAddress: addr };
         })
       );
