@@ -284,14 +284,19 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
       
       let workstationDbId = workstationId;
       if (!workstationDbId && actualWorkstationName) {
-        const { data: workstationData, error: workstationError } = await supabase
+        let query = supabase
           .from('workstations')
           .select('id')
-          .eq('name', actualWorkstationName)
-          .single();
+          .eq('name', actualWorkstationName);
+        if (tenant?.id) {
+          query = query.eq('tenant_id', tenant.id);
+        }
+        const { data: workstationData, error: workstationError } = await query.maybeSingle();
         
         if (workstationError) throw workstationError;
-        workstationDbId = workstationData.id;
+        if (workstationData) {
+          workstationDbId = workstationData.id;
+        }
       }
       
       let allTasks = [...tasksWithProjectInfo];
