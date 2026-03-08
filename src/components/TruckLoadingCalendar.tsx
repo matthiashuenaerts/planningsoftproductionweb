@@ -428,7 +428,7 @@ const TruckLoadingCalendar = () => {
                           </div>
                           <div className="flex items-center justify-between mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                              onClick={() => adjustLoadingDate(assignment.project.id, 'left')}
+                              onClick={(e) => { e.stopPropagation(); adjustLoadingDate(assignment.project.id, 'left'); }}
                               className="text-xs text-blue-600 hover:text-blue-800"
                             >
                               ←
