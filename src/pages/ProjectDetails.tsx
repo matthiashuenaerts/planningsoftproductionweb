@@ -1530,7 +1530,7 @@ const ProjectDetails = () => {
                                   {orderItems[order.id].map((item: any) => <div key={item.id} className={cn("flex justify-between items-start sm:items-center bg-white/80 backdrop-blur-sm rounded-md p-2 shadow-sm border gap-2", order.status === 'delivered' ? 'border-green-100' : order.status === 'pending' ? 'border-orange-100' : order.status === 'delayed' ? 'border-red-100' : order.status === 'canceled' ? 'border-gray-100' : 'border-blue-100')}>
                                       <div className="flex-1 min-w-0">
                                         <span className="font-semibold text-xs sm:text-sm text-gray-800 line-clamp-2">{item.description}</span>
-                                        {item.article_code && <div className={cn("text-xs font-medium mt-0.5", order.status === 'delivered' ? 'text-green-700' : order.status === 'pending' ? 'text-orange-700' : order.status === 'delayed' ? 'text-red-700' : order.status === 'canceled' ? 'text-gray-700' : 'text-blue-700')}>
+                                        {item.article_code && <div className={cn("text-[10px] sm:text-xs font-medium mt-0.5", order.status === 'delivered' ? 'text-green-700' : order.status === 'pending' ? 'text-orange-700' : order.status === 'delayed' ? 'text-red-700' : order.status === 'canceled' ? 'text-gray-700' : 'text-blue-700')}>
                                             Article: {item.article_code}
                                           </div>}
                                         {order.status === 'delivered' && item.stock_location && <div className="text-xs font-semibold text-green-800 mt-0.5 flex items-center gap-1">
