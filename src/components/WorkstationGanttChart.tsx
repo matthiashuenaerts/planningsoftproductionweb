@@ -793,10 +793,10 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
             }}
           >
             <div 
-              className="sticky left-0 z-20 bg-muted border-r flex items-center justify-center font-medium"
+              className={cn("sticky left-0 z-20 bg-muted border-r flex items-center justify-center font-medium", isMobile && "text-[10px] px-1")}
               style={{ width: workstationLabelWidth, minWidth: workstationLabelWidth }}
             >
-              {format(selectedDate, 'EEEE d MMMM', { locale: nl })}
+              {format(selectedDate, isMobile ? 'EEE d MMM' : 'EEEE d MMMM', { locale: nl })}
             </div>
             <div className="flex">
               {timeline.map((t, i) => (
