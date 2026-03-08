@@ -476,7 +476,7 @@ const Login: React.FC = () => {
           </CardHeader>
 
           <form onSubmit={handleLogin}>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
               <div className="space-y-2">
                 <Label
                   htmlFor="name"
