@@ -211,7 +211,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
     error: queryError,
     refetch: loadTasks
   } = useQuery<ExtendedTask[], Error>({
-    queryKey: ['workstationTasks', actualWorkstationName],
+    queryKey: ['workstationTasks', actualWorkstationName, tenant?.id],
     queryFn: async () => {
       if (!actualWorkstationName) return [];
       
