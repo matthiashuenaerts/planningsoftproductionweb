@@ -252,7 +252,7 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
       {/* Edit Dialog */}
       {selectedOrder && (
         <Dialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open) setSelectedOrder(null); setIsEditDialogOpen(open); }}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogContent className={`max-h-[90vh] overflow-auto ${isMobile ? 'max-w-[calc(100vw-2rem)] w-[calc(100vw-2rem)] p-4' : 'max-w-4xl'}`}>
             <DialogHeader>
               <DialogTitle>{t('edit_rush_order')}</DialogTitle>
               <DialogDescription>
