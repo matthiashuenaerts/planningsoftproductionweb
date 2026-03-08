@@ -387,21 +387,21 @@ const Orders: React.FC = () => {
       {isMobile && <Navbar />}
       <div className={`w-full ${isMobile ? 'p-3 pt-16' : 'p-6 ml-64'} overflow-x-hidden`}>
         <div className="w-full max-w-full">
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-3">
-            <h1 className="text-xl md:text-2xl font-bold">{t('ord_all_orders')}</h1>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative">
+          <div className={`flex flex-col gap-2 mb-4 ${isMobile ? '' : 'md:flex-row md:items-center md:justify-between md:gap-3'}`}>
+            <h1 className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{t('ord_all_orders')}</h1>
+            <div className={`flex gap-2 ${isMobile ? 'flex-col' : 'flex-row'}`}>
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                   placeholder={t('ord_search_placeholder')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 w-full"
+                  className={`pl-9 w-full ${isMobile ? 'h-9 text-sm' : ''}`}
                 />
               </div>
-              <Button onClick={handleImportStockOrder} variant="outline" size={isMobile ? "sm" : "default"}>
-                <Package className="mr-2 h-4 w-4" />
-                {t('ord_import_stock')}
+              <Button onClick={handleImportStockOrder} variant="outline" size={isMobile ? "sm" : "default"} className={isMobile ? "h-9 text-xs" : ""}>
+                <Package className={`mr-1.5 ${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
+                {isMobile ? 'STOCK Import' : t('ord_import_stock')}
               </Button>
             </div>
           </div>
