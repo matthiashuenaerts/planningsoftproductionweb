@@ -316,7 +316,10 @@ const ServiceTeamCalendar: React.FC = () => {
         }
       }));
 
-      toast({ title: 'Route Optimized', description: `Optimized route for ${orderedProjects.length} stops based on real road distances` });
+      const warningMsg = unrecognizedAddresses.length > 0 
+        ? ` (${unrecognizedAddresses.length} address(es) not recognized)` 
+        : '';
+      toast({ title: 'Route Optimized', description: `Optimized route for ${orderedProjects.length} stops with return home${warningMsg}` });
       loadData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
