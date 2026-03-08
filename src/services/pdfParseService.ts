@@ -201,13 +201,15 @@ function mergeMultiLineRows(rows: TableRow[], maxGap: number = 12): TableRow[] {
 }
 
 const COLUMN_HEADER_PATTERNS: Record<string, RegExp> = {
-  'article_code': /^(art|article|code|artikelcode|artikel\s*code|artnr|art[\.\s]*nr|item\s*(?:no|nr)?|sku|ean|product\s*code|bestelnr|materiaal|mat[\.\s]*nr|réf(?:érence)?|n°\s*art|code\s*art)/i,
-  'description': /^(description|omschrijving|desc|naam|name|product|benaming|artikel\s*naam|item\s*desc|tekst|material|désignation|libellé|intitulé)/i,
-  'quantity': /^(qty|quantity|aantal|hoeveelheid|stuks|pcs|aant|besteld|geleverd|hoeveelh|order\s*qty|aant\.?|quantité|qté|qte)/i,
-  'unit': /^(unit|eenheid|enh|uom|me|vpe|unité)/i,
-  'price': /^(price|prijs|unit\s*price|eenheid|e\.?\s*prijs|stukprijs|netto\s*prijs|prijs\/eenheid|prijs\s*per|per\s*stuk|prix|p\.?\s*u\.?|prix\s*unit)/i,
-  'total': /^(total|totaal|bedrag|amount|netto\s*bedrag|regel\s*bedrag|line\s*total|subtotaal|montant|total\s*ligne)/i,
-  'discount': /^(discount|korting|remise|rabat|réduction)/i,
+  'ean': /^(ean|ean[\-\s]*code|barcode|gtin|upc)\b/i,
+  'article_code': /^(art|article|code|artikelcode|artikel\s*code|artnr|art[\.\s]*nr|item\s*(?:no|nr)?|sku|product\s*code|bestelnr|materiaal|mat[\.\s]*nr|réf(?:érence)?|n°\s*art|code\s*art)\b/i,
+  'description': /^(description|omschrijving|desc|naam|name|product|benaming|artikel\s*naam|item\s*desc|tekst|material|désignation|libellé|intitulé)\b/i,
+  'quantity': /^(qty|quantity|aantal|hoeveelheid|stuks|pcs|aant|besteld|geleverd|hoeveelh|order\s*qty|aant\.?|quantité|qté|qte)\b/i,
+  'unit': /^(unit|eenheid|enh|uom|me|vpe|unité)\b/i,
+  'price': /^(price|prijs|unit\s*price|eenheid|e\.?\s*prijs|stukprijs|netto\s*prijs|prijs\/eenheid|prijs\s*per|per\s*stuk|prix|p\.?\s*u\.?|prix\s*unit)\b/i,
+  'total': /^(total|totaal|bedrag|amount|netto\s*bedrag|regel\s*bedrag|line\s*total|montant|total\s*ligne)\b/i,
+  'subtotal': /^(subtotal|subtotaal|sous[\-\s]?total)\b/i,
+  'discount': /^(discount|korting|remise|rabat|réduction)\b/i,
 };
 
 function detectColumns(rows: TableRow[]): { columns: Map<string, number>; headerRowIndex: number } {
