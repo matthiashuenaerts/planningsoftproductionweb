@@ -603,7 +603,7 @@ const TaskList: React.FC<TaskListProps> = ({
                         variant="outline"
                         onClick={() => handleStatusChange(task, 'TODO')}
                       >
-                        Back to Todo
+                        {t('tl_back_to_todo')}
                       </Button>
                     </div>
                   )}
