@@ -672,7 +672,7 @@ const ServiceTeamCalendar: React.FC = () => {
                                 className="h-5 w-14 text-xs"
                                 onClick={(e) => e.stopPropagation()}
                               />
-                              <span className="text-muted-foreground">hrs</span>
+                              <span className="text-muted-foreground">{t('svc_hrs')}</span>
                             </div>
                           </div>
                         ))}
