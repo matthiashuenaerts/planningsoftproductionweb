@@ -322,7 +322,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                       .select('title')
                       .eq('id', taskLink.rush_order_id)
                       .neq('status', 'completed')
-                      .single();
+                      .maybeSingle();
                     
                     if (rushOrderError) {
                       return null;
